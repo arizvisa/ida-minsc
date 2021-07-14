@@ -120,6 +120,12 @@ class netnode(object):
         altfirst = _ida_netnode.netnode_altfirst
         altnext = _ida_netnode.netnode_altnext
 
+    # default tags (older versions of IDA use a char which we'll use as well)
+    alttag = idaapi.atag
+    suptag = idaapi.stag
+    hashtag = idaapi.htag
+    chartag = b'd' if idaapi.__version__ < 7.0 else 0x64    # found while reversing ida's shared library
+
 class utils(object):
     """
     This namespace provides utilities for interacting with a netnode and each
@@ -171,116 +177,116 @@ class utils(object):
         return
 
     @classmethod
-    def valfiter(cls, node, first, last, next, val):
-        '''Iterate through all of the values for a netnode in order, and yield the (item, value) for each item that was found.'''
-        start, end = first(node), last(node)
+    def valfiter(cls, node, first, last, next, val, tag):
+        '''Iterate through all of the values for a netnode in order, and yield the (item, value) for each item that was found for the given tag.'''
+        start, end = first(node, tag), last(node, tag)
         if start in {None, idaapi.BADADDR}: return
-        yield start, val(node, start)
+        yield start, val(node, start, tag)
         while start != end:
-            start = next(node, start)
-            yield start, val(node, start)
+            start = next(node, start, tag)
+            yield start, val(node, start, tag)
         return
 
     @classmethod
-    def valriter(cls, node, first, last, prev, val):
-        '''Iterate through all of the values for a netnode in reverse order, and yield the (item, value) for each item that was found.'''
-        start, end = first(node), last(node)
+    def valriter(cls, node, first, last, prev, val, tag):
+        '''Iterate through all of the values for a netnode in reverse order, and yield the (item, value) for each item that was found for the given tag.'''
+        start, end = first(node, tag), last(node, tag)
         if end in {None, idaapi.BADADDR}: return
-        yield end, val(node, end)
+        yield end, val(node, end, tag)
         while end != start:
-            end = prev(node, end)
-            yield end, val(node, end)
+            end = prev(node, end, tag)
+            yield end, val(node, end, tag)
         return
 
     @classmethod
-    def hfiter(cls, node, first, last, next, val):
-        '''Iterate through all of the hash values for a netnode in order, and yield the (item, value) for each item that was found.'''
-        start, end = first(node), last(node)
+    def hfiter(cls, node, first, last, next, val, tag):
+        '''Iterate through all of the hash values for a netnode in order, and yield the (item, value) for each item that was found for the given tag.'''
+        start, end = first(node, tag), last(node, tag)
 
         # If the start key is None, and it's the same as the end key, then we
         # need to verify that there's no value stored for the empty key. If
         # there's no value for the empty key, then we can be sure that there's
         # no keys to iterate through and thus we can leave.
-        if start is None and start == end and val(node, start or '') is None:
+        if start is None and start == end and val(node, start or '', tag) is None:
             return
 
         # Otherwise we need to start at the first item and continue fetching
         # the next key until we end up at the last one.
-        yield start or '', val(node, start or '')
+        yield start or '', val(node, start or '', tag)
         while start != end:
-            start = next(node, start or '')
-            yield start or '', val(node, start or '')
+            start = next(node, start or '', tag)
+            yield start or '', val(node, start or '', tag)
         return
 
     @classmethod
-    def hriter(cls, node, first, last, prev, val):
-        '''Iterate through all of the hash values for a netnode in reverse order, and yield the (item, value) for each item that was found.'''
-        start, end = first(node), last(node)
+    def hriter(cls, node, first, last, prev, val, tag):
+        '''Iterate through all of the hash values for a netnode in reverse order, and yield the (item, value) for each item that was found for the given tag.'''
+        start, end = first(node, tag), last(node, tag)
 
         # If the end key is None, and it's the same as the start key, then we
         # need to verify that there's no value stored for the empty key. If
         # there's no value for the empty key, then we can be sure that there's
         # no keys to iterate through and thus we can leave.
-        if end is None and start == end and val(node, end or '') is None:
+        if end is None and start == end and val(node, end or '', tag) is None:
             return
 
         # Otherwise we need to start at the last item and continue fetching the
         # previous key until we end up at the first one.
-        yield end or '', val(node, end or '')
+        yield end or '', val(node, end or '', tag)
         while end != start:
-            end = prev(node, end or '')
-            yield end or '', val(node, end or '')
+            end = prev(node, end or '', tag)
+            yield end or '', val(node, end or '', tag)
         return
 
     @classmethod
-    def falt(cls, node):
+    def falt(cls, node, tag=netnode.alttag):
         '''Iterate through each "altval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, netnode.altfirst, netnode.altlast, netnode.altnext, netnode.altval):
+        for item in cls.valfiter(node, netnode.altfirst, netnode.altlast, netnode.altnext, netnode.altval, tag=tag):
             yield item
         return
     @classmethod
-    def ralt(cls, node):
+    def ralt(cls, node, tag=netnode.alttag):
         '''Iterate through each "altval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.altfirst, netnode.altlast, netnode.altprev, netnode.altval):
+        for item in cls.valriter(node, netnode.altfirst, netnode.altlast, netnode.altprev, netnode.altval, tag=tag):
             yield item
         return
 
     @classmethod
-    def fsup(cls, node):
+    def fsup(cls, node, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, netnode.supval):
+        for item in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, netnode.supval, tag=tag):
             yield item
         return
     @classmethod
-    def rsup(cls, node):
+    def rsup(cls, node, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.supfirst, netnode.suplast, netnode.supprev, netnode.supval):
+        for item in cls.valriter(node, netnode.supfirst, netnode.suplast, netnode.supprev, netnode.supval, tag=tag):
             yield item
         return
 
     @classmethod
-    def fhash(cls, node):
+    def fhash(cls, node, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.hfiter(node, netnode.hashfirst, netnode.hashlast, netnode.hashnext, netnode.hashval):
+        for item in cls.hfiter(node, netnode.hashfirst, netnode.hashlast, netnode.hashnext, netnode.hashval, tag=tag):
             yield item
         return
     @classmethod
-    def rhash(cls, node):
+    def rhash(cls, node, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
-        for item in cls.hriter(node, netnode.hashfirst, netnode.hashlast, netnode.hashprev, netnode.hashval):
+        for item in cls.hriter(node, netnode.hashfirst, netnode.hashlast, netnode.hashprev, netnode.hashval, tag=tag):
             yield item
         return
 
     @classmethod
-    def fchar(cls, node):
+    def fchar(cls, node, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, netnode.charval):
+        for item in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, netnode.charval, tag=tag):
             yield item
         return
     @classmethod
-    def rchar(cls, node):
+    def rchar(cls, node, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.charfirst, netnode.charlast, netnode.charprev, netnode.charval):
+        for item in cls.valriter(node, netnode.charfirst, netnode.charlast, netnode.charprev, netnode.charval, tag=tag):
             yield item
         return
 
@@ -478,49 +484,49 @@ class alt(object):
     """
 
     @classmethod
-    def has(cls, nodeidx, index):
+    def has(cls, nodeidx, index, tag=None):
         '''Return whether the netnode identified by `nodeidx` has an "altval" for the specified `index`.'''
-        return any(index == idx for idx, item in cls.fiter(nodeidx))
+        return any(index == idx for idx, item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
-    def get(cls, nodeidx, index):
+    def get(cls, nodeidx, index, tag=None):
         '''Return the integer at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.altval(node, index)
+        return netnode.altval(node, index, tag or netnode.alttag)
 
     @classmethod
-    def set(cls, nodeidx, index, value):
+    def set(cls, nodeidx, index, value, tag=None):
         '''Assign the integer `value` at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.altset(node, index, value)
+        return netnode.altset(node, index, value, tag or netnode.alttag)
 
     @classmethod
-    def remove(cls, nodeidx, index):
+    def remove(cls, nodeidx, index, tag=None):
         '''Remove the integer from the specified `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.altdel(node, index)
+        return netnode.altdel(node, index, tag or netnode.alttag)
 
     @classmethod
-    def fiter(cls, nodeidx):
+    def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, value in utils.falt(node):
+        for index, value in utils.falt(node, tag=tag or netnode.alttag):
             yield index, value
         return
 
     @classmethod
-    def riter(cls, nodeidx):
+    def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, value in utils.ralt(node):
+        for index, value in utils.ralt(node, tag=tag or netnode.alttag):
             yield index, value
         return
 
     @classmethod
-    def repr(cls, nodeidx):
+    def repr(cls, nodeidx, tag=None):
         '''Display the "altval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
-        for index, value in cls.fiter(nodeidx):
+        for index, value in cls.fiter(nodeidx, tag=tag):
             res.append("{0:x} : {1:#x} ({1:d})".format(index, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any altvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
@@ -537,59 +543,59 @@ class sup(object):
     MAX_SIZE = 0x400
 
     @classmethod
-    def has(cls, nodeidx, index):
+    def has(cls, nodeidx, index, tag=None):
         '''Return whether the netnode identified by `nodeidx` has a "supval" for the specified `index`.'''
-        return any(index == item for item in cls.fiter(nodeidx))
+        return any(index == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
-    def get(cls, nodeidx, index, type=None):
+    def get(cls, nodeidx, index, type=None, tag=None):
         '''Return the value at the `index` of the "supval" array belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
         node = netnode.get(nodeidx)
         if type in {None}:
-            return netnode.supval(node, index)
+            return netnode.supval(node, index, tag or netnode.suptag)
         elif issubclass(type, memoryview):
-            res = netnode.supval(node, index)
+            res = netnode.supval(node, index, tag or netnode.suptag)
             return res and memoryview(res)
         elif issubclass(type, bytes):
-            return netnode.supstr(node, index)
+            return netnode.supstr(node, index, tag or netnode.suptag)
         elif issubclass(type, six.string_types):
-            return netnode.supstr(node, index)
+            return netnode.supstr(node, index, tag or netnode.suptag)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, index, type, type))
 
     @classmethod
-    def set(cls, nodeidx, index, value):
+    def set(cls, nodeidx, index, value, tag=None):
         '''Assign the provided `value` to the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.supset(node, index, value.tobytes() if isinstance(value, memoryview) else value)
+        return netnode.supset(node, index, value.tobytes() if isinstance(value, memoryview) else value, tag or netnode.suptag)
 
     @classmethod
-    def remove(cls, nodeidx, index):
+    def remove(cls, nodeidx, index, tag=None):
         '''Remove the value at the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.supdel(node, index)
+        return netnode.supdel(node, index, tag or netnode.suptag)
 
     @classmethod
-    def fiter(cls, nodeidx):
+    def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, _ in utils.fsup(node):
+        for index, _ in utils.fsup(node, tag=tag or netnode.suptag):
             yield index
         return
 
     @classmethod
-    def riter(cls, nodeidx):
+    def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, _ in utils.rsup(node):
+        for index, _ in utils.rsup(node, tag=tag or netnode.suptag):
             yield index
         return
 
     @classmethod
-    def repr(cls, nodeidx):
+    def repr(cls, nodeidx, tag=None):
         '''Display the "supval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
-        for index, item in enumerate(cls.fiter(nodeidx)):
-            value = cls.get(nodeidx, item)
+        for index, item in enumerate(cls.fiter(nodeidx, tag=tag)):
+            value = cls.get(nodeidx, item, tag=tag)
             res.append("[{:d}] {:x} : {!r}".format(index, item, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any supvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
@@ -605,77 +611,77 @@ class hash(object):
     """
 
     @classmethod
-    def has(cls, nodeidx, key):
+    def has(cls, nodeidx, key, tag=None):
         '''Return whether the netnode identified by `nodeidx` has a "hashval" for the specified `key`.'''
-        return any(key == item for item in cls.fiter(nodeidx))
+        return any(key == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
-    def get(cls, nodeidx, key, type=None):
+    def get(cls, nodeidx, key, type=None, tag=None):
         '''Return the value for the provided `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
         node = netnode.get(nodeidx)
         if type in {None}:
-            return netnode.hashval(node, key)
+            return netnode.hashval(node, key, tag or netnode.hashtag)
         elif issubclass(type, memoryview):
-            res = netnode.hashval(node, key)
+            res = netnode.hashval(node, key, tag or netnode.hashtag)
             return res and memoryview(res)
         elif issubclass(type, bytes):
-            res = netnode.hashval(node, key)
+            res = netnode.hashval(node, key, tag or netnode.hashtag)
             return res and bytes(res)
         elif issubclass(type, six.string_types):
-            return netnode.hashstr(node, key)
+            return netnode.hashstr(node, key, tag or netnode.hashtag)
         elif issubclass(type, six.integer_types):
-            return netnode.hashval_long(node, key)
+            return netnode.hashval_long(node, key, tag or netnode.hashtag)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, type, type))
 
     @classmethod
-    def set(cls, nodeidx, key, value):
+    def set(cls, nodeidx, key, value, tag=None):
         '''Assign the provided `value` to the specified `key` for the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
         # in my testing the type really doesn't matter
         if isinstance(value, memoryview):
-            return netnode.hashset(node, key, value.tobytes())
+            return netnode.hashset(node, key, value.tobytes(), tag or netnode.hashtag)
         elif isinstance(value, bytes):
-            return netnode.hashset(node, key, value)
+            return netnode.hashset(node, key, value, tag or netnode.hashtag)
         elif isinstance(value, six.string_types):
-            return netnode.hashset_buf(node, key, value)
+            return netnode.hashset_buf(node, key, value, tag or netnode.hashtag)
         elif isinstance(value, six.integer_types):
-            return netnode.hashset_idx(node, key, value)
+            return netnode.hashset_idx(node, key, value, tag or netnode.hashtag)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}, {!r}) : An unsupported type ({!r}) was specified for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, value, type(value)))
 
     @classmethod
-    def remove(cls, nodeidx, key):
+    def remove(cls, nodeidx, key, tag=None):
         '''Remove the value assigned to the specified `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.hashdel(node, key)
+        return netnode.hashdel(node, key, tag or netnode.hashtag)
 
     @classmethod
-    def fiter(cls, nodeidx):
+    def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for key, _ in utils.fhash(node):
+        for key, _ in utils.fhash(node, tag=tag or netnode.hashtag):
             yield key
         return
 
     @classmethod
-    def riter(cls, nodeidx):
+    def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for key, _ in utils.rhash(node):
+        for key, _ in utils.rhash(node, tag=tag or netnode.hashtag):
             yield key
         return
 
     @classmethod
-    def repr(cls, nodeidx):
+    def repr(cls, nodeidx, tag=None):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         res = []
         try:
-            l1 = max(len(key or '') for key in cls.fiter(nodeidx))
-            l2 = max(len("{!r}".format(cls.get(nodeidx, key))) for key in cls.fiter(nodeidx))
+            l1 = max(len(key or '') for key in cls.fiter(nodeidx, tag=tag))
+            l2 = max(len("{!r}".format(cls.get(nodeidx, key, tag=tag))) for key in cls.fiter(nodeidx, tag=tag))
         except ValueError:
             l1, l2 = 0, 2
 
-        for index, key in enumerate(cls.fiter(nodeidx)):
-            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, None), cls.get(nodeidx, key, bytes), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
+        for index, key in enumerate(cls.fiter(nodeidx, tag=tag)):
+            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=tag)), l2, cls.get(nodeidx, key, None, tag=tag), cls.get(nodeidx, key, bytes, tag=tag), cls.get(nodeidx, key, int, tag=tag), cls.get(nodeidx, key, int, tag=tag))
             res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, key, l1, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
