@@ -50,16 +50,7 @@ import idaapi
 def has(enum):
     '''Return truth if an enumeration with the identifier `enum` exists within the database.'''
     ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL = -1, -3, -5, -8
-
-    # Apparently the ENUM_ORDINAL and ENUM_QTY_IDX altvals aren't guaranteed to be
-    # associated with an enumeration, so we only check for ENUM_FLG_IDX and ENUM_FLAGS.
-    # For sanity, we also return true if there's any enumeration members which are
-    # stored in the enumeration's altval for tag 0x45.
-    if interface.node.is_identifier(enum):
-        alts = {idaapi.BADADDR & uval for uval in [ENUM_FLG_IDX, ENUM_FLAGS]}
-        members = internal.netnode.alt.fiter(enum, tag=0x45)
-        return all(internal.netnode.alt.has(enum, idx) for idx in alts) or len(item for item in members) > 0
-    return False
+    return interface.node.is_identifier(enum) and idaapi.get_enum_idx(enum) != idaapi.BADADDR
 @utils.multicase(name=six.string_types)
 def has(name):
     '''Return truth if an enumeration with the specified `name` exists within the database.'''
