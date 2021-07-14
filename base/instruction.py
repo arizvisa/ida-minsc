@@ -387,7 +387,7 @@ def opsi_register(ea, reg, *regs, **modifiers):
     iterops = interface.regmatch.modifier(**modifiers)
     uses = interface.regmatch.use( (reg,) + regs )
     return tuple(filter(functools.partial(uses, ea), iterops(ea)))
-opsi_regi = opsi_regs = opsi_registers = utils.alias(opsi_register)
+opsi_regi = opsi_reg = opsi_regs = opsi_registers = utils.alias(opsi_register)
 
 @utils.multicase()
 def ops_register(**modifiers):
@@ -1323,6 +1323,8 @@ def op_enumeration(ea, opnum):
     # After grabbing the member, lets grab the actual value that we're going to
     # need to process the member identifier out of.
     value, bits, signed = op(ea, opnum), op_bits(ea, opnum), interface.node.alt_opinverted(ea, opnum)
+
+    # FIXME: recalculate the operand value if the operand is negated (~)
 
     # If this enumeration is a bitfield, then we need to figure out all the masks
     # that this operand uses. If it's not, then we have a single mask which is
