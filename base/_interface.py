@@ -1679,14 +1679,12 @@ class switch_t(object):
             ea, count = self.object.jumps, self.object.ncases
             items = database.get.array(ea, length=count)
 
-        # check that the result is a proper array with a typecode, and use
-        # it to recreate an array with unsigned elements.
+        # check that the result is a proper array with a typecode.
         if not hasattr(items, 'typecode'):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.branch() : An invalid type ({!s}) was returned from the switch table at address {:#x}.".format(cls.__name__, items.__class__, ea))
-        result = _array.array(items.typecode.upper())
 
         # last thing to do is to adjust each element from our items to
-        # correspond to the what's described in its refinfo_t.
+        # correspond to what's described by its refinfo_t.
         ri = instruction.ops_refinfo(ea)
 
         # the refinfo_t's flags determine whether we need to subtract or
@@ -1694,9 +1692,9 @@ class switch_t(object):
         f = operator.sub if ri.is_subtract() else operator.add
 
         # now that we know what type of operation the refinfo_t is, use
-        # it to translate the array's values into addresses.
-        result.fromlist( [f(ri.base, item) for item in items] )
-        return result
+        # it to translate the array's values into database addresses, and
+        # then we can return them to the caller.
+        return [f(ri.base, item) for item in items]
     @property
     def index(self):
         '''Return the contents of the case or index table.'''
