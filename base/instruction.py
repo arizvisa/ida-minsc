@@ -1602,7 +1602,7 @@ def op_refs(ea, opnum):
         X = idaapi.xrefblk_t()
         if not X.first_to(mid, idaapi.XREF_ALL):
             fullname = '.'.join([enumeration.name(eid), enumeration.member.name(mid)])
-            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found for enumeration member {:s} ({:#x}).".format(__name__, inst.ea, opnum, fullname, m))
+            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references were found for the enumeration member {:s} ({:#x}) at operand {:d} of the instruction at {:#x}.".format(__name__, inst.ea, opnum, fullname, mid, opnum, inst.ea))
             return []
 
         # As we were able to find one, we can just continue to iterate through
