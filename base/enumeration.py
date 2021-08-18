@@ -272,6 +272,83 @@ def bitfield(enum, boolean):
     return res
 bitflag = utils.alias(bitfield)
 
+def up(enum):
+    '''Return all structure or frame members within the database that reference the specified `enum`.'''
+    X, eid = idaapi.xrefblk_t(), by(enum)
+
+    # IDA does not seem to create xrefs to enumeration identifiers.
+    raise E.UnsupportedCapability(u"{:s}.up({:#x}) : Unable to locate any cross-references for the specified enumeration due to the disassembler not keeping track of them.".format(__name__, eid))
+
+    # Grab the first reference to the enumeration.
+    if not X.first_to(eid, idaapi.XREF_ALL):
+        return []
+
+    # Continue to grab all the rest of the refs to the enumeration.
+    refs = [(X.frm, X.iscode, X.type)]
+    while X.next_to():
+        refs.append((X.frm, X.iscode, X.type))
+
+    # Iterate through each xref and figure out if the enumeration id is
+    # applied to a structure type.
+    res = []
+    for ref, _, _ in refs:
+
+        # If the reference is not an identifier, then we don't care about
+        # it because it's pointing to code and the member.refs function
+        # should be used for grabbing those.
+        if not interface.node.is_identifier(ref):
+            continue
+
+        # Get mptr, full member name, and sptr for the identifier we found.
+        mpack = idaapi.get_member_by_id(ref)
+        if mpack is None:
+            cls = self.__class__
+            raise E.MemberNotFoundError(u"{:s}.up({:#x}) : Unable to locate the member identified by {:#x}.".format(__name__, eid, ref))
+
+        mptr, name, sptr = mpack
+        if not interface.node.is_identifier(sptr.id):
+            sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
+
+        # Verify the type of the mptr is correct so that we can use it.
+        if not isinstance(mptr, idaapi.member_t):
+            cls, name = self.__class__, idaapi.get_member_fullname(ref)
+            raise E.InvalidTypeOrValueError(u"{:s}.up({:#x}) : Unexpected type {!s} returned for member \"{:s}\".".format(__name__, eid, mptr.__class__, internal.utils.string.escape(name, '"')))
+
+        # Use the mptr identifier to determine if we're referencing a frame.
+        frname, _ = name.split('.', 1)
+        frid = internal.netnode.get(frname)
+        ea = idaapi.get_func_by_frame(frid)
+
+        # If we couldn't find a frame for it, then this is a structure member
+        # and we can just grab it using the structure module.
+        if ea == idaapi.BADADDR:
+            st = structure.by_identifier(sptr.id)
+            mem = st.members.by_identifier(mptr.id)
+            res.append(mem)
+            continue
+
+        # Otherwise, we know that this is a a function frame and
+        # we can just grab it using idaapi.get_frame. We also
+        # need the idaapi.func_t for it to get the frame size.
+        fr = idaapi.get_frame(ea)
+        if fr is None:
+            cls = self.__class__
+            raise E.MissingTypeOrAttribute(u"{:s}.up({:#x}) : The function at {:#x} for frame member {:#x} does not have a frame.".format(__name__, eid, ea, mptr.id))
+
+        f = idaapi.get_func(ea)
+        if f is None:
+            cls = self.__class__
+            raise E.FunctionNotFoundError(u"{:s}.up({:#x}) : Unable to locate the function for frame member {:#x} by address {:#x}.".format(__name__, eid, mptr.id, ea))
+
+        # Now that we have everything we need, we use the structure
+        # module and the idaapi.func_t we fetched to instantiate the
+        # structure with the correct offset and then fetch the member
+        # to aggregate to our list of results.
+        st = structure.by_identifier(fr.id, offset=-f.frsize)
+        mem = st.members.by_identifier(mptr.id)
+        res.append(mem)
+    return res
+
 def repr(enum):
     '''Return a printable summary of the enumeration `enum`.'''
     eid = by(enum)
@@ -933,6 +1010,50 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.mask(mid)
+
+    @utils.multicase()
+    @classmethod
+    def refs(cls, mid):
+        '''Return the `(address, opnum, type)` of all the instructions that reference the enumeration member `mid`.'''
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+        eid = cls.parent(mid)
+
+        # Assign some constants that we'll use for checking an operand type.
+        NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
+
+        # Check if there's an xref that points to the enumeration member
+        # identifier. If there isn't one, then we return an empty list.
+        X = idaapi.xrefblk_t()
+        if not X.first_to(mid, idaapi.XREF_ALL):
+            fullname = '.'.join([name(eid), cls.name(mid)])
+            logging.warning(u"{:s}.refs({:#x}) : No references found to enumeration member {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, fullname, mid))
+            return []
+
+        # As we were able to find at least one, iterate through any others
+        # that we found whilst gathering the 3 attributes that we care about.
+        refs = [(X.frm, X.iscode, X.type)]
+        while X.next_to():
+            refs.append((X.frm, X.iscode, X.type))
+
+        # Now that we have a list of xrefs, we need to convert each element
+        # into an internal.opref_t. We do this by figuring out which operand
+        # the member is in for each address. We double-verify that the member
+        # from the operand actually belongs to the enumeration.
+        res = []
+        for ea, _, t in refs:
+            ops = ((opnum, internal.netnode.alt.get(ea, altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(ea, altidx))
+            ops = (opnum for opnum, mid in ops if cls.parent(mid) == eid)
+            res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
+        return res
+
+    @utils.multicase()
+    @classmethod
+    def refs(cls, enum, member):
+        '''Returns the `(address, opnum, type)` of all the instructions that reference the enumeration `member` belonging to `enum`.'''
+        eid = by(enum)
+        mid = members.by(eid, member)
+        return cls.refs(mid)
 
 class masks(object):
     """
