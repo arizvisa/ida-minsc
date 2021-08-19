@@ -732,8 +732,8 @@ class priorityhook(prioritybase):
         hType = hObject.__class__
         hName = hType.__name__
         if not self.available:
-            return "Hooks for {:s}: {:s}".format(hName, 'No hooks have been added.')
-        res, items = "Hooks for {:s}:".format(hName), super(priorityhook, self).__repr__().split('\n')
+            return "Callables currently attached to {:s}: {:s}".format(hName, 'No hooks are attached.')
+        res, items = "Callables currently attached to {:s}:".format(hName), super(priorityhook, self).__repr__().split('\n')
         return '\n'.join([res] + items[1:])
 
 class prioritynotification(prioritybase):
@@ -770,8 +770,8 @@ class prioritynotification(prioritybase):
 
     def __repr__(self):
         if not self.available:
-            return "Notification events: {:s}".format('No hooks have been added.')
-        res, items = 'Notification events:', super(prioritynotification, self).__repr__().split('\n')
+            return "Callables currently attached to notifications: {:s}".format('No hooks are attached.')
+        res, items = 'Callables currently attached to notifications:', super(prioritynotification, self).__repr__().split('\n')
         return '\n'.join([res] + items[1:])
 
 class address(object):
