@@ -1185,12 +1185,21 @@ class hook(object):
     """
     This namespace exposes the ability to hook different parts of IDA.
 
-    There are 3 different components in IDA that can be hooked. These
-    are available as ``hook.idp``, ``hook.idb``, and ``hook.ui``.
+    There are 4 different event types in IDA that can be hooked. These
+    are available under the ``hook.idp``, ``hook.idb``, ``hook.ui``,
+    and ``hook.notification`` objects.
 
-    Please refer to the documentation for ``idaapi.IDP_Hooks``,
-    ``idaapi.IDB_Hooks``, and ``idaapi.UI_Hooks`` for identifying what
-    is available.
+    To add a hook for any of these event types, one can use
+    the `add(target, callable, priority)` method to associate a python
+    callable with the desired event. After the callable has been
+    attached, the `enable(target)` or `disable(target)` methods can be
+    used to temporarily enable or disable the hook.
+
+    Please refer to the documentation for the ``idaapi.IDP_Hooks``,
+    ``idaapi.IDB_Hooks``, and ``idaapi.UI_Hooks`` classes for
+    identifying what event targets are available to hook. Similarly,
+    the documentation for ``idaapi.notify_when`` can be used to list
+    the targets available for notification hooks.
     """
     @classmethod
     def __start_ida__(cls):
@@ -1213,6 +1222,11 @@ class hook(object):
 
             # Now we can enable all the hooks so the user can use them
             instance.hook()
+
+        # If the idaapi.__notification__ object exists, then also
+        # assign it directly into our namespace.
+        if hasattr(idaapi, '__notification__'):
+            setattr(cls, 'notification', idaapi.__notification__)
         return
 
     @classmethod
@@ -1227,6 +1241,8 @@ class hook(object):
             # the language extension is unloaded.
             hooker.unhook()
         return
+
+hooks = hook    # XXX: ns alias
 
 ### Helper classes to use or inherit from
 # XXX: why was this base class implemented again??
