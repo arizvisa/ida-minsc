@@ -1405,17 +1405,19 @@ class members_t(object):
         F = filter or (lambda structure, items: items)
         filtered = F(owner.ptr, members) if len(members) > 1 else members
 
-        # If we didn't get any members, then just return the delta amd
-        # terminate our traversal.
-        if not len(filtered):
-            return (), offset
-
-        # If we didn't get a single result after filtering, then we will
-        # terminate our traversal here with the nearest member, and include
-        # the offset that's relative to our findings.
-        if len(filtered) > 1:
+        # If we didn't get exactly one member after filtering our path,
+        # then either we hit a union (multiple members) or an undefined
+        # field. To handle this, we grab the nearest member to the
+        # requested offset, and check that it's located before the offset.
+        # This way we can guarantee that the offset is relative to the
+        # member and is always positive. If these constraints aren't
+        # satisfied, then we return an empty path which means the offset
+        # is relative to the beginning of the structure.
+        if len(filtered) != 1:
             nearest = self.near_realoffset(offset)
-            return (nearest,), offset - nearest.realoffset
+            if nearest.realoffset <= offset:
+                return (nearest,), offset - nearest.realoffset
+            return (), offset
 
         # Otherwise we found a single item, then we just need to know if
         # we need to continue recursing into something and what exactly
