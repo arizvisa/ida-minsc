@@ -1407,16 +1407,26 @@ class members_t(object):
 
         # If we didn't get exactly one member after filtering our path,
         # then either we hit a union (multiple members) or an undefined
-        # field. To handle this, we grab the nearest member to the
-        # requested offset, and check that it's located before the offset.
-        # This way we can guarantee that the offset is relative to the
-        # member and is always positive. If these constraints aren't
-        # satisfied, then we return an empty path which means the offset
-        # is relative to the beginning of the structure.
+        # field.
         if len(filtered) != 1:
+
+            # If it's a union, then we just return an offset relative to
+            # the structure itself. Generally, the caller needs to tell
+            # us which union member to choose using the filter parameter.
+            if owner.ptr.is_union():
+                return (), offset
+
+            # Otherwise, grab the nearest member to the offset and check
+            # if the member can be used to describe the offset by verifying
+            # that the member is located in front of the offset. This way
+            # we can use the nearest member to adjust the offset, and then
+            # return it along with the adjusted offset to the caller.
             nearest = self.near_realoffset(offset)
-            if nearest.realoffset <= offset:
+            if offset >= nearest.realoffset:
                 return (nearest,), offset - nearest.realoffset
+
+            # Otherwise, our offset is going to be relative to the
+            # structure itself and we need to return an empty path.
             return (), offset
 
         # Otherwise we found a single item, then we just need to know if
