@@ -1253,10 +1253,8 @@ def op_structure(ea, opnum, sptr, *path):
     # Now we need to use the requested offset to descend through the structure
     # that we're starting at, and then hope it matches the path that was
     # recommended. We need to shift whatever this offset is by the delta that
-    # we were given, and then gather our results into mptr and sptrs. If our
-    # offset and value are the same, then we don't need to adjust anything.
-    res = 0 if offset == value else offset
-    rp, realdelta = st.members.__walk_to_realoffset__(res + value + delta, filter=filter)
+    # we were given, and then gather our results into mptr and sptrs.
+    rp, realdelta = st.members.__walk_to_realoffset__(value + delta, filter=filter)
     results = [(item.parent.ptr, item.ptr) for item in rp]
     moffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
 
