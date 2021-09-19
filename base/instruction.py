@@ -855,7 +855,7 @@ def op_structure(ea, opnum):
     # offset from the value property. Anything else should be a memory
     # address that we'll calculate the offset into the structure from.
     res = op.value if op.type in {idaapi.o_imm} else op.addr
-    offset = idaapi.as_signed(res, op_bits(ea, opnum))
+    offset = idaapi.as_signed(res, database.config.bits())
 
     # Verify that the operand is actually represented by a structure offset.
     if all(F & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
@@ -1004,10 +1004,15 @@ def op_structure(ea, opnum):
     Ffilter = generate_filter(items)
     res, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
 
-    # If our item length is larger than our result path, then this might be
-    # a union with the delta pointing outside of it. This is a special case.
+    # If our number of items that we filtered is larger than the result path
+    # that we were able to walk, then this might be a union with the delta
+    # pointing outside of its bounds. We handle this as a special case for now.
     if len(res) < len(items):
-        assert len(items) - len(res) == 1
+        if not(len(items) - len(res) == 1):
+            raise AssertionError(u"{:s}.op_structure({:#x}, {:d}) : An unexpected number of items was returned ({:d}) during path calculation for {:d} items.".format(__name__, ea, opnum, len(res), len(items)))
+
+        # XXX: We validate this logic with the prior assertion because I
+        #      believe this logic to be incorrect.
         mfix = st.members.by_identifier(items[0].id)
         path = (mfix,) + res if isinstance(res, builtins.tuple) else [mfix] + res
 
@@ -1125,7 +1130,7 @@ def op_structure(ea, opnum, sptr, *path):
     # that we'll collect when traversing the structure path.
     op = operand(ea, opnum)
     res = op.value if op.type in {idaapi.o_imm} else op.addr
-    value = idaapi.as_signed(res, op_bits(ea, opnum))
+    value = idaapi.as_signed(res, database.config.bits())
 
     # If the operand type is not a valid type, then raise an exception so that
     # we don't accidentally apply a structure to an invalid operand type.
