@@ -990,13 +990,17 @@ def op_structure(ea, opnum):
         items.append(mptr)
         moffset += 0 if mparent.is_union() else mptr.soff
 
-    # Now we need to check if the operand value is not a structure path, but
-    # rather the structure address or its size. This condition will only hold
-    # true if there's no items in the path, and the delta is empty. In this
-    # case, we just check whether the offset is 0 or the structure's size.
+    # Now we need to check if the operand value is not a structure path because
+    # we might be pointing to the first member or the structure's size. If there
+    # are no items from our previous traversal, the delta is zero, and there are
+    # no members, then we just return the structure. In this case, we return the
+    # structure itself along with the offset (if there's one defined). If the
+    # operand was a sizeof(structure), then we ignore this conditional because
+    # we're going to later return an offset relative to the nearest member. This
+    # will issue a warning, but it should be more accurate.
     st = structure.__instance__(sptr.id, offset=-delta.value())
-    if not len(items) and delta.value() == 0 and offset in {0, st.size}:
-        return st
+    if not len(items) and delta.value() == 0 and not len(st.members):
+        return (st, offset) if offset else st
 
     # Generate our filter function, and fetch the structure that we're going
     # to use to walk our path with. This should then give us the actual path
