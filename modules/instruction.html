@@ -848,8 +848,8 @@ whether the operand is being read from, written to, or modified (both).</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em>, <em>structure</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
-<dd><p>Apply the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current address.</p>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em>, <em>structure</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code> along with any members in <code class="docutils literal notranslate"><span class="pre">path</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -858,6 +858,7 @@ whether the operand is being read from, written to, or modified (both).</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
 <li><strong>structure</strong> (<a class="reference internal" href="structure.html#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> to apply</li>
+<li><strong>*path</strong> – any structure members to include in the path</li>
 <li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
 </ul>
 </td>
@@ -868,7 +869,49 @@ whether the operand is being read from, written to, or modified (both).</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em>, <em>member</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em>, <em>sptr</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t`in</span> <span class="pre">``sptr`</span></code> along with any members in <code class="docutils literal notranslate"><span class="pre">path</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
+<li><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to apply</li>
+<li><strong>*path</strong> – any structure members to include in the path</li>
+<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em>, <em>name</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the structure with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> and the members in <code class="docutils literal notranslate"><span class="pre">path</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
+<li><strong>name</strong> (<em>str</em>) – </li>
+<li><strong>*path</strong> – any structure name or member names to include in the path</li>
+<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em>, <em>member</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
 <dd><p>Apply the specified <code class="docutils literal notranslate"><span class="pre">member</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -876,9 +919,31 @@ whether the operand is being read from, written to, or modified (both).</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
-<li><strong>member</strong> (<a class="reference internal" href="structure.html#structure.member_t" title="structure.member_t"><em>member_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">member_t</span></code> of a structure to apply</li>
-<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the member by it</li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
+<li><strong>member</strong> (<a class="reference internal" href="structure.html#structure.member_t" title="structure.member_t"><em>member_t</em></a>) – the <a class="reference internal" href="structure.html#structure.member_t" title="structure.member_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.member_t</span></code></a> to apply</li>
+<li><strong>*path</strong> – any structure name or member names to include in the path</li>
+<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em>, <em>mptr</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.member_t`in</span> <span class="pre">``mptr`</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
+<li><strong>mptr</strong> (<em>idaapi.member_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> to apply</li>
+<li><strong>*path</strong> – any structure name or member names to include in the path</li>
+<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
 </ul>
 </td>
 </tr>
@@ -908,8 +973,8 @@ whether the operand is being read from, written to, or modified (both).</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>structure</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
-<dd><p>Apply the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>structure</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code> along with the members in <code class="docutils literal notranslate"><span class="pre">path</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -919,6 +984,7 @@ whether the operand is being read from, written to, or modified (both).</p>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
 <li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
 <li><strong>structure</strong> (<a class="reference internal" href="structure.html#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> to apply</li>
+<li><strong>*path</strong> – an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand</li>
 <li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
 </ul>
 </td>
@@ -929,8 +995,8 @@ whether the operand is being read from, written to, or modified (both).</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>member</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
-<dd><p>Apply the specified <code class="docutils literal notranslate"><span class="pre">member</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>name</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the structure with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> and any members in <code class="docutils literal notranslate"><span class="pre">path</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -939,8 +1005,53 @@ whether the operand is being read from, written to, or modified (both).</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
 <li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
-<li><strong>member</strong> (<a class="reference internal" href="structure.html#structure.member_t" title="structure.member_t"><em>member_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">member_t</span></code> of a structure to apply</li>
-<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the member by it</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the structure to apply</li>
+<li><strong>*path</strong> – an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand</li>
+<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>member</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the specified <code class="docutils literal notranslate"><span class="pre">member</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
+<li><strong>member</strong> (<a class="reference internal" href="structure.html#structure.member_t" title="structure.member_t"><em>member_t</em></a>) – the <a class="reference internal" href="structure.html#structure.member_t" title="structure.member_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.member_t</span></code></a> to apply</li>
+<li><strong>*path</strong> – any structure name or member names to include in the path</li>
+<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>mptr</em>, <em>*path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.member_t`in</span> <span class="pre">``mptr`</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
+<li><strong>mptr</strong> (<em>idaapi.member_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> to apply</li>
+<li><strong>*path</strong> – any structure name or member names to include in the path</li>
+<li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
 </ul>
 </td>
 </tr>
@@ -952,7 +1063,6 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>path</em>, <em>**delta</em><span class="sig-paren">)</span></dt>
 <dd><p>Apply the structure members in <code class="docutils literal notranslate"><span class="pre">path</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>If the offset <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified, shift the structure by that amount.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -961,8 +1071,29 @@ whether the operand is being read from, written to, or modified (both).</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
 <li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
-<li><strong>path</strong> (<em>tuple</em><em> or </em><a class="reference internal" href="#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand</li>
+<li><strong>path</strong> (<em>tuple</em><em> or </em><a class="reference internal" href="#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – an iterable containing structure, members, or integers that are used to calculate the offset into the structure when applying it to the operand</li>
 <li><strong>**delta</strong> – if <code class="docutils literal notranslate"><span class="pre">delta</span></code> is specified as an integer, then offset the structure by it</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em>, <em>sptr</em>, <em>*path</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the structure identified by <code class="docutils literal notranslate"><span class="pre">sptr</span></code> along with the members in <code class="docutils literal notranslate"><span class="pre">path</span></code> to the instruction operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</li>
+<li><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to apply</li>
+<li><strong>*path</strong> – any structure members to include in the path</li>
 </ul>
 </td>
 </tr>
@@ -1119,14 +1250,14 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt id="instruction.ops_constant">
 <code class="descclassname">instruction.</code><code class="descname">ops_constant</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.ops_constant" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the indices of any operands in the current instruction that are constants.</p>
+<dd><p>Return the operands that are being written to by the instruction at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.ops_constant" title="instruction.ops_constant"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_const</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">ops_constant</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the indices of any operands in the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> that are constants.</p>
+<dd><p>Return the operands that are being written to by the instruction at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.ops_constant" title="instruction.ops_constant"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_const</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1161,13 +1292,13 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt id="instruction.ops_read">
 <code class="descclassname">instruction.</code><code class="descname">ops_read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.ops_read" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns the indices of any operands that are being read from by the instruction at the current address.</p>
+<dd><p>Return the operands that are being read from by the instruction at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">ops_read</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns the indices of any operands that are being read from by the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the operands that are being read from by the instruction at the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1201,8 +1332,8 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt id="instruction.ops_register">
 <code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>**modifiers</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.ops_register" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yields the index of each operand in the instruction at the current address which uses a register.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a></p>
+<dd><p>Returns each register operand in the instruction at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_registers</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1216,14 +1347,14 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>ea</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
-<dd><p>Yields the index of each operand in the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> which uses a register.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a></p>
+<dd><p>Returns each register operand in the instruction at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_registers</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> – the address of an instruction</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
 <li><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to any registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</li>
 </ul>
 </td>
@@ -1235,8 +1366,8 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
-<dd><p>Yields the index of each operand in the instruction at the current address that uses <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a></p>
+<dd><p>Returns each register operand in the instruction at the current address that is <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_registers</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1255,15 +1386,15 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>ea</em>, <em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
-<dd><p>Yields the index of each operand in the instruction at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> that uses <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
+<dd><p>Returns each register operand in the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> that is <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.’’’</p>
 <p>If the keyword <code class="docutils literal notranslate"><span class="pre">write</span></code> is true, then only return the result if it’s writing to the register.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_registers</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> – the address of an instruction</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
 <li><strong>reg</strong> (<em>str</em><em> or </em><em>register_t</em>) – the register to search the operands for</li>
 <li><strong>*regs</strong> – any other registers to include</li>
 <li><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to the specified registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</li>
@@ -1337,12 +1468,150 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt id="instruction.ops_write">
 <code class="descclassname">instruction.</code><code class="descname">ops_write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.ops_write" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns the indices of the operands that are being written to by the instruction at the current address.</p>
+<dd><p>Return the operands that are being written to by the instruction at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">ops_write</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the operands that are being written to by the instruction at the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.opsi_constant">
+<code class="descclassname">instruction.</code><code class="descname">opsi_constant</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.opsi_constant" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the indices of any operands in the current instruction that are constants.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.opsi_constant" title="instruction.opsi_constant"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_const</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">opsi_constant</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the indices of any operands in the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> that are constants.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.opsi_constant" title="instruction.opsi_constant"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_const</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.opsi_read">
+<code class="descclassname">instruction.</code><code class="descname">opsi_read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.opsi_read" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the indices of any operands that are being read from by the instruction at the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">opsi_read</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the indices of any operands that are being read from by the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.opsi_register">
+<code class="descclassname">instruction.</code><code class="descname">opsi_register</code><span class="sig-paren">(</span><em>**modifiers</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.opsi_register" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the index of each operand in the instruction at the current address which uses a register.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regs</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regi</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_registers</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_reg</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to any registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">opsi_register</code><span class="sig-paren">(</span><em>ea</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the index of each operand in the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> which uses a register.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regs</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regi</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_registers</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_reg</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to any registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">opsi_register</code><span class="sig-paren">(</span><em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the index of each operand in the instruction at the current address that uses <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regs</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regi</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_registers</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_reg</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>reg</strong> (<em>str</em><em> or </em><em>register_t</em>) – the register to search the operands for</li>
+<li><strong>*regs</strong> – any other registers to include</li>
+<li><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to any registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">opsi_register</code><span class="sig-paren">(</span><em>ea</em>, <em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the index of each operand in the instruction at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> that uses <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
+<p>If the keyword <code class="docutils literal notranslate"><span class="pre">write</span></code> is true, then only return the result if it’s writing to the register.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regs</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_regi</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_registers</span></code></a>, <a class="reference internal" href="#instruction.opsi_register" title="instruction.opsi_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opsi_reg</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>reg</strong> (<em>str</em><em> or </em><em>register_t</em>) – the register to search the operands for</li>
+<li><strong>*regs</strong> – any other registers to include</li>
+<li><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to any registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.opsi_write">
+<code class="descclassname">instruction.</code><code class="descname">opsi_write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.opsi_write" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the indices of the operands that are being written to by the instruction at the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">opsi_write</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns the indices of the operands that are being written to by the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />

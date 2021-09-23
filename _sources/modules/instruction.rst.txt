@@ -475,9 +475,9 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
-.. py:function:: op_structure(opnum, structure, \*\*delta)
+.. py:function:: op_structure(opnum, structure, \*path, \*\*delta)
    
-   Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
+   Apply the specified ``structure`` along with any members in ``path`` to the instruction operand ``opnum`` at the current address.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
@@ -485,19 +485,60 @@ functions and aliases. For more information on this, please see
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
    :type structure: structure_t
+   :param \*path: any structure members to include in the path
    :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
-.. py:function:: op_structure(opnum, member, \*\*delta)
+.. py:function:: op_structure(opnum, sptr, \*path, \*\*delta)
+   
+   Apply the :py:obj:`idaapi.struc_t`in ``sptr`` along with any members in ``path`` to the instruction operand ``opnum`` at the current address.
+   
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param sptr: the :py:obj:`idaapi.struc_t` to apply
+   :type sptr: idaapi.struc_t
+   :param \*path: any structure members to include in the path
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   
+.. py:function:: op_structure(opnum, name, \*path, \*\*delta)
+   
+   Apply the structure with the specified ``name`` and the members in ``path`` to the instruction operand ``opnum`` at the current address.
+   
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param name:
+   :type name: str
+   :param \*path: any structure name or member names to include in the path
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   
+.. py:function:: op_structure(opnum, member, \*path, \*\*delta)
    
    Apply the specified ``member`` to the instruction operand ``opnum`` at the current address.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
-   :param opnum: the operand number of the instruction
+   :param opnum: the operand number of the current instruction
    :type opnum: int or long
-   :param member: the :py:obj:`member_t` of a structure to apply
+   :param member: the :py:obj:`structure.member_t` to apply
    :type member: member_t
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the member by it
+   :param \*path: any structure name or member names to include in the path
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   
+.. py:function:: op_structure(opnum, mptr, \*path, \*\*delta)
+   
+   Apply the :py:obj:`idaapi.member_t`in ``mptr`` to the instruction operand ``opnum`` at the current address.
+   
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param mptr: the :py:obj:`idaapi.member_t` to apply
+   :type mptr: idaapi.member_t
+   :param \*path: any structure name or member names to include in the path
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: op_structure(opnum, path, \*\*delta)
    
@@ -511,9 +552,9 @@ functions and aliases. For more information on this, please see
    :type path: tuple or list
    :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
-.. py:function:: op_structure(ea, opnum, structure, \*\*delta)
+.. py:function:: op_structure(ea, opnum, structure, \*path, \*\*delta)
    
-   Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
+   Apply the specified ``structure`` along with the members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
@@ -523,9 +564,25 @@ functions and aliases. For more information on this, please see
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
    :type structure: structure_t
+   :param \*path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
    :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
-.. py:function:: op_structure(ea, opnum, member, \*\*delta)
+.. py:function:: op_structure(ea, opnum, name, \*path, \*\*delta)
+   
+   Apply the structure with the specified ``name`` and any members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   :param name: the name of the structure to apply
+   :type name: str
+   :param \*path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   
+.. py:function:: op_structure(ea, opnum, member, \*path, \*\*delta)
    
    Apply the specified ``member`` to the instruction operand ``opnum`` at the address ``ea``.
    
@@ -533,17 +590,31 @@ functions and aliases. For more information on this, please see
    
    :param ea: the address of an instruction
    :type ea: int or long
-   :param opnum: the operand number of the instruction
+   :param opnum: the operand number of the current instruction
    :type opnum: int or long
-   :param member: the :py:obj:`member_t` of a structure to apply
+   :param member: the :py:obj:`structure.member_t` to apply
    :type member: member_t
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the member by it
+   :param \*path: any structure name or member names to include in the path
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   
+.. py:function:: op_structure(ea, opnum, mptr, \*path, \*\*delta)
+   
+   Apply the :py:obj:`idaapi.member_t`in ``mptr`` to the instruction operand ``opnum`` at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param mptr: the :py:obj:`idaapi.member_t` to apply
+   :type mptr: idaapi.member_t
+   :param \*path: any structure name or member names to include in the path
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: op_structure(ea, opnum, path, \*\*delta)
    
    Apply the structure members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
-   
-   If the offset ``delta`` is specified, shift the structure by that amount.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
@@ -551,9 +622,23 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param opnum: the operand number of the instruction
    :type opnum: int or long
-   :param path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
+   :param path: an iterable containing structure, members, or integers that are used to calculate the offset into the structure when applying it to the operand
    :type path: tuple or list
    :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   
+.. py:function:: op_structure(ea, opnum, sptr, \*path)
+   
+   Apply the structure identified by ``sptr`` along with the members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param sptr: the :py:obj:`idaapi.struc_t` to apply
+   :type sptr: idaapi.struc_t
+   :param \*path: any structure members to include in the path
    
 .. py:function:: operand(opnum)
    
@@ -639,13 +724,13 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_constant()
    
-   Return the indices of any operands in the current instruction that are constants.
+   Return the operands that are being written to by the instruction at the current address.
    
    Aliases: :py:func:`instruction.ops_const<ops_constant>`
    
 .. py:function:: ops_constant(ea)
    
-   Return the indices of any operands in the instruction at ``ea`` that are constants.
+   Return the operands that are being written to by the instruction at the current address.
    
    Aliases: :py:func:`instruction.ops_const<ops_constant>`
    
@@ -665,11 +750,11 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_read()
    
-   Returns the indices of any operands that are being read from by the instruction at the current address.
+   Return the operands that are being read from by the instruction at the current address.
    
 .. py:function:: ops_read(ea)
    
-   Returns the indices of any operands that are being read from by the instruction at the address ``ea``.
+   Return the operands that are being read from by the instruction at the current address.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -687,26 +772,27 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_register(\*\*modifiers)
    
-   Yields the index of each operand in the instruction at the current address which uses a register.
+   Returns each register operand in the instruction at the current address.
    
-   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`, :py:func:`instruction.ops_registers<ops_register>`
    
    :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
    
 .. py:function:: ops_register(ea, \*\*modifiers)
    
-   Yields the index of each operand in the instruction at the address ``ea`` which uses a register.
+   Returns each register operand in the instruction at the current address.
    
-   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`, :py:func:`instruction.ops_registers<ops_register>`
    
    :param ea: the address of an instruction
+   :type ea: int or long
    :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
    
 .. py:function:: ops_register(reg, \*regs, \*\*modifiers)
    
-   Yields the index of each operand in the instruction at the current address that uses ``reg`` or any one of the registers in ``regs``.
+   Returns each register operand in the instruction at the current address that is ``reg`` or any one of the registers in ``regs``.
    
-   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`, :py:func:`instruction.ops_registers<ops_register>`
    
    :param reg: the register to search the operands for
    :type reg: str or register_t
@@ -715,13 +801,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_register(ea, reg, \*regs, \*\*modifiers)
    
-   Yields the index of each operand in the instruction at address ``ea`` that uses ``reg`` or any one of the registers in ``regs``.
+   Returns each register operand in the instruction at the address ``ea`` that is ``reg`` or any one of the registers in ``regs``.'''
    
    If the keyword ``write`` is true, then only return the result if it's writing to the register.
    
-   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`, :py:func:`instruction.ops_registers<ops_register>`
    
    :param ea: the address of an instruction
+   :type ea: int or long
    :param reg: the register to search the operands for
    :type reg: str or register_t
    :param \*regs: any other registers to include
@@ -762,9 +849,90 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_write()
    
-   Returns the indices of the operands that are being written to by the instruction at the current address.
+   Return the operands that are being written to by the instruction at the current address.
    
 .. py:function:: ops_write(ea)
+   
+   Return the operands that are being written to by the instruction at the current address.
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: opsi_constant()
+   
+   Return the indices of any operands in the current instruction that are constants.
+   
+   Aliases: :py:func:`instruction.opsi_const<opsi_constant>`
+   
+.. py:function:: opsi_constant(ea)
+   
+   Return the indices of any operands in the instruction at ``ea`` that are constants.
+   
+   Aliases: :py:func:`instruction.opsi_const<opsi_constant>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: opsi_read()
+   
+   Returns the indices of any operands that are being read from by the instruction at the current address.
+   
+.. py:function:: opsi_read(ea)
+   
+   Returns the indices of any operands that are being read from by the instruction at the address ``ea``.
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: opsi_register(\*\*modifiers)
+   
+   Returns the index of each operand in the instruction at the current address which uses a register.
+   
+   Aliases: :py:func:`instruction.opsi_regs<opsi_register>`, :py:func:`instruction.opsi_regi<opsi_register>`, :py:func:`instruction.opsi_registers<opsi_register>`, :py:func:`instruction.opsi_reg<opsi_register>`
+   
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
+   
+.. py:function:: opsi_register(ea, \*\*modifiers)
+   
+   Returns the index of each operand in the instruction at the address ``ea`` which uses a register.
+   
+   Aliases: :py:func:`instruction.opsi_regs<opsi_register>`, :py:func:`instruction.opsi_regi<opsi_register>`, :py:func:`instruction.opsi_registers<opsi_register>`, :py:func:`instruction.opsi_reg<opsi_register>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
+   
+.. py:function:: opsi_register(reg, \*regs, \*\*modifiers)
+   
+   Returns the index of each operand in the instruction at the current address that uses ``reg`` or any one of the registers in ``regs``.
+   
+   Aliases: :py:func:`instruction.opsi_regs<opsi_register>`, :py:func:`instruction.opsi_regi<opsi_register>`, :py:func:`instruction.opsi_registers<opsi_register>`, :py:func:`instruction.opsi_reg<opsi_register>`
+   
+   :param reg: the register to search the operands for
+   :type reg: str or register_t
+   :param \*regs: any other registers to include
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
+   
+.. py:function:: opsi_register(ea, reg, \*regs, \*\*modifiers)
+   
+   Returns the index of each operand in the instruction at address ``ea`` that uses ``reg`` or any one of the registers in ``regs``.
+   
+   If the keyword ``write`` is true, then only return the result if it's writing to the register.
+   
+   Aliases: :py:func:`instruction.opsi_regs<opsi_register>`, :py:func:`instruction.opsi_regi<opsi_register>`, :py:func:`instruction.opsi_registers<opsi_register>`, :py:func:`instruction.opsi_reg<opsi_register>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param reg: the register to search the operands for
+   :type reg: str or register_t
+   :param \*regs: any other registers to include
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
+   
+.. py:function:: opsi_write()
+   
+   Returns the indices of the operands that are being written to by the instruction at the current address.
+   
+.. py:function:: opsi_write(ea)
    
    Returns the indices of the operands that are being written to by the instruction at the address ``ea``.
    

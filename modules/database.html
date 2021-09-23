@@ -7233,8 +7233,99 @@ will return the <code class="xref py py-obj docutils literal notranslate"><span 
 
 </div>
 </div>
+<div class="section" id="database-types">
+<span id="ns-database-types"></span><h3>3.1.1.2.14. database.types<a class="headerlink" href="#database-types" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for interacting with the local types that are
+defined within the database. The functions within this namespace
+can be used to create, query, or fetch the types that have been
+defined.</p>
+<dl class="function">
+<dt id="database.types.get">
+<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>ordinal</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.get" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ordinal</strong> – the ordinal of the type to get</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>ordinal</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the ordinal of the type to get</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> to fetch the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>name</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to get</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> to fetch the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.set">
+<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>name</em>, <em>parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.set" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the ordinal of the type to set</li>
+<li><strong>name</strong> – the name of the type to set</li>
+<li><strong>parameters</strong> – the extra parameters to include during serialization</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>name</em>, <em>parameters</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the ordinal of the type to set</li>
+<li><strong>name</strong> – the name of the type to set</li>
+<li><strong>parameters</strong> – the extra parameters to include during serialization</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> to set the type in</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
 <div class="section" id="database-xref">
-<span id="ns-database-xref"></span><h3>3.1.1.2.14. database.xref<a class="headerlink" href="#database-xref" title="Permalink to this headline">¶</a></h3>
+<span id="ns-database-xref"></span><h3>3.1.1.2.15. database.xref<a class="headerlink" href="#database-xref" title="Permalink to this headline">¶</a></h3>
 <p>Aliases: <a class="reference internal" href="#ns-database-xref"><span class="std std-ref">database.x</span></a></p>
 <p>This namespace is for navigating the cross-references (xrefs)
 associated with an address in the database. This lets one identify
@@ -7749,7 +7840,8 @@ also aliased as globals. Some of these are:</p>
 <li><a class="reference internal" href="#database-type-structure">3.1.1.2.13.2. database.type.structure</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#database-xref">3.1.1.2.14. database.xref</a></li>
+<li><a class="reference internal" href="#database-types">3.1.1.2.14. database.types</a></li>
+<li><a class="reference internal" href="#database-xref">3.1.1.2.15. database.xref</a></li>
 </ul>
 </li>
 </ul>

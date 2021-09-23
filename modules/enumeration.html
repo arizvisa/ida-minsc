@@ -352,12 +352,26 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.has">
 <code class="descclassname">enumeration.</code><code class="descname">has</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.has" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return truth if the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> exists within the database.</p>
+<dd><p>Return truth if an enumeration with the identifier <code class="docutils literal notranslate"><span class="pre">enum</span></code> exists within the database.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration identifier to check</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> (<em>int</em><em> or </em><em>long</em>) – the enumeration identifier to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">enumeration.</code><code class="descname">has</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Return truth if an enumeration with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> exists within the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the enumeration name to check</td>
 </tr>
 </tbody>
 </table>
@@ -585,6 +599,20 @@ functions and aliases. For more information on this, please see
 <li><strong>width</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to set the enumeration width to</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.up">
+<code class="descclassname">enumeration.</code><code class="descname">up</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.up" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return all structure or frame members within the database that reference the specified <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration to return references for</td>
 </tr>
 </tbody>
 </table>
@@ -1052,6 +1080,38 @@ enumeration’s members.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="enumeration.member.refs">
+<code class="descclassname">member.</code><code class="descname">refs</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.refs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">opnum,</span> <span class="pre">type)</span></code> of all the instructions that reference the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> – the enumeration member identifier to return references for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">refs</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">opnum,</span> <span class="pre">type)</span></code> of all the instructions that reference the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to use</li>
+<li><strong>member</strong> – the member name or identifier to return references for</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="enumeration.member.remove">
 <code class="descclassname">member.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.remove" title="Permalink to this definition">¶</a></dt>
 <dd><p>Remove the enumeration member with the given <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
@@ -1149,9 +1209,8 @@ enumeration’s members.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">member.</code><code class="descname">value</code><span class="sig-paren">(</span><em>mid</em>, <em>value</em>, <em>**bitmask</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the <code class="docutils literal notranslate"><span class="pre">value</span></code> for the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
-<p>If the integer <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified, then use it as a bitmask. Otherwise assume all bits are set.</p>
+<code class="descclassname">member.</code><code class="descname">value</code><span class="sig-paren">(</span><em>mid</em>, <em>value</em><span class="sig-paren">)</span></dt>
+<dd><p>Assign the integer specified by <code class="docutils literal notranslate"><span class="pre">value</span></code> to the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1159,7 +1218,6 @@ enumeration’s members.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the member to set the value of</li>
 <li><strong>value</strong> (<em>int</em><em> or </em><em>long</em>) – the value to set the member to</li>
-<li><strong>**bitmask</strong> – if <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified as an integer, then use it as the bitmask to assign to the value</li>
 </ul>
 </td>
 </tr>
@@ -1171,7 +1229,6 @@ enumeration’s members.</p>
 <dt>
 <code class="descclassname">member.</code><code class="descname">value</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em>, <em>value</em>, <em>**bitmask</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the <code class="docutils literal notranslate"><span class="pre">value</span></code> for the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
-<p>If the integer <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified, then use it as a bitmask. Otherwise assume all bits are set.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1349,6 +1406,44 @@ members of an enumeration.</p>
 <li><strong>enum</strong> – the enumeration to return a member for</li>
 <li><strong>value</strong> – the value of the enumeration member to return</li>
 <li><strong>**filters</strong> – the filters to use when choosing the enumeration member</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.members.has">
+<code class="descclassname">members.</code><code class="descname">has</code><span class="sig-paren">(</span><em>enum</em>, <em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.has" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> contains a member with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to use</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the enumeration member to check</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">members.</code><code class="descname">has</code><span class="sig-paren">(</span><em>enum</em>, <em>value</em>, <em>**bitmask</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> contains a member with the specified <code class="docutils literal notranslate"><span class="pre">value</span></code>.</p>
+<p>If an integral is provided for <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> or <code class="docutils literal notranslate"><span class="pre">serial</span></code>, then only return true if the member is within the specified bitmask, or uses the provided serial.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to use</li>
+<li><strong>value</strong> (<em>int</em><em> or </em><em>long</em>) – the value of the enumeration member to check</li>
+<li><strong>**bitmask</strong> – if <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified as an integer, then check the value within the specified bitmask</li>
 </ul>
 </td>
 </tr>

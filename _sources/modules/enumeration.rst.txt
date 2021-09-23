@@ -167,9 +167,17 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: has(enum)
    
-   Return truth if the enumeration ``enum`` exists within the database.
+   Return truth if an enumeration with the identifier ``enum`` exists within the database.
    
    :param enum: the enumeration identifier to check
+   :type enum: int or long
+   
+.. py:function:: has(name)
+   
+   Return truth if an enumeration with the specified ``name`` exists within the database.
+   
+   :param name: the enumeration name to check
+   :type name: str
    
 .. py:function:: index(enum)
    
@@ -271,6 +279,12 @@ functions and aliases. For more information on this, please see
    :param enum: the enumeration to set the width for
    :param width: the number of bytes to set the enumeration width to
    :type width: int or long
+   
+.. py:function:: up(enum)
+   
+   Return all structure or frame members within the database that reference the specified ``enum``.
+   
+   :param enum: the enumeration to return references for
    
 .. py:function:: values(enum)
    
@@ -531,6 +545,19 @@ Some examples of how to use this namespace can be::
    
    :param mid: the identifier of the member to return the enumeration for
    
+.. py:function:: member\.refs(mid)
+   
+   Return the ``(address, opnum, type)`` of all the instructions that reference the enumeration member ``mid``.
+   
+   :param mid: the enumeration member identifier to return references for
+   
+.. py:function:: member\.refs(enum, member)
+   
+   Returns the ``(address, opnum, type)`` of all the instructions that reference the enumeration ``member`` belonging to ``enum``.
+   
+   :param enum: the enumeration to use
+   :param member: the member name or identifier to return references for
+   
 .. py:function:: member\.remove(mid)
    
    Remove the enumeration member with the given ``mid``.
@@ -573,23 +600,18 @@ Some examples of how to use this namespace can be::
    :param enum: the enumeration containing the member to return the value of
    :param member: the member to return the value of
    
-.. py:function:: member\.value(mid, value, \*\*bitmask)
+.. py:function:: member\.value(mid, value)
    
-   Set the ``value`` for the enumeration ``member`` belonging to ``enum``.
-   
-   If the integer ``bitmask`` is specified, then use it as a bitmask. Otherwise assume all bits are set.
+   Assign the integer specified by ``value`` to the enumeration member ``mid``.
    
    :param mid: the identifier of the member to set the value of
    :type mid: int or long
    :param value: the value to set the member to
    :type value: int or long
-   :param \*\*bitmask: if ``bitmask`` is specified as an integer, then use it as the bitmask to assign to the value
    
 .. py:function:: member\.value(enum, member, value, \*\*bitmask)
    
    Set the ``value`` for the enumeration ``member`` belonging to ``enum``.
-   
-   If the integer ``bitmask`` is specified, then use it as a bitmask. Otherwise assume all bits are set.
    
    :param enum: the enumeration containing the member to set the value for
    :param member: the member to set the value of
@@ -692,6 +714,25 @@ Some examples of using this namespace are::
    :param enum: the enumeration to return a member for
    :param value: the value of the enumeration member to return
    :param \*\*filters: the filters to use when choosing the enumeration member
+   
+.. py:function:: members\.has(enum, name)
+   
+   Return whether the enumeration ``enum`` contains a member with the specified ``name``.
+   
+   :param enum: the enumeration to use
+   :param name: the name of the enumeration member to check
+   :type name: str
+   
+.. py:function:: members\.has(enum, value, \*\*bitmask)
+   
+   Return whether the enumeration ``enum`` contains a member with the specified ``value``.
+   
+   If an integral is provided for ``bitmask`` or ``serial``, then only return true if the member is within the specified bitmask, or uses the provided serial.
+   
+   :param enum: the enumeration to use
+   :param value: the value of the enumeration member to check
+   :type value: int or long
+   :param \*\*bitmask: if ``bitmask`` is specified as an integer, then check the value within the specified bitmask
    
 .. py:function:: members\.iterate(enum)
    

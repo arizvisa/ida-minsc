@@ -4269,6 +4269,51 @@ Some of the ways to use this namespace are::
    :param ea: an address in the database containing a structure
    :type ea: int or long
    
+.. _ns-database-types:
+
+**************
+database.types
+**************
+
+This namespace is for interacting with the local types that are
+defined within the database. The functions within this namespace
+can be used to create, query, or fetch the types that have been
+defined.
+
+.. py:function:: types\.get(ordinal)
+   
+   :param ordinal: the ordinal of the type to get
+   
+.. py:function:: types\.get(ordinal, library)
+   
+   :param ordinal: the ordinal of the type to get
+   :type ordinal: int or long
+   :param library: the :py:obj:`idaapi.til_t` to fetch the type from
+   :type library: idaapi.til_t
+   
+.. py:function:: types\.get(name, library)
+   
+   :param name: the name of the type to get
+   :type name: str
+   :param library: the :py:obj:`idaapi.til_t` to fetch the type from
+   :type library: idaapi.til_t
+   
+.. py:function:: types\.set(ordinal, name, parameters)
+   
+   :param ordinal: the ordinal of the type to set
+   :type ordinal: int or long
+   :param name: the name of the type to set
+   :param parameters: the extra parameters to include during serialization
+   
+.. py:function:: types\.set(ordinal, name, parameters, library)
+   
+   :param ordinal: the ordinal of the type to set
+   :type ordinal: int or long
+   :param name: the name of the type to set
+   :param parameters: the extra parameters to include during serialization
+   :param library: the :py:obj:`idaapi.til_t` to set the type in
+   :type library: idaapi.til_t
+   
 .. _ns-database-xref:
 
 *************

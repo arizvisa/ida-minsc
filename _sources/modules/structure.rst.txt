@@ -5,7 +5,7 @@ structure -- Structure module
 
 This module exposes a number of tools and defines some classes that
 can be used to interacting with the structures defined in the database.
-The classes defined by this module wrap IDA's structure API and expose
+The classes defined by this module wrap IDAPython's structure API and expose
 a simpler interface that can be used to perform various operations
 against a structure such as renaming or enumerating the structure's
 members.
@@ -49,7 +49,7 @@ functions and aliases. For more information on this, please see
 
 .. py:function:: by(name, \*\*options)
    
-   Return a structure by its name.
+   Return the structure with the given ``name``.
    
    :param name: the name of the structure to return
    :type name: str
@@ -57,10 +57,18 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: by(id, \*\*options)
    
-   Return a structure by its index or id.
+   Return the structure with the specified ``id`` or index.
    
    :param id: the identifier or the index of the structure to return
    :type id: int or long
+   :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
+   
+.. py:function:: by(sptr, \*\*options)
+   
+   Return the structure for the specified ``sptr``.
+   
+   :param sptr: the ``idaapi.struc_t`` to return
+   :type sptr: idaapi.struc_t
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
    
 .. py:function:: by(\*\*type)
@@ -189,6 +197,27 @@ functions and aliases. For more information on this, please see
    :param size: the size of the members to yield
    :type size: int or long
    
+.. py:function:: has(id)
+   
+   Return whether a structure with the specified ``id`` exists within the database.
+   
+   :param id: the identifier or the index of the structure to check
+   :type id: int or long
+   
+.. py:function:: has(name)
+   
+   Return if a structure with the specified ``name`` exists within the database.
+   
+   :param name: the name of the structure to check
+   :type name: str
+   
+.. py:function:: has(structure)
+   
+   Return whether the database includes the provided ``structure``.
+   
+   :param structure:
+   :type structure: idaapi.struc_t
+   
 .. py:function:: index(id)
    
    Return the index of the structure identified by ``id``.
@@ -220,6 +249,24 @@ functions and aliases. For more information on this, please see
    :type structure: structure_t
    :param index: the index to move the structure to
    :type index: int or long
+   
+.. py:function:: is_union(id)
+   
+   Return whether the structure identified by ``id`` is a union or not.
+   
+   Aliases: :py:func:`structure.unionQ<is_union>`, :py:func:`structure.isunion<is_union>`
+   
+   :param id: the identifier of the structure to check
+   :type id: int or long
+   
+.. py:function:: is_union(structure)
+   
+   Return whether the provided ``structure`` is defined as a union.
+   
+   Aliases: :py:func:`structure.unionQ<is_union>`, :py:func:`structure.isunion<is_union>`
+   
+   :param structure: the ``idaapi.struc_t`` or :py:obj:`structure_t` to check
+   :type structure: idaapi.struc_t or structure_t
    
 .. py:function:: iterate(string)
    
@@ -456,6 +503,11 @@ member_t
    
       :param getter: Return the structure_t that owns the member.
    
+   .. py:attribute:: properties
+   
+   The \\"props\\" field of the :py:class:`idaapi.member_t` that this ``member_t`` wraps.
+      :param getter: Return the properties for the current member.
+   
    .. py:attribute:: ptr
    
    The :py:class:`idaapi.member_t` that this ``member_t`` wraps.
@@ -571,10 +623,10 @@ members_t
        > iterable = st.members.iterate(like='p_*')
        > result = st.members.by(offset=0x2a)
    
-   .. py:attribute:: parent
+   .. py:attribute:: owner
    
    The ``structure_t`` that owns this ``members_t``.
-      :param getter: Return the :py:obj:`structure_t` that owns this :py:obj:`members_t`.
+      :param getter: Return the owner :py:obj:`structure_t` for this :py:obj:`members_t`.
    
    .. py:attribute:: ptr
    
@@ -728,7 +780,7 @@ members_t
       
    .. py:method:: remove(self, offset, size)
       
-      Remove all the members from the structure from ``offset`` up to ``size``.
+      Remove all the members from the structure from the specified ``offset`` up to ``size`` bytes.
       
       :param offset: the offset of the starting member to remove
       :param size: the size of the members that follow to remove
@@ -749,6 +801,11 @@ structure_t
    array in order to access the different elements available. This
    property also allows a user to create a new member or remove an
    already existing one.
+   
+   .. py:attribute:: bounds
+   
+   The :py:class:`interface.bounds_t` describing the boundaries of this structure relative to its base offset.
+      :param getter: 
    
    .. py:attribute:: comment
    
@@ -790,10 +847,20 @@ structure_t
       :param setter: Set the base offset of the structure to ``offset``.
       :param offset: the new base offset to assign to the structure
    
+   .. py:attribute:: properties
+   
+   The \\"props\\" field of the :py:class:`idaapi.struc_t` that this ``structure_t`` wraps.
+      :param getter: Return the properties for the current structure.
+   
    .. py:attribute:: ptr
    
    The :py:class:`idaapi.struc_t` that this ``structure_t`` wraps.
       :param getter: Return the pointer of the :py:obj:`idaapi.struc_t`.
+   
+   .. py:attribute:: realbounds
+   
+   The :py:class:`interface.bounds_t` describing the boundaries of this structure.
+      :param getter: 
    
    .. py:attribute:: size
    
@@ -818,10 +885,6 @@ structure_t
       
       Remove the structure from the database.
       
-   .. py:method:: down(self)
-      
-      Return all the structure members and addresses that are referenced by this specific structure.
-      
    .. py:method:: field(self, offset)
       
       Return the member at the specified offset.
@@ -830,7 +893,7 @@ structure_t
       
    .. py:method:: refs(self)
       
-      Return all structure or frame members within the database that reference this particular structure.
+      Return all the structure members and operand references which reference this specific structure.
       
    .. py:method:: tag(self)
       
@@ -862,5 +925,5 @@ structure_t
       
    .. py:method:: up(self)
       
-      Return all the structure members and addresses that reference this specific structure.
+      Return all structure or frame members within the database that reference this particular structure.
       

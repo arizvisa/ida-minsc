@@ -59,7 +59,7 @@
 <h1>3.1.6. structure – Structure module<a class="headerlink" href="#structure-structure-module" title="Permalink to this headline">¶</a></h1>
 <p>This module exposes a number of tools and defines some classes that
 can be used to interacting with the structures defined in the database.
-The classes defined by this module wrap IDA’s structure API and expose
+The classes defined by this module wrap IDAPython’s structure API and expose
 a simpler interface that can be used to perform various operations
 against a structure such as renaming or enumerating the structure’s
 members.</p>
@@ -99,7 +99,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="structure.by">
 <code class="descclassname">structure.</code><code class="descname">by</code><span class="sig-paren">(</span><em>name</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.by" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a structure by its name.</p>
+<dd><p>Return the structure with the given <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -117,13 +117,31 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">structure.</code><code class="descname">by</code><span class="sig-paren">(</span><em>id</em>, <em>**options</em><span class="sig-paren">)</span></dt>
-<dd><p>Return a structure by its index or id.</p>
+<dd><p>Return the structure with the specified <code class="docutils literal notranslate"><span class="pre">id</span></code> or index.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier or the index of the structure to return</li>
+<li><strong>**options</strong> – if <code class="docutils literal notranslate"><span class="pre">offset</span></code> is specified, then use it as the base offset of the structure</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">by</code><span class="sig-paren">(</span><em>sptr</em>, <em>**options</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the structure for the specified <code class="docutils literal notranslate"><span class="pre">sptr</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to return</li>
 <li><strong>**options</strong> – if <code class="docutils literal notranslate"><span class="pre">offset</span></code> is specified, then use it as the base offset of the structure</li>
 </ul>
 </td>
@@ -364,6 +382,48 @@ comment.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="structure.has">
+<code class="descclassname">structure.</code><code class="descname">has</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.has" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether a structure with the specified <code class="docutils literal notranslate"><span class="pre">id</span></code> exists within the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier or the index of the structure to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">has</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Return if a structure with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> exists within the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the structure to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">has</code><span class="sig-paren">(</span><em>structure</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the database includes the provided <code class="docutils literal notranslate"><span class="pre">structure</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<em>idaapi.struc_t</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="structure.index">
 <code class="descclassname">structure.</code><code class="descname">index</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.index" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the index of the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code>.</p>
@@ -422,6 +482,36 @@ comment.</p>
 <li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index to move the structure to</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="structure.is_union">
+<code class="descclassname">structure.</code><code class="descname">is_union</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.is_union" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code> is a union or not.</p>
+<p>Aliases: <a class="reference internal" href="#structure.is_union" title="structure.is_union"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.unionQ</span></code></a>, <a class="reference internal" href="#structure.is_union" title="structure.is_union"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.isunion</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the structure to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">is_union</code><span class="sig-paren">(</span><em>structure</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the provided <code class="docutils literal notranslate"><span class="pre">structure</span></code> is defined as a union.</p>
+<p>Aliases: <a class="reference internal" href="#structure.is_union" title="structure.is_union"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.unionQ</span></code></a>, <a class="reference internal" href="#structure.is_union" title="structure.is_union"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.isunion</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<em>idaapi.struc_t</em><em> or </em><a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> or <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to check</td>
 </tr>
 </tbody>
 </table>
@@ -941,6 +1031,23 @@ database that references said member.</p>
 </dd></dl>
 
 <dl class="attribute">
+<dt id="structure.member_t.properties">
+<code class="descname">properties</code><a class="headerlink" href="#structure.member_t.properties" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="docutils">
+<dt>The &quot;props&quot; field of the <code class="xref py py-class docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> that this <code class="docutils literal notranslate"><span class="pre">member_t</span></code> wraps.</dt>
+<dd><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the properties for the current member.</td>
+</tr>
+</tbody>
+</table>
+</dd>
+</dl>
+<dl class="attribute">
 <dt id="structure.member_t.ptr">
 <code class="descname">ptr</code><a class="headerlink" href="#structure.member_t.ptr" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -1184,8 +1291,8 @@ specified. The keywords that are available to filter members are:</p>
 </pre></div>
 </div>
 <dl class="attribute">
-<dt id="structure.members_t.parent">
-<code class="descname">parent</code><a class="headerlink" href="#structure.members_t.parent" title="Permalink to this definition">¶</a></dt>
+<dt id="structure.members_t.owner">
+<code class="descname">owner</code><a class="headerlink" href="#structure.members_t.owner" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="docutils">
@@ -1194,7 +1301,7 @@ specified. The keywords that are available to filter members are:</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> that owns this <a class="reference internal" href="#structure.members_t" title="structure.members_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">members_t</span></code></a>.</td>
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the owner <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> for this <a class="reference internal" href="#structure.members_t" title="structure.members_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">members_t</span></code></a>.</td>
 </tr>
 </tbody>
 </table>
@@ -1516,7 +1623,7 @@ specified. The keywords that are available to filter members are:</p>
 <dl class="method">
 <dt>
 <code class="descname">remove</code><span class="sig-paren">(</span><em>self</em>, <em>offset</em>, <em>size</em><span class="sig-paren">)</span></dt>
-<dd><p>Remove all the members from the structure from <code class="docutils literal notranslate"><span class="pre">offset</span></code> up to <code class="docutils literal notranslate"><span class="pre">size</span></code>.</p>
+<dd><p>Remove all the members from the structure from the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> up to <code class="docutils literal notranslate"><span class="pre">size</span></code> bytes.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1548,6 +1655,23 @@ certain attributes of the structure.</p>
 array in order to access the different elements available. This
 property also allows a user to create a new member or remove an
 already existing one.</p>
+<dl class="attribute">
+<dt id="structure.structure_t.bounds">
+<code class="descname">bounds</code><a class="headerlink" href="#structure.structure_t.bounds" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="docutils">
+<dt>The <code class="xref py py-class docutils literal notranslate"><span class="pre">interface.bounds_t</span></code> describing the boundaries of this structure relative to its base offset.</dt>
+<dd><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+</dd>
+</dl>
 <dl class="attribute">
 <dt id="structure.structure_t.comment">
 <code class="descname">comment</code><a class="headerlink" href="#structure.structure_t.comment" title="Permalink to this definition">¶</a></dt>
@@ -1673,6 +1797,23 @@ already existing one.</p>
 </dd>
 </dl>
 <dl class="attribute">
+<dt id="structure.structure_t.properties">
+<code class="descname">properties</code><a class="headerlink" href="#structure.structure_t.properties" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="docutils">
+<dt>The &quot;props&quot; field of the <code class="xref py py-class docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> that this <code class="docutils literal notranslate"><span class="pre">structure_t</span></code> wraps.</dt>
+<dd><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the properties for the current structure.</td>
+</tr>
+</tbody>
+</table>
+</dd>
+</dl>
+<dl class="attribute">
 <dt id="structure.structure_t.ptr">
 <code class="descname">ptr</code><a class="headerlink" href="#structure.structure_t.ptr" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -1684,6 +1825,23 @@ already existing one.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the pointer of the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code>.</td>
+</tr>
+</tbody>
+</table>
+</dd>
+</dl>
+<dl class="attribute">
+<dt id="structure.structure_t.realbounds">
+<code class="descname">realbounds</code><a class="headerlink" href="#structure.structure_t.realbounds" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="docutils">
+<dt>The <code class="xref py py-class docutils literal notranslate"><span class="pre">interface.bounds_t</span></code> describing the boundaries of this structure.</dt>
+<dd><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body"></td>
 </tr>
 </tbody>
 </table>
@@ -1749,12 +1907,6 @@ already existing one.</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="structure.structure_t.down">
-<code class="descname">down</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.structure_t.down" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return all the structure members and addresses that are referenced by this specific structure.</p>
-</dd></dl>
-
-<dl class="method">
 <dt id="structure.structure_t.field">
 <code class="descname">field</code><span class="sig-paren">(</span><em>self</em>, <em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.structure_t.field" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the member at the specified offset.</p>
@@ -1771,7 +1923,7 @@ already existing one.</p>
 <dl class="method">
 <dt id="structure.structure_t.refs">
 <code class="descname">refs</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.structure_t.refs" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return all structure or frame members within the database that reference this particular structure.</p>
+<dd><p>Return all the structure members and operand references which reference this specific structure.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1833,7 +1985,7 @@ already existing one.</p>
 <dl class="method">
 <dt id="structure.structure_t.up">
 <code class="descname">up</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.structure_t.up" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return all the structure members and addresses that reference this specific structure.</p>
+<dd><p>Return all structure or frame members within the database that reference this particular structure.</p>
 </dd></dl>
 
 </dd></dl>
