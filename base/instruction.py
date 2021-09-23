@@ -1006,7 +1006,16 @@ def op_structure(ea, opnum):
     # to use to walk our path with. This should then give us the actual path
     # along with the real delta that we'll return rather than what IDA gave us.
     Ffilter = generate_filter(items)
-    res, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
+    try:
+        res, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
+
+    # If we couldn't find a nearest member, then our structure probably doesn't
+    # have any members. If there aren't any, calculate an empty path and its
+    # delta so that we can return it properly.
+    except E.MemberNotFoundError as exception:
+        if len(st.members):
+            raise exception
+        res, realdelta = [], offset + delta.value()
 
     # If our number of items that we filtered is larger than the result path
     # that we were able to walk, then this might be a union with the delta
@@ -1254,23 +1263,33 @@ def op_structure(ea, opnum, sptr, *path):
         res = [mptr for mptr in members if mptr.id == choice]
         return res
 
-    # Now we need to use the requested offset to descend through the structure
-    # that we're starting at, and then hope it matches the path that was
-    # recommended. We need to shift whatever this offset is by the delta that
-    # we were given, and then gather our results into mptr and sptrs.
-    rp, realdelta = st.members.__walk_to_realoffset__(value + delta, filter=filter)
-    results = [(item.parent.ptr, item.ptr) for item in rp]
-    moffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
+    # If our structure has some members, then we need to use the requested offset
+    # to descend through the structure that we're starting with and then hope it
+    # matches the path that was recommended to us. We need to shift whatever this
+    # offset is by the delta that we were given, and then gather our results into
+    # both an sptr and mptrs.
+    if len(st.members):
+        rp, realdelta = st.members.__walk_to_realoffset__(value + delta, filter=filter)
+        results = [(item.parent.ptr, item.ptr) for item in rp]
+        moffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
 
-    # Now that we've carved an actual path through the structure and its
-    # descendants, we can allocate the tid_array using the starting structure and
-    # adding each individual member to it. If we didn't get any members for our
-    # results, then that's okay since we still have the structure to start at.
-    length, (sptr, _) = 1 + len(results), results[0] if results else (st.ptr, None)
-    tid = idaapi.tid_array(length)
-    tid[0] = sptr.id
-    for i, (sptr, mptr) in enumerate(results):
-        tid[i + 1] = mptr.id
+        # Now that we've carved an actual path through the structure and its
+        # descendants, we can allocate the tid_array using the starting structure and
+        # adding each individual member to it. If we didn't get any members for our
+        # results, then that's okay since we still have the structure to start at.
+        length, (sptr, _) = 1 + len(results), results[0] if results else (st.ptr, None)
+        tid = idaapi.tid_array(length)
+        tid[0] = sptr.id
+        for i, (sptr, mptr) in enumerate(results):
+            tid[i + 1] = mptr.id
+
+    # If there are no members in the structure, then we just apply it by
+    # calculating all of the necessary variables before asking IDA to write
+    # it to the desired operand.
+    else:
+        length, realdelta, moffset = 1, value + delta, 0
+        tid = idaapi.tid_array(length)
+        tid[0] = sptr.id
 
     # Now we can apply our tid_array to the operand, and include our original
     # member offset from the path the user gave us so that way the user can
