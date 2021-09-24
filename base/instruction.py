@@ -1006,36 +1006,7 @@ def op_structure(ea, opnum):
     # to use to walk our path with. This should then give us the actual path
     # along with the real delta that we'll return rather than what IDA gave us.
     Ffilter = generate_filter(items)
-    try:
-        res, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
-
-    # If we couldn't find a nearest member, then our structure probably doesn't
-    # have any members. If there aren't any, calculate an empty path and its
-    # delta so that we can return it properly.
-    except E.MemberNotFoundError as exception:
-        if len(st.members):
-            raise exception
-        res, realdelta = [], offset + delta.value()
-
-    # If our number of items that we filtered is larger than the result path
-    # that we were able to walk, then this might be a union with the delta
-    # pointing outside of its bounds. In this case, we'll just trust our items.
-    if len(res) < len(items):
-        res, current, listQ = [], st, False
-        for mptr in items:
-            item = current.members.by_identifier(mptr.id)
-            res.append(item)
-            listQ = listQ or isinstance(item.type, builtins.list)
-            current = item.type
-
-        # Adjust our realdelta, and convert the path to the correct type.
-        realdelta = -delta.value() + moffset
-        path = builtins.list(res) if listQ else builtins.tuple(res)
-
-    # Otherwise our __walk_to_realoffset__ call worked, and we can trust
-    # what we received from it.
-    else:
-        path = res
+    path, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
 
     # If our path is empty, then there's no members and this is just a structure.
     if not path:
@@ -1281,15 +1252,27 @@ def op_structure(ea, opnum, sptr, *path, **force):
         rp, rpdelta = st.members.__walk_to_realoffset__(offset + delta, filter=filter)
         results = [(item.parent.ptr, item.ptr) for item in rp]
 
+        # Count the number of members that are unions because we will be using it
+        # to allocate the path that we write to the supval for the designated
+        # instruction operand.
+        length = 1 + sum(1 for sptr, mptr in results if sptr.is_union())
+
         # Now that we've carved an actual path through the structure and its
         # descendants, we can allocate the tid_array using the starting structure and
         # adding each individual member to it. If we didn't get any members for our
         # results, then that's okay since we still have the structure to start at.
-        length, (sptr, _) = 1 + len(results), results[0] if results else (st.ptr, None)
-        tid = idaapi.tid_array(length)
+        sptr, _ = results[0] if results else (st.ptr, None)
+        index, tid = 1, idaapi.tid_array(length)
         tid[0] = sptr.id
-        for i, (sptr, mptr) in enumerate(results):
-            tid[i + 1] = mptr.id
+        for sptr, mptr in results:
+            if sptr.is_union():
+                tid[index] = mptr.id
+                index += 1
+            continue
+
+        # Verify our length just to be certain.
+        if index != length:
+            raise AssertionError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The number of elements in the path ({:d}) does not correspond to the number of elements that were calculated ({:d}).".format(__name__, ea, opnum, st.ptr.id, index, length))
         rpoffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
 
     # If there are no members in the structure, then we build a tid_array composed
@@ -1300,14 +1283,15 @@ def op_structure(ea, opnum, sptr, *path, **force):
         tid = idaapi.tid_array(length)
         tid[0] = sptr.id
 
-    # If the user asked us to force this path, then re-calculate the offset
-    # relative to the operand value so that it can be corrected.
-    if force.get('force', False):
-        res = (rpoffset + rpdelta) - value
-
-    # Otherwise, we just trust the value return by our traversal.
-    else:
+    # If the user asked us to force this path, then we just trust the value
+    # that was returned by our traversal.
+    if any(k in force for k in ['force', 'forced']) and builtins.next((force[k] for k in ['force', 'forced'] if k in force), False):
         res = rpoffset + rpdelta
+
+    # Otherwise, we take the difference between the user's offset and our
+    # traversal's offset, and then add the delta we figured out.
+    else:
+        res = (rpoffset - offset) + rpdelta
 
     # Now we can apply our tid_array to the operand, and include our original
     # member offset from the path the user gave us so that way the user can
