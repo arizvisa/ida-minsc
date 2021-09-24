@@ -1019,16 +1019,21 @@ def op_structure(ea, opnum):
 
     # If our number of items that we filtered is larger than the result path
     # that we were able to walk, then this might be a union with the delta
-    # pointing outside of its bounds. We handle this as a special case for now.
+    # pointing outside of its bounds. In this case, we'll just trust our items.
     if len(res) < len(items):
-        if not(len(items) - len(res) == 1):
-            raise AssertionError(u"{:s}.op_structure({:#x}, {:d}) : An unexpected number of items was returned ({:d}) during path calculation for {:d} items.".format(__name__, ea, opnum, len(res), len(items)))
+        res, current, listQ = [], st, False
+        for mptr in items:
+            item = current.members.by_identifier(mptr.id)
+            res.append(item)
+            listQ = listQ or isinstance(item.type, builtins.list)
+            current = item.type
 
-        # XXX: We validate this logic with the prior assertion because I
-        #      believe this logic to be incorrect.
-        mfix = st.members.by_identifier(items[0].id)
-        path = (mfix,) + res if isinstance(res, builtins.tuple) else [mfix] + res
+        # Adjust our realdelta, and convert the path to the correct type.
+        realdelta = -delta.value() + moffset
+        path = builtins.list(res) if listQ else builtins.tuple(res)
 
+    # Otherwise our __walk_to_realoffset__ call worked, and we can trust
+    # what we received from it.
     else:
         path = res
 
@@ -1051,31 +1056,31 @@ def op_structure(ea, opnum):
 @utils.multicase(opnum=six.integer_types, structure=structure.structure_t)
 def op_structure(opnum, structure, *path, **delta):
     '''Apply the specified `structure` along with any members in `path` to the instruction operand `opnum` at the current address.'''
-    sptr, deltapath = structure.ptr, [delta.get('delta', 0)] if delta else []
-    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath))
+    sptr, deltapath = structure.ptr, [delta.pop('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath), **delta)
 @utils.multicase(opnum=six.integer_types, sptr=idaapi.struc_t)
 def op_structure(opnum, sptr, *path, **delta):
     '''Apply the ``idaapi.struc_t` in `sptr` along with any members in `path` to the instruction operand `opnum` at the current address.'''
-    deltapath = [delta.get('delta', 0)] if delta else []
-    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath))
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath), **delta)
 @utils.multicase(opnum=six.integer_types, name=six.string_types)
 def op_structure(opnum, name, *path, **delta):
     '''Apply the structure with the specified `name` and the members in `path` to the instruction operand `opnum` at the current address.'''
-    sptr, deltapath = structure.by(name).ptr, [delta.get('delta', 0)] if delta else []
-    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath))
+    sptr, deltapath = structure.by(name).ptr, [delta.pop('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath), **delta)
 @utils.multicase(opnum=six.integer_types, member=structure.member_t)
 def op_structure(opnum, member, *path, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the current address.'''
-    sptr, deltapath = member.parent.ptr, [delta.get('delta', 0)] if delta else []
-    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain([member], path, deltapath))
+    sptr, deltapath = member.parent.ptr, [delta.pop('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain([member], path, deltapath), **delta)
 @utils.multicase(opnum=six.integer_types, mptr=idaapi.member_t)
 def op_structure(opnum, mptr, *path, **delta):
     '''Apply the ``idaapi.member_t` in `mptr` to the instruction operand `opnum` at the current address.'''
     _, _, sptr = idaapi.get_member_by_id(mptr.id)
     if not interface.node.is_identifier(sptr.id):
         sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
-    deltapath = [delta.get('delta', 0)] if delta else []
-    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain([mptr], path, deltapath))
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain([mptr], path, deltapath), **delta)
 @utils.multicase(opnum=six.integer_types, path=(builtins.tuple, builtins.list))
 def op_structure(opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
@@ -1084,30 +1089,30 @@ def op_structure(opnum, path, **delta):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=structure.structure_t)
 def op_structure(ea, opnum, structure, *path, **delta):
     '''Apply the specified `structure` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
-    sptr, deltapath = structure.ptr, [delta.get('delta', 0)] if delta else []
-    return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath))
+    sptr, deltapath = structure.ptr, [delta.pop('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath), **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=six.string_types)
 def op_structure(ea, opnum, name, *path, **delta):
     '''Apply the structure with the specified `name` and any members in `path` to the instruction operand `opnum` at the address `ea`.'''
-    sptr, deltapath = structure.by(name).ptr, [delta.get('delta', 0)] if delta else []
-    return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath))
+    sptr, deltapath = structure.by(name).ptr, [delta.pop('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath), **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, member=structure.member_t)
 def op_structure(ea, opnum, member, *path, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
-    sptr, deltapath = member.parent.ptr, [delta.get('delta', 0)] if delta else []
-    return op_structure(ea, opnum, sptr, *itertools.chain([member], path, deltapath))
+    sptr, deltapath = member.parent.ptr, [delta.pop('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain([member], path, deltapath), **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, mptr=idaapi.member_t)
 def op_structure(ea, opnum, mptr, *path, **delta):
     '''Apply the ``idaapi.member_t` in `mptr` to the instruction operand `opnum` at the address `ea`.'''
     _, _, sptr = idaapi.get_member_by_id(mptr.id)
     if not interface.node.is_identifier(sptr.id):
         sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
-    deltapath = [delta.get('delta', 0)] if delta else []
-    return op_structure(ea, opnum, sptr, *itertools.chain([mptr], path, deltapath))
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain([mptr], path, deltapath), **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(builtins.tuple, builtins.list))
 def op_structure(ea, opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.'''
-    items, deltapath = [item for item in path], [delta.get('delta', 0)] if delta else []
+    items, deltapath = [item for item in path], [delta.pop('delta', 0)] if delta else []
     member = items.pop(0) if len(items) else ''
     if isinstance(member, six.string_types):
         sptr, fullpath = structure.by(member).ptr, items
@@ -1124,9 +1129,9 @@ def op_structure(ea, opnum, path, **delta):
         sptr, fullpath = member.parent.ptr, [member] + items
     else:
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:+d}) : Unable to determine the structure from the provided path due to the first member being of an unsupported type ({!s}).".format(__name__, ea, opnum, path, delta.get('delta', 0), member.__class__))
-    return op_structure(ea, opnum, sptr, *itertools.chain(fullpath, deltapath))
+    return op_structure(ea, opnum, sptr, *itertools.chain(fullpath, deltapath), **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, sptr=idaapi.struc_t)
-def op_structure(ea, opnum, sptr, *path):
+def op_structure(ea, opnum, sptr, *path, **force):
     '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
@@ -1236,11 +1241,13 @@ def op_structure(ea, opnum, sptr, *path):
 
     # Now that we have the suggested path and thus the desired offset, we're
     # going to use it to generate a filter that we will use to determine the
-    # _actual_ path for the desired offset. We'll start by formatting these
-    # items into a lookup table.
+    # union members to choose along the desired offset. We'll start by formatting
+    # these items into a lookup table.
     table = {}
     for sptr, mptr in items:
-        table.setdefault(sptr.id, []).append(mptr.id)
+        if sptr.is_union():
+            table.setdefault(sptr.id, []).append(mptr.id)
+        continue
 
     # Now we can define a closure that uses this table to get as close as we can
     # to what the user suggsted. If the path doesn't correspond, then we're
@@ -1254,12 +1261,14 @@ def op_structure(ea, opnum, sptr, *path):
         if len(choices) == 0:
             return []
 
-        # Check that the choice the user gave us is in our list.
-        choice, tids = choices.pop(0), {item.id for item in members}
-        if choice not in tids:
+        # Check the next item on the stack is a valid candidate, and
+        # pop it off it is.
+        mid = choices[0]
+        if mid not in candidates:
             return []
+        choice = choices.pop(0)
 
-        # We found a match and so we should be okay with returning it.
+        # Filter our list of members for the one that matches our choice.
         res = [mptr for mptr in members if mptr.id == choice]
         return res
 
@@ -1269,9 +1278,8 @@ def op_structure(ea, opnum, sptr, *path):
     # offset is by the delta that we were given, and then gather our results into
     # both an sptr and mptrs.
     if len(st.members):
-        rp, realdelta = st.members.__walk_to_realoffset__(value + delta, filter=filter)
+        rp, rpdelta = st.members.__walk_to_realoffset__(offset + delta, filter=filter)
         results = [(item.parent.ptr, item.ptr) for item in rp]
-        moffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
 
         # Now that we've carved an actual path through the structure and its
         # descendants, we can allocate the tid_array using the starting structure and
@@ -1282,19 +1290,28 @@ def op_structure(ea, opnum, sptr, *path):
         tid[0] = sptr.id
         for i, (sptr, mptr) in enumerate(results):
             tid[i + 1] = mptr.id
+        rpoffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
 
-    # If there are no members in the structure, then we just apply it by
-    # calculating all of the necessary variables before asking IDA to write
-    # it to the desired operand.
+    # If there are no members in the structure, then we build a tid_array composed
+    # of just the structure identifier, and then use the path that we were given
+    # that includes just the offset and the delta.
     else:
-        length, realdelta, moffset = 1, value + delta, 0
+        length, rpdelta, rpoffset = 1, delta, offset
         tid = idaapi.tid_array(length)
         tid[0] = sptr.id
+
+    # If the user asked us to force this path, then re-calculate the offset
+    # relative to the operand value so that it can be corrected.
+    if force.get('force', False):
+        res = (rpoffset + rpdelta) - value
+
+    # Otherwise, we just trust the value return by our traversal.
+    else:
+        res = rpoffset + rpdelta
 
     # Now we can apply our tid_array to the operand, and include our original
     # member offset from the path the user gave us so that way the user can
     # fetch it later if they so desire.
-    res = moffset - value + realdelta
     if idaapi.__version__ < 7.0:
         ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, res)
 
