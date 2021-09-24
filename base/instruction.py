@@ -1006,7 +1006,17 @@ def op_structure(ea, opnum):
     # to use to walk our path with. This should then give us the actual path
     # along with the real delta that we'll return rather than what IDA gave us.
     Ffilter = generate_filter(items)
-    path, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
+    try:
+        path, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
+
+    # If the member was not found, then check to see if the structure has any
+    # members. If it does, then re-raise the exception. Otherwise we need to
+    # return the structure relative to the discovered offset because there aren't
+    # any members that we need to traverse.
+    except E.MemberNotFoundError as exception:
+        if len(st.members):
+            raise exception
+        path, realdelta = [], offset + delta.value()
 
     # If our path is empty, then there's no members and this is just a structure.
     if not path:
