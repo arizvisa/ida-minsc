@@ -1001,68 +1001,43 @@ class node(object):
         return identifier & mask == mask
 
     @staticmethod
-    def sup_functype(sup):
-        """Given a supval, return the pointer size, model, and calling convention for a function.
+    def sup_functype(sup, *supfields):
+        """Given a supval, return the pointer size, model, calling convention, return type, and a tuple composed of the argument stack size and the arguments for a function.
 
         This string is typically found in a supval[0x3000] of a function.
         """
-        res, iterable = [], (item for item in bytearray(sup))
+        res, ti = [], idaapi.tinfo_t()
+        if not ti.deserialize(None, sup, *itertools.chain(supfields, [None] * (2 - min(2, len(supfields))))):
+            raise internal.exceptions.DisassemblerError(u"{:s}.sup_functype(\"{!s}\") : Unable to deserialize the type information that was received.".format('.'.join([__name__, node.__name__]), sup.encode('hex')))
 
-        # pointer and model
-        by = builtins.next(iterable)
-        if by & 0xf0:
-            # FIXME: If this doesn't match, then this is a type that forwards to the real function type.
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), by, 2 + 2))
-        res.append( (by & idaapi.CM_MASK) )
-        res.append( (by & idaapi.CM_M_MASK) )
+        # Fetch the pointer size (alignment?), and the model (realtype?).
+        if not ti.is_func():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.sup_functype(\"{!s}\") : The type that was received ({!s}) was not a function type.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), ti))
+        res.append(ti.get_declalign())
+        res.append(ti.get_realtype())
 
-        # calling convention
-        by = builtins.next(iterable)
-        cc, count = by & idaapi.CM_CC_MASK, by & 0x0f
-        if cc == idaapi.CM_CC_SPOILED:
-            if count != 15:
-                lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('CM_CC_') }
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
-            funcattr = builtins.next(iterable)
-            by = builtins.next(iterable)
-            res.append( (by & idaapi.CM_CC_MASK) )
-        else:
-            res.append(cc)
+        # Now we can get the calling convention and append the return type.
+        ftd = idaapi.func_type_data_t()
+        if not ti.get_func_details(ftd):
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.sup_functype(\"{!s}\") : Unable to get the function's details from the received type information.".format('.'.join([__name__, node.__name__]), sup.encode('hex')))
+        res.append(ftd.cc)
+        res.append(ftd.rettype)
 
-        # FIXME: terminate ahead of time because decoding the return type seemed more work than I desired to commit
-        return tuple(res)
+        # Validate the number of arguments corresponds to the our ftd array.
+        number = ti.get_nargs()
+        if number != len(ftd):
+            raise internal.exceptions.AssertionError(u"{:s}.sup_functype(\"{!s}\") : The number of arguments for the function type ({:d}) does not match the number of arguments that were returned ({:d}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), number, len(ftd)))
 
-        # XXX: implement a parser for type_t in order to figure out idaapi.BT_COMPLEX types
-        # return type_t
-        item = builtins.next(iterable)
-        data, base, flags, mods = bytearray([item]), item & idaapi.TYPE_BASE_MASK, item & idaapi.TYPE_FLAGS_MASK, item & idaapi.TYPE_MODIF_MASK
-        if base == idaapi.BT_PTR:
-            data += bytearray([builtins.next(iterable)])
+        # To grab the arguments, we need to figure out the count because our arguments
+        # will be a tuple composed of the (name, type, comment) for each one.
+        arguments = []
+        for index in builtins.range(ti.get_nargs()):
+            item = ftd[index]
+            typename, typeinfo, typecomment = item.name, item.type, item.cmt
+            arguments.append(typeinfo if not len(supfields) else (typeinfo, typename) if len(supfields) == 1 else (typeinfo, typename, typecomment))
+        res.append((ftd.stkargs, arguments))
 
-        elif base == idaapi.BT_COMPLEX and flags == 0x30:
-            by = builtins.next(iterable)
-            skip, data = by, data + bytearray([by])
-            while skip > 1:
-                data += bytearray([builtins.next(iterable)])
-                skip -= 1
-
-        elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
-            lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
-            if base == idaapi.BT_COMPLEX:
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, item, 2 + 2))
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, mods, item, 2 + 2))
-
-        # append the return type as some bytes
-        res.append(bytes(data))
-
-        # append the number of arguments
-        by = builtins.next(iterable)
-        res.append(by)
-
-        # Everything else in the iterable is an array of type_t as found in "Type flags" in the SDK docs.
-        ''.join(iterable)
-
-        # now we can return the whole thing
+        # Now we can return everything that we've collected from the type.
         return tuple(res)
 
     @staticmethod
