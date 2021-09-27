@@ -2305,7 +2305,7 @@ class type(object):
             raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
         sup = view.tobytes()
         try:
-            _, _, cc = interface.node.sup_functype(sup)
+            _, _, cc, _, _ = interface.node.sup_functype(sup)
         except E.UnsupportedCapability:
             raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
         return cc
