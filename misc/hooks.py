@@ -716,7 +716,7 @@ class typeinfo(changingchanged):
 
         # If we encounter a StopIteration while submitting the comment, then the
         # coroutine has terminated unexpectedly which is a pretty critical issue.
-        except StopIteration as E:
+        except StopIteration:
             logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Abandoning update of type information at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled and then
