@@ -136,11 +136,21 @@ def opinfo(opnum):
 def opinfo(opnum, info, **flags):
     '''Set the opinfo for the operand `opnum` at the current address to the ``idaapi.opinfo_t`` provided by `info`.'''
     return opinfo(ui.current.address(), opnum, info, **flags)
+@utils.multicase(reference=interface.opref_t)
+def opinfo(reference):
+    '''Returns the ``idaapi.opinfo_t`` for the operand pointed to by the provided `reference`.'''
+    address, opnum, _ = reference
+    return opinfo(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def opinfo(ea, opnum):
     '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     ti, flags = idaapi.opinfo_t(), database.type.flags(ea)
     return idaapi.get_opinfo(ea, opnum, flags, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, flags)
+@utils.multicase(reference=interface.opref_t, info=idaapi.opinfo_t)
+def opinfo(reference, info, **flags):
+    '''Set the operand info for the operand specified by `reference` to the ``idaapi.opinfo_t`` provided by `info`.'''
+    address, opnum, _ = reference
+    return opinfo(address, opnum, info, **flags)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, info=idaapi.opinfo_t)
 def opinfo(ea, opnum, info, **flags):
     """Set the operand info for the operand `opnum` at the address `ea` to the ``idaapi.opinfo_t`` provided by `info`.
@@ -207,6 +217,11 @@ def operands(ea):
 def operand(opnum):
     '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the current address.'''
     return operand(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def operand(reference):
+    '''Returns the ``idaapi.op_t`` for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return operand(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def operand(ea, opnum):
     '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
@@ -415,6 +430,11 @@ ops_reg = ops_regs = ops_registers = utils.alias(ops_register)
 def op_repr(opnum):
     '''Returns the representation for the operand `opnum` belonging to the instruction at the current address.'''
     return op_repr(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_repr(reference):
+    '''Returns the representation for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_repr(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_repr(ea, opnum):
     '''Returns the representation for the operand `opnum` belonging to the instruction at the address `ea`.'''
@@ -432,6 +452,11 @@ def op_repr(ea, opnum):
 def op_state(opnum):
     '''Returns the modification state for the operand `opnum` belonging to the current instruction.'''
     return op_state(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_state(reference):
+    '''Returns the modification state for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_state(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_state(ea, opnum):
     """Returns the modification state for the operand `opnum` belonging to the instruction at the address `ea`.
@@ -457,6 +482,11 @@ def op_state(ea, opnum):
 def op_size(opnum):
     '''Returns the size for the operand `opnum` belonging to the current instruction.'''
     return op_size(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_size(reference):
+    '''Returns the size for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_size(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_size(ea, opnum):
     '''Returns the size for the operand `opnum` belonging to the instruction at the address `ea`.'''
@@ -469,6 +499,10 @@ def op_size(ea, opnum):
 def op_bits(opnum):
     '''Returns the size (in bits) for the operand `opnum` belonging to the current instruction.'''
     return 8 * op_size(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_bits(reference):
+    '''Returns the size (in bits) for the operand pointed to by `reference`.'''
+    return 8 * op_size(reference)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_bits(ea, opnum):
     '''Returns the size (in bits) for the operand `opnum` belonging to the instruction at the address `ea`.'''
@@ -478,6 +512,11 @@ def op_bits(ea, opnum):
 def opt(opnum):
     '''Returns the type of the operand `opnum` belonging to the current instruction.'''
     return opt(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def opt(reference):
+    '''Returns the type of the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return opt(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def opt(ea, opnum):
     """Returns the type of the operand `opnum` belonging to the instruction at the address `ea`.
@@ -501,6 +540,11 @@ op_type = utils.alias(opt)
 def op(opnum):
     '''Decodes the operand `opnum` for the current instruction.'''
     return op(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op(reference):
+    '''Decodes the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op(ea, opnum):
     '''Decodes the operand `opnum` for the instruction at the address `ea`.'''
@@ -533,6 +577,11 @@ op_value = op_decode = utils.alias(op)
 def op_segment(opnum):
     '''Returns the segment register used by the operand `opnum` for the instruction at the current address.'''
     return op_segment(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_segment(reference):
+    '''Returns the segment register used by the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_segment(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_segment(ea, opnum):
     '''Returns the segment register used by the operand `opnum` for the instruction at the address `ea`.'''
@@ -550,6 +599,11 @@ def op_segment(ea, opnum):
 def op_number(opnum):
     '''Set the type for operand `opnum` at the current instruction to a number and return it.'''
     return op_number(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_number(reference):
+    '''Set the type for the operand pointed to by `reference` to a number and return it.'''
+    address, opnum, _ = reference
+    return op_number(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_number(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a number and return it.'''
@@ -581,6 +635,11 @@ op_num = utils.alias(op_number)
 def op_character(opnum):
     '''Set the type for operand `opnum` at the current instruction to a character and return it.'''
     return op_character(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_character(reference):
+    '''Set the type for the operand pointed to by `reference` to a character and return it.'''
+    address, opnum, _ = reference
+    return op_character(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_character(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a character and return it.'''
@@ -628,6 +687,11 @@ op_chr = op_char = utils.alias(op_character)
 def op_binary(opnum):
     '''Set the type for operand `opnum` at the current instruction to binary and return it.'''
     return op_binary(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_binary(reference):
+    '''Set the type for the operand pointed to by `reference` to binary and return it.'''
+    address, opnum, _ = reference
+    return op_binary(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_binary(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to binary and return it.'''
@@ -659,6 +723,11 @@ op_bin = utils.alias(op_binary)
 def op_octal(opnum):
     '''Set the type for operand `opnum` at the current instruction to octal and return it.'''
     return op_octal(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_octal(reference):
+    '''Set the type for the operand pointed to by `reference` to octal and return it.'''
+    address, opnum, _ = reference
+    return op_octal(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_octal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to octal and return it.'''
@@ -690,6 +759,11 @@ op_oct = utils.alias(op_octal)
 def op_decimal(opnum):
     '''Set the type for operand `opnum` at the current instruction to decimal and return it.'''
     return op_decimal(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_decimal(reference):
+    '''Set the type for the operand pointed to by `reference` to decimal and return it.'''
+    address, opnum, _ = reference
+    return op_decimal(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_decimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to decimal and return it.'''
@@ -721,6 +795,11 @@ op_dec = utils.alias(op_decimal)
 def op_hexadecimal(opnum):
     '''Set the type for operand `opnum` at the current instruction to hexadecimal and return it.'''
     return op_hexadecimal(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_hexadecimal(reference):
+    '''Set the type for the operand pointed to by `reference` to hexadecimal and return it.'''
+    address, opnum, _ = reference
+    return op_hexadecimal(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_hexadecimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to hexadecimal and return it.'''
@@ -752,6 +831,11 @@ op_hex = utils.alias(op_hexadecimal)
 def op_float(opnum):
     '''Set the type for operand `opnum` at the current instruction to floating-point and return it.'''
     return op_float(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_float(reference):
+    '''Set the type for the operand pointed to by `reference` to floating-point and return it.'''
+    address, opnum, _ = reference
+    return op_float(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_float(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to floating-point and return it.'''
@@ -797,6 +881,11 @@ op_flt = utils.alias(op_float)
 def op_stackvar(opnum):
     '''Set the type for operand `opnum` at the current instruction to a stack variable and return it.'''
     return op_stackvar(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_stackvar(reference):
+    '''Set the type for the operand pointed to by `reference` to a stack variable and return it.'''
+    address, opnum, _ = reference
+    return op_stackvar(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_stackvar(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a stack variable and return it.'''
@@ -815,6 +904,11 @@ op_stack = op_stkvar = utils.alias(op_stackvar)
 def op_structure(opnum):
     '''Return the structure and members for operand `opnum` at the current instruction.'''
     return op_structure(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_structure(reference):
+    '''Return the structure and members for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_structure(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
@@ -1067,16 +1161,31 @@ def op_structure(opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
 
+@utils.multicase(reference=interface.opref_t, structure_or_sptr=(structure.structure_t, idaapi.struc_t))
+def op_structure(reference, structure_or_sptr, *path, **delta):
+    '''Apply the specified `structure_or_sptr` along with the members in `path` to the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_structure(address, opnum, structure_or_sptr, *path, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=structure.structure_t)
 def op_structure(ea, opnum, structure, *path, **delta):
     '''Apply the specified `structure` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
     sptr, deltapath = structure.ptr, [delta.pop('delta', 0)] if delta else []
     return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath), **delta)
+@utils.multicase(reference=interface.opref_t, name=six.string_types)
+def op_structure(reference, name, *path, **delta):
+    '''Apply the structure with the specified `name` and any members in `path` to the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_structure(address, opnum, name, *path, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=six.string_types)
 def op_structure(ea, opnum, name, *path, **delta):
     '''Apply the structure with the specified `name` and any members in `path` to the instruction operand `opnum` at the address `ea`.'''
     sptr, deltapath = structure.by(name).ptr, [delta.pop('delta', 0)] if delta else []
     return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath), **delta)
+@utils.multicase(reference=interface.opref_t, member_or_mptr=(structure.member_t, idaapi.member_t))
+def op_structure(reference, member_or_mptr, *path, **delta):
+    '''Apply the specified `member_or_mptr` to the instruction operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_structure(address, opnum, member_or_mptr, *path, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, member=structure.member_t)
 def op_structure(ea, opnum, member, *path, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
@@ -1090,6 +1199,11 @@ def op_structure(ea, opnum, mptr, *path, **delta):
         sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
     deltapath = [delta.pop('delta', 0)] if delta else []
     return op_structure(ea, opnum, sptr, *itertools.chain([mptr], path, deltapath), **delta)
+@utils.multicase(reference=interface.opref_t, path=(builtins.tuple, builtins.list))
+def op_structure(reference, path, **delta):
+    '''Apply the structure members in `path` to the instruction operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_structure(address, opnum, path, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(builtins.tuple, builtins.list))
 def op_structure(ea, opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.'''
@@ -1331,6 +1445,11 @@ op_struc = op_struct = utils.alias(op_structure)
 def op_enumeration(opnum):
     '''Return the enumeration member id for the operand `opnum` belonging to the current instruction.'''
     return op_enumeration(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_enumeration(reference):
+    '''Return the enumeration member id for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_enumeration(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_enumeration(ea, opnum):
     '''Return the enumeration member id for the operand `opnum` belonging to the instruction at `ea`.'''
@@ -1424,6 +1543,11 @@ def op_enumeration(ea, opnum):
 def op_enumeration(opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
+@utils.multicase(reference=interface.opref_t)
+def op_enumeration(reference, name_or_id):
+    '''Apply the enumeration `name_or_id` to the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_enumeration(address, opnum, name_or_id)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=six.string_types)
 @utils.string.decorate_arguments('name')
 def op_enumeration(ea, opnum, name):
@@ -1446,6 +1570,11 @@ op_enum = utils.alias(op_enumeration)
 def op_string(opnum):
     '''Return the string type of operand `opnum` for the current instruction.'''
     return op_string(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_string(reference):
+    '''Return the string type (``idaapi.STRTYPE_``) of the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_string(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
@@ -1458,6 +1587,11 @@ def op_string(ea, opnum):
         raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:d}) : Unable to get `idaapi.opinfo_t` for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, F))
 
     return res.strtype
+@utils.multicase(reference=interface.opref_t, strtype=six.integer_types)
+def op_string(reference, strtype):
+    '''Set the string type used by operand pointed to by `reference` to `strtype`.'''
+    address, opnum, _ = reference
+    return op_string(address, opnum, strtype)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
 def op_string(ea, opnum, strtype):
     '''Set the string type used by operand `opnum` for the instruction at `ea` to `strtype`.'''
@@ -1487,6 +1621,11 @@ def ops_refinfo(ea):
 def op_refinfo(opnum):
     '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
     return op_refinfo(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_refinfo(reference):
+    '''Return the ``idaapi.refinfo_t`` for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_refinfo(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_refinfo(ea, opnum):
     '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
@@ -1498,6 +1637,11 @@ def op_refinfo(ea, opnum):
 def op_refs(opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the current instruction.'''
     return op_refs(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_refs(reference):
+    '''Returns the `(address, opnum, type)` of all the instructions that reference the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_refs(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_refs(ea, opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
