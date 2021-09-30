@@ -1225,7 +1225,8 @@ class namedtypedtuple(tuple):
         res = args[:]
         for n, t, x in zip(cls._fields, cls._types, args):
             if not isinstance(x, t):
-                raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n.encode('utf8') if isinstance(n, unicode) else n, t))
+                field_name = n.encode('utf8') if sys.version_info.major < 3 and isinstance(n, unicode) else n
+                raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), field_name, t))
             continue
         return tuple.__new__(cls, res)
 
@@ -1241,7 +1242,8 @@ class namedtypedtuple(tuple):
             raise TypeError("Expected {:d} arguments, got {:d}.".format(len(cls._fields), len(result)))
         for n, t, x in zip(cls._fields, cls._types, result):
             if not isinstance(x, t):
-                raise TypeError("Unexpected type ({!r} for field {:s} should be {!r}.".format(type(x), n.encode('utf8') if isinstance(n, unicode) else n, t))
+                field_name = n.encode('utf8') if sys.version_info.major < 3 and isinstance(n, unicode) else n
+                raise TypeError("Unexpected type ({!r} for field {:s} should be {!r}.".format(type(x), field_name, t))
             continue
         return result
 
