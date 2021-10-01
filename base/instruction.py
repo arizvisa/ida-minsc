@@ -380,7 +380,7 @@ ops_const = utils.alias(ops_constant)
 @utils.multicase()
 def opsi_register(**modifiers):
     '''Returns the index of each operand in the instruction at the current address which uses a register.'''
-    return ops_register(ui.current.address(), **modifiers)
+    return opsi_register(ui.current.address(), **modifiers)
 @utils.multicase(ea=six.integer_types)
 def opsi_register(ea, **modifiers):
     '''Returns the index of each operand in the instruction at the address `ea` which uses a register.'''
@@ -391,7 +391,7 @@ def opsi_register(ea, **modifiers):
 @utils.multicase(reg=(six.string_types, interface.register_t))
 def opsi_register(reg, *regs, **modifiers):
     '''Returns the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.'''
-    return ops_register(ui.current.address(), reg, *regs, **modifiers)
+    return opsi_register(ui.current.address(), reg, *regs, **modifiers)
 @utils.multicase(ea=six.integer_types, reg=(six.string_types, interface.register_t))
 def opsi_register(ea, reg, *regs, **modifiers):
     """Returns the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
