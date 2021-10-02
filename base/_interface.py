@@ -1008,11 +1008,11 @@ class node(object):
         """
         res, ti = [], idaapi.tinfo_t()
         if not ti.deserialize(None, sup, *itertools.chain(supfields, [None] * (2 - min(2, len(supfields))))):
-            raise internal.exceptions.DisassemblerError(u"{:s}.sup_functype(\"{!s}\") : Unable to deserialize the type information that was received.".format('.'.join([__name__, node.__name__]), sup.encode('hex')))
+            raise internal.exceptions.DisassemblerError(u"{:s}.sup_functype(\"{!s}\") : Unable to deserialize the type information that was received.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup)))
 
         # Fetch the pointer size (alignment?), and the model (realtype?).
         if not ti.is_func():
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.sup_functype(\"{!s}\") : The type that was received ({!s}) was not a function type.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), ti))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.sup_functype(\"{!s}\") : The type that was received ({!s}) was not a function type.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), ti))
         byte = ti.get_realtype()
         psize, model = byte & idaapi.CM_MASK, byte & idaapi.CM_M_MASK
         res += [psize, model]
@@ -1020,7 +1020,7 @@ class node(object):
         # Now we can get the calling convention and append the return type.
         ftd = idaapi.func_type_data_t()
         if not ti.get_func_details(ftd):
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.sup_functype(\"{!s}\") : Unable to get the function's details from the received type information.".format('.'.join([__name__, node.__name__]), sup.encode('hex')))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.sup_functype(\"{!s}\") : Unable to get the function's details from the received type information.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup)))
         byte = ftd.cc
         cc, count = byte & idaapi.CM_CC_MASK, byte & ~idaapi.CM_CC_MASK
         res += [cc, ftd.rettype]
@@ -1031,7 +1031,7 @@ class node(object):
         if ftd.flags & idaapi.FTI_ARGLOCS:
             number = ti.get_nargs()
             if number != len(ftd):
-                raise internal.exceptions.AssertionError(u"{:s}.sup_functype(\"{!s}\") : The number of arguments for the function type ({:d}) does not match the number of arguments that were returned ({:d}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), number, len(ftd)))
+                raise internal.exceptions.AssertionError(u"{:s}.sup_functype(\"{!s}\") : The number of arguments for the function type ({:d}) does not match the number of arguments that were returned ({:d}).".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), number, len(ftd)))
 
             # To grab the arguments, we need to figure out the count because our arguments
             # will be a tuple composed of the (name, type, comment) for each one.
@@ -1105,7 +1105,7 @@ class node(object):
                 #res = map(functools.partial(operator.xor, 0x3f000000), res)
                 return offset, [0x3f000000 ^ le(item) for item in chunks]
 
-            raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id32 : An unsupported itemsize ({:d}) was discovered while trying to decode {:d} chunks at offset {:#x}. These chunks are {!r}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), itemsize, count, offset, [bytes().join(item) for item in chunks]))
+            raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id32 : An unsupported itemsize ({:d}) was discovered while trying to decode {:d} chunks at offset {:#x}. These chunks are {!r}.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), itemsize, count, offset, [bytes().join(item) for item in chunks]))
 
         # 64-bit
         # 000002 c000888e00 c000889900 -- KEVENT.Header.anonymous_0.anonymous_0.Type
@@ -1147,7 +1147,7 @@ class node(object):
 
             #length = le(chunks.pop(0))
             if len(chunks) != length:
-                raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), len(chunks), length, [bytes().join(item) for item in chunks]))
+                raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), len(chunks), length, [bytes().join(item) for item in chunks]))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
