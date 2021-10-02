@@ -2201,7 +2201,7 @@ class type(object):
         '''Return if the function `func` returns.'''
         fn = by(func)
         if fn.flags & idaapi.FUNC_NORET_PENDING == idaapi.FUNC_NORET_PENDING:
-            logging.warning(u"{:s}.has_return({:s}) : Analysis for function return is still pending. The flag (`idaapi.FUNC_NORET_PENDING`) is still set.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
+            logging.warning(u"{:s}.has_return({:s}) : Analysis for function return is still pending. The flag (`idaapi.FUNC_NORET_PENDING`) is still set.".format('.'.join([__name__, cls.__name__]), ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
     returnQ = utils.alias(has_return, 'type')
 
@@ -2302,12 +2302,12 @@ class type(object):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
         view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
         if view is None:
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func))
         sup = view.tobytes()
         try:
             _, _, cc, _, _ = interface.node.sup_functype(sup)
         except E.UnsupportedCapability:
-            raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
+            raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format('.'.join([__name__, cls.__name__]), func))
         return cc
     @utils.multicase(convention=(six.string_types, six.integer_types))
     @classmethod
@@ -2316,7 +2316,7 @@ class type(object):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
         view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
         if view is None:
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}, {!r}) : Specified function does not contain a prototype declaration.".format(__name__, func, convention))
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}, {!r}) : Specified function does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func, convention))
         sup = view.tobytes()
 
         # Now that we have a prototype, we need to figure out what convention the user gave us so
@@ -2336,19 +2336,19 @@ class type(object):
 
             # Verify that the string can be found in our lookup table, and then use it to grab our cc.
             if not operator.contains(cclookup, string):
-                raise E.ItemNotFoundError(u"{:s}.convention({!r}, {!r}) : The convention that was specified ({!s}) is not currently supported.".format(__name__, func, convention, string))
+                raise E.ItemNotFoundError(u"{:s}.convention({!r}, {!r}) : The convention that was specified ({!s}) is not currently supported.".format('.'.join([__name__, cls.__name__]), func, convention, string))
             cc = cclookup[string]
 
         # If we received an integer, then we need to double-check that it doesn't have any other
         # extra bits that were set. If so, then we need to warn the user about it.
         elif isinstance(convention, six.integer_types):
             if convention & idaapi.CM_CC_MASK:
-                logging.warning(u"{:s}.convention({!r}, {:#x}) : The convention that was provided ({:#x}) contains extra bits ({:#x}) that will be masked ({:#x}) out.".format(__name__, func, convention, convention, convention & ~idaapi.CM_CC_MASK, idaapi.CM_CC_MASK))
+                logging.warning(u"{:s}.convention({!r}, {:#x}) : The convention that was provided ({:#x}) contains extra bits ({:#x}) that will be masked ({:#x}) out.".format('.'.join([__name__, cls.__name__]), func, convention, convention, convention & ~idaapi.CM_CC_MASK, idaapi.CM_CC_MASK))
             cc = convention & idaapi.CM_CC_MASK
 
         # Otherwise we have a TypeError and we are unable to continue.
         else:
-            raise E.InvalidTypeOrValueError(u"{:s}.convention({!r}, {!r}) : An unsupported type ({!s}) was specified for the calling convention to apply.".format(__name__, func, convention, convention.__class__))
+            raise E.InvalidTypeOrValueError(u"{:s}.convention({!r}, {!r}) : An unsupported type ({!s}) was specified for the calling convention to apply.".format('.'.join([__name__, cls.__name__]), func, convention, convention.__class__))
 
         # Assign the things we need based on the version of IDA that's being used.
         til, ti = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati(), idaapi.tinfo_t()
@@ -2359,12 +2359,12 @@ class type(object):
         # a new type.
         newsup = interface.node.sup_functype(sup, None, None, cc, None, None)
         if not ti.deserialize(til, newsup, None):
-            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to decode the new type information ({:s}).".format(__name__, func, cc, utils.string.tohex(newsup)))
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to decode the new type information ({:s}).".format('.'.join([__name__, cls.__name__]), func, cc, utils.string.tohex(newsup)))
 
         # Now we can apply our type to the location specified by the user, and return what was
         # set back to the caller.
         if not set_tinfo(ea, ti):
-            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format(__name__, func, cc, ti, ea))
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, cc, ti, ea))
         return cls.convention(ea)
 
     cc = utils.alias(convention)
