@@ -2309,6 +2309,64 @@ class type(object):
         except E.UnsupportedCapability:
             raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
         return cc
+    @utils.multicase(convention=(six.string_types, six.integer_types))
+    @classmethod
+    def convention(cls, func, convention):
+        '''Set the calling convention used by the prototype for the function `func` to the specified `convention`.'''
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
+        if view is None:
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}, {!r}) : Specified function does not contain a prototype declaration.".format(__name__, func, convention))
+        sup = view.tobytes()
+
+        # Now that we have a prototype, we need to figure out what convention the user gave us so
+        # that we can apply it to the specified function. After verifying that the user gave us a
+        # string to look up, we need to create a table that we can use to actually look it up.
+        if isinstance(convention, six.string_types):
+            cclookup = {
+                '__cdecl': idaapi.CM_CC_CDECL,
+                '__stdcall': idaapi.CM_CC_STDCALL,
+                '__pascal': idaapi.CM_CC_PASCAL,
+                '__fastcall': idaapi.CM_CC_FASTCALL,
+                '__thiscall': idaapi.CM_CC_THISCALL,
+            }
+
+            # Try to normalize the string so that it will match an entry in our table.
+            string = convention.lower() if convention.startswith('__') else "__{:s}".format(convention).lower()
+
+            # Verify that the string can be found in our lookup table, and then use it to grab our cc.
+            if not operator.contains(cclookup, string):
+                raise E.ItemNotFoundError(u"{:s}.convention({!r}, {!r}) : The convention that was specified ({!s}) is not currently supported.".format(__name__, func, convention, string))
+            cc = cclookup[string]
+
+        # If we received an integer, then we need to double-check that it doesn't have any other
+        # extra bits that were set. If so, then we need to warn the user about it.
+        elif isinstance(convention, six.integer_types):
+            if convention & idaapi.CM_CC_MASK:
+                logging.warning(u"{:s}.convention({!r}, {:#x}) : The convention that was provided ({:#x}) contains extra bits ({:#x}) that will be masked ({:#x}) out.".format(__name__, func, convention, convention, convention & ~idaapi.CM_CC_MASK, idaapi.CM_CC_MASK))
+            cc = convention & idaapi.CM_CC_MASK
+
+        # Otherwise we have a TypeError and we are unable to continue.
+        else:
+            raise E.InvalidTypeOrValueError(u"{:s}.convention({!r}, {!r}) : An unsupported type ({!s}) was specified for the calling convention to apply.".format(__name__, func, convention, convention.__class__))
+
+        # Assign the things we need based on the version of IDA that's being used.
+        til, ti = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati(), idaapi.tinfo_t()
+        set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
+
+        # Okay, we now have an integer to apply to the calling convention. We'll first need to
+        # update our supval with the new calling convention, and then we can use it to deserialize
+        # a new type.
+        newsup = interface.node.sup_functype(sup, None, None, cc, None, None)
+        if not ti.deserialize(til, newsup, None):
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to decode the new type information ({:s}).".format(__name__, func, cc, utils.string.tohex(newsup)))
+
+        # Now we can apply our type to the location specified by the user, and return what was
+        # set back to the caller.
+        if not set_tinfo(ea, ti):
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format(__name__, func, cc, ti, ea))
+        return cls.convention(ea)
+
     cc = utils.alias(convention)
 
 t = type # XXX: ns alias
