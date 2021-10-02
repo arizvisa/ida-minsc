@@ -1000,17 +1000,18 @@ class node(object):
         mask = 0xff * pow(2, math.trunc(bits) - 8)
         return identifier & mask == mask
 
-    @staticmethod
-    def sup_functype(sup, *supfields):
+    @internal.utils.multicase(sup=bytes)
+    @classmethod
+    def sup_functype(cls, sup, *supfields):
         """Given a supval, return the pointer size, model, calling convention, return type, and a tuple composed of the argument stack size and the arguments for a function.
 
-        This string is typically found in a supval[0x3000] of a function.
+        These bytes are typically found in a supval[0x3000] of a function.
         """
         res, ti = [], idaapi.tinfo_t()
         if not ti.deserialize(None, sup, *itertools.chain(supfields, [None] * (2 - min(2, len(supfields))))):
             raise internal.exceptions.DisassemblerError(u"{:s}.sup_functype(\"{!s}\") : Unable to deserialize the type information that was received.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup)))
 
-        # Fetch the pointer size (alignment?), and the model (realtype?).
+        # Fetch the pointer size and the model from the realtype byte.
         if not ti.is_func():
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.sup_functype(\"{!s}\") : The type that was received ({!s}) was not a function type.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), ti))
         byte = ti.get_realtype()
@@ -1022,7 +1023,7 @@ class node(object):
         if not ti.get_func_details(ftd):
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.sup_functype(\"{!s}\") : Unable to get the function's details from the received type information.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup)))
         byte = ftd.cc
-        cc, count = byte & idaapi.CM_CC_MASK, byte & ~idaapi.CM_CC_MASK
+        cc, spoiled_count = byte & idaapi.CM_CC_MASK, byte & ~idaapi.CM_CC_MASK
         res += [cc, ftd.rettype]
 
         # If the argument locations have been calculated, then we can add
@@ -1053,6 +1054,97 @@ class node(object):
 
         # Now we can return everything that we've collected from the type.
         return tuple(res)
+    @internal.utils.multicase(sup=bytes, psize=(None.__class__, six.integer_types), model=(None.__class__, six.integer_types), cc=(None.__class__, six.integer_types), rettype=(None.__class__, idaapi.tinfo_t), arglocs=(None.__class__, builtins.list, builtins.tuple))
+    @classmethod
+    def sup_functype(cls, sup, psize, model, cc, rettype, arglocs):
+        """Given the old supval, re-encode any of the given parameters into it whilst ignoring the parameters that are ``None``.
+
+        These bytes are typically applied to the supval[0x3000] for a function.
+        """
+
+        # First decode the type information that we were given since we're going
+        # to use it to reconstruct the supval.
+        res, ti = bytearray(), idaapi.tinfo_t()
+        if not ti.deserialize(None, sup, None):
+            raise internal.exceptions.DisassemblerError(u"{:s}.sup_functype(\"{!s}\", ...) : Unable to deserialize the type information that was received.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup)))
+
+        # If it's not a function, then refuse to process it.
+        if not ti.is_func():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.sup_functype(\"{!s}\", ...) : The type that was received ({!s}) was not a function type.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), ti))
+
+        # Grab the extra function details so that we can sort out the caling
+        # convention and types.
+        ftd = idaapi.func_type_data_t()
+        if not ti.get_func_details(ftd):
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.sup_functype(\"{!s}\", ...) : Unable to get the function's details from the received type information.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup)))
+
+        # Verify that our arglocs were calculated and the number matches our type.
+        if ftd.flags & idaapi.FTI_ARGLOCS:
+            number = ti.get_nargs()
+            if number != len(ftd):
+                raise internal.exceptions.AssertionError(u"{:s}.sup_functype(\"{!s}\", ...) : The number of arguments for the function type ({:d}) does not match the number of arguments that were returned ({:d}).".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), number, len(ftd)))
+
+        # Start out by grabbing the first byte and compose it from the psize an model.
+        obyte, nbyte = ti.get_realtype(), 0
+        nbyte |= obyte & idaapi.CM_MASK if psize is None else psize & idaapi.CM_MASK
+        nbyte |= obyte & idaapi.CM_M_MASK if model is None else model & idaapi.CM_M_MASK
+        res.append(nbyte)
+
+        # Next we compose the calling convention. We need to extract the count
+        # from the old byte since the user should be giving us a straight-up
+        # calling convention to use.
+        obyte, nbyte = ftd.cc, 0
+        nbyte |= obyte & idaapi.CM_CC_MASK if cc is None else cc & idaapi.CM_CC_MASK
+        nbyte |= obyte & ~idaapi.CM_CC_MASK
+        res.append(nbyte)
+
+        # Next in our queue is the serialized return type.
+        otype = ftd.rettype
+        nbytes, _, _ = otype.serialize() if rettype is None else rettype.serialize()
+        res.extend(bytearray(nbytes))
+
+        # The last thing we need to do is to figure out our arguments. First we'll
+        # check if the user gave us any. If not, then we'll just use the previously
+        # used arguments from the idaapi.tinfo_t. We start with the old length,
+        # and then we serialize everything into our result.
+        if arglocs is None:
+            ocount = len(ftd)
+            res.append(1 + ocount)
+
+            # Now we can iterate through all of them and serialize each one
+            # so that we can extend our result with it.
+            for index in builtins.range(ocount):
+                funcarg = ftd[index]
+                obytes, _, _ = funcarg.type.serialize()
+                res.extend(bytearray(obytes))
+
+            # That was it, so we can append our null-byte because we're done.
+            res.append(0)
+
+        # Otherwise the user gave us some new arguments to use which we'll need
+        # to serialize in order to extend our result. First we'll need to check
+        # if we were given a tuple, because if we were then this is a tuple
+        # composed of the argument stack size and our actual argument list.
+        else:
+            _, arglocs = arglocs if isinstance(arglocs, builtins.tuple) else (0, arglocs)
+
+            # Now that we have our real list of arguments, we can start by
+            # appending the number of arguments that we were given.
+            ncount = len(arglocs)
+            res.append(1 + ncount)
+
+            # Next we iterate through each of them in order to serialize each
+            # one so that we can extend our result with it.
+            for index, argloc in builtins.enumerate(arglocs):
+                nbytes, _, _ = argloc.serialize()
+                res.extend(bytearray(nbytes))
+
+            # Last thing to do is append our null byte.
+            res.append(0)
+
+        # We're returning a supval here, so we need to convert our bytearray
+        # back to bytes in order for it to be usable.
+        return builtins.bytes(res)
 
     @staticmethod
     def sup_opstruct(sup, bit64Q):
