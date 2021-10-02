@@ -1015,8 +1015,8 @@ class node(object):
         if not ti.is_func():
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.sup_functype(\"{!s}\") : The type that was received ({!s}) was not a function type.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), ti))
         byte = ti.get_realtype()
-        psize, model = byte & idaapi.CM_MASK, byte & idaapi.CM_M_MASK
-        res += [psize, model]
+        ptrsize, model = byte & idaapi.CM_MASK, byte & idaapi.CM_M_MASK
+        res += [ptrsize, model]
 
         # Now we can get the calling convention and append the return type.
         ftd = idaapi.func_type_data_t()
@@ -1054,13 +1054,10 @@ class node(object):
 
         # Now we can return everything that we've collected from the type.
         return tuple(res)
-    @internal.utils.multicase(sup=bytes, psize=(None.__class__, six.integer_types), model=(None.__class__, six.integer_types), cc=(None.__class__, six.integer_types), rettype=(None.__class__, idaapi.tinfo_t), arglocs=(None.__class__, builtins.list, builtins.tuple))
+    @internal.utils.multicase(sup=bytes, ptrsize=(None.__class__, six.integer_types), model=(None.__class__, six.integer_types), cc=(None.__class__, six.integer_types), rettype=(None.__class__, idaapi.tinfo_t), arglocs=(None.__class__, builtins.list, builtins.tuple))
     @classmethod
-    def sup_functype(cls, sup, psize, model, cc, rettype, arglocs):
-        """Given the old supval, re-encode any of the given parameters into it whilst ignoring the parameters that are ``None``.
-
-        These bytes are typically applied to the supval[0x3000] for a function.
-        """
+    def sup_functype(cls, sup, ptrsize, model, cc, rettype, arglocs):
+        '''Given the old supval, re-encode any of the given parameters into it whilst ignoring the parameters that are specified as ``None``.'''
 
         # First decode the type information that we were given since we're going
         # to use it to reconstruct the supval.
@@ -1084,19 +1081,19 @@ class node(object):
             if number != len(ftd):
                 raise internal.exceptions.AssertionError(u"{:s}.sup_functype(\"{!s}\", ...) : The number of arguments for the function type ({:d}) does not match the number of arguments that were returned ({:d}).".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), number, len(ftd)))
 
-        # Start out by grabbing the first byte and compose it from the psize an model.
-        obyte, nbyte = ti.get_realtype(), 0
-        nbyte |= obyte & idaapi.CM_MASK if psize is None else psize & idaapi.CM_MASK
-        nbyte |= obyte & idaapi.CM_M_MASK if model is None else model & idaapi.CM_M_MASK
-        res.append(nbyte)
+        # Start out by grabbing the first byte and compose it from the ptrsize and model.
+        obyte = ti.get_realtype()
+        nptrsize = obyte & idaapi.CM_MASK if ptrsize is None else ptrsize & idaapi.CM_MASK
+        nmodel = obyte & idaapi.CM_M_MASK if model is None else model & idaapi.CM_M_MASK
+        res.append(nptrsize | nmodel)
 
         # Next we compose the calling convention. We need to extract the count
         # from the old byte since the user should be giving us a straight-up
         # calling convention to use.
-        obyte, nbyte = ftd.cc, 0
-        nbyte |= obyte & idaapi.CM_CC_MASK if cc is None else cc & idaapi.CM_CC_MASK
-        nbyte |= obyte & ~idaapi.CM_CC_MASK
-        res.append(nbyte)
+        obyte = ftd.cc
+        ncc = obyte & idaapi.CM_CC_MASK if cc is None else cc & idaapi.CM_CC_MASK
+        nspoiled_count = obyte & ~idaapi.CM_CC_MASK
+        res.append(ncc | nspoiled_count)
 
         # Next in our queue is the serialized return type.
         otype = ftd.rettype
@@ -1126,7 +1123,7 @@ class node(object):
         # if we were given a tuple, because if we were then this is a tuple
         # composed of the argument stack size and our actual argument list.
         else:
-            _, arglocs = arglocs if isinstance(arglocs, builtins.tuple) else (0, arglocs)
+            _, arglocs = arglocs if isinstance(arglocs, tuple) else (0, arglocs)
 
             # Now that we have our real list of arguments, we can start by
             # appending the number of arguments that we were given.
