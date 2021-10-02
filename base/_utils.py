@@ -1050,6 +1050,9 @@ class string(object):
         # spending the time to figure out the correct math for this.
         raise NotImplementedError(base)
 
+    # Convert a string to hexadecimal so that it can be displayed.
+    tohex = operator.methodcaller('encode', 'hex') if sys.version_info.major < 3 else operator.methodcaller('hex')
+
 ### wrapping functions with another caller whilst preserving the wrapped function
 class wrap(object):
     """
