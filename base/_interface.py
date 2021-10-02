@@ -1013,29 +1013,43 @@ class node(object):
         # Fetch the pointer size (alignment?), and the model (realtype?).
         if not ti.is_func():
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.sup_functype(\"{!s}\") : The type that was received ({!s}) was not a function type.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), ti))
-        res.append(ti.get_declalign())
-        res.append(ti.get_realtype())
+        byte = ti.get_realtype()
+        psize, model = byte & idaapi.CM_MASK, byte & idaapi.CM_M_MASK
+        res += [psize, model]
 
         # Now we can get the calling convention and append the return type.
         ftd = idaapi.func_type_data_t()
         if not ti.get_func_details(ftd):
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.sup_functype(\"{!s}\") : Unable to get the function's details from the received type information.".format('.'.join([__name__, node.__name__]), sup.encode('hex')))
-        res.append(ftd.cc)
-        res.append(ftd.rettype)
+        byte = ftd.cc
+        cc, count = byte & idaapi.CM_CC_MASK, byte & ~idaapi.CM_CC_MASK
+        res += [cc, ftd.rettype]
 
-        # Validate the number of arguments corresponds to the our ftd array.
-        number = ti.get_nargs()
-        if number != len(ftd):
-            raise internal.exceptions.AssertionError(u"{:s}.sup_functype(\"{!s}\") : The number of arguments for the function type ({:d}) does not match the number of arguments that were returned ({:d}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), number, len(ftd)))
+        # If the argument locations have been calculated, then we can add
+        # them to our results. For sanity, we first validate that the number
+        # of arguments corresponds to the number of elements in our ftd array.
+        if ftd.flags & idaapi.FTI_ARGLOCS:
+            number = ti.get_nargs()
+            if number != len(ftd):
+                raise internal.exceptions.AssertionError(u"{:s}.sup_functype(\"{!s}\") : The number of arguments for the function type ({:d}) does not match the number of arguments that were returned ({:d}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), number, len(ftd)))
 
-        # To grab the arguments, we need to figure out the count because our arguments
-        # will be a tuple composed of the (name, type, comment) for each one.
-        arguments = []
-        for index in builtins.range(ti.get_nargs()):
-            item = ftd[index]
-            typename, typeinfo, typecomment = item.name, item.type, item.cmt
-            arguments.append(typeinfo if not len(supfields) else (typeinfo, typename) if len(supfields) == 1 else (typeinfo, typename, typecomment))
-        res.append((ftd.stkargs, arguments))
+            # To grab the arguments, we need to figure out the count because our arguments
+            # will be a tuple composed of the (name, type, comment) for each one.
+            arguments = []
+            for index in builtins.range(ti.get_nargs()):
+                item = ftd[index]
+                typename, typeinfo, typecomment = item.name, item.type, item.cmt
+                arguments.append(typeinfo if not len(supfields) else (typeinfo, typename) if len(supfields) == 1 else (typeinfo, typename, typecomment))
+
+            # Include the size for the arguments on the stack along with the
+            # arguments that we just extracted.argument size along with the arguments.
+            arglocs = ftd.stkargs, arguments
+
+        # If the argument locations weren't calculated, then the next element we
+        # append is the size of the stack that is allocated to the arguments.
+        else:
+            arglocs = ftd.stkargs
+        res += [arglocs]
 
         # Now we can return everything that we've collected from the type.
         return tuple(res)
