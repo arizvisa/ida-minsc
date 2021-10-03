@@ -606,6 +606,13 @@ class priorityhook(prioritybase):
             supermethod = getattr(supercls, name)
             return supermethod(keyword, value_type, pvalue, idb_loaded)
 
+        def bookmark_changed(self, index, pos, desc, operation):
+            # /home/user/idapro-7.6/python/3/ida_idp.py:5801 # expected 5, got 4
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            return supermethod(index, pos, desc, operation)
+
         def compiler_changed(self, adjust_inf_fields):
             cls = self.__class__
             supercls = super(cls, self)
@@ -639,6 +646,8 @@ class priorityhook(prioritybase):
                 return renamed
             elif name in {'saved'}:
                 return saved
+            elif name in {'bookmark_changed'}:
+                return bookmark_changed
 
         return method
 
