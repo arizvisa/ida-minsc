@@ -3038,6 +3038,24 @@ one to filter functions according to their particular attributes.</p>
 </dd></dl>
 
 <dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">convention</code><span class="sig-paren">(</span><em>func</em>, <em>convention</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the calling convention used by the prototype for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the specified <code class="docutils literal notranslate"><span class="pre">convention</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to assign the calling convention to</li>
+<li><strong>convention</strong> (<em>str</em><em> or </em><em>int</em><em> or </em><em>long</em>) – a string or integer masked with <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.CM_CC_MASK</span></code> to assign</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.type.has_frame">
 <code class="descclassname">type.</code><code class="descname">has_frame</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.has_frame" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return if the current function has a frame allocated to it.</p>
