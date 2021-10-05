@@ -342,7 +342,7 @@ def ops_read(ea):
 @utils.multicase()
 def opsi_write():
     '''Returns the indices of the operands that are being written to by the instruction at the current address.'''
-    return ops_write(ui.current.address())
+    return opsi_write(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def opsi_write(ea):
     '''Returns the indices of the operands that are being written to by the instruction at the address `ea`.'''
@@ -360,7 +360,7 @@ def ops_write(ea):
 @utils.multicase()
 def opsi_constant():
     '''Return the indices of any operands in the current instruction that are constants.'''
-    return ops_constant(ui.current.address())
+    return opsi_constant(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def opsi_constant(ea):
     '''Return the indices of any operands in the instruction at `ea` that are constants.'''
