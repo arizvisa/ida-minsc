@@ -2308,7 +2308,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
     def memory(insn, op):
         '''Operand type decoder for memory-type operands which return an address.'''
-        seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
         return op.addr
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
@@ -2351,70 +2351,57 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
     def phrase(insn, op):
         '''Operand type decoder for returning a memory phrase on the Intel architecture.'''
-        F1, F2, rex = op.specflag1, op.specflag2, insn.insnpref
+        global architecture
         REX_B, REX_X, REX_R, REX_W, VEX_L = 1, 2, 4, 8, 0x80
+        INDEX_NONE = 4
 
+        # First we'll extract the necessary attributes from the operand and its instruction.
+        hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
+        segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+
+        # Now we can figure out the operand's specifics.
         if op.type in {idaapi.o_displ, idaapi.o_phrase}:
-            if F1 == 0:
-                base = op.reg
-                index = None
+            if hasSIB:
+                base = (sib & 0x07) >> 0
+                index = (sib & 0x38) >> 3
 
-            elif F1 == 1:
-                base = (F2 & 0x07) >> 0
-                index = (F2 & 0x38) >> 3
+                # If the index register is INDEX_NONE, then there isn't an index
+                # register and we need to clear it.
+                if index in {INDEX_NONE}:
+                    index = None
 
-                # add the 64-bit flag to the base and index registers if relevant.
-                base |= 8 if rex & REX_B else 0
-                index |= 8 if rex & REX_X else 0
+                # Otherwise, we're good and all we need to do is to add the 64-bit
+                # flag to the base and index registers if it's relevant.
+                else:
+                    base |= 8 if rex & REX_B else 0
+                    index |= 8 if rex & REX_X else 0
 
+            # If there isn't an SIB, then the base register is in op_t.phrase.
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type, F1))
-
-            if op.type == idaapi.o_displ:
-                offset = op.addr
-            elif op.type == idaapi.o_phrase:
-                offset = op.value
-            else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type))
-
-            # XXX: for some reason stack variables include both base and index
-            #      testing .specval seems to be a good way to determine whether
-            #      something is referencing the stack
-            # TODO: find some samples for this
-            if op.specval & 0x00ff0000 == 0x001f0000 and index == base:
+                base = op.phrase
                 index = None
-
-            ## specval means kind of the following:
-            # OF_NO_BASE_DISP = 1 then .addr doesn't exist
-            # OF_OUTER_DISP = 1 then .value exists
-
-            ## op_t.flags:
-            # OF_NO_BASE_DISP = 0x80 #  o_displ: base displacement doesn't exist meaningful only for o_displ type if set, base displacement (x.addr) doesn't exist.
-            # OF_OUTER_DISP = 0x40 #  o_displ: outer displacement exists meaningful only for o_displ type if set, outer displacement (x.value) exists.
-            # PACK_FORM_DEF = 0x20 #  !o_reg + dt_packreal: packed factor defined
-            # OF_NUMBER = 0x10 # can be output as number only if set, the operand can be converted to a number only
-            # OF_SHOW = 0x08 #  should the operand be displayed? if clear, the operand is hidden and should not be displayed
 
         # TODO: find some samples for this
-        elif op.type == idaapi.o_mem:
-            if F1 == 0:
+        elif op.type in {idaapi.o_mem}:
+            if hasSIB:
                 base = None
-                index = None
-
-            elif F1 == 1:
-                base = None
-                index = (F2 & 0x38) >> 3
+                index = (sib & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type, F1))
-            offset = op.addr
+                base = None
+                index = None
 
         else:
             optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
             raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype[0], optype[1], optype[2], op.type))
 
-        # Extract the segment and selector from the operand.
-        seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        # Figure out which property contains our offset depending on the type.
+        if op.type in {idaapi.o_displ, idaapi.o_mem}:
+            offset = op.addr
+        elif op.type in {idaapi.o_phrase}:
+            offset = op.value
+        else:
+            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type))
 
         # Figure out the maximum value for the offset part of the phrase which
         # IDA seems to use the number of bits from the database to clamp. Then
@@ -2434,11 +2421,10 @@ class operand_types:
 
         # Finally we can calculate all of the components for the operand, and
         # then return them to the user.
-        global architecture
         offset_ = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
         base_ = None if base is None else architecture.by_indextype(base, dtype)
         index_ = None if index is None else architecture.by_indextype(index, dtype)
-        scale_ = [1, 2, 4, 8][(F2 & 0xc0) // 0x40]
+        scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
         return intelops.OffsetBaseIndexScale(offset_, base_, index_, scale_)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
