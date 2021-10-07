@@ -1951,7 +1951,7 @@ class map_t(object):
         return name in self.__state__
 
     def __repr__(self):
-        return "{:s} {!s}".format(self.__class__, internal.utils.string.repr(self.__state__))
+        return "{!s} {:s}".format(self.__class__, internal.utils.string.repr(self.__state__))
 
 class collect_t(object):
     """
