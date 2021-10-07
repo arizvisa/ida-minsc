@@ -2350,14 +2350,15 @@ class operand_types:
     def memory(insn, op):
         '''Operand type decoder for returning a memory address including a segment on the Intel architecture.'''
         global architecture
+        aux_use32, aux_use64 = 0x8, 0x10
 
         # First we'll extract the necessary attributes from the operand and its instruction.
-        hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
-        segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        auxpref, segrg, segsel = insn.auxpref, (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        bits = 64 if auxpref & aux_use64 else 32 if auxpref & aux_use32 else 16
 
         # Now all we need to do is to clamp our operand address using the number
-        # of bits for the database.
-        maximum = pow(2, database.config.bits())
+        # of bits for the instruction's segment type.
+        maximum = pow(2, bits)
         address = op.addr & (maximum - 1)
 
         # Finally we can calculate all of the components for the operand, and
@@ -2371,11 +2372,12 @@ class operand_types:
         '''Operand type decoder for returning a phrase or displacement on the Intel architecture.'''
         global architecture
         REX_B, REX_X, REX_R, REX_W, VEX_L = 1, 2, 4, 8, 0x80
-        INDEX_NONE = 4
+        INDEX_NONE, aux_use32, aux_use64 = 0x4, 0x8, 0x10
 
         # First we'll extract the necessary attributes from the operand and its instruction.
         hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
-        segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        auxpref, segrg, segsel = insn.auxpref, (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        bits = 64 if auxpref & aux_use64 else 32 if auxpref & aux_use32 else 16
 
         # Now we can figure out the operand's specifics.
         if hasSIB:
@@ -2406,12 +2408,12 @@ class operand_types:
         else:
             raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type))
 
-        # Figure out the maximum value for the offset part of the phrase which
-        # IDA seems to use the number of bits from the database to clamp. Then
-        # we can convert the value that we get from IDAPython into its signed
-        # form so that we can calculate the correct value for whatever variation
-        # we need to return.
-        bits, dtype_by_size = database.config.bits(), utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+        # Figure out the maximum value for the offset part of the phrase from
+        # the number of bits for the instruction's segment type in order to
+        # clamp it. Then, we can convert the value that we get from IDAPython
+        # into both its signed and unsigned form. This way we can calculate the
+        # correct value for whatever variation we need to actually return.
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         maximum, dtype = pow(2, bits), dtype_by_size(bits // 8)
         res = idaapi.as_signed(offset, bits)
 
