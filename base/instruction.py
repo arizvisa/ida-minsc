@@ -2261,7 +2261,6 @@ class operand_types:
     def register(insn, op):
         '''Operand type decoder for ``idaapi.o_reg`` which returns a ``register_t``.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
-        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
 
         # FIXME: This information was found in the sdk by @BrunoPujos.
         # On PLFM_ARM, op.specflag1 specifies the SIMD vector element size (0=scalar, 1=8 bits, 2=16 bits, 3=32 bits, 4=64 bits, 5=128 bits)
@@ -2271,12 +2270,7 @@ class operand_types:
         # On PLFM_ARM, if a banked register is specified, then op.specflag1 has its high bit (0x80) set
 
         global architecture
-        if op.type in {idaapi.o_reg}:
-            res, dt = op.reg, dtype_by_size(database.config.bits() // 8)
-            return architecture.by_indextype(res, get_dtype_attribute(op))
-
-        optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
-        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype, op.type))
+        return architecture.by_indextype(op.reg, get_dtype_attribute(op))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
@@ -2290,26 +2284,23 @@ class operand_types:
         # On PLFM_ARM, op.specflag2 specifies a shift type
         # On PLFM_ARM, op.specval specifies a shift counter
 
-        if op.type in {idaapi.o_imm, idaapi.o_phrase}:
-            bits = 8 * get_dtype_size(get_dtype_attribute(op))
+        bits = 8 * get_dtype_size(get_dtype_attribute(op))
 
-            # Figure out the maximum operand size using the operand's type,
-            # and convert the value that was returned by IDAPython into its
-            # signed format so that we can figure out what to return.
-            maximum, value = pow(2, bits), op.value
-            res = idaapi.as_signed(value, bits)
+        # Figure out the maximum operand size using the operand's type,
+        # and convert the value that was returned by IDAPython into its
+        # signed format so that we can figure out what to return.
+        maximum, value = pow(2, bits), op.value
+        res = idaapi.as_signed(value, bits)
 
-            # Immediates appear to be handled differently from phrases, so if
-            # our operand is in regular form, then we always return it unsigned
-            # by masking it within the maximum operand value. If the operand is
-            # inverted, then we take the signed variation if it's less than 0.
-            # If it isn't, then we take the difference form the maximum in
-            # order to ensure it's signed.
-            regular = value & (maximum - 1)
-            inverted = res if res < 0 else value - maximum
-            return res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
-        optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
-        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype, op.type))
+        # Immediates appear to be handled differently from phrases, so if
+        # our operand is in regular form, then we always return it unsigned
+        # by masking it within the maximum operand value. If the operand is
+        # inverted, then we take the signed variation if it's less than 0.
+        # If it isn't, then we take the difference form the maximum in
+        # order to ensure it's signed.
+        regular = value & (maximum - 1)
+        inverted = res if res < 0 else value - maximum
+        return res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
@@ -2317,11 +2308,8 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
     def memory(insn, op):
         '''Operand type decoder for memory-type operands which return an address.'''
-        if op.type in {idaapi.o_mem, idaapi.o_far, idaapi.o_near, idaapi.o_displ}:
-            seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
-            return op.addr
-        optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
-        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, {!r}) : Expected operand type `{:s}` or `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype[0], optype[1], op.type))
+        seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        return op.addr
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(insn, op):
@@ -2425,20 +2413,7 @@ class operand_types:
             optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
             raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype[0], optype[1], optype[2], op.type))
 
-        # if arch == x64, then index += 8
-
-        # TODO: remove this
-        scale_lookup = {
-            0x00 : 1,   # 00
-            0x40 : 2,   # 01
-            0x80 : 4,   # 10
-            0xc0 : 8,   # 11
-        }
-        scale = scale_lookup[F2 & 0xc0]
-
-        bits = database.config.bits()
-        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
-
+        # Extract the segment and selector from the operand.
         seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
         # Figure out the maximum value for the offset part of the phrase which
@@ -2446,7 +2421,8 @@ class operand_types:
         # we can convert the value that we get from IDAPython into its signed
         # form so that we can calculate the correct value for whatever variation
         # we need to return.
-        maximum, dt = pow(2, bits), dtype_by_size(database.config.bits() // 8)
+        bits, dtype_by_size = database.config.bits(), utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+        maximum, dtype = pow(2, bits), dtype_by_size(bits // 8)
         res = idaapi.as_signed(offset, bits)
 
         # If our operand is defined as its regular form, then we either
@@ -2456,9 +2432,14 @@ class operand_types:
         regular = res if res < 0 else offset & (maximum - 1)
         inverted = offset & (maximum - 1) if res < 0 else offset - maximum
 
+        # Finally we can calculate all of the components for the operand, and
+        # then return them to the user.
         global architecture
-        items = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
-        return intelops.OffsetBaseIndexScale(*items)
+        offset_ = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
+        base_ = None if base is None else architecture.by_indextype(base, dtype)
+        index_ = None if index is None else architecture.by_indextype(index, dtype)
+        scale_ = [1, 2, 4, 8][(F2 & 0xc0) // 0x40]
+        return intelops.OffsetBaseIndexScale(offset_, base_, index_, scale_)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(insn, op):
@@ -2544,6 +2525,7 @@ class operand_types:
 
         # FIXME: This information was found in the sdk by @BrunoPujos.
         # op.specflag1 == processor number
+
         raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
