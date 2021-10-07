@@ -954,7 +954,7 @@ def op_structure(ea, opnum):
     elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
         value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
     else:
-        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, res.__class__, opnum, ea))
+        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
 
     # Verify that the operand is actually represented by a structure offset.
     if all(F & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
@@ -1013,8 +1013,8 @@ def op_structure(ea, opnum):
 
     # Start out by checking if the operand is a stack variable, because
     # we'll need to handle it differently if so.
-    if idaapi.is_stkvar(F, opnum) and function.within(ea):
-        fn = function.by(ea)
+    if idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
+        fn = function.by(insn.ea)
 
         # Now we can ask IDA what's up with it.
         res = idaapi.get_stkvar(insn, op, offset)
@@ -1050,7 +1050,7 @@ def op_structure(ea, opnum):
     # Since IDAPython's get_stroff_path implementation doesn't recognize NULL,
     # we need to call it twice in order to get the size of needed array.
     delta, path = idaapi.sval_pointer(), idaapi.tid_array(idaapi.MAXSTRUCPATH)
-    count = idaapi.get_stroff_path(ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
+    count = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
     if not count:
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
@@ -1058,7 +1058,7 @@ def op_structure(ea, opnum):
     # with the correct length, and then use what IDA didn't store to fetch
     # the exact field.
     delta, path = idaapi.sval_pointer(), idaapi.tid_array(count)
-    res = idaapi.get_stroff_path(ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
+    res = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), insn.ea, opnum)
     if res != count:
         raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The length ({:d}) for the structure path at operand {:d} changed ({:d}).".format(__name__, ea, count, opnum, opnum, res))
 
@@ -1066,7 +1066,7 @@ def op_structure(ea, opnum):
     # converting them into mptrs so that we can use generate_filter to
     # produce the closure we will need to filter members in the path.
     path = [ path[index] for index in range(count) ]
-    logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Processing {:d} members ({:s}) from path that was returned from `{:s}`.".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(mid) for mid in path), "{!s}({:#x}, {:d}, ...)".format('idaapi.get_stroff_path', ea, opnum)))
+    logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Processing {:d} members ({:s}) from path that was returned from `{:s}`.".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(mid) for mid in path), "{!s}({:#x}, {:d}, ...)".format('idaapi.get_stroff_path', insn.ea, opnum)))
 
     # Our first member should always be the sptr identifier. Once we snag
     # that, then the rest of the identifiers need to be converted into
@@ -1078,7 +1078,7 @@ def op_structure(ea, opnum):
         # If we couldn't find a member for the identifier, then warn the
         # user and continue chugging along.
         if res is None:
-            logging.warning(u"{:s}.op_structure({:#x}, {:d}) : Unable to find member for the identifier {:#x}.".format(__name__, ea, opnum, tid))
+            logging.warning(u"{:s}.op_structure({:#x}, {:d}) : Unable to find member for the identifier {:#x}.".format(__name__, insn.ea, opnum, tid))
             continue
 
         # Unpack the result that we got into their 3 components so that we
@@ -1250,7 +1250,7 @@ def op_structure(ea, opnum, sptr, *path, **force):
     # If the operand type is not a valid type, then raise an exception so that
     # we don't accidentally apply a structure to an invalid operand type.
     if op.type not in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ, idaapi.o_imm}:
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sptr.id, path, opnum, ea, op.type))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sptr.id, path, opnum, insn.ea, op.type))
 
     # Now we need to decode our operand and stash it so that we can later
     # use it to calculate the delta between it and the actual member offset
@@ -1262,7 +1262,7 @@ def op_structure(ea, opnum, sptr, *path, **force):
     elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
         value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
     else:
-        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, sptr.id, path, value.__class__, opnum, ea))
+        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, sptr.id, path, value.__class__, opnum, insn.ea))
 
     # We have to start somewhere and our first element in the path should be a
     # a member of the sptr we were given. So, now we begin to traverse through
@@ -1448,10 +1448,10 @@ def op_structure(ea, opnum, sptr, *path, **force):
         suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
         resolved = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in results)
         resolved = ('.'.join(map(utils.string.of, pair)) for pair in resolved)
-        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply the resolved structure path ({!r}) to the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, [item for item in suggested], [item for item in resolved], ea))
+        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply the resolved structure path ({!r}) to the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, [item for item in suggested], [item for item in resolved], insn.ea))
 
     # Otherwise, we can chain into our other case to return what was just applied.
-    return op_structure(ea, opnum)
+    return op_structure(insn.ea, opnum)
 op_struc = op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
@@ -1658,30 +1658,30 @@ def op_refs(reference):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_refs(ea, opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
-    inst, ops = at(ea), operands(ea)
+    insn, ops = at(ea), operands(ea)
     if len(ops) < opnum:
         raise E.InvalidTypeOrValueError(u"{:s}.op_refs({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # First we'll define the get_stroff_path function to get what IDA's
     # suggestion and delta is for the path at a given operand.
-    def get_stroff_path(inst, opnum):
-        op = operand(inst.ea, opnum)
+    def get_stroff_path(insn, opnum):
+        op = operand(insn.ea, opnum)
 
         # Firstly, IDAPython's get_stroff_path api doesn't tell us how much
         # space we need to allocate. So we need to allocate the maximum first,
         # and only then will we know the count to actually use.
         delta, path = idaapi.sval_pointer(), idaapi.tid_array(idaapi.MAXSTRUCPATH)
-        count = idaapi.get_stroff_path(inst.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), inst.ea, opnum)
+        count = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), insn.ea, opnum)
         if not count:
-            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, inst.ea, opnum, opnum))
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, insn.ea, opnum, opnum))
 
         # Now that we have the right length, we can use IDAPython to
         # actually populate the tid_array here. Afterwards, we discard
         # our array by converting it into a list.
         delta, path = idaapi.sval_pointer(), idaapi.tid_array(count)
-        res = idaapi.get_stroff_path(inst.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), inst.ea, opnum)
+        res = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), insn.ea, opnum)
         if res != count:
-            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The length ({:d}) for the structure path at operand {:d} changed ({:d}).".format(__name__, inst.ea, count, opnum, opnum, res))
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The length ({:d}) for the structure path at operand {:d} changed ({:d}).".format(__name__, insn.ea, count, opnum, opnum, res))
         return delta.value(), [path[idx] for idx in range(count)]
 
     # As the get_stroff_path function doesn't return a full path at all,
@@ -1738,38 +1738,38 @@ def op_refs(ea, opnum):
     # distinguish the "type" of xrefs that are associated with an operand.
     # This way we can distinguish structure members, enumeration members,
     # locals, globals, etc.
-    F = database.type.flags(inst.ea)
-    info, has_xrefs = opinfo(inst.ea, opnum), idaapi.op_adds_xrefs(F, opnum)
+    F = database.type.flags(insn.ea)
+    info, has_xrefs = opinfo(insn.ea, opnum), idaapi.op_adds_xrefs(F, opnum)
 
     # If we have xrefs but no type information, then this operand has to
     # be pointing to a local stack variable that is stored in the frame.
     # This means that we need to be inside a function so that we can
     # grab its frame and search through it.
     if has_xrefs and info is None:
-        fn = idaapi.get_func(inst.ea)
+        fn = idaapi.get_func(insn.ea)
         if fn is None:
-            raise E.FunctionNotFoundError(u"{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, inst.ea, opnum, inst.ea))
+            raise E.FunctionNotFoundError(u"{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, ea, opnum, insn.ea))
 
         # Use IDAPython's api to calculate the structure offset into the
         # function's frame using the instruction operand.
-        stkofs_ = idaapi.calc_stkvar_struc_offset(fn, inst.ea if idaapi.__version__ < 7.0 else inst, opnum)
+        stkofs_ = idaapi.calc_stkvar_struc_offset(fn, insn.ea if idaapi.__version__ < 7.0 else insn, opnum)
 
         # For sanity, we're going to grab the actual value of the operand
         # and use it to verify that the result from IDAPython is correct.
-        op = operand(inst.ea, opnum)
+        op = operand(insn.ea, opnum)
         sval = interface.sval_t(op.addr).value
 
         # Now that we have the instruction operand's value, we can use
         # it with IDAPython to check if it's actually a frame member.
-        res = idaapi.get_stkvar(op, sval) if idaapi.__version__ < 7.0 else idaapi.get_stkvar(inst, op, sval)
+        res = idaapi.get_stkvar(op, sval) if idaapi.__version__ < 7.0 else idaapi.get_stkvar(insn, op, sval)
         if res is None:
-            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : The instruction operand's value ({:#x}) does not appear to point to a frame variable at the same offset ({:#x}).".format(__name__, inst.ea, opnum, sval.value, stkofs_))
+            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : The instruction operand's value ({:#x}) does not appear to point to a frame variable at the same offset ({:#x}).".format(__name__, ea, opnum, sval.value, stkofs_))
 
         # Now we have the actual frame member and the offset into the
         # frame, and we can use it to validate against our expectation.
         member, stkofs = res
         if stkofs != stkofs_:
-            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The stack variable offset ({:#x}) for the instruction operand does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
+            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The stack variable offset ({:#x}) for the instruction operand does not match what was expected ({:#x}).".format(__name__, ea, opnum, stkofs, stkofs_))
 
         # Finally we can instantiate an idaapi.xreflist_t, and call directly
         # into the IDAPython api in order to let it build all of the
@@ -1788,7 +1788,7 @@ def op_refs(ea, opnum):
     # looking for references to an enumeration member. We start by grabbing both
     # id for the enumeration and its member.
     elif has_xrefs and info and enumeration.has(info.tid):
-        eid, mid = info.tid, op_enumeration(inst.ea, opnum)
+        eid, mid = info.tid, op_enumeration(insn.ea, opnum)
         NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
 
         # Now we check to see if it has any xrefs that point directly to the id
@@ -1796,7 +1796,7 @@ def op_refs(ea, opnum):
         X = idaapi.xrefblk_t()
         if not X.first_to(mid, idaapi.XREF_ALL):
             fullname = '.'.join([enumeration.name(eid), enumeration.member.name(mid)])
-            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references were found for the enumeration member {:s} ({:#x}) at operand {:d} of the instruction at {:#x}.".format(__name__, inst.ea, opnum, fullname, mid, opnum, inst.ea))
+            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references were found for the enumeration member {:s} ({:#x}) at operand {:d} of the instruction at {:#x}.".format(__name__, ea, opnum, fullname, mid, opnum, insn.ea))
             return []
 
         # As we were able to find one, we can just continue to iterate through
@@ -1830,13 +1830,13 @@ def op_refs(ea, opnum):
         # operand, and then get the operand's value. This is because IDA
         # isn't always guaranteed to return a proper path, and so we'll need
         # to calculate the offset ourselves.
-        delta, items = get_stroff_path(inst, opnum)
+        delta, items = get_stroff_path(insn, opnum)
 
         # Now we should have the path and delta that IDA is suggesting is
         # at the given operand, so now we'll need the operand's value so
         # that we can use it to find the proper path through the structure.
         res = op.value if op.type in {idaapi.o_imm} else op.addr
-        offset = idaapi.as_signed(res, op_bits(ea, opnum)) + delta
+        offset = idaapi.as_signed(res, op_bits(insn.ea, opnum)) + delta
         _, items = calculate_stroff_path(offset, items)
 
         # If we actually got some items, then we can assign it to members.
@@ -1847,7 +1847,7 @@ def op_refs(ea, opnum):
         # to the op_structure implementation. This should give us the
         # members that are being used at the operand.
         else:
-            res = op_structure(inst.ea, opnum)
+            res = op_structure(insn.ea, opnum)
             items = [item for item in res] if isinstance(res, (builtins.list, builtins.tuple)) else [res]
             items.pop(-1) if isinstance(items[-1], six.integer_types) else items
 
@@ -1875,7 +1875,7 @@ def op_refs(ea, opnum):
             X = idaapi.xrefblk_t()
             if not X.first_to(mptr.id, idaapi.XREF_ALL):
                 fullname = idaapi.get_member_fullname(mptr.id)
-                logging.info(u"{:s}.op_refs({:#x}, {:d}) : No references were found for structure member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
+                logging.info(u"{:s}.op_refs({:#x}, {:d}) : No references were found for structure member \"{:s}\".".format(__name__, ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
                 continue
 
             # If we were able to get an xref, then we can gather the rest of
@@ -1937,7 +1937,7 @@ def op_refs(ea, opnum):
                 # member id of the frame that we need to descend into.
                 item = idaapi.get_stkvar(at(ea), op, op.value if op.type in {idaapi.o_imm} else op.addr)
                 if item is None:
-                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, inst.ea, opnum, refopnum, ea))
+                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, insn.ea, opnum, refopnum, ea))
                     continue
                 mptr, actval = item
                 offset = actval - mptr.soff
@@ -1947,7 +1947,7 @@ def op_refs(ea, opnum):
                 # we can use the actual value to compose a path through it.
                 msptr = idaapi.get_sptr(mptr)
                 if msptr is None:
-                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, inst.ea, opnum, refopnum, ea))
+                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, insn.ea, opnum, refopnum, ea))
                     continue
 
                 # Instantiate a structure_t in order to grab its members_t. From
@@ -2017,14 +2017,14 @@ def op_refs(ea, opnum):
     NSUP_REF0, NSUP_REF1, NSUP_REF2, NSUP_REF3, NSUP_REF4, NSUP_REF5, NSUP_REF6, NSUP_REF7 = (getattr(idaapi, name, supidx) for name, supidx in zip(attributes, indices))
 
     # We start by grabbing the operand's value from the instruction.
-    value = operand(inst.ea, opnum).value if operand(inst.ea, opnum).type in {idaapi.o_imm} else operand(inst.ea, opnum).addr
+    value = operand(insn.ea, opnum).value if operand(insn.ea, opnum).type in {idaapi.o_imm} else operand(insn.ea, opnum).addr
 
     # Now we can try to get all the xrefs from the address value that
     # we extracted. If we couldn't grab anything, then just warn the
     # user about it and return an empty list.
     X = idaapi.xrefblk_t()
     if not X.first_to(value, idaapi.XREF_ALL):
-        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The operand ({:d}) at the specified address ({:#x}) does not have any references.".format(__name__, inst.ea, opnum, opnum, inst.ea))
+        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The operand ({:d}) at the specified address ({:#x}) does not have any references.".format(__name__, insn.ea, opnum, opnum, insn.ea))
         return []
 
     # However, if we were able to find the first value, then we can
