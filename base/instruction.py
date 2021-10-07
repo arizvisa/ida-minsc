@@ -2306,8 +2306,8 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
-    def memory(insn, op):
-        '''Operand type decoder for memory-type operands which return just an address.'''
+    def address(insn, op):
+        '''Operand type decoder for address operands which return just an immediate address.'''
         segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
         return op.addr
 
@@ -2348,12 +2348,13 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
     def memory(insn, op):
-        '''Operand type decoder for returning a memory address on the Intel architecture.'''
+        '''Operand type decoder for returning a memory address including a segment on the Intel architecture.'''
         global architecture
 
         # First we'll extract the necessary attributes from the operand and its instruction.
         hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
         segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        address = op.addr
 
         # Now we can figure out the operand's specifics.
         if hasSIB:
@@ -2365,12 +2366,7 @@ class operand_types:
             index = None
 
         # Figure out which property contains our offset depending on the type.
-        if op.type in {idaapi.o_displ, idaapi.o_mem}:
-            offset = op.addr
-        elif op.type in {idaapi.o_phrase}:
-            offset = op.value
-        else:
-            raise E.InvalidTypeOrValueError(u"{:s}.memory({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type))
+        offset = op.addr
 
         # Figure out the maximum value for the offset part of the phrase which
         # IDA seems to use the number of bits from the database to clamp. Then
@@ -2379,18 +2375,10 @@ class operand_types:
         # we need to return.
         bits, dtype_by_size = database.config.bits(), utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         maximum, dtype = pow(2, bits), dtype_by_size(bits // 8)
-        res = idaapi.as_signed(offset, bits)
-
-        # If our operand is defined as its regular form, then we either
-        # clamp it or take its signed value. This is because IDA appears to
-        # treat all SIB-encoded operands as a signed value. Likewise, if the
-        # operand is inverted, then we essentially swap these values.
-        regular = res if res < 0 else offset & (maximum - 1)
-        inverted = offset & (maximum - 1) if res < 0 else offset - maximum
 
         # Finally we can calculate all of the components for the operand, and
         # then return them to the user.
-        offset_ = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
+        offset_ = offset & (maximum - 1)
         base_ = None if base is None else architecture.by_indextype(base, dtype)
         index_ = None if index is None else architecture.by_indextype(index, dtype)
         scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
