@@ -2307,7 +2307,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
     def memory(insn, op):
-        '''Operand type decoder for memory-type operands which return an address.'''
+        '''Operand type decoder for memory-type operands which return just an address.'''
         segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
         return op.addr
 
@@ -2347,10 +2347,59 @@ class operand_types:
         return architecture.by_xmm(regnum)
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
+    def memory(insn, op):
+        '''Operand type decoder for returning a memory address on the Intel architecture.'''
+        global architecture
+
+        # First we'll extract the necessary attributes from the operand and its instruction.
+        hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
+        segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+
+        # Now we can figure out the operand's specifics.
+        if hasSIB:
+            base = None
+            index = (sib & 0x38) >> 3
+
+        else:
+            base = None
+            index = None
+
+        # Figure out which property contains our offset depending on the type.
+        if op.type in {idaapi.o_displ, idaapi.o_mem}:
+            offset = op.addr
+        elif op.type in {idaapi.o_phrase}:
+            offset = op.value
+        else:
+            raise E.InvalidTypeOrValueError(u"{:s}.memory({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type))
+
+        # Figure out the maximum value for the offset part of the phrase which
+        # IDA seems to use the number of bits from the database to clamp. Then
+        # we can convert the value that we get from IDAPython into its signed
+        # form so that we can calculate the correct value for whatever variation
+        # we need to return.
+        bits, dtype_by_size = database.config.bits(), utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+        maximum, dtype = pow(2, bits), dtype_by_size(bits // 8)
+        res = idaapi.as_signed(offset, bits)
+
+        # If our operand is defined as its regular form, then we either
+        # clamp it or take its signed value. This is because IDA appears to
+        # treat all SIB-encoded operands as a signed value. Likewise, if the
+        # operand is inverted, then we essentially swap these values.
+        regular = res if res < 0 else offset & (maximum - 1)
+        inverted = offset & (maximum - 1) if res < 0 else offset - maximum
+
+        # Finally we can calculate all of the components for the operand, and
+        # then return them to the user.
+        offset_ = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
+        base_ = None if base is None else architecture.by_indextype(base, dtype)
+        index_ = None if index is None else architecture.by_indextype(index, dtype)
+        scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
+        return intelops.OffsetBaseIndexScale(offset_, base_, index_, scale_)
+
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
     def phrase(insn, op):
-        '''Operand type decoder for returning a memory phrase on the Intel architecture.'''
+        '''Operand type decoder for returning a phrase or displacement on the Intel architecture.'''
         global architecture
         REX_B, REX_X, REX_R, REX_W, VEX_L = 1, 2, 4, 8, 0x80
         INDEX_NONE = 4
@@ -2360,40 +2409,25 @@ class operand_types:
         segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
         # Now we can figure out the operand's specifics.
-        if op.type in {idaapi.o_displ, idaapi.o_phrase}:
-            if hasSIB:
-                base = (sib & 0x07) >> 0
-                index = (sib & 0x38) >> 3
+        if hasSIB:
+            base = (sib & 0x07) >> 0
+            index = (sib & 0x38) >> 3
 
-                # If the index register is INDEX_NONE, then there isn't an index
-                # register and we need to clear it.
-                if index in {INDEX_NONE}:
-                    index = None
-
-                # Otherwise, we're good and all we need to do is to add the 64-bit
-                # flag to the base and index registers if it's relevant.
-                else:
-                    base |= 8 if rex & REX_B else 0
-                    index |= 8 if rex & REX_X else 0
-
-            # If there isn't an SIB, then the base register is in op_t.phrase.
-            else:
-                base = op.phrase
+            # If the index register is INDEX_NONE, then there isn't an index
+            # register and we need to clear it.
+            if index in {INDEX_NONE}:
                 index = None
 
-        # TODO: find some samples for this
-        elif op.type in {idaapi.o_mem}:
-            if hasSIB:
-                base = None
-                index = (sib & 0x38) >> 3
-
+            # Otherwise, we're good and all we need to do is to add the 64-bit
+            # flag to the base and index registers if it's relevant.
             else:
-                base = None
-                index = None
+                base |= 8 if rex & REX_B else 0
+                index |= 8 if rex & REX_X else 0
 
+        # If there isn't an SIB, then the base register is in op_t.phrase.
         else:
-            optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype[0], optype[1], optype[2], op.type))
+            base = op.phrase
+            index = None
 
         # Figure out which property contains our offset depending on the type.
         if op.type in {idaapi.o_displ, idaapi.o_mem}:
