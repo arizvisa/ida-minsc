@@ -912,7 +912,7 @@ def op_structure(reference):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
-    F, op = database.type.flags(ea), operand(ea, opnum)
+    F, insn, op = database.type.flags(ea), at(ea), operand(ea, opnum)
 
     # First check if our operand is pointing to memory by checking the operand
     # type. If it is, then the operand is not a structure offset and thus we'll
@@ -945,11 +945,16 @@ def op_structure(ea, opnum):
             return results + (delta,)
         return tuple(results) if len(results) > 1 else results[0]
 
-    # If the operand is an immediate value, then we need to extract the
-    # offset from the value property. Anything else should be a memory
-    # address that we'll calculate the offset into the structure from.
-    res = op.value if op.type in {idaapi.o_imm} else op.addr
-    offset = idaapi.as_signed(res, database.config.bits())
+    # Now we have to decode our operand in order to extract an offset
+    # from. We try our damned-est to grab an integer out of it, and
+    # bail if we're unable to.
+    res = __optype__.decode(insn, op)
+    if isinstance(res, six.integer_types):
+        value = res
+    elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
+        value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
+    else:
+        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, res.__class__, opnum, ea))
 
     # Verify that the operand is actually represented by a structure offset.
     if all(F & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
@@ -1009,7 +1014,7 @@ def op_structure(ea, opnum):
     # Start out by checking if the operand is a stack variable, because
     # we'll need to handle it differently if so.
     if idaapi.is_stkvar(F, opnum) and function.within(ea):
-        fn, insn = function.by(ea), at(ea)
+        fn = function.by(ea)
 
         # Now we can ask IDA what's up with it.
         res = idaapi.get_stkvar(insn, op, offset)
@@ -1238,17 +1243,26 @@ def op_structure(ea, opnum, sptr, *path, **force):
         index, item = next((index, item) for index, item in enumerate(path) if not isinstance(item, accepted))
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The path member at index {:d} has a type ({!s}) that is not supported.".format(__name__, ea, opnum, sptr.id, path, index, item.__class__))
 
-    # Now we need to examine our operand and stash it so that we can later
-    # use it to calculate the delta between it and the actual member offset
-    # that we'll collect when traversing the structure path.
-    op = operand(ea, opnum)
-    res = op.value if op.type in {idaapi.o_imm} else op.addr
-    value = idaapi.as_signed(res, database.config.bits())
+    # Grab information about our instruction and operand so that we can decode
+    # it to get the structure offset to use.
+    insn, op = at(ea), operand(ea, opnum)
 
     # If the operand type is not a valid type, then raise an exception so that
     # we don't accidentally apply a structure to an invalid operand type.
     if op.type not in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ, idaapi.o_imm}:
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sptr.id, path, opnum, ea, op.type))
+
+    # Now we need to decode our operand and stash it so that we can later
+    # use it to calculate the delta between it and the actual member offset
+    # to use when traversing the structure path. We try every possible attribute
+    # from our decoders until we find one. Otherwise, we bail.
+    res = __optype__.decode(insn, op)
+    if isinstance(res, six.integer_types):
+        value = res
+    elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
+        value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
+    else:
+        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, sptr.id, path, value.__class__, opnum, ea))
 
     # We have to start somewhere and our first element in the path should be a
     # a member of the sptr we were given. So, now we begin to traverse through
@@ -1421,12 +1435,11 @@ def op_structure(ea, opnum, sptr, *path, **force):
     # member offset from the path the user gave us so that way the user can
     # fetch it later if they so desire.
     if idaapi.__version__ < 7.0:
-        ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, res)
+        ok = idaapi.op_stroff(insn.ea, opnum, tid.cast(), length, res)
 
     # If we're using IDAPython from v7.0 or later, then we're required to grab
     # the instruction to apply our tid_array to its operand.
     else:
-        insn = at(ea)
         ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, res)
 
     # If we failed applying our structure, then we'll just raise an exception.
