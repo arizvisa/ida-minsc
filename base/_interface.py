@@ -1279,23 +1279,23 @@ class node(object):
     def alt_opinverted(cls, ea, opnum):
         '''Return whether the operand `opnum` at the address `ea` has its sign inverted or not.'''
         AFL_SIGN0, AFL_SIGN1 = 0x100000, 0x200000
-        AFL_SIGNX = AFL_SIGN0 | AFL_SIGN1
 
-        # Grab the altval containing the additional flags for the given address.
-        result = cls.aflags(ea, AFL_SIGNX)
+        # Verify that we were given an operand number that has been tested, and
+        # log it if we haven't. Although it's likely that inverting the second
+        # operand will afect all of the following operands, we do this to be safe.
+        if opnum not in {0, 1, 2}:
+            result = cls.aflags(ea)
+            logging.info(u"{:s}.alt_opinverted({:#x}, {:d}) : Fetching the inversion state for the operand ({:d}) of the instruction at {:#x} has not been tested (aflags={:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, opnum, ea, result))
 
-        # Verify that we were given an operand number that we support, and
-        # mask our altval to return whether the specified operand has its
-        # signed flag set.
-        if opnum in {0, 1}:
-            flag = AFL_SIGN1 if opnum else AFL_SIGN0
-            return result & flag == flag
+        # Grab the altval containing the additional flags for the given address
+        # masked with the bits that we plan on checking.
+        else:
+            result = cls.aflags(ea, AFL_SIGN0 | AFL_SIGN1)
 
-        # If we were given an invalid operand number, then we have no idea
-        # what the actual flag is and we need to warn the user about it. It
-        # isn't critical though, as we can still return false.
-        logging.warning(u"{:s}.alt_opinverted({:#x}, {:d}) : Unable to determine the operand flag for the additional flags ({:#x}) belonging to the specified instruction ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, result, ea))
-        return False
+        # Now we just need to figure out which flag we need to use for the
+        # operand that was chosen, and then we can check its mask.
+        flag = AFL_SIGN1 if opnum else AFL_SIGN0
+        return result & flag == flag
 
     @classmethod
     def alt_opnegated(cls, ea, opnum):
@@ -1303,21 +1303,23 @@ class node(object):
         AFL_BNOT0, AFL_BNOT1 = 0x100, 0x200
         AFL_BNOTX = AFL_BNOT0 | AFL_BNOT1
 
-        # Grab the altval containing the additional flags for the given address.
-        result = cls.aflags(ea, AFL_BNOTX)
+        # Verify that we were given an operand number that has been tested, and
+        # log it if we haven't. Although it's likely that negating the second
+        # operand will affect all of the following operands, we do this to be safe.
+        if opnum not in {0, 1, 2}:
+            result = cls.aflags(ea)
+            logging.info(u"{:s}.alt_opnegated({:#x}, {:d}) : Fetching the negation state for the operand ({:d}) of the instruction at {:#x} has not been tested (aflags={:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, opnum, ea, result))
 
-        # Verify that we were given an operand number that we support, and
-        # then check if out altval has the negation flag set or not.
-        if opnum in {0, 1}:
-            flag = AFL_BNOT1 if opnum else AFL_BNOT0
-            return result & flag == flag
+        # Grab the altval containing the additional flags for the given address
+        # masked with the bits that we want to check.
+        else:
+            result = cls.aflags(ea, AFL_BNOT0 | AFL_BNOT1)
 
-        # If we were given an invalid operand number, then we have no idea
-        # what bits point to it, and so we need to warn the user. Similar to
-        # the alt_opinverted function, though, this isn't critical and we
-        # can just return False since you can only negate the first two operands.
-        logging.warning(u"{:s}.alt_opinverted({:#x}, {:d}) : Unable to determine the operand flag for the additional flags ({:#x}) belonging to the specified instruction ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, result, ea))
-        return False
+        # Similar to the alt_opinverted function, we just need to figure out
+        # the flag to use for the operand number that was chosen so that we
+        # check its the aflags against the correct mask.
+        flag = AFL_BNOT1 if opnum else AFL_BNOT0
+        return result & flag == flag
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
