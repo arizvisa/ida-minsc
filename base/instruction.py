@@ -2354,35 +2354,16 @@ class operand_types:
         # First we'll extract the necessary attributes from the operand and its instruction.
         hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
         segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
-        address = op.addr
 
-        # Now we can figure out the operand's specifics.
-        if hasSIB:
-            base = None
-            index = (sib & 0x38) >> 3
-
-        else:
-            base = None
-            index = None
-
-        # Figure out which property contains our offset depending on the type.
-        offset = op.addr
-
-        # Figure out the maximum value for the offset part of the phrase which
-        # IDA seems to use the number of bits from the database to clamp. Then
-        # we can convert the value that we get from IDAPython into its signed
-        # form so that we can calculate the correct value for whatever variation
-        # we need to return.
-        bits, dtype_by_size = database.config.bits(), utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
-        maximum, dtype = pow(2, bits), dtype_by_size(bits // 8)
+        # Now all we need to do is to clamp our operand address using the number
+        # of bits for the database.
+        maximum = pow(2, database.config.bits())
+        address = op.addr & (maximum - 1)
 
         # Finally we can calculate all of the components for the operand, and
         # then return them to the user.
-        offset_ = offset & (maximum - 1)
-        base_ = None if base is None else architecture.by_indextype(base, dtype)
-        index_ = None if index is None else architecture.by_indextype(index, dtype)
-        scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
-        return intelops.OffsetBaseIndexScale(offset_, base_, index_, scale_)
+        reg = architecture.by_index(segrg)
+        return intelops.SegmentOffset(reg, address)
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
