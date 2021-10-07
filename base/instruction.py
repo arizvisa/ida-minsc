@@ -2363,7 +2363,9 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
     def phrase(insn, op):
         '''Operand type decoder for returning a memory phrase on the Intel architecture.'''
-        F1, F2 = op.specflag1, op.specflag2
+        F1, F2, rex = op.specflag1, op.specflag2, insn.insnpref
+        REX_B, REX_X, REX_R, REX_W, VEX_L = 1, 2, 4, 8, 0x80
+
         if op.type in {idaapi.o_displ, idaapi.o_phrase}:
             if F1 == 0:
                 base = op.reg
@@ -2372,6 +2374,10 @@ class operand_types:
             elif F1 == 1:
                 base = (F2 & 0x07) >> 0
                 index = (F2 & 0x38) >> 3
+
+                # add the 64-bit flag to the base and index registers if relevant.
+                base |= 8 if rex & REX_B else 0
+                index |= 8 if rex & REX_X else 0
 
             else:
                 raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type, F1))
@@ -2386,6 +2392,7 @@ class operand_types:
             # XXX: for some reason stack variables include both base and index
             #      testing .specval seems to be a good way to determine whether
             #      something is referencing the stack
+            # TODO: find some samples for this
             if op.specval & 0x00ff0000 == 0x001f0000 and index == base:
                 index = None
 
@@ -2400,6 +2407,7 @@ class operand_types:
             # OF_NUMBER = 0x10 # can be output as number only if set, the operand can be converted to a number only
             # OF_SHOW = 0x08 #  should the operand be displayed? if clear, the operand is hidden and should not be displayed
 
+        # TODO: find some samples for this
         elif op.type == idaapi.o_mem:
             if F1 == 0:
                 base = None
@@ -2419,6 +2427,7 @@ class operand_types:
 
         # if arch == x64, then index += 8
 
+        # TODO: remove this
         scale_lookup = {
             0x00 : 1,   # 00
             0x40 : 2,   # 01
@@ -2432,7 +2441,7 @@ class operand_types:
 
         seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
-        # Figure out the maximum value for the offset parse of the phrase which
+        # Figure out the maximum value for the offset part of the phrase which
         # IDA seems to use the number of bits from the database to clamp. Then
         # we can convert the value that we get from IDAPython into its signed
         # form so that we can calculate the correct value for whatever variation
