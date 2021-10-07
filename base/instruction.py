@@ -527,15 +527,6 @@ def opt(ea, opnum):
     return __optype__.type(res)
 op_type = utils.alias(opt)
 
-#@utils.multicase(opnum=six.integer_types)
-#def op_decode(opnum):
-#    '''Returns the value of the operand `opnum` in byte form belonging to the current instruction (if possible).'''
-#    raise NotImplementedError
-#@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-#def op_decode(ea, opnum):
-#    '''Returns the value of the operand `opnum` in byte form belonging to the instruction at address `ea`.'''
-#    raise NotImplementedError
-
 @utils.multicase(opnum=six.integer_types)
 def op(opnum):
     '''Decodes the operand `opnum` for the current instruction.'''
@@ -586,12 +577,12 @@ def op_segment(reference):
 def op_segment(ea, opnum):
     '''Returns the segment register used by the operand `opnum` for the instruction at the address `ea`.'''
     op = operand(ea, opnum)
-    segment  = (op.specval & 0xffff0000) >> 16
-    selector = (op.specval & 0x0000ffff) >> 0
-    if segment:
+    segrg  = (op.specval & 0xffff0000) >> 16
+    segsel = (op.specval & 0x0000ffff) >> 0
+    if segrg:
         global architecture
-        return architecture.by_index(segment)
-    #raise NotImplementedError("{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for the specified operand number. {!r} was returned.".format(__name__, ea, opnum, segment))
+        return architecture.by_index(segrg)
+    #raise NotImplementedError("{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for the specified operand number. {!r} was returned.".format(__name__, ea, opnum, segrg))
     return None
 # FIXME: maybe use idaapi.op_seg(*args) to apply a segment to an operand?
 
@@ -1050,7 +1041,7 @@ def op_structure(ea, opnum):
     # Since IDAPython's get_stroff_path implementation doesn't recognize NULL,
     # we need to call it twice in order to get the size of needed array.
     delta, path = idaapi.sval_pointer(), idaapi.tid_array(idaapi.MAXSTRUCPATH)
-    count = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
+    count = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), insn.ea, opnum)
     if not count:
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
@@ -2363,11 +2354,14 @@ class operand_types:
     def memory(insn, op):
         '''Operand type decoder for returning a memory address including a segment on the Intel architecture.'''
         global architecture
-        aux_use32, aux_use64 = 0x8, 0x10
+        aux_use32, aux_use64, aux_natad = 0x8, 0x10, 0x1000
 
         # First we'll extract the necessary attributes from the operand and its instruction.
         auxpref, segrg, segsel = insn.auxpref, (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
         bits = 64 if auxpref & aux_use64 else 32 if auxpref & aux_use32 else 16
+
+        # FIXME: verify that support for 16-bit addressing actually works if we're 32-bit
+        #        and the prefix has been toggled.
 
         # Now all we need to do is to clamp our operand address using the number
         # of bits for the instruction's segment type.
@@ -2385,7 +2379,7 @@ class operand_types:
         '''Operand type decoder for returning a phrase or displacement on the Intel architecture.'''
         global architecture
         REX_B, REX_X, REX_R, REX_W, VEX_L = 1, 2, 4, 8, 0x80
-        INDEX_NONE, aux_use32, aux_use64 = 0x4, 0x8, 0x10
+        INDEX_NONE, aux_use32, aux_use64, aux_natad = 0x4, 0x8, 0x10, 0x1000
 
         # First we'll extract the necessary attributes from the operand and its instruction.
         hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
@@ -2398,8 +2392,10 @@ class operand_types:
             index = (sib & 0x38) >> 3
 
             # If the index register is INDEX_NONE, then there isn't an index
-            # register and we need to clear it.
+            # register and we need to clear it. The base register might still
+            # need to be promoted however, so we check it.
             if index in {INDEX_NONE}:
+                base |= 8 if rex & REX_B else 0
                 index = None
 
             # Otherwise, we're good and all we need to do is to add the 64-bit
@@ -2407,6 +2403,12 @@ class operand_types:
             else:
                 base |= 8 if rex & REX_B else 0
                 index |= 8 if rex & REX_X else 0
+
+        # If this is a 16-bit addressing scheme, then we need to explicitly
+        # figure out what phrase type is being used.
+        elif not (auxpref & (aux_use32 | aux_use64)):
+            # FIXME: Implement this whenever a user complains about it.
+            raise E.UnsupportedCapability(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the phrase for {:d}-bit addressing schemes.".format('.'.join([__name__, 'operand_types']), insn.ea, op, 16))
 
         # If there isn't an SIB, then the base register is in op_t.phrase.
         else:
@@ -2521,7 +2523,7 @@ class operand_types:
         # op.specflag1 == CRn
         # op.specflag2 == CRm
 
-        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
+        raise E.UnsupportedCapability(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec3)
     def coprocessorlist(insn, op):
@@ -2530,7 +2532,7 @@ class operand_types:
         # FIXME: This information was found in the sdk by @BrunoPujos.
         # op.specflag1 == processor number
 
-        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
+        raise E.UnsupportedCapability(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
     def extensionlist(insn, op):
@@ -2542,7 +2544,7 @@ class operand_types:
         # op.specflag2 == spacing between registers (0: {Dd, Dd+1,... }, 1: {Dd, Dd+2, ...} etc)
         # op.specflag3 == neon scalar index + 1 (Dd[x]). if index is 254, then this represents the entire set (Dd[...])
 
-        raise NotImplementedError(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
+        raise E.UnsupportedCapability(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5)
     def text(insn, op):
@@ -2551,7 +2553,7 @@ class operand_types:
         # FIXME: This information was found in the sdk by @BrunoPujos.
         # The entire op_t structure contains the designated text starting at op.value
 
-        raise NotImplementedError(u"{:s}.text({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
+        raise E.UnsupportedCapability(u"{:s}.text({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5 + 1)
     def condition(insn, op):
@@ -2560,7 +2562,7 @@ class operand_types:
         # FIXME: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
         # op.value == condition
 
-        raise NotImplementedError(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
+        raise E.UnsupportedCapability(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(insn, op):
