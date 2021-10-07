@@ -945,7 +945,7 @@ def op_structure(ea, opnum):
     elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
         value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
     else:
-        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
+        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}).".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
 
     # Verify that the operand is actually represented by a structure offset.
     if all(F & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
@@ -1253,7 +1253,7 @@ def op_structure(ea, opnum, sptr, *path, **force):
     elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
         value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
     else:
-        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unknown type ({!s}) was decoded from operand {:d} for the instruction at {:#x}).".format(__name__, ea, opnum, sptr.id, path, value.__class__, opnum, insn.ea))
+        raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}).".format(__name__, ea, opnum, sptr.id, path, value.__class__, opnum, insn.ea))
 
     # We have to start somewhere and our first element in the path should be a
     # a member of the sptr we were given. So, now we begin to traverse through
@@ -1824,10 +1824,17 @@ def op_refs(ea, opnum):
         delta, items = get_stroff_path(insn, opnum)
 
         # Now we should have the path and delta that IDA is suggesting is
-        # at the given operand, so now we'll need the operand's value so
-        # that we can use it to find the proper path through the structure.
-        res = op.value if op.type in {idaapi.o_imm} else op.addr
-        offset = idaapi.as_signed(res, op_bits(insn.ea, opnum)) + delta
+        # at the given operand, so we'll need to decode the operand's value
+        # so that we can use it to find the proper path through the structure.
+        res = __optype__.decode(insn, op)
+        if isinstance(res, six.integer_types):
+            offset = res
+        elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
+            offset = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
+        else:
+            raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}.".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
+
+        # Hopefully that was it, now we should be able to figure out our path.
         _, items = calculate_stroff_path(offset, items)
 
         # If we actually got some items, then we can assign it to members.
@@ -2007,12 +2014,21 @@ def op_refs(ea, opnum):
     indices = [9, 10, 11, 21, 22, 23, 33, 34]
     NSUP_REF0, NSUP_REF1, NSUP_REF2, NSUP_REF3, NSUP_REF4, NSUP_REF5, NSUP_REF6, NSUP_REF7 = (getattr(idaapi, name, supidx) for name, supidx in zip(attributes, indices))
 
-    # We start by grabbing the operand's value from the instruction.
-    value = operand(insn.ea, opnum).value if operand(insn.ea, opnum).type in {idaapi.o_imm} else operand(insn.ea, opnum).addr
+    # We start by decoding the operand's value from the instruction. From
+    # this, we should be able to get an immediate address, an offset, or
+    # whatever. Once we get the right type, then we can start looking for
+    # xrefs to it.
+    res = __optype__.decode(insn, ops[opnum])
+    if isinstance(res, six.integer_types):
+        value = res
+    elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
+        value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
+    else:
+        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}.".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
 
-    # Now we can try to get all the xrefs from the address value that
-    # we extracted. If we couldn't grab anything, then just warn the
-    # user about it and return an empty list.
+    # Now we can try to get all the xrefs from the address or value that
+    # we extracted. If we couldn't grab anything, then just warn the user
+    # about it and return an empty list.
     X = idaapi.xrefblk_t()
     if not X.first_to(value, idaapi.XREF_ALL):
         logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The operand ({:d}) at the specified address ({:#x}) does not have any references.".format(__name__, insn.ea, opnum, opnum, insn.ea))
