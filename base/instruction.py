@@ -73,10 +73,10 @@ class __optype__(object):
         except KeyError: return cls.cache[0, type]
 
     @classmethod
-    def decode(cls, ea, op, processor=None):
-        '''Using the specified `processor`, decode the operand `op` at the specified address `ea`.'''
+    def decode(cls, insn, op, processor=None):
+        '''Using the specified `processor`, decode the operand `op` for the specified instruction `insn`.'''
         res = cls.lookup(op.type, processor=processor)
-        return res(ea, op)
+        return res(insn, op)
 
     @classmethod
     def type(cls, op, processor=None):
@@ -548,8 +548,8 @@ def op(reference):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op(ea, opnum):
     '''Decodes the operand `opnum` for the instruction at the address `ea`.'''
-    res = operand(ea, opnum)
-    return __optype__.decode(ea, res)
+    insn, res = at(ea), operand(ea, opnum)
+    return __optype__.decode(insn, res)
 op_value = op_decode = utils.alias(op)
 
 ## older typeinfo stuff
@@ -2251,14 +2251,14 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_void)
-    def void(ea, op):
+    def void(insn, op):
         '''Operand type decoder for ``idaapi.o_void``.'''
         return ()
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_reg)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_reg)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg)
-    def register(ea, op):
+    def register(insn, op):
         '''Operand type decoder for ``idaapi.o_reg`` which returns a ``register_t``.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
@@ -2276,12 +2276,12 @@ class operand_types:
             return architecture.by_indextype(res, get_dtype_attribute(op))
 
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
-        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype, op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
-    def immediate(ea, op):
+    def immediate(insn, op):
         '''Operand type decoder for ``idaapi.o_imm`` which returns an immediate integer.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
@@ -2307,52 +2307,52 @@ class operand_types:
             # order to ensure it's signed.
             regular = value & (maximum - 1)
             inverted = res if res < 0 else value - maximum
-            return res and inverted if interface.node.alt_opinverted(ea, op.n) else regular
+            return res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
-        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype, op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype, op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
-    def memory(ea, op):
+    def memory(insn, op):
         '''Operand type decoder for memory-type operands which return an address.'''
         if op.type in {idaapi.o_mem, idaapi.o_far, idaapi.o_near, idaapi.o_displ}:
             seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
             return op.addr
         optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
-        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, {!r}) : Expected operand type `{:s}` or `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype[0], optype[1], op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, {!r}) : Expected operand type `{:s}` or `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype[0], optype[1], op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
-    def trregister(ea, op):
+    def trregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec0`` which returns a trap register on the Intel architecture.'''
         global architecture
-        raise E.UnsupportedCapability(u"{:s}.trregister({:#x}, ...) : Trap registers (`%trX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), ea))
+        raise E.UnsupportedCapability(u"{:s}.trregister({:#x}, ...) : Trap registers (`%trX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), insn.ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
-    def dbregister(ea, op):
+    def dbregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec1`` which returns a Db register on the Intel architecture.'''
         global architecture
-        raise E.UnsupportedCapability(u"{:s}.dbregister({:#x}, ...) : Db registers (`%dbX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), ea))
+        raise E.UnsupportedCapability(u"{:s}.dbregister({:#x}, ...) : Db registers (`%dbX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), insn.ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
-    def crregister(ea, op):
+    def crregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec2`` which returns a control register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_control(regnum)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
-    def fpregister(ea, op):
+    def fpregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec3`` which returns an FPU register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_float(regnum)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
-    def mmxregister(ea, op):
+    def mmxregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec4`` which returns an MMX register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_mmx(regnum)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
-    def xmmregister(ea, op):
+    def xmmregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec5`` which returns an XMM register on the Intel architecture.'''
         global architecture
         regnum = op.reg
@@ -2361,7 +2361,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
-    def phrase(ea, op):
+    def phrase(insn, op):
         '''Operand type decoder for returning a memory phrase on the Intel architecture.'''
         F1, F2 = op.specflag1, op.specflag2
         if op.type in {idaapi.o_displ, idaapi.o_phrase}:
@@ -2374,14 +2374,14 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join([__name__, 'operand_types']), ea, op, op.type, F1))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type, F1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
             elif op.type == idaapi.o_phrase:
                 offset = op.value
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join([__name__, 'operand_types']), ea, op, op.type))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type))
 
             # XXX: for some reason stack variables include both base and index
             #      testing .specval seems to be a good way to determine whether
@@ -2410,12 +2410,12 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join([__name__, 'operand_types']), ea, op, op.type, F1))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join([__name__, 'operand_types']), insn.ea, op, op.type, F1))
             offset = op.addr
 
         else:
             optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype[0], optype[1], optype[2], op.type))
+            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), insn.ea, op, optype[0], optype[1], optype[2], op.type))
 
         # if arch == x64, then index += 8
 
@@ -2448,11 +2448,11 @@ class operand_types:
         inverted = offset & (maximum - 1) if res < 0 else offset - maximum
 
         global architecture
-        items = res and inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
+        items = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
         return intelops.OffsetBaseIndexScale(*items)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
-    def phrase(ea, op):
+    def phrase(insn, op):
         '''Operand type decoder for returning a memory phrase on either the AArch32 or AArch64 architectures.'''
         global architecture
 
@@ -2463,14 +2463,14 @@ class operand_types:
         return armops.registerphrase(Rn, Rm)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
-    def phrase(ea, op):
+    def phrase(insn, op):
         '''Operand type decoder for returning a memory displacement on either the AArch32 or AArch64 architectures.'''
         global architecture
         Rn = architecture.by_index(op.reg)
         return armops.immediatephrase(Rn, idaapi.as_signed(op.addr))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
-    def memory(ea, op):
+    def memory(insn, op):
         '''Operand type decoder for returning a memory reference on either the AArch32 or AArch64 architectures.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
@@ -2489,7 +2489,7 @@ class operand_types:
         return armops.memory(addr, res - maxval if sf else res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
-    def flex(ea, op):
+    def flex(insn, op):
         '''Operand type decoder for returning a flexible operand (shift-op) on either the AArch32 or AArch64 architectures.'''
         global architecture
 
@@ -2503,7 +2503,7 @@ class operand_types:
         return armops.flex(Rn, int(shift), int(op.value))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
-    def list(ea, op):
+    def list(insn, op):
         '''Operand type decoder for returning a register list on either the AArch32 or AArch64 architectures.'''
         global architecture
         res = set()
@@ -2519,7 +2519,7 @@ class operand_types:
         return armops.list(res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec2)
-    def coprocessorlist(ea, op):
+    def coprocessorlist(insn, op):
         '''Operand type decoder for the coprocessor register list (CDP) on either the AArch32 or AArch64 architectures.'''
 
         # FIXME: This information was found in the sdk by @BrunoPujos.
@@ -2527,18 +2527,18 @@ class operand_types:
         # op.specflag1 == CRn
         # op.specflag2 == CRm
 
-        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), ea, op.type, op.type))
+        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec3)
-    def coprocessorlist(ea, op):
+    def coprocessorlist(insn, op):
         '''Operand type decoder for the coprocessor register list (LDC/STC) on either the AArch32 or AArch64 architectures.'''
 
         # FIXME: This information was found in the sdk by @BrunoPujos.
         # op.specflag1 == processor number
-        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), ea, op.type, op.type))
+        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
-    def extensionlist(ea, op):
+    def extensionlist(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec4`` which returns a floating-point register list on either the AArch32 or AArch64 architectures.'''
 
         # FIXME: This information was found in the sdk by @BrunoPujos.
@@ -2547,28 +2547,28 @@ class operand_types:
         # op.specflag2 == spacing between registers (0: {Dd, Dd+1,... }, 1: {Dd, Dd+2, ...} etc)
         # op.specflag3 == neon scalar index + 1 (Dd[x]). if index is 254, then this represents the entire set (Dd[...])
 
-        raise NotImplementedError(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), ea, op.type, op.type))
+        raise NotImplementedError(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5)
-    def text(ea, op):
+    def text(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec5`` which returns arbitrary text on either the AArch32 or AArch64 architectures.'''
 
         # FIXME: This information was found in the sdk by @BrunoPujos.
         # The entire op_t structure contains the designated text starting at op.value
 
-        raise NotImplementedError(u"{:s}.text({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), ea, op.type, op.type))
+        raise NotImplementedError(u"{:s}.text({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5 + 1)
-    def condition(ea, op):
+    def condition(insn, op):
         '''Operand type decoder for dealing with an undocumented operand type found on AArch64.'''
 
         # FIXME: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
         # op.value == condition
 
-        raise NotImplementedError(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), ea, op.type, op.type))
+        raise NotImplementedError(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
-    def phrase(ea, op):
+    def phrase(insn, op):
         '''Operand type decoder for memory phrases on MIPS architecturs.'''
         global architecture
 
@@ -2576,13 +2576,13 @@ class operand_types:
         return mipsops.phrase(rt, imm)
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec0)
-    def code(ea, op):
+    def code(insn, op):
         '''Operand type decoder for trap codes on MIPS architectures.'''
         res = op.value
         return mipsops.trap(int(res))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
-    def float(ea, op):
+    def float(insn, op):
         '''Operand type decoder for floating-point registers on MIPS architectures.'''
         index = op.reg
         return mipsops.float(index)
