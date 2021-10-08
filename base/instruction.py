@@ -941,9 +941,9 @@ def op_structure(ea, opnum):
     # bail if we're unable to.
     res = __optype__.decode(insn, op)
     if isinstance(res, six.integer_types):
-        value = res
+        offset = res
     elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
-        value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
+        offset = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
     else:
         raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}).".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
 
