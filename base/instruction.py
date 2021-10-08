@@ -2365,6 +2365,20 @@ class operand_types:
         global architecture
         regnum = op.reg
         return architecture.by_xmm(regnum)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5+1)
+    def ymmregister(insn, op):
+        '''Operand type decoder for ``idaapi.o_idpspec5+1`` which returns an YMM register on the Intel architecture.'''
+        global architecture
+        regnum = op.reg
+        return architecture.by_ymm(regnum)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5+2)
+    def zmmregister(insn, op):
+        '''Operand type decoder for ``idaapi.o_idpspec5+2`` which returns an ZMM register on the Intel architecture.'''
+        raise E.UnsupportedCapability(u"{:s}.zmmregister({:#x}, ...) : ZMM registers (`%zmmX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), insn.ea))
+
+        global architecture
+        regnum = op.reg
+        return architecture.by_zmm(regnum)
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
     def memory(insn, op):
