@@ -2942,7 +2942,7 @@ class Intel(interface.architecture_t):
 
         # sse1/sse2 simd registers
         [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16)) for _ in range(16) ]
-        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 128, dtype=idaapi.dt_ldbl)) for _ in range(16) ]
+        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 256, dtype=idaapi.dt_byte32)) for _ in range(16) ]
 
         # control registers
         [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in range(8) ]
