@@ -1280,9 +1280,11 @@ class node(object):
         '''Return whether the operand `opnum` at the address `ea` has its sign inverted or not.'''
         AFL_SIGN0, AFL_SIGN1 = 0x100000, 0x200000
 
-        # Verify that we were given an operand number that has been tested, and
-        # log it if we haven't. Although it's likely that inverting the second
-        # operand will afect all of the following operands, we do this to be safe.
+        # Verify that we were given an operand number that has been tested before,
+        # and log it if we haven't. Although it's likely that IDA will consider
+        # all of the operands that follow the second operand as inverted once the
+        # inversion has been applied by the user, we log this just to be safe and
+        # let the user know that we're making an assumption here.
         if opnum not in {0, 1, 2}:
             result = cls.aflags(ea)
             logging.info(u"{:s}.alt_opinverted({:#x}, {:d}) : Fetching the inversion state for the operand ({:d}) of the instruction at {:#x} has not been tested (aflags={:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, opnum, ea, result))
@@ -1303,9 +1305,11 @@ class node(object):
         AFL_BNOT0, AFL_BNOT1 = 0x100, 0x200
         AFL_BNOTX = AFL_BNOT0 | AFL_BNOT1
 
-        # Verify that we were given an operand number that has been tested, and
-        # log it if we haven't. Although it's likely that negating the second
-        # operand will affect all of the following operands, we do this to be safe.
+        # Verify that we were given an operand number that has been tested before,
+        # and if not then log it. Although it's totally plausible that the negation
+        # of the second operand will affect all of the other operands that follow
+        # it when the negation is applied by the user, we do this log just to be
+        # safe and let the user know that we're making an assumption.
         if opnum not in {0, 1, 2}:
             result = cls.aflags(ea)
             logging.info(u"{:s}.alt_opnegated({:#x}, {:d}) : Fetching the negation state for the operand ({:d}) of the instruction at {:#x} has not been tested (aflags={:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, opnum, ea, result))
