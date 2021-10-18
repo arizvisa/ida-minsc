@@ -2246,6 +2246,17 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def library(cls, boolean):
+        '''Modify the attributes of the current function to set it as a library function depending on the value of `boolean`.'''
+        return cls.library(ui.current.function(), boolean)
+    @utils.multicase()
+    @classmethod
+    def library(cls, func, boolean):
+        '''Modify the attributes of the function `func` to set it as a library function depending on the value of `boolean`.'''
+        return cls.flags(func, idaapi.FUNC_LIB, boolean) == idaapi.FUNC_LIB
+
+    @utils.multicase()
+    @classmethod
     def is_thunk(cls):
         '''Return if the current function was determined to be a code thunk.'''
         return cls.is_thunk(ui.current.function())
@@ -2255,6 +2266,17 @@ class type(object):
         '''Return if the function `func` was determined to be a code thunk.'''
         return True if cls.flags(func, idaapi.FUNC_THUNK) else False
     thunkQ = utils.alias(is_thunk, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def thunk(cls, boolean):
+        '''Modify the attributes of the current function to set it as a code thunk depending on the value of `boolean`.'''
+        return cls.thunk(ui.current.function(), boolean)
+    @utils.multicase()
+    @classmethod
+    def thunk(cls, func, boolean):
+        '''Modify the attributes of the function `func` to set it as a code thunk depending on the value of `boolean`.'''
+        return cls.flags(func, idaapi.FUNC_THUNK, boolean) == idaapi.FUNC_THUNK
 
     @utils.multicase()
     @classmethod
@@ -2283,6 +2305,18 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def static(cls, boolean):
+        '''Modify the attributes of the current function to set it as a static function depending on the value of `boolean`.'''
+        return cls.static(ui.current.function(), boolean)
+    @utils.multicase()
+    @classmethod
+    def static(cls, func, boolean):
+        '''Modify the attributes of the function `func` to set it as a static function depending on the value of `boolean`.'''
+        FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
+        return cls.flags(func, FUNC_STATICDEF, boolean) == FUNC_STATICDEF
+
+    @utils.multicase()
+    @classmethod
     def is_hidden(cls):
         '''Returns true if the current function is hidden.'''
         return cls.is_hidden(ui.current.function())
@@ -2292,6 +2326,17 @@ class type(object):
         '''Returns true if the function `func` is hidden.'''
         return True if cls.flags(func, idaapi.FUNC_HIDDEN) else False
     hiddenQ = utils.alias(is_hidden, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def hidden(cls, boolean):
+        '''Modify the attributes of the current function to set it as a hidden function depending on the value of `boolean`.'''
+        return cls.hidden(ui.current.function(), boolean)
+    @utils.multicase()
+    @classmethod
+    def hidden(cls, func, boolean):
+        '''Modify the attributes of the function `func` to set it as a hidden function depending on the value of `boolean`.'''
+        return cls.flags(func, idaapi.FUNC_HIDDEN, boolean) == idaapi.FUNC_HIDDEN
 
     @utils.multicase()
     @classmethod
