@@ -2153,6 +2153,34 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def flags(cls):
+        '''Return the flags for the current function.'''
+        return cls.flags(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def flags(cls, func):
+        '''Return the flags for the function `func`.'''
+        fn = by(func)
+        return idaapi.as_uint32(fn.flags)
+    @utils.multicase(mask=six.integer_types)
+    @classmethod
+    def flags(cls, func, mask):
+        '''Return the flags for the function `func` selected with the specified `mask`.'''
+        fn = by(func)
+        return idaapi.as_uint32(fn.flags & mask)
+    @utils.multicase(mask=six.integer_types, integer=(bool, six.integer_types))
+    @classmethod
+    def flags(cls, func, mask, integer):
+        '''Set the flags for the function `func` selected by the specified `mask` to the provided `integer`.'''
+        fn, preserve, value = by(func), idaapi.as_uint32(~mask), idaapi.as_uint32(-1 if integer else 0) if isinstance(integer, bool) else idaapi.as_uint32(integer)
+        res, fn.flags = fn.flags, (fn.flags & preserve) | (value & mask)
+        if not idaapi.update_func(fn):
+            description = ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)
+            logging.fatal(u"{:s}.flags({:s}, {:#x}, {!s}) : Unable to change the flags ({:#x}) for function at {:s} to requested value ({:#x}).".format('.'.join([__name__, cls.__name__]), description, mask, value, idaapi.as_uint32(res), description, idaapi.as_uint32(fn.flags)))
+        return idaapi.as_uint32(res & mask)
+
+    @utils.multicase()
+    @classmethod
     def has_frame(cls):
         '''Return if the current function has a frame allocated to it.'''
         return cls.has_frame(ui.current.function())
