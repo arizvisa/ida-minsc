@@ -2201,8 +2201,7 @@ class type(object):
     @classmethod
     def has_frameptr(cls, func):
         '''Return if the function `func` uses a frame pointer (register).'''
-        fn = by(func)
-        return fn.flags & idaapi.FUNC_FRAME == idaapi.FUNC_FRAME
+        return True if cls.flags(func, idaapi.FUNC_FRAME) else False
     frameptrQ = utils.alias(has_frameptr, 'type')
 
     @utils.multicase()
@@ -2242,8 +2241,7 @@ class type(object):
     @classmethod
     def is_library(cls, func):
         '''Return if the function `func` is considered a library function.'''
-        fn = by(func)
-        return fn.flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
+        return True if cls.flags(func, idaapi.FUNC_LIB) else False
     libraryQ = utils.alias(is_library, 'type')
 
     @utils.multicase()
@@ -2255,8 +2253,7 @@ class type(object):
     @classmethod
     def is_thunk(cls, func):
         '''Return if the function `func` was determined to be a code thunk.'''
-        fn = by(func)
-        return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
+        return True if cls.flags(func, idaapi.FUNC_THUNK) else False
     thunkQ = utils.alias(is_thunk, 'type')
 
     @utils.multicase()
@@ -2268,8 +2265,7 @@ class type(object):
     @classmethod
     def is_far(cls, func):
         '''Returns true if the function `func` is considered a "far" function by IDA or the user.'''
-        fn = by(func)
-        return any(fn.flags & fl == fl for fl in {idaapi.FUNC_FAR, idaapi.FUNC_USERFAR})
+        return True if cls.flags(func, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
     farQ = utils.alias(is_far, 'type')
 
     @utils.multicase()
@@ -2282,9 +2278,7 @@ class type(object):
     def is_static(cls, func):
         '''Returns true if the function `func` is a static function.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
-
-        fn = by(func)
-        return fn.flags & FUNC_STATICDEF == FUNC_STATICDEF
+        return True if cls.flags(func, FUNC.STATICDEF) else False
     staticQ = utils.alias(is_static, 'type')
 
     @utils.multicase()
@@ -2296,8 +2290,7 @@ class type(object):
     @classmethod
     def is_hidden(cls, func):
         '''Returns true if the function `func` is hidden.'''
-        fn = by(func)
-        return fn.flags & idaapi.FUNC_HIDDEN == idaapi.FUNC_HIDDEN
+        return True if cls.flags(func, idaapi.FUNC_HIDDEN) else False
     hiddenQ = utils.alias(is_hidden, 'type')
 
     @utils.multicase()
@@ -2394,7 +2387,6 @@ class type(object):
         if not set_tinfo(ea, ti):
             raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, cc, ti, ea))
         return cls.convention(ea)
-
     cc = utils.alias(convention)
 
 t = type # XXX: ns alias
