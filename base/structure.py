@@ -2048,6 +2048,8 @@ class member_t(object):
             return 0
         flag = m.flag & idaapi.DT_TYPE
         return idaapi.as_uint32(flag)
+    dtype = dt_type
+
     @property
     def type(self):
         '''Return the type of the member in its pythonic form.'''
