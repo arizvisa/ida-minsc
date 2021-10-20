@@ -2235,15 +2235,20 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_library(cls):
-        '''Return if the current function is considered a library function.'''
+        '''Return a boolean describing whether the current function is considered a library function.'''
         return cls.is_library(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_library(cls, func):
-        '''Return if the function `func` is considered a library function.'''
+        '''Return a boolean describing whether the function `func` is considered a library function.'''
         return True if cls.flags(func, idaapi.FUNC_LIB) else False
     libraryQ = utils.alias(is_library, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def library(cls):
+        '''Return a boolean describing whether the current function is considered a library function.'''
+        return cls.is_library(ui.current.function())
     @utils.multicase()
     @classmethod
     def library(cls, boolean):
@@ -2258,15 +2263,20 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_thunk(cls):
-        '''Return if the current function was determined to be a code thunk.'''
+        '''Return a boolean describing whether the current function was determined to be a code thunk.'''
         return cls.is_thunk(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_thunk(cls, func):
-        '''Return if the function `func` was determined to be a code thunk.'''
+        '''Return a boolean describing whether the function `func` was determined to be a code thunk.'''
         return True if cls.flags(func, idaapi.FUNC_THUNK) else False
     thunkQ = utils.alias(is_thunk, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def thunk(cls):
+        '''Return a boolean describing whether the current function was determined to be a code thunk.'''
+        return cls.is_thunk(ui.current.function())
     @utils.multicase()
     @classmethod
     def thunk(cls, boolean):
@@ -2281,28 +2291,33 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_far(cls):
-        '''Returns true if the current function is considered a "far" function by IDA or the user.'''
+        '''Return a boolean describing whether the current function is considered a "far" function by IDA or the user.'''
         return cls.is_far(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_far(cls, func):
-        '''Returns true if the function `func` is considered a "far" function by IDA or the user.'''
+        '''Return a boolean describing whether the function `func` is considered a "far" function by IDA or the user.'''
         return True if cls.flags(func, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
     farQ = utils.alias(is_far, 'type')
 
     @utils.multicase()
     @classmethod
     def is_static(cls):
-        '''Returns true if the current function is a static function.'''
+        '''Return a boolean describing whether the current function is defined as a static function.'''
         return cls.is_static(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_static(cls, func):
-        '''Returns true if the function `func` is a static function.'''
+        '''Return a boolean describing whether the function `func` is defined as a static function.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
         return True if cls.flags(func, FUNC.STATICDEF) else False
     staticQ = utils.alias(is_static, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def static(cls):
+        '''Return a boolean describing whether the current function is defined as a static function.'''
+        return cls.is_static(ui.current.function())
     @utils.multicase()
     @classmethod
     def static(cls, boolean):
@@ -2318,15 +2333,20 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_hidden(cls):
-        '''Returns true if the current function is hidden.'''
+        '''Return a boolean describing whether the current function is hidden.'''
         return cls.is_hidden(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_hidden(cls, func):
-        '''Returns true if the function `func` is hidden.'''
+        '''Return a boolean describing whether the function `func` is hidden.'''
         return True if cls.flags(func, idaapi.FUNC_HIDDEN) else False
     hiddenQ = utils.alias(is_hidden, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def hidden(cls):
+        '''Return a boolean describing whether the current function is hidden.'''
+        return cls.is_hidden(ui.current.function())
     @utils.multicase()
     @classmethod
     def hidden(cls, boolean):
@@ -2341,12 +2361,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_prototype(cls):
-        '''Returns true if the current function has a prototype associated with it.'''
+        '''Return a boolean describing whether the current function has a prototype associated with it.'''
         return cls.has_prototype(ui.current.function())
     @utils.multicase()
     @classmethod
     def has_prototype(cls, func):
-        '''Returns true if the function `func` has a prototype associated with it.'''
+        '''Return a boolean describing whether the function `func` has a prototype associated with it.'''
         fn = by(func)
         ea = interface.range.start(fn)
         return database.type.has_typeinfo(ea)
