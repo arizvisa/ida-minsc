@@ -136,16 +136,21 @@ class trie(node):
         cls = self.__class__
         # FIXME: doesn't support recursion
         def stringify(layer, indent=0, tab='  '):
-            data = (k for k, v in layer.items() if not isinstance(v, node))
             result = []
-            for k in data:
-                result.append("{:s}{!r} -> {!r}".format(tab * indent, k, layer[k]))
 
-            branches = [k for k, v in layer.items() if isinstance(v, node)]
-            for k in branches:
-                result.append("{:s}{!r}".format(tab * indent, k))
-                branch_data = stringify(layer[k], 1 + indent, tab=tab)
-                result.extend(branch_data)
+            # iterate through data
+            for key, value in layer.items():
+                if not isinstance(value, node):
+                    result.append("{:s}{!r} -> {!r}".format(tab * indent, key, value))
+                continue
+
+            # iterate through branches
+            for key, value in layer.items():
+                if isinstance(value, node):
+                    result.append("{:s}{!r}".format(tab * indent, key))
+                    branch_data = stringify(value, 1 + indent, tab=tab)
+                    result.extend(branch_data)
+                continue
             return result
         return '\n'.join(["{!r}({:d})".format(cls, self.id), '\n'.join(stringify(self))])
 
@@ -615,50 +620,75 @@ def decode(data, default=u''):
     if not data:
         return {}
 
-    # initialize some variables to keep our state
-    res = {}
-    key, value = internal.interface.collect_t(object, lambda _, key: key), internal.interface.collect_t(object, lambda _, value: value)
-
-    # iterate through each line in the data
+    # iterate through each line in the data so that we can collect it
+    # into our result dictionary.
+    result = {}
     for line in data.split(u'\n'):
         iterable = (ch for ch in line)
 
         # try and decode the key and the value from the line
         try:
-            k, v = tag.decode(iterable)
+            key, value = tag.decode(iterable)
 
-        # if the key wasn't terminated properly, or formatted correctly,
-        # then append it to the default key separated by newlines
+        # if the key wasn't terminated properly or the line was not
+        # formatted correctly, then fall back to using the default key.we
+        # first need to grab the value of the default key from our result
+        # dictionary because we need to ensure it's a string so that we
+        # can actually append our corrupted value to it.
         except (StopIteration, internal.exceptions.InvalidFormatError) as E:
-            items = filter(None, res.setdefault(default, u'').split(u'\n'))
-            k, v = default, u'\n'.join(itertools.chain(items, [line]))
+            key, value = default, result.setdefault(default, u'')
 
-        # warn the user if we're overwriting a key in the tag that
-        # already exists.
+            # if our previous value is already a string, then we can use
+            # it as-is and append it to the default key separated by a newline.
+            if isinstance(value, six.string_types):
+                string = value
+
+            # if it's not, however, then we need to demote the value to
+            # a string by temporarily encoding it. this is hackish, but
+            # its okay because we're warning the user about it anywayz.
+            else:
+                logging.warning(u"{:s}.decode(..., {!s}) : Coercing the prior value ({!s}) for the decoded tag ({!s}) to a {!s} due to its value being of a non-cumulative type ({!s}).".format('.'.join([__name__]), internal.utils.string.repr(key), internal.utils.string.repr(value), internal.utils.string.repr(key), key.__class__, value.__class__))
+
+                # now we can collect it into a string...
+                collected_value = internal.interface.collect_t(unicode if sys.version_info.major < 3 else str, operator.add)
+                tag.value.encode(iter([value]), collected_value)
+                string = collected_value.get()
+
+            # now we should have a proper string that we can append our
+            # incorrectly formatted tag and value to.
+            items = filter(None, string.split(u'\n'))
+            value = u'\n'.join(itertools.chain(items, [line]))
+
+        # if there was no exception, but the key that we decoded can potentially
+        # overwrite an already existing key in our result dictionary, then we will
+        # still need to warn the user about it because we're being destructive.
+        # NOTE: another option here to avoid being destructive is to demote the
+        #       previous dictionary value to a string, and append to it. personally
+        #       i believe that warning the user should be enough so that way we don't
+        #       interfere with any scripting that they might currently be performing.
         else:
-            if operator.contains(res, k):
-                logging.warning(u"{:s}.decode(..., {!s}) : Overwriting the tag name {!s} from its old value ({!r}) with the new value ({!r}).".format('.'.join([__name__]), internal.utils.string.repr(default), internal.utils.string.repr(k), res[k], v))
+            if operator.contains(result, key):
+                logging.warning(u"{:s}.decode(..., {!s}) : Overwriting the value ({!r}) for the decoded tag ({!s}) using a new value ({!r}) of {!s}.".format('.'.join([__name__]), internal.utils.string.repr(default), result[key], internal.utils.string.repr(key), value, value.__class__))
 
         # add our item to the result dictionary
-        res[k] = v
+        result[key] = value
 
     # return the dictionary we decoded
-    return res
+    return result
 
 def encode(dict):
     '''Encode a dictionary into a multi-line string encoded as a list of tags.'''
-    res = []
+    result = []
 
-    # walk each item in the dictionary
-    for k, v in (dict or {}).items():
-        # encode the key and value from the dictionary
-        line = tag.encode(k, v)
+    # walk each item in the dictionary, so that we can encode
+    # each key and value into a single line and aggregate them
+    # into our result list.
+    for key, value in (dict or {}).items():
+        line = tag.encode(key, value)
+        result.append(line)
 
-        # aggregate it into our list
-        res.append(line)
-
-    # join them by newlines and return them to the caller
-    return '\n'.join(res)
+    # now we can join them with newlines and return it to the caller
+    return '\n'.join(result)
 
 def check(data):
     '''Check that the string `data` has the correct format by trying to decode it.'''
