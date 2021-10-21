@@ -606,7 +606,7 @@ class structure_t(object):
 
     @property
     def typeinfo(self):
-        '''Return the type info of the member.'''
+        '''Return the type information of the current structure.'''
         ti = database.type(self.id)
 
         # If there was no type information found for the member, then raise
@@ -620,7 +620,7 @@ class structure_t(object):
         return ti
     @typeinfo.setter
     def typeinfo(self, info):
-        '''Sets the typeinfo of the structure to `info`.'''
+        '''Sets the type information of the current structure to `info`.'''
         try:
             ti = database.type(self.id, info)
 
@@ -642,12 +642,12 @@ class structure_t(object):
         return idaapi.del_struc(self.ptr)
 
     def __str__(self):
-        '''Display the structure in a readable format.'''
+        '''Render the current structure in a readable format.'''
         sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
         return "<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __unicode__(self):
-        '''Display the structure in a readable format.'''
+        '''Render the current structure in a readable format.'''
         sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
         return u"<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
@@ -1682,13 +1682,93 @@ class members_t(object):
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.remove({:+#x}) : Refusing to remove more than {:d} member{:s} ({:d}) at offset {:#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, 1, '' if len(items) == 1 else 's', len(items), offset))
 
         # Now we know exactly what we can remove.
-        item, = items
-        return idaapi.del_struc_member(owner.ptr, item.soff)
+        mptr = items[0]
+        result, = self.remove(self.baseoffset + mptr.soff, mptr.eoff - mptr.soff)
+        return result
     @utils.multicase()
     def remove(self, offset, size):
         '''Remove all the members from the structure from the specified `offset` up to `size` bytes.'''
-        owner, res = self.owner, offset - self.baseoffset
-        return idaapi.del_struc_members(owner.ptr, res, res + size)
+        sptr, soffset = self.owner.ptr, offset - self.baseoffset
+        if not sptr.memqty:
+            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : The structure has no members that are able to be removed.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size))
+            return []
+
+        # If we're a union, then we need to raise an exception because
+        # there's a likely chance that the user might empty out the
+        # union entirely.
+        if sptr.is_union():
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Refusing to remove members from the specified union by the specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, offset))
+
+        # First we'll need to figure out the index of the member that
+        # we will start removing things at. This way we can start
+        # collecting the members that'll be removed.
+        index = idaapi.get_prev_member_idx(sptr, soffset) + 1
+        if sptr.memqty < index:
+            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to find the member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, offset))
+            return []
+
+        # Next we need to collect each member that will be removed so
+        # that we can return them back to the caller after removal.
+        items = []
+        while index < sptr.memqty and sptr.members[index].soff < soffset + size:
+            mptr = sptr.members[index]
+            items.append(mptr)
+            index += 1
+
+        # Now we know what will need to be removed, so we'll need to
+        # collect their attributes so that the user can recreate them
+        # if necessary.
+        result = []
+        for mptr in items:
+            name = utils.string.of(idaapi.get_member_name(mptr.id) or '')
+            moffset, msize = mptr.soff + self.baseoffset, idaapi.get_member_size(mptr)
+
+            # now we need to grab the type information in order to pythonify
+            # our type before we remove it.
+            opinfo = idaapi.opinfo_t()
+            if idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr):
+                tid = opinfo.tid
+            else:
+                tid = idaapi.BADADDR
+
+            # now we can dissolve it, and than append things to our results.
+            type = interface.typemap.dissolve(mptr.flag, tid, msize)
+            result.append((mptr.id, name, type, moffset))
+
+        # Figure out whether we're just going to remove one element, or
+        # multiple elements so that we can call the correct api and figure
+        # out how to compare the number of successfully removed members.
+        if len(items) > 1:
+            count = idaapi.del_struc_members(sptr, soffset, soffset + size)
+        elif len(items):
+            count = 1 if idaapi.del_struc_member(sptr, soffset) else 0
+        else:
+            count = 0
+
+        # If we didn't remove anything and we were supposed to, then let
+        # the user know that it didn't happen.
+        if result and not count:
+            logging.fatal(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove the requested elements ({:+#x}<>{:+#x}) from the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, result[0].soff, result[-1].eoff))
+            return []
+
+        # If our count matches what was expected, then we're good and can
+        # just return our results to the user.
+        if len(result) == count:
+            return [(name, type, offset) for _, name, type, offset in result]
+
+        # Otherwise, we only removed some of the elements and we need to
+        # figure out what happened so we can let the user know.
+        removed, expected = {id for id in []}, {id : (name, type, offset) for id, name, type, offset in result}
+        for id, name, _, offset in result:
+            if idaapi.get_member(sptr, offset - self.baseoffset):
+                logging.debug(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove member {:s} at offset {:+#x} with the specified id ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, name, offset, id))
+                continue
+            removed.add(id)
+
+        # We have the list of identities that were removed. So let's proceed
+        # with our warnings and return whatever we successfully removed.
+        logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove {:d} members out of an expected {:d} members within the specified range ({:+#x}<>{:+#x}) of the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, len(expected) - len(removed), len(expected), result[0].soff, result[-1].eoff))
+        return [(name, type, offset) for id, name, type, offset in result if id in removed]
 
     def __contains__(self, member):
         '''Return whether the specified `member` is contained by this structure.'''
@@ -1705,7 +1785,7 @@ class members_t(object):
         return True
 
     def __str__(self):
-        '''Display all the fields within the specified structure.'''
+        '''Render all of the fields within the current structure.'''
         res = []
         mn, ms, mti = 0, 0, 0
         for i in range(len(self)):
@@ -1724,7 +1804,7 @@ class members_t(object):
         return "{!r}".format(self.owner)
 
     def __unicode__(self):
-        '''Display all the fields within the specified structure.'''
+        '''Render all of the fields within the current structure.'''
         res = []
         mn, ms, mti = 0, 0, 0
         for i in range(len(self)):
@@ -2093,7 +2173,7 @@ class member_t(object):
 
     @property
     def typeinfo(self):
-        '''Return the type info of the member.'''
+        '''Return the type information of the current member.'''
         ti = idaapi.tinfo_t()
 
         # Guess the typeinfo for the current member. If we're unable to get the
@@ -2109,7 +2189,7 @@ class member_t(object):
 
     @typeinfo.setter
     def typeinfo(self, info):
-        '''Set the type info of the member to `info`.'''
+        '''Set the type information of the current member to `info`.'''
 
         if idaapi.__version__ < 7.0:
             set_member_tinfo = idaapi.set_member_tinfo2
@@ -2131,7 +2211,7 @@ class member_t(object):
         # We failed, so just raise an exception for the user to handle.
         elif res == idaapi.SMT_FAILED:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign typeinfo ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name)))
 
         # If we received an alternative return code, then build a relevant
         # message that we can raise with our exception.
@@ -2154,15 +2234,15 @@ class member_t(object):
 
         # Finally we can raise our exception so that the user knows whats up.
         cls = self.__class__
-        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign typeinfo ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name), message))
+        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name), message))
 
     def __str__(self):
-        '''Display the member in a readable format.'''
+        '''Render the current member in a readable format.'''
         id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
         return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __unicode__(self):
-        '''Display the member in a readable format.'''
+        '''Render the current member in a readable format.'''
         id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
         return u"<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
