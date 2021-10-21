@@ -1646,51 +1646,51 @@ Some simple ways of getting information about a function::
 
 .. py:function:: type()
    
-   Return the typeinfo for the current function as a :py:obj:`idaapi.tinfo_t`.
+   Return the type information for the current function as an :py:obj:`idaapi.tinfo_t`.
    
 .. py:function:: type(info)
    
-   Apply the typeinfo in ``info`` to the current function.
+   Apply the type information in ``info`` to the current function.
    
-   :param info: the typeinfo to assign to the current function
+   :param info: the type information to assign to the current function
    :type info: str or idaapi.tinfo_t
    
 .. py:function:: type(none)
    
-   Remove the typeinfo for the current function.
+   Remove the type information for the current function.
    
-   :param none: the value :py:obj:`None`
+   :param none: the value :py:obj:`None` which will remove the type information
    :type none: None
    
 .. py:function:: type(func)
    
-   Return the typeinfo for the function ``func`` as a :py:obj:`idaapi.tinfo_t`.
+   Return the type information for the function ``func`` as an :py:obj:`idaapi.tinfo_t`.
    
-   :param func: the function to get the typeinfo for
+   :param func: the function to return the type information from
    :type func: int or long or idaapi.func_t
    
 .. py:function:: type(func, info)
    
-   Apply the :py:obj:`idaapi.tinfo_t` typeinfo in ``info`` to the function ``func``.
+   Apply the :py:obj:`idaapi.tinfo_t` in ``info`` to the function ``func``.
    
-   :param func: the function to set the typeinfo for
-   :param info: the typeinfo string to assign to the function
+   :param func: the function to set the type information of
+   :param info: the type information string to assign to the function
    :type info: idaapi.tinfo_t
    
 .. py:function:: type(func, info)
    
-   Parse the typeinfo string in ``info`` to an :py:obj:`idaapi.tinfo_t` and apply it to the function ``func``.
+   Parse the type information string in ``info`` into an :py:obj:`idaapi.tinfo_t` and apply it to the function ``func``.
    
-   :param func: the function to set the typeinfo for
-   :param info: the ``idaapi.tinfo_t`` to assign to the function
+   :param func: the function to set the type information of
+   :param info: the ``idaapi.tinfo_t`` representing the type information to assign to the function
    :type info: str
    
 .. py:function:: type(func, none)
    
-   Remove the typeinfo for the function ``func``.
+   Remove the type information for the function ``func``.
    
-   :param func:
-   :param none:
+   :param func: the function to remove the type information from
+   :param none: the value :py:obj:`None` which will remove the type information
    :type none: None
    
 .. py:function:: type\.convention()
@@ -1707,15 +1707,45 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.cc<type\.convention>`, :py:func:`function.convention<type\.convention>`, :py:func:`function.type.cc<type\.convention>`
    
-   :param func: the function to return the calling convention for
+   :param func: the function to use when returning the calling convention
    
 .. py:function:: type\.convention(func, convention)
    
    Set the calling convention used by the prototype for the function ``func`` to the specified ``convention``.
    
-   :param func: the function to assign the calling convention to
-   :param convention: a string or integer masked with :py:obj:`idaapi.CM_CC_MASK` to assign
+   Aliases: :py:func:`function.cc<type\.convention>`, :py:func:`function.convention<type\.convention>`, :py:func:`function.type.cc<type\.convention>`
+   
+   :param func: the desired function to modify the calling convention of
+   :param convention: a string or integer masked with :py:obj:`idaapi.CM_CC_MASK` representing the calling convention to apply
    :type convention: str or int or long
+   
+.. py:function:: type\.flags()
+   
+   Return the flags for the current function.
+   
+.. py:function:: type\.flags(func)
+   
+   Return the flags for the function ``func``.
+   
+   :param func: the function to fetch the flags from
+   
+.. py:function:: type\.flags(func, mask)
+   
+   Return the flags for the function ``func`` selected with the specified ``mask``.
+   
+   :param func: the function to fetch the flags from
+   :param mask: a bitmask used to select the explicit flag bits to return
+   :type mask: int or long
+   
+.. py:function:: type\.flags(func, mask, integer)
+   
+   Set the flags for the function ``func`` selected by the specified ``mask`` to the provided ``integer``.
+   
+   :param func: the function owning the flags that are to be modified
+   :param mask: a bitmask used to select the explicit flag bits to modify
+   :type mask: int or long
+   :param integer: the flags to use when modifying the bits selected by the bitmask
+   :type integer: bool or int or long
    
 .. py:function:: type\.has_frame()
    
@@ -1729,7 +1759,7 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.frameQ<type\.has_frame>`
    
-   :param func:
+   :param func: the function to use when checking for the existence of a frame
    
 .. py:function:: type\.has_frameptr()
    
@@ -1743,7 +1773,7 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.frameptrQ<type\.has_frameptr>`
    
-   :param func: the function to check
+   :param func: the function to use when checking for the existence of its frame pointer
    
 .. py:function:: type\.has_name()
    
@@ -1757,21 +1787,21 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.nameQ<type\.has_name>`
    
-   :param func: the function to check
+   :param func: the function to use when checking for its name
    
 .. py:function:: type\.has_prototype()
    
-   Returns true if the current function has a prototype associated with it.
+   Return a boolean describing whether the current function has a prototype associated with it.
    
    Aliases: :py:func:`function.type.has_typeinfo<type\.has_prototype>`, :py:func:`function.type.typeinfoQ<type\.has_prototype>`, :py:func:`function.type.prototypeQ<type\.has_prototype>`
    
 .. py:function:: type\.has_prototype(func)
    
-   Returns true if the function ``func`` has a prototype associated with it.
+   Return a boolean describing whether the function ``func`` has a prototype associated with it.
    
    Aliases: :py:func:`function.type.has_typeinfo<type\.has_prototype>`, :py:func:`function.type.typeinfoQ<type\.has_prototype>`, :py:func:`function.type.prototypeQ<type\.has_prototype>`
    
-   :param func: the function to check
+   :param func: the function to use when checking for the existence of a prototype
    
 .. py:function:: type\.has_return()
    
@@ -1785,75 +1815,143 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.returnQ<type\.has_return>`
    
-   :param func: the function to check
+   :param func: the function to use when checking if it returns
+   
+.. py:function:: type\.hidden()
+   
+   Return a boolean describing whether the current function is hidden.
+   
+.. py:function:: type\.hidden(boolean)
+   
+   Modify the attributes of the current function to set it as a hidden function depending on the value of ``boolean``.
+   
+   :param boolean: a boolean value representing whether the function is hidden or not
+   
+.. py:function:: type\.hidden(func, boolean)
+   
+   Modify the attributes of the function ``func`` to set it as a hidden function depending on the value of ``boolean``.
+   
+   :param func: the desired function to modify the attributes of
+   :param boolean: a boolean value representing whether the function is hidden or not
    
 .. py:function:: type\.is_far()
    
-   Returns true if the current function is considered a "far" function by IDA or the user.
+   Return a boolean describing whether the current function is considered a "far" function by IDA or the user.
    
    Aliases: :py:func:`function.type.farQ<type\.is_far>`
    
 .. py:function:: type\.is_far(func)
    
-   Returns true if the function ``func`` is considered a "far" function by IDA or the user.
+   Return a boolean describing whether the function ``func`` is considered a "far" function by IDA or the user.
    
    Aliases: :py:func:`function.type.farQ<type\.is_far>`
    
-   :param func: the function to check
+   :param func: the function to use when checking if it is typically called from outside its segment
    
 .. py:function:: type\.is_hidden()
    
-   Returns true if the current function is hidden.
+   Return a boolean describing whether the current function is hidden.
    
    Aliases: :py:func:`function.type.hiddenQ<type\.is_hidden>`
    
 .. py:function:: type\.is_hidden(func)
    
-   Returns true if the function ``func`` is hidden.
+   Return a boolean describing whether the function ``func`` is hidden.
    
    Aliases: :py:func:`function.type.hiddenQ<type\.is_hidden>`
    
-   :param func: the function to check
+   :param func: the function to use when checking if it is hidden
    
 .. py:function:: type\.is_library()
    
-   Return if the current function is considered a library function.
+   Return a boolean describing whether the current function is considered a library function.
    
    Aliases: :py:func:`function.type.libraryQ<type\.is_library>`
    
 .. py:function:: type\.is_library(func)
    
-   Return if the function ``func`` is considered a library function.
+   Return a boolean describing whether the function ``func`` is considered a library function.
    
    Aliases: :py:func:`function.type.libraryQ<type\.is_library>`
    
-   :param func: the function to check
+   :param func: the function to use when checking if it is a library function
    
 .. py:function:: type\.is_static()
    
-   Returns true if the current function is a static function.
+   Return a boolean describing whether the current function is defined as a static function.
    
    Aliases: :py:func:`function.type.staticQ<type\.is_static>`
    
 .. py:function:: type\.is_static(func)
    
-   Returns true if the function ``func`` is a static function.
+   Return a boolean describing whether the function ``func`` is defined as a static function.
    
    Aliases: :py:func:`function.type.staticQ<type\.is_static>`
    
-   :param func: the function to check
+   :param func: the function to use when checking if it is a static function
    
 .. py:function:: type\.is_thunk()
    
-   Return if the current function was determined to be a code thunk.
+   Return a boolean describing whether the current function was determined to be a code thunk.
    
    Aliases: :py:func:`function.type.thunkQ<type\.is_thunk>`
    
 .. py:function:: type\.is_thunk(func)
    
-   Return if the function ``func`` was determined to be a code thunk.
+   Return a boolean describing whether the function ``func`` was determined to be a code thunk.
    
    Aliases: :py:func:`function.type.thunkQ<type\.is_thunk>`
    
-   :param func: the function to check
+   :param func: the function to use when checking if it is a code thunk
+   
+.. py:function:: type\.library()
+   
+   Return a boolean describing whether the current function is considered a library function.
+   
+.. py:function:: type\.library(boolean)
+   
+   Modify the attributes of the current function to set it as a library function depending on the value of ``boolean``.
+   
+   :param boolean: a boolean value representing whether the function should be set as a library function or not
+   
+.. py:function:: type\.library(func, boolean)
+   
+   Modify the attributes of the function ``func`` to set it as a library function depending on the value of ``boolean``.
+   
+   :param func: the desired function to modify the attributes of
+   :param boolean: a boolean value representing whether the function should be set as a library function or not
+   
+.. py:function:: type\.static()
+   
+   Return a boolean describing whether the current function is defined as a static function.
+   
+.. py:function:: type\.static(boolean)
+   
+   Modify the attributes of the current function to set it as a static function depending on the value of ``boolean``.
+   
+   :param boolean: a boolean value representing whether the function should be set as a static function or not
+   
+.. py:function:: type\.static(func, boolean)
+   
+   Modify the attributes of the function ``func`` to set it as a static function depending on the value of ``boolean``.
+   
+   :param func: the desired function to modify the attributes of
+   :param boolean: a boolean value representing whether the function should be set as a static function or not
+   
+.. py:function:: type\.thunk()
+   
+   Return a boolean describing whether the current function was determined to be a code thunk.
+   
+.. py:function:: type\.thunk(boolean)
+   
+   Modify the attributes of the current function to set it as a code thunk depending on the value of ``boolean``.
+   
+   :param boolean: a boolean value representing whether the function should be set as a code thunk or not
+   
+.. py:function:: type\.thunk(func, boolean)
+   
+   Modify the attributes of the function ``func`` to set it as a code thunk depending on the value of ``boolean``.
+   
+   :param func: the desired function to modify the attributes of
+   :param boolean: a boolean value representing whether the function should be set as a code thunk or not
    

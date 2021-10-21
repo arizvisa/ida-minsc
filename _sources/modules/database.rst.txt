@@ -2207,13 +2207,13 @@ following examples can be used::
    
 .. py:function:: get\.info()
    
-   Return the typeinfo at the current address as an :py:obj:`idaapi.tinfo_t`.
+   Return the type information for the current address as an :py:obj:`idaapi.tinfo_t`.
    
    Aliases: :py:func:`database.get.typeinfo<get\.info>`
    
 .. py:function:: get\.info(ea)
    
-   Return the typeinfo at the address ``ea`` as an :py:obj:`idaapi.tinfo_t`.
+   Return the type information for the address ``ea`` as an :py:obj:`idaapi.tinfo_t`.
    
    Aliases: :py:func:`database.get.typeinfo<get\.info>`
    
@@ -3323,22 +3323,22 @@ This can be used as in the following examples::
    
 .. py:function:: set\.info(info)
    
-   Set the typeinfo at the current address to ``info``.
+   Set the type information at the current address to ``info``.
    
    Aliases: :py:func:`database.set.typeinfo<set\.info>`
    
-   :param info: the typeinfo to assign to the address
+   :param info: the type information to assign to the address
    :type info: str or idaapi.tinfo_t
    
 .. py:function:: set\.info(ea, info)
    
-   Set the typeinfo at the address ``ea`` to ``info``.
+   Set the type information at the address ``ea`` to ``info``.
    
    Aliases: :py:func:`database.set.typeinfo<set\.info>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param info: the typeinfo to assign to the address
+   :param info: the type information to assign to the address
    :type info: str or idaapi.tinfo_t
    
 .. py:function:: set\.string(\*\*strtype)
@@ -3656,32 +3656,32 @@ Some examples of using this namespace can be::
 
 .. py:function:: type()
    
-   Return the typeinfo at the current address as an :py:obj:`idaapi.tinfo_t`.
+   Return the type information for the current address as an :py:obj:`idaapi.tinfo_t`.
    
 .. py:function:: type(ea)
    
-   Return the typeinfo at the address ``ea`` as an :py:obj:`idaapi.tinfo_t`.
+   Return the type information for the address ``ea`` as an :py:obj:`idaapi.tinfo_t`.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: type(none)
    
-   Remove the typeinfo from the current address.
+   Remove the type information from the current address.
    
    :param none: the value :py:obj:`None`
    :type none: None
    
 .. py:function:: type(info)
    
-   Apply the :py:obj:`idaapi.tinfo_t` typeinfo or typeinfo string in ``info`` to the current address.
+   Apply the type information in ``info`` to the current address.
    
-   :param info: the typeinfo to assign to the address
+   :param info: the type information to assign to the address
    :type info: str or idaapi.tinfo_t
    
 .. py:function:: type(ea, info)
    
-   Apply the :py:obj:`idaapi.tinfo_t` typeinfo in ``info`` to the address ``ea``.
+   Apply the :py:obj:`idaapi.tinfo_t` in ``info`` to the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3690,7 +3690,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: type(ea, none)
    
-   Remove the typeinfo from the address ``ea``.
+   Remove the type information from the address ``ea``.
    
    :param ea: an address in the database
    :param none: the value :py:obj:`None`
@@ -3698,11 +3698,11 @@ Some examples of using this namespace can be::
    
 .. py:function:: type(ea, info)
    
-   Parse the typeinfo string in ``info`` to an :py:obj:`idaapi.tinfo_t` and apply it to the address ``ea``.
+   Parse the type information string in ``info`` into an :py:obj:`idaapi.tinfo_t` and apply it to the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
-   :param info: the typeinfo string to assign to the address
+   :param info: the type information as a string to assign to the address
    :type info: str
    
 .. py:function:: type\.flags()
@@ -3858,13 +3858,13 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.has_typeinfo()
    
-   Return if the current address has typeinfo associated with it.
+   Return if the current address has any type information associated with it.
    
    Aliases: :py:func:`database.type.infoQ<type\.has_typeinfo>`, :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
    
 .. py:function:: type\.has_typeinfo(ea)
    
-   Return if the address at ``ea`` has typeinfo associated with it.
+   Return if the address at ``ea`` has any type information associated with it.
    
    Aliases: :py:func:`database.type.infoQ<type\.has_typeinfo>`, :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
    

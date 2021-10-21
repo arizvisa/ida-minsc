@@ -3847,14 +3847,14 @@ If a pythonic type is passed to <code class="docutils literal notranslate"><span
 <dl class="function">
 <dt id="database.get.info">
 <code class="descclassname">get.</code><code class="descname">info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.get.info" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the typeinfo at the current address as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<dd><p>Return the type information for the current address as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.get.info" title="database.get.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.typeinfo</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">get.</code><code class="descname">info</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the typeinfo at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<dd><p>Return the type information for the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.get.info" title="database.get.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.typeinfo</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -5769,13 +5769,13 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <dl class="function">
 <dt id="database.set.info">
 <code class="descclassname">set.</code><code class="descname">info</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.info" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the typeinfo at the current address to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<dd><p>Set the type information at the current address to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.set.info" title="database.set.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.typeinfo</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the typeinfo to assign to the address</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to assign to the address</td>
 </tr>
 </tbody>
 </table>
@@ -5784,7 +5784,7 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <dl class="function">
 <dt>
 <code class="descclassname">set.</code><code class="descname">info</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the typeinfo at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<dd><p>Set the type information at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.set.info" title="database.set.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.typeinfo</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -5792,7 +5792,7 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the typeinfo to assign to the address</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to assign to the address</li>
 </ul>
 </td>
 </tr>
@@ -6282,13 +6282,13 @@ specified address.</p>
 <dl class="function">
 <dt id="database.type">
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the typeinfo at the current address as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<dd><p>Return the type information for the current address as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the typeinfo at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<dd><p>Return the type information for the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6302,7 +6302,7 @@ specified address.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>none</em><span class="sig-paren">)</span></dt>
-<dd><p>Remove the typeinfo from the current address.</p>
+<dd><p>Remove the type information from the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6316,12 +6316,12 @@ specified address.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> typeinfo or typeinfo string in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current address.</p>
+<dd><p>Apply the type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the typeinfo to assign to the address</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to assign to the address</td>
 </tr>
 </tbody>
 </table>
@@ -6330,7 +6330,7 @@ specified address.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> typeinfo in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6348,7 +6348,7 @@ specified address.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>none</em><span class="sig-paren">)</span></dt>
-<dd><p>Remove the typeinfo from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Remove the type information from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6366,14 +6366,14 @@ specified address.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Parse the typeinfo string in <code class="docutils literal notranslate"><span class="pre">info</span></code> to an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Parse the type information string in <code class="docutils literal notranslate"><span class="pre">info</span></code> into an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>info</strong> (<em>str</em>) – the typeinfo string to assign to the address</li>
+<li><strong>info</strong> (<em>str</em>) – the type information as a string to assign to the address</li>
 </ul>
 </td>
 </tr>
@@ -6617,14 +6617,14 @@ specified address.</p>
 <dl class="function">
 <dt id="database.type.has_typeinfo">
 <code class="descclassname">type.</code><code class="descname">has_typeinfo</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.has_typeinfo" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return if the current address has typeinfo associated with it.</p>
+<dd><p>Return if the current address has any type information associated with it.</p>
 <p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.infoQ</span></code></a>, <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">has_typeinfo</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return if the address at <code class="docutils literal notranslate"><span class="pre">ea</span></code> has typeinfo associated with it.</p>
+<dd><p>Return if the address at <code class="docutils literal notranslate"><span class="pre">ea</span></code> has any type information associated with it.</p>
 <p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.infoQ</span></code></a>, <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />

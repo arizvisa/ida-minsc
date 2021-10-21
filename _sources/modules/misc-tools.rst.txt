@@ -62,8 +62,8 @@ functions and aliases. For more information on this, please see
    sentinel functions and collection will terminate when one of those
    functions are reached.
    
-   :param ea: the address of the function to start at
-   :param sentinel: an iterable containing the addresses of any functions to terminate at
+   :param ea: the address of the function to start from
+   :param sentinel: an iterable containing the addresses belonging to a functions to terminate at
    
 .. py:function:: colormarks(color=0x7f007f)
    

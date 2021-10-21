@@ -78,7 +78,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`instruction.op_value<op>`, :py:func:`instruction.op_decode<op>`
    
-   :param opnum: the operand number of the current instruction
+   :param opnum: the operand number of the current instruction to decode
    :type opnum: int or long
    
 .. py:function:: op(reference)
@@ -87,7 +87,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`instruction.op_value<op>`, :py:func:`instruction.op_decode<op>`
    
-   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :param reference: the :py:obj:`opref_t` of the instruction and operand to decode
    :type reference: interface.opref_t
    
 .. py:function:: op(ea, opnum)
@@ -98,7 +98,7 @@ functions and aliases. For more information on this, please see
    
    :param ea: the address of an instruction
    :type ea: int or long
-   :param opnum: the operand number of the instruction
+   :param opnum: the operand number of the instruction to decode
    :type opnum: int or long
    
 .. py:function:: op_binary(opnum)

@@ -459,7 +459,7 @@ member_t
    
    .. py:attribute:: dt_type
    
-   The :py:class:`.dt_type` attribute of the :py:class:`idaapi.member_t` that is wrapped by this ``member_t``.
+   The \\"dt_type\\" attribute of the :py:class:`idaapi.member_t` that is wrapped by this ``member_t``.
       :param getter: Return the ``dt_type`` attribute of the member.
    
    .. py:attribute:: flag
@@ -535,7 +535,7 @@ member_t
    
    .. py:attribute:: type
    
-   The pythonic type of this ``member_t``.
+   The pythonic type that is associated with this ``member_t``.
       :param getter: Return the type of the member in its pythonic form.
       :param setter: Set the type of the member to the provided ``type``.
       :param type: the pythonic type to set the member type to
@@ -547,9 +547,9 @@ member_t
    
    .. py:attribute:: typeinfo
    
-      :param getter: Return the type info of the member.
-      :param setter: Set the type info of the member to ``info``.
-      :param info: the typeinfo to set the member type to
+      :param getter: Return the type information of the current member.
+      :param setter: Set the type information of the current member to ``info``.
+      :param info: the type information to apply to the member
    
    .. py:method:: refs(self)
       
@@ -871,8 +871,8 @@ structure_t
    
    .. py:attribute:: typeinfo
    
-      :param getter: Return the type info of the member.
-      :param setter: Sets the typeinfo of the structure to ``info``.
+      :param getter: Return the type information of the current structure.
+      :param setter: Sets the type information of the current structure to ``info``.
       :param info:
    
    .. py:method:: contains(self, offset)
