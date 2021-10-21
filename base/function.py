@@ -2032,19 +2032,19 @@ class type(object):
     """
     @utils.multicase()
     def __new__(cls):
-        '''Return the typeinfo for the current function as a ``idaapi.tinfo_t``.'''
+        '''Return the type information for the current function as an ``idaapi.tinfo_t``.'''
         return cls(ui.current.address())
     @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
     def __new__(cls, info):
-        '''Apply the typeinfo in `info` to the current function.'''
+        '''Apply the type information in `info` to the current function.'''
         return cls(ui.current.address(), info)
     @utils.multicase(none=None.__class__)
     def __new__(cls, none):
-        '''Remove the typeinfo for the current function.'''
+        '''Remove the type information for the current function.'''
         return cls(ui.current.address(), None)
     @utils.multicase(func=(six.integer_types, idaapi.func_t))
     def __new__(cls, func):
-        '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
+        '''Return the type information for the function `func` as an ``idaapi.tinfo_t``.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
 
         # Guess the type information for the function ahead of time because
@@ -2058,7 +2058,7 @@ class type(object):
         return database.type(ea) or ti
     @utils.multicase(info=idaapi.tinfo_t)
     def __new__(cls, func, info):
-        '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the function `func`.'''
+        '''Apply the ``idaapi.tinfo_t`` in `info` to the function `func`.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
 
         # In order to apply the typeinfo with idaapi.apply_cdecl, we need the
@@ -2085,7 +2085,7 @@ class type(object):
         return cls(ea, tinfo_s)
     @utils.multicase(info=six.string_types)
     def __new__(cls, func, info):
-        '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
+        '''Parse the type information string in `info` into an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
         til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
 
         _, ea = interface.addressOfRuntimeOrStatic(func)
@@ -2136,7 +2136,7 @@ class type(object):
         return cls(ea)
     @utils.multicase(none=None.__class__)
     def __new__(cls, func, none):
-        '''Remove the typeinfo for the function `func`.'''
+        '''Remove the type information for the function `func`.'''
         fn = by(func)
         ti, ea = idaapi.tinfo_t(), interface.range.start(fn)
 
