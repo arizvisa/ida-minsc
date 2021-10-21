@@ -2310,7 +2310,7 @@ class type(object):
     def is_static(cls, func):
         '''Return a boolean describing whether the function `func` is defined as a static function.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
-        return True if cls.flags(func, FUNC.STATICDEF) else False
+        return True if cls.flags(func, FUNC_STATICDEF) else False
     staticQ = utils.alias(is_static, 'type')
 
     @utils.multicase()
