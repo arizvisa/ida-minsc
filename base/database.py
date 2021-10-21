@@ -3166,11 +3166,11 @@ class type(object):
 
     @utils.multicase()
     def __new__(cls):
-        '''Return the typeinfo at the current address as an ``idaapi.tinfo_t``.'''
+        '''Return the type information for the current address as an ``idaapi.tinfo_t``.'''
         return cls(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
-        '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
+        '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
         ti = idaapi.tinfo_t()
 
         # First try and get the actual typeinfo for the given address. If it
@@ -3199,15 +3199,15 @@ class type(object):
         return ti
     @utils.multicase(none=None.__class__)
     def __new__(cls, none):
-        '''Remove the typeinfo from the current address.'''
+        '''Remove the type information from the current address.'''
         return cls(ui.current.address(), None)
     @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
     def __new__(cls, info):
-        '''Apply the ``idaapi.tinfo_t`` typeinfo or typeinfo string in `info` to the current address.'''
+        '''Apply the type information in `info` to the current address.'''
         return cls(ui.current.address(), info)
     @utils.multicase(ea=six.integer_types, info=idaapi.tinfo_t)
     def __new__(cls, ea, info):
-        '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the address `ea`.'''
+        '''Apply the ``idaapi.tinfo_t`` in `info` to the address `ea`.'''
         info_s = "{!s}".format(info)
 
         # Check if we're pointing at an export or directly at a function. If we
@@ -3230,7 +3230,7 @@ class type(object):
         return cls(ea)
     @utils.multicase(none=None.__class__)
     def __new__(cls, ea, none):
-        '''Remove the typeinfo from the address `ea`.'''
+        '''Remove the type information from the address `ea`.'''
         ti = idaapi.tinfo_t()
 
         # Grab the previous typeinfo if there was something there, and coerce
@@ -3252,7 +3252,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types, info=six.string_types)
     @utils.string.decorate_arguments('info')
     def __new__(cls, ea, info):
-        '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
+        '''Parse the type information string in `info` into an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
 
         # Check if we're pointing at an export or directly at a function. If we
         # are, then we need to use function.type.
@@ -3540,12 +3540,12 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def has_typeinfo():
-        '''Return if the current address has typeinfo associated with it.'''
+        '''Return if the current address has any type information associated with it.'''
         return type.has_typeinfo(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_typeinfo(ea):
-        '''Return if the address at `ea` has typeinfo associated with it.'''
+        '''Return if the address at `ea` has any type information associated with it.'''
         try:
             ok = type(ea) is not None
 
@@ -4805,12 +4805,12 @@ class set(object):
     @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
     @classmethod
     def info(cls, info):
-        '''Set the typeinfo at the current address to `info`.'''
+        '''Set the type information at the current address to `info`.'''
         return cls.info(ui.current.address(), info)
     @utils.multicase(ea=six.integer_types, info=(six.string_types, idaapi.tinfo_t))
     @classmethod
     def info(cls, ea, info):
-        '''Set the typeinfo at the address `ea` to `info`.'''
+        '''Set the type information at the address `ea` to `info`.'''
         return type(ea, info)
     typeinfo = utils.alias(info, 'set')
 
@@ -5500,12 +5500,12 @@ class get(object):
     @utils.multicase()
     @classmethod
     def info(cls):
-        '''Return the typeinfo at the current address as an ``idaapi.tinfo_t``.'''
+        '''Return the type information for the current address as an ``idaapi.tinfo_t``.'''
         return cls.info(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def info(cls, ea):
-        '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
+        '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
         return type(ea)
     typeinfo = utils.alias(info, 'get')
 
