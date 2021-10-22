@@ -864,7 +864,7 @@ def rebase(info):
     through all of the known global tags and then transform those.
     """
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
-    functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())])
+    functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.netnode.alt.fitems(internal.comment.tagging.node())])
 
     p = ui.Progress()
     p.update(current=0, title=u"Rebasing tagcache...", min=0, max=sum(len(item) for item in [functions, globals]))
