@@ -519,34 +519,34 @@ class alt(object):
 
     @classmethod
     def fiter(cls, nodeidx, tag=None):
-        '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
+        '''Iterate through all of the indexes of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, value in utils.falt(node, tag=tag or netnode.alttag):
-            yield index, value
+        for nalt, _ in utils.falt(node, tag=tag or netnode.alttag):
+            yield nalt
         return
 
     @classmethod
     def fitems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, altval in utils.falt(node, tag=tag or netnode.alttag):
-            yield index, altval
+        for nalt, altval in utils.falt(node, tag=tag or netnode.alttag):
+            yield nalt, altval
         return
 
     @classmethod
     def riter(cls, nodeidx, tag=None):
-        '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
+        '''Iterate through all of the indexes of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, value in utils.ralt(node, tag=tag or netnode.alttag):
-            yield index, value
+        for nalt, _ in utils.ralt(node, tag=tag or netnode.alttag):
+            yield nalt
         return
 
     @classmethod
     def ritems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, altval in utils.ralt(node, tag=tag or netnode.alttag):
-            yield index, altval
+        for nalt, altval in utils.ralt(node, tag=tag or netnode.alttag):
+            yield nalt, altval
         return
 
     @classmethod
@@ -605,32 +605,32 @@ class sup(object):
     def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the indexes of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, _ in utils.fsup(node, tag=tag or netnode.suptag):
-            yield index
+        for nsup, _ in utils.fsup(node, tag=tag or netnode.suptag):
+            yield nsup
         return
 
     @classmethod
     def fitems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, supval in utils.fsup(node, tag=tag or netnode.suptag):
-            yield index, supval
+        for nsup, supval in utils.fsup(node, tag=tag or netnode.suptag):
+            yield nsup, supval
         return
 
     @classmethod
     def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the indexes of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, _ in utils.rsup(node, tag=tag or netnode.suptag):
-            yield index
+        for nsup, _ in utils.rsup(node, tag=tag or netnode.suptag):
+            yield nsup
         return
 
     @classmethod
     def ritems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, supval in utils.rsup(node, tag=tag or netnode.suptag):
-            yield index, supval
+        for nsup, supval in utils.rsup(node, tag=tag or netnode.suptag):
+            yield nsup, supval
         return
 
     @classmethod
@@ -701,32 +701,32 @@ class hash(object):
     def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the keys of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for key, _ in utils.fhash(node, tag=tag or netnode.hashtag):
-            yield key
+        for idx, _ in utils.fhash(node, tag=tag or netnode.hashtag):
+            yield idx
         return
 
     @classmethod
     def fitems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for key, hashval in utils.fhash(node, tag=tag or netnode.hashtag):
-            yield key, hashval
+        for idx, hashval in utils.fhash(node, tag=tag or netnode.hashtag):
+            yield idx, hashval
         return
 
     @classmethod
     def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the keys of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for key, _ in utils.rhash(node, tag=tag or netnode.hashtag):
-            yield key
+        for idx, _ in utils.rhash(node, tag=tag or netnode.hashtag):
+            yield idx
         return
 
     @classmethod
     def ritems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for key, hashval in utils.rhash(node, tag=tag or netnode.hashtag):
-            yield key, hashval
+        for idx, hashval in utils.rhash(node, tag=tag or netnode.hashtag):
+            yield idx, hashval
         return
 
     @classmethod
