@@ -1147,7 +1147,7 @@ class globals(tagging):
     @classmethod
     def address(cls):
         '''Return all the tag addresses (``sorted``) in the specified database (globals and func-tags)'''
-        return sorted(ea for ea, _ in internal.netnode.alt.fitems(tagging.node()))
+        return sorted(ea for ea in internal.netnode.alt.fiter(tagging.node()))
 
     @classmethod
     def set_name(cls, name, count):
