@@ -230,7 +230,7 @@ def everything():
 def erase_globals():
     '''Erase the cache defined for all of the global tags in the database.'''
     n = internal.comment.tagging.node()
-    hashes, alts, sups = res = [list(items) for items in [internal.netnode.hash.fiter(n), internal.netnode.alt.fitems(n), internal.netnode.sup.fiter(n)]]
+    hashes, alts, sups = res = [list(items) for items in [internal.netnode.hash.fiter(n), internal.netnode.alt.fiter(n), internal.netnode.sup.fiter(n)]]
     total = sum(map(len, res))
 
     yield total
@@ -246,7 +246,7 @@ def erase_globals():
         yield current + idx, ea
 
     current += len(sups)
-    for idx, (ea, _) in enumerate(alts):
+    for idx, ea in enumerate(alts):
         internal.netnode.alt.remove(n, ea)
         yield current + idx, ea
     return
