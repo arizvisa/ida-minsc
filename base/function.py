@@ -508,7 +508,7 @@ class chunk(object):
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the function chunk containing the current address which uses `reg` or any one of the registers in `regs`.'''
-        return cls.register(ui.current.function(), reg, *regs, **modifiers)
+        return cls.register(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
