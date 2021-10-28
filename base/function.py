@@ -84,14 +84,18 @@ def by(name):
 
 @utils.multicase()
 def offset():
-    '''Return the offset of the current function from the base of the database.'''
-    ea = address()
-    return database.address.offset(ea)
+    '''Return the offset from the base of the database for the current function.'''
+    func = ui.current.function()
+    return offset(func, 0)
 @utils.multicase()
 def offset(func):
-    '''Return the offset of the function `func` from the base of the database.'''
+    '''Return the offset from the base of the database for the function `func`.'''
+    return offset(func, 0)
+@utils.multicase(offset=six.integer_types)
+def offset(func, offset):
+    '''Return the offset from the base of the database for the function `func` and add the provided `offset` to it.'''
     ea = address(func)
-    return database.address.offset(ea)
+    return database.address.offset(ea) + offset
 
 ## properties
 @utils.multicase()
@@ -291,7 +295,7 @@ def color(none):
 
 @utils.multicase()
 def address():
-    '''Return the entry-point of the current function.'''
+    '''Return the address of the entrypoint for the current function.'''
     try:
         res = ui.current.function()
     except E.ItemNotFoundError:
@@ -299,9 +303,13 @@ def address():
     return interface.range.start(res)
 @utils.multicase()
 def address(func):
-    '''Return the entry-point of the function identified by `func`.'''
+    '''Return the address for the entrypoint belonging to the function `func`.'''
+    return address(func, 0)
+@utils.multicase(offset=six.integer_types)
+def address(func, offset):
+    '''Return the address for the entrypoint belonging to the function `func` and add the provided `offset` to it.'''
     res = by(func)
-    return interface.range.start(res)
+    return interface.range.start(res) + offset
 top = addr = utils.alias(address)
 
 @utils.multicase()
@@ -567,6 +575,40 @@ class chunk(object):
         '''Return the bottom address of the chunk at address `ea`.'''
         _, right = cls(ea)
         return right
+
+    @utils.multicase()
+    @classmethod
+    def address(cls):
+        '''Return the top address of the function chunk containing the current address.'''
+        return cls.address(ui.current.address(), 0)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def address(cls, ea):
+        '''Return the top address of the function chunk containing the address `ea`.'''
+        return cls.address(ea, 0)
+    @utils.multicase(ea=six.integer_types, offset=six.integer_types)
+    @classmethod
+    def address(cls, ea, offset):
+        '''Return the address of the function chunk containing the address `ea` and add the provided `offset` to it.'''
+        left, _ = cls(ea)
+        return left + offset
+
+    @utils.multicase()
+    @classmethod
+    def offset(cls):
+        '''Return the offset from the base of the database for the current function chunk.'''
+        return cls.offset(ui.current.address(), 0)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def offset(cls, ea):
+        '''Return the offset from the base of the database for the function chunk containing the address `ea`.'''
+        return cls.offset(ea, 0)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def offset(cls, ea, offset):
+        '''Return the offset from the base of the database for the function chunk containing the address `ea` and add the provided `offset` to it.'''
+        left, _ = cls(ea)
+        return database.address.offset(left) + offset
 
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
@@ -1114,6 +1156,40 @@ class block(object):
         '''Return the bottom address of the basic block identified by `bounds`.'''
         _, right = cls(bounds)
         return right
+
+    @utils.multicase()
+    @classmethod
+    def address(cls):
+        '''Return the top address for the basic block containing the current address.'''
+        return cls.address(ui.current.address(), 0)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def address(cls, ea):
+        '''Return the top address for the basic block containing the address `ea`.'''
+        return cls.address(ea, 0)
+    @utils.multicase(ea=six.integer_types, offset=six.integer_types)
+    @classmethod
+    def address(cls, ea, offset):
+        '''Return the top address for the basic block containing the address `ea` and add the provided `offset` to it.'''
+        left, _ = cls(ea)
+        return left + offset
+
+    @utils.multicase()
+    @classmethod
+    def offset(cls):
+        '''Return the offset from the base of the database for the basic block at the current address.'''
+        return cls.offset(ui.current.address(), 0)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def offset(cls, ea):
+        '''Return the offset from the base of the database for the basic block at the address `ea`.'''
+        return cls.offset(ea, 0)
+    @utils.multicase(ea=six.integer_types, offset=six.integer_types)
+    @classmethod
+    def offset(cls, ea, offset):
+        '''Return the offset from the base of the database for the basic block at address `ea` and add the provided `offset` to it.'''
+        left, _ = cls(ea)
+        return database.address.offset(left) + offset
 
     @utils.multicase()
     @classmethod
