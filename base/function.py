@@ -445,6 +445,36 @@ class chunks(object):
             continue
         raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
+    @utils.multicase()
+    @classmethod
+    def contains(cls):
+        '''Returns True if the current function contains the current address in any of its chunks.'''
+        return cls.contains(ui.current.function(), ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def contains(cls, ea):
+        '''Returns True if the current function contains the address `ea` in any of its chunks.'''
+        return cls.contains(ui.current.function(), ea)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def contains(cls, func, ea):
+        '''Returns True if the function `func` contains the address `ea` in any of its chunks.'''
+        try:
+            fn, ea = by(func), interface.address.within(ea)
+
+        # If the function is not found, or the address is out of bounds
+        # then the address isn't contained in the function. Simple.
+        except (E.FunctionNotFoundError, E.OutOfBoundsError):
+            return False
+
+        # If we didn't raise any exceptions, then grab all of the chunks
+        # for the function that we determined.
+        else:
+            iterable = cls(fn)
+
+        # Now we can just iterate through each chunk whilst checking the bounds.
+        return any(start <= ea < end for start, end in iterable)
+
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
@@ -469,6 +499,7 @@ class chunks(object):
         return
 
 iterate = utils.alias(chunks.iterate, 'chunks')
+contains = utils.alias(chunks.contains, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
 
 class chunk(object):
@@ -720,28 +751,6 @@ def within(ea):
     except E.OutOfBoundsError:
         return False
     return idaapi.get_func(ea) is not None and idaapi.segtype(ea) != idaapi.SEG_XTRN
-
-# Checks if ea is contained in function or in any of its chunks
-@utils.multicase()
-def contains():
-    '''Returns True if the current address is within a function.'''
-    return contains(ui.current.function(), ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def contains(ea):
-    '''Returns True if the address `ea` is contained by the current function.'''
-    return contains(ui.current.function(), ea)
-@utils.multicase(ea=six.integer_types)
-def contains(func, ea):
-    '''Returns True if the address `ea` is contained by the function `func`.'''
-    try:
-        fn = by(func)
-        ea = interface.address.within(ea)
-
-    # If the function is not found, or the address is out of bounds
-    # then the address isn't contained in the function. simple.
-    except (E.FunctionNotFoundError, E.OutOfBoundsError):
-        return False
-    return any(start <= ea < end for start, end in chunks(fn))
 
 class blocks(object):
     """
