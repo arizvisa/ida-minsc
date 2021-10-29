@@ -1770,6 +1770,56 @@ class frame(object):
 
         @utils.multicase()
         @classmethod
+        def registers(cls):
+            '''Return the register information associated with the arguments for the current function.'''
+            return cls.registers(ui.current.function())
+        @utils.multicase()
+        @classmethod
+        def registers(cls, func):
+            '''Returns the register information associated with the arguments for the function `func`.'''
+            fn = by(func)
+            arguments = [fn.regargs[index] for index in builtins.range(fn.regargqty)]
+
+            # FIXME: This doesn't seem to get all of the registers used in both 32-bit and 64-bit calling conventions
+
+            # Iterate through all of our arguments and grab the type information out of the register argument.
+            tinfo = []
+            for index, regarg in enumerate(arguments):
+                ti = idaapi.tinfo_t()
+
+                # Deserialize the type information that we received from the register argument.
+                if ti.deserialize(None, regarg.type, None):
+                    tinfo.append(ti)
+
+                # If we failed, then log a warning and try to append a void* as a placeholder.
+                elif ti.deserialize(None, bytes(bytearray([idaapi.BT_PTR, idaapi.BT_VOID])), None):
+                    logging.warning(u"{:s}.registers({:#x}) : Using the type {!r} as a placeholder due to being unable to decode the type information ({!s}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ti._print(), regarg.type, index))
+                    tinfo.append(ti)
+
+                # If we couldn't even create a void*, then this is a critical failure and we
+                # really need to get the argument size correct. So, we just look it up.
+                else:
+                    bits, lookup = database.config.bits(), {
+                        8: idaapi.BT_INT8,
+                        16: idaapi.BT_INT16,
+                        32: idaapi.BT_INT32,
+                        64: idaapi.BT_INT64,
+                        128: idaapi.BT_INT128,
+                    }
+                    if not operator.contains(lookup, bits) or not ti.deserialize(None, bytes(bytearray([lookup[bits]])), None):
+                        raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to create a type that fits within the number of bits for the database ({:d}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bits))
+                    logging.critical(u"{:s}.registers({:#x}) : Falling back to the type {!r} as a placeholder due to being unable to cast the type information ({!s}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ti._print(), regarg.type, index))
+                continue
+
+            # Collect our results so that we can return all of them back to the caller.
+            results = []
+            for index, (regarg, ti) in enumerate(zip(arguments, tinfo)):
+                reg = instruction.architecture.by_indexsize(regarg.reg, ti.get_size())
+                results.append((reg, ti, utils.string.of(regarg.name)))
+            return results
+
+        @utils.multicase()
+        @classmethod
         def size(cls):
             '''Returns the size of the arguments for the current function.'''
             return cls.size(ui.current.function())
