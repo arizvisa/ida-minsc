@@ -561,7 +561,7 @@ class chunk(object):
 
         # Otherwise, we just need to yield the function that owns this chunk.
         else:
-            iterable = ( ea for ea, _ in map(interface.range.bounds, [ch]))
+            iterable = (ea for ea, _ in map(interface.range.bounds, [ch]))
 
         # We've collected all of our items, so iterate through what we've collected
         # and then yield them to the caller before returning.
@@ -607,6 +607,62 @@ class chunk(object):
                 items = ea, opnum, instruction.op_state(ea, opnum)
                 yield interface.opref_t(*items)
             continue
+        return
+
+    @utils.multicase()
+    @classmethod
+    def points(cls):
+        '''Iterate through the current function chunk and yield each address and stack delta that was calculated.'''
+        return cls.points(ui.current.function(), ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def points(cls, ea):
+        '''Iterate through the function chunk containing the address `ea` and yield each address and stack delta that was calculated.'''
+        fn = by_address(ea)
+        return cls.points(fn, ea)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def points(cls, func, ea):
+        '''Iterate through the chunk belonging to the function `func` and containing the address `ea` in order to yield each address and stack delta that was calculated.'''
+        ch = idaapi.get_fchunk(ea)
+
+        # If we were unable to get the function chunk for the provided address,
+        # then IDA didn't calculate any stack deltas for what was requested.
+        if ch is None:
+            return
+
+        # If this is a function tail, then we need to get its owners so that we
+        # can figure out which chunk will contain the address and calc'd delta.
+        if ch.flags & idaapi.FUNC_TAIL:
+            bounds, owners = interface.range.bounds(ch), (chunk for chunk in map(idaapi.get_fchunk, cls.owners(ea)) if chunk)
+
+            # Now that we've grabbed each chunk, we need to filter each chunk
+            # by its stack point so that we only grab the one referencing the
+            # chunk the caller provided us.
+            Fcontains = bounds.contains
+            filtered = (chunk for chunk in owners if any(Fcontains(chunk.points[index].ea) for index in builtins.range(chunk.pntqty)))
+
+            # We have a list of chunks that has been filtered for the specific
+            # point within our chunk boundary. There really should be only one
+            # chunk, but just in case we store them into a dict so that we can
+            # use their address as a key to sort.
+            items = itertools.chain(*(map(chunk.points.__getitem__, builtins.range(chunk.pntqty)) for chunk in filtered))
+            available = {item.ea : item for item in items if Fcontains(item.ea)}
+
+            # That was it. We have the sorted addresses of the points that we want,
+            # and we need to just convert them back into an iterable so that we
+            # can yield each point back to the caller.
+            iterable = (available[ea] for ea in sorted(available))
+
+        # Now we just need to iterate through all of the stack change points,
+        # and then yield their address and the delta that was calculated.
+        else:
+            iterable = (ch.points[index] for index in builtins.range(ch.pntqty))
+
+        # We have our iterator of points, so all we need to do is to unpack each
+        # one and yield it to our caller.
+        for point in iterable:
+            yield point.ea, point.spd
         return
 
     @utils.multicase()
