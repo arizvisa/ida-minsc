@@ -496,6 +496,50 @@ class chunk(object):
 
     @utils.multicase()
     @classmethod
+    def owner(cls):
+        '''Return the first owner of the function chunk containing the current address.'''
+        return cls.owner(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def owner(cls, ea):
+        '''Return the first owner of the function chunk containing the address specified by `ea`.'''
+        if within(ea):
+            return next(item for item in cls.owners(ea))
+        raise E.FunctionNotFoundError(u"{:s}.owner({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+    @utils.multicase()
+    @classmethod
+    def owners(cls):
+        '''Yield each of the owners which have the current function chunk associated with it.'''
+        ea = ui.current.address()
+        return (item for item in cls.owners(ea))
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def owners(cls, ea):
+        '''Yield each of the owners which have the function chunk containing the address `ea` associated with it.'''
+        ch = idaapi.get_fchunk(ea)
+
+        # If we were unable to get the function chunk for the provided address,
+        # then we can just return because there's nothing that owns it.
+        if ch is None:
+            return
+
+        # If this is a function tail, then we need to iterate through the referers
+        # for the chunk so that we can yield each address.
+        if ch.flags & idaapi.FUNC_TAIL:
+            iterable = (ch.referers[index] for index in builtins.range(ch.refqty))
+
+        # Otherwise, we just need to yield the function that owns this chunk.
+        else:
+            iterable = ( ea for ea, _ in map(interface.range.bounds, [ch]))
+
+        # We've collected all of our items, so iterate through what we've collected
+        # and then yield them to the caller before returning.
+        for ea in iterable:
+            yield ea
+        return
+
+    @utils.multicase()
+    @classmethod
     def iterate(cls):
         '''Iterate through all the instructions for the function chunk containing the current address.'''
         for ea in cls.iterate(ui.current.address()):
