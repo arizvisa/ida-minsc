@@ -3067,6 +3067,92 @@ class address(object):
 
     @utils.multicase()
     @classmethod
+    def prevcomment(cls, **repeatable):
+        '''Returns the previous address from the current one that has any type of comment.'''
+        return cls.prevcomment(ui.current.address(), repeatable.pop('count', 1), **repeatable)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevcomment(cls, predicate, **repeatable):
+        '''Returns the previous address from the current one that has any type of comment and satisfies the provided `predicate`.'''
+        return cls.prevcomment(ui.current.address(), repeatable.pop('count', 1), **repeatable)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def prevcomment(cls, ea, **repeatable):
+        '''Returns the previous address from the address `ea` that has any type of comment.'''
+        return cls.prevcomment(ea, repeatable.pop('count', 1), **repeatable)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevcomment(cls, ea, predicate, **repeatable):
+        """Returns the previous address from the address `ea` that has any type of comment and satisfies the provided `predicate`.
+
+        If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
+        """
+        if 'repeatable' in repeatable:
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
+            Fx = utils.fcompose(utils.fmap(type.has_comment, Fcheck_comment), builtins.all)
+        else:
+            Fx = type.has_comment
+        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def prevcomment(cls, ea, count, **repeatable):
+        """Returns the previous `count` addresses from the address `ea` that has any type of comment.
+
+        If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
+        """
+        if 'repeatable' in repeatable:
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
+            F = utils.fcompose(utils.fmap(type.has_comment, Fcheck_comment), builtins.all)
+        else:
+            F = type.has_comment
+        return cls.prevF(ea, F, count)
+
+    @utils.multicase()
+    @classmethod
+    def nextcomment(cls, **repeatable):
+        '''Returns the next address from the current one that has any type of comment.'''
+        return cls.nextcomment(ui.current.address(), repeatable.pop('count', 1), **repeatable)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextcomment(cls, predicate, **repeatable):
+        '''Returns the next address from the current one that has any type of comment and satisfies the provided `predicate`.'''
+        return cls.nextcomment(ui.current.address(), repeatable.pop('count', 1), **repeatable)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def nextcomment(cls, ea, **repeatable):
+        '''Returns the next address from the address `ea` that has any type of comment.'''
+        return cls.nextcomment(ea, repeatable.pop('count', 1), **repeatable)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextcomment(cls, ea, predicate, **repeatable):
+        """Returns the next address from the address `ea` that has any type of comment and satisfies the provided `predicate`.
+
+        If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
+        """
+        if 'repeatable' in repeatable:
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
+            Fx = utils.fcompose(utils.fmap(type.has_comment, Fcheck_comment), builtins.all)
+        else:
+            Fx = type.has_comment
+        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def nextcomment(cls, ea, count, **repeatable):
+        """Returns the the next `count` addresses from the address `ea` that has any type of comment.
+
+        If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
+        """
+        if 'repeatable' in repeatable:
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
+            F = utils.fcompose(utils.fmap(type.has_comment, Fcheck_comment), builtins.all)
+        else:
+            F = type.has_comment
+        return cls.nextF(ea, F, count)
+
+    @utils.multicase()
+    @classmethod
     @utils.string.decorate_arguments('tagname')
     def prevtag(cls, **tagname):
         '''Return the previous address that contains a tag.'''
@@ -3140,7 +3226,6 @@ class address(object):
         tagname = tagname.get('tagname', None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         return cls.nextF(ea, Ftag, count)
-    prevcomment, nextcomment = utils.alias(prevtag, 'address'), utils.alias(nexttag, 'address')
 
     @utils.multicase()
     @classmethod
@@ -3203,7 +3288,7 @@ class address(object):
     @classmethod
     def offset(cls):
         '''Return the current address translated to an offset relative to the base address of the database.'''
-        return offset(ui.current.address())
+        return cls.offset(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def offset(cls, ea):
