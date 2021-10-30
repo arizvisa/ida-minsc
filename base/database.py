@@ -2419,7 +2419,7 @@ class address(object):
             raise E.AddressOutOfBoundsError(u"{:s}.prevF: Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), config.bounds()[0], ea))
 
         res = cls.__walk__(Fprev(ea), Fprev, Finverse)
-        return cls.prevF(res, predicate, count-1) if count > 1 else res
+        return cls.prevF(res, predicate, count - 1) if count > 1 else res
 
     @utils.multicase(predicate=builtins.callable)
     @classmethod
@@ -2442,7 +2442,7 @@ class address(object):
         if Fnext(ea) == idaapi.BADADDR:
             raise E.AddressOutOfBoundsError(u"{:s}.nextF: Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), config.bounds()[1], idaapi.get_item_end(ea)))
         res = cls.__walk__(Fnext(ea), Fnext, Finverse)
-        return cls.nextF(res, predicate, count-1) if count > 1 else res
+        return cls.nextF(res, predicate, count - 1) if count > 1 else res
 
     @utils.multicase()
     @classmethod
@@ -2559,6 +2559,9 @@ class address(object):
         '''Returns the next `count` addresses from `ea` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fdref, count)
+
+    # FIXME: the semantics of these aliases are wrong, and they really shouldn't be
+    #        aliasing a data reference. thus, we should be checking the address' type.
     prevdata, nextdata = utils.alias(prevdref, 'address'), utils.alias(nextdref, 'address')
 
     @utils.multicase()
@@ -2618,6 +2621,9 @@ class address(object):
         '''Returns the next `count` addresses from `ea` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fcref, count)
+
+    # FIXME: the semantics of these aliases are wrong, and they really shouldn't be#
+    #        aliasing a code reference. thus, we should be checking the address' type.
     prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
 
     @utils.multicase(reg=(six.string_types, interface.register_t))
@@ -2813,6 +2819,8 @@ class address(object):
             found, ea = type.is_code(res), cls.next(res)
         return res
 
+    # FIXME: we should add aliases for a stack point as per the terminology that's used
+    #        by IDA in its ``idaapi.func_t`` when getting points for a function or a chunk.
     prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
 
     @utils.multicase()
@@ -2930,6 +2938,78 @@ class address(object):
         Fbranch = _instruction.type.is_branch
         F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         return cls.nextF(ea, F, count)
+
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set))
+    @classmethod
+    def prevmnemonic(cls, mnemonics):
+        '''Return the address of the previous instruction from the current address that uses any of the specified `mnemonics`.'''
+        return cls.prevmnemonic(ui.current.address(), mnemonics, 1)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @classmethod
+    def prevmnemonic(cls, mnemonics, predicate):
+        '''Return the address of the previous instruction from the current address that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
+        return cls.prevmnemonic(ui.current.address(), mnemonics, predicate)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @classmethod
+    def prevmnemonic(cls, mnemonics, count):
+        '''Return the address of the previous `count` instructions from the current address that uses any of the specified `mnemonics`.'''
+        return cls.prevmnemonic(ui.current.address(), mnemonics, count)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set))
+    @classmethod
+    def prevmnemonic(cls, ea, mnemonics):
+        '''Return the address of the previous instruction from the address `ea` that uses any of the specified `mnemonics`.'''
+        return cls.prevmnemonic(ea, mnemonics, 1)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @classmethod
+    def prevmnemonic(cls, ea, mnemonics, predicate):
+        '''Return the address of the previous instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
+        items = {mnemonics} if isinstance(mnemonics, six.string_types) else {item for item in mnemonics}
+        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        F = utils.fcompose(utils.fmap(Fuses_mnemonics, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @classmethod
+    def prevmnemonic(cls, ea, mnemonics, count):
+        '''Return the address of the previous `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
+        items = {mnemonics} if isinstance(mnemonics, six.string_types) else {item for item in mnemonics}
+        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        return cls.prevF(ea, Fuses_mnemonics, count)
+
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set))
+    @classmethod
+    def nextmnemonic(cls, mnemonics):
+        '''Return the address of the next instruction from the current address that uses any of the specified `mnemonics`.'''
+        return cls.nextmnemonic(ui.current.address(), mnemonics, 1)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @classmethod
+    def nextmnemonic(cls, mnemonics, predicate):
+        '''Return the address of the next instruction from the current address that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
+        return cls.nextmnemonic(ui.current.address(), mnemonics, predicate)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @classmethod
+    def nextmnemonic(cls, mnemonics, count):
+        '''Return the address of the next `count` instructions from the current address that uses any of the specified `mnemonics`.'''
+        return cls.nextmnemonic(ui.current.address(), mnemonics, count)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set))
+    @classmethod
+    def nextmnemonic(cls, ea, mnemonics):
+        '''Return the address of the next instruction from the address `ea` that uses any of the specified `mnemonics`.'''
+        return cls.nextmnemonic(ea, mnemonics, 1)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @classmethod
+    def nextmnemonic(cls, ea, mnemonics, predicate):
+        '''Return the address of the next instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
+        items = {mnemonics} if isinstance(mnemonics, six.string_types) else {item for item in mnemonics}
+        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        F = utils.fcompose(utils.fmap(Fuses_mnemonics, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @classmethod
+    def nextmnemonic(cls, ea, mnemonics, count):
+        '''Return the address of the next `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
+        items = {mnemonics} if isinstance(mnemonics, six.string_types) else {item for item in mnemonics}
+        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        return cls.nextF(ea, Fuses_mnemonics, count)
 
     @utils.multicase()
     @classmethod
