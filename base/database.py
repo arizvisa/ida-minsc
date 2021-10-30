@@ -3230,51 +3230,65 @@ class address(object):
     @utils.multicase()
     @classmethod
     def prevunknown(cls):
-        '''Return the previous address that is undefined.'''
+        '''Return the previous address from the current one that is undefined.'''
         return cls.prevunknown(ui.current.address(), 1)
+    @utils.multicase(count=six.integer_types)
+    @classmethod
+    def prevunknown(cls, count):
+        '''Return the previous `count` address from the current one that is undefined.'''
+        return cls.prevunknown(ui.current.address(), count)
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevunknown(cls, predicate):
-        '''Return the previous address that is undefined and matches `predicate`.'''
+        '''Return the previous address from the current one that is undefined and satisfies the provided `predicate`.'''
         return cls.prevunknown(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevunknown(cls, ea):
-        '''Return the previous address from `ea` that is undefined.'''
+        '''Return the previous address from the address `ea` that is undefined.'''
         return cls.prevunknown(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevunknown(cls, ea, predicate):
-        '''Return the previous address from `ea` that is undefined and matches `predicate`.'''
-        return cls.prevF(ea, type.is_unknown, 1)
+        '''Return the previous address from the address `ea` that is undefined and satisfies the provided `predicate`.'''
+        F = utils.fcompose(utils.fmap(type.is_unknown, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevunknown(cls, ea, count):
+        '''Return the previous `count` address from the address `ea` that is undefined.'''
         return cls.prevF(ea, type.is_unknown, count)
 
     @utils.multicase()
     @classmethod
     def nextunknown(cls):
-        '''Return the next address that is undefined.'''
+        '''Return the next address from the current one that is undefined.'''
         return cls.nextunknown(ui.current.address(), 1)
+    @utils.multicase(count=six.integer_types)
+    @classmethod
+    def nextunknown(cls, count):
+        '''Return the next `count` address from the current one that is undefined.'''
+        return cls.nextunknown(ui.current.address(), count)
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextunknown(cls, predicate):
-        '''Return the next address that is undefined and matches `predicate`.'''
+        '''Return the next address from the current one that is undefined and satisfies the provided `predicate`.'''
         return cls.nextunknown(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextunknown(cls, ea):
-        '''Return the next address from `ea` that is undefined.'''
+        '''Return the next address from the address `ea` that is undefined.'''
         return cls.nextunknown(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextunknown(cls, ea, predicate):
-        '''Return the next address from `ea` that is undefined and matches `predicate`.'''
-        return cls.nextF(ea, type.is_unknown, 1)
+        '''Return the next address from the address `ea` that is undefined and satisfies the provided `predicate`.'''
+        F = utils.fcompose(utils.fmap(type.is_unknown, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextunknown(cls, ea, count):
+        '''Return the next `count` address from the address `ea` that is undefined.'''
         return cls.nextF(ea, type.is_unknown, count)
 
     # address translations
