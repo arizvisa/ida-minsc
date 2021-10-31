@@ -411,7 +411,7 @@ class multicase(object):
         def flatten(iterable):
             '''This closure takes the provided `iterable` (or tree), and flattens it into a list.'''
             for item in iterable:
-                if isinstance(item, (builtins.list, builtins.tuple)):
+                if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
                     for item in flatten(item):
                         yield item
                     continue
@@ -546,7 +546,8 @@ class multicase(object):
         # If we iterated through everything in our heap, then we couldn't find a match for the
         # types the user gave us. So we need to raise an exception to inform the user that the
         # types we were given did not match any of the constraints that we know about.
-        error_arguments = [item.__class__.__name__ for item in args]
+        ignored = min(ignore_count for _, _, (ignore_count, _, _, _) in heap) if heap else 0
+        error_arguments = [item.__class__.__name__ for item in args[ignored:]]
         error_keywords = ["{:s}={!s}".format(name, kwds[name].__class__.__name__) for name in kwds]
         error_prototypes = [cls.prototype(F, constraints) for F, constraints, _ in heap]
         raise internal.exceptions.UnknownPrototypeError(u"@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(error_prototypes)))
