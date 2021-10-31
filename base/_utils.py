@@ -450,49 +450,106 @@ class multicase(object):
         return "{:s}({:s})".format(pycompat.function.name(func), ', '.join(itertools.chain(*res)))
 
     @classmethod
-    def match(cls, args_kwds, heap):
+    def match(cls, packed_parameters, heap):
         '''Given the tuple (`args`, `kwds`), find the correct function according to its types.'''
-        args, kwds = args_kwds
+        args, kwds = packed_parameters
 
-        # FIXME: yep, done in O(n) time.
-        for f, ts, (sa, af, defaults, (argname, kwdname)) in heap:
-            # populate our arguments
-            ac, kc = (n for n in args), { kwd : kval for kwd, kval in kwds.items() }
+        # Iterate through all the available functions/cases within the heap that
+        # we were given. This is being done in O(n) time which can be significantly
+        # improved because we should be being sorted by complexity and count. This
+        # really should allow use to start searching closer to the item in the list
+        # that matches our parameters that we're searching with.
+        for F, constraints, (parameter_ignore_count, parameter_names, parameter_defaults, (parameter_wildargs, parameter_wildkeywords)) in heap:
 
-            # skip some args in our tuple
-            [next(item) for item in [ac] * sa]
+            # Grab our values that we're going to match with.
+            parameter_iterator, parameter_keywords = (item for item in args), {kwparam : kwvalue for kwparam, kwvalue in kwds.items()}
 
-            # build the argument tuple using the generator, kwds, or our defaults.
-            a = []
-            try:
-                for n in af:
-                    try: a.append(next(ac))
-                    except StopIteration: a.append(kc.pop(n) if n in kc else defaults.pop(n))
-            except KeyError: pass
-            finally: a = tuple(a)
+            # Skip the ignored arguments within our parameters.
+            [next(item) for item in [parameter_iterator] * parameter_ignore_count]
 
-            # now anything left in ac or kc goes in the wildcards. if there aren't any, then this iteration doesn't match.
-            wA, wK = [item for item in ac], { kwd : kval for kwd, kval in kc.items() }
-            if (not argname and len(wA)) or (not kwdname and wK):
+            # Build the argument tuple that contains the actual parameters that
+            # will be passed to the matched function. When we collect the arguments,
+            # we need to ensure that any keywords parameters and default parameters
+            # will be inserted into the correct place within the tuple.
+            parameter_values = []
+            for name in parameter_names:
+                try:
+                    value = next(parameter_iterator)
+
+                # If there were no parameters left within our iterator, then we
+                # need to apply any keywords that we were given.
+                except StopIteration:
+                    if name in parameter_keywords:
+                        value = parameter_keywords.pop(name)
+
+                    # If there weren't any keywords with our parameter name, then
+                    # we need to check to see if there's a default parameter to use.
+                    elif name in parameter_defaults:
+                        value = parameter_defaults.pop(name)
+
+                    # If there were no default parameters, then we need to leave
+                    # because we don't have a way to grab any more parameters.
+                    else:
+                        break
+
+                    # We were able to get a keyword or default parameter, so we can
+                    # add it to our arguments to match with.
+                    parameter_values.append(value)
+
+                # We consumed a parameter value, so we can now append it to our arguments
+                # that we will match against.
+                else:
+                    parameter_values.append(value)
                 continue
 
-            # if our perceived argument length doesn't match, then this iteration doesn't match either
-            if sa + len(a) != len(af):
+            # Now that we have our parameter values, we need to convert it into a tuple
+            # so that we can process and use it. Any parameters left in parameter_iterator
+            # or parameter_keywords are considered part of the wildcard parameters.
+            argument_values = builtins.tuple(parameter_values)
+            argument_wildcard, argument_keywords = [item for item in parameter_iterator], {kwparam : kwvalue for kwparam, kwvalue in parameter_keywords.items()}
+
+            # First check if we have any extra parameters. If we do, but there's no wildcards
+            # available in our current match, then it doesn't fit and we move onto the next one.
+            if len(argument_wildcard) and not parameter_wildargs:
                 continue
 
-            # figure out how to match the types by checking if it's a regular type or it's a callable
-            predicateF = lambda t: callable if t == callable else (lambda v: isinstance(v, t))
-
-            # now we can finally start checking that the types match
-            if not all(predicateF(ts[t])(v) for t, v in zip(af[sa:], a) if t in ts):
+            # If we have any extra keywords, then we need to ensure that there's a keyword
+            # parameter in our current match. Otherwise, it doesn't fit and we need to move on.
+            elif argument_keywords and not parameter_wildkeywords:
                 continue
 
-            # we should have a match
-            return f, (tuple(args[:sa]) + a, wA, wK)
+            # Second, we need to check that our argument length actually matches. To accomplish
+            # this, we need to include the parameters that we ignored, and check them against
+            # the number of parameter names from our current match. Move on if they're different.
+            if parameter_ignore_count + len(argument_values) != len(parameter_names):
+                continue
 
-        error_arguments = [n.__class__.__name__ for n in args]
-        error_keywords = ["{:s}={!s}".format(n, kwds[n].__class__.__name__) for n in kwds]
-        raise internal.exceptions.UnknownPrototypeError(u"@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(cls.prototype(f, t) for f, t, _ in heap)))
+            # Third, we need to actually check our type constraints that our current match we
+            # decorated with. If our constraint is a builtins.callable, then we just need to
+            # ensure that the parameter can be called. Otherwise our constraint should be an
+            # iterable of types that we can simply pass long to the isinstance() function.
+            critiqueF = lambda constraint: builtins.callable if constraint == builtins.callable else finstance(*constraint)
+
+            # Zip our parameter names along with our argument values so that we can extract
+            # the contraint, and check the value against it. If any of these checks fail,
+            # then it's not a match and we need to move on to the next iteration.
+            parameter_names_and_values = zip(parameter_names[parameter_ignore_count:], argument_values)
+            if not all(critiqueF(constraints[name])(value) for name, value in parameter_names_and_values):
+                continue
+
+            # We should now have a match. So now that we've figured out all of our individual
+            # parameters and their positions, we need to put them all together so that we can
+            # return them to the caller so that they can actually call it.
+            result_arguments = builtins.tuple(itertools.chain(args[:parameter_ignore_count], argument_values))
+            return F, (result_arguments, argument_wildcard, argument_keywords)
+
+        # If we iterated through everything in our heap, then we couldn't find a match for the
+        # types the user gave us. So we need to raise an exception to inform the user that the
+        # types we were given did not match any of the constraints that we know about.
+        error_arguments = [item.__class__.__name__ for item in args]
+        error_keywords = ["{:s}={!s}".format(name, kwds[name].__class__.__name__) for name in kwds]
+        error_prototypes = [cls.prototype(F, constraints) for F, constraints, _ in heap]
+        raise internal.exceptions.UnknownPrototypeError(u"@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(error_prototypes)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
