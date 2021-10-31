@@ -465,7 +465,7 @@ class multicase(object):
             # build the argument tuple using the generator, kwds, or our defaults.
             a = []
             try:
-                for n in af[sa:]:
+                for n in af:
                     try: a.append(next(ac))
                     except StopIteration: a.append(kc.pop(n) if n in kc else defaults.pop(n))
             except KeyError: pass
@@ -477,14 +477,14 @@ class multicase(object):
                 continue
 
             # if our perceived argument length doesn't match, then this iteration doesn't match either
-            if len(a) != len(af[sa:]):
+            if sa + len(a) != len(af):
                 continue
 
             # figure out how to match the types by checking if it's a regular type or it's a callable
             predicateF = lambda t: callable if t == callable else (lambda v: isinstance(v, t))
 
             # now we can finally start checking that the types match
-            if any(not predicateF(ts[t])(v) for t, v in zip(af[sa:], a) if t in ts):
+            if not all(predicateF(ts[t])(v) for t, v in zip(af[sa:], a) if t in ts):
                 continue
 
             # we should have a match
@@ -501,7 +501,8 @@ class multicase(object):
         def F(*arguments, **keywords):
             heap = [res for _, res in heapq.nsmallest(len(cache), cache, key=operator.attrgetter('priority'))]
             f, (a, w, k) = cls.match((arguments[:], keywords), heap)
-            return f(*arguments, **keywords)
+            return f(*itertools.chain(a, w), **k)
+            #return f(*arguments, **keywords)
             #return f(*(arguments + tuple(w)), **keywords)
 
         # swap out the original code object with our wrapper's
