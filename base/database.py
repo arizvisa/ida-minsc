@@ -2351,10 +2351,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def prev(cls, ea, predicate, count):
-        """Return the previous address from the address `ea` that satisfies the provided `predicate`.
-
-        Skip `count` addresses before returning.
-        """
+        '''Return the previous `count` address from the address `ea` that satisfies the provided `predicate`.'''
         return cls.prevF(ea, predicate, count)
 
     @utils.multicase()
@@ -2385,10 +2382,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def next(cls, ea, predicate, count):
-        """Return the next address from the address `ea` that satisfies the provided `predicate`.
-
-        Skip `count` addresses before returning.
-        """
+        '''Return the next `count` address from the address `ea` that satisfies the provided `predicate`.'''
         return cls.nextF(ea, predicate, count)
 
     @utils.multicase(predicate=builtins.callable)
@@ -2937,27 +2931,27 @@ class address(object):
         F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         return cls.nextF(ea, F, count)
 
-    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set))
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple))
     @classmethod
     def prevmnemonic(cls, mnemonics):
         '''Return the address of the previous instruction from the current address that uses any of the specified `mnemonics`.'''
         return cls.prevmnemonic(ui.current.address(), mnemonics, 1)
-    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), predicate=builtins.callable)
     @classmethod
     def prevmnemonic(cls, mnemonics, predicate):
         '''Return the address of the previous instruction from the current address that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
         return cls.prevmnemonic(ui.current.address(), mnemonics, predicate)
-    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), count=six.integer_types)
     @classmethod
     def prevmnemonic(cls, mnemonics, count):
         '''Return the address of the previous `count` instructions from the current address that uses any of the specified `mnemonics`.'''
         return cls.prevmnemonic(ui.current.address(), mnemonics, count)
-    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set))
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple))
     @classmethod
     def prevmnemonic(cls, ea, mnemonics):
         '''Return the address of the previous instruction from the address `ea` that uses any of the specified `mnemonics`.'''
         return cls.prevmnemonic(ea, mnemonics, 1)
-    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), predicate=builtins.callable)
     @classmethod
     def prevmnemonic(cls, ea, mnemonics, predicate):
         '''Return the address of the previous instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
@@ -2965,7 +2959,7 @@ class address(object):
         Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
         F = utils.fcompose(utils.fmap(Fuses_mnemonics, predicate), builtins.all)
         return cls.prevF(ea, F, 1)
-    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), count=six.integer_types)
     @classmethod
     def prevmnemonic(cls, ea, mnemonics, count):
         '''Return the address of the previous `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
@@ -2973,27 +2967,27 @@ class address(object):
         Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
         return cls.prevF(ea, Fuses_mnemonics, count)
 
-    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set))
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple))
     @classmethod
     def nextmnemonic(cls, mnemonics):
         '''Return the address of the next instruction from the current address that uses any of the specified `mnemonics`.'''
         return cls.nextmnemonic(ui.current.address(), mnemonics, 1)
-    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), predicate=builtins.callable)
     @classmethod
     def nextmnemonic(cls, mnemonics, predicate):
         '''Return the address of the next instruction from the current address that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
         return cls.nextmnemonic(ui.current.address(), mnemonics, predicate)
-    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @utils.multicase(mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), count=six.integer_types)
     @classmethod
     def nextmnemonic(cls, mnemonics, count):
         '''Return the address of the next `count` instructions from the current address that uses any of the specified `mnemonics`.'''
         return cls.nextmnemonic(ui.current.address(), mnemonics, count)
-    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set))
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple))
     @classmethod
     def nextmnemonic(cls, ea, mnemonics):
         '''Return the address of the next instruction from the address `ea` that uses any of the specified `mnemonics`.'''
         return cls.nextmnemonic(ea, mnemonics, 1)
-    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), predicate=builtins.callable)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), predicate=builtins.callable)
     @classmethod
     def nextmnemonic(cls, ea, mnemonics, predicate):
         '''Return the address of the next instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
@@ -3001,7 +2995,7 @@ class address(object):
         Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
         F = utils.fcompose(utils.fmap(Fuses_mnemonics, predicate), builtins.all)
         return cls.nextF(ea, F, 1)
-    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set), count=six.integer_types)
+    @utils.multicase(ea=six.integer_types, mnemonics=(six.string_types, builtins.list, builtins.set, builtins.tuple), count=six.integer_types)
     @classmethod
     def nextmnemonic(cls, ea, mnemonics, count):
         '''Return the address of the next `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
@@ -3151,6 +3145,7 @@ class address(object):
             F = type.has_comment
         return cls.nextF(ea, F, count)
 
+    # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('tagname')
@@ -3189,6 +3184,7 @@ class address(object):
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         return cls.prevF(ea, Ftag, count)
 
+    # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('tagname')
