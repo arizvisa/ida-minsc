@@ -545,13 +545,13 @@ class multicase(object):
             # decorated with. If our constraint is a builtins.callable, then we just need to
             # ensure that the parameter can be called. Otherwise our constraint should be an
             # iterable of types that we can simply pass long to the isinstance() function.
-            critiqueF = lambda constraint: builtins.callable if constraint == builtins.callable else finstance(*constraint)
+            critiqueF = lambda constraint: builtins.callable if constraint == builtins.callable else frpartial(builtins.isinstance, constraint)
 
             # Zip our parameter names along with our argument values so that we can extract
             # the contraint, and check the value against it. If any of these checks fail,
             # then it's not a match and we need to move on to the next iteration.
             parameter_names_and_values = zip(parameter_names[parameter_ignore_count:], argument_values)
-            if not all(critiqueF(constraints[name])(value) for name, value in parameter_names_and_values):
+            if not all(critiqueF(constraints[name])(value) for name, value in parameter_names_and_values if name in constraints):
                 continue
 
             # We should now have a match. So now that we've figured out all of our individual
