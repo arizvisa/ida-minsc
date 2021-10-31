@@ -317,194 +317,305 @@ class multicase(object):
     def __new__(cls, *other, **t_args):
         '''Decorate a case of a function with the specified types.'''
         def result(wrapped):
-            # extract the FunctionType and its arg types
-            cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
-            args, defaults, (star, starstar) = cls.ex_args(func)
-            s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) else 0
 
-            # determine if the user included the previous function
+            # First we need to extract the function from whatever type it is
+            # so that we can read any properties we need from it. We also extract
+            # its "constructor" so that we can re-create it after we've processed it.
+            cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
+
+            # Next we need to extract all of the argument information from it. We
+            # also need to determine whether it's a special type of some sort so
+            # that we know that its first argument is irrelevant to our needs. We
+            # also check to see if it's using the magic name "__new__" which takes
+            # an implicit parameter that gets passed to it.
+            args, defaults, (star, starstar) = cls.ex_args(func)
+            s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) or func.__name__ in {'__new__'} else 0
+
+            # If the user decorated us whilst explicitly providing the previous
+            # function that this case is a part of, then make sure that we use it.
             if len(other):
                 ok, prev = True, other[0]
-            # ..otherwise we just figure it out by looking in the caller's locals
+
+            # If we weren't given a function, then we need to be tricky and search
+            # through our parent frame's locals. Hopefully it's using the same name.
             elif pycompat.function.name(func) in sys._getframe().f_back.f_locals:
                 ok, prev = True, sys._getframe().f_back.f_locals[pycompat.function.name(func)]
-            # ..otherwise, first blood and we're not ok.
+
+            # Otherwise, we've hit first blood and this is the very first definition
+            # of the function. This requires us to do some construction later.
             else:
                 ok = False
 
-            # so, a wrapper was found and we need to steal its cache
+            # So if we found an already-existing wrapper, then we need to steal its cache.
             res = ok and cls.ex_function(prev)
             if ok and hasattr(res, cls.cache_name):
                 cache = getattr(res, cls.cache_name)
-            # ..otherwise, we just create a new one.
+
+            # Otherwise, we simply need to create a new cache entirely.
             else:
                 cache = []
                 res = cls.new_wrapper(func, cache)
                 res.__module__ = getattr(wrapped, '__module__', getattr(func, '__module__', '__main__'))
 
-            # calculate the priority by trying to match the most first
+            # We calculate the priority of this case by trying to match against the
+            # most complex definition first.
             argtuple = s_args, args, defaults, (star, starstar)
             priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i, a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for item in [star, starstar] if item)
 
-            # check to see if our func is already in the cache
+            # Iterate through our cache whilst checking to see if our decorated
+            # function is already inside of it.
             current = tuple(t_args.get(_, None) for _ in args), (star, starstar)
             for i, (p, (_, t, a)) in enumerate(cache):
                 if p != priority: continue
-                # verify that it actually matches the entry
+
+                # Verify that the function actually matches our current entry. If
+                # it does, then we can update the entry and its documentation.
                 if current == (tuple(t.get(_, None) for _ in a[1]), a[3]):
-                    # yuuup, update it.
                     cache[i] = priority_tuple(priority, (func, t_args, argtuple))
                     res.__doc__ = cls.document(func.__name__, [item for _, item in cache])
                     return cons(res)
                 continue
 
-            # everything is ok...so should be safe to add it
+            # That means we should be good to go, so it should be okay to push
+            # our new entry into our heap that will be searched upon using the function.
             heapq.heappush(cache, priority_tuple(priority, (func, t_args, argtuple)))
             #heapq.heappush(cache, (priority, (func, t_args, argtuple)))
 
-            # now we can update the docs
+            # Completely regenerate the documentation using what we have in the cache.
             res.__doc__ = cls.document(func.__name__, [item for _, item in cache])
 
-            # ..and then restore the wrapper to its former glory
+            # ..and then we can restore the original wrapper in all of its former glory.
             return cons(res)
 
-        # validate type arguments
-        for n, t in t_args.items():
-            if not isinstance(t, (builtins.type, builtins.tuple)) and t not in {callable}:
-                error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
-                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), t, string.escape(n, '"')))
+        # Validate the types of all of our arguments and raise an exception if it used
+        # an unsupported type.
+        for name, type in t_args.items():
+            if not isinstance(type, (builtins.type, builtins.tuple)) and type not in {callable}:
+                error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(t_.__name__ for t_ in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
+                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), type, string.escape(name, '"')))
             continue
 
-        # validate arguments containing original callable
+        # Validate the types of our arguments that we were asked to decorate with, this
+        # way we can ensure that our previously decorated functions are actually of the
+        # correct type. We do this strictly to assist with debugging.
         try:
-            for c in other:
-                cls.ex_function(c)
-        except:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
+            [cls.ex_function(item) for item in other]
+        except Exception:
+            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
 
-        # throw an exception if we were given an unexpected number of arguments
+        # If we were given an unexpected number of arguments to decorate with, then
+        # raise an exception. This is strictly done to assist with debugging.
         if len(other) > 1:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
+            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(pycompat.code.name(c) if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
         return result
 
     @classmethod
     def document(cls, name, cache):
         '''Generate documentation for a multicased function.'''
-        res = []
-        for func, types, _ in cache:
-            doc = (func.__doc__ or '').split('\n')
+        result = []
+
+        # Iterate through every item in our cache, and generate the prototype for it.
+        for function, constraints, (ignore_count, parameter_names, _, _) in cache:
+            prototype = cls.prototype(function, constraints, parameter_names[:ignore_count])
+
+            # Now that we have the prototype, we need to figure out where we need to
+            # add the documentation for the individual case.
+            doc = (function.__doc__ or '').split('\n')
             if len(doc) > 1:
-                res.append("{:s} ->".format(cls.prototype(func, types)))
-                res.extend("{: >{padding:d}s}".format(item, padding=1 + len(name) + len(item)) for item in map(operator.methodcaller('strip'), doc))
+                item, lines = "{:s} -> ".format(prototype), (item for item in doc)
+                result.append("{:s}{:s}".format(item, next(lines)))
+                result.extend("{: >{padding:d}s}".format(line, padding=len(item) + len(line)) for line in map(operator.methodcaller('strip'), lines))
             elif len(doc) == 1:
-                res.append(cls.prototype(func, types) + (" -> {:s}".format(doc[0]) if len(doc[0]) else ''))
+                result.append("{:s}{:s}".format(prototype, " -> {:s}".format(doc[0]) if len(doc[0]) else ''))
             continue
-        return '\n'.join(res)
+        return '\n'.join(result)
 
     @classmethod
-    def prototype(cls, func, parameters={}):
-        '''Generate a prototype for an instance of a function `func`.'''
-        args, defaults, (star, starstar) = cls.ex_args(func)
+    def prototype(cls, function, constraints={}, ignored={item for item in []}):
+        '''Generate a prototype for an instance of a `function`.'''
+        args, defaults, (star, starstar) = cls.ex_args(function)
 
         def flatten(iterable):
-            '''This closure takes the provided `iterable` (or tree), and flattens it into a list.'''
+            '''This closure takes the provided `iterable` (or tree) and then flattens it into a list.'''
             for item in iterable:
-                if isinstance(item, (builtins.list, builtins.tuple)):
+                if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
                     for item in flatten(item):
                         yield item
                     continue
                 yield item
             return
 
-        def Fargsiter(names=args, values=parameters):
+        def Femit_arguments(names, constraints, ignored):
             '''Yield a tuple for each individual parameter composed of the name and its constraints.'''
+
+            # Iterate through all of our argument names. If any of them are within
+            # our ignored items, however, then we can simply skip over them.
             for item in names:
-                if item not in parameters:
+                if item in ignored:
+                    continue
+
+                # If the current argument name is not within our constraints, then
+                # we only have to yield the argument name and move on.
+                if item not in constraints:
                     yield item, None
                     continue
 
-                param_type = parameters[item]
-                if isinstance(param_type, builtins.type) or param_type in {callable}:
-                    yield item, param_type.__name__
-                elif hasattr(param_type, '__iter__'):
-                    yield item, '|'.join(t.__name__ for t in flatten(param_type))
+                # Figure out which constraint to use for each item, and yield how
+                # it should be represented back to the caller.
+                constraint = constraints[item]
+                if isinstance(constraint, builtins.type) or constraint in {callable}:
+                    yield item, constraint.__name__
+                elif hasattr(constraint, '__iter__'):
+                    yield item, '|'.join(type.__name__ for type in flatten(constraint))
                 else:
-                    yield item, "{!s}".format(param_type)
+                    yield item, "{!s}".format(constraint)
                 continue
             return
 
-        # Log any multicased functions that define type constraints for parameters which don't exist.
-        co = pycompat.function.code(func)
-        co_fullname, co_filename, co_lineno = '.'.join([func.__module__, func.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
-        unavailable = {param for param in parameters.keys()} - {item for item in args}
+        # Log any multicased functions that accidentally define type constraints for parameters
+        # which don't actually exist. This is specifically done in order to aid debugging.
+        unavailable = {constraint_name for constraint_name in constraints.keys()} - {argument_name for argument_name in args}
         if unavailable:
+            co = pycompat.function.code(function)
+            co_fullname, co_filename, co_lineno = '.'.join([function.__module__, function.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
             proto_s = "{:s}({:s}{:s}{:s})".format(co_fullname, ', '.join(args) if args else '', ", *{:s}".format(star) if star and args else "*{:s}".format(star) if star else '', ", **{:s}".format(starstar) if starstar and (star or args) else "**{:s}".format(starstar) if starstar else '')
             path_s = "{:s}:{:d}".format(co_filename, co_lineno)
-            logging.warning("{:s}({:s}): unable to constrain the type in {:s} for parameter{:s} ({:s}) at {:s}.".format('.'.join([__name__, 'multicase']), co_fullname, proto_s, '' if len(unavailable) == 1 else 's', ', '.join(unavailable), path_s))
+            logging.warning("{:s}({:s}): Unable to constrain the type in {:s} for parameter{:s} ({:s}) at {:s}.".format('.'.join([__name__, 'multicase']), co_fullname, proto_s, '' if len(unavailable) == 1 else 's', ', '.join(unavailable), path_s))
 
         # Return the prototype for the current function with the provided parameter constraints.
-        argsiter = ("{:s}={:s}".format(item, parameter) if parameter else item for item, parameter in Fargsiter(args, parameters))
-        res = (argsiter, ("*{:s}".format(star),) if star else (), ("**{:s}".format(starstar),) if starstar else ())
-        return "{:s}({:s})".format(pycompat.function.name(func), ', '.join(itertools.chain(*res)))
+        iterable = (item if parameter is None else "{:s}={:s}".format(item, parameter) for item, parameter in Femit_arguments(args, constraints, ignored))
+        items = iterable, ["*{:s}".format(star)] if star else [], ["**{:s}".format(starstar)] if starstar else []
+        return "{:s}({:s})".format(pycompat.function.name(function), ', '.join(itertools.chain(*items)))
 
     @classmethod
-    def match(cls, args_kwds, heap):
-        '''Given the tuple (`args`, `kwds`), find the correct function according to its types.'''
-        args, kwds = args_kwds
+    def match(cls, packed_parameters, heap):
+        '''Given the (`args`, `kwds`) stored in the `packed_parameters`, find the correct function according to the constraints of each member in the `heap`.'''
+        args, kwds = packed_parameters
 
-        # FIXME: yep, done in O(n) time.
-        for f, ts, (sa, af, defaults, (argname, kwdname)) in heap:
-            # populate our arguments
-            ac, kc = (n for n in args), { kwd : kval for kwd, kval in kwds.items() }
+        # Iterate through all the available functions/cases within the heap that
+        # we were given. This is being done in O(n) time which can be significantly
+        # improved because we should be being sorted by complexity and count. This
+        # really should allow use to start searching closer to the item in the list
+        # that matches our parameters that we're searching with.
+        for F, constraints, (parameter_ignore_count, parameter_names, parameter_defaults, (parameter_wildargs, parameter_wildkeywords)) in heap:
 
-            # skip some args in our tuple
-            [next(item) for item in [ac] * sa]
+            # Grab our values that we're going to match with.
+            parameter_iterator, parameter_keywords = (item for item in args), {kwparam : kwvalue for kwparam, kwvalue in kwds.items()}
 
-            # build the argument tuple using the generator, kwds, or our defaults.
-            a = []
-            try:
-                for n in af[sa:]:
-                    try: a.append(next(ac))
-                    except StopIteration: a.append(kc.pop(n) if n in kc else defaults.pop(n))
-            except KeyError: pass
-            finally: a = tuple(a)
+            # Skip the ignored arguments within our parameters.
+            [next(item) for item in [parameter_iterator] * parameter_ignore_count]
 
-            # now anything left in ac or kc goes in the wildcards. if there aren't any, then this iteration doesn't match.
-            wA, wK = [item for item in ac], { kwd : kval for kwd, kval in kc.items() }
-            if (not argname and len(wA)) or (not kwdname and wK):
+            # Build the argument tuple that contains the actual parameters that
+            # will be passed to the matched function. When we collect the arguments,
+            # we need to ensure that any keywords parameters and default parameters
+            # will be inserted into the correct place within the tuple.
+            parameter_values = []
+            for name in parameter_names:
+                try:
+                    value = next(parameter_iterator)
+
+                # If there were no parameters left within our iterator, then we
+                # need to apply any keywords that we were given.
+                except StopIteration:
+                    if name in parameter_keywords:
+                        value = parameter_keywords.pop(name)
+
+                    # If there weren't any keywords with our parameter name, then
+                    # we need to check to see if there's a default parameter to use.
+                    elif name in parameter_defaults:
+                        value = parameter_defaults.pop(name)
+
+                    # If there were no default parameters, then we need to leave
+                    # because we don't have a way to grab any more parameters.
+                    else:
+                        break
+
+                    # We were able to get a keyword or default parameter, so we can
+                    # add it to our arguments to match with.
+                    parameter_values.append(value)
+
+                # We consumed a parameter value, so we can now append it to our arguments
+                # that we will match against.
+                else:
+                    parameter_values.append(value)
                 continue
 
-            # if our perceived argument length doesn't match, then this iteration doesn't match either
-            if len(a) != len(af[sa:]):
+            # Now that we have our parameter values, we need to convert it into a tuple
+            # so that we can process and use it. Any parameters left in parameter_iterator
+            # or parameter_keywords are considered part of the wildcard parameters.
+            argument_values = builtins.tuple(parameter_values)
+            argument_wildcard, argument_keywords = [item for item in parameter_iterator], {kwparam : kwvalue for kwparam, kwvalue in parameter_keywords.items()}
+
+            # First check if we have any extra parameters. If we do, but there's no wildcards
+            # available in our current match, then it doesn't fit and we move onto the next one.
+            if len(argument_wildcard) and not parameter_wildargs:
                 continue
 
-            # figure out how to match the types by checking if it's a regular type or it's a callable
-            predicateF = lambda t: callable if t == callable else (lambda v: isinstance(v, t))
-
-            # now we can finally start checking that the types match
-            if any(not predicateF(ts[t])(v) for t, v in zip(af[sa:], a) if t in ts):
+            # If we have any extra keywords, then we need to ensure that there's a keyword
+            # parameter in our current match. Otherwise, it doesn't fit and we need to move on.
+            elif argument_keywords and not parameter_wildkeywords:
                 continue
 
-            # we should have a match
-            return f, (tuple(args[:sa]) + a, wA, wK)
+            # Second, we need to check that our argument length actually matches. To accomplish
+            # this, we need to include the parameters that we ignored, and check them against
+            # the number of parameter names from our current match. Move on if they're different.
+            if parameter_ignore_count + len(argument_values) != len(parameter_names):
+                continue
 
-        error_arguments = [n.__class__.__name__ for n in args]
-        error_keywords = ["{:s}={!s}".format(n, kwds[n].__class__.__name__) for n in kwds]
-        raise internal.exceptions.UnknownPrototypeError(u"@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(cls.prototype(f, t) for f, t, _ in heap)))
+            # Third, we need to actually check our type constraints that our current match we
+            # decorated with. If our constraint is a builtins.callable, then we just need to
+            # ensure that the parameter can be called. Otherwise our constraint should be an
+            # iterable of types that we can simply pass long to the isinstance() function.
+            critiqueF = lambda constraint: builtins.callable if constraint == builtins.callable else frpartial(builtins.isinstance, constraint)
+
+            # Zip our parameter names along with our argument values so that we can extract
+            # the contraint, and check the value against it. If any of these checks fail,
+            # then it's not a match and we need to move on to the next iteration.
+            parameter_names_and_values = zip(parameter_names[parameter_ignore_count:], argument_values)
+            if not all(critiqueF(constraints[name])(value) for name, value in parameter_names_and_values if name in constraints):
+                continue
+
+            # We should now have a match. So now that we've figured out all of our individual
+            # parameters and their positions, we need to put them all together so that we can
+            # return them to the caller so that they can actually call it.
+            result_arguments = builtins.tuple(itertools.chain(args[:parameter_ignore_count], argument_values))
+            return F, (result_arguments, argument_wildcard, argument_keywords)
+
+        # If we iterated through everything in our heap, then we couldn't find a match for the
+        # types the user gave us. So we need to raise an exception to inform the user that the
+        # types we were given did not match any of the constraints that we know about.
+        ignored = min(ignore_count for _, _, (ignore_count, _, _, _) in heap) if heap else 0
+        error_arguments = [item.__class__.__name__ for item in args[ignored:]]
+        error_keywords = ["{:s}={!s}".format(name, kwds[name].__class__.__name__) for name in kwds]
+        error_prototypes = [cls.prototype(F, constraints) for F, constraints, _ in heap]
+        raise internal.exceptions.UnknownPrototypeError(u"@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(error_prototypes)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
         '''Create a new wrapper that will determine the correct function to call.'''
-        # define the wrapper...
-        def F(*arguments, **keywords):
-            heap = [res for _, res in heapq.nsmallest(len(cache), cache, key=operator.attrgetter('priority'))]
-            f, (a, w, k) = cls.match((arguments[:], keywords), heap)
-            return f(*arguments, **keywords)
-            #return f(*(arguments + tuple(w)), **keywords)
 
-        # swap out the original code object with our wrapper's
+        # Define the wrapper for the function that we're decorating. This way whenever the
+        # decorated function gets called, we can search for one that matches the correct
+        # constraints and dispatch into it with the original parameters in the correct order.
+        def F(*arguments, **keywords):
+            heap = [item for _, item in heapq.nsmallest(len(cache), cache, key=operator.attrgetter('priority'))]
+
+            # Pack our parameters, and then hand them off to our matching function. This
+            # should then return the correct callable that matches the argument types we
+            # were given so that we can dispatch to it.
+            packed_parameters = arguments, keywords
+            result_callable, result_parameters = cls.match(packed_parameters, heap)
+
+            # Now we have a matching callable for the user's parameters, and we just need
+            # to unpack our individual parameters and dispatch to the callable with them.
+            parameters, wild_parameters, keyword_parameters = result_parameters
+            return result_callable(*itertools.chain(parameters, wild_parameters), **keyword_parameters)
+
+        # First, we need to swap out the original code object with the one from the closure
+        # that we defined. In order to preserve information within the backtrace, we just
+        # make a copy of all of the relevant code properties.
         f, c = F, pycompat.function.code(F)
         cargs = c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags, \
                 c.co_code, c.co_consts, c.co_names, c.co_varnames, \
@@ -512,15 +623,17 @@ class multicase(object):
                 c.co_firstlineno, c.co_lnotab, c.co_freevars, c.co_cellvars
         newcode = pycompat.code.new(cargs, pycompat.code.unpack_extra(c))
 
-        res = pycompat.function.new(newcode, pycompat.function.globals(f), pycompat.function.name(f), pycompat.function.defaults(f), pycompat.function.closure(f))
-        pycompat.function.set_name(res, pycompat.function.name(func)),
-        pycompat.function.set_documentation(res, pycompat.function.documentation(func))
+        # Now we can use the new code object that we created in order to create a function
+        # and assign the previous name and documentation into it.
+        result = pycompat.function.new(newcode, pycompat.function.globals(f), pycompat.function.name(f), pycompat.function.defaults(f), pycompat.function.closure(f))
+        pycompat.function.set_name(result, pycompat.function.name(func)),
+        pycompat.function.set_documentation(result, pycompat.function.documentation(func))
 
-        # assign the specified cache to it
-        setattr(res, cls.cache_name, cache)
-        # ...and finally add a default docstring
-        setattr(res, '__doc__', '')
-        return res
+        # The last two things to do is to copy our cache that we were given into the function
+        # that we're going to return. This way people can debug it if they feel they need to.
+        setattr(result, cls.cache_name, cache)
+        setattr(result, '__doc__', '')
+        return result
 
     @classmethod
     def ex_function(cls, object):
