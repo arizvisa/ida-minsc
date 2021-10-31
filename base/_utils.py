@@ -392,16 +392,22 @@ class multicase(object):
     @classmethod
     def document(cls, name, cache):
         '''Generate documentation for a multicased function.'''
-        res = []
-        for func, types, _ in cache:
-            doc = (func.__doc__ or '').split('\n')
+        result = []
+
+        # Iterate through every item in our cache, and generate the prototype for it.
+        for function, constraints, (ignore_count, parameter_names, _, _) in cache:
+            prototype = cls.prototype(function, constraints, parameter_names[:ignore_count])
+
+            # Now that we have the prototype, we need to figure out where we need to
+            # add the documentation for the individual case.
+            doc = (function.__doc__ or '').split('\n')
             if len(doc) > 1:
-                res.append("{:s} ->".format(cls.prototype(func, types)))
-                res.extend("{: >{padding:d}s}".format(item, padding=1 + len(name) + len(item)) for item in map(operator.methodcaller('strip'), doc))
+                result.append("{:s} ->".format(prototype))
+                result.extend("{: >{padding:d}s}".format(item, padding=1 + len(name) + len(item)) for item in map(operator.methodcaller('strip'), doc))
             elif len(doc) == 1:
-                res.append(cls.prototype(func, types) + (" -> {:s}".format(doc[0]) if len(doc[0]) else ''))
+                result.append("{:s} -> {:s}".format(prototype, doc[0]) if len(doc[0]) else '')
             continue
-        return '\n'.join(res)
+        return '\n'.join(result)
 
     @classmethod
     def prototype(cls, function, constraints={}, ignored={item for item in []}):
