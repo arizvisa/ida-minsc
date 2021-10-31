@@ -451,7 +451,7 @@ class multicase(object):
 
     @classmethod
     def match(cls, packed_parameters, heap):
-        '''Given the tuple (`args`, `kwds`), find the correct function according to its types.'''
+        '''Given the (`args`, `kwds`) stored in the `packed_parameters`, find the correct function according to the constraints of each member in the `heap`.'''
         args, kwds = packed_parameters
 
         # Iterate through all the available functions/cases within the heap that
@@ -555,15 +555,27 @@ class multicase(object):
     @classmethod
     def new_wrapper(cls, func, cache):
         '''Create a new wrapper that will determine the correct function to call.'''
-        # define the wrapper...
-        def F(*arguments, **keywords):
-            heap = [res for _, res in heapq.nsmallest(len(cache), cache, key=operator.attrgetter('priority'))]
-            f, (a, w, k) = cls.match((arguments[:], keywords), heap)
-            return f(*itertools.chain(a, w), **k)
-            #return f(*arguments, **keywords)
-            #return f(*(arguments + tuple(w)), **keywords)
 
-        # swap out the original code object with our wrapper's
+        # Define the wrapper for the function that we're decorating. This way whenever the
+        # decorated function gets called, we can search for one that matches the correct
+        # constraints and dispatch into it with the original parameters in the correct order.
+        def F(*arguments, **keywords):
+            heap = [item for _, item in heapq.nsmallest(len(cache), cache, key=operator.attrgetter('priority'))]
+
+            # Pack our parameters, and then hand them off to our matching function. This
+            # should then return the correct callable that matches the argument types we
+            # were given so that we can dispatch to it.
+            packed_parameters = arguments, keywords
+            result_callable, result_parameters = cls.match(packed_parameters, heap)
+
+            # Now we have a matching callable for the user's parameters, and we just need
+            # to unpack our individual parameters and dispatch to the callable with them.
+            parameters, wild_parameters, keyword_parameters = result_parameters
+            return result_callable(*itertools.chain(parameters, wild_parameters), **keyword_parameters)
+
+        # First, we need to swap out the original code object with the one from the closure
+        # that we defined. In order to preserve information within the backtrace, we just
+        # make a copy of all of the relevant code properties.
         f, c = F, pycompat.function.code(F)
         cargs = c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags, \
                 c.co_code, c.co_consts, c.co_names, c.co_varnames, \
@@ -571,15 +583,17 @@ class multicase(object):
                 c.co_firstlineno, c.co_lnotab, c.co_freevars, c.co_cellvars
         newcode = pycompat.code.new(cargs, pycompat.code.unpack_extra(c))
 
-        res = pycompat.function.new(newcode, pycompat.function.globals(f), pycompat.function.name(f), pycompat.function.defaults(f), pycompat.function.closure(f))
-        pycompat.function.set_name(res, pycompat.function.name(func)),
-        pycompat.function.set_documentation(res, pycompat.function.documentation(func))
+        # Now we can use the new code object that we created in order to create a function
+        # and assign the previous name and documentation into it.
+        result = pycompat.function.new(newcode, pycompat.function.globals(f), pycompat.function.name(f), pycompat.function.defaults(f), pycompat.function.closure(f))
+        pycompat.function.set_name(result, pycompat.function.name(func)),
+        pycompat.function.set_documentation(result, pycompat.function.documentation(func))
 
-        # assign the specified cache to it
-        setattr(res, cls.cache_name, cache)
-        # ...and finally add a default docstring
-        setattr(res, '__doc__', '')
-        return res
+        # The last two things to do is to copy our cache that we were given into the function
+        # that we're going to return. This way people can debug it if they feel they need to.
+        setattr(result, cls.cache_name, cache)
+        setattr(result, '__doc__', '')
+        return result
 
     @classmethod
     def ex_function(cls, object):
