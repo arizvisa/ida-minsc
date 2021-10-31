@@ -2252,19 +2252,19 @@ class address(object):
         left, right = bounds
         return cls.iterate(left, cls.prev(right), step)
 
-    @classmethod
     @utils.multicase(end=six.integer_types)
+    @classmethod
     def blocks(cls, end):
         '''Yields the boundaries of each block from the current address to `end`.'''
         return cls.blocks(ui.current.address(), end)
-    @classmethod
     @utils.multicase(bounds=tuple)
+    @classmethod
     def blocks(cls, bounds):
         '''Yields the boundaries of each block within the specified `bounds`.'''
         left, right = bounds
         return cls.blocks(left, right)
-    @classmethod
     @utils.multicase(start=six.integer_types, end=six.integer_types)
+    @classmethod
     def blocks(cls, start, end):
         '''Yields the boundaries of each block between the addresses `start` and `end`.'''
         block, _ = start, end = interface.address.head(start), address.tail(end) + 1
