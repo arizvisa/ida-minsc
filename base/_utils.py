@@ -404,12 +404,12 @@ class multicase(object):
         return '\n'.join(res)
 
     @classmethod
-    def prototype(cls, func, parameters={}):
-        '''Generate a prototype for an instance of a function `func`.'''
-        args, defaults, (star, starstar) = cls.ex_args(func)
+    def prototype(cls, function, constraints={}, ignored={item for item in []}):
+        '''Generate a prototype for an instance of a `function`.'''
+        args, defaults, (star, starstar) = cls.ex_args(function)
 
         def flatten(iterable):
-            '''This closure takes the provided `iterable` (or tree), and flattens it into a list.'''
+            '''This closure takes the provided `iterable` (or tree) and then flattens it into a list.'''
             for item in iterable:
                 if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
                     for item in flatten(item):
@@ -418,36 +418,47 @@ class multicase(object):
                 yield item
             return
 
-        def Fargsiter(names=args, values=parameters):
+        def Femit_arguments(names, constraints, ignored):
             '''Yield a tuple for each individual parameter composed of the name and its constraints.'''
+
+            # Iterate through all of our argument names. If any of them are within
+            # our ignored items, however, then we can simply skip over them.
             for item in names:
-                if item not in parameters:
+                if item in ignored:
+                    continue
+
+                # If the current argument name is not within our constraints, then
+                # we only have to yield the argument name and move on.
+                if item not in constraints:
                     yield item, None
                     continue
 
-                param_type = parameters[item]
-                if isinstance(param_type, builtins.type) or param_type in {callable}:
-                    yield item, param_type.__name__
-                elif hasattr(param_type, '__iter__'):
-                    yield item, '|'.join(t.__name__ for t in flatten(param_type))
+                # Figure out which constraint to use for each item, and yield how
+                # it should be represented back to the caller.
+                constraint = constraints[item]
+                if isinstance(constraint, builtins.type) or constraint in {callable}:
+                    yield item, constraint.__name__
+                elif hasattr(constraint, '__iter__'):
+                    yield item, '|'.join(type.__name__ for type in flatten(constraint))
                 else:
-                    yield item, "{!s}".format(param_type)
+                    yield item, "{!s}".format(constraint)
                 continue
             return
 
-        # Log any multicased functions that define type constraints for parameters which don't exist.
-        co = pycompat.function.code(func)
-        co_fullname, co_filename, co_lineno = '.'.join([func.__module__, func.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
-        unavailable = {param for param in parameters.keys()} - {item for item in args}
+        # Log any multicased functions that accidentally define type constraints for parameters
+        # which don't actually exist. This is specifically done in order to aid debugging.
+        unavailable = {constraint_name for constraint_name in constraints.keys()} - {argument_name for argument_name in args}
         if unavailable:
+            co = pycompat.function.code(function)
+            co_fullname, co_filename, co_lineno = '.'.join([function.__module__, function.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
             proto_s = "{:s}({:s}{:s}{:s})".format(co_fullname, ', '.join(args) if args else '', ", *{:s}".format(star) if star and args else "*{:s}".format(star) if star else '', ", **{:s}".format(starstar) if starstar and (star or args) else "**{:s}".format(starstar) if starstar else '')
             path_s = "{:s}:{:d}".format(co_filename, co_lineno)
-            logging.warning("{:s}({:s}): unable to constrain the type in {:s} for parameter{:s} ({:s}) at {:s}.".format('.'.join([__name__, 'multicase']), co_fullname, proto_s, '' if len(unavailable) == 1 else 's', ', '.join(unavailable), path_s))
+            logging.warning("{:s}({:s}): Unable to constrain the type in {:s} for parameter{:s} ({:s}) at {:s}.".format('.'.join([__name__, 'multicase']), co_fullname, proto_s, '' if len(unavailable) == 1 else 's', ', '.join(unavailable), path_s))
 
         # Return the prototype for the current function with the provided parameter constraints.
-        argsiter = ("{:s}={:s}".format(item, parameter) if parameter else item for item, parameter in Fargsiter(args, parameters))
-        res = (argsiter, ("*{:s}".format(star),) if star else (), ("**{:s}".format(starstar),) if starstar else ())
-        return "{:s}({:s})".format(pycompat.function.name(func), ', '.join(itertools.chain(*res)))
+        iterable = (item if parameter is None else "{:s}={:s}".format(item, parameter) for item, parameter in Femit_arguments(args, constraints, ignored))
+        items = iterable, ["*{:s}".format(star)] if star else [], ["**{:s}".format(starstar)] if starstar else []
+        return "{:s}({:s})".format(pycompat.function.name(function), ', '.join(itertools.chain(*items)))
 
     @classmethod
     def match(cls, packed_parameters, heap):
