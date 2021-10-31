@@ -424,10 +424,11 @@ class multicase(object):
             # add the documentation for the individual case.
             doc = (function.__doc__ or '').split('\n')
             if len(doc) > 1:
-                result.append("{:s} ->".format(prototype))
-                result.extend("{: >{padding:d}s}".format(item, padding=1 + len(name) + len(item)) for item in map(operator.methodcaller('strip'), doc))
+                item, lines = "{:s} -> ".format(prototype), (item for item in doc)
+                result.append("{:s}{:s}".format(item, next(lines)))
+                result.extend("{: >{padding:d}s}".format(line, padding=len(item) + len(line)) for line in map(operator.methodcaller('strip'), lines))
             elif len(doc) == 1:
-                result.append("{:s} -> {:s}".format(prototype, doc[0]) if len(doc[0]) else '')
+                result.append("{:s}{:s}".format(prototype, " -> {:s}".format(doc[0]) if len(doc[0]) else ''))
             continue
         return '\n'.join(result)
 
