@@ -317,75 +317,97 @@ class multicase(object):
     def __new__(cls, *other, **t_args):
         '''Decorate a case of a function with the specified types.'''
         def result(wrapped):
-            # extract the FunctionType and its arg types
+
+            # First we need to extract the function from whatever type it is
+            # so that we can read any properties we need from it. We also extract
+            # its "constructor" so that we can re-create it after we've processed it.
             cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
+
+            # Next we need to extract all of the argument information from it. We
+            # also need to determine whether it's a special type of some sort so
+            # that we know that its first argument is irrelevant to our needs. We
+            # also check to see if it's using the magic name "__new__" which takes
+            # an implicit parameter that gets passed to it.
             args, defaults, (star, starstar) = cls.ex_args(func)
             s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) else 0
 
-            # determine if the user included the previous function
+            # If the user decorated us whilst explicitly providing the previous
+            # function that this case is a part of, then make sure that we use it.
             if len(other):
                 ok, prev = True, other[0]
-            # ..otherwise we just figure it out by looking in the caller's locals
+
+            # If we weren't given a function, then we need to be tricky and search
+            # through our parent frame's locals. Hopefully it's using the same name.
             elif pycompat.function.name(func) in sys._getframe().f_back.f_locals:
                 ok, prev = True, sys._getframe().f_back.f_locals[pycompat.function.name(func)]
-            # ..otherwise, first blood and we're not ok.
+
+            # Otherwise, we've hit first blood and this is the very first definition
+            # of the function. This requires us to do some construction later.
             else:
                 ok = False
 
-            # so, a wrapper was found and we need to steal its cache
+            # So if we found an already-existing wrapper, then we need to steal its cache.
             res = ok and cls.ex_function(prev)
             if ok and hasattr(res, cls.cache_name):
                 cache = getattr(res, cls.cache_name)
-            # ..otherwise, we just create a new one.
+
+            # Otherwise, we simply need to create a new cache entirely.
             else:
                 cache = []
                 res = cls.new_wrapper(func, cache)
                 res.__module__ = getattr(wrapped, '__module__', getattr(func, '__module__', '__main__'))
 
-            # calculate the priority by trying to match the most first
+            # We calculate the priority of this case by trying to match against the
+            # most complex definition first.
             argtuple = s_args, args, defaults, (star, starstar)
             priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i, a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for item in [star, starstar] if item)
 
-            # check to see if our func is already in the cache
+            # Iterate through our cache whilst checking to see if our decorated
+            # function is already inside of it.
             current = tuple(t_args.get(_, None) for _ in args), (star, starstar)
             for i, (p, (_, t, a)) in enumerate(cache):
                 if p != priority: continue
-                # verify that it actually matches the entry
+
+                # Verify that the function actually matches our current entry. If
+                # it does, then we can update the entry and its documentation.
                 if current == (tuple(t.get(_, None) for _ in a[1]), a[3]):
-                    # yuuup, update it.
                     cache[i] = priority_tuple(priority, (func, t_args, argtuple))
                     res.__doc__ = cls.document(func.__name__, [item for _, item in cache])
                     return cons(res)
                 continue
 
-            # everything is ok...so should be safe to add it
+            # That means we should be good to go, so it should be okay to push
+            # our new entry into our heap that will be searched upon using the function.
             heapq.heappush(cache, priority_tuple(priority, (func, t_args, argtuple)))
             #heapq.heappush(cache, (priority, (func, t_args, argtuple)))
 
-            # now we can update the docs
+            # Completely regenerate the documentation using what we have in the cache.
             res.__doc__ = cls.document(func.__name__, [item for _, item in cache])
 
-            # ..and then restore the wrapper to its former glory
+            # ..and then we can restore the original wrapper in all of its former glory.
             return cons(res)
 
-        # validate type arguments
-        for n, t in t_args.items():
-            if not isinstance(t, (builtins.type, builtins.tuple)) and t not in {callable}:
-                error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
-                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), t, string.escape(n, '"')))
+        # Validate the types of all of our arguments and raise an exception if it used
+        # an unsupported type.
+        for name, type in t_args.items():
+            if not isinstance(type, (builtins.type, builtins.tuple)) and type not in {callable}:
+                error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(t_.__name__ for t_ in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
+                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), type, string.escape(name, '"')))
             continue
 
-        # validate arguments containing original callable
+        # Validate the types of our arguments that we were asked to decorate with, this
+        # way we can ensure that our previously decorated functions are actually of the
+        # correct type. We do this strictly to assist with debugging.
         try:
-            for c in other:
-                cls.ex_function(c)
-        except:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
+            [cls.ex_function(item) for item in other]
+        except Exception:
+            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
 
-        # throw an exception if we were given an unexpected number of arguments
+        # If we were given an unexpected number of arguments to decorate with, then
+        # raise an exception. This is strictly done to assist with debugging.
         if len(other) > 1:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
+            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(pycompat.code.name(c) if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
         return result
 
