@@ -329,7 +329,7 @@ class multicase(object):
             # also check to see if it's using the magic name "__new__" which takes
             # an implicit parameter that gets passed to it.
             args, defaults, (star, starstar) = cls.ex_args(func)
-            s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) else 0
+            s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) or func.__name__ in {'__new__'} else 0
 
             # If the user decorated us whilst explicitly providing the previous
             # function that this case is a part of, then make sure that we use it.
