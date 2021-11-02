@@ -2653,7 +2653,12 @@ class type(object):
             }
 
             # Try to normalize the string so that it will match an entry in our table.
-            string = convention.lower() if convention.startswith('__') else "__{:s}".format(convention).lower()
+            noncommonsuffix = {item for item in cclookup if not item.endswith('call')}
+            prefixed = convention.lower() if convention.startswith('__') else "__{:s}".format(convention).lower()
+            string = prefixed if operator.contains(noncommonsuffix, prefixed) or prefixed.endswith('call') else "{:s}call".format(prefixed)
+
+            # FIXME: we should probably use globs, or something more intelligent
+            #        to figure out what the user is trying to do.
 
             # Verify that the string can be found in our lookup table, and then use it to grab our cc.
             if not operator.contains(cclookup, string):
