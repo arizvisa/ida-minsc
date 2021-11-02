@@ -2668,7 +2668,7 @@ class type(object):
         # If we received an integer, then we need to double-check that it doesn't have any other
         # extra bits that were set. If so, then we need to warn the user about it.
         elif isinstance(convention, six.integer_types):
-            if convention & idaapi.CM_CC_MASK:
+            if convention & ~idaapi.CM_CC_MASK:
                 logging.warning(u"{:s}.convention({!r}, {:#x}) : The convention that was provided ({:#x}) contains extra bits ({:#x}) that will be masked ({:#x}) out.".format('.'.join([__name__, cls.__name__]), func, convention, convention, convention & ~idaapi.CM_CC_MASK, idaapi.CM_CC_MASK))
             cc = convention & idaapi.CM_CC_MASK
 
@@ -2687,11 +2687,13 @@ class type(object):
         if not ti.deserialize(til, newsup, None):
             raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to decode the new type information ({:s}).".format('.'.join([__name__, cls.__name__]), func, cc, utils.string.tohex(newsup)))
 
-        # Now we can apply our type to the location specified by the user, and return what was
-        # set back to the caller.
+        # As we have the new type information with the modified cc, we need to extract the previous
+        # cc from the supval before we modified it so it can be returned. Do that, and then apply
+        # the type information we just deserialized to the location specified by the user.
+        _, _, result, _, _ = interface.node.sup_functype(sup)
         if not set_tinfo(ea, ti):
             raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, cc, ti, ea))
-        return cls.convention(ea)
+        return result
     cc = utils.alias(convention)
 
 t = type # XXX: ns alias
