@@ -2382,7 +2382,7 @@ class type(object):
         # created. So, we'll go through and remove this because it's the best
         # that we've got.
         internal.netnode.sup.remove(ea, 8)
-        internal.netnode.alt.remove(ea, 0x3000)
+        internal.netnode.alt.remove(ea, idaapi.NSUP_TYPEINFO)
 
         return cls(ui.current.function(), None)
 
@@ -2621,7 +2621,7 @@ class type(object):
         The integer returned corresponds to one of the ``idaapi.CM_CC_*`` constants.
         """
         rt, ea = interface.addressOfRuntimeOrStatic(func)
-        view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
+        view = internal.netnode.sup.get(ea, idaapi.NSUP_TYPEINFO, type=memoryview)
         if view is None:
             raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func))
         sup = view.tobytes()
@@ -2635,7 +2635,7 @@ class type(object):
     def convention(cls, func, convention):
         '''Set the calling convention used by the prototype for the function `func` to the specified `convention`.'''
         rt, ea = interface.addressOfRuntimeOrStatic(func)
-        view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
+        view = internal.netnode.sup.get(ea, idaapi.NSUP_TYPEINFO, type=memoryview)
         if view is None:
             raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}, {!r}) : Specified function does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func, convention))
         sup = view.tobytes()
@@ -2695,6 +2695,60 @@ class type(object):
             raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, cc, ti, ea))
         return result
     cc = utils.alias(convention)
+
+    @utils.multicase()
+    @classmethod
+    def result(cls):
+        '''Return the result type information for the current function as an ``idaapi.tinfo_t``.'''
+        return cls.result(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def result(cls, func):
+        '''Return the result type information for the function `func` as an ``idaapi.tinfo_t``.'''
+        ti = cls(func)
+        if not ti.has_details():
+            logging.warning(u"{:s}.result({!r}) : Using the type information directly ({!s}) to get the return type due to the inability to get the function details for the specified function.".format('.'.join([__name__, cls.__name__]), func, ti))
+            return tinfo.get_rettype()
+        ftd = idaapi.func_type_data_t()
+        if not ti.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
+            raise E.DisassemblerError(u"{:s}.result({!r}) : Unable to get the details from the type information ({!s}) for the specified function.".format('.'.join([__name__, cls.__name__]), func, ti))
+        return ftd.rettype
+    @utils.multicase(info=six.string_types)
+    @classmethod
+    def result(cls, func, info):
+        '''Modify the result type information for the function `func` to the type information string in `info`.'''
+        tinfo = internal.declaration.parse(info)
+        if tinfo is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!s}) : Unable to parse the provided type information ({!s})".format('.'.join([__name__, cls.__name__]), func, utils.string.repr(info), utils.string.repr(info)))
+        return cls.result(func, tinfo)
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def result(cls, func, info):
+        '''Modify the result type information for the function `func` to the ``idaapi.tinfo_t`` in `info`.'''
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        view = internal.netnode.sup.get(ea, idaapi.NSUP_TYPEINFO, type=memoryview)
+        if view is None:
+            raise E.DisassemblerError(u"{:s}.result({!r}, {!s}) : Specified function does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func, info))
+        sup = view.tobytes()
+
+        # Assign the things we need based on the version of IDA that's being used.
+        til, ti = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati(), idaapi.tinfo_t()
+        set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
+
+        # As the idaapi.func_type_data_t that we get from tinfo_t.get_func_details() only lets us
+        # ask for the return type, and doesn't give us a way to update it (other than modifying
+        # everything), we take what the user gave us, combine it with the other values in the supval
+        # for the function's prototype, and then deserialize it back into our new type.
+        newsup = interface.node.sup_functype(sup, None, None, None, info, None)
+        if not ti.deserialize(til, newsup, None):
+            raise E.DisassemblerError(u"{:s}.result({!r}, {!s}) : Unable to decode the new type information ({:s})".format('.'.join([__name__, cls.__name__]), func, info, utils.string.tohex(newsup)))
+
+        # Now we can apply our type to the location specified by the user, and return what was
+        # set back to the caller.
+        _, _, _, result, _ = interface.node.sup_functype(sup)
+        if not set_tinfo(ea, ti):
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, cc, ti, ea))
+        return result
 
 t = type # XXX: ns alias
 convention = cc = utils.alias(type.convention, 'type')
