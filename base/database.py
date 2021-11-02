@@ -3346,11 +3346,12 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
         '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
-        ti = idaapi.tinfo_t()
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
 
         # First try and get the actual typeinfo for the given address. If it
         # actually worked, then we can just return it as-is.
-        if idaapi.get_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(ti, ea):
+        ti = idaapi.tinfo_t
+        if get_tinfo(ti, ea):
             return ti
 
         # Otherwise we'll and guess the typeinfo for the same address.
