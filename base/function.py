@@ -2621,79 +2621,129 @@ class type(object):
         The integer returned corresponds to one of the ``idaapi.CM_CC_*`` constants.
         """
         rt, ea = interface.addressOfRuntimeOrStatic(func)
-        view = internal.netnode.sup.get(ea, idaapi.NSUP_TYPEINFO, type=memoryview)
-        if view is None:
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func))
-        sup = view.tobytes()
-        try:
-            _, _, cc, _, _ = interface.node.sup_functype(sup)
-        except E.UnsupportedCapability:
-            raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format('.'.join([__name__, cls.__name__]), func))
-        return cc
-    @utils.multicase(convention=(six.string_types, six.integer_types))
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+
+        # Grab the type information from the address that we resolved.
+        ti = idaapi.tinfo_t()
+        if not get_tinfo(ti, ea):
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function {:#x} does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func, ea))
+
+        # If this is a runtime address (a function pointer), then we need to navigate
+        # to the type information that it points to.
+        if rt and ti.is_funcptr():
+            pi = idaapi.ptr_type_data_t()
+            if not ti.get_ptr_details(pi):
+                raise E.DisassemblerError(u"{:s}.convention({!r}) : Unable to get the pointer target from the type ({!r}) for the specified function ({:#x})".format('.'.join([__name__, cls.__name__]), func, "{!s}".format(ti), ea))
+            tinfo = pi.obj_type
+
+        # Otherwise, it should be a function and we can just use its idaapi.tinfo_t as-is.
+        elif not rt and ti.is_func():
+            tinfo = ti
+
+        # Otherwise, this is not a function prototype and we can't use it.
+        else:
+            raise E.InvalidTypeOrValueError(u"{:s}.convention({!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), func, "{!s}".format(ti), ea))
+
+        # Now we need to get the function details from the type and then we can extract the
+        # convention and the spoiled count from it that we'll return.
+        ftd = idaapi.func_type_data_t()
+        if not (tinfo.has_details() and tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT)):
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Unable to extract the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), func, "{!s}".format(tinfo), ea))
+        result, spoiled_count = ftd.cc & idaapi.CM_CC_MASK, ftd.cc & ~idaapi.CM_CC_MASK
+        return result
+    @utils.multicase(convention=six.string_types)
+    @classmethod
+    def convention(cls, func, convention):
+        '''Set the calling convention used by the prototype for the function `func` to the specified `convention` string.'''
+        cclookup = {
+            '__cdecl': idaapi.CM_CC_CDECL,
+            '__stdcall': idaapi.CM_CC_STDCALL,
+            '__pascal': idaapi.CM_CC_PASCAL,
+            '__fastcall': idaapi.CM_CC_FASTCALL,
+            '__thiscall': idaapi.CM_CC_THISCALL,
+        }
+
+        # Try to normalize the string so that it will match an entry in our table.
+        noncommonsuffix = {item for item in cclookup if not item.endswith('call')}
+        prefixed = convention.lower() if convention.startswith('__') else "__{:s}".format(convention).lower()
+        string = prefixed if operator.contains(noncommonsuffix, prefixed) or prefixed.endswith('call') else "{:s}call".format(prefixed)
+
+        # FIXME: we should probably use globs, or something more intelligent
+        #        to figure out what convention the user is trying apply.
+
+        # Verify that the string can be found in our lookup table, and then use it to grab our cc.
+        if not operator.contains(cclookup, string):
+            raise E.ItemNotFoundError(u"{:s}.convention({!r}, {!r}) : The convention that was specified ({!s}) is not currently supported.".format('.'.join([__name__, cls.__name__]), func, convention, string))
+        cc = cclookup[string]
+
+        # Now we have the calling convention integer that we can use.
+        return cls.convention(func, cc)
+    @utils.multicase(convention=six.integer_types)
     @classmethod
     def convention(cls, func, convention):
         '''Set the calling convention used by the prototype for the function `func` to the specified `convention`.'''
         rt, ea = interface.addressOfRuntimeOrStatic(func)
-        view = internal.netnode.sup.get(ea, idaapi.NSUP_TYPEINFO, type=memoryview)
-        if view is None:
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}, {!r}) : Specified function does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func, convention))
-        sup = view.tobytes()
-
-        # Now that we have a prototype, we need to figure out what convention the user gave us so
-        # that we can apply it to the specified function. After verifying that the user gave us a
-        # string to look up, we need to create a table that we can use to actually look it up.
-        if isinstance(convention, six.string_types):
-            cclookup = {
-                '__cdecl': idaapi.CM_CC_CDECL,
-                '__stdcall': idaapi.CM_CC_STDCALL,
-                '__pascal': idaapi.CM_CC_PASCAL,
-                '__fastcall': idaapi.CM_CC_FASTCALL,
-                '__thiscall': idaapi.CM_CC_THISCALL,
-            }
-
-            # Try to normalize the string so that it will match an entry in our table.
-            noncommonsuffix = {item for item in cclookup if not item.endswith('call')}
-            prefixed = convention.lower() if convention.startswith('__') else "__{:s}".format(convention).lower()
-            string = prefixed if operator.contains(noncommonsuffix, prefixed) or prefixed.endswith('call') else "{:s}call".format(prefixed)
-
-            # FIXME: we should probably use globs, or something more intelligent
-            #        to figure out what the user is trying to do.
-
-            # Verify that the string can be found in our lookup table, and then use it to grab our cc.
-            if not operator.contains(cclookup, string):
-                raise E.ItemNotFoundError(u"{:s}.convention({!r}, {!r}) : The convention that was specified ({!s}) is not currently supported.".format('.'.join([__name__, cls.__name__]), func, convention, string))
-            cc = cclookup[string]
-
-        # If we received an integer, then we need to double-check that it doesn't have any other
-        # extra bits that were set. If so, then we need to warn the user about it.
-        elif isinstance(convention, six.integer_types):
-            if convention & ~idaapi.CM_CC_MASK:
-                logging.warning(u"{:s}.convention({!r}, {:#x}) : The convention that was provided ({:#x}) contains extra bits ({:#x}) that will be masked ({:#x}) out.".format('.'.join([__name__, cls.__name__]), func, convention, convention, convention & ~idaapi.CM_CC_MASK, idaapi.CM_CC_MASK))
-            cc = convention & idaapi.CM_CC_MASK
-
-        # Otherwise we have a TypeError and we are unable to continue.
-        else:
-            raise E.InvalidTypeOrValueError(u"{:s}.convention({!r}, {!r}) : An unsupported type ({!s}) was specified for the calling convention to apply.".format('.'.join([__name__, cls.__name__]), func, convention, convention.__class__))
-
-        # Assign the things we need based on the version of IDA that's being used.
-        til, ti = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati(), idaapi.tinfo_t()
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
 
-        # Okay, we now have an integer to apply to the calling convention. We'll first need to
-        # update our supval with the new calling convention, and then we can use it to deserialize
-        # a new type.
-        newsup = interface.node.sup_functype(sup, None, None, cc, None, None)
-        if not ti.deserialize(til, newsup, None):
-            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to decode the new type information ({:s}).".format('.'.join([__name__, cls.__name__]), func, cc, utils.string.tohex(newsup)))
+        # Grab the type information from the resolved address so that we can modify it.
+        ti = idaapi.tinfo_t()
+        if not get_tinfo(ti, ea):
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}, {:#x}) : Specified function {:#x} does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), func, convention, ea))
 
-        # As we have the new type information with the modified cc, we need to extract the previous
-        # cc from the supval before we modified it so it can be returned. Do that, and then apply
-        # the type information we just deserialized to the location specified by the user.
-        _, _, result, _, _ = interface.node.sup_functype(sup)
-        if not set_tinfo(ea, ti):
-            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!s}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, cc, ti, ea))
-        return result
+        # If this is a runtime address (a function pointer), then we need to get what
+        # it actually points to so that we can actually get its function details.
+        if rt and ti.is_funcptr():
+            pi = idaapi.ptr_type_data_t()
+            if not ti.get_ptr_details(pi):
+                raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to get the pointer target from the type ({!r}) for the specified function ({:#x})".format('.'.join([__name__, cls.__name__]), func, convention, "{!s}".format(ti), ea))
+            tinfo = pi.obj_type
+
+        # Otherwise, it should be a function and we can just use its idaapi.tinfo_t as-is.
+        elif not rt and ti.is_func():
+            tinfo = ti
+
+        # Otherwise, this is not a function prototype and we can't use it.
+        else:
+            raise E.InvalidTypeOrValueError(u"{:s}.convention({!r}, {:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), func, convention, "{!s}".format(ti), ea))
+
+        # Now we need to get the function details from the type and then we can modify its
+        # convention and preserve its spoiled count.
+        ftd = idaapi.func_type_data_t()
+        if not (tinfo.has_details() and tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT)):
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}, {:#x}) : Unable to extract the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), func, convention, "{!s}".format(tinfo), ea))
+
+        # Update the calling convention whilst preserving the spoiled count. If it has extra
+        # bits that were set, then we need to warn the user about it, and then we can recreate
+        # our function using it.
+        if convention & ~idaapi.CM_CC_MASK:
+            logging.warning(u"{:s}.convention({!r}, {:#x}) : The convention that was provided ({:#x}) contains extra bits ({:#x}) that will be masked ({:#x}) out.".format('.'.join([__name__, cls.__name__]), func, convention, convention, convention & ~idaapi.CM_CC_MASK, idaapi.CM_CC_MASK))
+        result, ftd.cc = ftd.cc, (ftd.cc & ~idaapi.CM_CC_MASK) | (convention & idaapi.CM_CC_MASK)
+
+        # Now we can use the function prototype that we snagged earlier, and re-create it using
+        # the function details that we just modified.
+        if not tinfo.create_func(ftd):
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), func, convention, "{!s}".format(tinfo), ea))
+
+        # Next we need to do is to figure out if the user asked us to modify a runtime function
+        # which makes this function pointer and requires another step to fix it up.
+        if rt:
+            pi.obj_type = tinfo
+            if not ti.create_ptr(pi):
+                raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), func, convention, "{!s}".format(tinfo), ea))
+            newinfo = ti
+
+        # If it isn't a runtime function and is just a regular one, then we're fine and can just
+        # apply the tinfo that we've currently been fucking around with.
+        else:
+            newinfo = tinfo
+
+        # Now we have a proper tinfo_t that has been modified which we can apply to the given
+        # address. After we apply it, then we can return the previous calling convention making
+        # sure that we mask out the spoiled_count bits.
+        if not set_tinfo(ea, newinfo):
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to apply the new type information ({!r}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, convention, "{!s}".format(newinfo), ea))
+        return result & idaapi.CM_CC_MASK
     cc = utils.alias(convention)
 
     @utils.multicase()
@@ -2719,7 +2769,7 @@ class type(object):
         '''Modify the result type information for the function `func` to the type information string in `info`.'''
         tinfo = internal.declaration.parse(info)
         if tinfo is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!s}) : Unable to parse the provided type information ({!s})".format('.'.join([__name__, cls.__name__]), func, utils.string.repr(info), utils.string.repr(info)))
+            raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r})".format('.'.join([__name__, cls.__name__]), func, info, info))
         return cls.result(func, tinfo)
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
