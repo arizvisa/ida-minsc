@@ -2611,7 +2611,7 @@ class type(object):
     @classmethod
     def convention(cls):
         '''Return the calling convention of the current function.'''
-        # use ui.current.address() instead of ui.current.function() to deal with import table entries
+        # we avoid ui.current.function() so that we can also act on pointers.
         return cls.convention(ui.current.address())
     @utils.multicase()
     @classmethod
@@ -2620,8 +2620,14 @@ class type(object):
 
         The integer returned corresponds to one of the ``idaapi.CM_CC_*`` constants.
         """
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        try:
+            rt, ea = interface.addressOfRuntimeOrStatic(func)
+
+        # If we couldn't resolve the function, then consider our parameter
+        # as the calling convention that we're going to apply to the current address.
+        except E.FunctionNotFoundError:
+            return cls.convention(ui.current.address(), func)
 
         # Grab the type information from the address that we resolved.
         ti = idaapi.tinfo_t()
@@ -2750,6 +2756,7 @@ class type(object):
     @classmethod
     def result(cls):
         '''Return the result type for the current function as an ``idaapi.tinfo_t``.'''
+        # we avoid ui.current.function() so that we can also act on function pointers.
         return cls.result(ui.current.address())
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
