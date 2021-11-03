@@ -99,6 +99,25 @@ class config(object):
         idp_modname = idaapi.get_idp_name()
         return cls.__init_info_structure__(idp_modname)
 
+    @utils.multicase()
+    @classmethod
+    def lflags(cls):
+        '''Return the value of the ``idainfo.lflags`` field from the database.'''
+        return idaapi.inf_get_lflags()
+    @utils.multicase(mask=six.integer_types)
+    @classmethod
+    def lflags(cls, mask):
+        '''Return the value of the ``idainfo.lflags`` field from the database with the specified `mask`.'''
+        return idaapi.inf_get_lflags() & mask
+    @utils.multicase(mask=six.integer_types, value=six.integer_types)
+    @classmethod
+    def lflags(cls, mask, value):
+        '''Set the ``idainfo.lflags`` with the provided `mask` from the database to the specified `value`.'''
+        result = idaapi.inf_get_lflags()
+        if not idaapi.inf_set_lflags((result & ~mask) | (value & mask)):
+            raise E.DisassemblerError(u"{:s}.lflags({:#x}, {:#x}) : Unable to modify the flags in idainfo.lflags ({:#x} & {:#x}) to the specified value ({:s}).".format('.'.join([__name__, cls.__name__]), result, mask, "{:#x} & {:#x}".format(value, mask) if value & ~mask else "{:#x}".format(value)))
+        return result
+
     @classmethod
     def filename(cls):
         '''Return the filename that the database was built from.'''
@@ -140,17 +159,18 @@ class config(object):
         return idaapi.get_imagebase()
 
     @classmethod
-    def readonly(cls):
+    def is_readonly(cls):
         '''Return whether the database is read-only or not.'''
         if idaapi.__version__ >= 7.0:
-            return cls.info.readonly_idb()
+            return idaapi.inf_readonly_idb()
         raise E.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+    readonlyQ = utils.alias(is_readonly, 'config')
 
     @classmethod
     def is_sharedobject(cls):
         '''Return whether the database is a shared-object or not.'''
         if idaapi.__version__ >= 7.0:
-            return True if cls.info.lflags & idaapi.LFLG_IS_DLL else False
+            return True if idaapi.inf_get_lflags() & idaapi.LFLG_IS_DLL else False
         raise E.UnsupportedVersion(u"{:s}.is_sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
     sharedobject = is_shared = sharedQ = utils.alias(is_sharedobject, 'config')
 
@@ -158,22 +178,68 @@ class config(object):
     def is_kernelspace(cls):
         '''Return whether the database is using a kernelmode address space or not.'''
         if idaapi.__version__ >= 7.0:
-            return True if cls.info.lflags & idaapi.LFLG_KERNMODE else False
+            return True if idaapi.inf_get_lflags() & idaapi.LFLG_KERNMODE else False
         raise E.UnsupportedVersion(u"{:s}.is_kernelspace() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-    kernelspaceQ = utils.alias(is_kernelspace, 'config')
+    kernelspaceQ = kernelQ = utils.alias(is_kernelspace, 'config')
+
+    @utils.multicase()
+    @classmethod
+    def filetype(cls):
+        '''Return the file type identified by the loader when creating the database.'''
+        return idaapi.inf_get_filetype()
+    @utils.multicase(filetype_t=six.integer_types)
+    @classmethod
+    def filetype(cls, filetype_t):
+        '''Set the file type identified by the loader to the specified `filetype_t`.'''
+        result = idaapi.inf_get_filetype()
+        if not idaapi.inf_set_filetype(filetype_t):
+            raise E.DisassemblerError(u"{:s}.filetype({:#x}) : Unable to set value for idainfo.filetype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), filetype_t, filetype_t))
+        return result
+
+    @utils.multicase()
+    @classmethod
+    def ostype(cls):
+        '''Return the operating system type identified by the loader when creating the database.'''
+        # FIXME: this is a bitflag that should be documented in libfuncs.hpp
+        #        which unfortunately is not included anywhere in the sdk.
+        return idaapi.inf_get_ostype()
+    @utils.multicase(ostype_t=six.integer_types)
+    @classmethod
+    def ostype(cls, ostype_t):
+        '''Set the operating system type for the database to the specified `ostype_t`.'''
+        result = idaapi.inf_get_ostype()
+        if not idaapi.inf_set_ostype(ostype_t):
+            raise E.DisassemblerError(u"{:s}.ostype({:#x}) : Unable to set value for idainfo.ostype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), ostype_t, ostype_t))
+        return result
+
+    @utils.multicase()
+    @classmethod
+    def apptype(cls):
+        '''Return the application type identified by the loader when creating the database.'''
+        # FIXME: this is a bitflag that should be documented in libfuncs.hpp
+        #        which unfortunately is not included anywhere in the sdk.
+        return idaapi.inf_get_apptype()
+    @utils.multicase(apptype_t=six.integer_types)
+    @classmethod
+    def apptype(cls, apptype_t):
+        '''Set the application type for the database to the specified `apptype_t`.'''
+        result = idaapi.inf_get_apptype()
+        if not idaapi.inf_set_apptype(apptype_t):
+            raise E.DisassemblerError(u"{:s}.apptype({:#x}) : Unable to set value for idainfo.apptype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), apptype_t, apptype_t))
+        return result
 
     @classmethod
     def changes(cls):
         '''Return the number of changes within the database.'''
         if idaapi.__version__ >= 7.0:
-            return cls.info.database_change_count
+            return idaapi.inf_get_database_change_count()
         raise E.UnsupportedVersion(u"{:s}.changes() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
 
     @classmethod
     def processor(cls):
-        '''Return the name of the processor configured by the database.'''
+        '''Return the name of the processor used by the database.'''
         if idaapi.__version__ >= 7.0:
-            result = cls.info.get_procName()
+            result = idaapi.inf_get_procname()
         elif hasattr(cls.info, 'procName'):
             result = cls.info.procName
         else:
@@ -182,12 +248,15 @@ class config(object):
 
     @classmethod
     def compiler(cls):
-        '''Return the configured compiler for the database.'''
-        return cls.info.cc
+        '''Return the compiler that was configured for the database.'''
+        cc = idaapi.compiler_info_t()
+        if not idaapi.inf_get_cc(cc):
+            raise E.DisassemblerError(u"{:s}.processor() : Unable to fetch the value for the idainfo.cc attribute.".format('.'.join([__name__, cls.__name__])))
+        return cc
     @classmethod
     def version(cls):
-        '''Return the database version.'''
-        return cls.info.version
+        '''Return the version of the database.'''
+        return idaapi.inf_get_version()
 
     @classmethod
     def type(cls, typestr):
@@ -208,12 +277,12 @@ class config(object):
     @classmethod
     def bits(cls):
         '''Return number of bits of the processor used by the database.'''
-        if cls.info.is_64bit():
+        lflags = idaapi.inf_get_lflags() & (idaapi.LFLG_PC_FLAT | idaapi.LFLG_64BIT)
+        if lflags & idaapi.LFLG_64BIT:
             return 64
-        elif cls.info.is_32bit():
+        elif lflags & idaapi.LFLG_PC_FLAT:
             return 32
-        # Anything else seems to be 16-bit
-        return 16
+        return 32 if lflags & idaapi.LFLG_FLAT_OFF32 else 16
 
     @classmethod
     def byteorder(cls):
@@ -221,28 +290,29 @@ class config(object):
         if idaapi.__version__ < 7.0:
             res = idaapi.cvar.inf.mf
             return 'big' if res else 'little'
-        return 'big' if cls.info.lflags & idaapi.LFLG_MSF else 'little'
+        return 'big' if idaapi.inf_get_lflags() & idaapi.LFLG_MSF else 'little'
 
     @classmethod
     def main(cls):
-        return cls.info.main
+        return idaapi.inf_get_main()
 
     @classmethod
     def entry(cls):
         '''Return the first entry point for the database.'''
         if idaapi.__version__ < 7.0:
             return cls.info.beginEA
-        return cls.info.start_ip
+        return idaapi.inf_get_start_ea()
 
     @classmethod
     def margin(cls):
         '''Return the current margin position for the current database.'''
-        return cls.info.margin
+        return idaapi.inf_get_margin()
 
     @classmethod
     def bounds(cls):
         '''Return the bounds of the current database in a tuple formatted as `(left, right)`.'''
-        return interface.bounds_t(cls.info.minEA, cls.info.maxEA)
+        min, max = idaapi.inf_get_min_ea(), idaapi.inf_get_max_ea()
+        return interface.bounds_t(min, max)
 
     class register(object):
         """
