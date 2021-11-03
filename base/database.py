@@ -3480,7 +3480,7 @@ class type(object):
 
         # First try and get the actual typeinfo for the given address. If it
         # actually worked, then we can just return it as-is.
-        ti = idaapi.tinfo_t
+        ti = idaapi.tinfo_t()
         if get_tinfo(ti, ea):
             return ti
 
