@@ -2795,7 +2795,7 @@ class type(object):
     def result(cls, func, info):
         '''Modify the result type for the function `func` to the type information provided as an ``idaapi.tinfo_t`` in `info`.'''
         rt, ea = interface.addressOfRuntimeOrStatic(func)
-        get_tinfo = lambda ti, ea: idaapi.get_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(ti, ea)
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
 
         # Grab the type information from the resolved address so that we can modify it.
