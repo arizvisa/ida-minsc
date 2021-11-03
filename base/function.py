@@ -2760,7 +2760,18 @@ class type(object):
     @classmethod
     def result(cls, func):
         '''Return the result type for the function `func` as an ``idaapi.tinfo_t``.'''
-        tinfo = cls(func)
+        try:
+            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+
+        # If we couldn't resolve the function, then consider our parameter
+        # as some type information that we're going to apply to the current one.
+        except E.FunctionNotFoundError:
+            return cls.result(ui.current.address(), func)
+
+        # The user gave us a function to try out, so we'll try and grab the
+        # type information from the address we resolved.
+        else:
+            tinfo = cls(ea)
 
         # If our type is a function pointer, then we need to dereference it
         # in order to get the type that we want to extract the result from.
@@ -2786,6 +2797,8 @@ class type(object):
     @classmethod
     def result(cls, func, info):
         '''Modify the result type for the function `func` to the type information provided as a string in `info`.'''
+
+        # FIXME: figure out the proper way to parse a type instead of a declaration
         tinfo = internal.declaration.parse(info)
         if tinfo is None:
             raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r})".format('.'.join([__name__, cls.__name__]), func, info, info))
@@ -2854,3 +2867,4 @@ class type(object):
 
 t = type # XXX: ns alias
 convention = cc = utils.alias(type.convention, 'type')
+result = utils.alias(type.result, 'result')
