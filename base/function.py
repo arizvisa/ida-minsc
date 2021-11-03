@@ -2749,12 +2749,17 @@ class type(object):
     @utils.multicase()
     @classmethod
     def result(cls):
-        '''Return the result type information for the current function as an ``idaapi.tinfo_t``.'''
+        '''Return the result type for the current function as an ``idaapi.tinfo_t``.'''
         return cls.result(ui.current.address())
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def result(cls, info):
+        '''Modify the result type for the current function to the type information provided as an ``idaapi.tinfo_t`` provided in `info`.'''
+        return cls.result(ui.current.address(), info)
     @utils.multicase()
     @classmethod
     def result(cls, func):
-        '''Return the result type information for the function `func` as an ``idaapi.tinfo_t``.'''
+        '''Return the result type for the function `func` as an ``idaapi.tinfo_t``.'''
         tinfo = cls(func)
 
         # If our type is a function pointer, then we need to dereference it
@@ -2780,7 +2785,7 @@ class type(object):
     @utils.multicase(info=six.string_types)
     @classmethod
     def result(cls, func, info):
-        '''Modify the result type information for the function `func` to the type information string in `info`.'''
+        '''Modify the result type for the function `func` to the type information provided as a string in `info`.'''
         tinfo = internal.declaration.parse(info)
         if tinfo is None:
             raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r})".format('.'.join([__name__, cls.__name__]), func, info, info))
@@ -2788,7 +2793,7 @@ class type(object):
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
     def result(cls, func, info):
-        '''Modify the result type information for the function `func` to the ``idaapi.tinfo_t`` in `info`.'''
+        '''Modify the result type for the function `func` to the type information provided as an ``idaapi.tinfo_t`` in `info`.'''
         rt, ea = interface.addressOfRuntimeOrStatic(func)
         get_tinfo = lambda ti, ea: idaapi.get_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(ti, ea)
         set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
