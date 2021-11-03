@@ -195,6 +195,26 @@ class config(object):
         if not idaapi.inf_set_filetype(filetype_t):
             raise E.DisassemblerError(u"{:s}.filetype({:#x}) : Unable to set value for idainfo.filetype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), filetype_t, filetype_t))
         return result
+    @utils.multicase(FT_=six.string_types)
+    @classmethod
+    def filetype(cls, FT_):
+        '''Set the file type identified by the loader to the value for the string `FT_`.'''
+        prefix, choice = 'FT_', FT_.upper()
+        candidates = {prefix + choice, choice}
+
+        # Grab all of our available choices from the idc module since they're not defined anywhere else.
+        import idc
+        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
+        choices = {item : value for item, value in filtered if isinstance(value, six.integer_types)}
+
+        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
+        iterable = (value for item, value in choices.items() if item in candidates)
+        value = builtins.next(iterable, None)
+        if value is None:
+            raise E.ItemNotFoundError(u"{:s}.filetype({!r}) : Unable to find the requested file type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), FT_, string))
+
+        # We found it, so we can recurse into the correct case to assign it.
+        return cls.filetype(value)
 
     @utils.multicase()
     @classmethod
@@ -211,6 +231,26 @@ class config(object):
         if not idaapi.inf_set_ostype(ostype_t):
             raise E.DisassemblerError(u"{:s}.ostype({:#x}) : Unable to set value for idainfo.ostype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), ostype_t, ostype_t))
         return result
+    @utils.multicase(OSTYPE_=six.string_types)
+    @classmethod
+    def ostype(cls, OSTYPE_):
+        '''Set the operating system type for the database to the value for the string `OSTYPE_`.'''
+        prefix, choice = 'OSTYPE_', OSTYPE_.upper()
+        candidates = {prefix + choice, choice}
+
+        # Grab all of our available choices from the idc module since they're not defined anywhere else.
+        import idc
+        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
+        choices = {item : value for item, value in filtered if isinstance(value, six.integer_types)}
+
+        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
+        iterable = (value for item, value in choices.items() if item in candidates)
+        value = builtins.next(iterable, None)
+        if value is None:
+            raise E.ItemNotFoundError(u"{:s}.ostype({!r}) : Unable to find the requested operating system type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), OSTYPE_, string))
+
+        # We found it, so we can recurse into the correct case to assign it.
+        return cls.ostype(value)
 
     @utils.multicase()
     @classmethod
@@ -227,6 +267,26 @@ class config(object):
         if not idaapi.inf_set_apptype(apptype_t):
             raise E.DisassemblerError(u"{:s}.apptype({:#x}) : Unable to set value for idainfo.apptype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), apptype_t, apptype_t))
         return result
+    @utils.multicase(APPT_=six.string_types)
+    @classmethod
+    def apptype(cls, APPT_):
+        '''Set the application type for the database to the value for the string `APPT_`.'''
+        prefix, choice = 'APPT_', APPT_.upper()
+        candidates = {prefix + choice, choice}
+
+        # Grab all of our available choices from the idc module since they're not defined anywhere else.
+        import idc
+        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
+        choices = {item : value for item, value in filtered if isinstance(value, six.integer_types)}
+
+        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
+        iterable = (value for item, value in choices.items() if item in candidates)
+        value = builtins.next(iterable, None)
+        if value is None:
+            raise E.ItemNotFoundError(u"{:s}.apptype({!r}) : Unable to find the requested application type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), APPT_, string))
+
+        # We found it, so we can recurse into the correct case to assign it.
+        return cls.apptype(value)
 
     @classmethod
     def changes(cls):
