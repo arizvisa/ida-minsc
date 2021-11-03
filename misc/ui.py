@@ -521,12 +521,27 @@ class notepad(appwindow):
         editor = cls.open()
         return editor.toPlainText()
 
+    @classmethod
+    def count(cls):
+        '''Return the number of lines that are currently stored within the notepad window.'''
+        editor = cls.open()
+        result = editor.toPlainText()
+        return result.count('\n') + (0 if result.endswith('\n') else 1)
+
+    @classmethod
+    def size(cls):
+        '''Return the number of characters that are currently stored within the notepad window.'''
+        editor = cls.open()
+        result = editor.toPlainText()
+        return len(result)
+
     @internal.utils.multicase(string=six.string_types)
     @classmethod
     def set(cls, string):
         '''Set the text that is currently stored within the notepad window to `string`.'''
         editor = cls.open()
-        return editor.setPlainText(string)
+        result, none = editor.toPlainText(), editor.setPlainText(string)
+        return result
 
     @internal.utils.multicase(items=(builtins.list, builtins.tuple))
     @classmethod
@@ -539,7 +554,8 @@ class notepad(appwindow):
     def append(cls, string):
         '''Append the provided `string` to the current text that is stored within the notepad window.'''
         editor = cls.open()
-        return editor.appendPlainText(string)
+        result, none = editor.toPlainText(), editor.appendPlainText(string)
+        return result.count('\n') + (0 if result.endswith('\n') else 1)
 
     @internal.utils.multicase()
     @classmethod
