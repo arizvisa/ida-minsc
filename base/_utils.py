@@ -550,18 +550,24 @@ class multicase(object):
 
             # First check if we have any extra parameters. If we do, but there's no wildcards
             # available in our current match, then it doesn't fit and we move onto the next one.
-            if len(argument_wildcard) and not parameter_wildargs:
+            if not parameter_wildargs and len(argument_wildcard):
                 continue
 
             # If we have any extra keywords, then we need to ensure that there's a keyword
             # parameter in our current match. Otherwise, it doesn't fit and we need to move on.
-            elif argument_keywords and not parameter_wildkeywords:
+            elif not parameter_wildkeywords and argument_keywords:
                 continue
 
             # Second, we need to check that our argument length actually matches. To accomplish
-            # this, we need to include the parameters that we ignored, and check them against
-            # the number of parameter names from our current match. Move on if they're different.
-            if parameter_ignore_count + len(argument_values) != len(parameter_names):
+            # this, we need to check if our function can take a wildcard parameter. If so, then
+            # we need to ensure that the number of parameters that we were given are larger than
+            # what was required.
+            if parameter_wildargs and parameter_ignore_count + len(argument_values) < len(parameter_names):
+                continue
+
+            # If our function doesn't take a wildcard parameter, then our number of arguments
+            # should match what we were given. If they don't, then skip onto the next one.
+            elif not parameter_wildargs and parameter_ignore_count + len(argument_values) != len(parameter_names):
                 continue
 
             # Third, we need to actually check our type constraints that our current match we
