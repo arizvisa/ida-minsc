@@ -1827,7 +1827,7 @@ class frame(object):
         @classmethod
         def location(cls, ea):
             '''Return the list of address locations for each of the parameters that are passed to the function call at `ea`.'''
-            if not instruction.type.is_call(ea):
+            if not any(Finstruction(ea) for Finstruction in [instruction.type.is_call, instruction.type.is_branch]):
                 raise E.MissingTypeOrAttribute(u"{:s}.location({:#x}) : The instruction at the specified address ({:#x}) is not a function call.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
             items = idaapi.get_arg_addrs(ea)
