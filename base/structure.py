@@ -149,21 +149,22 @@ def list(**type):
         six.print_(u"[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), u" // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
     return
 
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=(six.string_types, tuple))
 @utils.string.decorate_arguments('name')
 def new(name):
     '''Returns a new structure `name`.'''
     return new(name, 0)
-@utils.multicase(name=six.string_types, offset=six.integer_types)
+@utils.multicase(name=(six.string_types, tuple), offset=six.integer_types)
 @utils.string.decorate_arguments('name')
 def new(name, offset):
     '''Returns a new structure `name` using `offset` as its base offset.'''
-    res = utils.string.to(name)
+    string = interface.tuplename(*name) if isinstance(name, tuple) else string
+    res = utils.string.to(string)
 
     # add a structure with the specified name
     id = idaapi.add_struc(idaapi.BADADDR, res)
     if id == idaapi.BADADDR:
-        raise E.DisassemblerError(u"{:s}.new({!r}, {:#x}) : Unable to add a new structure to the database.".format(__name__, name, offset))
+        raise E.DisassemblerError(u"{:s}.new({!r}, {:#x}) : Unable to add a new structure to the database.".format(__name__, string, offset))
 
     # FIXME: we should probably move the new structure to the end of the list via idaapi.set_struc_idx
 
