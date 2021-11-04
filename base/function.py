@@ -2319,6 +2319,7 @@ class type(object):
         # Recurse back into ourselves in order to call idaapi.apply_cdecl
         return cls(ea, tinfo_s)
     @utils.multicase(info=six.string_types)
+    @utils.string.decorate_arguments('info')
     def __new__(cls, func, info):
         '''Parse the type information string in `info` into an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
         til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
@@ -2802,6 +2803,7 @@ class type(object):
         return ftd.rettype
     @utils.multicase(info=six.string_types)
     @classmethod
+    @utils.string.decorate_arguments('info')
     def result(cls, func, info):
         '''Modify the result type for the function `func` to the type information provided as a string in `info`.'''
 
