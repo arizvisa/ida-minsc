@@ -230,7 +230,7 @@ class current(object):
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}.function() : Unable to locate the current function.".format('.'.join([__name__, cls.__name__])))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}.function() : Unable to find a function at the current location.".format('.'.join([__name__, cls.__name__])))
         return res
     @classmethod
     def segment(cls):
@@ -240,7 +240,8 @@ class current(object):
     @classmethod
     def status(cls):
         '''Return the IDA status.'''
-        raise internal.exceptions.UnsupportedCapability(u"{:s}.status() : Unable to return the current status of IDA.".format('.'.join([__name__, cls.__name__])))
+        # TODO: grab the current status and return it in some form
+        raise internal.exceptions.UnsupportedCapability(u"{:s}.status() : Unable to get the current disassembler status.".format('.'.join([__name__, cls.__name__])))
     @classmethod
     def symbol(cls):
         '''Return the current highlighted symbol name.'''
