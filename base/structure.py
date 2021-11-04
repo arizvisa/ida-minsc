@@ -185,6 +185,29 @@ def by(id, **options):
 def by(sptr, **options):
     '''Return the structure for the specified `sptr`.'''
     return __instance__(sptr.id, **options)
+@utils.multicase(tinfo=idaapi.tinfo_t)
+def by(tinfo, **options):
+    '''Return the structure for the specified `tinfo`.'''
+    if tinfo.is_struct():
+        return by_name(tinfo.get_type_name(), **options)
+
+    # If the type information is not a pointer, then we really don't know what
+    # to do with this and so we raise an exception.
+    elif not tinfo.is_ptr():
+        raise E.InvalidTypeOrValueError(u"{:s}.by(\"{:s}\"{:s}) : Unable to locate structure for the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+
+    # If there are no details, then raise an exception because we need to
+    # dereference the pointer to get the real name.
+    if not tinfo.has_details():
+        raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : The provided type information ({!r}) does not contain any details.".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+
+    # Now we can grab our pointer and extract the object from it, At this
+    # point we continue by recursing back into ourselves. This way we can
+    # repeatedly dereference a pointer until we get to a structure.
+    pi = idaapi.ptr_type_data_t()
+    if not tinfo.get_ptr_details(pi):
+        raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : Unable to get the pointer target from the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+    return by(pi.obj_type, **options)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
