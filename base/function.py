@@ -1820,6 +1820,32 @@ class frame(object):
 
         @utils.multicase()
         @classmethod
+        def location(cls):
+            '''Return the list of address locations for each of the parameters that are passed to the function call near the current address.'''
+            return cls.location(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def location(cls, ea):
+            '''Return the list of address locations for each of the parameters that are passed to the function call at `ea`.'''
+            if not instruction.type.is_call(ea):
+                raise E.MissingTypeOrAttribute(u"{:s}.location({:#x}) : The instruction at the specified address ({:#x}) is not a function call.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+            items = idaapi.get_arg_addrs(ea)
+            if items is None:
+                raise E.DisassemblerError(u"{:s}.location({:#x}) : Unable to retrieve the initialization addresses for the arguments to the function call at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+            return [ea for ea in items]
+        @utils.multicase(ea=six.integer_types, index=six.integer_types)
+        @classmethod
+        def location(cls, ea, index):
+            '''Return the initialization address for the parameter at `index` for the function call at `ea`.'''
+            items = cls.location(ea)
+            if not (0 <= index < len(items)):
+                raise E.InvalidTypeOrValueError(u"{:s}.location({:#x}, {:d}) : The requested argument index ({:d}) for the function call at address {:#x} is not within the bounds of the function's arguments ({:d} <= {:d} < {:d}).".format('.'.join([__name__, cls.__name__]), ea, index, index, ea, 0, index, len(items)))
+            return items[index]
+        locations = utils.alias(location, 'frame.args')
+
+        @utils.multicase()
+        @classmethod
         def registers(cls):
             '''Return the register information associated with the arguments for the current function.'''
             return cls.registers(ui.current.function())
@@ -1881,7 +1907,7 @@ class frame(object):
             max = structure.size(get_frameid(fn))
             total = frame.lvars.size(fn) + frame.regs.size(fn)
             return max - total
-    arguments = args    # XXX: ns alias
+    arguments = arg = args    # XXX: ns alias
 
     class lvars(object):
         """
