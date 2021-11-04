@@ -872,6 +872,46 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
+    def walk(cls):
+        '''Yield each ``idaapi.BasicBlock`` starting at the current address and terminating when there's no clear path to continue.'''
+        for item in cls.walk(ui.current.function(), ui.current.address()):
+            yield item
+        return
+    @utils.multicase()
+    @classmethod
+    def walk(cls, ea):
+        '''Yield each ``idaapi.BasicBlock`` starting at the address `ea` and terminating when there's no clear path to continue.'''
+        fn = by(ea)
+        for item in cls.walk(fn, ea if isinstance(ea, six.integer_types) else interface.range.start(fn)):
+            yield item
+        return
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def walk(cls, func, ea):
+        '''Yield each ``idaapi.BasicBlock`` in the function `func` starting at the address `ea` and terminating when there's no clear path to continue.'''
+        fn = by(func)
+        bb = cls.at(fn, ea)
+        for item in cls.walk(bb):
+            yield item
+        return
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def walk(cls, bb):
+        '''Yield each ``idaapi.BasicBlock`` starting at the specified `bb` and terminating when there's no clear path to continue.'''
+        item, visited = bb, {item for item in []}
+        yield item
+        visited |= {item.id}
+
+        # Now continue following the successors until there are no singles left.
+        items = [bb for bb in item.succs()]
+        while len(items) == 1 and not operator.contains(visited, items[0].id):
+            item = items[0]
+            yield item
+            visited, items = visited | {item.id}, [bb for bb in item.succs()]
+        return
+
+    @utils.multicase()
+    @classmethod
     def at(cls):
         '''Return the ``idaapi.BasicBlock`` at the current address in the current function.'''
         return cls.at(ui.current.function(), ui.current.address())
@@ -886,11 +926,21 @@ class blocks(object):
     def at(cls, func, ea):
         '''Return the ``idaapi.BasicBlock`` in function `func` at address `ea`.'''
         fn = by(func)
-        for bb in blocks.iterate(fn):
+        for bb in cls.iterate(fn):
             if interface.range.within(ea, bb):
                 return bb
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def at(cls, func, bb):
+        '''Return the ``idaapi.BasicBlock`` in function `func` identifed by `bb`.'''
+        fn = by(func)
+        iterable = (item for item in cls.iterate(fn) if item.id == bb.id)
+        result = builtins.next(iterable, None)
+        if result is None:
+            raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate `idaapi.BasicBlock` with the specified id ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.bounds(bb), bb.id, interface.range.start(fn)))
+        return result
 
     @utils.multicase()
     @classmethod
