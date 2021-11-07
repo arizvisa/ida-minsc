@@ -29,17 +29,27 @@ functions and aliases. For more information on this, please see
 
 .. py:function:: address()
    
-   Return the entry-point of the current function.
+   Return the address of the entrypoint for the current function.
    
    Aliases: :py:func:`function.top<address>`, :py:func:`function.addr<address>`
    
 .. py:function:: address(func)
    
-   Return the entry-point of the function identified by ``func``.
+   Return the address for the entrypoint belonging to the function ``func``.
    
    Aliases: :py:func:`function.top<address>`, :py:func:`function.addr<address>`
    
    :param func: the function to return the address for
+   
+.. py:function:: address(func, offset)
+   
+   Return the address for the entrypoint belonging to the function ``func`` and add the provided ``offset`` to it.
+   
+   Aliases: :py:func:`function.top<address>`, :py:func:`function.addr<address>`
+   
+   :param func: the function to return the address for
+   :param offset: the amount to add to the returned address
+   :type offset: int or long
    
 .. py:function:: bottom()
    
@@ -205,7 +215,7 @@ functions and aliases. For more information on this, please see
    
    Returns True if the address ``ea`` is contained by the current function.
    
-   :param ea: an address in the database to check
+   :param ea: an address within the database to check
    :type ea: int or long
    
 .. py:function:: contains(func, ea)
@@ -213,7 +223,7 @@ functions and aliases. For more information on this, please see
    Returns True if the address ``ea`` is contained by the function ``func``.
    
    :param func: the function to check the address against
-   :param ea: an address in the database to check
+   :param ea: an address within the database to check
    :type ea: int or long
    
 .. py:function:: down()
@@ -305,13 +315,21 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: offset()
    
-   Return the offset of the current function from the base of the database.
+   Return the offset from the base of the database for the current function.
    
 .. py:function:: offset(func)
    
-   Return the offset of the function ``func`` from the base of the database.
+   Return the offset from the base of the database for the function ``func``.
    
    :param func: anything referring to a function to return the offset for
+   
+.. py:function:: offset(func, offset)
+   
+   Return the offset from the base of the database for the function ``func`` and add the provided ``offset`` to it.
+   
+   :param func:
+   :param offset:
+   :type offset: int or long
    
 .. py:function:: prototype()
    
@@ -546,6 +564,26 @@ Some examples of this functionality can be::
    
    :param bounds: the boundaries of the basic block to return the basic block for
    :type bounds: tuple
+   
+.. py:function:: block\.address()
+   
+   Return the top address for the basic block containing the current address.
+   
+.. py:function:: block\.address(ea)
+   
+   Return the top address for the basic block containing the address ``ea``.
+   
+   :param ea: the address of the basic block to return the address of
+   :type ea: int or long
+   
+.. py:function:: block\.address(ea, offset)
+   
+   Return the top address for the basic block containing the address ``ea`` and add the provided ``offset`` to it.
+   
+   :param ea: the address of the basic block to return the address of
+   :type ea: int or long
+   :param offset: the amount to add to the returned address
+   :type offset: int or long
    
 .. py:function:: block\.after()
    
@@ -913,6 +951,26 @@ Some examples of this functionality can be::
    :param bb: the basic block to iterate through
    :type bb: idaapi.BasicBlock
    
+.. py:function:: block\.offset()
+   
+   Return the offset from the base of the database for the basic block at the current address.
+   
+.. py:function:: block\.offset(ea)
+   
+   Return the offset from the base of the database for the basic block at the address ``ea``.
+   
+   :param ea: the address of the basic block to return the offset of
+   :type ea: int or long
+   
+.. py:function:: block\.offset(ea, offset)
+   
+   Return the offset from the base of the database for the basic block at address ``ea`` and add the provided ``offset`` to it.
+   
+   :param ea: the address of the basic block to return the offset of
+   :type ea: int or long
+   :param offset: the amount to add to the returned offset
+   :type offset: int or long
+   
 .. py:function:: block\.read()
    
    Return all the bytes contained in the current basic block.
@@ -1075,6 +1133,14 @@ Some examples of this namespace's usage::
    :param ea: the address of the basic block to return
    :type ea: int or long
    
+.. py:function:: blocks\.at(func, bb)
+   
+   Return the :py:obj:`idaapi.BasicBlock` in function ``func`` identifed by ``bb``.
+   
+   :param func:
+   :param bb:
+   :type bb: idaapi.BasicBlock
+   
 .. py:function:: blocks\.digraph()
    
    Return a :py:obj:`networkx.DiGraph` of the function at the current address.
@@ -1136,6 +1202,31 @@ Some examples of this namespace's usage::
    :param exits: the addresses of basic blocks to stop at
    :type exits: int or long or list or tuple or set
    
+.. py:function:: blocks\.walk()
+   
+   Yield each :py:obj:`idaapi.BasicBlock` starting at the current address and terminating when there's no clear path to continue.
+   
+.. py:function:: blocks\.walk(ea)
+   
+   Yield each :py:obj:`idaapi.BasicBlock` starting at the address ``ea`` and terminating when there's no clear path to continue.
+   
+   :param ea:
+   
+.. py:function:: blocks\.walk(func, ea)
+   
+   Yield each :py:obj:`idaapi.BasicBlock` in the function ``func`` starting at the address ``ea`` and terminating when there's no clear path to continue.
+   
+   :param func:
+   :param ea:
+   :type ea: int or long
+   
+.. py:function:: blocks\.walk(bb)
+   
+   Yield each :py:obj:`idaapi.BasicBlock` starting at the specified ``bb`` and terminating when there's no clear path to continue.
+   
+   :param bb:
+   :type bb: idaapi.BasicBlock
+   
 .. _ns-function-chunk:
 
 **************
@@ -1181,7 +1272,7 @@ The functions in this namespace can be used as::
    
    Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
-   :param bounds: the boundaries of the chunk to add
+   :param bounds: the boundaries of the chunk to add to the current function
    :type bounds: tuple
    
 .. py:function:: chunk\.add(func, start, end)
@@ -1191,7 +1282,7 @@ The functions in this namespace can be used as::
    Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
    :param func: the function to add the chunk to
-   :param start: the starting address of the chunk to add to the current function
+   :param start: the starting address of the chunk to add to the function
    :type start: int or long
    :param end: the ending address of the chunk
    :type end: int or long
@@ -1203,8 +1294,28 @@ The functions in this namespace can be used as::
    Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
    :param func: the function to add the chunk to
-   :param bounds: the boundaries of the chunk to add
+   :param bounds: the boundaries of the chunk to add to the function
    :type bounds: tuple
+   
+.. py:function:: chunk\.address()
+   
+   Return the top address of the function chunk containing the current address.
+   
+.. py:function:: chunk\.address(ea)
+   
+   Return the top address of the function chunk containing the address ``ea``.
+   
+   :param ea: the address of the chunk
+   :type ea: int or long
+   
+.. py:function:: chunk\.address(ea, offset)
+   
+   Return the address of the function chunk containing the address ``ea`` and add the provided ``offset`` to it.
+   
+   :param ea: the address of the chunk
+   :type ea: int or long
+   :param offset: the offset to add to the chunk address
+   :type offset: int or long
    
 .. py:function:: chunk\.assign(ea)
    
@@ -1222,7 +1333,7 @@ The functions in this namespace can be used as::
    Aliases: :py:func:`function.assign_chunk<chunk\.assign>`
    
    :param func: the function to assign the chunk to
-   :param ea: the address of the chunk to add to the current function
+   :param ea: the address of the chunk to add to the function
    :type ea: int or long
    
 .. py:function:: chunk\.at()
@@ -1233,7 +1344,7 @@ The functions in this namespace can be used as::
    
    Return a tuple containing the bounds of the function chunk at the address ``ea``.
    
-   :param ea: the address belonging to the chunk to return
+   :param ea: the address of the chunk to return
    :type ea: int or long
    
 .. py:function:: chunk\.at(func, ea)
@@ -1241,7 +1352,7 @@ The functions in this namespace can be used as::
    Return a tuple containing the bounds of the function chunk belonging to ``func`` at the address ``ea``.
    
    :param func: the function containing the chunk
-   :param ea: the address belonging to the chunk to return
+   :param ea: the address of the chunk to return
    :type ea: int or long
    
 .. py:function:: chunk\.bottom()
@@ -1264,6 +1375,66 @@ The functions in this namespace can be used as::
    Iterate through all the instructions for the function chunk containing the address :py:obj:`ea`.
    
    :param ea: the address belonging to the function chunk to iterate through
+   :type ea: int or long
+   
+.. py:function:: chunk\.offset()
+   
+   Return the offset from the base of the database for the current function chunk.
+   
+.. py:function:: chunk\.offset(ea)
+   
+   Return the offset from the base of the database for the function chunk containing the address ``ea``.
+   
+   :param ea: the address of the chunk to return the offset of
+   :type ea: int or long
+   
+.. py:function:: chunk\.offset(ea, offset)
+   
+   Return the offset from the base of the database for the function chunk containing the address ``ea`` and add the provided ``offset`` to it.
+   
+   :param ea: the address of the chunk to return the offset of
+   :type ea: int or long
+   :param offset: the offset to add to the result
+   
+.. py:function:: chunk\.owner()
+   
+   Return the first owner of the function chunk containing the current address.
+   
+.. py:function:: chunk\.owner(ea)
+   
+   Return the first owner of the function chunk containing the address specified by ``ea``.
+   
+   :param ea: the address of the chunk to return the function for
+   :type ea: int or long
+   
+.. py:function:: chunk\.owners()
+   
+   Yield each of the owners which have the current function chunk associated with it.
+   
+.. py:function:: chunk\.owners(ea)
+   
+   Yield each of the owners which have the function chunk containing the address ``ea`` associated with it.
+   
+   :param ea: the address of the chunk to return each of the functions for
+   :type ea: int or long
+   
+.. py:function:: chunk\.points()
+   
+   Iterate through the current function chunk and yield each address and stack delta that was calculated.
+   
+.. py:function:: chunk\.points(ea)
+   
+   Iterate through the function chunk containing the address ``ea`` and yield each address and stack delta that was calculated.
+   
+   :param ea: the address of the chunk to yield each of the stack points for
+   :type ea: int or long
+   
+.. py:function:: chunk\.points(func, ea)
+   
+   Iterate through the chunk belonging to the function ``func`` and containing the address ``ea`` in order to yield each address and stack delta that was calculated.
+   
+   :param func: the function containing the chunk
+   :param ea: the address of the chunk to yield each of the stack points for
    :type ea: int or long
    
 .. py:function:: chunk\.register(reg, \*regs, \*\*modifiers)
@@ -1299,7 +1470,7 @@ The functions in this namespace can be used as::
    
    Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
    
-   :param ea: the address belonging to the chunk to remove
+   :param ea: the address of the chunk to remove
    :type ea: int or long
    
 .. py:function:: chunk\.remove(func, ea)
@@ -1308,8 +1479,8 @@ The functions in this namespace can be used as::
    
    Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
    
-   :param func: the function containing the chunk to remove
-   :param ea: the address belonging to the chunk to remove
+   :param func: the function containing the chunk
+   :param ea: the address of the chunk to remove from the function
    :type ea: int or long
    
 .. py:function:: chunk\.top()
@@ -1367,6 +1538,31 @@ Some of the ways to use this namespace are::
    :param ea: the address belonging to the chunk to return
    :type ea: int or long
    
+.. py:function:: chunks\.contains()
+   
+   Returns True if the current function contains the current address in any of its chunks.
+   
+   Aliases: :py:func:`function.contains<chunks\.contains>`
+   
+.. py:function:: chunks\.contains(ea)
+   
+   Returns True if the current function contains the address ``ea`` in any of its chunks.
+   
+   Aliases: :py:func:`function.contains<chunks\.contains>`
+   
+   :param ea: the address of the chunk to check
+   :type ea: int or long
+   
+.. py:function:: chunks\.contains(func, ea)
+   
+   Returns True if the function ``func`` contains the address ``ea`` in any of its chunks.
+   
+   Aliases: :py:func:`function.contains<chunks\.contains>`
+   
+   :param func: the function to check the chunk against
+   :param ea: the address of the chunk to check
+   :type ea: int or long
+   
 .. py:function:: chunks\.iterate()
    
    Iterate through all the instructions for each chunk in the current function.
@@ -1385,6 +1581,8 @@ Some of the ways to use this namespace are::
    
    Yield each ``(address, opnum, state)`` within the current function that uses ``reg`` or any one of the registers in ``regs``.
    
+   Aliases: :py:func:`function.register<chunks\.register>`
+   
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
@@ -1395,6 +1593,8 @@ Some of the ways to use this namespace are::
    Yield each ``(address, opnum, state)`` within the function ``func`` that uses ``reg`` or any one of the registers in ``regs``.
    
    If the keyword ``write`` is True, then only return the result if it's writing to the register.
+   
+   Aliases: :py:func:`function.register<chunks\.register>`
    
    :param func: the function to identify registers in
    :param reg: a register of some kind
@@ -1538,11 +1738,41 @@ Some ways of using this are::
    
    :param func: the function containing the arguments to yield
    
+.. py:function:: frame\.args\.location()
+   
+   Return the list of address locations for each of the parameters that are passed to the function call near the current address.
+   
+   Aliases: :py:func:`function.get_args_size<frame\.args\.location>`
+   
+.. py:function:: frame\.args\.location(ea)
+   
+   Return the list of address locations for each of the parameters that are passed to the function call at ``ea``.
+   
+   :param ea:
+   :type ea: int or long
+   
+.. py:function:: frame\.args\.location(ea, index)
+   
+   Return the initialization address for the parameter at ``index`` for the function call at ``ea``.
+   
+   :param ea:
+   :type ea: int or long
+   :param index:
+   :type index: int or long
+   
+.. py:function:: frame\.args\.registers()
+   
+   Return the register information associated with the arguments for the current function.
+   
+.. py:function:: frame\.args\.registers(func)
+   
+   Returns the register information associated with the arguments for the function ``func``.
+   
+   :param func: the function containing the argument register information to return
+   
 .. py:function:: frame\.args\.size()
    
    Returns the size of the arguments for the current function.
-   
-   Aliases: :py:func:`function.get_args_size<frame\.args\.size>`
    
 .. py:function:: frame\.args\.size(func)
    
@@ -1652,14 +1882,14 @@ Some simple ways of getting information about a function::
    
    Apply the type information in ``info`` to the current function.
    
-   :param info: the type information to assign to the current function
+   :param info: the type information to apply to the current function
    :type info: str or idaapi.tinfo_t
    
 .. py:function:: type(none)
    
    Remove the type information for the current function.
    
-   :param none: the value :py:obj:`None` which will remove the type information
+   :param none: the value :py:obj:`None` which will remove the type information from the current function
    :type none: None
    
 .. py:function:: type(func)
@@ -1673,16 +1903,16 @@ Some simple ways of getting information about a function::
    
    Apply the :py:obj:`idaapi.tinfo_t` in ``info`` to the function ``func``.
    
-   :param func: the function to set the type information of
-   :param info: the type information string to assign to the function
+   :param func: the function to use when applying type information
+   :param info: the type information string to apply to the function
    :type info: idaapi.tinfo_t
    
 .. py:function:: type(func, info)
    
    Parse the type information string in ``info`` into an :py:obj:`idaapi.tinfo_t` and apply it to the function ``func``.
    
-   :param func: the function to set the type information of
-   :param info: the ``idaapi.tinfo_t`` representing the type information to assign to the function
+   :param func: the function to use when applying type information
+   :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the function
    :type info: str
    
 .. py:function:: type(func, none)
@@ -1690,8 +1920,52 @@ Some simple ways of getting information about a function::
    Remove the type information for the function ``func``.
    
    :param func: the function to remove the type information from
-   :param none: the value :py:obj:`None` which will remove the type information
+   :param none: the value :py:obj:`None` which will remove the type information from the function
    :type none: None
+   
+.. py:function:: type\.argument(index)
+   
+   Return the type information for the argument at the specified ``index`` of the current function.
+   
+   :param index: the index of the argument for the current function to return
+   :type index: int or long
+   
+.. py:function:: type\.argument(index, info)
+   
+   Modify the type information for the argument at the specified ``index`` of the current function and set it to ``info``.
+   
+   :param index: the index of the argument to apply the type to
+   :type index: int or long
+   :param info: the type information to apply to the specified function argument
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: type\.argument(func, index)
+   
+   Return the type information for the argument at the specified ``index`` of the function ``func``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the function argument to return
+   :type index: int or long
+   
+.. py:function:: type\.argument(func, index, info)
+   
+   Modify the type information for the argument at the specified ``index`` of the function ``func`` and set it to ``info``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the function argument to apply type information
+   :type index: int or long
+   :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the function argument
+   :type info: idaapi.tinfo_t
+   
+.. py:function:: type\.argument(func, index, info_s)
+   
+   Modify the type information for the argument at the specified ``index`` of the function ``func`` and set it to the string in ``info_s``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the function argument to apply type information
+   :type index: int or long
+   :param info_s: the type information as a string to apply to the function argument
+   :type info_s: str
    
 .. py:function:: type\.convention()
    
@@ -1707,7 +1981,15 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.cc<type\.convention>`, :py:func:`function.convention<type\.convention>`, :py:func:`function.type.cc<type\.convention>`
    
-   :param func: the function to use when returning the calling convention
+   :param func: the function to fetch the calling convention from
+   
+.. py:function:: type\.convention(func, convention)
+   
+   Set the calling convention used by the prototype for the function ``func`` to the specified ``convention`` string.
+   
+   :param func: the function to modify the calling convention
+   :param convention: the calling convention to apply to the function prototype as a string
+   :type convention: str
    
 .. py:function:: type\.convention(func, convention)
    
@@ -1715,9 +1997,9 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.cc<type\.convention>`, :py:func:`function.convention<type\.convention>`, :py:func:`function.type.cc<type\.convention>`
    
-   :param func: the desired function to modify the calling convention of
-   :param convention: a string or integer masked with :py:obj:`idaapi.CM_CC_MASK` representing the calling convention to apply
-   :type convention: str or int or long
+   :param func: the function to modify the calling convention
+   :param convention: the calling convention to apply to the function specified as an :py:obj:`idaapi.CM_CC_MASK`
+   :type convention: int or long
    
 .. py:function:: type\.flags()
    
@@ -1727,13 +2009,13 @@ Some simple ways of getting information about a function::
    
    Return the flags for the function ``func``.
    
-   :param func: the function to fetch the flags from
+   :param func: the function to return the flags of
    
 .. py:function:: type\.flags(func, mask)
    
    Return the flags for the function ``func`` selected with the specified ``mask``.
    
-   :param func: the function to fetch the flags from
+   :param func: the function to return the flags of
    :param mask: a bitmask used to select the explicit flag bits to return
    :type mask: int or long
    
@@ -1741,10 +2023,10 @@ Some simple ways of getting information about a function::
    
    Set the flags for the function ``func`` selected by the specified ``mask`` to the provided ``integer``.
    
-   :param func: the function owning the flags that are to be modified
-   :param mask: a bitmask used to select the explicit flag bits to modify
+   :param func: the function with the flags that are to be modified
+   :param mask: a bitmask used to specify the explicit flags to set
    :type mask: int or long
-   :param integer: the flags to use when modifying the bits selected by the bitmask
+   :param integer: the flags to set on the function
    :type integer: bool or int or long
    
 .. py:function:: type\.has_frame()
@@ -1759,7 +2041,7 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.frameQ<type\.has_frame>`
    
-   :param func: the function to use when checking for the existence of a frame
+   :param func: the function to check for the existence of a frame
    
 .. py:function:: type\.has_frameptr()
    
@@ -1773,7 +2055,7 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.frameptrQ<type\.has_frameptr>`
    
-   :param func: the function to use when checking for the existence of its frame pointer
+   :param func: the function to check for the existence of a frame pointer
    
 .. py:function:: type\.has_name()
    
@@ -1787,7 +2069,7 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.nameQ<type\.has_name>`
    
-   :param func: the function to use when checking for its name
+   :param func: the function to use when checking for a name
    
 .. py:function:: type\.has_prototype()
    
@@ -1801,7 +2083,7 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.has_typeinfo<type\.has_prototype>`, :py:func:`function.type.typeinfoQ<type\.has_prototype>`, :py:func:`function.type.prototypeQ<type\.has_prototype>`
    
-   :param func: the function to use when checking for the existence of a prototype
+   :param func: the function to check for the existence of a prototype
    
 .. py:function:: type\.has_return()
    
@@ -1831,7 +2113,7 @@ Some simple ways of getting information about a function::
    
    Modify the attributes of the function ``func`` to set it as a hidden function depending on the value of ``boolean``.
    
-   :param func: the desired function to modify the attributes of
+   :param func: the function to modify the hidden attribute
    :param boolean: a boolean value representing whether the function is hidden or not
    
 .. py:function:: type\.is_far()
@@ -1860,7 +2142,7 @@ Some simple ways of getting information about a function::
    
    Aliases: :py:func:`function.type.hiddenQ<type\.is_hidden>`
    
-   :param func: the function to use when checking if it is hidden
+   :param func: the function to check for its visibility
    
 .. py:function:: type\.is_library()
    
@@ -1921,6 +2203,39 @@ Some simple ways of getting information about a function::
    :param func: the desired function to modify the attributes of
    :param boolean: a boolean value representing whether the function should be set as a library function or not
    
+.. py:function:: type\.result()
+   
+   Return the result type for the current function as an :py:obj:`idaapi.tinfo_t`.
+   
+.. py:function:: type\.result(info)
+   
+   Modify the result type for the current function to the type information provided as an :py:obj:`idaapi.tinfo_t` provided in ``info``.
+   
+   :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the current function result
+   :type info: idaapi.tinfo_t
+   
+.. py:function:: type\.result(func)
+   
+   Return the result type for the function ``func`` as an :py:obj:`idaapi.tinfo_t`.
+   
+   :param func: the function containing the result to return
+   
+.. py:function:: type\.result(func, info)
+   
+   Modify the result type for the function ``func`` to the type information provided as a string in ``info``.
+   
+   :param func: the function to modify its result
+   :param info: the type information to apply to the result of the function
+   :type info: str
+   
+.. py:function:: type\.result(func, info)
+   
+   Modify the result type for the function ``func`` to the type information provided as an :py:obj:`idaapi.tinfo_t` in ``info``.
+   
+   :param func: the function to modify its result
+   :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the function result
+   :type info: idaapi.tinfo_t
+   
 .. py:function:: type\.static()
    
    Return a boolean describing whether the current function is defined as a static function.
@@ -1935,7 +2250,7 @@ Some simple ways of getting information about a function::
    
    Modify the attributes of the function ``func`` to set it as a static function depending on the value of ``boolean``.
    
-   :param func: the desired function to modify the attributes of
+   :param func: the function to modify the static attribute
    :param boolean: a boolean value representing whether the function should be set as a static function or not
    
 .. py:function:: type\.thunk()
@@ -1952,6 +2267,6 @@ Some simple ways of getting information about a function::
    
    Modify the attributes of the function ``func`` to set it as a code thunk depending on the value of ``boolean``.
    
-   :param func: the desired function to modify the attributes of
+   :param func: the function to modify the thunk attribute
    :param boolean: a boolean value representing whether the function should be set as a code thunk or not
    

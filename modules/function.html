@@ -78,20 +78,39 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="function.address">
 <code class="descclassname">function.</code><code class="descname">address</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.address" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the entry-point of the current function.</p>
+<dd><p>Return the address of the entrypoint for the current function.</p>
 <p>Aliases: <a class="reference internal" href="#function.address" title="function.address"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.top</span></code></a>, <a class="reference internal" href="#function.address" title="function.address"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.addr</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">function.</code><code class="descname">address</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the entry-point of the function identified by <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<dd><p>Return the address for the entrypoint belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#function.address" title="function.address"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.top</span></code></a>, <a class="reference internal" href="#function.address" title="function.address"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.addr</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the address for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">address</code><span class="sig-paren">(</span><em>func</em>, <em>offset</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address for the entrypoint belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code> and add the provided <code class="docutils literal notranslate"><span class="pre">offset</span></code> to it.</p>
+<p>Aliases: <a class="reference internal" href="#function.address" title="function.address"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.top</span></code></a>, <a class="reference internal" href="#function.address" title="function.address"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.addr</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to return the address for</li>
+<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the amount to add to the returned address</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -416,7 +435,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database to check</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database to check</td>
 </tr>
 </tbody>
 </table>
@@ -432,7 +451,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to check the address against</li>
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database to check</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database to check</li>
 </ul>
 </td>
 </tr>
@@ -608,18 +627,36 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <dl class="function">
 <dt id="function.offset">
 <code class="descclassname">function.</code><code class="descname">offset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.offset" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the offset of the current function from the base of the database.</p>
+<dd><p>Return the offset from the base of the database for the current function.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">function.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the offset of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> from the base of the database.</p>
+<dd><p>Return the offset from the base of the database for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – anything referring to a function to return the offset for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>func</em>, <em>offset</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the offset from the base of the database for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> and add the provided <code class="docutils literal notranslate"><span class="pre">offset</span></code> to it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1052,6 +1089,44 @@ namespace.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to return the basic block for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.block.address">
+<code class="descclassname">block.</code><code class="descname">address</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block.address" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the top address for the basic block containing the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">address</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the top address for the basic block containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return the address of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">address</code><span class="sig-paren">(</span><em>ea</em>, <em>offset</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the top address for the basic block containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and add the provided <code class="docutils literal notranslate"><span class="pre">offset</span></code> to it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return the address of</li>
+<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the amount to add to the returned address</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1743,6 +1818,44 @@ namespace.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="function.block.offset">
+<code class="descclassname">block.</code><code class="descname">offset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block.offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the offset from the base of the database for the basic block at the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the offset from the base of the database for the basic block at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return the offset of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em>, <em>offset</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the offset from the base of the database for the basic block at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and add the provided <code class="docutils literal notranslate"><span class="pre">offset</span></code> to it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return the offset of</li>
+<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the amount to add to the returned offset</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.block.read">
 <code class="descclassname">block.</code><code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block.read" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return all the bytes contained in the current basic block.</p>
@@ -2028,6 +2141,24 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 </dd></dl>
 
 <dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>bb</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> in function <code class="docutils literal notranslate"><span class="pre">func</span></code> identifed by <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.blocks.digraph">
 <code class="descclassname">blocks.</code><code class="descname">digraph</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.digraph" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return a <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx.DiGraph</span></code> of the function at the current address.</p>
@@ -2130,6 +2261,58 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 </table>
 </dd></dl>
 
+<dl class="function">
+<dt id="function.blocks.walk">
+<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.walk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> starting at the current address and terminating when there’s no clear path to continue.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> starting at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and terminating when there’s no clear path to continue.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> in the function <code class="docutils literal notranslate"><span class="pre">func</span></code> starting at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and terminating when there’s no clear path to continue.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>bb</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> starting at the specified <code class="docutils literal notranslate"><span class="pre">bb</span></code> and terminating when there’s no clear path to continue.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </div>
 <div class="section" id="function-chunk">
 <span id="ns-function-chunk"></span><h3>3.1.3.2.3. function.chunk<a class="headerlink" href="#function-chunk" title="Permalink to this headline">¶</a></h3>
@@ -2191,7 +2374,7 @@ the chunk containing the requested address.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the chunk to add</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the chunk to add to the current function</td>
 </tr>
 </tbody>
 </table>
@@ -2208,7 +2391,7 @@ the chunk containing the requested address.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to add the chunk to</li>
-<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address of the chunk to add to the current function</li>
+<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address of the chunk to add to the function</li>
 <li><strong>end</strong> (<em>int</em><em> or </em><em>long</em>) – the ending address of the chunk</li>
 </ul>
 </td>
@@ -2228,7 +2411,45 @@ the chunk containing the requested address.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to add the chunk to</li>
-<li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the chunk to add</li>
+<li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the chunk to add to the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.chunk.address">
+<code class="descclassname">chunk.</code><code class="descname">address</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.address" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the top address of the function chunk containing the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">address</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the top address of the function chunk containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">address</code><span class="sig-paren">(</span><em>ea</em>, <em>offset</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address of the function chunk containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and add the provided <code class="docutils literal notranslate"><span class="pre">offset</span></code> to it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk</li>
+<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the offset to add to the chunk address</li>
 </ul>
 </td>
 </tr>
@@ -2262,7 +2483,7 @@ the chunk containing the requested address.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to assign the chunk to</li>
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to add to the current function</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to add to the function</li>
 </ul>
 </td>
 </tr>
@@ -2284,7 +2505,7 @@ the chunk containing the requested address.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address belonging to the chunk to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return</td>
 </tr>
 </tbody>
 </table>
@@ -2300,7 +2521,7 @@ the chunk containing the requested address.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the chunk</li>
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address belonging to the chunk to return</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return</li>
 </ul>
 </td>
 </tr>
@@ -2343,6 +2564,122 @@ the chunk containing the requested address.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address belonging to the function chunk to iterate through</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.chunk.offset">
+<code class="descclassname">chunk.</code><code class="descname">offset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the offset from the base of the database for the current function chunk.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the offset from the base of the database for the function chunk containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return the offset of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em>, <em>offset</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the offset from the base of the database for the function chunk containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and add the provided <code class="docutils literal notranslate"><span class="pre">offset</span></code> to it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return the offset of</li>
+<li><strong>offset</strong> – the offset to add to the result</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.chunk.owner">
+<code class="descclassname">chunk.</code><code class="descname">owner</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.owner" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the first owner of the function chunk containing the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">owner</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the first owner of the function chunk containing the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return the function for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.chunk.owners">
+<code class="descclassname">chunk.</code><code class="descname">owners</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.owners" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yield each of the owners which have the current function chunk associated with it.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">owners</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield each of the owners which have the function chunk containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> associated with it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return each of the functions for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.chunk.points">
+<code class="descclassname">chunk.</code><code class="descname">points</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.points" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the current function chunk and yield each address and stack delta that was calculated.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">points</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through the function chunk containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and yield each address and stack delta that was calculated.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to yield each of the stack points for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">points</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through the chunk belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code> and containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in order to yield each address and stack delta that was calculated.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the chunk</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to yield each of the stack points for</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2404,7 +2741,7 @@ the chunk containing the requested address.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address belonging to the chunk to remove</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to remove</td>
 </tr>
 </tbody>
 </table>
@@ -2420,8 +2757,8 @@ the chunk containing the requested address.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the function containing the chunk to remove</li>
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address belonging to the chunk to remove</li>
+<li><strong>func</strong> – the function containing the chunk</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to remove from the function</li>
 </ul>
 </td>
 </tr>
@@ -2519,6 +2856,47 @@ the boundaries of each chunk associated with a function.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="function.chunks.contains">
+<code class="descclassname">chunks.</code><code class="descname">contains</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunks.contains" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns True if the current function contains the current address in any of its chunks.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunks.contains" title="function.chunks.contains"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.contains</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunks.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns True if the current function contains the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in any of its chunks.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunks.contains" title="function.chunks.contains"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.contains</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunks.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns True if the function <code class="docutils literal notranslate"><span class="pre">func</span></code> contains the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in any of its chunks.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunks.contains" title="function.chunks.contains"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.contains</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to check the chunk against</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to check</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.chunks.iterate">
 <code class="descclassname">chunks.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunks.iterate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Iterate through all the instructions for each chunk in the current function.</p>
@@ -2544,6 +2922,7 @@ the boundaries of each chunk associated with a function.</p>
 <dt id="function.chunks.register">
 <code class="descclassname">chunks.</code><code class="descname">register</code><span class="sig-paren">(</span><em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span><a class="headerlink" href="#function.chunks.register" title="Permalink to this definition">¶</a></dt>
 <dd><p>Yield each <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">opnum,</span> <span class="pre">state)</span></code> within the current function that uses <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunks.register" title="function.chunks.register"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.register</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2564,6 +2943,7 @@ the boundaries of each chunk associated with a function.</p>
 <code class="descclassname">chunks.</code><code class="descname">register</code><span class="sig-paren">(</span><em>func</em>, <em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
 <dd><p>Yield each <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">opnum,</span> <span class="pre">state)</span></code> within the function <code class="docutils literal notranslate"><span class="pre">func</span></code> that uses <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
 <p>If the keyword <code class="docutils literal notranslate"><span class="pre">write</span></code> is True, then only return the result if it’s writing to the register.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunks.register" title="function.chunks.register"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.register</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2775,10 +3155,68 @@ supported.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="function.frame.args.location">
+<code class="descclassname">frame.args.</code><code class="descname">location</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.location" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the list of address locations for each of the parameters that are passed to the function call near the current address.</p>
+<p>Aliases: <a class="reference internal" href="#function.frame.args.location" title="function.frame.args.location"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.get_args_size</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">frame.args.</code><code class="descname">location</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the list of address locations for each of the parameters that are passed to the function call at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">frame.args.</code><code class="descname">location</code><span class="sig-paren">(</span><em>ea</em>, <em>index</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the initialization address for the parameter at <code class="docutils literal notranslate"><span class="pre">index</span></code> for the function call at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.frame.args.registers">
+<code class="descclassname">frame.args.</code><code class="descname">registers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.registers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the register information associated with the arguments for the current function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">frame.args.</code><code class="descname">registers</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the register information associated with the arguments for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function containing the argument register information to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.frame.args.size">
 <code class="descclassname">frame.args.</code><code class="descname">size</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.size" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the size of the arguments for the current function.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.size" title="function.frame.args.size"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.get_args_size</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -2926,7 +3364,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to assign to the current function</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to apply to the current function</td>
 </tr>
 </tbody>
 </table>
@@ -2940,7 +3378,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information from the current function</td>
 </tr>
 </tbody>
 </table>
@@ -2969,8 +3407,8 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the function to set the type information of</li>
-<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the type information string to assign to the function</li>
+<li><strong>func</strong> – the function to use when applying type information</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the type information string to apply to the function</li>
 </ul>
 </td>
 </tr>
@@ -2987,8 +3425,8 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the function to set the type information of</li>
-<li><strong>info</strong> (<em>str</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> representing the type information to assign to the function</li>
+<li><strong>func</strong> – the function to use when applying type information</li>
+<li><strong>info</strong> (<em>str</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the function</li>
 </ul>
 </td>
 </tr>
@@ -3006,7 +3444,95 @@ one to filter functions according to their particular attributes.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to remove the type information from</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information</li>
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information from the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.type.argument">
+<code class="descclassname">type.</code><code class="descname">argument</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#function.type.argument" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type information for the argument at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> of the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the argument for the current function to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">argument</code><span class="sig-paren">(</span><em>index</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the type information for the argument at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> of the current function and set it to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the argument to apply the type to</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to apply to the specified function argument</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">argument</code><span class="sig-paren">(</span><em>func</em>, <em>index</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type information for the argument at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> of the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the argument</li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the function argument to return</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">argument</code><span class="sig-paren">(</span><em>func</em>, <em>index</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the type information for the argument at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> and set it to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the argument</li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the function argument to apply type information</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the function argument</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">argument</code><span class="sig-paren">(</span><em>func</em>, <em>index</em>, <em>info_s</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the type information for the argument at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> and set it to the string in <code class="docutils literal notranslate"><span class="pre">info_s</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the argument</li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the function argument to apply type information</li>
+<li><strong>info_s</strong> (<em>str</em>) – the type information as a string to apply to the function argument</li>
 </ul>
 </td>
 </tr>
@@ -3031,7 +3557,25 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to use when returning the calling convention</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to fetch the calling convention from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">convention</code><span class="sig-paren">(</span><em>func</em>, <em>convention</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the calling convention used by the prototype for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the specified <code class="docutils literal notranslate"><span class="pre">convention</span></code> string.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to modify the calling convention</li>
+<li><strong>convention</strong> (<em>str</em>) – the calling convention to apply to the function prototype as a string</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -3047,8 +3591,8 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the desired function to modify the calling convention of</li>
-<li><strong>convention</strong> (<em>str</em><em> or </em><em>int</em><em> or </em><em>long</em>) – a string or integer masked with <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.CM_CC_MASK</span></code> representing the calling convention to apply</li>
+<li><strong>func</strong> – the function to modify the calling convention</li>
+<li><strong>convention</strong> (<em>int</em><em> or </em><em>long</em>) – the calling convention to apply to the function specified as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.CM_CC_MASK</span></code></li>
 </ul>
 </td>
 </tr>
@@ -3070,7 +3614,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to fetch the flags from</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the flags of</td>
 </tr>
 </tbody>
 </table>
@@ -3085,7 +3629,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the function to fetch the flags from</li>
+<li><strong>func</strong> – the function to return the flags of</li>
 <li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – a bitmask used to select the explicit flag bits to return</li>
 </ul>
 </td>
@@ -3103,9 +3647,9 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the function owning the flags that are to be modified</li>
-<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – a bitmask used to select the explicit flag bits to modify</li>
-<li><strong>integer</strong> (<em>bool</em><em> or </em><em>int</em><em> or </em><em>long</em>) – the flags to use when modifying the bits selected by the bitmask</li>
+<li><strong>func</strong> – the function with the flags that are to be modified</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – a bitmask used to specify the explicit flags to set</li>
+<li><strong>integer</strong> (<em>bool</em><em> or </em><em>int</em><em> or </em><em>long</em>) – the flags to set on the function</li>
 </ul>
 </td>
 </tr>
@@ -3129,7 +3673,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to use when checking for the existence of a frame</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check for the existence of a frame</td>
 </tr>
 </tbody>
 </table>
@@ -3151,7 +3695,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to use when checking for the existence of its frame pointer</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check for the existence of a frame pointer</td>
 </tr>
 </tbody>
 </table>
@@ -3173,7 +3717,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to use when checking for its name</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to use when checking for a name</td>
 </tr>
 </tbody>
 </table>
@@ -3195,7 +3739,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to use when checking for the existence of a prototype</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check for the existence of a prototype</td>
 </tr>
 </tbody>
 </table>
@@ -3252,7 +3796,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the desired function to modify the attributes of</li>
+<li><strong>func</strong> – the function to modify the hidden attribute</li>
 <li><strong>boolean</strong> – a boolean value representing whether the function is hidden or not</li>
 </ul>
 </td>
@@ -3299,7 +3843,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to use when checking if it is hidden</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check for its visibility</td>
 </tr>
 </tbody>
 </table>
@@ -3410,6 +3954,76 @@ one to filter functions according to their particular attributes.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="function.type.result">
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.result" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the result type for the current function as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the result type for the current function to the type information provided as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> provided in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the current function result</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function containing the result to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the type information provided as a string in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to modify its result</li>
+<li><strong>info</strong> (<em>str</em>) – the type information to apply to the result of the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the type information provided as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to modify its result</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the function result</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.type.static">
 <code class="descclassname">type.</code><code class="descname">static</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.static" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return a boolean describing whether the current function is defined as a static function.</p>
@@ -3438,7 +4052,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the desired function to modify the attributes of</li>
+<li><strong>func</strong> – the function to modify the static attribute</li>
 <li><strong>boolean</strong> – a boolean value representing whether the function should be set as a static function or not</li>
 </ul>
 </td>
@@ -3476,7 +4090,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the desired function to modify the attributes of</li>
+<li><strong>func</strong> – the function to modify the thunk attribute</li>
 <li><strong>boolean</strong> – a boolean value representing whether the function should be set as a code thunk or not</li>
 </ul>
 </td>

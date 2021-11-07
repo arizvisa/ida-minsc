@@ -71,6 +71,14 @@ functions and aliases. For more information on this, please see
    :type sptr: idaapi.struc_t
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
    
+.. py:function:: by(tinfo, \*\*options)
+   
+   Return the structure for the specified ``tinfo``.
+   
+   :param tinfo:
+   :type tinfo: idaapi.tinfo_t
+   :param \*\*options:
+   
 .. py:function:: by(\*\*type)
    
    Return the structure matching the keyword specified by ``type``.
@@ -340,21 +348,15 @@ functions and aliases. For more information on this, please see
    :type string: str
    :param \*suffix: any other names to append to the base name
    
-.. py:function:: new(name)
+.. py:function:: new(string, \*suffix, \*\*offset)
    
-   Returns a new structure ``name``.
+   Return a new structure using the name specified by ``string``.
    
-   :param name: the name of the structure to create
-   :type name: str
+   If the integer ``offset`` is provided, then use it as the base offset for the newly created structure.
    
-.. py:function:: new(name, offset)
-   
-   Returns a new structure ``name`` using ``offset`` as its base offset.
-   
-   :param name: the name of the structure to create
-   :type name: str
-   :param offset: the base offset of the structure
-   :type offset: int or long
+   :param string: a string to use as the name
+   :param \*suffix: any other strings to append to the name
+   :param \*\*offset: the base offset of the structure that's being created
    
 .. py:function:: remove(structure)
    

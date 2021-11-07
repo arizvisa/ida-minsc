@@ -152,6 +152,24 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
+<code class="descclassname">structure.</code><code class="descname">by</code><span class="sig-paren">(</span><em>tinfo</em>, <em>**options</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the structure for the specified <code class="docutils literal notranslate"><span class="pre">tinfo</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>tinfo</strong> (<em>idaapi.tinfo_t</em>) – </li>
+<li><strong>**options</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">structure.</code><code class="descname">by</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the structure matching the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -669,29 +687,17 @@ comment.</p>
 
 <dl class="function">
 <dt id="structure.new">
-<code class="descclassname">structure.</code><code class="descname">new</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.new" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns a new structure <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the structure to create</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">structure.</code><code class="descname">new</code><span class="sig-paren">(</span><em>name</em>, <em>offset</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns a new structure <code class="docutils literal notranslate"><span class="pre">name</span></code> using <code class="docutils literal notranslate"><span class="pre">offset</span></code> as its base offset.</p>
+<code class="descclassname">structure.</code><code class="descname">new</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em>, <em>**offset</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.new" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a new structure using the name specified by <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">offset</span></code> is provided, then use it as the base offset for the newly created structure.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>name</strong> (<em>str</em>) – the name of the structure to create</li>
-<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the base offset of the structure</li>
+<li><strong>string</strong> – a string to use as the name</li>
+<li><strong>*suffix</strong> – any other strings to append to the name</li>
+<li><strong>**offset</strong> – the base offset of the structure that’s being created</li>
 </ul>
 </td>
 </tr>

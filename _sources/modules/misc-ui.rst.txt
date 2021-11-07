@@ -508,6 +508,10 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
    
    Close or hide the notepad window.
    
+.. py:function:: notepad\.count()
+   
+   Return the number of lines that are currently stored within the notepad window.
+   
 .. py:function:: notepad\.cursor()
    
    Return the :py:obj:`QtGui.QTextCursor` used by the notepad window.
@@ -539,6 +543,10 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
    Set each line that is currently stored within the notepad window to ``items``.
    
    :param items: the list to assign to each row of the notepad window
+   
+.. py:function:: notepad\.size()
+   
+   Return the number of characters that are currently stored within the notepad window.
    
 .. _ns-ui-segments:
 
