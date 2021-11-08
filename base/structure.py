@@ -149,7 +149,7 @@ def list(**type):
         six.print_(u"[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), u" // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
     return
 
-@utils.multicase(name=(six.string_types, tuple))
+@utils.multicase(string=(six.string_types, tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def new(string, *suffix, **offset):
     """Return a new structure using the name specified by `string`.
