@@ -504,7 +504,7 @@ class multicase(object):
             # Grab our values that we're going to match with.
             parameter_iterator, parameter_keywords = (item for item in args), {kwparam : kwvalue for kwparam, kwvalue in kwds.items()}
 
-            # Skip the ignored arguments within our parameters.
+            # Skip the ignored argument values within our parameters.
             [next(item) for item in [parameter_iterator] * parameter_ignore_count]
 
             # Build the argument tuple that contains the actual parameters that
@@ -512,7 +512,7 @@ class multicase(object):
             # we need to ensure that any keywords parameters and default parameters
             # will be inserted into the correct place within the tuple.
             parameter_values = []
-            for name in parameter_names:
+            for name in parameter_names[parameter_ignore_count:]:
                 try:
                     value = next(parameter_iterator)
 
