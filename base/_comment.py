@@ -404,6 +404,7 @@ class _list(default):
         return '[' + ', '.join(map(f, instance)) + ']'
 
 @cache.register(tuple, pattern.star(' \t'), '(')
+@cache.register(object, pattern.star(' \t'), '(')
 class _tuple(default):
     @classmethod
     def type(cls, instance):
