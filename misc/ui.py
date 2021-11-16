@@ -272,9 +272,10 @@ class current(object):
         return internal.interface.bounds_t(ea_l, ea_r)
     selected = internal.utils.alias(selection, 'current')
     @classmethod
-    def opnum(cls):
+    def operand(cls):
         '''Return the currently selected operand number.'''
         return idaapi.get_opnum()
+    opnum = internal.utils.alias(operand, 'current')
     @classmethod
     def widget(cls):
         '''Return the current widget that the mouse is hovering over.'''
