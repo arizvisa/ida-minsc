@@ -2855,20 +2855,28 @@ class type(object):
         # The user gave us a function to try out, so we'll try and grab the
         # type information from the address we resolved.
         else:
-            tinfo = cls(ea)
+            ti = cls(ea)
 
         # If our type is a function pointer, then we need to dereference it
         # in order to get the type that we want to extract the result from.
-        if tinfo.is_funcptr():
+        if rt and ti.is_funcptr():
             pi = idaapi.ptr_type_data_t()
-            if not tinfo.get_ptr_details(pi):
-                raise E.DisassemblerError(u"{:s}.result({!r}) : Unable to get the pointer target from the type ({!r}) for the specified function.".format('.'.join([__name__, cls.__name__]), func, "{!s}".format(tinfo)))
+            if not ti.get_ptr_details(pi):
+                raise E.DisassemblerError(u"{:s}.result({!r}) : Unable to get the pointer target from the type ({!r}) for the specified function.".format('.'.join([__name__, cls.__name__]), func, "{!s}".format(ti)))
             tinfo = pi.obj_type
 
-        # Otherwise it should be a regular function that we can grab the
-        # type out of its details. If there are no details, then we fall
-        # back to one of the methods off of the idaapi.tinfo_t.
-        elif not tinfo.has_details():
+        # Otherwise, it should be a function and we can just use its idaapi.tinfo_t as-is.
+        elif not rt and ti.is_func():
+            tinfo = ti
+
+        # Otherwise, this is not a function prototype and we can't use it.
+        else:
+            raise E.InvalidTypeOrValueError(u"{:s}.result({!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), func, "{!s}".format(ti), ea))
+
+        # Now we should have a function prototype where we can grab the
+        # return type type out of its details. If there are no details,
+        # then we fall back to the method off of the idaapi.tinfo_t.
+        if not tinfo.has_details():
             logging.warning(u"{:s}.result({!r}) : Using the type information directly ({!s}) to get the return type due to the inability to get the function details for the specified function.".format('.'.join([__name__, cls.__name__]), func, tinfo))
             return tinfo.get_rettype()
 
@@ -2883,7 +2891,7 @@ class type(object):
     def result(cls, func, info):
         '''Modify the result type for the function `func` to the type information provided as a string in `info`.'''
 
-        # FIXME: figure out the proper way to parse a type instead of a declaration
+        # FIXME: figure out the proper way to parse a type instead of as a declaration
         tinfo = internal.declaration.parse(info)
         if tinfo is None:
             raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r})".format('.'.join([__name__, cls.__name__]), func, info, info))
@@ -2975,20 +2983,27 @@ class type(object):
         @utils.multicase(index=six.integer_types)
         def __new__(cls, func, index):
             '''Return the type information for the argument at the specified `index` of the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            tinfo = type(ea)
+            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            ti = type(ea)
 
             # If our type is a function pointer, then we need to dereference it
             # in order to get the type that we want to extract the argument from.
-            if tinfo.is_funcptr():
+            if rt and ti.is_funcptr():
                 pi = idaapi.ptr_type_data_t()
-                if not tinfo.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}({!r}, {:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, index, "{!s}".format(tinfo), ea))
+                if not ti.get_ptr_details(pi):
+                    raise E.DisassemblerError(u"{:s}({!r}, {:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, index, "{!s}".format(ti), ea))
                 tinfo = pi.obj_type
 
-            # Otherwise it should be a regular function and we can grab the
-            # types out of its details. If there are no details, then we raise
-            # an exception informing the user.
+            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
+            elif not rt and ti.is_func():
+                tinfo = ti
+
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), func, index, "{!s}".format(ti), ea))
+
+            # Now we can check to see if the type has details that we can grab the
+            # argument type out of. If there are no details, then we raise an
+            # exception informing the user.
             if not tinfo.has_details():
                 raise E.MissingTypeOrAttribute(u"{:s}({!r}, {:#x}) : The type information ({!s}) for the function at {:#x} does not contain any details.".format('.'.join([__name__, cls.__name__]), func, index, "{!s}".format(tinfo), ea))
 
@@ -3014,12 +3029,20 @@ class type(object):
             # First we need to figure out if our type is a function. If it is, then
             # we need to dereference it in order to get the information that we'll
             # need to modify.
-            tinfo = type(ea)
-            if tinfo.is_funcptr():
+            ti = type(ea)
+            if rt and ti.is_funcptr():
                 pi = idaapi.ptr_type_data_t()
-                if not tinfo.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}({!r}, {:#x}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, index, "{!s}".format(info), "{!s}".format(tinfo), ea))
+                if not ti.get_ptr_details(pi):
+                    raise E.DisassemblerError(u"{:s}({!r}, {:#x}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), func, index, "{!s}".format(info), "{!s}".format(ti), ea))
                 tinfo = pi.obj_type
+
+            # If it's a regular function, then we can use the idaapi.tinfo_t we received.
+            elif not rt and ti.is_func():
+                tinfo = ti
+
+            # Anything else is not a function prototype and thus we can't use it.
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), func, index, "{!s}".format(info), "{!s}".format(ti), ea))
 
             # Next we need to ensure that the type information has details that
             # we can modify. If they aren't there, then we need to bail.
