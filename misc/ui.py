@@ -259,11 +259,16 @@ class current(object):
         '''Return the current address range of whatever is selected'''
         view = idaapi.get_current_viewer()
         left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
-        ok = idaapi.read_selection(view, left, right)
-        if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.selection() : Unable to read the current selection.".format('.'.join([__name__, cls.__name__])))
-        pl_l, pl_r = left.place(view), right.place(view)
-        ea_l, ea_r = internal.interface.address.inside(pl_l.ea, pl_r.ea)
+
+        # If we were able to grab a selection, then return it.
+        if idaapi.read_selection(view, left, right):
+            pl_l, pl_r = left.place(view), right.place(view)
+            ea_l, ea_r = internal.interface.address.inside(pl_l.ea, pl_r.ea)
+
+        # Otherwise we need to use the current address and its bounds.
+        else:
+            ea = idaapi.get_screen_ea()
+            ea_l, ea_r = idaapi.get_item_head(ea), idaapi.get_item_end(ea) - 1
         return internal.interface.bounds_t(ea_l, ea_r)
     selected = internal.utils.alias(selection, 'current')
     @classmethod
