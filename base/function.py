@@ -3257,5 +3257,46 @@ class xref(object):
         # regular
         return database.xref.up(ea)
 
+    @utils.multicase(index=six.integer_types)
+    @classmethod
+    def argument(cls, index):
+        '''Return the address of the argument at the specified `index` that is passed to the function reference at the current address.'''
+        items = cls.arguments(ui.current.address())
+        return items[index]
+    @utils.multicase(index=six.integer_types, ea=six.integer_types)
+    @classmethod
+    def argument(cls, index, ea):
+        '''Return the address of the argument at the specified `index` that is passed to the function reference identified by the address `ea`.'''
+        items = cls.arguments(ea)
+        return items[index]
+    @utils.multicase(index=six.integer_types, ea=six.integer_types)
+    @classmethod
+    def argument(cls, func, index, ea):
+        '''Return the address of the argument at the specified `index` of the function `func` that is passed to function reference identifed by the address `ea`.'''
+        items = cls.arguments(func, ea)
+        return items[index]
+
+    @utils.multicase()
+    @classmethod
+    def arguments(cls):
+        '''Return the address of all of the arguments being passed to the function reference at the current address.'''
+        return cls.arguments(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def arguments(cls, ea):
+        '''Return the address of all of the arguments being passed to the function reference at address `ea`.'''
+        if not database.xref.code_down(ea):
+            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) is not referencing a code type.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        items = idaapi.get_arg_addrs(ea)
+        return [] if items is None else [ea for ea in items]
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def arguments(cls, func, ea):
+        '''Return the address of all of the arguments for the function `func` that are being passed to the reference at address `ea`.'''
+        refs = {ref for ref in cls.up(func)}
+        if ea not in refs:
+            logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, cls.__name__]), func, ea, address(func), ea))
+        return cls.arguments(ea)
+
 x = xref    # XXX: ns alias
 up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
