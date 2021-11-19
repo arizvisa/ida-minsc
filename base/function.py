@@ -2279,42 +2279,6 @@ def select(func, **boolean):
         if res: yield ea, res
     return
 
-## referencing
-@utils.multicase()
-def down():
-    '''Return all the functions that are called by the current function.'''
-    return down(ui.current.function())
-@utils.multicase()
-def down(func):
-    '''Return all the functions that are called by the function `func`.'''
-    def codeRefs(fn):
-        data, code = [], []
-        for ea in iterate(fn):
-            if len(database.down(ea)) == 0:
-                if database.type.is_code(ea) and instruction.type.is_call(ea):
-                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, interface.range.start(fn), utils.string.escape(database.disassemble(ea), '"')))
-                    #code.append((ea, 0))
-                continue
-            data.extend( (ea, x) for x in database.xref.data_down(ea) )
-            code.extend( (ea, x) for x in database.xref.code_down(ea) if interface.range.start(fn) == x or not contains(fn, x) )
-        return data, code
-    fn = by(func)
-    return sorted({d for _, d in codeRefs(fn)[1]})
-
-@utils.multicase()
-def up():
-    '''Return all the functions that call the current function.'''
-    return up(ui.current.address())
-@utils.multicase()
-def up(func):
-    '''Return all the functions that call the function `func`.'''
-    rt, ea = interface.addressOfRuntimeOrStatic(func)
-    # runtime
-    if rt:
-        return database.up(ea)
-    # regular
-    return database.up(ea)
-
 @utils.multicase()
 def switches():
     '''Yield each switch found in the current function.'''
@@ -3224,8 +3188,74 @@ class type(object):
             if not set_tinfo(ea, newinfo):
                 raise E.DisassemblerError(u"{:s}.name({!r}, {:#x}, {!s}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), func, index, utils.string.repr(name), "{!s}".format(newinfo), ea))
             return result
+
     arg = argument  # XXX: ns alias
 
 t = type # XXX: ns alias
 convention = cc = utils.alias(type.convention, 'type')
 result = utils.alias(type.result, 'result')
+
+class xref(object):
+    """
+    This namespace is for navigating the cross-references (xrefs)
+    associated with a function in the database. This allows for one
+    to return all of the callers for a function, as well as all of
+    the functions that it may call.
+
+    This namespace is aliased as ``function.x``.
+
+    The functions within this namespace are also aliased as globals.
+    These are:
+
+        ``function.up`` - Return all the addresses that reference a function
+        ``function.down`` - Return the callable addresses referenced by a function
+
+    Some ways to utilize this namespace can be::
+
+        > print( function.x.up() )
+        > for ea in function.x.down(): ...
+
+    """
+
+    ## referencing
+    @utils.multicase()
+    @classmethod
+    def down(cls):
+        '''Return all of the addresses that are referenced by the current function.'''
+        return down(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def down(cls, func):
+        '''Return all of the addresses that are referenced by the function `func`.'''
+        def codeRefs(fn):
+            data, code = [], []
+            for ea in iterate(fn):
+                if len(database.down(ea)) == 0:
+                    if database.type.is_code(ea) and instruction.type.is_call(ea):
+                        logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.disassemble(ea), '"')))
+                        #code.append((ea, 0))
+                    continue
+                data.extend( (ea, x) for x in database.xref.data_down(ea) )
+                code.extend( (ea, x) for x in database.xref.code_down(ea) if interface.range.start(fn) == x or not contains(fn, x) )
+            return data, code
+        fn = by(func)
+        return sorted({d for _, d in codeRefs(fn)[1]})
+
+    @utils.multicase()
+    @classmethod
+    def up(cls):
+        '''Return all of the addresses that reference to the current function.'''
+        return up(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def up(cls, func):
+        '''Return all of the addresses that reference the function `func`.'''
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        # runtime
+        if rt:
+            return database.xref.up(ea)
+        # regular
+        return database.xref.up(ea)
+
+x = xref    # XXX: ns alias
+up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
