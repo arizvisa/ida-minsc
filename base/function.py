@@ -2924,9 +2924,12 @@ class type(object):
 
     class argument(object):
         """
-        This namespace allows one to interaction the with arguments within
-        a function prototype. This allows one to rename or modify the
-        information for a particular argument within a function's definition.
+        This namespace allows one to interaction the with individual
+        arguments within a function prototype. This allows one to
+        rename or modify the type information for a particular argument
+        within a function's definition.
+
+        This namespace is aliased as ``function.type.arg``.
 
         Some simple ways of fetching or modifying the type of the first parameter
         in a function:
@@ -3191,6 +3194,29 @@ class type(object):
 
     arg = argument  # XXX: ns alias
 
+    class arguments(object):
+        """
+        This namespace allows one to interaction the with the arguments
+        belonging to a function prototype as a whole. This can allow
+        one to count the number of arguments, or fetch all their names
+        and types in their entirety.
+
+        This namespace is aliased as ``function.type.args``.
+        """
+        @utils.multicase()
+        @classmethod
+        def count(cls):
+            '''Return the number of arguments within the current function's prototype.'''
+            return cls.count(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def count(cls, func):
+            '''Return the number of arguments for the prototype of the function identified by `func`.'''
+            ti = type()
+            return ti.get_nargs()
+
+    args = arguments
+
 t = type # XXX: ns alias
 convention = cc = utils.alias(type.convention, 'type')
 result = utils.alias(type.result, 'result')
@@ -3212,8 +3238,8 @@ class xref(object):
 
     Some ways to utilize this namespace can be::
 
-        > print( function.x.up() )
-        > for ea in function.x.down(): ...
+        > print( function.xref.up() )
+        > for ea in function.xref.down(): ...
 
     """
 
