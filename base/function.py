@@ -3301,6 +3301,7 @@ class xref(object):
         '''Return the address of the argument at the specified `index` of the function `func` that is passed to function reference identifed by the address `ea`.'''
         items = cls.arguments(func, ea)
         return items[index]
+    arg = utils.alias(argument, 'xref')
 
     @utils.multicase()
     @classmethod
@@ -3323,6 +3324,7 @@ class xref(object):
         if ea not in refs:
             logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, cls.__name__]), func, ea, address(func), ea))
         return cls.arguments(ea)
+    args = utils.alias(arguments, 'xref')
 
 x = xref    # XXX: ns alias
 up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
