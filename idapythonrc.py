@@ -227,7 +227,7 @@ class plugin_module(object):
 
 ## IDA's native lower-level api
 if sys.platform in {'darwin'}:
-    sys.meta_path.append( internal_object('ida', library(idaapi.idadir('libida.dylib'))) )
+    sys.meta_path.append( internal_object('ida', library(idaapi.idadir("libida{:s}.dylib".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
 
 elif sys.platform in {'linux', 'linux2'}:
     sys.meta_path.append( internal_object('ida', library("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64'))) )
