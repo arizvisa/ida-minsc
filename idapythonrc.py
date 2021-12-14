@@ -227,10 +227,10 @@ class plugin_module(object):
 
 ## IDA's native lower-level api
 if sys.platform in {'darwin'}:
-    sys.meta_path.append( internal_object('ida', library(idaapi.idadir('libida.dylib'))) )
+    sys.meta_path.append( internal_object('ida', library(idaapi.idadir("libida{:s}.dylib".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
 
 elif sys.platform in {'linux', 'linux2'}:
-    sys.meta_path.append( internal_object('ida', library("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64'))) )
+    sys.meta_path.append( internal_object('ida', library(idaapi.idadir("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
 
 elif sys.platform in {'win32'}:
     if __import__('os').path.exists(idaapi.idadir('ida.wll')):
@@ -239,7 +239,7 @@ elif sys.platform in {'win32'}:
         sys.meta_path.append( internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
 
 else:
-    __import__('logging').warning("{:s} : Unable to successfully load IDA's native api with ctypes.".format(__name__))
+    __import__('logging').warning("{:s} : Unable to successfully load IDA's native api via ctypes. Ignoring...".format(__name__))
 
 ## private (internal) api
 sys.meta_path.append( internal_submodule('internal', os.path.join(root, 'base'), include='_*.py') )
