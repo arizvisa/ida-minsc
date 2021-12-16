@@ -2496,7 +2496,7 @@ class address(object):
     def tail(cls, ea):
         '''Return the address of the last byte at the end of the address at `ea`.'''
         ea = interface.address.within(ea)
-        return idaapi.get_item_end(ea)-1
+        return idaapi.get_item_end(ea) - 1
 
     @utils.multicase()
     @classmethod
@@ -5771,6 +5771,16 @@ class set(object):
     def structure(cls, type):
         '''Set the data at the current address to the structure_t specified by `type`.'''
         return cls.structure(ui.current.address(), type)
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    def structure(cls, name):
+        '''Set the data at the current address to the structure_t with the given `name`.'''
+        return cls.structure(ui.current.address(), name)
+    @utils.multicase(sptr=idaapi.struc_t)
+    @classmethod
+    def structure(cls, sptr):
+        '''Set the data at the current address to the structure_t for the specified `sptr`.'''
+        return cls.structure(ui.current.address(), sptr)
     @utils.multicase(ea=six.integer_types, type=_structure.structure_t)
     @classmethod
     def structure(cls, ea, type):
@@ -5779,6 +5789,24 @@ class set(object):
         if not ok:
             raise E.DisassemblerError(u"{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join([__name__, cls.__name__]), ea, type))
         return get.structure(ea, structure=type)
+    @utils.multicase(ea=six.integer_types, name=six.string_types)
+    @classmethod
+    def structure(cls, ea, name):
+        '''Set the data at address `ea` to the structure_t with the given `name`.'''
+        st = _structure.by(name)
+        return cls.structure(ea, st)
+    @utils.multicase(ea=six.integer_types, sptr=idaapi.struc_t)
+    @classmethod
+    def structure(cls, ea, sptr):
+        '''Set the data at address `ea` to the structure_t for the specified `sptr`.'''
+        st = _structure.by(sptr)
+        return cls.structure(ea, st)
+    @utils.multicase(ea=six.integer_types, identifier=six.integer_types)
+    @classmethod
+    def structure(cls, ea, identifier):
+        '''Set the data at address `ea` to the structure_t that has the specified `identifier`.'''
+        st = _structure.by(identifier)
+        return cls.structure(ea, st)
 
     struc = struct = utils.alias(structure, 'set')
 
