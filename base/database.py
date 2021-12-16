@@ -5144,18 +5144,17 @@ class set(object):
         > database.set.structure(ea, structure.by('mystructure'))
 
     """
-
     @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
-    @classmethod
-    def info(cls, info):
+    def __new__(cls, info):
         '''Set the type information at the current address to `info`.'''
-        return cls.info(ui.current.address(), info)
+        return type(ui.current.address(), info)
     @utils.multicase(ea=six.integer_types, info=(six.string_types, idaapi.tinfo_t))
-    @classmethod
-    def info(cls, ea, info):
+    def __new__(cls, ea, info):
         '''Set the type information at the address `ea` to `info`.'''
+        # FIXME: instead of just setting the type, we need to use the type
+        #        to actually modify the data at the specified address.
         return type(ea, info)
-    typeinfo = utils.alias(info, 'set')
+    info = typeinfo = utils.alias(__new__, 'set')
 
     @utils.multicase()
     @classmethod
