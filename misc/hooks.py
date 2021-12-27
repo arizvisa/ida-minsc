@@ -270,7 +270,7 @@ class address(changingchanged):
 
         # If a StopIteration was raised when submitting the comment to the coroutine,
         # then something failed and we need to let the user know about it.
-        except StopIteration as E:
+        except StopIteration:
             logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Abandoning {:s} comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
@@ -303,7 +303,7 @@ class address(changingchanged):
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we something bugged out and we need to let the user
         # know about it.
-        except StopIteration as E:
+        except StopIteration:
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Abandoning update of {:s} comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea), exc_info=True)
 
         # Re-enable our hooks that we had prior disabled
@@ -485,7 +485,7 @@ class globals(changingchanged):
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then something terrible has happened and we need to let
         # the user know what's up.
-        except StopIteration as E:
+        except StopIteration:
             logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Abandoning {:s} function comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
@@ -527,7 +527,7 @@ class globals(changingchanged):
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we something terrible has happend that the user will
         # likely need to know about.
-        except StopIteration as E:
+        except StopIteration:
             logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Abandoning update of {:s} function comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
@@ -676,7 +676,7 @@ class typeinfo(changingchanged):
 
         # If we encounter a StopIteration while submitting the comment, then the
         # coroutine has gone out of control and we need to let the user know.
-        except StopIteration as E:
+        except StopIteration:
             logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Abandoning type information at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled and then leave.
