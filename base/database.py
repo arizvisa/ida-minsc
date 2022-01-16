@@ -3460,6 +3460,52 @@ class address(object):
         '''Return the next `count` addresses from the address `ea` that is undefined.'''
         return cls.nextF(ea, type.is_unknown, count)
 
+    @utils.multicase()
+    @classmethod
+    def prevfunction(cls, **count):
+        '''Return the previous address from the current address that is within a function.'''
+        return cls.prevfunction(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def prevfunction(cls, ea):
+        '''Return the previous address from the address `ea` that is within a function.'''
+        return cls.prevfunction(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevfunction(cls, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that is within a function and satisfies the provided `predicate`.'''
+        F = utils.fcompose(utils.fmap(function.within, predicate), builtins.all)
+        return cls.prevF(ea, F, count.pop('count', 1))
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def prevfunction(cls, ea, count):
+        '''Return the previous `count` addresses from the address `ea` that is within a function.'''
+        return cls.prevF(ea, function.within, count)
+
+    @utils.multicase()
+    @classmethod
+    def nextfunction(cls, **count):
+        '''Return the next address from the current address that is within a function.'''
+        return cls.nextfunction(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def nextfunction(cls, ea):
+        '''Return the next address from the address `ea` that is within a function.'''
+        return cls.nextfunction(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextfunction(cls, ea, predicate, **count):
+        '''Return the next address from the address `ea` that is within a function and satisfies the provided `predicate`.'''
+        F = utils.fcompose(utils.fmap(function.within, predicate), builtins.all)
+        return cls.nextF(ea, F, count.pop('count', 1))
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def nextfunction(cls, ea, count):
+        '''Return the next `count` addresses from the address `ea` that is within a function.'''
+        return cls.nextF(ea, function.within, count)
+
+    prevfunc, nextfunc = utils.alias(prevfunction, 'address'), utils.alias(nextfunction, 'address')
+
     # address translations
     @classmethod
     def by_offset(cls, offset):
