@@ -3335,80 +3335,74 @@ class address(object):
     # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def prevtag(cls, **tagname):
-        '''Return the previous address that contains a tag.'''
+        '''Return the previous address that contains a tag using the specified `tagname`.'''
         return cls.prevtag(ui.current.address(), tagname.pop('count', 1), **tagname)
     @utils.multicase(predicate=builtins.callable)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def prevtag(cls, predicate, **tagname):
-        '''Return the previous address that contains a tag and satisfies the provided `predicate`.'''
+        '''Return the previous address that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
         return cls.prevtag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def prevtag(cls, ea, **tagname):
-        """Return the previous address from `ea` that contains a tag.
-
-        If the string `tagname` is specified, then only return the address if the specified tag is defined.
-        """
+        '''Return the previous address from `ea` that contains a tag using the specified `tagname`.'''
         return cls.prevtag(ea, tagname.pop('count', 1), **tagname)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def prevtag(cls, ea, predicate, **tagname):
-        '''Return the previous address from `ea` that contains a tag and satisfies the provided `predicate`.'''
-        tagname = tagname.get('tagname', None)
+        '''Return the previous address from `ea` that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
+        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
         return cls.prevF(ea, F, tagname.pop('count', 1))
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def prevtag(cls, ea, count, **tagname):
-        '''Return the previous `count` addresses from `ea` that contains a tag.'''
-        tagname = tagname.get('tagname', None)
+        '''Return the previous `count` addresses from `ea` that contains a tag using the specified `tagname`.'''
+        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         return cls.prevF(ea, Ftag, count)
 
     # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def nexttag(cls, **tagname):
-        '''Return the next address that contains a tag.'''
+        '''Return the next address that contains a tag using the specified `tagname`.'''
         return cls.nexttag(ui.current.address(), tagname.pop('count', 1), **tagname)
     @utils.multicase(predicate=builtins.callable)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def nexttag(cls, predicate, **tagname):
-        '''Return the next address that contains a tag and satisfies the provided `predicate`.'''
+        '''Return the next address that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
         return cls.nexttag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def nexttag(cls, ea, **tagname):
-        """Return the next address from `ea` that contains a tag.
-
-        If the string `tagname` is specified, then only return the address if the specified tag is defined.
-        """
+        '''Return the next address from `ea` that contains a tag using the specified `tagname`.'''
         return cls.nexttag(ea, tagname.pop('count', 1), **tagname)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def nexttag(cls, ea, predicate, **tagname):
-        '''Return the next address from `ea` that contains a tag and satisfies the provided `predicate`.'''
-        tagname = tagname.get('tagname', None)
+        '''Return the next address from `ea` that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
+        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
         return cls.nextF(ea, F, tagname.pop('count', 1))
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
-    @utils.string.decorate_arguments('tagname')
+    @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def nexttag(cls, ea, count, **tagname):
-        '''Return the next `count` addresses from `ea` that contains a tag.'''
-        tagname = tagname.get('tagname', None)
+        '''Return the next `count` addresses from `ea` that contains a tag using the specified `tagname`.'''
+        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         return cls.nextF(ea, Ftag, count)
 
