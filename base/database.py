@@ -2375,8 +2375,13 @@ class address(object):
     def __walk__(ea, next, match):
         '''Return the first address from `ea` using `next` for stepping until the provided callable doesn't `match`.'''
         res = interface.address.inside(ea)
+
+        # Now that we know we're a valid address in the database,
+        # we simply need to keeping calling next() while match()
+        # continuously allows us to.
         while res not in {None, idaapi.BADADDR} and match(res):
-            res = next(res)
+            ea = ui.navigation.analyze(res)
+            res = next(ea)
         return res
 
     @utils.multicase(end=six.integer_types)
@@ -2576,14 +2581,17 @@ class address(object):
         '''Return the previous `count` address from the address `ea` that satisfies the provided `predicate`.'''
         Fprev, Finverse = utils.fcompose(interface.address.within, idaapi.prev_not_tail), utils.fcompose(predicate, operator.not_)
 
-        # if we're at the very bottom address of the database
-        # then skip the ``interface.address.within`` check.
-        if ea == config.bounds()[1]:
+        # If we're at the very bottom address of the database then skip
+        # the boundary check for interface.address.within().
+        _, bottom = config.bounds()
+        if ea == bottom:
             Fprev = idaapi.prev_not_tail
 
+        # Otherwise if we're already at the top, there's nowhere else to go.
         if Fprev(ea) == idaapi.BADADDR:
             raise E.AddressOutOfBoundsError(u"{:s}.prevF: Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), config.bounds()[0], ea))
 
+        # Walk until right before the matching address, and then return the one before.
         res = cls.__walk__(Fprev(ea), Fprev, Finverse)
         return cls.prevF(res, predicate, count - 1) if count > 1 else res
 
@@ -2602,8 +2610,12 @@ class address(object):
     def nextF(cls, ea, predicate, count):
         '''Return the next `count` address from the address `ea` that satisfies the provided `predicate`.'''
         Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
+
+        # If we're at the very bottom of the database, then we're done.
         if Fnext(ea) == idaapi.BADADDR:
             raise E.AddressOutOfBoundsError(u"{:s}.nextF: Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), config.bounds()[1], idaapi.get_item_end(ea)))
+
+        # Walk until right before the matching address, and then return the one after.
         res = cls.__walk__(Fnext(ea), Fnext, Finverse)
         return cls.nextF(res, predicate, count - 1) if count > 1 else res
 
