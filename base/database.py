@@ -807,7 +807,7 @@ def disassemble(ea, **options):
             res.append(u"{:x}: {:s}".format(ea, noextraspaces))
 
         # move on to the next iteration
-        ea = address.next(ea)
+        ea = address.next(ea) if count > 1 else address.tail(ea)
         count -= 1
     return '\n'.join(res)
 disasm = utils.alias(disassemble)
