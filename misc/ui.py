@@ -341,6 +341,20 @@ class appwindow(object):
         res = cls.open()
         return res.deleteLater()
 
+class breakpoints(appwindow):
+    """
+    This namespace is for interacting with the Breakpoints window.
+    """
+    __open__ = staticmethod(idaapi.open_bpts_window)
+    __open_defaults__ = (idaapi.BADADDR, 0)
+
+class calls(appwindow):
+    """
+    This namespace is for interacting with the (Function) Calls window.
+    """
+    __open__ = staticmethod(idaapi.open_calls_window)
+    __open_defaults__ = (idaapi.BADADDR, 0)
+
 class disassembly(appwindow):
     """
     This namespace is for interacting with the Disassembly window.
@@ -352,12 +366,35 @@ class disassembly(appwindow):
     def refresh(cls):
         '''Refresh the main IDA disassembly view.'''
         return idaapi.refresh_idaview_anyway()
+disassembler = disassembly
+
+class dump(appwindow):
+    """
+    This namespace is for interacting with the (Hex) Dump window.
+    """
+    __open__ = staticmethod(idaapi.open_hexdump_window)
+    __open_defaults__ = (idaapi.BADADDR, 0)
+hexdump = dump
+
+class enumerations(appwindow):
+    """
+    This namespace is for interacting with the Enumerations window.
+    """
+    __open__ = staticmethod(idaapi.open_enums_window)
+    __open_defaults__ = (idaapi.BADADDR, 0)
 
 class exports(appwindow):
     """
     This namespace is for interacting with the Exports window.
     """
     __open__ = staticmethod(idaapi.open_exports_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
+class frame(appwindow):
+    """
+    This namespace is for interacting with the (Function) Frame window.
+    """
+    __open__ = staticmethod(idaapi.open_frame_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class functions(appwindow):
@@ -372,6 +409,21 @@ class imports(appwindow):
     This namespace is for interacting with the Imports window.
     """
     __open__ = staticmethod(idaapi.open_imports_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
+class libraries(appwindow):
+    """
+    This namespace is for interacting with the (Type) Libraries window.
+    """
+    __open__ = staticmethod(idaapi.open_tils_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+tils = typelibraries = libraries
+
+class modules(appwindow):
+    """
+    This namespace is for interacting with the Modules window.
+    """
+    __open__ = staticmethod(idaapi.open_modules_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class names(appwindow):
@@ -500,12 +552,57 @@ class notepad(appwindow):
         editor = cls.open()
         return editor.setTextCursor(cursor)
 
+class problems(appwindow):
+    """
+    This namespace is for interacting with the Problems window.
+    """
+    __open__ = staticmethod(idaapi.open_problems_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
+class references(appwindow):
+    """
+    This namespace is for interacting with the Cross-References window.
+    """
+    __open__ = staticmethod(idaapi.open_xrefs_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+xrefs = references
+
 class segments(appwindow):
     """
     This namespace is for interacting with the Segments window.
     """
     __open__ = staticmethod(idaapi.open_segments_window)
     __open_defaults__ = (idaapi.BADADDR, )
+
+class segmentregisters(appwindow):
+    """
+    This namespace is for interacting with the Segments window.
+    """
+    __open__ = staticmethod(idaapi.open_segments_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+segregs = segmentregisters
+
+class selectors(appwindow):
+    """
+    This namespace is for interacting with the Selectors window.
+    """
+    __open__ = staticmethod(idaapi.open_selectors_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
+class signatures(appwindow):
+    """
+    This namespace is for interacting with the Signatures window.
+    """
+    __open__ = staticmethod(idaapi.open_signatures_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
+class stack(appwindow):
+    """
+    This namespace is for interacting with the (Call) Stack window.
+    """
+    __open__ = staticmethod(idaapi.open_stack_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+callstack = stack
 
 class strings(appwindow):
     """
@@ -577,6 +674,28 @@ class structures(appwindow):
     """
     __open__ = staticmethod(idaapi.open_structs_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
+
+class threads(appwindow):
+    """
+    This namespace is for interacting with the Threads window.
+    """
+    __open__ = staticmethod(idaapi.open_threads_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
+class tracing(appwindow):
+    """
+    This namespace is for interacting with the Tracing window.
+    """
+    __open__ = staticmethod(idaapi.open_trace_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+trace = tracing
+
+class types(appwindow):
+    """
+    This namespace is for interacting with the Types window.
+    """
+    __open__ = staticmethod(idaapi.open_loctypes_window)
+    __open_defaults__ = (idaapi.BADADDR, )
 
 class timer(object):
     """
