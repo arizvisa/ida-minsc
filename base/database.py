@@ -1153,15 +1153,15 @@ class search(object):
     bybytes = utils.alias(by_bytes, 'search')
 
     @utils.multicase(string=six.string_types)
-    @staticmethod
+    @classmethod
     @utils.string.decorate_arguments('string')
     def by_regex(string, **options):
         '''Search through the database at the current address for the regex matched by `string`.'''
-        return search.by_regex(ui.current.address(), string, **options)
+        return cls.by_regex(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=six.string_types)
-    @staticmethod
+    @classmethod
     @utils.string.decorate_arguments('string')
-    def by_regex(ea, string, **options):
+    def by_regex(cls, ea, string, **options):
         """Search the database at address `ea` for the regex matched by `string`.
 
         If `reverse` is specified as a bool, then search backwards from the given address.
@@ -1169,26 +1169,26 @@ class search(object):
         """
         queryF = utils.string.to
 
-        reverseQ = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
+        reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = idaapi.SEARCH_REGEX
-        flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
+        flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     byregex = utils.alias(by_regex, 'search')
 
     @utils.multicase(string=six.string_types)
-    @staticmethod
+    @classmethod
     @utils.string.decorate_arguments('string')
     def by_text(string, **options):
         '''Search through the database at the current address for the text matched by `string`.'''
-        return search.by_text(ui.current.address(), string, **options)
+        return cls.by_text(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=six.string_types)
-    @staticmethod
+    @classmethod
     @utils.string.decorate_arguments('string')
-    def by_text(ea, string, **options):
+    def by_text(cls, ea, string, **options):
         """Search the database at address `ea` for the text matched by `string`.
 
         If `reverse` is specified as a bool, then search backwards from the given address.
@@ -1196,24 +1196,24 @@ class search(object):
         """
         queryF = utils.string.to
 
-        reverseQ = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
+        reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = 0
-        flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
+        flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     bytext = by_string = bystring = utils.alias(by_text, 'search')
 
     @utils.multicase(name=six.string_types)
-    @staticmethod
+    @classmethod
     @utils.string.decorate_arguments('name')
     def by_name(name, **options):
         '''Search through the database at the current address for the symbol `name`.'''
-        return search.by_name(ui.current.address(), name, **options)
+        return cls.by_name(ui.current.address(), name, **options)
     @utils.multicase(ea=six.integer_types, name=six.string_types)
-    @staticmethod
+    @classmethod
     @utils.string.decorate_arguments('name')
     def by_name(ea, name, **options):
         """Search through the database at address `ea` for the symbol `name`.
@@ -1223,13 +1223,13 @@ class search(object):
         """
         queryF = utils.string.to
 
-        reverseQ = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
+        reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = idaapi.SEARCH_IDENT
-        flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
+        flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(name), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     byname = utils.alias(by_name, 'search')
 
