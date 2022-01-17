@@ -19,7 +19,7 @@ import idaapi
 
 def greeting():
     barrier = 93
-    available = ['database', 'function', 'instruction', 'segment', 'structure', 'enumeration']
+    available = ['database', 'function', 'instruction', 'segment', 'structure', 'enumeration', 'ui']
 
     six.print_('=' * barrier)
     six.print_("Welcome to the ida-minsc plugin!")
