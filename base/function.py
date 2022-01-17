@@ -2210,8 +2210,6 @@ def tags(func):
     ea = interface.range.start(fn)
     return internal.comment.contents.name(ea)
 
-# FIXME: consolidate this logic into the utils module
-# FIXME: document this properly
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
 def select(**boolean):
@@ -2250,33 +2248,33 @@ def select(func, **boolean):
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
 
-    # nothing specific was queried, so just yield each tag
+    # If nothing specific was queried, then yield all tags that are available.
     if not boolean:
-        for ea in internal.comment.contents.address(interface.range.start(fn)):
+        for ea in sorted(internal.comment.contents.address(interface.range.start(fn))):
             ui.navigation.analyze(ea)
-            res = database.tag(ea)
-            if res: yield ea, res
+            address = database.tag(ea)
+            if address: yield ea, address
         return
 
-    # collect the keys to query as specified by the user
+    # Collect the tagnames being queried as specified by the user.
     Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
-    # walk through every tagged address and cross-check it against query
-    for ea in internal.comment.contents.address(interface.range.start(fn)):
+    # Walk through every tagged address and cross-check it against the query.
+    for ea in sorted(internal.comment.contents.address(interface.range.start(fn))):
         ui.navigation.analyze(ea)
-        res, d = {}, database.tag(ea)
+        collected, address = {}, database.tag(ea)
 
-        # Or(|) includes any of the tags being queried
-        res.update({key : value for key, value in d.items() if key in Or})
+        # Or(|) includes any of the tagnames that were selected.
+        collected.update({key : value for key, value in address.items() if key in Or})
 
-        # And(&) includes any tags only if they include all the specified tagnames
+        # And(&) includes tags only if the address includes all of the specified tagnames.
         if And:
-            if And & six.viewkeys(d) == And:
-                res.update({key : value for key, value in d.items() if key in And})
+            if And & six.viewkeys(address) == And:
+                collected.update({key : value for key, value in address.items() if key in And})
             else: continue
 
-        # if anything matched, then yield the address and the queried tags.
-        if res: yield ea, res
+        # If anything was collected (matched), then yield the address and the matching tags.
+        if collected: yield ea, collected
     return
 
 @utils.multicase()
