@@ -1088,7 +1088,7 @@ class search(object):
         # Figure out the correct format depending on the radix that we were given by the caller.
         formats = {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02X}".format}
         if radix and not operator.contains(formats, radix):
-            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : In invalid radix ({:d}) was specified.".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
+            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : In invalid radix ({:d}) was specified.".format('.'.join([__name__, search.__name__]), ea, '...' if isinstance(data, idaapi.compiled_binpat_vec_t) else utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
         format = formats[radix or 16]
 
         # Now that we know the radix, if we were given bytes then we need to format them into the right query.
@@ -1104,7 +1104,7 @@ class search(object):
             query = data
 
         else:
-            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : A query of an unsupported type ({!s}) was provided.".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', string.__class__))
+            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : A query of an unsupported type ({!s}) was provided.".format('.'.join([__name__, search.__name__]), ea, '...' if isinstance(data, idaapi.compiled_binpat_vec_t) else utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', string.__class__))
 
         # Now we can actually parse what we were given if we weren't already given a pattern.
         if not isinstance(query, idaapi.compiled_binpat_vec_t):
@@ -1121,7 +1121,7 @@ class search(object):
         # If parsing has failed in some way, then throw up an error for the user to act upon.
         if not ok:
             queries = (' '.join(map(format, bytearray(item.bytes))) for item in patterns) if len(patterns) else [query]
-            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : Unable to parse the specified quer{:s} ({:s}).".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', 'ies' if len(patterns) > 1 else 'y', ', '.join("\"{:s}\"".format(utils.string.escape(item, '"')) for item in queries)))
+            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : Unable to parse the specified quer{:s} ({:s}).".format('.'.join([__name__, search.__name__]), ea, '...' if isinstance(data, idaapi.compiled_binpat_vec_t) else utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', 'ies' if len(patterns) > 1 else 'y', ', '.join("\"{:s}\"".format(utils.string.escape(item, '"')) for item in queries)))
 
         # Once we have our pattern, let's figure first figure out our direction flags.
         reversed = builtins.next((direction[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in direction), False)
@@ -1147,7 +1147,7 @@ class search(object):
         result = idaapi.bin_search(left, ea, patterns, flags) if reversed else idaapi.bin_search(ea, right, patterns, flags)
         if result == idaapi.BADADDR:
             queries = (' '.join(map(format, bytearray(item.bytes))) for item in patterns)
-            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : The specified bytes described by the quer{:s} ({:s}) were not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', 'ies' if len(patterns) > 1 else 'y', ', '.join("\"{:s}\"".format(utils.string.escape(item, '"')) for item in queries)))
+            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : The specified bytes described by the quer{:s} ({:s}) were not found.".format('.'.join([__name__, search.__name__]), ea, '...' if isinstance(data, idaapi.compiled_binpat_vec_t) else utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', 'ies' if len(patterns) > 1 else 'y', ', '.join("\"{:s}\"".format(utils.string.escape(item, '"')) for item in queries)))
         return result
 
     bybytes = utils.alias(by_bytes, 'search')
@@ -1264,18 +1264,57 @@ class search(object):
         return
 
     @utils.multicase()
-    def __new__(cls, data, **direction):
-        '''Search through the database at the current address for the bytes specified by `data`.'''
-        return cls(ui.current.address(), data, **direction)
+    def __new__(cls, pattern, **direction):
+        '''Search through the database at the current address for the specified `pattern`.'''
+        return cls(ui.current.address(), pattern, **direction)
     @utils.multicase(ea=six.integer_types)
-    def __new__(cls, ea, data, **direction):
-        """Search through the database at address `ea` for the bytes specified by `data`.
+    def __new__(cls, ea, pattern, **direction):
+        """Search through the database at address `ea` for the specified `pattern`.'''
 
         If `reverse` is specified as a bool, then search backwards from the given address.
         If `radix` is specified, then use it as the numerical radix for describing the bytes.
         If `radix` is not specified, then assume that `data` represents the exact bytes to search.
         """
-        return cls.by_bytes(ea, data, **direction)
+        if idaapi.__version__ < 7.0:
+            return cls.by_bytes(ea, pattern, **direction)
+
+        # If we're using a more recent version of IDA, then we can actually allow users to
+        # specify their own full queries here. If they already gave us an idaapi.compiled_binpat_vec_t,
+        # then we just pass that through onto by_bytes.
+        if isinstance(pattern, idaapi.compiled_binpat_vec_t):
+            return cls.by_bytes(ea, pattern, **direction)
+
+        # Check if we were given multiple patterns for any particular reason and
+        # combine them into a list so we can parse them all individually.
+        listable = pattern if isinstance(pattern, (builtins.tuple, builtins.set, builtins.list)) else [pattern]
+        patterns = [pattern for pattern in listable]
+
+        # Extract the radix if we were given one so that we can pretty up the logs.
+        radix, formats = direction.get('radix', 16), {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02x}".format}
+        if not operator.contains(formats, radix):
+            raise E.InvalidParameterError(u"{:s}({:#x}, {:s}{:s}) : In invalid radix ({:d}) was specified.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
+        format = formats[radix]
+
+        # Now we need to parse them all individually into an idaapi.compiled_binpat_vec_t().
+        result = idaapi.compiled_binpat_vec_t()
+        for index, item in enumerate(patterns):
+
+            # If we were given some bytes instead of a string, then format them into a
+            # proper string using the specified radix.
+            string = ' '.join(map(format, bytearray(item))) if isinstance(item, (bytes, bytearray)) else item
+
+            # Now to parse each one with idaapi.parse_binpat_str(), but of course the idaapi.parse_binpat_str()
+            # api returns an empty string on success and a None on failure.
+            if idaapi.parse_binpat_str(result, ea, utils.string.to(string), radix, direction.get('encoding', idaapi.PBSENC_ALL)) is None:
+                raise E.DisassemblerError(u"{:s}({:#x}, {:s}{:s}) : Unable to parse the provided pattern {:s}(\"{:s}\").".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', "at index {:d} ".format(index) if len(patterns) > 1 else '', utils.string.escape(string, '"')))
+
+            # Log what was just parsed to help with debugging things.
+            parsed = result[index]
+            description = "{:s}" if parsed.all_bytes_defined() else "{:s}) with mask ({:s}"
+            logging.info(u"{:s}({:#x}, {:s}{:s}) : Successfully parsed the pattern at index {:d} (\"{:s}\") into bytes ({:s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', index, utils.string.escape(string, '"'), description.format(*(' '.join(map(format, bytearray(item))) for item in [parsed.bytes, parsed.mask]))))
+
+        # Everything was parsed, so we should be able to just hand things off to by_bytes.
+        return cls.by_bytes(ea, result, **direction)
 
 byname = by_name = utils.alias(search.by_name, 'search')
 
