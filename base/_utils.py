@@ -439,12 +439,19 @@ class multicase(object):
 
         def flatten(iterable):
             '''This closure takes the provided `iterable` (or tree) and then flattens it into a list.'''
+            duplicates = {item for item in []}
             for item in iterable:
                 if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
                     for item in flatten(item):
+                        if item in duplicates:
+                            continue
                         yield item
+                        duplicates |= {item}
+                    continue
+                if item in duplicates:
                     continue
                 yield item
+                duplicates |= {item}
             return
 
         def Femit_arguments(names, constraints, ignored):
