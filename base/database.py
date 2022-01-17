@@ -2056,9 +2056,6 @@ def tag(ea, key, none):
     # return the previous value back to the user because we're nice
     return res
 
-# FIXME: consolidate the boolean querying logic into the utils module
-# FIXME: document this properly
-# FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=six.string_types)
 @utils.string.decorate_arguments('And', 'Or')
 def select(tag, *And, **boolean):
@@ -2077,37 +2074,35 @@ def select(**boolean):
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
 
-    # nothing specific was queried, so just yield all the tags
+    # Nothing specific was queried, so just yield all tags that are available.
     if not boolean:
-        for ea in internal.comment.globals.address():
+        for ea in sorted(internal.comment.globals.address()):
             ui.navigation.set(ea)
-            res = function.tag(ea) if function.within(ea) else tag(ea)
-            if res: yield ea, res
+            address = function.tag(ea) if function.within(ea) else tag(ea)
+            if address: yield ea, address
         return
 
-    # collect the keys to query as specified by the user
+    # Collect the tagnames to query as specified by the user.
     Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
-    # walk through all tags so we can cross-check them with the query
-    for ea in internal.comment.globals.address():
+    # Walk through every tagged address so we can cross-check them with the query.
+    for ea in sorted(internal.comment.globals.address()):
         ui.navigation.set(ea)
-        res, d = {}, function.tag(ea) if function.within(ea) else tag(ea)
+        collected, address = {}, function.tag(ea) if function.within(ea) else tag(ea)
 
-        # Or(|) includes any tags that were queried
-        res.update({key : value for key, value in d.items() if key in Or})
+        # Or(|) includes any of the tagnames that were queried.
+        collected.update({key : value for key, value in address.items() if key in Or})
 
-        # And(&) includes any tags that match all of the queried tagnames
+        # And(&) includes any tags that include all of the queried tagnames.
         if And:
-            if And & six.viewkeys(d) == And:
-                res.update({key : value for key, value in d.items() if key in And})
+            if And & six.viewkeys(address) == And:
+                collected.update({key : value for key, value in address.items() if key in And})
             else: continue
 
-        # if anything matched, then yield the address and the queried tags
-        if res: yield ea, res
+        # If we collected anything (matches), then yield the address and the matching tags.
+        if collected: yield ea, collected
     return
 
-# FIXME: consolidate the boolean querying logic into the utils module
-# FIXME: document this properly
 @utils.multicase(tag=six.string_types)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def selectcontents(tag, *Or, **boolean):
@@ -2126,42 +2121,57 @@ def selectcontents(**boolean):
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
 
-    # nothing specific was queried, so just yield all tagnames
+    # Nothing specific was queried, so just yield all tagnames that are available.
     if not boolean:
-        for ea, _ in internal.comment.contents.iterate():
+        for ea, _ in sorted(internal.comment.contents.iterate()):
             ui.navigation.procedure(ea)
-            res = internal.comment.contents.name(ea)
-            if res: yield ea, res
+            contents = internal.comment.contents.name(ea)
+            if contents: yield ea, contents
         return
 
-    # collect the keys to query as specified by the user
+    # Collect the tagnames to query as specified by the user.
     Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
-    # walk through all tagnames so we can cross-check them against the query
-    for ea, res in internal.comment.contents.iterate():
+    # Walk through all the tagnames so we can cross-check them against the query.
+    for ea, cache in sorted(internal.comment.contents.iterate()):
         ui.navigation.procedure(ea)
-        res, d = {item for item in res}, internal.comment.contents._read(None, ea) or {}
 
-        # check to see that the dict's keys match
-        if {key for key in d} != res:
-            # FIXME: include query in warning
+        # If we're within a function, then read the contents cache from its glob.
+        if function.within(ea):
+            sup, contents = {key for key in cache}, internal.comment.contents._read(None, ea) or {}
+
+        # Otherwise we're not within a function which means that our cache is
+        # lying to us and we need to skip this iteration.
+        else:
             q = utils.string.kwargs(boolean)
-            logging.warning(u"{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
+            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency where address ({:#x}) should be within a function.".format(__name__, q, ea))
+            continue
 
-        # now start aggregating the keys that the user is looking for
-        res, d = {item for item in []}, internal.comment.contents.name(ea)
+        # Check to see that the global contents cache (supval) matches the actual
+        # function contents cache (blob). This isn't too serious because we always
+        # trust the real function cache, but it implies that there was an
+        # inconsistency when the global index of written tagnames was updated.
+        blob = {key for key in contents}
+        if blob != sup:
+            f, q = function.address(ea), utils.string.kwargs(boolean)
+            sup_formatted, blob_formatted = (', '.join(items) for items in [sup, blob])
+            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency between contents of function ({:#x}) and address ({:#x}) - supval ({:s}) is different from blob ({:s}).".format(__name__, q, f, ea, sup_formatted, blob_formatted))
 
-        # Or(|) includes any of the tagnames being queried
-        res.update(Or & d)
+        # Now start aggregating the tagnames that the user is searching for.
+        collected, names = {item for item in []}, internal.comment.contents.name(ea)
 
-        # And(&) includes tags only if they include all of the specified tagnames
+        # Or(|) includes the address if any of the tagnames matched.
+        collected.update(Or & names)
+
+        # And(&) includes tags only if the address includes all of the specified tagnames.
         if And:
-            if And & d == And:
-                res.update(And)
+            if And & names == And:
+                collected.update(And)
             else: continue
 
-        # if any tags matched, then yield the address and the results
-        if res: yield ea, res
+        # If anything was collected (tagnames were matched), then yield the
+        # address along with the matching tagnames.
+        if collected: yield ea, collected
     return
 selectcontent = utils.alias(selectcontents)
 
