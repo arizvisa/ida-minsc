@@ -1061,35 +1061,39 @@ class search(object):
         If `radix` is not specified, then assume that `data` represents the exact bytes to search.
         """
         radix = direction.get('radix', 0)
-
-        # If we're using an earlier version of IDA, then we need to completely build the query ourselves.
-        if idaapi.__version__ < 7.0:
-
-            # Convert the bytes directly into a string of base-10 integers
-            if isinstance(data, bytes) and radix == 0:
-                radix, queryF = 10, lambda string: ' '.join("{:d}".format(by) for by in bytearray(string))
-
-            # Convert the string directly into a string of base-10 integers
-            elif isinstance(data, six.string_types) and radix == 0:
-                radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((ord(ch) & 0xff00) // 0x100, (ord(ch) & 0x00ff) // 0x1) for ch in string))))
-
-            # Otherwise, leave it alone because the user specified the radix already
-            else:
-                radix, queryF = radix or 16, utils.string.to
-
-            reversed = builtins.next((direction[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in direction), False)
-            flags = idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
-            res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(data), radix, idaapi.SEARCH_CASE | flags)
-
-            if res == idaapi.BADADDR:
-                raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : The specified bytes were not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
-            return res
+        left, right = config.bounds()
 
         # Figure out the correct format depending on the radix that we were given by the caller.
         formats = {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02X}".format}
         if radix and not operator.contains(formats, radix):
             raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : In invalid radix ({:d}) was specified.".format('.'.join([__name__, search.__name__]), ea, '...' if isinstance(data, idaapi.compiled_binpat_vec_t) else utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
         format = formats[radix or 16]
+
+        # If we're using an earlier version of IDA, then we need to completely build the query ourselves.
+        if idaapi.__version__ < 7.6:
+
+            # Convert the bytes directly into a string of base-10 integers.
+            if (isinstance(data, bytes) and radix == 0) or isinstance(data, bytearray):
+                query = ' '.join(map(format, bytearray(data)))
+
+            # Convert the string directly into a string of base-10 integers.
+            elif isinstance(data, six.string_types) and radix == 0:
+                query = ' '.join(map(format, itertools.chain(*(((ord(ch) & 0xff00) // 0x100, (ord(ch) & 0x00ff) // 0x1) for ch in data))))
+
+            # Otherwise, leave it alone because the user specified the radix already.
+            else:
+                query = data
+
+            # Assign our flags according to whatever the direction the user gave us.
+            reversed = builtins.next((direction[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in direction), False)
+            flags = idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
+
+            # Now we can start our actual searching for things.
+            start, stop = (left, ea) if reversed else (ea, right)
+            res = idaapi.find_binary(start, stop, utils.string.to(query), radix or 16, idaapi.SEARCH_CASE | flags)
+            if res == idaapi.BADADDR:
+                raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : The specified bytes ({!s}) were not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', query))
+            return res
 
         # Now that we know the radix, if we were given bytes then we need to format them into the right query.
         if isinstance(data, (bytes, bytearray)):
@@ -1143,7 +1147,6 @@ class search(object):
         flags |= idaapi.BIN_SEARCH_NOCASE if foldcase else idaapi.BIN_SEARCH_CASE
 
         # Now we actually perform our idaapi.bin_search().
-        left, right = config.bounds()
         result = idaapi.bin_search(left, ea, patterns, flags) if reversed else idaapi.bin_search(ea, right, patterns, flags)
         if result == idaapi.BADADDR:
             queries = (' '.join(map(format, bytearray(item.bytes))) for item in patterns)
@@ -1233,24 +1236,24 @@ class search(object):
         return res
     byname = utils.alias(by_name, 'search')
 
-    @utils.multicase(pattern=(six.string_types, bytes))
+    @utils.multicase(pattern=(six.string_types, bytes, bytearray))
     @classmethod
     def iterate(cls, pattern, **options):
         '''Iterate through all search results that match the `pattern` starting at the current address.'''
         predicate = options.pop('predicate', cls)
         return cls.iterate(ui.current.address(), pattern, predicate, **options)
-    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes))
+    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes, bytearray))
     @classmethod
     def iterate(cls, ea, pattern, **options):
         '''Iterate through all search results that match the specified `pattern` starting at address `ea`.'''
         predicate = options.pop('predicate', cls)
         return cls.iterate(ea, pattern, predicate, **options)
-    @utils.multicase(pattern=(six.string_types, bytes))
+    @utils.multicase(pattern=(six.string_types, bytes, bytearray))
     @classmethod
     def iterate(cls, pattern, predicate, **options):
         '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at the current address.'''
         return cls.iterate(ui.current.address(), pattern, predicate, **options)
-    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes))
+    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes, bytearray))
     @classmethod
     def iterate(cls, ea, pattern, predicate, **options):
         '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at address `ea`.'''
@@ -1287,7 +1290,8 @@ class search(object):
         If `radix` is specified, then use it as the numerical radix for describing the bytes.
         If `radix` is not specified, then assume that `data` represents the exact bytes to search.
         """
-        if idaapi.__version__ < 7.0:
+        if idaapi.__version__ < 7.6:
+            direction.setdefault('radix', 16)
             return cls.by_bytes(ea, pattern, **direction)
 
         # If we're using a more recent version of IDA, then we can actually allow users to
