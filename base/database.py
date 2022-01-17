@@ -1047,13 +1047,13 @@ class search(object):
     """
 
     @utils.multicase()
-    @staticmethod
-    def by_bytes(data, **direction):
+    @classmethod
+    def by_bytes(cls, data, **direction):
         '''Search through the database at the current address for the bytes specified by `data`.'''
-        return search.by_bytes(ui.current.address(), data, **direction)
+        return cls.by_bytes(ui.current.address(), data, **direction)
     @utils.multicase(ea=six.integer_types)
-    @staticmethod
-    def by_bytes(ea, data, **direction):
+    @classmethod
+    def by_bytes(cls, ea, data, **direction):
         """Search through the database at address `ea` for the bytes specified by `data`.
 
         If `reverse` is specified as a bool, then search backwards from the given address.
@@ -1062,24 +1062,94 @@ class search(object):
         """
         radix = direction.get('radix', 0)
 
-        # convert the bytes directly into a string of base-10 integers
-        if isinstance(data, bytes) and radix == 0:
-            radix, queryF = 10, lambda string: ' '.join("{:d}".format(by) for by in bytearray(string))
+        # If we're using an earlier version of IDA, then we need to completely build the query ourselves.
+        if idaapi.__version__ < 7.0:
 
-        # convert the string directly into a string of base-10 integers
-        elif isinstance(data, six.string_types) and radix == 0:
-            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((ord(ch) & 0xff00) // 0x100, (ord(ch) & 0x00ff) // 0x1) for ch in string))))
+            # Convert the bytes directly into a string of base-10 integers
+            if isinstance(data, bytes) and radix == 0:
+                radix, queryF = 10, lambda string: ' '.join("{:d}".format(by) for by in bytearray(string))
 
-        # otherwise, leave it alone because the user specified the radix already
+            # Convert the string directly into a string of base-10 integers
+            elif isinstance(data, six.string_types) and radix == 0:
+                radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((ord(ch) & 0xff00) // 0x100, (ord(ch) & 0x00ff) // 0x1) for ch in string))))
+
+            # Otherwise, leave it alone because the user specified the radix already
+            else:
+                radix, queryF = radix or 16, utils.string.to
+
+            reversed = builtins.next((direction[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in direction), False)
+            flags = idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
+            res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(data), radix, idaapi.SEARCH_CASE | flags)
+
+            if res == idaapi.BADADDR:
+                raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : The specified bytes were not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
+            return res
+
+        # Figure out the correct format depending on the radix that we were given by the caller.
+        formats = {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02X}".format}
+        if radix and not operator.contains(formats, radix):
+            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : In invalid radix ({:d}) was specified.".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
+        format = formats[radix or 16]
+
+        # Now that we know the radix, if we were given bytes then we need to format them into the right query.
+        if isinstance(data, (bytes, bytearray)):
+            query = ' '.join(map(format, bytearray(data)))
+
+        # If we were given a string, then we need to encode it into some bytes.
+        elif isinstance(data, six.string_types):
+            query = ' '.join(map(format, itertools.chain(*(((ord(ch) & 0xff00) // 0x100, (ord(ch) & 0x00ff) // 0x1) for ch in data))))
+
+        # If we were given an idaapi.compiled_binpat_vec_t already, then the user knows what they're doing.
+        elif isinstance(data, idaapi.compiled_binpat_vec_t):
+            query = data
+
         else:
-            radix, queryF = radix or 16, utils.string.to
+            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : A query of an unsupported type ({!s}) was provided.".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', string.__class__))
 
-        reverseQ = builtins.next((direction[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in direction), False)
-        flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
-        res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(data), radix, idaapi.SEARCH_CASE | flags)
-        if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, \"{:s}\"{:s}) : The specified bytes were not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(data, '"'), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
-        return res
+        # Now we can actually parse what we were given if we weren't already given a pattern.
+        if not isinstance(query, idaapi.compiled_binpat_vec_t):
+            patterns = idaapi.compiled_binpat_vec_t()
+
+            # It seems that idaapi.parse_binpat_str() returns an empty string on success, and None on failure...
+            res = idaapi.parse_binpat_str(patterns, ea, utils.string.to(query), radix, direction.get('encoding', 0))
+            ok = not (res is None)
+
+        # Otherwise we were given an idaapi.compiled_binpat_vec_t, and we don't need to do any parsing.
+        else:
+            ok, patterns = len(query) > 0, query
+
+        # If parsing has failed in some way, then throw up an error for the user to act upon.
+        if not ok:
+            queries = (' '.join(map(format, bytearray(item.bytes))) for item in patterns) if len(patterns) else [query]
+            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : Unable to parse the specified quer{:s} ({:s}).".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', 'ies' if len(patterns) > 1 else 'y', ', '.join("\"{:s}\"".format(utils.string.escape(item, '"')) for item in queries)))
+
+        # Once we have our pattern, let's figure first figure out our direction flags.
+        reversed = builtins.next((direction[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in direction), False)
+
+        # Then we figure out what case option the user gave us if there was one.
+        if any(k in direction for k in ['case', 'sensitive', 'casesensitive']):
+            foldcase = not builtins.next(direction[k] for k in ['case', 'sensitive', 'casesensitive'])
+
+        elif any(k in direction for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive']):
+            foldcase = builtins.next(direction[k] for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive'])
+
+        # Otherwise we'll be doing a case-insensitive search (non-folded case).
+        else:
+            foldcase = False
+
+        # Finally we can update the flags with whatever the user gave us.
+        flags = direction.get('flags', 0)
+        flags |= idaapi.BIN_SEARCH_BACKWARD if reversed else idaapi.BIN_SEARCH_FORWARD
+        flags |= idaapi.BIN_SEARCH_NOCASE if foldcase else idaapi.BIN_SEARCH_CASE
+
+        # Now we actually perform our idaapi.bin_search().
+        left, right = config.bounds()
+        result = idaapi.bin_search(left, ea, patterns, flags) if reversed else idaapi.bin_search(ea, right, patterns, flags)
+        if result == idaapi.BADADDR:
+            queries = (' '.join(map(format, bytearray(item.bytes))) for item in patterns)
+            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : The specified bytes described by the quer{:s} ({:s}) were not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', 'ies' if len(patterns) > 1 else 'y', ', '.join("\"{:s}\"".format(utils.string.escape(item, '"')) for item in queries)))
+        return result
+
     bybytes = utils.alias(by_bytes, 'search')
 
     @utils.multicase(string=six.string_types)
@@ -1196,7 +1266,7 @@ class search(object):
     @utils.multicase()
     def __new__(cls, data, **direction):
         '''Search through the database at the current address for the bytes specified by `data`.'''
-        return cls.by_bytes(ui.current.address(), data, **direction)
+        return cls(ui.current.address(), data, **direction)
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea, data, **direction):
         """Search through the database at address `ea` for the bytes specified by `data`.
