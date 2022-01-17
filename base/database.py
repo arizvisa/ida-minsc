@@ -1070,7 +1070,7 @@ class search(object):
         format = formats[radix or 16]
 
         # If we're using an earlier version of IDA, then we need to completely build the query ourselves.
-        if idaapi.__version__ < 7.6:
+        if idaapi.__version__ < 7.5:
 
             # Convert the bytes directly into a string of base-10 integers.
             if (isinstance(data, bytes) and radix == 0) or isinstance(data, bytearray):
@@ -1290,7 +1290,7 @@ class search(object):
         If `radix` is specified, then use it as the numerical radix for describing the bytes.
         If `radix` is not specified, then assume that `data` represents the exact bytes to search.
         """
-        if idaapi.__version__ < 7.6:
+        if idaapi.__version__ < 7.5:
             direction.setdefault('radix', 16)
             return cls.by_bytes(ea, pattern, **direction)
 
