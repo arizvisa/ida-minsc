@@ -360,6 +360,13 @@ class exports(appwindow):
     __open__ = staticmethod(idaapi.open_exports_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
+class functions(appwindow):
+    """
+    This namespace is for interacting with the Functions window.
+    """
+    __open__ = staticmethod(idaapi.open_funcs_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
 class imports(appwindow):
     """
     This namespace is for interacting with the Imports window.
@@ -412,91 +419,6 @@ class names(appwindow):
         for idx in range(cls.size()):
             yield cls.at(idx)
         return
-
-class functions(appwindow):
-    """
-    This namespace is for interacting with the Functions window.
-    """
-    __open__ = staticmethod(idaapi.open_funcs_window)
-    __open_defaults__ = (idaapi.BADADDR, )
-
-class structures(appwindow):
-    """
-    This namespace is for interacting with the Structures window.
-    """
-    __open__ = staticmethod(idaapi.open_structs_window)
-    __open_defaults__ = (idaapi.BADADDR, 0)
-
-class strings(appwindow):
-    """
-    This namespace is for interacting with the Strings window.
-    """
-    __open__ = staticmethod(idaapi.open_strings_window)
-    __open_defaults__ = (idaapi.BADADDR, idaapi.BADADDR, idaapi.BADADDR)
-
-    @classmethod
-    def __on_openidb__(cls, code, is_old_database):
-        if code != idaapi.NW_OPENIDB or is_old_database:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.__on_openidb__({:#x}, {:b}) : Hook was called with an unexpected code or an old database.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
-        config = idaapi.strwinsetup_t()
-        config.minlen = 3
-        config.ea1, config.ea2 = idaapi.cvar.inf.minEA, idaapi.cvar.inf.maxEA
-        config.display_only_existing_strings = True
-        config.only_7bit = True
-        config.ignore_heads = False
-
-        # aggregate all the string types for IDA 6.95x
-        if idaapi.__version__ < 7.0:
-            res = [idaapi.ASCSTR_TERMCHR, idaapi.ASCSTR_PASCAL, idaapi.ASCSTR_LEN2, idaapi.ASCSTR_UNICODE, idaapi.ASCSTR_LEN4, idaapi.ASCSTR_ULEN2, idaapi.ASCSTR_ULEN4]
-
-        # otherwise use IDA 7.x's naming scheme
-        else:
-            res = [idaapi.STRTYPE_TERMCHR, idaapi.STRTYPE_PASCAL, idaapi.STRTYPE_LEN2, idaapi.STRTYPE_C_16, idaapi.STRTYPE_LEN4, idaapi.STRTYPE_LEN2_16, idaapi.STRTYPE_LEN4_16]
-
-        config.strtypes = functools.reduce(lambda result, item: result | pow(2, item), res, 0)
-        if not idaapi.set_strlist_options(config):
-            raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
-        return
-        #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
-
-    @classmethod
-    def refresh(cls):
-        '''Refresh the strings list.'''
-        return idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
-    @classmethod
-    def size(cls):
-        '''Return the number of elements in the strings list.'''
-        return idaapi.get_strlist_qty()
-    @classmethod
-    def at(cls, index):
-        '''Return the string at the specified `index`.'''
-        si = idaapi.string_info_t()
-
-        # FIXME: this isn't being used correctly
-        ok = idaapi.get_strlist_item(si, index)
-        if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join([__name__, cls.__name__]), index, index, res))
-        return si
-    @classmethod
-    def get(cls, index):
-        '''Return the address and the string at the specified `index`.'''
-        si = cls.at(index)
-        get_contents = idaapi.get_strlit_contents if hasattr(idaapi, 'get_strlit_contents') else idaapi.get_ascii_contents
-        res = get_contents(si.ea, si.length, si.type)
-        return si.ea, internal.utils.string.of(res)
-    @classmethod
-    def iterate(cls):
-        '''Iterate through all of the address and strings in the strings list.'''
-        for index in range(cls.size()):
-            yield cls.get(index)
-        return
-
-class segments(appwindow):
-    """
-    This namespace is for interacting with the Segments window.
-    """
-    __open__ = staticmethod(idaapi.open_segments_window)
-    __open_defaults__ = (idaapi.BADADDR, )
 
 class notepad(appwindow):
     """
@@ -577,6 +499,84 @@ class notepad(appwindow):
         '''Set the ``QtGui.QTextCursor`` for the notepad window to `cursor`.'''
         editor = cls.open()
         return editor.setTextCursor(cursor)
+
+class segments(appwindow):
+    """
+    This namespace is for interacting with the Segments window.
+    """
+    __open__ = staticmethod(idaapi.open_segments_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
+class strings(appwindow):
+    """
+    This namespace is for interacting with the Strings window.
+    """
+    __open__ = staticmethod(idaapi.open_strings_window)
+    __open_defaults__ = (idaapi.BADADDR, idaapi.BADADDR, idaapi.BADADDR)
+
+    @classmethod
+    def __on_openidb__(cls, code, is_old_database):
+        if code != idaapi.NW_OPENIDB or is_old_database:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__on_openidb__({:#x}, {:b}) : Hook was called with an unexpected code or an old database.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
+        config = idaapi.strwinsetup_t()
+        config.minlen = 3
+        config.ea1, config.ea2 = idaapi.cvar.inf.minEA, idaapi.cvar.inf.maxEA
+        config.display_only_existing_strings = True
+        config.only_7bit = True
+        config.ignore_heads = False
+
+        # aggregate all the string types for IDA 6.95x
+        if idaapi.__version__ < 7.0:
+            res = [idaapi.ASCSTR_TERMCHR, idaapi.ASCSTR_PASCAL, idaapi.ASCSTR_LEN2, idaapi.ASCSTR_UNICODE, idaapi.ASCSTR_LEN4, idaapi.ASCSTR_ULEN2, idaapi.ASCSTR_ULEN4]
+
+        # otherwise use IDA 7.x's naming scheme
+        else:
+            res = [idaapi.STRTYPE_TERMCHR, idaapi.STRTYPE_PASCAL, idaapi.STRTYPE_LEN2, idaapi.STRTYPE_C_16, idaapi.STRTYPE_LEN4, idaapi.STRTYPE_LEN2_16, idaapi.STRTYPE_LEN4_16]
+
+        config.strtypes = functools.reduce(lambda result, item: result | pow(2, item), res, 0)
+        if not idaapi.set_strlist_options(config):
+            raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
+        return
+        #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
+
+    @classmethod
+    def refresh(cls):
+        '''Refresh the strings list.'''
+        return idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
+    @classmethod
+    def size(cls):
+        '''Return the number of elements in the strings list.'''
+        return idaapi.get_strlist_qty()
+    @classmethod
+    def at(cls, index):
+        '''Return the string at the specified `index`.'''
+        si = idaapi.string_info_t()
+
+        # FIXME: this isn't being used correctly
+        ok = idaapi.get_strlist_item(si, index)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join([__name__, cls.__name__]), index, index, res))
+        return si
+    @classmethod
+    def get(cls, index):
+        '''Return the address and the string at the specified `index`.'''
+        si = cls.at(index)
+        get_contents = idaapi.get_strlit_contents if hasattr(idaapi, 'get_strlit_contents') else idaapi.get_ascii_contents
+        res = get_contents(si.ea, si.length, si.type)
+        return si.ea, internal.utils.string.of(res)
+    @classmethod
+    def iterate(cls):
+        '''Iterate through all of the address and strings in the strings list.'''
+        for index in range(cls.size()):
+            yield cls.get(index)
+        return
+
+class structures(appwindow):
+    """
+    This namespace is for interacting with the Structures window.
+    """
+    __open__ = staticmethod(idaapi.open_structs_window)
+    __open_defaults__ = (idaapi.BADADDR, 0)
 
 class timer(object):
     """
