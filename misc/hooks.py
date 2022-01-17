@@ -1030,17 +1030,53 @@ def __relocate_globals(old, new, size, iterable):
         yield i, offset
     return
 
-def segm_start_changed(s):
-    # XXX: not yet implemented
+def segm_start_changed(s, *oldstart):
+    # XXX: since changing the segment boundaries shouldn't really modify the
+    #      types of any tags, this doesn't need to do anything.
     return
 
-def segm_end_changed(s):
-    # XXX: not yet implemented
+def segm_end_changed(s, *oldend):
+    # XXX: since changing the segment boundaries shouldn't really modify the
+    #      types of any tags, this doesn't need to do anything.
     return
 
-def segm_moved(source, destination, size):
-    # XXX: not yet implemented
-    return
+def segm_moved(source, destination, size, changed_netmap):
+    """This is for when the user relocates an individual segment on older versions of IDA (6.9 and earlier).
+
+    The segment is updated in two parts. First we itreate through the functions
+    and relocate their cache to the destination address. Afterwards, we iterate
+    through all the global tags and relocate those.
+    """
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
+    seg = idaapi.getseg(destination)
+
+    # Pre-calculate our search boundaries, collect all of the functions and globals,
+    # and then total the number of items that we expect to process.
+    functions = sorted(ea for ea in database.functions() if destination <= ea < destination + size)
+    globals = sorted((ea, count) for ea, count in internal.comment.globals.iterate() if source <= ea < source + size)
+    logging.info(u"{:s}.segm_moved({:#x}, {:#x}, {:+#x}) : Relocating tagcache for segment {:s}.".format(__name__, source, destination, size, get_segment_name(seg)))
+    count = sum(map(len, [functions, globals]))
+
+    # Create our progress bar that includes a title describing what's going on and
+    # output it to the console so the user can see it.
+    P, msg = ui.Progress(), u"Relocating tagcache for segment {:s}: {:#x} ({:+#x}) -> {:#x}".format(get_segment_name(seg), source, size, destination)
+    P.update(current=0, min=0, max=count, title=msg), six.print_(msg)
+    P.open()
+
+    # Iterate through each function that we're moving and relocate its contents.
+    for i, offset in __relocate_function(source, destination, size, (item for item in functions), moved=not changed_netmap):
+        name = database.name(destination + offset)
+        text = u"Relocating function {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(functions), " ({:s})".format(name) if name else '', source + offset, destination + offset)
+        P.update(value=i, text=text)
+        ui.navigation.procedure(destination + offset)
+
+    # Iterate through each global that we're moving (we use the target address, because IDA moved everything already).
+    for i, offset in __relocate_globals(source, destination, size, (item for item in globals)):
+        name = database.name(destination + offset)
+        text = u"Relocating global {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(globals), " ({:s})".format(name) if name else '', source + offset, destination + offset)
+        P.update(value=len(functions) + i, text=text)
+        ui.navigation.analyze(destination + offset)
+    P.close()
 
 # address naming
 def rename(ea, newname):
