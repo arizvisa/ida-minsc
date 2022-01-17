@@ -198,7 +198,8 @@ class default(object):
         return eval(data)
 
 ### type encoder/decoder registration
-# FIXME: maybe figure out how to parse out an int from a long (which ends in 'L')
+
+# FIXME: maybe figure out how to parse out an int from a long in Python2 (which ends in 'L')
 @cache.register(object, pattern.star(' \t'), pattern.maybe('-+'), '0123456789')
 class _int(default):
     @classmethod
@@ -209,18 +210,33 @@ class _int(default):
     def encode(cls, instance):
         return "{:-#x}".format(instance)
 
+    # Build a table of prefixes and their radix for O(1) lookup.
+    radixtable = {}
+    for prefix in ['0x', '-0x', '+0x']: radixtable[prefix] = 16
+    for prefix in ['0o', '-0o', '+0o']: radixtable[prefix] = 8
+    for prefix in ['0b', '-0b', '+0b']: radixtable[prefix] = 2
+
+    # We use a negative radix as a placeholder since Python doesn't know this prefix.
+    for prefix in ['0y', '-0y', '+0y']: radixtable[prefix] = -2
+
     @classmethod
     def decode(cls, data):
-        if data.startswith('0x'):
-            return int(data, 16)
-        elif data.startswith('0o'):
-            return int(data, 8)
-        elif data.startswith('0o'):
-            return int(data, 8)
-        elif data.startswith('0b'):
-            return int(data, 2)
-        elif data.startswith('0y'):
-            return int(data[2:], 2)
+        length = 2 if data[0] == '0' else 3
+        prefix = data[:length]
+
+        # Grab the radix using our precalculated prefix table. If our radix
+        # is positive, then we can just pass it to `int` to get the value.
+        radix = cls.radixtable.get(prefix, 0)
+        if radix > 0:
+            return int(data, radix)
+
+        # If the radix is negative, then we need to explicitly slice off
+        # the prefix before passing the radix to our value.
+        elif radix < 0:
+            return -int(data[length:], abs(radix)) if prefix[:1] == '-' else int(data[length:], abs(radix))
+
+        # Otherwise we couldn't find a radix, and we need to hand it off to
+        # `int` to try parsing it as an integer.
         return int(data)
 
 @cache.register(object, pattern.star(' \t'), *'float(')
