@@ -1041,9 +1041,9 @@ class search(object):
 
     The ``search.iterate`` function allows one to iterate through all the results
     discovered in the database. One variation of ``search.iterate`` takes a 3rd
-    parameter `predicate`. One can provide one of the search methods provided
-    or include their own. This function will then yield each matched search
-    result.
+    parameter `predicate`. This allows usage of one of the search methods provided
+    or to allow a user to include their own. This function will then yield each
+    matched search result.
     """
 
     @utils.multicase()
@@ -1233,32 +1233,44 @@ class search(object):
         return res
     byname = utils.alias(by_name, 'search')
 
-    @utils.multicase()
+    @utils.multicase(pattern=(six.string_types, bytes))
     @classmethod
-    def iterate(cls, data, **options):
-        '''Iterate through all search results that match the bytes `data` starting at the current address.'''
-        predicate = options.pop('predicate', cls.by_bytes)
-        return cls.iterate(ui.current.address(), data, predicate, **options)
-    @utils.multicase(predicate=callable)
+    def iterate(cls, pattern, **options):
+        '''Iterate through all search results that match the `pattern` starting at the current address.'''
+        predicate = options.pop('predicate', cls)
+        return cls.iterate(ui.current.address(), pattern, predicate, **options)
+    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes))
     @classmethod
-    def iterate(cls, data, predicate, **options):
-        '''Iterate through all search results matched by the function `predicate` with the specified `data` starting at the current address.'''
-        return cls.iterate(ui.current.address(), data, predicate, **options)
-    @utils.multicase(ea=six.integer_types)
+    def iterate(cls, ea, pattern, **options):
+        '''Iterate through all search results that match the specified `pattern` starting at address `ea`.'''
+        predicate = options.pop('predicate', cls)
+        return cls.iterate(ea, pattern, predicate, **options)
+    @utils.multicase(pattern=(six.string_types, bytes))
     @classmethod
-    def iterate(cls, ea, data, **options):
-        '''Iterate through all search results that match the bytes `data` starting at address `ea`.'''
-        predicate = options.pop('predicate', cls.by_bytes)
-        return cls.iterate(ea, data, predicate, **options)
-    @utils.multicase(ea=six.integer_types, predicate=callable)
+    def iterate(cls, pattern, predicate, **options):
+        '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at the current address.'''
+        return cls.iterate(ui.current.address(), pattern, predicate, **options)
+    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes))
     @classmethod
-    def iterate(cls, ea, data, predicate, **options):
-        '''Iterate through all search results matched by the function `predicate` with the specified `data` starting at address `ea`.'''
-        ea = predicate(ea, data, **options)
+    def iterate(cls, ea, pattern, predicate, **options):
+        '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at address `ea`.'''
+        reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
+        Fnext = address.prev if reversed else address.next
+
+        # If our predicate is a string, then we need to ensure that it's one that
+        # we know about. We cheat here by checking it against our current namespace.
+        if isinstance(predicate, six.string_types) and not hasattr(cls, predicate):
+            raise E.InvalidParameterError(u"{:s}.iterate({:#x}, {:s}, {:s}, {:s}) : The provided predicate ({:s}) is unknown and does not refer to anything within the \"{:s}\" namespace.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(pattern), utils.string.repr(predicate), u", {:s}".format(utils.string.kwargs(options)) if options else '', predicate, cls.__name__))
+
+        # Now we either grab the predicate from the namespace or use it as-is.
+        predicate = getattr(cls, predicate) if isinstance(predicate, six.string_types) else predicate
+
+        # Now we can begin our traversal of all search results using it.
         try:
+            ea = predicate(ea, pattern, **options)
             while ea != idaapi.BADADDR:
                 yield ea
-                ea = predicate(address.next(ea), data)
+                ea = predicate(Fnext(ea), pattern, **options)
         except E.SearchResultsError:
             return
         return
