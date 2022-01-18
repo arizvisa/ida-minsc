@@ -64,7 +64,7 @@ def fetch_globals_functions():
     functions = [item for item in db.functions()]
     for i, ea in enumerate(functions):
         ui.navigation.auto(ea)
-        six.print_(u"globals: fetching tag from function {:#x} : {:d} of {:d}".format(ea, i, len(functions)), file=output)
+        six.print_(u"globals: fetching tag from function {:#x} : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
 
         # grab both comment types from the current function and then decode
         # them. once decoded then we can just iterate through their keys and
@@ -191,7 +191,7 @@ def all():
 
     # process all function contents tags
     for i, ea in enumerate(functions):
-        six.print_(u"updating references for contents ({:#x}) : {:d} of {:d}".format(ea, i, len(functions)), file=output)
+        six.print_(u"updating references for contents ({:#x}) : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
         _, _ = contents(ea)
 
     # process all global tags
@@ -269,12 +269,12 @@ def erase():
 
     current = 0
     for idx, ea in iter1:
-        six.print_(u"erasing contents for function {:#x} : {:d} of {:d}".format(ea, idx, total), file=output)
+        six.print_(u"erasing contents for function {:#x} : {:d} of {:d}".format(ea, 1 + idx, total), file=output)
 
     res = idx + 1
     for idx, addressOrName in iter2:
         fmt = "{:#x}" if isinstance(addressOrName, six.integer_types) else "tagname {!r}"
-        six.print_(u"erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), res+idx, total), file=output)
+        six.print_(u"erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), 1 + res + idx, total), file=output)
     return
 
 __all__ = ['everything', 'globals', 'contents']
