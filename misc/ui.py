@@ -823,7 +823,8 @@ class window(object):
         '''Return the active main window.'''
         global application
         q = application()
-        return q.activeWindow()
+        widgets = q.topLevelWidgets()
+        return next(widget for widget in widgets if isinstance(widget, PyQt5.QtWidgets.QMainWindow))
 
 class windows(object):
     """
@@ -1201,13 +1202,12 @@ try:
         # methods
         def open(self, width=0.8, height=0.1):
             '''Open a progress bar with the specified `width` and `height` relative to the dimensions of IDA's window.'''
-            global window
             cls = self.__class__
 
             # XXX: spin for a second until main is defined because IDA seems to be racy with this api
             ts, main = time.time(), getattr(self, '__appwindow__', None)
             while time.time() - ts < self.timeout and main is None:
-                main = window.main()
+                _, main = application().processEvents(), window.main()
 
             if main is None:
                 logging.warning(u"{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join([__name__, cls.__name__]), width, height))
@@ -1237,14 +1237,16 @@ try:
             self.object.move(x, y)
 
             # now everything should look good.
-            self.object.show()
+            self.object.show(), application().processEvents()
 
         def close(self):
             '''Close the current progress bar.'''
-            self.object.close()
+            self.object.close(), application().processEvents()
 
         def update(self, **options):
             '''Update the current state of the progress bar.'''
+            application().processEvents()
+
             minimum, maximum = options.get('min', None), options.get('max', None)
             text, title, tooltip = (options.get(item, None) for item in ['text', 'title', 'tooltip'])
 
