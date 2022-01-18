@@ -2519,6 +2519,12 @@ class address(object):
             res = next(ea)
         return res
 
+    @utils.multicase()
+    @classmethod
+    def iterate(cls):
+        '''Iterate through the currently selected addresses.'''
+        selection = ui.current.selection()
+        return cls.iterate(selection)
     @utils.multicase(end=six.integer_types)
     @classmethod
     def iterate(cls, end):
@@ -2546,11 +2552,11 @@ class address(object):
         if start == end: return
         op = operator.le if start < end else operator.ge
 
-        res = start
+        ea = start
         try:
-            while res not in {idaapi.BADADDR, None} and op(res, end):
-                yield res
-                res = step(res)
+            while ea not in {idaapi.BADADDR, None} and op(ea, end):
+                yield ea
+                ea = step(ea)
         except E.OutOfBoundsError:
             pass
         return
@@ -2567,6 +2573,12 @@ class address(object):
         left, right = bounds
         return cls.iterate(left, cls.prev(right), step)
 
+    @utils.multicase()
+    @classmethod
+    def blocks(cls):
+        '''Iterate through the currently selected blocks.'''
+        selection = ui.current.selection()
+        return cls.blocks(selection)
     @utils.multicase(end=six.integer_types)
     @classmethod
     def blocks(cls, end):
@@ -2599,17 +2611,17 @@ class address(object):
 
             # halting instructions terminate a block
             if _instruction.type.is_return(ea):
-                yield block, nextea
+                yield interface.bounds_t(block, nextea)
                 block = ea
 
             # branch instructions will terminate a block
             elif cxdown(ea):
-                yield block, nextea
+                yield interface.bounds_t(block, nextea)
                 block = nextea
 
             # a branch target will also terminate a block
             elif cxup(ea) and block != ea:
-                yield block, ea
+                yield interface.bounds_t(block, ea)
                 block = ea
             continue
         return
