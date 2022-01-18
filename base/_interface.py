@@ -1621,12 +1621,16 @@ class reftype_t(object):
             res = F(self.S, item)
         return cls.of_action(str().join(res)) if isinstance(res, set) else res
 
+    def __hash__(self):
+        return hash(self.F)
     def __or__(self, other):
         return self.__operator__(operator.or_, other)
     def __and__(self, other):
         return self.__operator__(operator.and_, other)
     def __eq__(self, other):
         return self.__operator__(operator.eq, other)
+    def __ne__(self, other):
+        return self.__operator__(operator.ne, other)
     def __contains__(self, type):
         if isinstance(type, six.integer_types):
             res = self.F & type
@@ -1671,14 +1675,14 @@ class reftype_t(object):
         elif state == 'rw':
             state = 'w'
 
-        # Verify that the state we were given can be iterated through
+        # Verify that the state we were given can be iterated through.
         try:
             (item for item in state)
 
         except TypeError:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), state, state, cls.__name__))
 
-        # Search through our mapper for the correct contents of the reftype_t
+        # Search through our mapper for the correct contents of the reftype_t.
         res = { item for item in state }
         for F, t in cls.__mapper__.items():
             if { item for item in t } == res:
