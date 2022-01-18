@@ -807,8 +807,12 @@ class address(object):
 
     @classmethod
     def __bounds__(cls):
-        info = idaapi.get_inf_structure()
-        return info.minEA, info.maxEA
+        if idaapi.__version__ < 7.2:
+            info = idaapi.get_inf_structure()
+            min, max = info.minEA, info.maxEA
+        else:
+            min, max = idaapi.inf_get_min_ea(), idaapi.inf_get_max_ea()
+        return min, max
 
     @classmethod
     def __within__(cls, ea):
@@ -927,8 +931,8 @@ class address(object):
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
             raise internal.exceptions.InvalidParameterError(u"{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
 
-        # FIXME: off-by-one here, as end can be the size of the db.
-        if any(not cls.__within__(ea) for ea in (start, end-1)):
+        # If the start and end are matching, then we don't need to fit the bounds.
+        if any(not cls.__within__(ea) for ea in [start, end if start == end else end - 1]):
             l, r = cls.__bounds__()
             raise internal.exceptions.OutOfBoundsError(u"{:s} : The specified range ({:#x}<>{:#x}) is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, start, end, l, r))
         return start, end
