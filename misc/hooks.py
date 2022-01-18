@@ -821,27 +821,27 @@ def __process_functions(percentage=0.10):
 
     It's intended to be called once the database is ready to be tampered with.
     """
-    p = ui.Progress()
+    P = ui.Progress()
     globals = {item for item in internal.comment.globals.address()}
 
     total = 0
 
     funcs = [ea for ea in database.functions()]
-    p.update(current=0, max=len(funcs), title=u"Pre-building tagcache...")
-    p.open()
+    P.update(current=0, max=len(funcs), title=u"Pre-building tagcache...")
+    P.open()
     six.print_(u"Pre-building tagcache for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
         chunks = [item for item in function.chunks(fn)]
 
         text = functools.partial(u"Processing function {:#x} ({chunks:d} chunk{plural:s}) -> {:d} of {:d}".format, fn, 1 + i, len(funcs))
-        p.update(current=i)
+        P.update(current=i)
         ui.navigation.procedure(fn)
         if i % (int(len(funcs) * percentage) or 1) == 0:
             six.print_(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, 1 + i, len(funcs), i / float(len(funcs)) * 100.0))
 
         contents = {item for item in internal.comment.contents.address(fn)}
         for ci, (l, r) in enumerate(chunks):
-            p.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
+            P.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
             ui.navigation.analyze(l)
             for ea in database.address.iterate(l, database.address.prev(r)):
                 # FIXME: no need to iterate really since we should have
@@ -854,7 +854,7 @@ def __process_functions(percentage=0.10):
             continue
         continue
     six.print_(u"Successfully built tag-cache composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
-    p.close()
+    P.close()
 
 def rebase(info):
     """This is for when the user rebases the entire database.
@@ -885,7 +885,7 @@ def rebase(info):
 
         # for each function (using target address because ida moved the netnodes for us)
         listable = [ea for ea in functions if info[si].to <= ea < info[si].to + info[si].size]
-        for i, offset in __rebase_function(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
+        for i, offset in __relocate_function(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
             name = database.name(info[si].to + offset)
             text = u"Relocating function {:d} of {:d}{:s}: {:#x} -> {:#x}".format(i + fcount, len(functions), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
             p.update(value=sum([fcount, gcount, i]), text=text)
@@ -894,7 +894,7 @@ def rebase(info):
 
         # for each global
         listable = [(ea, count) for ea, count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
-        for i, offset in __rebase_globals(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
+        for i, offset in __relocate_globals(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
             name = database.name(info[si].to + offset)
             text = u"Relocating global {:d} of {:d}{:s}: {:#x} -> {:#x}".format(i + gcount, len(globals), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
             p.update(value=sum([fcount, gcount, i]), text=text)
@@ -902,61 +902,112 @@ def rebase(info):
         gcount += len(listable)
     p.close()
 
-def __rebase_function(old, new, size, iterable):
+def __relocate_function(old, new, size, iterable, moved=False):
+    """Relocate the function addresses in `iterable` from address `old` to `new` adjusting them by the specified `size`.
+
+    If `moved` is specified as true, then the netnodes are already at their target
+    as per "Move Segment(s)". Otherwise they're still at their original address
+    which happens when the database has been relocated via "Rebase Program".
+    """
     key = internal.comment.tagging.__address__
-    failure, total = [], [item for item in iterable]
+    failure, total, index = [], [item for item in iterable], {ea : keys for ea, keys in internal.comment.contents.iterate() if old <= ea < old + size}
 
     for i, fn in enumerate(total):
         offset = fn - new
+        source, target = offset + old, offset + new
 
-        # grab the contents dictionary from the former address
+        # Grab the contents tags from the former function's netnode. If the netnode has
+        # already been moved, then use the function we were given. Otherwise we can just
+        # use the old offset.
         try:
-            state = internal.comment.contents._read(offset + old, offset + old)
+            state = internal.comment.contents._read(target if moved else source, offset + old)
 
         except E.FunctionNotFoundError:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Unable to transform non-function address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new), exc_info=True)
+            logging.fatal(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Unable to locate the original function address ({:#x}) while trying to transform to {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new), exc_info=True)
             state = None
 
-        if state is None: continue
+        # If there was no read state then there's nothing to do. So we just
+        # continue to the next iteration (without yielding) for performance.
+        if state is None:
+            logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Skipping contents of function {:#x} due to no state being stored at {:#x}.".format(__name__, old, new, size, iterable, fn, fn if moved else (offset + old)))
+            continue
 
-        # erase the old one since we've loaded its state
-        internal.comment.contents._write(offset + old, offset + old, None)
+        # Erase the old contents tags since we've already loaded its state.
+        internal.comment.contents._write(source, offset + old, None)
+        logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cleared contents of function {:#x} at old address {:#x}.".format(__name__, old, new, size, iterable, fn, offset + old))
 
-        # ensure that the key is available in the state that we fetched
+        # If there wasn't a value in our contents index, then warn the user
+        # before we remove it. We use this later to figure out any strays.
+        if not operator.contains(index, source):
+            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Found contents for function {:#x} at old address {:#x} that wasn't in index.".format(__name__, old, new, size, iterable, fn, source))
+        index.pop(source, None)
+
+        # Ensure that the function key is available in the loaded state.
         if key not in state:
             state.setdefault(key, {})
-            # FIXME: we should completely rebuild the contents here instead of just
-            #        initializing it with an empty dict and throwing a warning.
-            logging.warning(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Missing address cache while translating address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
+            # FIXME: We should completely rebuild the contents here instead of
+            #        logging a warning and initializing it with an empty dict.
+            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Missing address cache while translating address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
 
-        # update the addresses
+        # Update the state containing the old addresses with the newly transformed ones.
         res, state[key] = state[key], {ea - old + new : ref for ea, ref in state[key].items()}
 
-        # and put the new addresses back to the new state
-        ok = internal.comment.contents._write(None, fn, state)
+        # And then we can write the modified state back to the function's netnode.
+        ok = internal.comment.contents._write(fn, fn, state)
         if not ok:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to write reference count for function {:#x} while trying to update old reference count ({!s}) to new one ({!s}).".format(__name__, old, new, size, iterable, fn, utils.string.repr(res), utils.string.repr(state[key])))
+            logging.fatal(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to write reference count for function {:#x} while trying to update old reference count ({!s}) to new one ({!s}).".format(__name__, old, new, size, iterable, fn, utils.string.repr(res), utils.string.repr(state[key])))
             failure.append((fn, res, state[key]))
 
+        # We successfully processed this function, so yield its index and offset.
+        logging.debug(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Relocated {:d} content locations for function {:#x} using delta {:+#x}.".format(__name__, old, new, size, iterable, len(state[key]), fn, new - old))
         yield i, offset
+
+    # Last thing to do is to clean up the stray contents from the index that weren't
+    # pointing to a function anyways.
+    for ea, keys in index.items():
+        offset = ea - old
+        source, target = offset + old, offset + new
+
+        # Check that this stray isn't pointing to an actual function before we
+        # continue to remove it from the netnode. If it is, then we skip processing.
+        ch = idaapi.get_fchunk(target)
+        if ch is None:
+            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is not associated with a function.".format(__name__, old, new, size, iterable, ea, target))
+        elif ch.flags & idaapi.FUNC_TAIL:
+            owners = [interface.range.start(ch.referers[index]) for index in range(ch.refqty)]
+            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is associated with more than one function ({:s}).".format(__name__, old, new, size, iterable, ea, target, ', '.join(map("{:#x}".format, owners))))
+        elif interface.range.start(ch) != target:
+            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is not associated with the right function ({:#x}).".format(__name__, old, new, size, iterable, ea, target, interface.range.start(ch)))
+        else:
+            logging.critical(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Refusing to clean up index for {:#x} as it has been relocated to {:#x} which is currently in use by function ({:#x}).".format(__name__, old, new, size, iterable, ea, offset + new, interface.range.start(ch)))
+            continue
+
+        # Now we know why this address is within our index, so all that
+        # we really need to do is to remove it.
+        internal.comment.contents._write(ea, ea, None)
+        logging.debug(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cleared stray contents for {:#x} at old address {:#x}.".format(__name__, old, new, size, iterable, offset + new, offset + old))
     return
 
-def __rebase_globals(old, new, size, iterable):
+def __relocate_globals(old, new, size, iterable):
+    '''Relocate the global tuples (address, count) in `iterable` from address `old` to `new` adjusting them by the specified `size`.'''
     node = internal.comment.tagging.node()
     failure, total = [], [item for item in iterable]
     for i, (ea, count) in enumerate(total):
         offset = ea - old
 
-        # remove the old address
+        # Remove the old address from the netnode cache (altval) with our global.
         ok = internal.netnode.alt.remove(node, ea)
         if not ok:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to remove reference count ({!r}) for global {:#x}.".format(__name__, old, new, size, iterable, count, ea))
+            logging.fatal(u"{:s}.relocate_globals({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to remove reference count ({!r}) for global {:#x}.".format(__name__, old, new, size, iterable, count, ea))
 
-        # now add the new address
-        ok = internal.netnode.alt.set(node, offset + new, count)
+        # Now we can re-add the new address to the netnode cache (altval).
+        ok = internal.netnode.alt.set(node, new + offset, count)
         if not ok:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to store reference count ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, new + offset))
+            logging.fatal(u"{:s}.relocate_globals({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to store reference count ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, new + offset))
             failure.append((ea, new + offset, count))
+
+        # Yield the offset to the global that we just processed.
+        logging.debug(u"{:s}.relocate_globals({:#x}, {:#x}, {:+#x}, {!r}) : Relocated count ({:d}) for global {:#x} from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, old + offset, new + offset))
         yield i, offset
     return
 
