@@ -2020,38 +2020,49 @@ def tag(func, key):
     res = tag(func)
     if key in res:
         return res[key]
-    raise E.MissingFunctionTagError(u"{:s}.tag({!r}, {!r}) : Unable to read tag \"{:s}\" from function.".format(__name__, func, key, utils.string.escape(key, '"')))
+    raise E.MissingFunctionTagError(u"{:s}.tag({:s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the function.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, utils.string.escape(key, '"')))
 @utils.multicase()
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
+
+    # If the given location was not within a function, then fall back to a database tag.
     except E.FunctionNotFoundError:
-        logging.warning(u"{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
+        logging.warning(u"{:s}.tag({:s}) : Attempted to read any tags from a non-function. Falling back to using database tags.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return database.tag(func)
 
+    # If we were given a runtime function, then the address actually uses a database tag.
     if rt:
-        logging.warning(u"{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
+        logging.warning(u"{:s}.tag({:#x}) : Attempted to read any tags from a runtime-linked address. Falling back to using database tags.".format(__name__, ea))
         return database.tag(ea)
 
+    # Read both repeatable and non-repeatable comments from the address, and
+    # decode the tags that are stored within to a dictionary.
     fn, repeatable = by_address(ea), True
     res = comment(fn, repeatable=False)
     d1 = internal.comment.decode(res)
     res = comment(fn, repeatable=True)
     d2 = internal.comment.decode(res)
 
+    # Detect if the address had content in both repeatable or non-repeatable
+    # comments so we can warn the user about what we're going to do.
     if six.viewkeys(d1) & six.viewkeys(d2):
         logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
+    # Then we can store them into a dictionary whilst preserving priority.
     res = {}
     [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
 
-    # add the function's name to the result
+    # Add any of the implicit tags for the given function into our results.
     fname = name(fn)
-    if fname and database.type.flags(interface.range.start(fn), idaapi.FF_NAME):
-        res.setdefault('__name__', fname)
+    if fname and database.type.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', fname)
+    fcolor = color(fn)
+    if fcolor is not None: res.setdefault('__color__', fcolor)
 
-    # add the function's typeinfo to the result
+    # For the function's type information within the implicit "__typeinfo__"
+    # tag, we'll need to extract the prototype and the function's name. This
+    # is so that we can use the name to emit a proper function prototype.
     try:
         if type.has_prototype(fn):
             ti, fname = type(fn), database.name(interface.range.start(fn))
@@ -2063,24 +2074,24 @@ def tag(func):
             # And then return it to the user
             res.setdefault('__typeinfo__', fprototype)
 
-    # if an exception was raised, then this name might be mangled and we need
-    # to rip the type information from the demangled name.
+    # If an exception was raised, then the name from the type information might
+    # be mangled and so we need to rip the type from the demangled name.
     except E.InvalidTypeOrValueError:
         demangled = internal.declaration.demangle(fname)
 
-        # if the demangled name is different from the actual name, then we need
+        # If the demangled name is different from the actual name, then we need
         # to extract its result type and prepend it to the demangled name.
         if demangled != fname:
             res.setdefault('__typeinfo__', ' '.join([internal.declaration.extract.result(prototype(ea)), demangled]))
 
-    # ..and now hand it off.
+    # Finally we can hand our result back to the caller.
     return res
 @utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key', 'value')
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
     if value is None:
-        raise E.InvalidParameterError(u"{:s}.tag({!r}) : Tried to set tag \"{:s}\" to an unsupported type.".format(__name__, ea, utils.string.escape(key, '"')))
+        raise E.InvalidParameterError(u"{:s}.tag({:s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value, utils.string.escape(key, '"'), value))
 
     # Check to see if function tag is being applied to an import
     try:
@@ -2088,47 +2099,58 @@ def tag(func, key, value):
 
     # If we're not even in a function, then use a database tag.
     except E.FunctionNotFoundError:
-        logging.warning(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
+        logging.warning(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag (\"{:s}\") for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value, utils.string.escape(key, '"')))
         return database.tag(func, key, value)
 
     # If we are a runtime-only function, then write the tag to the import
     if rt:
-        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
+        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag (\"{:s}\") for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value, utils.string.escape(key, '"')))
         return database.tag(ea, key, value)
 
     # Otherwise, it's a function.
     fn = by_address(ea)
 
-    # if the user wants to change the '__name__' tag then update the function's name.
+    # If the user wants to modify any of the implicit tags, then we use the key
+    # to figure out which function to dispatch to in order to modify it.
     if key == '__name__':
         return name(fn, value)
-
-    # if the user wants to change the '__typeinfo__' tag, then apply it to the function's prototype
-    if key == '__typeinfo__':
+    elif key == '__color__':
+        return color(fn, value)
+    elif key == '__typeinfo__':
         return type(fn, value)
 
-    # decode both comments and figure out which type of comment the tag is
-    # currently in. if it's in neither then we just fall back to a repeatable
-    # comment because we're a function.
+    # Decode both comment types for the function so that we can figure out which
+    # type that the tag they specified is currently in. If it's in neither, then
+    # we can simply use a repeatable comment because we're a function.
     state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
     state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
     state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
-    # grab the previous value, and update the state with the new one
+    # Grab the previous value from the correct dictionary, and update it with
+    # the new value that was given to us.
     res, state[key] = state.get(key, None), value
 
-    # guard the modification of the comment so we don't tamper with any references
+    # Now we need to guard the modification of the comment so that we don't
+    # mistakenly tamper with any of the reference counts in the tag cache.
     hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
     try:
         [ ui.hook.idb.disable(item) for item in hooks ]
+
+    # If we weren't able to disable the hooks due to an exception, then don't
+    # bother to re-encoding the tags back into the comment.
     except Exception:
         raise
+
+    # Finally we can encode the modified dict and write it to the function comment.
     else:
         comment(fn, internal.comment.encode(state), repeatable=where)
+
+    # Release the hooks that we disabled since we finished modifying the comment.
     finally:
         [ ui.hook.idb.enable(item) for item in hooks ]
 
-    # if we weren't able to find a key in the dict, then one was added and we need to update its reference
+    # If there wasn't a key in any of the dictionaries we decoded, then
+    # we know one was added and so we need to update the tagcache.
     if res is None:
         internal.comment.globals.inc(interface.range.start(fn), key)
 
@@ -2147,9 +2169,10 @@ def tag(func, key, none):
     # Check to see if function tag is being applied to an import
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
+
+    # If we're not even in a function, then use a database tag.
     except E.FunctionNotFoundError:
-        # If we're not even in a function, then use a database tag.
-        logging.warning(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
+        logging.warning(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear the tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
         return database.tag(func, key, none)
 
     # If so, then write the tag to the import
@@ -2160,7 +2183,8 @@ def tag(func, key, none):
     # Otherwise, it's a function.
     fn = by_address(ea)
 
-    # if the user wants to remove the '__name__' tag then remove the name from the function.
+    # If the user wants to remove any of the implicit tags, then we need to
+    # dispatch to the correct function in order to clear the requested value.
     if key == '__name__':
         return name(fn, None)
     elif key == '__color__':
@@ -2168,30 +2192,40 @@ def tag(func, key, none):
     elif key == '__typeinfo__':
         return type(fn, None)
 
-    # decode both comment types so we can figure out which one the user's
-    # key is in. if we don't find it in either then it doesn't matter since
-    # we're gonna raise an exception anyways.
+    # Decode both comment types so that we can figure out which comment type
+    # the tag they're trying to remove is in. If it's in neither, then we just
+    # assume which comment it should be in as an exception will be raised later.
     state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
     state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
     state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
+    # If the user's key was not in any of the decoded dictionaries, then raise
+    # an exception because the key doesn't exist within the function's tags.
     if key not in state:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag (\"{:s}\") from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
 
-    # guard the modification of the comment so that we don't tamper with any references
+    # Before modifying the comment, we first need to guard its modification
+    # so that the hooks don't also tamper with the reference count in the cache.
     hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
     try:
         [ ui.hook.idb.disable(item) for item in hooks ]
+
+    # If an exception was raised while trying to disable the hooks, then we just
+    # give up and avoid re-encoding the user's tags back into the comment.
     except Exception:
         raise
+
+    # Finally we can encode the modified dict back into the function comment.
     else:
         comment(fn, internal.comment.encode(state), repeatable=where)
+
+    # Release the hooks that were disabled now that that comment has been written.
     finally:
         [ ui.hook.idb.enable(item) for item in hooks ]
 
-    # if we got here without raising an exception, then the tag was remove and
-    # we just need to update the cache with its removal.
+    # If we got here cleanly without an exception, then the tag was successfully
+    # removed and we just need to update the tag cache with its removal.
     internal.comment.globals.dec(interface.range.start(fn), key)
     return res
 
