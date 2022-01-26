@@ -856,51 +856,70 @@ def __process_functions(percentage=0.10):
     six.print_(u"Successfully built tag-cache composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
     P.close()
 
-def rebase(info):
-    """This is for when the user rebases the entire database.
+def relocate(info):
+    """This is for when the user relocates a number of segments in newer versions of IDA.
 
     We update the entire database in two parts. First we iterate through all
     the functions, and transform its cache to its new address. Next we iterate
-    through all of the known global tags and then transform those.
+    through all of the known global tags and then transform those. As we don't
+    received the "changed_netmap" parameter, we don't know whether IDA has
+    actually relocated the netnodes or not.
     """
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
-    functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.netnode.alt.fitems(internal.comment.tagging.node())])
+    functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.comment.globals.iterate()])
 
-    p = ui.Progress()
-    p.update(current=0, title=u"Rebasing tagcache...", min=0, max=sum(len(item) for item in [functions, globals]))
+    # First we need to sanity check what we've been asked to do and then we
+    # disable the auto-analysis so that IDA doesn't change anything as we're
+    # modifying the netnodes. We preserve this for restoration later.
+    if info.size() == 0:
+        return logging.warning(u"{:s}.relocate({!s}) : Ignoring request to relocate {:d} segments.".format(__name__, [], info.size()))
+
+    # Output the amount of work (number of segments) that we'll need to perform.
+    scount, segmap = info.size(), {info[si].to : info[si]._from for si in range(info.size())}
+    listable = sorted(segmap)
+    logging.info(u"{:s}.relocate({:#x}, {:#x}) : Relocating tagcache for {:d} segment{:s}.".format(__name__, segmap[listable[0]], listable[0], scount, '' if scount == 1 else 's'))
+
+    # Now we'll need to iterate through our functions and globals in order to filter
+    # them and calculate the number of items we'll be expecting to process.
+    count = sum(1 for ea in functions if any(info[si].to <= ea <= info[si].to + info[si].size for si in range(info.size())))
+    count+= sum(1 for ea, _ in globals if any(info[si]._from <= ea <= info[si]._from + info[si].size for si in range(info.size())))
+
+    # Create our progress bar that we'll continuously update using the number of
+    # items that we just calculated from filtering our functions and globals.
+    P = ui.Progress()
+    P.update(current=0, min=0, max=count, title=u"Relocating tagcache for {:d} segment{:s}...".format(scount, '' if scount == 1 else 's'))
     fcount = gcount = 0
 
-    scount = info.size()
-    segmap = {info[si].to : info[si]._from for si in range(scount)}
-    listable = sorted(segmap)
-    six.print_(u"{:s}.rebase({:#x}, {:#x}) : Rebasing tagcache for {:d} segments.".format(__name__, segmap[listable[0]], listable[0], scount))
-
-    # for each segment
-    p.open()
+    # Itreate through each work item (segment) in order to process them.
+    P.open()
     for si in range(scount):
         seg = idaapi.getseg(info[si].to)
 
-        msg = u"Rebasing tagcache for segment {:d} of {:d}{:s}: {:#x} ({:+#x}) -> {:#x}".format(1 + si, scount, " ({:s})".format(get_segment_name(seg)) if seg else '', info[si]._from, info[si].size, info[si].to)
-        p.update(title=msg), six.print_(msg)
+        # Format the description for the current work item (segment) that we're processing.
+        description = "{:d} of {:d}{:s}".format(1 + si, scount, " ({:s})".format(get_segment_name(seg)) if seg else '') if scount > 1 else "{:s}".format(get_segment_name(seg) if seg else '')
+        msg = u"Relocating tagcache for segment{:s}: {:#x} ({:+#x}) -> {:#x}".format(" {:s}".format(description) if description else '', info[si]._from, info[si].size, info[si].to)
+        P.update(title=msg), six.print_(msg)
 
-        # for each function (using target address because ida moved the netnodes for us)
+        # Iterate through each function that was moved and relocate its contents. If we're
+        # using a version of IDA prior to 7.3, then when our event has been dispatched
+        # the netnodes have already been moved.
         listable = [ea for ea in functions if info[si].to <= ea < info[si].to + info[si].size]
-        for i, offset in __relocate_function(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
+        for i, offset in __relocate_function(info[si]._from, info[si].to, info[si].size, (item for item in listable), moved=True if idaapi.__version__ < 7.3 else False):
             name = database.name(info[si].to + offset)
-            text = u"Relocating function {:d} of {:d}{:s}: {:#x} -> {:#x}".format(i + fcount, len(functions), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
-            p.update(value=sum([fcount, gcount, i]), text=text)
+            text = u"Relocating function {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(listable), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
+            P.update(value=sum([fcount, gcount, i]), text=text)
             ui.navigation.procedure(info[si].to + offset)
         fcount += len(listable)
 
-        # for each global
+        # Iterate through all of the globals that were moved.
         listable = [(ea, count) for ea, count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
         for i, offset in __relocate_globals(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
             name = database.name(info[si].to + offset)
-            text = u"Relocating global {:d} of {:d}{:s}: {:#x} -> {:#x}".format(i + gcount, len(globals), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
-            p.update(value=sum([fcount, gcount, i]), text=text)
+            text = u"Relocating global {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(listable), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
+            P.update(value=sum([fcount, gcount, i]), text=text)
             ui.navigation.analyze(info[si].to + offset)
         gcount += len(listable)
-    p.close()
+    P.close()
 
 def __relocate_function(old, new, size, iterable, moved=False):
     """Relocate the function addresses in `iterable` from address `old` to `new` adjusting them by the specified `size`.
@@ -1493,9 +1512,10 @@ def make_ida_not_suck_cocks(nw_code):
 
     [ ui.hook.idb.add(item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
 
-    ## rebase the entire tagcache when the entire database is rebased.
+    ## Relocate the tagcache for multiple segments if those segments are moved
+    ## or if the entire database has been rebased.
     if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('allsegs_moved', rebase, 0)
+        ui.hook.idb.add('allsegs_moved', relocate, 0)
 
     else:
         ui.hook.idb.add('segm_start_changed', segm_start_changed, 0)
