@@ -1213,3 +1213,11 @@ class globals(tagging):
         res = internal.netnode.alt.get(node, address)
         internal.netnode.alt.set(node, address, count)
         return res
+
+    @classmethod
+    def iterate(cls):
+        '''Yield each address and count for all of the globals in the database according to what is written in the altvals.'''
+        node = tagging.node()
+        for ea, count in internal.netnode.alt.fitems(node):
+            yield ea, count
+        return
