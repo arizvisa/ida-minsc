@@ -19,7 +19,7 @@ Likewise to rebuild the cache for just the globals or the contents::
 
 """
 
-import six, sys, logging
+import six, sys, logging, builtins
 import functools, operator, itertools, types
 
 import database as db, function as func, ui
@@ -276,5 +276,133 @@ def erase():
         fmt = "{:#x}" if isinstance(addressOrName, six.integer_types) else "tagname {!r}"
         six.print_(u"erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), 1 + res + idx, total), file=output)
     return
+
+def verify_index():
+    '''Iterate through the index and verify that each contents entry is pointing at the right functions.'''
+    cls, ok = internal.comment.contents, True
+
+    # Iterate through the entire index of contents.
+    for ea, available in cls.iterate():
+        if not func.within(ea):
+            ok, _ = False, six.print_(u"[{:#x}] the item in the index ({:#x}) has been orphaned and is not associated with a function".format(ea, ea))
+            continue
+
+        # Verify the owner of the address the cache is stored in
+        # actually belongs to the correct function.
+        f = func.address(ea)
+        if f != ea:
+            ok, _ = False, six.print_(u"[{:#x}] the item has the wrong parent ({:#x}) and should be owned by {:#x}".format(ea, ea, f))
+            continue
+
+        # Verify the keys inside the cache are only ones that we know about.
+        expected = {key for key in [cls.__tags__, cls.__address__]}
+        keys = {key for key in available}
+        if keys - expected:
+            ok, _ = False, six.print_(u"[{:#x}] the index item for this function contains unsupported keys ({:s})".format(ea, ', '.join(sorted(keys - expected))))
+            continue
+
+        # Make sure that both keys are contained within the cache.
+        if keys != expected:
+            ok, _ = False, six.print_(u"[{:#x}] the index item for this function contains keys ({:s}) that do not match the requirements ({:s})".format(ea, ', '.join(keys), ', '.join(expected)))
+        continue
+    return ok
+
+def verify_content(ea):
+    '''Iterate through the contents cache for an individual function and verify that the addresses in its cache are correct.'''
+    cls = internal.comment.contents
+    try:
+        cache = cls._read(ea, ea)
+
+    # We should be within a function, otherwise this can't be verified.
+    except internal.exceptions.FunctionNotFoundError:
+        six.print_(u"[{:#x}] unable to read the cache for the requested address {:#x}".format(ea, ea))
+        return False
+
+    # If there was no cache, then we can just immediately return.
+    if cache is None:
+        six.print_(u"[{:#x}] the requested address ({:#x}) does not contain a cache".format(ea, ea))
+        return False
+
+    # Grab the keys from the cache in order to cross-check them.
+    expected, available = {key for key in [cls.__tags__, cls.__address__]}, {key for key in cache}
+
+    # Verify that the keys in our cache match what we expect.
+    if available - expected:
+        six.print_(u"[{:#x}] the cache at {:#x} contains unsupported keys ({:s})".format(ea, ea, ', '.join(sorted(available - expected))))
+        return False
+
+    # Ensure that the cache definitely contains the keys we expect.
+    if available != expected:
+        six.print_(u"[{:#x}] the cache at {:#x} contains keys ({:s}) that do not meet the requirements ({:s})".format(ea, ea, ', '.join(available), ', '.join(expected)))
+        return False
+
+    # If we're not within a function, then we need to bail because
+    # the next tests can't possibly succeed.
+    if not func.within(ea):
+        six.print_(u"[{:#x}] the cache at {:#x} is not part of a function".format(ea, ea))
+        return False
+    f = func.address(ea)
+
+    # If we verify that the addresses in the cache are all within the
+    # function that the cache is associated with, then we're done.
+    if not builtins.all(func.contains(f, item) for item in cache[cls.__address__]):
+        missed = {item for item in cache[cls.__address__] if not func.contains(f, item)}
+        six.print_(u"[{:#x}] the cache references {:d} address{:s} that are not owned by function {:#x}".format(ea, len(missed), '' if len(missed) == 1 else 'es', f))
+
+        # Otherwise, some of the addresses are pointing to the wrong place.
+        for index, item in sorted(missed):
+            six.print_(u"[{:#x}] item {:d} of {:d} at {:#x} should be owned by {:#x} but {:s}".format(ea, 1 + index, len(missed), item, f, "is in {:#x}".format(func.address(item)) if func.within(item) else 'is not in a function'))
+        return False
+
+    # Iterate through the cache keeping track of the reference counts.
+    tags, address = {}, {}
+    for ea in cache[cls.__address__]:
+        item = db.tag(ea)
+
+        # Go through the tags that we read, and tally up their values.
+        for key in item:
+            tags[key], address[ea] = tags.setdefault(key, 0) + 1, address.setdefault(ea, 0) + 1
+        continue
+
+    # First we'll verify the address counts.
+    expected, available = {ea for ea in cache[cls.__address__]}, {ea for ea in address}
+    if expected != available:
+        additional, missing = sorted(available - expected), sorted(expected - available)
+        six.print_(u"[{:#x}] the address cache for {:#x} is desynchronized and {:s} addresses...".format(f, f, "contains {:d} additional and {:d} missing".format(len(additional), len(missing)) if additional and missing else "is missing {:d}".format(len(missing)) if missing else "has {:d} additional".format(len(additional))))
+        if additional:
+            six.print_(u"[{:#x}] ...the additional addresses are: {:s}".format(f, ', '.join(map("{:#x}".format, additional))))
+        if missing:
+            six.print_(u"[{:#x}] ...the addresses that are missing are: {:s}".format(f, ', '.join(map("{:#x}".format, missing))))
+        return False
+
+    # Then we'll verify the tag names.
+    expected, available = {key for key in cache[cls.__tags__]}, {key for key in tags}
+    if expected != available:
+        additional, missing = sorted(available - expected), sorted(expected - available)
+        six.print_(u"[{:#x}] the name cache for {:#x} is desynchronized and {:s} keys...".format(f, f, "contains {:d} additional and {:d} missing".format(len(additional), len(missing)) if additional and missing else "is missing {:d}".format(len(missing)) if missing else "has {:d} additional".format(len(additional))))
+        if additional:
+            six.print_(u"[{:#x}] ...the additional keys are: {:s}".format(f, ', '.join(map("{!r}".format, additional))))
+        if missing:
+            six.print_(u"[{:#x}] ...the keys that are missing are: {:s}".format(f, ', '.join(map("{!r}".format, missing))))
+        return False
+
+    # If those were all right, then all critical checks are complete and we
+    # can check on the reference counts. Starting with the tag names...
+    for key in expected & available:
+        expected = cache[cls.__tags__]
+        if expected[key] != tags[key]:
+            six.print_(u"[{:#x}] ...expected a reference count of {:d} for tag {!r}, got {:d}".format(f, expected[key], key, tags[key]))
+        continue
+
+    # Now we can compare the address reference counts.
+    expected, available = {ea for ea in cache[cls.__address__]}, {ea for ea in address}
+    for ea in expected & available:
+        count, expected = address[ea], cache[cls.__address__]
+
+        # This should compare exactly. So if the count doesn't match, let someone know.
+        if count != expected[ea]:
+            six.print_(u"[{:#x}] ...expected a reference count of {:d} for address {:#x}, got {:d}".format(f, expected[ea], ea, count))
+        continue
+    return True
 
 __all__ = ['everything', 'globals', 'contents']
