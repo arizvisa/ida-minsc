@@ -530,4 +530,20 @@ def verify_globals():
         continue
     return ok
 
+def verify_contents():
+    '''Verify the contents of every single function in the index.'''
+    index = sorted({ea for ea, _ in internal.comment.contents.iterate()})
+
+    # Verify the index as the very first thing.
+    ok = verify_index()
+    if not ok:
+        six.print_(u'some issues were found within the index... ignoring them and proceeding to verify each cache referenced by the index', file=output)
+
+    # Now we can iterate through the index and process each function's contents.
+    i = count = 0
+    for i, ea in enumerate(index):
+        ok = verify_content(ui.navigation.set(ea))
+        count += 1 if ok else 0
+    return count, len(index)
+
 __all__ = ['everything', 'globals', 'contents']
