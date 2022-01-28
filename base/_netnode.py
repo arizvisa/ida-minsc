@@ -615,11 +615,21 @@ class sup(object):
         return
 
     @classmethod
-    def fitems(cls, nodeidx, tag=None):
+    def fitems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
+        if type in {None}:
+            value, transform = netnode.supval, internal.utils.fidentity
+        elif issubclass(type, memoryview):
+            value, transform = netnode.supval, memoryview
+        elif issubclass(type, bytes):
+            value, transform = netnode.supstr, internal.utils.fidentity
+        elif issubclass(type, six.string_types):
+            value, transform = netnode.supstr, internal.utils.fidentity
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
         node = utils.get(nodeidx)
-        for nsup, supval in utils.fsup(node, tag=tag or netnode.suptag):
-            yield nsup, supval
+        for nsup, supval in utils.fsup(node, value, tag=tag or netnode.suptag):
+            yield nsup, transform(supval)
         return
 
     @classmethod
@@ -631,11 +641,21 @@ class sup(object):
         return
 
     @classmethod
-    def ritems(cls, nodeidx, tag=None):
+    def ritems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
+        if type in {None}:
+            value, transform = netnode.supval, internal.utils.fidentity
+        elif issubclass(type, memoryview):
+            value, transform = netnode.supval, memoryview
+        elif issubclass(type, bytes):
+            value, transform = netnode.supstr, internal.utils.fidentity
+        elif issubclass(type, six.string_types):
+            value, transform = netnode.supstr, internal.utils.fidentity
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
         node = utils.get(nodeidx)
-        for nsup, supval in utils.rsup(node, tag=tag or netnode.suptag):
-            yield nsup, supval
+        for nsup, supval in utils.rsup(node, value, tag=tag or netnode.suptag):
+            yield nsup, transform(supval)
         return
 
     @classmethod
@@ -711,11 +731,23 @@ class hash(object):
         return
 
     @classmethod
-    def fitems(cls, nodeidx, tag=None):
+    def fitems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
+        if type in {None}:
+            value, transform = netnode.hashval, internal.utils.fidentity
+        elif issubclass(type, memoryview):
+            value, transform = netnode.hashval, memoryview
+        elif issubclass(type, bytes):
+            value, transform = netnode.hashval, bytes
+        elif issubclass(type, six.string_types):
+            value, transform = netnode.hashstr, internal.utils.fidentity
+        elif issubclass(type, six.integer_types):
+            value, transform = netnode.hashval_long, internal.utils.fidentity
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
         node = utils.get(nodeidx)
-        for idx, hashval in utils.fhash(node, tag=tag or netnode.hashtag):
-            yield idx, hashval
+        for idx, hashval in utils.fhash(node, value, tag=tag or netnode.hashtag):
+            yield idx, transform(hashval)
         return
 
     @classmethod
@@ -727,11 +759,23 @@ class hash(object):
         return
 
     @classmethod
-    def ritems(cls, nodeidx, tag=None):
+    def ritems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
+        if type in {None}:
+            value, transform = netnode.hashval, internal.utils.fidentity
+        elif issubclass(type, memoryview):
+            value, transform = netnode.hashval, memoryview
+        elif issubclass(type, bytes):
+            value, transform = netnode.hashval, bytes
+        elif issubclass(type, six.string_types):
+            value, transform = netnode.hashstr, internal.utils.fidentity
+        elif issubclass(type, six.integer_types):
+            value, transform = netnode.hashval_long, internal.utils.fidentity
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
         node = utils.get(nodeidx)
-        for idx, hashval in utils.rhash(node, tag=tag or netnode.hashtag):
-            yield idx, hashval
+        for idx, hashval in utils.rhash(node, value, tag=tag or netnode.hashtag):
+            yield idx, transform(hashval)
         return
 
     @classmethod
