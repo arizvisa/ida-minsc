@@ -257,41 +257,41 @@ class utils(object):
         return
 
     @classmethod
-    def fsup(cls, node, tag=netnode.suptag):
+    def fsup(cls, node, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, netnode.supval, tag=tag):
+        for item in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
             yield item
         return
     @classmethod
-    def rsup(cls, node, tag=netnode.suptag):
+    def rsup(cls, node, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.supfirst, netnode.suplast, netnode.supprev, netnode.supval, tag=tag):
+        for item in cls.valriter(node, netnode.supfirst, netnode.suplast, netnode.supprev, value or netnode.supval, tag=tag):
             yield item
         return
 
     @classmethod
-    def fhash(cls, node, tag=netnode.hashtag):
+    def fhash(cls, node, value=None, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.hfiter(node, netnode.hashfirst, netnode.hashlast, netnode.hashnext, netnode.hashval, tag=tag):
+        for item in cls.hfiter(node, netnode.hashfirst, netnode.hashlast, netnode.hashnext, value or netnode.hashval, tag=tag):
             yield item
         return
     @classmethod
-    def rhash(cls, node, tag=netnode.hashtag):
+    def rhash(cls, node, value=None, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
-        for item in cls.hriter(node, netnode.hashfirst, netnode.hashlast, netnode.hashprev, netnode.hashval, tag=tag):
+        for item in cls.hriter(node, netnode.hashfirst, netnode.hashlast, netnode.hashprev, value or netnode.hashval, tag=tag):
             yield item
         return
 
     @classmethod
-    def fchar(cls, node, tag=netnode.chartag):
+    def fchar(cls, node, value=None, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, netnode.charval, tag=tag):
+        for item in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, value or netnode.charval, tag=tag):
             yield item
         return
     @classmethod
-    def rchar(cls, node, tag=netnode.chartag):
+    def rchar(cls, node, value=None, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.charfirst, netnode.charlast, netnode.charprev, netnode.charval, tag=tag):
+        for item in cls.valriter(node, netnode.charfirst, netnode.charlast, netnode.charprev, value or netnode.charval, tag=tag):
             yield item
         return
 
