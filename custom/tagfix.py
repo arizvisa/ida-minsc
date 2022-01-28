@@ -29,177 +29,158 @@ import idaapi
 output = sys.stderr
 
 def fetch_contents(fn):
-    """Fetch the reference count for the contents of function `fn` in the database.
+    """Fetch the number of references for the contents of function `fn` from the database.
 
-    Returns the tuple `(func, address, tags)` where the `address` and
-    `tags` fields are both dictionaries containing the reference count for
-    the addresses and tag names. The field `func` contains the address of the
-    function.
+    Returns the tuple `(function, address, tags)` where the `address` and
+    `tags` items are both dictionaries containing the number of references
+    for the addresses and tag names. The `function` item contains the address
+    of the function whose references were counted.
     """
-    addr, tags = {}, {}
+    address, tags = {}, {}
 
-    for ea in func.iterate(fn):
-        ui.navigation.auto(ea)
+    for ea in map(ui.navigation.analyze, func.iterate(fn)):
+        items = db.tag(ea)
 
-        # grab both comment types so that we can decode them. after decoding,
-        # then iterate through all of their keys and tally up their counts.
-        repeatable, nonrepeatable = (db.comment(ea, repeatable=item) for item in [True, False])
-        for items in map(internal.comment.decode, [repeatable, nonrepeatable]):
-            #items.pop('name', None)
-            for name in items:
-                addr[ea] = addr.get(ea, 0) + 1
-                tags[name] = tags.get(name, 0) + 1
-            continue
+        # tally up all of the reference counts from the dictionary that we
+        # fetched for the current address we're iterating through.
+        for name in items:
+            address[ea] = address.get(ea, 0) + 1
+            tags[name] = tags.get(name, 0) + 1
         continue
-    return func.address(fn), addr, tags
+    return func.address(fn), address, tags
 
 def fetch_globals_functions():
-    """Fetch the reference count for the global tags (function) in the database.
+    """Fetch the number of references for all of the global tags (functions) from the database.
 
-    Returns the tuple `(address, tags)` where the `address` and `tags`
-    fields are both dictionaries containing the reference count for
-    the addresses and tag names.
+    Returns the tuple `(address, tags)` where the `address` and `tags` items
+    are both dictionaries containing the number of references for both
+    addresses and tag names for each function from the database.
     """
-    addr, tags = {}, {}
+    address, tags = {}, {}
     functions = [item for item in db.functions()]
-    for i, ea in enumerate(functions):
-        ui.navigation.auto(ea)
-        six.print_(u"globals: fetching tag from function {:#x} : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
+    for i, ea in enumerate(map(ui.navigation.analyze, functions)):
+        items = func.tag(ea)
+        six.print_(u"globals: counting the tags assigned to function {:#x} : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
 
-        # grab both comment types from the current function and then decode
+        # iterate through all of the items in the tags that we decoded, and
+        # tally up their keys in order to return their reference count.
         # them. once decoded then we can just iterate through their keys and
-        # tally everything up.
-        repeatable, nonrepeatable = (func.comment(ea, repeatable=item) for item in [True, False])
-        for items in map(internal.comment.decode, [repeatable, nonrepeatable]):
-            #items.pop('name', None)
-            for name in items:
-                addr[ea] = addr.get(ea, 0) + 1
-                tags[name] = tags.get(name, 0) + 1
-            continue
+        for name in items:
+            address[ea] = address.get(ea, 0) + 1
+            tags[name] = tags.get(name, 0) + 1
         continue
-    return addr, tags
+    return address, tags
 
 def fetch_globals_data():
-    """Fetch the reference count for the global tags (non-function) in the database.
+    """Fetch the number of references for all of the global tags (non-functions) from the database.
 
-    Returns the tuple `(address, tags)` where the `address` and `tags`
-    fields are both dictionaries containing the reference count for
-    the addresses and tag names.
+    Returns a tuple `(address, tags)` where the `address` and `tags` items
+    are both dictionaries containing the number of references for both
+    addresses and tag names for every non-function in the database.
     """
-    addr, tags = {}, {}
+    address, tags = {}, {}
     left, right = db.config.bounds()
-    six.print_(u'globals: fetching tags from data', file=output)
-    for ea in db.address.iterate(left, right):
-        if func.within(ea): continue
-        ui.navigation.auto(ea)
-
-        # grab both comment types and decode them. after they've been decoded,
-        # then iterate through all of their keys and tally up their counts.
-        repeatable, nonrepeatable = (db.comment(ea, repeatable=item) for item in [True, False])
-        for items in map(internal.comment.decode, [repeatable, nonrepeatable]):
-            #items.pop('name', None)
-            for name in items:
-                addr[ea] = addr.get(ea, 0) + 1
-                tags[name] = tags.get(name, 0) + 1
+    six.print_(u'globals: counting any tags that are assigned to global data', file=output)
+    for ea in map(ui.navigation.analyze, db.address.iterate(left, right)):
+        if func.within(ea):
             continue
+        items = db.tag(ea)
+
+        # after grabbing the tags for the current address we're iterating
+        # through, tally up the number of keys and their values.
+        for name in items:
+            address[ea] = address.get(ea, 0) + 1
+            tags[name] = tags.get(name, 0) + 1
         continue
-    return addr, tags
+    return address, tags
 
 def fetch_globals():
-    """Fetch the reference count of all of the global tags for both functions and non-functions.
+    """Fetch the number of references for all of the global tags associated with both functions and non-functions from the database.
 
     Returns the tuple `(address, tags)` where the `address` and `tags`
-    fields are both dictionaries containing the reference count for
-    the addresses and tag names.
+    items are both dictionaries containing the number of references
+    for both addresses and tag names.
     """
-    # read addr and tags from all functions/globals
+    # Read both the address and tags from all functions and globals.
     faddr, ftags = fetch_globals_functions()
     daddr, dtags = fetch_globals_data()
 
-    # consolidate tags into individual dictionaries
-    six.print_(u'globals: aggregating results', file=output)
-    addr, tags = dict(faddr), dict(ftags)
-    for k, v in daddr.items():
-        addr[k] = addr.get(k, 0) + v
-    for k, v in dtags.items():
-        tags[k] = tags.get(k, 0) + v
+    # Consolidate tags into individual dictionaries.
+    six.print_(u'globals: tallying up the database tags for building the index', file=output)
 
-    six.print_(u"globals: found {:d} addresses".format(len(addr)), file=output)
-    six.print_(u"globals: found {:d} tags".format(len(tags)), file=output)
+    address, tags = {}, {}
+    for results, item in itertools.chain(zip(2 * [address], [faddr, daddr]), zip(2 * [tags], [ftags, dtags])):
+        matching = {ea for ea in results} & {ea for ea in item}
+        missing = {ea for ea in item} - {ea for ea in results}
 
-    return addr, tags
+        # Update all of the keys that aren't in both our results
+        # and our items, and add up the ones that are.
+        results.update({ea : item[ea] for ea in missing})
+        results.update({ea : results[ea] + item[ea] for ea in matching})
+
+    # Output our results to the specified output.
+    six.print_(u"globals: found {:d} addresses to include in index".format(len(address)), file=output)
+    six.print_(u"globals: found {:d} tags to include in index".format(len(tags)), file=output)
+    return address, tags
 
 def contents(ea):
-    '''Re-build the cache for the contents of the function `ea`.'''
+    '''Generate the cache for the contents of the function `ea`.'''
     try:
         func.address(ea)
     except internal.exceptions.FunctionNotFoundError:
+        logging.warning(u"{:s}.contents({:#x}): Unable to fetch cache the for the address {:#x} as it is not a function.".format('.'.join([__name__]), ea, ea))
         return {}, {}
 
-    # read addresses and tags from contents
-    ui.navigation.auto(ea)
-    logging.debug(u"{:s}.contents({:#x}): Fetching the contents from the function {:#x}.".format('.'.join([__name__]), ea, ea))
-    f, addr, tags = fetch_contents(ea)
+    # Read the addresses and tags from the contents of the function.
+    logging.debug(u"{:s}.contents({:#x}): Fetching the cache for the function {:#x}.".format('.'.join([__name__]), ea, ea))
+    f, address, tags = fetch_contents(ui.navigation.procedure(ea))
 
-    # clean out any hidden tag values
-    for k in tags.keys():
-        if k in {'__tags__', '__address__'}:
-            if f in addr:
-                addr[f] -= 1
-                if addr[f] == 0:
-                    addr.pop(f)
-            if k in tags:
-                tags[k] -= 1
-                if tags[k] == 0:
-                    tags.pop(k)
-        continue
-
-    # update addresses and tags to contents
+    # Update the addresses and tags for the contents of the function.
     ui.navigation.set(ea)
-    logging.debug(u"{:s}.contents({:#x}): Updating the name reference cache for the contents of function {:#x}.".format('.'.join([__name__]), ea, ea))
+    logging.debug(u"{:s}.contents({:#x}): Updating the name references in the cache belonging to function {:#x}.".format('.'.join([__name__]), ea, ea))
     for k, v in tags.items():
-        internal.comment.contents.set_name(f, k, v)
+        internal.comment.contents.set_name(f, k, v, target=f)
 
-    logging.debug(u"{:s}.contents({:#x}): Updating the address reference cache for the contents of function {:#x}.".format('.'.join([__name__]), ea, ea))
-    for k, v in addr.items():
+    logging.debug(u"{:s}.contents({:#x}): Updating the address references in the cache belonging to function {:#x}.".format('.'.join([__name__]), ea, ea))
+    for k, v in address.items():
         if not func.within(k):
             continue
-        internal.comment.contents.set_address(k, v)
+        internal.comment.contents.set_address(k, v, target=f)
 
-    return addr, tags
+    return address, tags
 
 def globals():
-    '''Re-build the cache for all of the globals in the database.'''
+    '''Build the index of references for all of the globals in the database.'''
 
-    # read all function and data tags
-    addr, tags = fetch_globals()
+    # Read all of the data tags for each function and address.
+    address, tags = fetch_globals()
 
-    # update the global state
-    six.print_(u'globals: updating global name refs', file=output)
+    # Update the the index containing the address and tags we counted.
+    six.print_(u'globals: updating the name references in the index for the database', file=output)
     for k, v in tags.items():
         internal.comment.globals.set_name(k, v)
 
-    six.print_(u'globals: updating global address refs', file=output)
-    for k, v in addr.items():
+    six.print_(u'globals: updating the address references in the index for the database', file=output)
+    for k, v in address.items():
         internal.comment.globals.set_address(k, v)
 
-    return addr, tags
+    return address, tags
 
 def all():
-    '''Re-build the cache for all the globals and contents in the database.'''
+    '''Build the index of references for all the globals and generate the caches for every function in the database.'''
     functions = [item for item in db.functions()]
 
     # process all function contents tags
     for i, ea in enumerate(functions):
-        six.print_(u"updating references for contents ({:#x}) : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
+        six.print_(u"updating the cache for the tags belonging to function ({:#x}) : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
         _, _ = contents(ea)
 
     # process all global tags
-    six.print_(u'updating references for globals', file=output)
+    six.print_(u'updating the index for the database with references for all globals', file=output)
     _, _ = globals()
 
 def customnames():
-    '''Iterate through all of the custom names defined in the database and update the cache with their reference counts.'''
+    '''Iterate through all of the "custom" names within the database and update their references in either the index or their associated function cache.'''
     # FIXME: first delete all the custom names '__name__' tag
     left, right = db.config.bounds()
     for ea in db.address.iterate(left, right):
@@ -210,7 +191,7 @@ def customnames():
     return
 
 def extracomments():
-    '''Iterate through all of the extra comments defined in the database and update the cache with their reference counts.'''
+    '''Iterate through all of the "extra" comments within the database and update their references in either the index or their associated function cache.'''
     left, right = db.config.bounds()
     for ea in db.address.iterate(left, right):
         ctx = internal.comment.contents if func.within(ea) else internal.comment.globals
@@ -223,58 +204,58 @@ def extracomments():
     return
 
 def everything():
-    '''Re-create the cache for all the tags found in the database.'''
+    '''Rebuild the index for all of the globals and the cache for each function from the database.'''
     erase()
     all()
 
 def erase_globals():
-    '''Erase the cache defined for all of the global tags in the database.'''
-    n = internal.comment.tagging.node()
-    hashes, alts, sups = res = [list(items) for items in [internal.netnode.hash.fiter(n), internal.netnode.alt.fiter(n), internal.netnode.sup.fiter(n)]]
-    total = sum(map(len, res))
+    '''Remove the contents of the index from the database which is used for storing information about the global tags.'''
+    node = internal.comment.tagging.node()
+    hashes, alts, sups = map(list, (iterator(node) for iterator in [internal.netnode.hash.fiter, internal.netnode.alt.fiter, internal.netnode.sup.fiter]))
+    total = sum(map(len, [hashes, alts, sups]))
 
     yield total
 
     current = 0
     for idx, k in enumerate(hashes):
-        internal.netnode.hash.remove(n, k)
+        internal.netnode.hash.remove(node, k)
         yield current + idx, k
 
     current += len(hashes)
     for idx, ea in enumerate(sups):
-        internal.netnode.sup.remove(n, ea)
+        internal.netnode.sup.remove(node, ea)
         yield current + idx, ea
 
     current += len(sups)
     for idx, ea in enumerate(alts):
-        internal.netnode.alt.remove(n, ea)
+        internal.netnode.alt.remove(node, ea)
         yield current + idx, ea
     return
 
 def erase_contents():
-    '''Erase the contents cache defined for each function in the database.'''
+    '''Remove the cache associated with each function from the database.'''
     functions = [item for item in db.functions()]
     total, tag = len(functions), internal.comment.contents.btag
     yield total
 
-    for idx, ea in enumerate(functions):
+    for idx, ea in enumerate(map(ui.navigation.set, functions)):
         internal.netnode.blob.remove(ea, tag)
         yield idx, ea
     return
 
 def erase():
-    '''Erase the current cache from the database.'''
+    '''Erase the index of all the globals and the cache associated with each function from the database.'''
     iter1, iter2 = erase_contents(), erase_globals()
     total = sum(map(next, [iter1, iter2]))
 
     current = 0
     for idx, ea in iter1:
-        six.print_(u"erasing contents for function {:#x} : {:d} of {:d}".format(ea, 1 + idx, total), file=output)
+        six.print_(u"removing the cache for function {:#x} : {:d} of {:d}".format(ea, 1 + idx, total), file=output)
 
     res = idx + 1
     for idx, addressOrName in iter2:
-        fmt = "{:#x}" if isinstance(addressOrName, six.integer_types) else "tagname {!r}"
-        six.print_(u"erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), 1 + res + idx, total), file=output)
+        format = "address {:#x}".format if isinstance(addressOrName, six.integer_types) else "tagname {!r}".format
+        six.print_(u"removing the global {:s} from the index : {:d} of {:d}".format(format(addressOrName), 1 + res + idx, total), file=output)
     return
 
 def verify_index():
