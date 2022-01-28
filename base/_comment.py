@@ -1216,8 +1216,18 @@ class globals(tagging):
 
     @classmethod
     def iterate(cls):
-        '''Yield each address and count for all of the globals in the database according to what is written in the altvals.'''
+        '''Yield the address and count for each of the globals in the database according to what is written in the altvals.'''
         node = tagging.node()
         for ea, count in internal.netnode.alt.fitems(node):
             yield ea, count
+        return
+
+    @classmethod
+    def counts(cls):
+        '''Yield the tag name and its count for each of the globals in the database according to what is written in the hashvals.'''
+        node = tagging.node()
+
+        for item, count in internal.netnode.hash.fitems(node, int):
+            string = internal.utils.string.of(item)
+            yield string, count
         return
