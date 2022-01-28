@@ -424,4 +424,110 @@ def verify_content(ea):
         continue
     return True
 
+def verify_globals():
+    '''Verify the globals for every address from the database.'''
+    cls = internal.comment.globals
+
+    # Calculate all the possible combinations for the implicit tags so that
+    # we can use them to figure out which variation will match.
+    implicit = {item for item in ['__typeinfo__', '__name__', '__extra_prefix__', '__extra_suffix__']}
+    combinations = [{item for item in combination} for combination in itertools.chain(*(itertools.combinations(implicit, length) for length in range(1 + len(implicit))))]
+    unique = {item for item in map(tuple, combinations)}
+    available = sorted({item for item in items} for items in unique)
+    ok, counts, results = True, {}, {}
+
+    # Iterate through the index for the globals and tally up the counts
+    # of each tag at the given address. We default with db.tag to fetch
+    # them and switch it up only if a function is detected.
+    for ea, count in cls.iterate():
+        Ftags = db.tag
+
+        # First figure out how to validate the address. If it's a function,
+        # then we can use func.address.
+        if func.within(ea):
+            f = func.address(ea)
+            if f != ea:
+                six.print_(u"[{:#x}] the item in the global index ({:#x}) is not at the beginning of a function ({:#x})".format(ea, ea, f), file=output)
+
+            # We can now force the address to point to the actual function
+            # address because func.tag will correct this anyways.
+            ea, Ftags = f, func.tag
+
+        # In this case we must be a global and we need to use a combination
+        # of database.contains, and then interface.address.head.
+        elif not db.within(ea):
+            ok, _ = False, six.print_(u"[{:#x}] the item in the global index ({:#x}) is not within the boundaries of the database".format(ea, ea), file=output)
+            continue
+
+        # If we're in the bounds of the database, then we can always succeed
+        # as db.tag will correct the address regardless of what we do.
+        elif internal.interface.address.head(ea, silent=True) != ea:
+            six.print_(u"[{:#x}] the item in the global index ({:#x}) is not pointing at the head of its address ({:#x})".format(ea, ea, internal.interface.address.head(ea, silent=True)), file=output)
+
+        # Now we can align its address and count the number of tags.
+        ea = internal.interface.address.head(ui.navigation.set(ea), silent=True)
+        expected = {tag for tag in Ftags(ea)}
+
+        # When we do this, we have to figure out whether the implicit tags
+        # were actually indexed which we accomplish by generating all possible
+        # combinations and figuring out which one is the right one.
+        matches = [combination for combination in available if combination & expected == combination]
+        if count in {len(expected - match) for match in matches}:
+            candidates = [match for match in matches if len(expected - match) == count]
+            logging.debug(u"{:s}.verify_globals(): Found {:d} candidate{:s} for the tags ({:s}) belonging to the {:s} at {:#x} that would result in a proper count of {:d} reference{:s}.".format('.'.join([__name__]), len(candidates), '' if len(candidates) == 1 else 's', ', '.join(map("{!r}".format, expected)), 'function' if func.within(ea) else 'address', ea, count, '' if count == 1 else 's'))
+            format = functools.partial(u"{:s}.verify_globals(): ...Candidate #{:d} would remove {:s}{:s} resulting in: {:s}.".format, '.'.join([__name__]))
+            [logging.debug(format(1 + index, "{:d} tag".format(len(listable)) if len(listable) == 1 else "{:d} tags".format(len(listable)), ", {:s}{:s}".format(', '.join(map("{!r}".format, listable[:-1])), ", and {!r},".format(*listable[-1:]) if len(listable) > 1 else ", {!r},".format(*listable)) if listable else '', ', '.join(map("{!r}".format, expected - candidate)))) for index, (candidate, listable) in enumerate(zip(candidates, map(sorted, candidates)))]
+
+        # If the count wasn't in our list of possible matches, then this address
+        # has a bunk reference count and we need to explain the to the user.
+        else:
+            # FIXME: Make sure this it outputting the results properly.
+            smallest, largest = min(available, key=len) if available else {item for item in []}, max(available, key=len) if available else {item for item in []}
+            if len(largest) == len(smallest):
+                format = "{:d} reference".format if len(expected) == 1 else "{:d} references".format
+            elif len(largest) > len(smallest):
+                format = "{:d} to {:d} references".format if len(largest) - len(smallest) > 0 and len(expected) > 0 else "{:d} references".format
+            else:
+                format = "{:d} references".format
+            ok, _ = False, six.print_(u"[{:#x}] expected to find {:d} reference{:s} at {:s} {:#x}, but found {:s} instead".format(ea, count, '' if count == 1 else 's', 'function' if func.within(ea) else 'address', ea, format(len(expected - largest), len(expected - smallest))))
+
+        # First tally up all of the counts that aren't affected by implicit tags.
+        for key in expected - implicit:
+            counts[key] = counts.get(key, 0) + 1
+
+        # Now we need to tally the implicit tags for the given address. We key
+        # this by the index of the available combinations so that we have multiple
+        # counts for each set of implicit tags that we can later compare.
+        for index, choice in enumerate(available):
+            for key in expected & choice:
+                candidates = results.setdefault(key, {})
+                candidates[index] = candidates.get(index, 0) + 1
+            continue
+        continue
+
+    # That was everything, now we just got to verify our global number of
+    # references for each specific tag that isn't implicit.
+    references = {key : count for key, count in cls.counts()}
+    tags = {tag for tag in references}
+    for key in tags - implicit:
+        count = references[key]
+        if key not in counts:
+            ok, _ = False, six.print_(u"[{:s}] unable to locate the referenced tag ({!r}) in the database index".format(key, key))
+        elif count != counts[key]:
+            ok, _ = False, six.print_(u"[{:s}] expected to find {:d} reference{:s} for the explicit tag {!r}, whereas {:s} found within the database.".format(key, count, '' if count == 1 else 's', key, "{:d} was".format(counts[key]) if counts[key] == 1 else "{:d} were".format(counts[key])), file=output)
+        continue
+
+    # The very last thing to do is to verify the tag counts for the implicit
+    # tags. This requires us to go through the results and find an index that
+    # matches what was written into the global index.
+    for key in tags & implicit:
+        count, candidates = references[key], {candidate for _, candidate in results.get(key, {}).items()}
+        logging.debug(u"{:s}.verify_globals(): Found {:d} candidate{:s} ({:s}) for the implicit tag ({!r}) while searching for a count of {:d}.".format('.'.join([__name__]), len(candidates), '' if len(candidates) == 1 else 's', ', '.join(map("{:d}".format, sorted(candidates))), key, count))
+        if not candidates:
+            ok, _ = False, six.print_(u"[{:s}] unable to locate the referenced implicit tag ({!r}) in the database index".format(key, key))
+        elif not operator.contains(candidates, count):
+            ok, _ = False, six.print_(u"[{:s}] expected to find {:d} reference{:s} for the implicit tag ({!r}) in the list of candidates ({:s})".format(key, count, '' if count == 1 else 's', key, ', '.join(map("{:d}".format, candidates))), file=output)
+        continue
+    return ok
+
 __all__ = ['everything', 'globals', 'contents']
