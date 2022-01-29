@@ -805,6 +805,18 @@ class contents(tagging):
     @classmethod
     def _key(cls, ea):
         '''Converts the address `ea` to a key that's used to store contents data for the specified function.'''
+        ch = idaapi.get_fchunk(ea)
+        if ch is None:
+            return None
+
+        # If we're a function tail, then there's a chance that the
+        # owner of the function is multiple ones. So we'll return
+        # the whole list if that's the case. Otherwise we'll just
+        # return the very first element.
+        if ch.flags & idaapi.FUNC_TAIL:
+            owners = [ch.referers[index] for index in range(ch.refqty)]
+            return owners if len(owners) > 1 else owners[0]
+
         res = idaapi.get_func(ea)
         return internal.interface.range.start(res) if res else None
 
@@ -817,6 +829,11 @@ class contents(tagging):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to locate a function for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, key, ea))
+
+        # If our key was a list, then we need to warn the user that
+        # we're going to take a guess on which function we'll return.
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._read_header({!r}, {:#x}) : Choosing to read header from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join("{:#x}".format(key))))
 
         view = internal.netnode.sup.get(node, key, type=memoryview)
         if view is None:
@@ -849,6 +866,11 @@ class contents(tagging):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to determine the key for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), target, ea))
+
+        # If our key was a list, then we raise an exception because
+        # we'd likely overwrite an address with an unrelated header.
+        elif isinstance(key, list):
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to determine the owner of the address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, len(key), '' if len(key) == 1 else 's', ', '.join("{:#x}".format(key))))
 
         # If our header is empty, then we just need to remove the supvalue
         if not value:
@@ -887,6 +909,11 @@ class contents(tagging):
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to determine the key for the target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, target, ea))
 
+        # If we received a list as the key, then we need to warn the
+        # user that we have to guess which supval to read from.
+        elif isinstance(key, list):
+            key, _ = key[0], logging.critical(u"{:s}._read({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join("{:#x}".format(key))))
+
         encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
             return None
@@ -918,7 +945,12 @@ class contents(tagging):
         """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to determine the key for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, value, target, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to determine the key for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), target, ea))
+
+        # If our key was a list, then we raise an exception instead
+        # of just choosing something at random to overwrite.
+        elif isinstance(key, list):
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to determine the owner of the address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, len(key), '' if len(key) == 1 else 's', ', '.join("{:#x}".format(key))))
 
         # erase cache and blob if no data is specified
         if not value:
