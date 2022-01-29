@@ -21,7 +21,7 @@ that can be used for querying are ``functions``, ``segments``,
 import six, builtins
 
 import functools, operator, itertools, types
-import sys, os, logging, string
+import sys, os, logging, string, bisect
 import math, array as _array, fnmatch, re, ctypes
 
 import function, segment
@@ -3129,7 +3129,6 @@ class address(object):
         modifiers['count'] = count - 1
         return cls.nextreg(res, predicate, *regs, **modifiers) if count > 1 else res
 
-    # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def prevstack(cls, delta):
@@ -3145,20 +3144,32 @@ class address(object):
             logging.warning(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join([__name__, cls.__name__]), ea, delta))
             cls.__prevstack_warning_count__ = getattr(cls, '__prevstack_warning_count__', 0) + 1
 
-        # determine the boundaries that we're not allowed to seek past
-        fn, sp = function.top(ea), function.get_spdelta(ea)
-        start, _ = function.chunk(ea)
-        fwithin = lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta
+        # Get all the stack changes within the current function chunk, and the
+        # current sp. This way we can bisect to found our starting point and
+        # traverse backwards from there.
+        points = [(item, sp) for item, sp in function.chunk.points(ea)]
+        addresses = [item for item, _ in points]
 
-        # walk to the previous major change in the stack delta, and keep
-        # looping if we haven't found it yet.
-        found = False
-        while not found:
-            res = cls.__walk__(ea, cls.prev, fwithin)
-            if res == idaapi.BADADDR or res < start:
-                raise E.AddressOutOfBoundsError(u"{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the top ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, start, fn, res))
-            found, ea = type.is_code(res), cls.prev(res)
-        return res
+        # Now we'll bisect our list of items in order to slice the points that
+        # out that are completely irrelevant, and reverse the list so that
+        # we can just walk it until we find the address that matches our argument.
+        index = bisect.bisect_left(addresses, ea)
+        filtered = points[:index][::-1]
+
+        # Return the first entry in the list that has a delta (difference
+        # between its sp and the starting address) that's larger than what
+        # was requested by the user.
+        start, position = function.get_spdelta(ea), cls.prev(ea)
+        for address, sp in filtered:
+            if delta <= abs(start - sp):
+                return cls.next(position) if delta < abs(start - sp) else position
+            position = cls.prev(address)
+
+        # If we ran out of entries in the list, then save the last address
+        # so that we can raise an exception to the user.
+        else:
+            fn, end = function.address(ea), address
+        raise E.AddressOutOfBoundsError(u"{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the top ({:#x}) of the function {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, end, fn))
 
     # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
     @utils.multicase(delta=six.integer_types)
@@ -3176,19 +3187,32 @@ class address(object):
             logging.warning(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join([__name__, cls.__name__]), ea, delta))
             cls.__nextstack_warning_count__ = getattr(cls, '__nextstack_warning_count__', 0) + 1
 
-        # determine the boundaries that we're not allowed to seek past
-        fn, sp = function.top(ea), function.get_spdelta(ea)
-        _, end = function.chunk(ea)
+        # Get all the stack changes within the current function chunk, and the
+        # current sp. This way we can bisect to find out where to start from
+        # continue to walk forwards from there looking for our match.
+        points = [(item, sp) for item, sp in function.chunk.points(ea)]
+        addresses = [item for item, _ in points]
 
-        # walk to the next major change in the stack delta, and keep
-        # looping if we haven't found it yet.
-        found = False
-        while not found:
-            res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
-            if res == idaapi.BADADDR or res >= end:
-                raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the bottom ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, end, fn, res))
-            found, ea = type.is_code(res), cls.next(res)
-        return res
+        # Now we'll bisect our list of items in order to select only the
+        # point thats are relevant. This way we can just walk the list
+        # until we find the address with the matching delta.
+        index = bisect.bisect_right(addresses, ea)
+        filtered = points[index:]
+
+        # Traverse our filtered list until we find the first entry that
+        # has the delta from the starting address that is larger than the
+        # size that was requested by the user.
+        start = function.get_spdelta(ea)
+        for address, sp in filtered:
+            if delta <= abs(start - sp):
+                return cls.prev(address) if delta < abs(start - sp) else address
+            continue
+
+        # If we completed processing our filtered list, then we ran out
+        # of addresses and need to save the address to raise an exception.
+        else:
+            fn, end = function.address(ea), address
+        raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the bottom ({:#x}) of the function {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, end, fn))
 
     # FIXME: we should add aliases for a stack point as per the terminology that's used
     #        by IDA in its ``idaapi.func_t`` when getting points for a function or a chunk.
