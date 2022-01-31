@@ -1548,15 +1548,10 @@ def make_ida_not_suck_cocks(nw_code):
 
     [ ui.hook.idb.add(item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
 
-    ## Relocate the tagcache for multiple segments if those segments are moved
-    ## or if the entire database has been rebased.
-    if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('allsegs_moved', relocate, 0)
-
-    else:
-        ui.hook.idb.add('segm_start_changed', segm_start_changed, 0)
-        ui.hook.idb.add('segm_end_changed', segm_end_changed, 0)
-        ui.hook.idb.add('segm_moved', segm_moved, 0)
+    ## Relocate the tagcache for an individual segment if that segment is moved.
+    ui.hook.idb.add('segm_start_changed', segm_start_changed, 0)
+    ui.hook.idb.add('segm_end_changed', segm_end_changed, 0)
+    ui.hook.idb.add('segm_moved', segm_moved, 0)
 
     ## switch the instruction set when the processor is switched
     if idaapi.__version__ >= 7.0:
