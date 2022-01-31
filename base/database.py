@@ -6003,7 +6003,7 @@ class set(object):
     @classmethod
     def structure(cls, ea, identifier):
         '''Set the data at address `ea` to the structure_t that has the specified `identifier`.'''
-        st = _structure.by(identifier)
+        st = _structure.by_identifier(identifier)
         return cls.structure(ea, st)
 
     struc = struct = utils.alias(structure, 'set')
