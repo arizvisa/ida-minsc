@@ -1019,8 +1019,10 @@ class member(object):
             raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         eid = cls.parent(mid)
 
-        # Assign some constants that we'll use for checking an operand type.
+        # Assign some constants that we'll use for verifying the references
+        # available for each operand.
         NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
+        Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
 
         # Check if there's an xref that points to the enumeration member
         # identifier. If there isn't one, then we return an empty list.
@@ -1042,8 +1044,8 @@ class member(object):
         # from the operand actually belongs to the enumeration.
         res = []
         for ea, _, t in refs:
-            ops = ((opnum, internal.netnode.alt.get(ea, altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(ea, altidx))
-            ops = (opnum for opnum, mid in ops if cls.parent(mid) == eid)
+            ops = ((opnum, internal.netnode.alt.get(Fnetnode(ea), altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(Fnetnode(ea), altidx))
+            ops = (opnum for opnum, mid in ops if cls.parent(Fidentifier(mid)) == eid)
             res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
         return res
 
