@@ -103,7 +103,7 @@ _image_targets = $(foreach image,$(wildcard $(IMAGEDIR)/*),$(SOURCEDIR)/$(image_
 _template_targets = $(foreach target,$(wildcard $(TEMPLATEDIR)/*),$(SOURCEDIR)/$(template_path)/$(notdir $(target)))
 _html_targets = $(foreach target,$(wildcard $(HTMLDIR)/*),$(SOURCEDIR)/$(static_path)/$(notdir $(target)))
 
-$(SOURCEDIR): $(SOURCEDIR)/index.rst $(_source_targets) $(_static_targets) $(_image_targets) $(_template_targets) $(_html_targets) | $(SOURCEDIR)/
+$(SOURCEDIR): $(SOURCEDIR)/index.rst $(SOURCEDIR)/conf.py $(_source_targets) $(_static_targets) $(_image_targets) $(_template_targets) $(_html_targets) | $(SOURCEDIR)/
 	$(info [!] Completed building of documentation)
 
 # base modules (module/$source.rst)
