@@ -252,6 +252,17 @@ def offset(segment, ea):
     return ea - interface.range.start(seg)
 
 @utils.multicase(offset=six.integer_types)
+def by_offset(offset):
+    '''Return the specified `offset` translated to the beginning of the current segment.'''
+    return by_offset(ui.current.segment(), offset)
+@utils.multicase(offset=six.integer_types)
+def by_offset(segment, offset):
+    '''Return the specified `offset` translated to the beginning of `segment`.'''
+    seg = by(segment)
+    return interface.range.start(seg) + offset
+byoffset = utils.alias(by_offset)
+
+@utils.multicase(offset=six.integer_types)
 def go_offset(offset):
     '''Go to the `offset` of the current segment.'''
     return go_offset(ui.current.segment(), offset)
