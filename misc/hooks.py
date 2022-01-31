@@ -981,6 +981,22 @@ def __relocate_function(old, new, size, iterable, moved=False):
         logging.debug(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Relocated {:d} content locations for function {:#x} using delta {:+#x}.".format(__name__, old, new, size, iterable, len(state[key]), fn, new - old))
         yield i, offset
 
+    # Now we need to gather all of our imports so that we can clean up any functions
+    # that are runtime-linked addresses. This is because IDA seems to create a
+    # func_t for certain imports.
+    imports = {item for item in []}
+    for idx in range(idaapi.get_import_module_qty()):
+        idaapi.enum_import_names(idx, lambda address, name, ordinal: imports.add(address) or True)
+
+    # Iterate through our index grabbing anything that's in our imports.
+    items = {ea - old + new for ea in index}
+    for ea in items & imports:
+        offset = ea - new
+        source, target = offset + old, offset + new
+        logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Removing contents of runtime-linked function ({:#x}) from index at {:#x}.".format(__name__, old, new, size, iterable, target, source))
+        internal.comment.contents._write(source, offset + old, None)
+        index.pop(source)
+
     # Last thing to do is to clean up the stray contents from the index that weren't
     # pointing to a function anyways.
     for ea, keys in index.items():
