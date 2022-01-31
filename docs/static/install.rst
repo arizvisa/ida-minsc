@@ -17,7 +17,7 @@ Software Requirements
 ---------------------
 
 This plugin requires IDA Pro to be installed along with the IDAPython plugin
-IDA versions 6.8 up to 7.6.210319 are supported. Both versions of the Python
+IDA versions 6.8 up to 7.7.220125 are supported. Both versions of the Python
 interpreter, the Python 2.x series, and the Python 3.x series are supported.
 The installation steps described within this document assume that you're not
 using the bundled Python instance and have instead installed a Python interpreter
@@ -45,16 +45,17 @@ execute the following at the IDAPython prompt to output the correct path:
 
 To then clone the repository, one can use Git [:ref:`3<install-clone-references>`].
 When cloning, the directory containing the plugin's repository should replace the
-contents of the IDA user directory. If there are any files that the user
+contents of the IDA user directory. If there are any existing files that the user
 currently has in their IDA user directory, the user can simply move these files
 into the repository's directory after cloning. This is done so that IDAPython
-will execute the "``idapythonrc.py``" file belonging to IDA-minsc. The following
-can be typed at command line to clone [:ref:`3<install-clone-references>`]
-the repository:
+will execute the "``idapythonrc.py``" file that is in the root of the IDA-minsc
+repository upon startup. The following can be typed at the command line in order
+to clone [:ref:`3<install-clone-references>`] the repository of the plugin directly
+into IDA's user directory:
 
 .. code-block:: sh
 
-    $ git clone https://github.com/arizvisa/ida-minsc $IDA_USERDIR
+    $ git clone https://github.com/arizvisa/ida-minsc $IDA_USERDIR/./
 
 Once this has been correctly done and the Python dependencies are installed,
 then when IDA starts up, the "``idapythonrc.py``" file in the repository should be
@@ -190,8 +191,8 @@ to use [:ref:`2<downgrading-references>`]. After choosing your version of Python
 and completing the installation process, IDAPython will appear to be locked to
 that particular version without doing a complete re-install.
 
-If you have chosen Python 3.x, then some desired plugins might not work with
-your setup, or some modules might not be available until you switch your Python
+If you have chosen Python 3.x, then some desired third-party plugins might not work
+with your setup, or some modules might not be available until you switch your Python
 interpreter. This however does not affect any part of the IDA-minsc plugin, and
 the choice of choosing a Python version is left completely up to the user. To
 temporary switch the interpreter that IDAPython uses, IDA provides a couple of
