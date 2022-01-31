@@ -1802,9 +1802,9 @@ def op_refs(ea, opnum):
         # figure out which operand the member is in for each address. During
         # this process, we also verify that the member is actually owned by
         # the enumeration we extracted from our original operand information.
-        res = []
+        res, Fnetnode = [], idaapi.ea2node if hasattr(idaapi, 'ea2node') else utils.fidentity
         for ea, _, t in refs:
-            ops = ((opnum, internal.netnode.alt.get(ea, altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(ea, altidx))
+            ops = ((opnum, internal.netnode.alt.get(Fnetnode(ea), altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(Fnetnode(ea), altidx))
             ops = (opnum for opnum, mid in ops if enumeration.member.parent(mid) == eid)
             res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
         return res
@@ -1895,14 +1895,14 @@ def op_refs(ea, opnum):
 
         # Now we can iterate through all our references and gather any operands
         # as potential candidates that we'll filter later.
-        result = []
+        result, Fnetnode = [], idaapi.ea2node if hasattr(idaapi, 'ea2node') else utils.fidentity
         for ea, _, t in sorted(refs, key=operator.itemgetter(0)):
             candidates = []
 
             # Start by gathering any structure candidates that may be referenced
             # by our structure path.
             for refopnum, supidx in enumerate([NSUP_STROFF0, NSUP_STROFF1]):
-                if internal.netnode.sup.has(ea, supidx):
+                if internal.netnode.sup.has(Fnetnode(ea), supidx):
                     delta, ids = get_stroff_path(at(ea), refopnum)
 
                     # We'll need to rebuild the path to this member because again
