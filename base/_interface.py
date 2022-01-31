@@ -1267,7 +1267,7 @@ class node(object):
         NALT_AFLAGS = getattr(idaapi, 'NALT_AFLAGS', 8)
         if hasattr(idaapi, 'get_aflags'):
             return idaapi.get_aflags(ea)
-        return internal.netnode.alt.get(ea, NALT_AFLAGS)
+        return internal.netnode.alt.get(idaapi.ea2node(ea) if hasattr(idaapi, 'ea2node') else ea, NALT_AFLAGS)
     @internal.utils.multicase(ea=six.integer_types, mask=six.integer_types)
     @classmethod
     def aflags(cls, ea, mask):
@@ -1281,7 +1281,7 @@ class node(object):
         result, flags = cls.aflags(ea, ~mask), value & mask
         if hasattr(idaapi, 'set_aflags'):
             return idaapi.set_aflags(ea, result | flags)
-        return internal.netnode.alt.set(ea, NALT_AFLAGS, result | flags)
+        return internal.netnode.alt.set(idaapi.ea2node(ea) if hasattr(idaapi, 'ea2node') else ea, NALT_AFLAGS, result | flags)
 
     @classmethod
     def alt_opinverted(cls, ea, opnum):
