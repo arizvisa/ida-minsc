@@ -156,12 +156,12 @@ class utils(object):
         if not ok:
             raise internal.exceptions.NetNodeNotFoundError(u"{:s}.renumerate() : Unable to find the end node.".format('.'.join([__name__, cls.__name__])))
 
-        yield end, netnode.get(end)
+        yield end, cls.get(end)
         while end != start:
             ok = netnode.prev(this)
             if not ok: break
             end = netnode.index(this)
-            yield end, netnode.get(end)
+            yield end, cls.get(end)
         return
 
     @classmethod
@@ -173,12 +173,12 @@ class utils(object):
         if not ok:
             raise internal.exceptions.NetNodeNotFoundError(u"{:s}.fenumerate() : Unable to find the start node.".format('.'.join([__name__, cls.__name__])))
 
-        yield start, netnode.get(start)
+        yield start, cls.get(start)
         while start != end:
             ok = netnode.next(this)
             if not ok: break
             start = netnode.index(this)
-            yield start, netnode.get(start)
+            yield start, cls.get(start)
         return
 
     @classmethod
@@ -304,7 +304,7 @@ def new(name):
 def has(name):
     '''Return whether the netnode with the given `name` exists in the database or not.'''
     if isinstance(name, six.integer_types):
-        node = netnode.get(name)
+        node = utils.get(name)
         return netnode.exist(node)
     res = internal.utils.string.to(name)
     return netnode.exist_name(res)
@@ -312,7 +312,7 @@ def has(name):
 def get(name):
     '''Get (or create) a netnode with the given `name`, and return its identifier.'''
     if isinstance(name, six.integer_types):
-        node = netnode.get(name)
+        node = utils.get(name)
         return netnode.index(node)
     res = internal.utils.string.to(name)
     node = netnode.get(res, len(res))
@@ -320,7 +320,7 @@ def get(name):
 
 def remove(nodeidx):
     '''Remove the netnode with the identifier `nodeidx`.'''
-    node = netnode.get(nodeidx)
+    node = utils.get(nodeidx)
     return netnode.kill(node)
 
 ### node name
@@ -332,19 +332,19 @@ class name(object):
     @classmethod
     def has(cls, nodeidx):
         '''Return whether the node identified by `nodeidx` has a name associated with it.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         res = netnode.name(node)
         return res is not None
     @classmethod
     def get(cls, nodeidx):
         '''Return the name of the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         res = netnode.name(node)
         return internal.utils.string.of(res)
     @classmethod
     def set(cls, nodeidx, string):
         '''Set the name of the netnode identified by `nodeidx` to `string`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         res = internal.utils.string.to(string)
         return netnode.rename(node, res)
 
@@ -357,14 +357,14 @@ class value(object):
     @classmethod
     def has(cls, nodeidx):
         '''Return whether the node identified by `nodeidx` has a value associated with it.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.value_exists(node)
     exists = internal.utils.alias(has, 'value')
 
     @classmethod
     def get(cls, nodeidx, type=None):
         '''Return the value for the netnode identified by `nodeidx` casted to the provided `type`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         if not netnode.value_exists(node):
             return None
 
@@ -385,7 +385,7 @@ class value(object):
     @classmethod
     def set(cls, nodeidx, value):
         '''Set the value for the netnode identified by `nodeidx` to the provided `value`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         if isinstance(value, memoryview):
             return netnode.set(nodeidx, value.tobytes())
         elif isinstance(value, bytes):
@@ -399,7 +399,7 @@ class value(object):
     @classmethod
     def remove(cls, nodeidx):
         '''Remove the value for the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.delvalue(node)
 
     @classmethod
@@ -418,7 +418,7 @@ class blob(object):
     @classmethod
     def has(cls, nodeidx, tag):
         '''Return whether the node identified by `nodeidx` has a blob associated with it.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         res = netnode.blobsize(node, 0, tag)
         return res > 0
 
@@ -428,7 +428,7 @@ class blob(object):
 
         If an offset is provided as `start`, then return the bytes from the specified offset.
         """
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         sz = netnode.blobsize(node, start, tag)
         res = netnode.getblob(node, start, tag)
         return None if res is None else res[:sz]
@@ -439,7 +439,7 @@ class blob(object):
 
         If an offset is provided as `start`, then store the provided `value` at the given offset.
         """
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.setblob(node, value.tobytes() if isinstance(value, memoryview) else value, start, tag)
 
     @classmethod
@@ -448,7 +448,7 @@ class blob(object):
 
         If an offset is provided as `start`, then remove the data at the given offset.
         """
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.delblob(node, start, tag)
 
     @classmethod
@@ -457,7 +457,7 @@ class blob(object):
 
         If an offset is provided as `start`, then return the size from the given offset.
         """
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.blobsize(node, start, tag)
 
     @classmethod
@@ -507,25 +507,25 @@ class alt(object):
     @classmethod
     def get(cls, nodeidx, index, tag=None):
         '''Return the integer at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.altval(node, index, tag or netnode.alttag)
 
     @classmethod
     def set(cls, nodeidx, index, value, tag=None):
         '''Assign the integer `value` at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.altset(node, index, value, tag or netnode.alttag)
 
     @classmethod
     def remove(cls, nodeidx, index, tag=None):
         '''Remove the integer from the specified `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.altdel(node, index, tag or netnode.alttag)
 
     @classmethod
     def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the indexes of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nalt, _ in utils.falt(node, tag=tag or netnode.alttag):
             yield nalt
         return
@@ -533,7 +533,7 @@ class alt(object):
     @classmethod
     def fitems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nalt, altval in utils.falt(node, tag=tag or netnode.alttag):
             yield nalt, altval
         return
@@ -541,7 +541,7 @@ class alt(object):
     @classmethod
     def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the indexes of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nalt, _ in utils.ralt(node, tag=tag or netnode.alttag):
             yield nalt
         return
@@ -549,7 +549,7 @@ class alt(object):
     @classmethod
     def ritems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nalt, altval in utils.ralt(node, tag=tag or netnode.alttag):
             yield nalt, altval
         return
@@ -582,7 +582,7 @@ class sup(object):
     @classmethod
     def get(cls, nodeidx, index, type=None, tag=None):
         '''Return the value at the `index` of the "supval" array belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         if type in {None}:
             return netnode.supval(node, index, tag or netnode.suptag)
         elif issubclass(type, memoryview):
@@ -597,19 +597,19 @@ class sup(object):
     @classmethod
     def set(cls, nodeidx, index, value, tag=None):
         '''Assign the provided `value` to the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.supset(node, index, value.tobytes() if isinstance(value, memoryview) else value, tag or netnode.suptag)
 
     @classmethod
     def remove(cls, nodeidx, index, tag=None):
         '''Remove the value at the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.supdel(node, index, tag or netnode.suptag)
 
     @classmethod
     def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the indexes of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nsup, _ in utils.fsup(node, tag=tag or netnode.suptag):
             yield nsup
         return
@@ -617,7 +617,7 @@ class sup(object):
     @classmethod
     def fitems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nsup, supval in utils.fsup(node, tag=tag or netnode.suptag):
             yield nsup, supval
         return
@@ -625,7 +625,7 @@ class sup(object):
     @classmethod
     def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the indexes of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nsup, _ in utils.rsup(node, tag=tag or netnode.suptag):
             yield nsup
         return
@@ -633,7 +633,7 @@ class sup(object):
     @classmethod
     def ritems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for nsup, supval in utils.rsup(node, tag=tag or netnode.suptag):
             yield nsup, supval
         return
@@ -666,7 +666,7 @@ class hash(object):
     @classmethod
     def get(cls, nodeidx, key, type=None, tag=None):
         '''Return the value for the provided `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         if type in {None}:
             return netnode.hashval(node, key, tag or netnode.hashtag)
         elif issubclass(type, memoryview):
@@ -684,7 +684,7 @@ class hash(object):
     @classmethod
     def set(cls, nodeidx, key, value, tag=None):
         '''Assign the provided `value` to the specified `key` for the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         # in my testing the type really doesn't matter
         if isinstance(value, memoryview):
             return netnode.hashset(node, key, value.tobytes(), tag or netnode.hashtag)
@@ -699,13 +699,13 @@ class hash(object):
     @classmethod
     def remove(cls, nodeidx, key, tag=None):
         '''Remove the value assigned to the specified `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         return netnode.hashdel(node, key, tag or netnode.hashtag)
 
     @classmethod
     def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the keys of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for idx, _ in utils.fhash(node, tag=tag or netnode.hashtag):
             yield idx
         return
@@ -713,7 +713,7 @@ class hash(object):
     @classmethod
     def fitems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for idx, hashval in utils.fhash(node, tag=tag or netnode.hashtag):
             yield idx, hashval
         return
@@ -721,7 +721,7 @@ class hash(object):
     @classmethod
     def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the keys of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for idx, _ in utils.rhash(node, tag=tag or netnode.hashtag):
             yield idx
         return
@@ -729,7 +729,7 @@ class hash(object):
     @classmethod
     def ritems(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.get(nodeidx)
+        node = utils.get(nodeidx)
         for idx, hashval in utils.rhash(node, tag=tag or netnode.hashtag):
             yield idx, hashval
         return
