@@ -8,7 +8,7 @@ import sys, os
 
 ## General information about the project.
 project = u'IDA-minsc'
-copyright = u'2010-2018, Ali Rizvi-Santiago'
+copyright = u'2010-2022, Ali Rizvi-Santiago'
 author = u'Ali Rizvi-Santiago'
 version = u''
 release = u''
