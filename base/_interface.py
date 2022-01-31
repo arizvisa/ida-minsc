@@ -1009,9 +1009,11 @@ class node(object):
     @staticmethod
     def is_identifier(identifier):
         '''Return truth if the specified `identifier` is valid.'''
-        bits = internal.utils.string.digits(idaapi.BADADDR, 2)
-        mask = 0xff * pow(2, math.trunc(bits) - 8)
-        return identifier & mask == mask
+        parameters = 2 * [identifier]
+        if any(F(id) for F, id in zip([idaapi.get_struc, idaapi.get_member_by_id], parameters)):
+            return True
+        iterable = (F(id) for F, id in zip([idaapi.get_enum_idx, idaapi.get_enum_member_enum], parameters))
+        return not all(map(functools.partial(operator.eq, idaapi.BADADDR), iterable))
 
     @internal.utils.multicase(sup=bytes)
     @classmethod
@@ -1163,6 +1165,7 @@ class node(object):
         This string is typically found in a supval[0xF+opnum] of the instruction.
         """
         le = functools.partial(functools.reduce, lambda agg, by: (agg * 0x100) | by)
+        Fidentifier = getattr(idaapi, 'node2ea', internal.utils.fidentity)
 
         # jspelman. he's everywhere.
         ror = lambda n, shift, bits: (n>>shift) | ((n & pow(2, shift) - 1) << (bits - shift))
@@ -1254,7 +1257,8 @@ class node(object):
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
 
-        return id64(sup) if bit64Q else id32(sup)
+        offset, items = id64(sup) if bit64Q else id32(sup)
+        return offset, [Fidentifier(item) for item in items]
 
     @internal.utils.multicase(ea=six.integer_types)
     @classmethod
