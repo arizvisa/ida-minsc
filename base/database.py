@@ -4985,8 +4985,8 @@ class extra(object):
 
     @classmethod
     def __has_extra__(cls, ea, base):
-        sup = internal.netnode.sup
-        return sup.get(ea, base, type=memoryview) is not None
+        sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
+        return sup.get(Fnetnode(ea), base, type=memoryview) is not None
 
     @utils.multicase()
     @classmethod
@@ -5012,9 +5012,9 @@ class extra(object):
 
     @classmethod
     def __count__(cls, ea, base):
-        sup = internal.netnode.sup
+        sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
         for i in builtins.range(cls.MAX_ITEM_LINES):
-            row = sup.get(ea, base + i, type=memoryview)
+            row = sup.get(Fnetnode(ea), base + i, type=memoryview)
             if row is None: break
         return i or None
 
@@ -5038,14 +5038,14 @@ class extra(object):
         @classmethod
         def __get__(cls, ea, base):
             '''Fetch the extra comment(s) for the address ``ea`` at the index ``base``.'''
-            sup = internal.netnode.sup
+            sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
 
             # count the number of rows
             count = cls.__count__(ea, base)
             if count is None: return None
 
             # now we can fetch them
-            res = (sup.get(ea, base + i, type=bytes) for i in builtins.range(count))
+            res = (sup.get(Fnetnode(ea), base + i, type=bytes) for i in builtins.range(count))
 
             # remove the null-terminator if there is one
             res = (row.rstrip(b'\0') for row in res)
@@ -5057,13 +5057,13 @@ class extra(object):
         def __set__(cls, ea, string, base):
             '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
             cls.__hide__(ea)
-            sup = internal.netnode.sup
+            sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
 
             # break the string up into rows, and encode each type for IDA
             res = [ utils.string.to(item) for item in string.split('\n') ]
 
             # assign them directly into IDA
-            [ sup.set(ea, base + i, row + b'\0') for i, row in enumerate(res) ]
+            [ sup.set(Fnetnode(ea), base + i, row + b'\0') for i, row in enumerate(res) ]
 
             # now we can show (refresh) them
             cls.__show__(ea)
@@ -5073,7 +5073,7 @@ class extra(object):
         @classmethod
         def __delete__(cls, ea, base):
             '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
-            sup = internal.netnode.sup
+            sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
 
             # count the number of rows to remove
             count = cls.__count__(ea, base)
@@ -5083,7 +5083,7 @@ class extra(object):
             cls.__hide__(ea)
 
             # now we can remove them
-            [ sup.remove(ea, base + i) for i in builtins.range(count) ]
+            [ sup.remove(Fnetnode(ea), base + i) for i in builtins.range(count) ]
 
             # and then show (refresh) it
             cls.__show__(ea)
