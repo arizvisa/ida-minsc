@@ -556,7 +556,7 @@ class chunk(object):
 
         # If this is a function tail, then we need to iterate through the referers
         # for the chunk so that we can yield each address.
-        if ch.flags & idaapi.FUNC_TAIL:
+        if ch.flags & idaapi.FUNC_TAIL and ch.refqty > 1:
             iterable = (ch.referers[index] for index in builtins.range(ch.refqty))
 
         # Otherwise, we just need to yield the function that owns this chunk.
