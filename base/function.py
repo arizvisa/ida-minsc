@@ -1398,7 +1398,6 @@ class block(object):
         # clear the color of each item too.
         for ea in block.iterate(ea):
             database.color(ea, None)
-            # internal.netnode.alt.remove(ea, 0x14)
         return res
     @utils.multicase(bounds=builtins.tuple, none=None.__class__)
     @classmethod
@@ -1419,7 +1418,6 @@ class block(object):
         # clear the color of each item too.
         for ea in block.iterate(bb):
             database.color(ea, None)
-            #internal.netnode.alt.remove(ea, 0x14)
         return res
     @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
     @classmethod
@@ -1450,7 +1448,6 @@ class block(object):
         # update the color of each item too
         for ea in block.iterate(ea):
             database.color(ea, rgb)
-            #internal.netnode.alt.set(ea, 0x14, ni.bg_color)
         return res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
@@ -1476,7 +1473,6 @@ class block(object):
         # update the colors of each item too.
         for ea in block.iterate(bb):
             database.color(ea, rgb)
-            #internal.netnode.alt.set(ea, 0x14, ni.bg_color)
         return res
     @utils.multicase(bounds=builtins.tuple, rgb=six.integer_types)
     @classmethod
@@ -2415,15 +2411,6 @@ class type(object):
         ti, ea = idaapi.tinfo_t(), interface.range.start(fn)
 
         raise E.UnsupportedCapability(u"{:s}({:#x}, {!s}) : IDAPython does not allow one to remove the prototype of a function.`.".format('.'.join([__name__, cls.__name__]), ea, None))
-
-        # There really isn't a way to remove the prototype from a function,
-        # but it seems that there are some supvals and altvals which are
-        # created. So, we'll go through and remove this because it's the best
-        # that we've got.
-        internal.netnode.sup.remove(ea, 8)
-        internal.netnode.alt.remove(ea, idaapi.NSUP_TYPEINFO)
-
-        return cls(ui.current.function(), None)
 
     @utils.multicase()
     @classmethod
