@@ -19,7 +19,7 @@ window that they wish to expose to the user.
 """
 
 import six, builtins
-import sys, os, time, functools, inspect
+import sys, os, time, functools, inspect, itertools
 import logging
 
 import idaapi, internal
@@ -1357,11 +1357,14 @@ class hook(object):
         priorityhook = internal.interface.priorityhook
         for attr, hookcls in api:
 
-            # Attach a priority hooking queue to an instance of IDA's hooks
-            instance = priorityhook(hookcls)
+            # If there's an instance already attached to us, then use it.
+            if hasattr(cls, attr):
+                instance = getattr(cls, attr)
 
-            # Explicitly assign the priority instance into our object
-            if not hasattr(cls, attr):
+            # Otherwise instantiate the priority hooks for each hook type,
+            # and assign it directly into our class.
+            else:
+                instance = priorityhook(hookcls)
                 setattr(cls, attr, instance)
 
             # Now we can enable all the hooks so the user can use them
@@ -1369,7 +1372,7 @@ class hook(object):
 
         # If the idaapi.__notification__ object exists, then also
         # assign it directly into our namespace.
-        if hasattr(idaapi, '__notification__'):
+        if all(itertools.starmap(hasattr, zip([cls, idaapi], ['notification', '__notification__']))):
             setattr(cls, 'notification', idaapi.__notification__)
         return
 
@@ -1385,6 +1388,15 @@ class hook(object):
             # the language extension is unloaded.
             hooker.unhook()
         return
+
+    idp = internal.interface.priorityhook(idaapi.IDP_Hooks)
+    idb = internal.interface.priorityhook(idaapi.IDB_Hooks)
+    ui = internal.interface.priorityhook(idaapi.UI_Hooks)
+
+    # if there's a __notification__ attribute attached to IDA, then
+    # assign it to our namespace so it can be used.
+    if hasattr(idaapi, '__notification__'):
+        notification = idaapi.__notification__
 
 hooks = hook    # XXX: ns alias
 
