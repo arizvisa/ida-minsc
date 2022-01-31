@@ -546,4 +546,11 @@ def verify_contents():
         count += 1 if ok else 0
     return count, len(index)
 
+def verify():
+    '''Use the index to verify the reference counts for the globals, functions, and the caches containing their contents.'''
+    verified, available = verify_contents()
+    ok = verify_globals()
+    six.print_(u"Verification of globals has {:s}. Successfully verified{:s} {:d} of {:d} indexed functions.".format('succeeded' if ok else 'failed', ' only' if verified < available else '', verified, available))
+    return ok and verified == available
+
 __all__ = ['everything', 'globals', 'contents']
