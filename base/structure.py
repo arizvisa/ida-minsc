@@ -68,23 +68,7 @@ def has(structure):
 
 def __instance__(identifier, **options):
     '''Create a new instance of the structure identified by `identifier`.'''
-    # check to see if the structure cache has been initialized
-    # XXX: this structure cache is needed in order to retain the "offset" that
-    #      is kept for a function frame. we need some better solution to this,
-    #      maybe we can stash this in a netnode for the structure's id
-    # FIXME: this cache needs to be refreshed when the database changes
-    try:
-        cache = __instance__.cache
-    except AttributeError:
-        # create it and try again if it hasn't
-        __instance__.cache = {}
-        return __instance__(identifier, **options)
-
-    # try and fetch the structure from the cache
-    res = cache.setdefault(identifier, structure_t(identifier, **options))
-    if 'offset' in options:
-        res.offset = options['offset']
-    return res
+    return structure_t(identifier, **options)
 
 __matcher__ = utils.matcher()
 __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
@@ -165,9 +149,7 @@ def new(string, *suffix, **offset):
     if id == idaapi.BADADDR:
         raise E.DisassemblerError(u"{:s}.new({:s}{:s}) : Unable to add a new structure to the database with the specified name ({!r}).".format(__name__, ', '.join(map("{!r}".format, res + suffix)), u", {:s}".format(utils.string.kwargs(offset)) if offset else '', name))
 
-    # FIXME: we should probably move the new structure to the end of the list via idaapi.set_struc_idx
-
-    # Create a new instance in the structure cache with the specified id
+    # return a new instance using the specified identifier
     return __instance__(id, **offset)
 
 @utils.multicase(name=six.string_types)
@@ -279,35 +261,39 @@ class structure_t(object):
     property also allows a user to create a new member or remove an
     already existing one.
     """
-    __slots__ = ('__id__', '__members__')
+    __slots__ = ('__ptr__', '__name__', '__members__')
 
     def __init__(self, sptr, offset=0):
         if not isinstance(sptr, (idaapi.struc_t, six.integer_types)):
             cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}, offset={:+#x}) : Unable to instantiate a structure using the provided type ({!s}).".format('.'.join([__name__, cls.__name__]), sptr, offset, sptr))
+            raise E.InvalidParameterError(u"{:s}({!s}, offset={:+#x}) : Unable to instantiate a structure using the provided type ({!s}).".format('.'.join([__name__, cls.__name__]), sptr, offset, sptr))
 
-        # After validating the type of our parameter, extract the id
-        # and assign it to our slot. This will be how we reference
-        # the structure throughout this instance's lifetime.
-        self.__id__ = id = sptr.id if isinstance(sptr, idaapi.struc_t) else sptr
-
-        # Perform a sanity check by asking IDAPython to resolve the
-        # id to an idaapi.struc_t for us.
-        if self.ptr is None:
+        # Use the type of our parameter in order to get a proper
+        # struc_t. If we didn't get one, then we likely got an identifier
+        # that we need to use with idaapi.get_struc to get our sptr.
+        ptr = sptr if isinstance(sptr, idaapi.struc_t) else idaapi.get_struc(sptr)
+        if ptr is None:
             cls = self.__class__
-            raise E.StructureNotFoundError(u"{:s}({:#x}, offset={:+#x}) : Unable to locate the structure with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), id, offset, id))
+            raise E.StructureNotFoundError(u"{:s}({!s}, offset={:+#x}) : Unable to locate the structure with the specified parameter ({!s}).".format('.'.join([__name__, cls.__name__]), sptr, offset, sptr))
 
-        # If we were able to successfully snag an idaapi.struc_t, then
-        # the final thing we need to do is instantiate the members
-        # property so that users can interact with the structure.
+        # After we verified our parameter and got a proper type, then
+        # grab the name using its id. We cache both the sptr and the
+        # structure's name in case one of them changes. This way we
+        # can figure out the other one in that situation.
+        name = idaapi.get_struc_name(ptr.id)
+        self.__ptr__, self.__name__ = ptr, name
+
+        # The final thing to do is instantiate the members property
+        # so that users can interact with the structure members.
         self.__members__ = members_t(self, baseoffset=offset)
 
     def refs(self):
         '''Return all the structure members and operand references which reference this specific structure.'''
+        Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
 
         # First collect all of our identifiers referenced by this structure,
         # whilst making sure to include all the members too.
-        items = [self.id] + [item.id for item in self.members]
+        items = itertools.chain([self.id], map(Fnetnode, map(operator.attrgetter('id'), self.members)))
 
         # Now we need to iterate through all of our members and grab references
         # to those identifiers too.
@@ -439,11 +425,28 @@ class structure_t(object):
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.struc_t``.'''
-        return idaapi.get_struc(self.id)
+        ptr, name = self.__ptr__, self.__name__
+
+        # Verify if our ptr is still within scope by verifying
+        # that its identifier is valid. Otherwise we need to use
+        # the name that we've cached to fetch it.
+        identifier = ptr.id if interface.node.is_identifier(ptr.id) else idaapi.get_struc_id(name)
+
+        # Now we can check if we okay with returning the ptr. We also
+        # update our cached name with whatever the current name is.
+        if identifier == ptr.id:
+            result, self.__name__ = ptr, idaapi.get_struc_name(identifier)
+
+        # Otherwise we need to use the identifier to grab the
+        # sptr from the identifier we just grabbed.
+        else:
+            result = self.__ptr__ = idaapi.get_struc(identifier)
+        return result
+
     @property
     def id(self):
         '''Return the identifier of the structure.'''
-        return self.__id__
+        return self.ptr.id
     @property
     def properties(self):
         '''Return the properties for the current structure.'''
@@ -480,7 +483,7 @@ class structure_t(object):
         idaapi.set_struc_cmt(identifier, utils.string.to(cmtf), False)
 
         # and set its attributes properly
-        self.__id__ = identifier
+        self.__ptr__, self.__name__ = idaapi.get_struc(identifier), name
         self.__members__ = members
         return
 
@@ -1051,8 +1054,8 @@ class members_t(object):
             if member.id == self[i].id:
                 return i
             continue
-        cls = self.__class__
-        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) is not in the members list.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), internal.netnode.name.get(member.id)))
+        cls, Fnetnode = self.__class__, getattr(idaapi, 'ea2node', utils.fidentity)
+        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) is not in the members list.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), internal.netnode.name.get(Fnetnode(member.id))))
 
     __members_matcher = utils.matcher()
     __members_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
@@ -2278,17 +2281,17 @@ class member_t(object):
         If `opnum` is ``None``, then the returned `address` has the structure applied to it.
         If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
         """
-        mid = self.id
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
 
         # if structure is a frame..
-        if interface.node.is_identifier(self.parent.id) and internal.netnode.name.get(self.parent.id).startswith('$ '):
+        if interface.node.is_identifier(self.parent.id) and internal.netnode.name.get(Fnetnode(self.parent.id)).startswith('$ '):
             name, mptr = self.fullname, self.ptr
             sptr = idaapi.get_sptr(mptr)
 
             # get frame, func_t
             frname, _ = name.split('.', 1)
-            frid = internal.netnode.get(frname)
+            frid = Fidentifier(internal.netnode.get(frname))
             ea = idaapi.get_func_by_frame(frid)
             f = idaapi.get_func(ea)
 
@@ -2305,7 +2308,7 @@ class member_t(object):
             return res
 
         # otherwise, it's a structure..which means we need to specify the member to get refs for
-        X = idaapi.xrefblk_t()
+        X, mid = idaapi.xrefblk_t(), self.id
         if not X.first_to(mid, idaapi.XREF_ALL):
             return []
 
@@ -2323,10 +2326,10 @@ class member_t(object):
 
             # iterate through every single structure that we have, and gather
             # its member_t references
-            for item in current:
+            for item in current.copy():
                 for member in item.refs():
                     if isinstance(item, member_t):
-                        current.add(item.parent)
+                        current.add(item)
                     continue
                 continue
 
@@ -2343,7 +2346,7 @@ class member_t(object):
         # now figure out which operand has the structure member applied to it
         res = []
         for ea, _, t in refs:
-            iterable = ((idx, internal.netnode.sup.get(ea, 0xf + idx, type=memoryview)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
+            iterable = ((idx, internal.netnode.sup.get(Fnetnode(ea), 0xf + idx, type=memoryview)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.has(Fnetnode(ea), 0xf + idx))
             listable = [(idx, view.tobytes()) for idx, view in iterable]
 
             # check if we found any ops that point directly to this member
