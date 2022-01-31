@@ -824,28 +824,41 @@ def __process_functions(percentage=0.10):
     P = ui.Progress()
     globals = {item for item in internal.comment.globals.address()}
 
-    total = 0
+    # Now we need to gather all of our imports so that we can clean up any functions
+    # that are runtime-linked addresses. This is because IDA seems to create a
+    # func_t for certain imports.
+    imports = {item for item in []}
+    for idx in range(idaapi.get_import_module_qty()):
+        idaapi.enum_import_names(idx, lambda address, name, ordinal: imports.add(address) or True)
 
-    funcs = [ea for ea in database.functions()]
+    # Now that we have our imports, we can iterate through all of the functions.
+    total, funcs = 0, [ea for ea in database.functions()]
     P.update(current=0, max=len(funcs), title=u"Pre-building tagcache...")
     P.open()
     six.print_(u"Pre-building tagcache for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
         chunks = [item for item in function.chunks(fn)]
 
+        # If the current function is in our imports, then we skip it because
+        # it's a runtime-linked address and shouldn't have been cached anyways.
+        if fn in imports:
+            continue
+
+        # Update the progress bar with the current function we're working on.
         text = functools.partial(u"Processing function {:#x} ({chunks:d} chunk{plural:s}) -> {:d} of {:d}".format, fn, 1 + i, len(funcs))
         P.update(current=i)
         ui.navigation.procedure(fn)
         if i % (int(len(funcs) * percentage) or 1) == 0:
             six.print_(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, 1 + i, len(funcs), i / float(len(funcs)) * 100.0))
 
+        # Grab the currently existing cache for the currnet function, and use
+        # it to tally up all of the reference counts for the tags.
         contents = {item for item in internal.comment.contents.address(fn)}
         for ci, (l, r) in enumerate(chunks):
             P.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
-            ui.navigation.analyze(l)
-            for ea in database.address.iterate(l, database.address.prev(r)):
+            for ea in database.address.iterate(ui.navigation.analyze(l), database.address.prev(r)):
                 # FIXME: no need to iterate really since we should have
-                #        all of the addresses
+                #        all of the relevant addresses in our cache.
                 for k, v in database.tag(ea).items():
                     if ea in globals: internal.comment.globals.dec(ea, k)
                     if ea not in contents: internal.comment.contents.inc(ea, k, target=fn)
