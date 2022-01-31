@@ -133,6 +133,11 @@ class utils(object):
     one to iterate through the types contained within the netnode.
     """
     @classmethod
+    def get(cls, index):
+        '''Return the netnode for the provided `index`.'''
+        return netnode.get(index)
+
+    @classmethod
     def range(cls):
         '''Return the bounds of each netnode (nodeidx_t) within the database.'''
         this = netnode.root()
