@@ -606,6 +606,13 @@ class priorityhook(prioritybase):
             supermethod = getattr(supercls, name)
             return supermethod(keyword, value_type, pvalue, idb_loaded)
 
+        def segm_deleted(self, start_ea, end_ea, flags):
+            # /home/user/idapro-7.6/python/3/ida_idp.py:5189 # expected 4, got 3
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            return supermethod(start_ea, end_ea, flags)
+
         def bookmark_changed(self, index, pos, desc, operation):
             # /home/user/idapro-7.6/python/3/ida_idp.py:5801 # expected 5, got 4
             cls = self.__class__
@@ -648,6 +655,10 @@ class priorityhook(prioritybase):
                 return saved
             elif name in {'bookmark_changed'}:
                 return bookmark_changed
+
+        if idaapi.__version__ >= 7.7:
+            if name in {'segm_deleted'}:
+                return segm_deleted
 
         return method
 
