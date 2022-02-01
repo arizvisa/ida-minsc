@@ -557,7 +557,7 @@ class chunk(object):
         # If this is a function tail, then we need to iterate through the referers
         # for the chunk so that we can yield each address. Older versions of IDA
         # don't always give us an array, so we construct it if we don't get one.
-        if ch.flags & idaapi.FUNC_TAIL and ch.refqty > 1:
+        if ch.flags & idaapi.FUNC_TAIL and ch.refqty > 0:
             tids = idaapi.tid_array(ch.refqty)
             referers = ch.referers if hasattr(ch.referers, 'count') else tids.frompointer(ch.referers)
             iterable = (referers[index] for index in builtins.range(ch.refqty))
