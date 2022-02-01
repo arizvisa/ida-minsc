@@ -805,6 +805,14 @@ class contents(tagging):
     @classmethod
     def _key(cls, ea):
         '''Converts the address `ea` to a key that's used to store contents data for the specified function.'''
+
+        # First we'll need to verify that we're within a function,
+        # then we can try and grab the chunk for the given address.
+        res = idaapi.get_func(ea)
+        if res is None:
+            return None
+
+        # Try and grab the function chunk for the given address.
         ch = idaapi.get_fchunk(ea)
         if ch is None:
             return None
@@ -812,16 +820,27 @@ class contents(tagging):
         # If we're a function tail, then there's a chance that the
         # owner of the function is owned by multiple functions.
         if ch.flags & idaapi.FUNC_TAIL:
-            tids = idaapi.tid_array(ch.refqty)
+            count, tids = ch.refqty, idaapi.tid_array(ch.refqty)
+
+            # If the referers are None, then our chunk might be busted
+            # beccause IDAPython is fucking garbage. If there's only
+            # more than one referrer, then we need to log a failure
+            # here and return the function that we grabbed.
+            if ch.referers is None and count > 1:
+                bounds = internal.interface.range.bounds(ch)
+                logging.critical(u"{:s}._key({:#x}) : Unable to read more than one referrer ({:d}) for the function tail at {!s}. The \"{:s}\" attribute is {!s}.".format('.'.join([__name__, cls.__name__]), ea, count, bounds, 'referers', ch.referers))
+                return internal.interface.range.start(res)
+
+            # Otherwise we can just use idaapi.get_func() to get the owner.
+            elif ch.referers is None:
+                return internal.interface.range.start(res)
 
             # If we didn't get an array with a count, then we're using
             # an older version of IDA where we need to construct it.
             referers = ch.referers if hasattr(ch.referers, 'count') else tids.frompointer(ch.referers)
-            owners = [referers[index] for index in range(ch.refqty)]
+            owners = [referers[index] for index in range(count)]
             return owners if len(owners) > 1 else owners[0]
-
-        res = idaapi.get_func(ea)
-        return internal.interface.range.start(res) if res else None
+        return internal.interface.range.start(res)
 
     @classmethod
     def _read_header(cls, target, ea):
