@@ -310,11 +310,22 @@ class prioritybase(object):
     def __formatter__(self, target):
         raise NotImplementedError
 
-    def connect(self, target, callable):
-        raise NotImplementedError
+    def connect(self, target):
+        if target in self.__cache__:
+            logging.warning(u"{:s}.connect({!r}) : Unable to connect to {:s} due to being already connected.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+            return False
+        self.__cache__[target]
+        return True
 
     def disconnect(self, target):
-        raise NotImplementedError
+        if target in self.__cache__:
+            if len(self.__cache__[target]):
+                logging.warning(u"{:s}.disconnect({!r}) : Unable to disconnect from {:s} due to items still in cache.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+                return False
+            self.__cache__.pop(target, None)
+            return True
+        logging.warning(u"{:s}.disconnect({!r}) : Unable to disconnect from {:s} due to not being connected.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+        raise False
 
     def hook(self):
         '''Physically connect all of the hooks controlled by this class.'''
@@ -324,7 +335,7 @@ class prioritybase(object):
         for target in self.__cache__:
             ok = self.connect(target, self.apply(target))
             if not ok:
-                logging.warning(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
+                logging.warning(u"{:s}.hook() : Error trying to connect to the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
                 notok = True
             continue
         return not notok
@@ -337,7 +348,7 @@ class prioritybase(object):
         for target in self.__cache__:
             ok = self.disconnect(target)
             if not ok:
-                logging.warning(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
+                logging.warning(u"{:s}.unhook() : Error trying to disconnect from the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
                 notok = True
             continue
         return not notok
@@ -420,14 +431,14 @@ class prioritybase(object):
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
-            res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items)))
+            res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items) if items else '...nothing attached...'))
 
         # Now we can append all the disabled ones.
         for target in sorted(self.disabled):
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
-            res.append("{:<{:d}s} : {!s}".format("{:s} (disabled)".format(self.__formatter__(target)), alignment_disabled, ' '.join(items)))
+            res.append("{:<{:d}s} : {!s}".format("{:s} (disabled)".format(self.__formatter__(target)), alignment_disabled, ' '.join(items) if items else '...nothing attached...'))
 
         # And then return it to the caller.
         return '\n'.join(res)
@@ -438,7 +449,14 @@ class prioritybase(object):
             cls = self.__class__
             logging.fatal(u"{:s}.enable({!r}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
+
+        # Always explicitly do what we're told...
         self.__disabled.discard(target)
+
+        # But if there were no entries in the cache, then warn the user about it.
+        if not len(self.__cache__[target]):
+            logging.warning(u"{:s}.enable({!r}) : The requested {:s} does not have any hooks attached to it.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target)))
+            return False
         return True
 
     def disable(self, target):
@@ -457,16 +475,16 @@ class prioritybase(object):
         '''Add the `callable` to our queue for the specified `target` with the provided `priority`.'''
 
         # connect to the requested target if possible
-        if target not in self.__cache__ and not self.connect(target, self.apply(target)):
-            cls = self.__class__
-            raise NameError(u"{:s}.add({!r}, {!s}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, self.__formatter__(target)))
+        if target not in self.__cache__:
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            raise NameError(u"{:s}.add({!r}, {!s}, priority={:s}) : Unable to connect to the specified {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, format(priority), self.__formatter__(target)))
 
         # discard any callables already attached to the specified target
         self.discard(target, callable)
 
         # add the callable to our priority queue
-        res = self.__cache__[target]
-        heapq.heappush(self.__cache__[target], internal.utils.priority_tuple(priority, callable))
+        queue = self.__cache__[target]
+        heapq.heappush(queue, internal.utils.priority_tuple(priority, callable))
 
         # preserve a backtrace so we can track where our callable is at
         self.__traceback[(target, callable)] = traceback.extract_stack()[:-1]
@@ -480,8 +498,8 @@ class prioritybase(object):
     def pop(self, target, index):
         '''Pop the item at the specified `index` from the given `target`.'''
         if target not in self.__cache__:
-            cls = self.__class__
-            raise NameError(u"{:s}.pop({!r}, {:d}) : Unable to connect to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), target, index, self.__formatter__(target)))
+            cls, format = self.__class__, "{:d}".format if isinstance(index, six.integer_types) else "{!r}".format
+            raise NameError(u"{:s}.pop({!r}, {:d}) : Unable to connect to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(index), self.__formatter__(target)))
         state = []
 
         # Iterate through the cache for the specified target and collect
@@ -495,10 +513,10 @@ class prioritybase(object):
         if state:
             self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # Otherwise our target is now empty and we need to remove it.
+        # Otherwise our target is now empty and we need to disable it.
         else:
-            self.__cache__.pop(target, [])
-            self.__disabled.discard(target)
+            self.__cache__[target][:] = []
+            self.__disabled.add(target)
 
         # Now we can return whatever it was they removed.
         priority, result = item
@@ -524,19 +542,18 @@ class prioritybase(object):
         if state:
             self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # Otherwise we found nothing and we can remove the entire target
-        # from our cache.
+        # Otherwise we found nothing and we should just disable the target.
         else:
-            self.__cache__.pop(target, [])
-            self.__disabled.discard(target)
+            self.__cache__[target][:] = []
+            self.__disabled.add(target)
 
         return True if found else False
 
     def remove(self, target, priority):
         '''Remove the first callable from the specified `target` that has the provided `priority`.'''
         if target not in self.__cache__:
-            cls = self.__class__
-            raise NameError(u"{:s}.remove({!r}, {:+d}) : Unable to connect to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), target, index, self.__formatter__(target)))
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            raise NameError(u"{:s}.remove({!r}, {:s}) : Unable to connect to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(priority), self.__formatter__(target)))
         state, table = [], {}
 
         # Iterate through our cache for the specified target and save
@@ -548,8 +565,8 @@ class prioritybase(object):
         # Before we do anything, we need to ping the priority we're searching for
         # in the table and then we grab the first index for the given priority.
         if priority not in table:
-            cls = self.__class__
-            raise NameError(u"{:s}.remove({!r}, {:+d}) : Unable to locate a callable with the requested priority ({:+d}).".format('.'.join([__name__, cls.__name__]), target, priority, priority))
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            raise NameError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the requested priority ({:+d}).".format('.'.join([__name__, cls.__name__]), target, format(priority), format(priority)))
         index = table[priority].pop(0)
 
         # We now can pop the index directly out of the state. Afterwards, we
@@ -558,11 +575,11 @@ class prioritybase(object):
         if state:
             self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # If our state is empty, then we go ahead and remove it from the
+        # If our state is empty, then we go ahead and disable the target.
         # cache and then discard the the target.
         else:
-            self.__cache__.pop(target, [])
-            self.__disabled.discard(target)
+            self.__cache__[target][:] = []
+            self.__disabled.add(target)
 
         # We have an item that we can now return.
         priority, result = item
@@ -593,7 +610,7 @@ class prioritybase(object):
 
                     format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)))
                     logging.fatal(format(u"Callback for {:s} with priority ({:+d}) raised an exception while executing {!s}".format(self.__formatter__(target), priority, callable)))
-                    logging.warning(format("Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
+                    logging.warning(format(u"Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
                     [ logging.warning(format(item)) for item in str().join(bt).split('\n') ]
                     [ logging.warning(format(item)) for item in current.split('\n') ]
 
@@ -606,7 +623,7 @@ class prioritybase(object):
                     break
 
                 cls = self.__class__
-                raise TypeError("{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
+                raise TypeError(u"{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
             return
 
         # That's it!
@@ -663,7 +680,7 @@ class priorityhook(prioritybase):
                 res.push_back(value)
                 pvalue = res
             else:
-                raise ValueError("ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
+                raise ValueError(u"ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
             supercls = super(cls, self)
             supermethod = getattr(supercls, name)
             return supermethod(keyword, value_type, pvalue, idb_loaded)
@@ -747,8 +764,8 @@ class priorityhook(prioritybase):
         try:
             yield self.object.unhook()
         finally:
-            pass
-        self.object.hook()
+            self.object.hook()
+        return
 
     def hook(self):
         '''Physically connect all of the hooks managed by this class.'''
@@ -762,9 +779,13 @@ class priorityhook(prioritybase):
 
     def connect(self, name, callable):
         '''Connect the hook `callable` to the specified `name`.'''
-        if not hasattr(self.object, name):
+        if not hasattr(self.__type__, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
+            raise NameError(u"{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
+
+        # if the name attribute already exists, then we're already connected.
+        if name in self.available:
+            return True
 
         # create a closure that calls our callable, and its supermethod
         supermethod = self.__make_dummy_method(name)
@@ -776,32 +797,48 @@ class priorityhook(prioritybase):
         with self.__context__():
             method = internal.utils.pycompat.method.new(closure, self.object, self.__type__)
             setattr(self.object, name, method)
-        return True
+        return super(priorityhook, self).connect(name)
 
     def disconnect(self, name):
         '''Disconnect the hook from the specified `name`.'''
         def closure(instance, *parameters):
             supermethod = getattr(super(cls, instance), name)
             return supermethod(*parameters)
+
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.disconnect({!r}, {!s}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            raise NameError(u"{:s}.disconnect({!r}, {!s}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+
         method = internal.utils.pycompat.method.new(closure, self.object, self.__type__)
         setattr(self.object, name, method)
-        return True
+        return super(priorityhook, self).disconnect(name)
+
+    def add(self, target, callable, priority):
+        '''Add the `callable` to the queue for the specified `target` with the provided `priority`.'''
+        if target in self.available:
+            return super(priorityhook, self).add(target, callable, priority)
+
+        # Try and connect to the target with a closure that will handle all its hooks.
+        ok = self.connect(target, self.apply(target))
+        if not ok:
+            raise ValueError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+
+        # We should've connected, so all that's left is to enable the hook.
+        ok = super(priorityhook, self).add(target, callable, priority)
+        return ok and self.enable(target)
 
     def discard(self, name, callable):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, method))
         return super(priorityhook, self).discard(name, callable)
 
     def apply(self, name):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
+            raise NameError(u"{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
         return super(priorityhook, self).apply(name)
 
     def __repr__(self):
@@ -829,19 +866,35 @@ class prioritynotification(prioritybase):
 
     def connect(self, notification, closure):
         '''Connect to the specified `notification` in order to execute any callables provided by the user.'''
-        return idaapi.notify_when(notification, closure)
+        ok = idaapi.notify_when(notification, closure)
+        return ok and super(prioritynotification, self).connect(notification)
 
     def disconnect(self, notification):
         '''Disconnect from the specified `notification` so that nothing will execute.'''
         def closure(*parameters):
             return True
-        return idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
+        ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
+        return ok and super(prioritynotification, self).disconnect(notification)
+
+    def add(self, notification, callable, priority):
+        '''Add the `callable` to the queue for the specified `notification` with the provided `priority`.'''
+        if notification in self.available:
+            return super(prioritynotification, self).add(notification, callable, priority)
+
+        # Notifications are always connected and enabled.
+        ok = self.connect(notification, self.apply(notification))
+        if not ok:
+            raise ValueError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+
+        # Add the callable to our connected notification.
+        ok = super(prioritynotification, self).add(notification, callable, priority)
+        return ok and self.enable(notification)
 
     def apply(self, notification):
         '''Return a closure that will execute all of the hooks for the specified `notification`.'''
         if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
             cls = self.__class__
-            raise ValueError("{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, notification))
+            raise ValueError(u"{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, notification))
 
         return super(prioritynotification, self).apply(notification)
 
