@@ -810,11 +810,14 @@ class contents(tagging):
             return None
 
         # If we're a function tail, then there's a chance that the
-        # owner of the function is multiple ones. So we'll return
-        # the whole list if that's the case. Otherwise we'll just
-        # return the very first element.
+        # owner of the function is owned by multiple functions.
         if ch.flags & idaapi.FUNC_TAIL:
-            owners = [ch.referers[index] for index in range(ch.refqty)]
+            tids = idaapi.tid_array(ch.refqty)
+
+            # If we didn't get an array with a count, then we're using
+            # an older version of IDA where we need to construct it.
+            referers = ch.referers if hasattr(ch.referers, 'count') else tids.frompointer(ch.referers)
+            owners = [referers[index] for index in range(ch.refqty)]
             return owners if len(owners) > 1 else owners[0]
 
         res = idaapi.get_func(ea)
