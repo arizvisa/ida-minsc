@@ -1372,7 +1372,7 @@ class hook(object):
 
         # If the idaapi.__notification__ object exists, then also
         # assign it directly into our namespace.
-        if all(itertools.starmap(hasattr, zip([cls, idaapi], ['notification', '__notification__']))):
+        if not hasattr(cls, 'notification') and hasattr(idaapi, '__notification__'):
             setattr(cls, 'notification', idaapi.__notification__)
         return
 
