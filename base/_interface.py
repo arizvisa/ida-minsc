@@ -662,10 +662,6 @@ class priorityhook(prioritybase):
 
         return method
 
-    def remove(self):
-        '''Unhook the instance completely.'''
-        return self.object.unhook()
-
     def __formatter__(self, name):
         cls = self.__type__
         return '.'.join([cls.__name__, name])
@@ -695,13 +691,12 @@ class priorityhook(prioritybase):
     def hook(self):
         '''Physically connect all of the hooks managed by this class.'''
         ok = super(priorityhook, self).hook()
-        self.__hook()
-        return ok
+        return ok and self.__hook()
 
     def unhook(self):
         '''Physically disconnect all of the hooks managed by this class.'''
-        self.__unhook()
-        return super(priorityhook, self).unhook()
+        ok = self.__unhook()
+        return ok and super(priorityhook, self).unhook()
 
     def connect(self, name, callable):
         '''Connect the hook `callable` to the specified `name`.'''
