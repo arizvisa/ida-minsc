@@ -477,11 +477,37 @@ class prioritybase(object):
         res = self.__cache__[target]
         return tuple(callable for _, callable in res)
 
+    def pop(self, target, index):
+        '''Pop the item at the specified `index` from the given `target`.'''
+        if target not in self.__cache__:
+            cls = self.__class__
+            raise NameError(u"{:s}.pop({!r}, {:d}) : Unable to connect to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), target, index, self.__formatter__(target)))
+        state = []
+
+        # Iterate through the cache for the specified target and collect
+        # each callable so we can figure out which one to remove.
+        for (priority, F) in self.__cache__[target][:]:
+            state.append((priority, F))
+
+        # Pop off the result the user requested, and then combine our
+        # state back into the cache we took it from.
+        item = state.pop(index)
+        if state:
+            self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
+
+        # Otherwise our target is now empty and we need to remove it.
+        else:
+            self.__cache__.pop(target, [])
+            self.__disabled.discard(target)
+
+        # Now we can return whatever it was they removed.
+        priority, result = item
+        return result
+
     def discard(self, target, callable):
         '''Discard the `callable` from our priority queue for the specified `target`.'''
         if target not in self.__cache__:
             return False
-
         state = []
 
         # Filter through our cache for the specified target, and collect
@@ -505,6 +531,42 @@ class prioritybase(object):
             self.__disabled.discard(target)
 
         return True if found else False
+
+    def remove(self, target, priority):
+        '''Remove the first callable from the specified `target` that has the provided `priority`.'''
+        if target not in self.__cache__:
+            cls = self.__class__
+            raise NameError(u"{:s}.remove({!r}, {:+d}) : Unable to connect to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), target, index, self.__formatter__(target)))
+        state, table = [], {}
+
+        # Iterate through our cache for the specified target and save
+        # both the state and the index of every single priority.
+        for index, (priority, F) in enumerate(self.__cache__[target][:]):
+            state.append((priority, F))
+            table.setdefault(priority, []).append(index)
+
+        # Before we do anything, we need to ping the priority we're searching for
+        # in the table and then we grab the first index for the given priority.
+        if priority not in table:
+            cls = self.__class__
+            raise NameError(u"{:s}.remove({!r}, {:+d}) : Unable to locate a callable with the requested priority ({:+d}).".format('.'.join([__name__, cls.__name__]), target, priority, priority))
+        index = table[priority].pop(0)
+
+        # We now can pop the index directly out of the state. Afterwards, we
+        # need to shove our state back into the cache for the target.
+        item = state.pop(index)
+        if state:
+            self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
+
+        # If our state is empty, then we go ahead and remove it from the
+        # cache and then discard the the target.
+        else:
+            self.__cache__.pop(target, [])
+            self.__disabled.discard(target)
+
+        # We have an item that we can now return.
+        priority, result = item
+        return result
 
     def apply(self, target):
         '''Return a closure that will execute all of the hooks for the specified `target`.'''
