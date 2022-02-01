@@ -1311,15 +1311,40 @@ def func_tail_appended(pfn, tail):
 def removing_func_tail(pfn, tail):
     """This hook is for when a chunk is removed from a function.
 
-    We simply iterate through the old chunk, decrease all of its tags in the
-    function context, and increase their reference within the global context.
+    If the tail we were given only has one owner, then we promote the tags in
+    the tail to globals tags. Otherwise, we just decrease the reference count
+    in the cache for the function that the tail was removed from.
     """
-    # tail = range_t
-    for ea in database.address.iterate(interface.range.bounds(tail)):
+    bounds = interface.range.bounds(tail)
+    referrers = [fn for fn in function.chunk.owners(bounds.left)]
+
+    # If the number of referrers is larger than 1, then the tail was just removed
+    # from the pfn function. We verify that the pfn is still in the list of
+    # referrers and warn the user if it isn't.
+    if len(referrers) > 1:
+        if not operator.contains(referrers, interface.range.start(pfn)):
+            logging.warning(u"{:s}.removing_func_tail({:#x}, {!s}) : Adjusting contents of function ({:#x}) but function was not found in the owners ({:s}) of chunk {!s}.".format(__name__, interface.range.start(pfn), bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+        # So there's no promotion from a contents tag to a global tag, but
+        # there is a removal from the cache for pfn.
+        for ea in database.address.iterate(bounds):
+            for k in database.tag(ea):
+                internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
+                logging.debug(u"{:s}.removing_func_tail({:#x}, {!s}) : Decreasing reference for tag ({:s}) at {:#x} in cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
+            continue
+        return
+
+    # Otherwise, there's just one referrer and it should be pointing to pfn.
+    if not operator.contains(referrers, interface.range.start(pfn)):
+        logging.warning(u"{:s}.removing_func_tail({:#x}, {!s}) : Promoting contents for function ({:#x}) but function was not found in the owners ({:s}) of chunk {!s}.".format(__name__, interface.range.start(pfn), bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+    # If there's just one referrer, then the referrer should be pfn and we should
+    # be promoting the relevant addresses in the cache from contents to globals.
+    for ea in database.address.iterate(bounds):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
-            logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.removing_func_tail({:#x}, {!s}) : Exchanging (increasing) reference count for global tag ({:s}) at {:#x} and (decreasing) reference count for contents tag in the cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
         continue
     return
 
