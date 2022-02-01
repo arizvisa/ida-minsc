@@ -1022,7 +1022,9 @@ def __relocate_function(old, new, size, iterable, moved=False):
         if ch is None:
             logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is not associated with a function.".format(__name__, old, new, size, iterable, ea, target))
         elif ch.flags & idaapi.FUNC_TAIL:
-            owners = [interface.range.start(ch.referers[index]) for index in range(ch.refqty)]
+            tids = idaapi.tid_array(ch.refqty)
+            referers = ch.referers if hasattr(ch, 'count') else tids.frompointer(ch.referers)
+            owners = [interface.range.start(referers[index]) for index in range(ch.refqty)]
             logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is associated with more than one function ({:s}).".format(__name__, old, new, size, iterable, ea, target, ', '.join(map("{:#x}".format, owners))))
         elif interface.range.start(ch) != target:
             logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is not associated with the right function ({:#x}).".format(__name__, old, new, size, iterable, ea, target, interface.range.start(ch)))
