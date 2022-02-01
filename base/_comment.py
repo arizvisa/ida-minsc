@@ -1020,21 +1020,36 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        key = target.get('target', None)
-        res = cls._read(key, address) or {}
-        state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
+        # If we weren't given a target, then we need to figure the key out ourselves.
+        if target.get('target', None) is None:
+            res = cls._key(address)
+            keys = res if isinstance(res, list) else [res]
 
-        state[name] = refs = state.get(name, 0) + 1
-        cache[address] = cache.get(address, 0) + 1
+        # If we were given a valid target, then turn it into a list unless it already is.
+        else:
+            keys = target['target'] if isinstance(target['target'], list) else [target['target']]
 
-        if state: res[cls.__tags__] = state
-        else: del res[cls.__tags__]
+        # Now we just iterate through all of the keys and update the cache.
+        result = 0
+        for key in keys:
+            item = cls._read(key, address) or {}
+            state, cache = item.get(cls.__tags__, {}), item.get(cls.__address__, {})
 
-        if cache: res[cls.__address__] = cache
-        else: del res[cls.__address__]
+            # Update the reference count for the items we were given.
+            state[name] = refs = state.get(name, 0) + 1
+            cache[address] = cache.get(address, 0) + 1
 
-        cls._write(key, address, res)
-        return refs
+            # Figure out whether we're removing the entry for the tags or adding it.
+            if state: item[cls.__tags__] = state
+            else: del item[cls.__tags__]
+
+            # Now do the exact same thing for the address.
+            if cache: item[cls.__address__] = cache
+            else: del item[cls.__address__]
+
+            # Now we can write that shit back into the cache.
+            _, result = cls._write(key, address, item), result + refs
+        return result
 
     @classmethod
     def dec(cls, address, name, **target):
@@ -1042,25 +1057,43 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        key = target.get('target', None)
-        res = cls._read(key, address) or {}
-        state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
+        # If we were asked to figure the target out ourselves, then do as we're told.
+        if target.get('target', None) is None:
+            res = cls._key(address)
+            keys = res if isinstance(res, list) else [res]
 
-        refs, count = state.pop(name, 0) - 1, cache.pop(address, 0) - 1
-        if refs > 0:
-            state[name] = refs
+        # Otherwise turn what we were given into a list unless it already was.
+        else:
+            keys = target['target'] if isinstance(target['target'], list) else [target['target']]
 
-        if count > 0:
-            cache[address] = count
+        # Now we can just iterate through all of the keys to update each cache.
+        result = 0
+        for key in keys:
+            item = cls._read(key, address) or {}
+            state, cache = item.get(cls.__tags__, {}), item.get(cls.__address__, {})
 
-        if state: res[cls.__tags__] = state
-        else: res.pop(cls.__tags__, None)
+            # Pop the number of references and the count of addresses and adjust
+            # them. We pop them because if the reference count drops below its
+            # minimum, then we remove the tag so that we can detect when the
+            # index has been decremented past what's available.
+            refs, count = state.pop(name, 0) - 1, cache.pop(address, 0) - 1
 
-        if cache: res[cls.__address__] = cache
-        else: res.pop(cls.__address__, None)
+            # If we still have some references for the names and the addresses,
+            # then add our keys back into the state and cache.
+            if refs > 0: state[name] = refs
+            if count > 0: cache[address] = count
 
-        cls._write(key, address, res)
-        return refs
+            # Figure out whether we're removing the names or keeping them.
+            if state: item[cls.__tags__] = state
+            else: item.pop(cls.__tags__, None)
+
+            # We do the exact same thing for the address reference count.
+            if cache: item[cls.__address__] = cache
+            else: item.pop(cls.__address__, None)
+
+            # We can finally write our reference counts back to the current key.
+            _, result = cls._write(key, address, item), result + refs
+        return result
 
     @classmethod
     def name(cls, address, **target):
