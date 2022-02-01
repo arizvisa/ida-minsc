@@ -853,7 +853,7 @@ def __process_functions(percentage=0.10):
 
         # Grab the currently existing cache for the currnet function, and use
         # it to tally up all of the reference counts for the tags.
-        contents = {item for item in internal.comment.contents.address(fn)}
+        contents = {item for item in internal.comment.contents.address(fn, target=fn)}
         for ci, (l, r) in enumerate(chunks):
             P.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
             for ea in database.address.iterate(ui.navigation.analyze(l), database.address.prev(r)):
@@ -1015,22 +1015,20 @@ def __relocate_function(old, new, size, iterable, moved=False):
     for ea, keys in index.items():
         offset = ea - old
         source, target = offset + old, offset + new
+        fn, ch = idaapi.get_func(target), idaapi.get_fchunk(target)
 
         # Check that this stray isn't pointing to an actual function before we
         # continue to remove it from the netnode. If it is, then we skip processing.
-        ch = idaapi.get_fchunk(target)
-        if ch is None:
-            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is not associated with a function.".format(__name__, old, new, size, iterable, ea, target))
-        elif ch.flags & idaapi.FUNC_TAIL:
-            tids = idaapi.tid_array(ch.refqty)
-            referers = ch.referers if hasattr(ch, 'count') else tids.frompointer(ch.referers)
-            owners = [interface.range.start(referers[index]) for index in range(ch.refqty)]
-            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is associated with more than one function ({:s}).".format(__name__, old, new, size, iterable, ea, target, ', '.join(map("{:#x}".format, owners))))
-        elif interface.range.start(ch) != target:
-            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Contents at {:#x} should've been relocated to {:#x} but is not associated with the right function ({:#x}).".format(__name__, old, new, size, iterable, ea, target, interface.range.start(ch)))
-        else:
-            logging.critical(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Refusing to clean up index for {:#x} as it has been relocated to {:#x} which is currently in use by function ({:#x}).".format(__name__, old, new, size, iterable, ea, offset + new, interface.range.start(ch)))
+        if fn is None:
+            logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Discarding cache at {:#x} should've been relocated to {:#x} but is not part of a function anymore.".format(__name__, old, new, size, iterable, ea, target))
+        elif interface.range.start(ch) == interface.range.start(fn) == target:
+            logging.critical(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Refusing to clean up index for {:#x} as it has been relocated to {:#x} which is in use by function ({:#x}).".format(__name__, old, new, size, iterable, ea, offset + new, interface.range.start(ch)))
             continue
+        elif ch.flags & idaapi.FUNC_TAIL:
+            owners = [item for item in function.chunk.owners(target)]
+            logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cache at {:#x} should've been relocated to {:#x} but is a tail associated with more than one function ({:s}).".format(__name__, old, new, size, iterable, ea, target, ', '.join(map("{:#x}".format, owners))))
+        else:
+            logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cache at {:#x} should've been relocated to {:#x} but its boundaries ({:#x}<>{:#x}) do not correspond with a function ({:#x}).".format(__name__, old, new, size, iterable, ea, target, interface.range.start(ch), interface.range.end(ch), interface.range.start(fn)))
 
         # Now we know why this address is within our index, so all that
         # we really need to do is to remove it.
