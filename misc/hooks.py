@@ -1296,15 +1296,42 @@ def thunk_func_created(pfn):
 def func_tail_appended(pfn, tail):
     """This hook is for when a chunk is appended to a function.
 
-    We simply iterate through the new chunk, decrease all of its tags in the
-    global context, and increase their reference within the function context.
+    If the tail we were given only has one owner, then that means we need to
+    demote the tags for the tail from globals to contents tags. If there's more
+    than one, then we simply add the references in the tail to the function.
     """
-    # tail = func_t
-    for ea in database.address.iterate(interface.range.bounds(tail)):
+    bounds = interface.range.bounds(tail)
+    referrers = [fn for fn in function.chunk.owners(bounds.left)]
+
+    # If the number of referrers is larger than just 1, then the tail is
+    # owned by more than one function. We still doublecheck, though, to
+    # ensure that our pfn is still in the list.
+    if len(referrers) > 1:
+        if not operator.contains(referrers, interface.range.start(pfn)):
+            logging.warning(u"{:s}.func_tail_appended({:#x}, {!s}) : Adjusting contents of function ({:#x}) but function was not found in the owners ({:s}) of chunk {!s}.".format(__name__, interface.range.start(pfn), bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+        # Now we just need to iterate through the tail, and tally up
+        # the tags for the function in pfn.
+        for ea in database.address.iterate(bounds):
+            for k in database.tag(ea):
+                internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
+                logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Adding reference for tag ({:s}) at {:#x} to cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
+            continue
+        return
+
+    # Otherwise if there was only one referrer, then that means this
+    # tail is being demoted from globals tags to contents that are
+    # owned by the function in pfn.
+    if not operator.contains(referrers, interface.range.start(pfn)):
+        logging.warning(u"{:s}.func_tail_appended({:#x}, {!s}) : Demoting globals in {!s} and adding them to the cache for function {:#x} but function was not found in the owners ({:s}) of chunk {!s}.".format(__name__, interface.range.start(pfn), bounds, bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+    # All we need to do is to iterate through the tail, and adjust
+    # any references by exchanging them with the cache for pfn.
+    for ea in database.address.iterate(bounds):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-            logging.debug(u"{:s}.func_tail_appended({:#x}, {:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Exchanging (decreasing) reference count for global tag ({:s}) at {:#x} and (increasing) reference count for contents tag in the cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
         continue
     return
 
