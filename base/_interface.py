@@ -705,11 +705,11 @@ class priorityhook(prioritybase):
             supermethod = getattr(supercls, name)
             return supermethod(adjust_inf_fields)
 
-        def renamed(self, ea, new_name, local_name, old_name):
+        def renamed(self, ea, new_name, local_name):
             cls = self.__class__
             supercls = super(cls, self)
             supermethod = getattr(supercls, name)
-            return supermethod(ea, new_name, local_name or None, old_name)
+            return supermethod(ea, new_name, local_name or None, '')
 
         def saved(self, path):
             cls = self.__class__
