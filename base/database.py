@@ -2173,24 +2173,24 @@ def selectcontents(**boolean):
     # Nothing specific was queried, so just yield all tagnames that are available.
     if not boolean:
         for ea, _ in sorted(internal.comment.contents.iterate()):
-            ui.navigation.procedure(ea)
-            contents = internal.comment.contents.name(ea)
+            if function.within(ui.navigation.procedure(ea)):
+                contents = internal.comment.contents.name(ea, target=ea)
+            else:
+                contents, _ = None, logging.warning(u"{:s}.selectcontents() : Detected cache inconsistency where address ({:#x}) should be within a function.".format(__name__, ea))
             if contents: yield ea, contents
         return
 
     # Collect the tagnames to query as specified by the user.
     Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
-    # Walk through all the tagnames so we can cross-check them against the query.
+    # Walk through the index verifying that they're within a function. This
+    # way we can cross-check their cache against the user's query.
     for ea, cache in sorted(internal.comment.contents.iterate()):
-        ui.navigation.procedure(ea)
+        if function.within(ui.navigation.procedure(ea)):
+            sup, contents = {key for key in cache}, internal.comment.contents._read(ea, ea) or {}
 
-        # If we're within a function, then read the contents cache from its glob.
-        if function.within(ea):
-            sup, contents = {key for key in cache}, internal.comment.contents._read(None, ea) or {}
-
-        # Otherwise we're not within a function which means that our cache is
-        # lying to us and we need to skip this iteration.
+        # Otherwise if we're not within a function then our cache is lying to us
+        # and we need to skip this iteration.
         else:
             q = utils.string.kwargs(boolean)
             logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency where address ({:#x}) should be within a function.".format(__name__, q, ea))
@@ -2207,7 +2207,7 @@ def selectcontents(**boolean):
             logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency between contents of function ({:#x}) and address ({:#x}) - supval ({:s}) is different from blob ({:s}).".format(__name__, q, f, ea, sup_formatted, blob_formatted))
 
         # Now start aggregating the tagnames that the user is searching for.
-        collected, names = {item for item in []}, internal.comment.contents.name(ea)
+        collected, names = {item for item in []}, internal.comment.contents.name(ea, target=ea)
 
         # Or(|) includes the address if any of the tagnames matched.
         collected.update(Or & names)
