@@ -50,7 +50,7 @@ functions and aliases. For more information on this, please see
    
    :param enum: the enumeration to set the bitfield flag for
    :param boolean: whether to set the flag or clear it
-   :type boolean: intlong or bool
+   :type boolean: int or long or bool
    
 .. py:function:: bits(enum)
    
@@ -136,7 +136,7 @@ functions and aliases. For more information on this, please see
    
    :param enum:
    :param none:
-   :type none: None.__class__
+   :type none: None
    :param \*\*repeatable:
    
 .. py:function:: count()
@@ -359,7 +359,7 @@ Some examples of how to use this namespace can be::
    :param mask: the mask to clear the comment of
    :type mask: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*repeatable: whether to clear the repeatable comment or not
    
 .. py:function:: masks\.has(enum, mask)
@@ -483,7 +483,7 @@ Some examples of how to use this namespace can be::
    :param enum:
    :param member:
    :param none:
-   :type none: None.__class__
+   :type none: None
    :param \*\*repeatable:
    
 .. py:function:: member\.mask(mid)
