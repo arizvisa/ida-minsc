@@ -420,7 +420,7 @@ def verify_content(ea):
 
         # This should compare exactly. So if the count doesn't match, let someone know.
         if count != expected[ea]:
-            six.print_(u"[{:#x}] expected to find {:d} reference{:s} to address {:#x}, whereas {:s} found within the function".format(f, expected[ea], '' if expected[ea] == 1 else '', ea, "{:d} was".format(count) if count == 1 else "{:d} were".format(count)), file=output)
+            six.print_(u"[{:#x}] expected to find {:d} reference{:s} to address {:#x}, whereas {:s} found within the function".format(f, expected[ea], '' if expected[ea] == 1 else 's', ea, "{:d} was".format(count) if count == 1 else "{:d} were".format(count)), file=output)
         continue
     return True
 
