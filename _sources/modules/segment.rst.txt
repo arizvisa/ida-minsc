@@ -50,7 +50,7 @@ functions and aliases. For more information on this, please see
    
    Return the bottom address of the segment identified by ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: bounds()
    
@@ -64,7 +64,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`segment.range<bounds>`
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: by(segment)
    
@@ -113,6 +113,25 @@ functions and aliases. For more information on this, please see
    
    :param name: the name of the segment to return
    
+.. py:function:: by_offset(offset)
+   
+   Return the specified ``offset`` translated to the beginning of the current segment.
+   
+   Aliases: :py:func:`segment.byoffset<by_offset>`
+   
+   :param offset: the offset into the current segment to return as an address
+   :type offset: int or long
+   
+.. py:function:: by_offset(segment, offset)
+   
+   Return the specified ``offset`` translated to the beginning of ``segment``.
+   
+   Aliases: :py:func:`segment.byoffset<by_offset>`
+   
+   :param segment: an identifier used to specify a segment
+   :param offset: the offset into the segment to return as an address
+   :type offset: int or long
+   
 .. py:function:: by_selector(selector)
    
    Return the segment associated with ``selector``.
@@ -129,28 +148,28 @@ functions and aliases. For more information on this, please see
    
    Return the color of the segment identified by ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: color(none)
    
    Clear the color of the current segment.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(segment, none)
    
    Clear the color of the segment identified by ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(segment, rgb)
    
    Sets the color of the segment identified by ``segment`` to ``rgb``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    
@@ -203,7 +222,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`segment.goof<go_offset>`, :py:func:`segment. gooffset<go_offset>`, :py:func:`segment.gotooffset<go_offset>`
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    :param offset: an offset into the segment
    :type offset: int or long
    
@@ -215,7 +234,7 @@ functions and aliases. For more information on this, please see
    
    Iterate through all of the addresses within the specified ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: iterate(segment)
    
@@ -270,7 +289,7 @@ functions and aliases. For more information on this, please see
    
    Return the name of the segment identified by ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: new(offset, size, name, \*\*kwds)
    
@@ -303,7 +322,7 @@ functions and aliases. For more information on this, please see
    
    Return the offset of the address ``ea`` from the beginning of ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    :param ea: an address within the segment
    :type ea: int or long
    
@@ -319,7 +338,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`segment.string<read>`
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: remove(segment, contents=False)
    
@@ -329,7 +348,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`segment.delete<remove>`
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    :param contents: whether to remove the contents of the segment from the database
    
 .. py:function:: repr()
@@ -340,7 +359,7 @@ functions and aliases. For more information on this, please see
    
    Return the specified ``segment`` in a printable form.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: save(filename, segment, offset=0)
    
@@ -375,7 +394,7 @@ functions and aliases. For more information on this, please see
    
    Return the size of the segment specified by ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: top()
    
@@ -385,7 +404,7 @@ functions and aliases. For more information on this, please see
    
    Return the top address of the segment identified by ``segment``.
    
-   :param segment: an identifier used to describe a segment
+   :param segment: an identifier used to specify a segment
    
 .. py:function:: within()
    

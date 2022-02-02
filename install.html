@@ -58,66 +58,58 @@
 <span id="install-intro"></span><h1>1. Installation of IDA-Minsc<a class="headerlink" href="#installation-of-ida-minsc" title="Permalink to this headline">¶</a></h1>
 <p>To install IDA-Minsc on the various platforms that a user has installed
 IDA in, it simply requires a user to clone the repository into their
-IDA user directory. The idea is that IDA-Minsc’s “<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code>” file
+IDA user directory. The idea is that IDA-Minsc’s <code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code> file
 is executed by IDAPython when the user starts up IDA. At this point,
 IDA-Minsc will then empty out the default namespace and replace it with
-the contents of “<code class="docutils literal notranslate"><span class="pre">__root__.py</span></code>”. This allows a user to use a function
+the contents of <code class="docutils literal notranslate"><span class="pre">__root__.py</span></code>. This allows a user to use a function
 such as <code class="xref py py-func docutils literal notranslate"><span class="pre">dir()</span></code> or <code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code> to list all the functions that
 they have created during their reversing project.</p>
 <div class="section" id="software-requirements">
 <h2>1.1. Software Requirements<a class="headerlink" href="#software-requirements" title="Permalink to this headline">¶</a></h2>
-<p>This plugin requires IDA Pro to be installed along with the IDAPython plugin
-IDA versions 6.8 up to 7.6.210319 are supported. Both versions of the Python
-interpreter, the Python 2.x series, and the Python 3.x series are supported.
-The installation steps described within this document assume that you’re not
-using the bundled Python instance and have instead installed a Python interpreter
-separately. Despite the support for both Python 2.x and Python 3.x series, if you
-have specified the usage of the Python 3.x for the IDAPython plugin and want
-to change it, please review the <a class="reference internal" href="#downgrading-the-idapython-version-to-python-2-x">Downgrading the IDAPython version to Python 2.x</a>
-section for your platform.</p>
+<p>This plugin requires IDA Pro to be installed along with the IDAPython plugin.
+IDA versions 6.9 up to 7.1.180227 are supported. The installation steps
+described within this document assume that you’re not using the bundled Python
+instance and have instead installed a Python interpreter separately.</p>
 </div>
 <div class="section" id="installing-the-actual-plugin">
 <h2>1.2. Installing the actual plugin<a class="headerlink" href="#installing-the-actual-plugin" title="Permalink to this headline">¶</a></h2>
-<p>To install the plugin, the contents of the repository must be either cloned
+<p>To install the directory, the contents of the repository must be either cloned
 or extracted into IDA’s user directory. The repository is located at the
-referenced github url [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">1</span></a>]. On the Windows
-platform, IDA Pro’s user directory can be typically found at the “<code class="docutils literal notranslate"><span class="pre">%APPDATA%/Roaming/Hex-Rays/IDA</span> <span class="pre">Pro</span></code>”
-directory whereas on Linux or MacOS the path to this directory can be found at
-“<code class="docutils literal notranslate"><span class="pre">$HOME/.idapro</span></code>” [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">2</span></a>]. If the user is not
-sure of the path that IDA’s user directory is located at, they can simply
+referenced github url [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">1</span></a>]. On the windows
+platform, IDA’s user directory is located at <code class="docutils literal notranslate"><span class="pre">%APPDATA%/Roaming/Hex-Rays/IDA</span> <span class="pre">Pro</span></code>
+whereas on Linux or MacOS it can be found at <code class="docutils literal notranslate"><span class="pre">$HOME/.idapro</span></code>. If the user is
+not sure of the path that IDA’s user directory is located at, they can simply
 execute the following at the IDAPython prompt to output the correct path:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">idaapi</span><span class="o">.</span><span class="n">get_user_idadir</span><span class="p">()</span>
 </pre></div>
 </div>
-<p>To then clone the repository, one can use Git [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">3</span></a>].
+<p>To then clone the repository, one can use Git [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">2</span></a>].
 When cloning, the directory containing the plugin’s repository should replace the
 contents of the IDA user directory. If there are any files that the user
 currently has in their IDA user directory, the user can simply move these files
-into the repository’s directory after cloning. This is done so that IDAPython
-will execute the “<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code>” file belonging to IDA-minsc. The following
-can be typed at command line to clone [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">3</span></a>]
-the repository:</p>
+into the repository’s directory. This is done so that IDAPython will execute the
+<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code> file belonging to IDA-minsc. To clone the repository, one can
+use Git [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">2</span></a>] at their shell’s command line:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/arizvisa/ida-minsc <span class="nv">$IDA_USERDIR</span>
 </pre></div>
 </div>
 <p>Once this has been correctly done and the Python dependencies are installed,
-then when IDA starts up, the “<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code>” file in the repository should be
+then when IDA starts up, the <code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code> file in the repository should be
 executed and IDAPython’s namespace replaced with the namespace belonging to the
 plugin.</p>
 <p class="rubric" id="install-clone-references">References</p>
 <ol class="arabic simple">
 <li><a class="reference external" href="https://github.com/arizvisa/ida-minsc">IDA-Minsc repository – https://github.com/arizvisa/ida-minsc</a></li>
-<li><a class="reference external" href="https://www.hex-rays.com/products/ida/support/idadoc/1375.shtml">IDA Help: Environment variables (%IDAUSR%) – https://www.hex-rays.com/products/ida/support/idadoc/1375.shtml</a></li>
 <li><a class="reference external" href="https://git-scm.com">Git – Local branching on the cheap – https://git-scm.com</a></li>
 </ol>
 <div class="section" id="required-python-dependencies">
 <h3>1.2.1. Required Python dependencies<a class="headerlink" href="#required-python-dependencies" title="Permalink to this headline">¶</a></h3>
 <p>This project depends on a small number of required Python modules that the
-user will need to install into their “<code class="docutils literal notranslate"><span class="pre">site-packages</span></code>” directory. These modules
+user will need to install into their <code class="docutils literal notranslate"><span class="pre">site-packages</span></code> directory. These modules
 do things such as provide an implementation of a graph or to assist with Python2
 and Python3 incompatbilities. To install these required packages one can use
-the “<code class="docutils literal notranslate"><span class="pre">pip</span></code>” tool which comes with Python to install them. In the root of the
-repository, there’s a file “<code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>”. This file contains the
+the <code class="docutils literal notranslate"><span class="pre">pip</span></code> tool which comes with Python to install them. In the root of the
+repository, there’s a file <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>. This file contains the
 required dependencies and can be installed by executing the following while
 in the root of the user directory:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$ pip install -r requirements.txt
@@ -142,10 +134,10 @@ that compose IDA-Minsc.</p>
 <h2>1.3. Customizing the root namespace<a class="headerlink" href="#customizing-the-root-namespace" title="Permalink to this headline">¶</a></h2>
 <p>If the user wishes to import their own modules, or define custom functions
 that are available with IDA-Minsc has properly loaded they can add them to
-a file in the in their home directory named “<code class="docutils literal notranslate"><span class="pre">$HOME/.idapythonrc.py</span></code>”.</p>
+a file in the in their home directory named <code class="docutils literal notranslate"><span class="pre">$HOME/.idapythonrc.py</span></code>.</p>
 <p>By default when IDA-Minsc starts up, the <code class="xref py py-mod docutils literal notranslate"><span class="pre">user</span></code> module is first
-imported (which will execute “<code class="docutils literal notranslate"><span class="pre">$HOME/.pythonrc.py</span></code>”). This module is then
-used to locate the user’s “<code class="docutils literal notranslate"><span class="pre">.idapythonrc.py</span></code>” file which is then evaluated
+imported (which will execute <code class="docutils literal notranslate"><span class="pre">$HOME/.pythonrc.py</span></code>). This module is then
+used to locate the user’s <code class="docutils literal notranslate"><span class="pre">.idapythonrc.py</span></code> file which is then evaluated
 within the current namespace.</p>
 <p>As mentioned, this can allow a user to define functions that they use often
 or add aliases to some of the longer ones. By default the following functions
@@ -156,31 +148,25 @@ are aliased in the root namespace:</p>
 <col width="5%" />
 <col width="76%" />
 </colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">alias name</th>
-<th class="head">&#160;</th>
-<th class="head">description of alias</th>
-</tr>
-</thead>
 <tbody valign="top">
-<tr class="row-even"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">h()</span></code></td>
+<tr class="row-odd"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">h()</span></code></td>
 <td>–</td>
 <td>Aliased from <a class="reference internal" href="modules/database.html#database.here" title="database.here"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.here()</span></code></a> which will return the
 current address</td>
 </tr>
-<tr class="row-odd"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">top()</span></code></td>
+<tr class="row-even"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">top()</span></code></td>
 <td>–</td>
 <td>Aliased from <code class="xref py py-func docutils literal notranslate"><span class="pre">function.top()</span></code> which will return the
 top address of the current function chunk</td>
 </tr>
-<tr class="row-even"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">go()</span></code></td>
+<tr class="row-odd"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">go()</span></code></td>
 <td>–</td>
 <td>Aliased from <a class="reference internal" href="modules/database.html#database.go" title="database.go"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.go()</span></code></a> which will navigate to
 the provided address</td>
 </tr>
-<tr class="row-odd"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">goof()</span></code></td>
+<tr class="row-even"><td><code class="xref py py-func docutils literal notranslate"><span class="pre">goof()</span></code></td>
 <td>–</td>
-<td>Aliased from <a class="reference internal" href="modules/database.html#database.go_offset" title="database.go_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.go_offset()</span></code></a> which will navigate
+<td>Aliased from <code class="xref py py-func docutils literal notranslate"><span class="pre">datbase.go_offset()</span></code> which will navigate
 to the specified offset from the lowest address in the database</td>
 </tr>
 </tbody>
@@ -188,25 +174,20 @@ to the specified offset from the lowest address in the database</td>
 <p>There are also a number of combinators that are exposed to the user via the
 default namespace. Please see <a class="reference internal" href="combinators.html"><span class="doc">Functional combinators</span></a> for more information on
 how these can be used.</p>
-<p>Some of the base types that can be used for checking the type of an
-instance are also included in the root namespace:</p>
+<p>Some of the base types that can be used for checking inheritance is also
+included in the root namespace:</p>
 <table border="1" class="docutils">
 <colgroup>
 <col width="29%" />
 <col width="5%" />
 <col width="66%" />
 </colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">class or type</th>
-<th class="head">&#160;</th>
-<th class="head">description</th>
-</tr>
-</thead>
 <tbody valign="top">
-<tr class="row-even"><td><code class="xref py py-class docutils literal notranslate"><span class="pre">register_t</span></code></td>
-<td>–</td>
-<td>The base type that registers are inherited from</td>
+<tr class="row-odd"><td rowspan="2"><code class="xref py py-class docutils literal notranslate"><span class="pre">register_t</span></code></td>
+<td rowspan="2">–</td>
+<td rowspan="2">The base type that registers are inherited from</td>
 </tr>
+<tr class="row-even"></tr>
 <tr class="row-odd"><td><code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></td>
 <td>–</td>
 <td>A type that is used to represent objects that are
@@ -217,316 +198,44 @@ or any object that contains an unresolvable symbol.</td>
 </tr>
 </tbody>
 </table>
-<p>In order to shorten the typing required to access commonly used parts of the api,
-there are a number of modules that are aliased. Thus to access these parts of the
-api, one can use their aliases which include:</p>
+<p>There are a number of modules that are aliased to shorten the typing required
+to access their members. Some of these are:</p>
 <table border="1" class="docutils">
 <colgroup>
 <col width="47%" />
 <col width="8%" />
 <col width="45%" />
 </colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">module name</th>
-<th class="head">&#160;</th>
-<th class="head">alias name</th>
-</tr>
-</thead>
 <tbody valign="top">
-<tr class="row-even"><td><a class="reference internal" href="modules/database.html#module-database" title="database"><code class="xref py py-mod docutils literal notranslate"><span class="pre">database</span></code></a></td>
+<tr class="row-odd"><td><a class="reference internal" href="modules/database.html#module-database" title="database"><code class="xref py py-mod docutils literal notranslate"><span class="pre">database</span></code></a></td>
 <td>–</td>
 <td>Aliased as <code class="docutils literal notranslate"><span class="pre">db</span></code></td>
 </tr>
-<tr class="row-odd"><td><a class="reference internal" href="modules/function.html#module-function" title="function"><code class="xref py py-mod docutils literal notranslate"><span class="pre">function</span></code></a></td>
+<tr class="row-even"><td><a class="reference internal" href="modules/function.html#module-function" title="function"><code class="xref py py-mod docutils literal notranslate"><span class="pre">function</span></code></a></td>
 <td>–</td>
 <td>Aliased as <code class="docutils literal notranslate"><span class="pre">func</span></code></td>
 </tr>
-<tr class="row-even"><td><a class="reference internal" href="modules/instruction.html#module-instruction" title="instruction"><code class="xref py py-mod docutils literal notranslate"><span class="pre">instruction</span></code></a></td>
+<tr class="row-odd"><td><a class="reference internal" href="modules/instruction.html#module-instruction" title="instruction"><code class="xref py py-mod docutils literal notranslate"><span class="pre">instruction</span></code></a></td>
 <td>–</td>
 <td>Aliased as <code class="docutils literal notranslate"><span class="pre">ins</span></code></td>
 </tr>
-<tr class="row-odd"><td><a class="reference internal" href="modules/structure.html#module-structure" title="structure"><code class="xref py py-mod docutils literal notranslate"><span class="pre">structure</span></code></a></td>
+<tr class="row-even"><td><a class="reference internal" href="modules/structure.html#module-structure" title="structure"><code class="xref py py-mod docutils literal notranslate"><span class="pre">structure</span></code></a></td>
 <td>–</td>
 <td>Aliased as <code class="docutils literal notranslate"><span class="pre">struc</span></code></td>
 </tr>
-<tr class="row-even"><td><a class="reference internal" href="modules/enumeration.html#module-enumeration" title="enumeration"><code class="xref py py-mod docutils literal notranslate"><span class="pre">enumeration</span></code></a></td>
+<tr class="row-odd"><td><a class="reference internal" href="modules/enumeration.html#module-enumeration" title="enumeration"><code class="xref py py-mod docutils literal notranslate"><span class="pre">enumeration</span></code></a></td>
 <td>–</td>
 <td>Aliased as <code class="docutils literal notranslate"><span class="pre">enum</span></code></td>
 </tr>
-<tr class="row-odd"><td><a class="reference internal" href="modules/segment.html#module-segment" title="segment"><code class="xref py py-mod docutils literal notranslate"><span class="pre">segment</span></code></a></td>
+<tr class="row-even"><td><a class="reference internal" href="modules/segment.html#module-segment" title="segment"><code class="xref py py-mod docutils literal notranslate"><span class="pre">segment</span></code></a></td>
 <td>–</td>
 <td>Aliased as <code class="docutils literal notranslate"><span class="pre">seg</span></code></td>
 </tr>
 </tbody>
 </table>
-<p>Through use of these aliases and some of the other features provided by
-the IDA-minsc plugin, it is hoped for by the author that the user is able
-to very quickly write terse code that will assist them to get the work
-they need done whilst reversing their target.</p>
-</div>
-<div class="section" id="downgrading-the-idapython-version-to-python-2-x">
-<span id="install-downgrade"></span><h2>1.4. Downgrading the IDAPython version to Python 2.x<a class="headerlink" href="#downgrading-the-idapython-version-to-python-2-x" title="Permalink to this headline">¶</a></h2>
-<p>The Python 2.x series has since been deprecated due to the compatibility-breaking
-changes that have been introduced with the Python 3.x series [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">1</span></a>].
-However, the user may still wish to use plugins or modules that only exist within
-the Python 2.x series. As a result of this deprecation, when installing later
-versions of IDAPython, the installer will let you choose which version of Python
-to use [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">2</span></a>]. After choosing your version of Python
-and completing the installation process, IDAPython will appear to be locked to
-that particular version without doing a complete re-install.</p>
-<p>If you have chosen Python 3.x, then some desired plugins might not work with
-your setup, or some modules might not be available until you switch your Python
-interpreter. This however does not affect any part of the IDA-minsc plugin, and
-the choice of choosing a Python version is left completely up to the user. To
-temporary switch the interpreter that IDAPython uses, IDA provides a couple of
-avenues that a user can take [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">3</span></a>].</p>
-<div class="section" id="earlier-versions-of-idapython">
-<h3>1.4.1. Earlier versions of IDAPython<a class="headerlink" href="#earlier-versions-of-idapython" title="Permalink to this headline">¶</a></h3>
-<p>When installing IDA Pro, all of the available plugins that are currently installed
-can be found under the “<code class="docutils literal notranslate"><span class="pre">plugins</span></code>” subdirectory [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">4</span></a>].
-On Windows, this directory is commonly found at a path that is similar to
-“<code class="docutils literal notranslate"><span class="pre">C:\Program</span> <span class="pre">Files\IDA</span> <span class="pre">7.x\plugins</span></code>”. Whereas on Linux, the plugins can be found
-under the “<code class="docutils literal notranslate"><span class="pre">$HOME/idapro/plugins</span></code>” directory. On the MacOS platform, this directory
-is likely “<code class="docutils literal notranslate"><span class="pre">/Applications/IDA</span> <span class="pre">Pro/ida.app/Contents/MacOS/plugins</span></code>”.</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="18%" />
-<col width="82%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Platform</th>
-<th class="head">Path to the IDA Pro plugins directory</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td>Windows</td>
-<td>C:\Program Files\IDA 7.x\plugin</td>
-</tr>
-<tr class="row-odd"><td>Linux</td>
-<td>$HOME/idapro-7.x/plugin</td>
-</tr>
-<tr class="row-even"><td>MacOS</td>
-<td>/Applications/IDA Pro/ida.app/Contents/MacOS/plugin</td>
-</tr>
-</tbody>
-</table>
-<p>This “<code class="docutils literal notranslate"><span class="pre">plugins</span></code>” directory contains a number of shared objects or dynamic
-libraries belonging to each individual plugin for both 32-bit and 64-bit
-versions of the IDA Pro application [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">4</span></a>].
-Thus this path is where either the user or the IDA Pro installer would’ve
-installed the IDAPython plugin. Regardless of what the user specified
-during the install (Python 2.x or Python 3.x), the IDA Pro installer
-installs both versions of the IDAPython plugin into this directory.</p>
-<p>To accommodate the version of the IDAPython plugin that was chosen by the user,
-the installer will use the filename suffix of the plugin to disable the version
-that was not desirable by the user. Thus in order to enable a plugin, one will
-simply need to rename the filename to include whichever suffix that corresponds
-to the platform’s shared library. This way when IDA Pro loads, it will see the
-shared object or dynamic library and initialize it as a plugin.</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="13%" />
-<col width="23%" />
-<col width="25%" />
-<col width="39%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Platform</th>
-<th class="head">Shared library name</th>
-<th class="head">Shared library suffix</th>
-<th class="head">Reference</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td>Windows</td>
-<td>plugin/python.dll</td>
-<td>.dll</td>
-<td>[<a class="reference internal" href="#downgrading-references"><span class="std std-ref">5</span></a>]</td>
-</tr>
-<tr class="row-odd"><td>Linux</td>
-<td>plugin/python.so</td>
-<td>.so</td>
-<td>[<a class="reference internal" href="#downgrading-references"><span class="std std-ref">6</span></a>]</td>
-</tr>
-<tr class="row-even"><td>MacOS</td>
-<td>plugin/python.dylib</td>
-<td>.dylib</td>
-<td>[<a class="reference internal" href="#downgrading-references"><span class="std std-ref">7</span></a>]</td>
-</tr>
-</tbody>
-</table>
-<p>The following table shows the filenames that are used by IDA for some of the
-known platforms. Thus in order to enable Python 2.x and be able to use this
-plugin, the user must rename the filename suffix of the currently enabled
-IDAPython plugin (which would be Python 3.x if explicitly chosen during the
-install process) to its disabled version effectively disabling it.</p>
-<p>Once the Python 3.x version of the IDAPython plugin has been disabled, then
-the Python 2.x version can be enabled by doing the opposite and renaming the
-file from its disabled version to its enabled version.</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="24%" />
-<col width="28%" />
-<col width="28%" />
-<col width="21%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Platform</th>
-<th class="head">Python2 (disabled)</th>
-<th class="head">Python3 (disabled)</th>
-<th class="head">Filename (enabled)</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td>Windows (32-bit)</td>
-<td>idapython2.disabled</td>
-<td>idapython3.disabled</td>
-<td>idapython.dll</td>
-</tr>
-<tr class="row-odd"><td>Windows (64-bit)</td>
-<td>idapython642.disabled</td>
-<td>idapython643.disabled</td>
-<td>idapython64.dll</td>
-</tr>
-<tr class="row-even"><td>Linux (32-bit)</td>
-<td>idapython2.so.disabled</td>
-<td>idapython3.so.disabled</td>
-<td>idapython.so</td>
-</tr>
-<tr class="row-odd"><td>Linux (64-bit)</td>
-<td>idapython2_64.so.disabled</td>
-<td>idapython3_64.so.disabled</td>
-<td>idapython64.so</td>
-</tr>
-<tr class="row-even"><td>MacOS (32-bit)</td>
-<td>idapython.2.disabled</td>
-<td>idapython.3.disabled</td>
-<td>idapython.dylib</td>
-</tr>
-<tr class="row-odd"><td>MacOS (64-bit)</td>
-<td>idapython64.2.disabled</td>
-<td>idapython64.3.disabled</td>
-<td>idapython64.dylib</td>
-</tr>
-</tbody>
-</table>
-<p>For more information on troubleshooting issues related to the Python interpreter, please review the
-article at [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">8</span></a>].</p>
-</div>
-<div class="section" id="later-versions-of-idapython">
-<h3>1.4.2. Later versions of IDAPython<a class="headerlink" href="#later-versions-of-idapython" title="Permalink to this headline">¶</a></h3>
-<p>Within the directory that IDA Pro was installed, are a number of directories
-containing the necessary components and assets for the application to run. Under
-this same directory is all the necessary files required for IDAPython to work.
-These files can be found under the “<code class="docutils literal notranslate"><span class="pre">python</span></code>” subdirectory of IDA Pro’s user
-directory [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">4</span></a>]. On Windows, this path in the user
-directory is found at “<code class="docutils literal notranslate"><span class="pre">C:\Program</span> <span class="pre">Files\Hex-Rays\IDA</span> <span class="pre">Pro\python</span></code>”. On Linux,
-the path can be “<code class="docutils literal notranslate"><span class="pre">$HOME/idapro/python</span></code>” depending on the location of the user
-directory, and then lastly on the MacOS platform the directory at “<code class="docutils literal notranslate"><span class="pre">/Applications/IDA</span> <span class="pre">Pro/ida.app/Contents/MacOS/python</span></code>”
-will contain the necessary Python components.</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="18%" />
-<col width="82%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Platform</th>
-<th class="head">Path to the IDA Pro python directory</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td>Windows</td>
-<td>C:\Program Files\IDA 7.x\python</td>
-</tr>
-<tr class="row-odd"><td>Linux</td>
-<td>$HOME/idapro-7.x/python</td>
-</tr>
-<tr class="row-even"><td>MacOS</td>
-<td>/Applications/IDA Pro/ida.app/Contents/MacOS/python</td>
-</tr>
-</tbody>
-</table>
-<p>Within this directory contains the Python code for the IDAPython api. Due to the
-variations between both Python 2.x and Python 3.x, IDAPython splits its implementation
-and necessary files under the “<code class="docutils literal notranslate"><span class="pre">python/2</span></code>” directory for Python 2.x, and the
-“<code class="docutils literal notranslate"><span class="pre">python/3</span></code>” directory for Python 3.x. These subdirectories will contain the
-files for the familiar <cite>idc</cite>, <cite>idautils</cite>, and <cite>idaapi</cite> modules.</p>
-<p>What’s important about the “<code class="docutils literal notranslate"><span class="pre">python</span></code>” subdirectory, however, is that the
-IDAPython plugin actually includes support for a conditional file (or a “kill file”)
-in order to determine whether a particular IDAPython plugin should be loaded or not.
-This is relevant in that the necessary file that’s used to determine whether the
-Python 2.x version of the IDAPython plugin should be loaded is located under this
-particular “<code class="docutils literal notranslate"><span class="pre">python</span></code>” subdirectory.</p>
-<p>The name of this conditional file is “<code class="docutils literal notranslate"><span class="pre">use_python</span></code>”. If a file with this name
-is found by IDAPython under the “<code class="docutils literal notranslate"><span class="pre">python</span></code>” subdirectory as “<code class="docutils literal notranslate"><span class="pre">python/use_python2</span></code>”,
-the Python 3.x version of the IDAPython plugin will refuse to load thus resulting
-in only the Python 2.x version of the IDAPython plugin loading.</p>
-<p>The following table loosely describes the path where IDA Pro may be installed on
-the platform, and the filename that must be created in order to prevent the Python
-3.x version of the IDAPython plugin from loading.</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="15%" />
-<col width="49%" />
-<col width="36%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Platform</th>
-<th class="head" colspan="2">Path to file that needs to exist in order to load only Python 2.x</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td>Windows</td>
-<td colspan="2">C:\Program Files\IDA 7.x\python\use_python2</td>
-</tr>
-<tr class="row-odd"><td>Linux</td>
-<td colspan="2">$HOME/idapro-7.x/python/use_python</td>
-</tr>
-<tr class="row-even"><td>MacOS</td>
-<td colspan="2">/Applications/IDA Pro/ida.app/Contents/MacOS/python/use_python</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section" id="the-idapyswitch-utility">
-<h3>1.4.3. The <cite>idapyswitch</cite> utility<a class="headerlink" href="#the-idapyswitch-utility" title="Permalink to this headline">¶</a></h3>
-<p>On some platforms, this utility comes installed with the IDA Pro application. It
-is believed that by running this utility, one can explicitly specify which Python
-version that IDAPython should use. This is done by scanning for already installed
-instances of Python in the system’s standard location and then allowing you to
-choose one of them. For more information on this utility and how to use it,
-please review the article at [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">9</span></a>].</p>
-</div>
-<div class="section" id="verifying-the-python-version-used-by-idapython">
-<h3>1.4.4. Verifying the Python version used by IDAPython<a class="headerlink" href="#verifying-the-python-version-used-by-idapython" title="Permalink to this headline">¶</a></h3>
-<p>Once the IDAPython plugin has been enabled, simply running the IDA Pro application
-will result in the plugin being loaded. At the bottom of the application’s user-interface
-is an input box that the user may use in order to execute Python code. This input box
-is the primary interface to Python’s REPL (Read-Eval-Print-Loop). To verify that
-the correct version of Python is in use by the plugin, one can execute the following
-code by typing it into the input box:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">sys</span>
-<span class="o">&gt;</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span>
-<span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">(</span><span class="n">major</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">minor</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">micro</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">releaselevel</span><span class="o">=</span><span class="s1">&#39;final&#39;</span><span class="p">,</span> <span class="n">serial</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>Examining the major version of the named tuple that has been returned shows that
-the Python 2.x version of the IDAPython plugin is currently being used. At this
-point, the user may continue to use the IDA-minsc plugin with whatever other
-plugins or modules that are now available.</p>
-<p class="rubric" id="downgrading-references">References</p>
-<ol class="arabic simple">
-<li><a class="reference external" href="https://blog.python.org/2011/03/recent-discussion-on-python-dev.html">Deprecations between Python 2.7 and 3.x – https://blog.python.org/2011/03/recent-discussion-on-python-dev.html</a></li>
-<li><a class="reference external" href="https://www.hex-rays.com/blog/ida-7-4-idapython-and-python-3/">Choosing Python version during installation – https://www.hex-rays.com/blog/ida-7-4-idapython-and-python-3/</a></li>
-<li><a class="reference external" href="https://www.hex-rays.com/products/ida/support/ida74_idapython_python3.shtml">IDAPython and Python3 – https://www.hex-rays.com/products/ida/support/ida74_idapython_python3.shtml</a></li>
-<li><a class="reference external" href="https://www.hex-rays.com/products/ida/support/idadoc/536.shtml">IDA Help: Plugin modules – https://www.hex-rays.com/products/ida/support/idadoc/536.shtml</a></li>
-<li><a class="reference external" href="https://en.wikipedia.org/wiki/Dynamic_linker#Microsoft_Windows">Dynamic linker (Windows) – https://en.wikipedia.org/wiki/Dynamic_linker#Microsoft_Windows</a></li>
-<li><a class="reference external" href="https://en.wikipedia.org/wiki/Dynamic_linker#Systems_using_ELF">Dynamic linker (Linux) – https://en.wikipedia.org/wiki/Dynamic_linker#Systems_using_ELF</a></li>
-<li><a class="reference external" href="https://en.wikipedia.org/wiki/Dynamic_linker#macOS_and_iOS">Dynamic linker (MacOS) – https://en.wikipedia.org/wiki/Dynamic_linker#macOS_and_iOS</a></li>
-<li><a class="reference external" href="https://www.hex-rays.com/blog/ida-and-common-python-issues/">IDA and common Python issues – https://www.hex-rays.com/blog/ida-and-common-python-issues/</a></li>
-<li><a class="reference external" href="https://www.hex-rays.com/blog/tag/idapyswitch/">idapyswitch – https://www.hex-rays.com/blog/tag/idapyswitch/</a></li>
-</ol>
-</div>
+<p>Through these aliases, it is hoped for by the author that the user is enabled
+to write very quick and hacky code that will assist them to get the work they
+need done.</p>
 </div>
 </div>
 
@@ -562,13 +271,6 @@ plugins or modules that are now available.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#customizing-the-root-namespace">1.3. Customizing the root namespace</a></li>
-<li><a class="reference internal" href="#downgrading-the-idapython-version-to-python-2-x">1.4. Downgrading the IDAPython version to Python 2.x</a><ul>
-<li><a class="reference internal" href="#earlier-versions-of-idapython">1.4.1. Earlier versions of IDAPython</a></li>
-<li><a class="reference internal" href="#later-versions-of-idapython">1.4.2. Later versions of IDAPython</a></li>
-<li><a class="reference internal" href="#the-idapyswitch-utility">1.4.3. The <cite>idapyswitch</cite> utility</a></li>
-<li><a class="reference internal" href="#verifying-the-python-version-used-by-idapython">1.4.4. Verifying the Python version used by IDAPython</a></li>
-</ul>
-</li>
 </ul>
 </li>
 </ul>

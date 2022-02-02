@@ -40,7 +40,7 @@ functions and aliases. For more information on this, please see
    Remove the color from the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(ea)
    
@@ -56,7 +56,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(ea, rgb)
    
@@ -96,7 +96,7 @@ functions and aliases. For more information on this, please see
    Remove the comment at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: comment(ea, string, \*\*repeatable)
@@ -120,7 +120,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: disassemble(\*\*options)
@@ -180,7 +180,7 @@ functions and aliases. For more information on this, please see
    Remove the mark at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: mark(ea)
    
@@ -203,7 +203,7 @@ functions and aliases. For more information on this, please see
    :param ea: the address of an existing mark within the database
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: mark(ea, description)
    
@@ -244,7 +244,7 @@ functions and aliases. For more information on this, please see
    Removes the name at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(ea, string, \*suffix, \*\*flags)
@@ -269,7 +269,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when removing the name
    
 .. py:function:: read()
@@ -387,7 +387,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tag(ea, key, none)
    
@@ -398,7 +398,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tags()
    
@@ -501,6 +501,10 @@ Some examples of using this namespace can be::
    :param ea: an address in the database to its item address for
    :type ea: int or long
    
+.. py:function:: address\.blocks()
+   
+   Iterate through the currently selected blocks.
+   
 .. py:function:: address\.blocks(end)
    
    Yields the boundaries of each block from the current address to ``end``.
@@ -554,6 +558,10 @@ Some examples of using this namespace can be::
    :param ea: an unaligned address within the database
    :type ea: int or long
    
+.. py:function:: address\.iterate()
+   
+   Iterate through the currently selected addresses.
+   
 .. py:function:: address\.iterate(end)
    
    Iterate from the current address to ``end``.
@@ -606,13 +614,15 @@ Some examples of using this namespace can be::
    :param step: a callable that seeks to the next address such as :py:obj:`address.next`
    :type step: callable
    
-.. py:function:: address\.next()
+.. py:function:: address\.next(\*\*count)
    
    Return the next address from the current address.
    
    Aliases: :py:func:`database.next<address\.next>`
    
-.. py:function:: address\.next(predicate)
+   :param \*\*count: the number of results to skip
+   
+.. py:function:: address\.next(predicate, \*\*count)
    
    Return the next address from the current address that satisfies the provided ``predicate``.
    
@@ -620,6 +630,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
+   :param \*\*count: the number of results to skip
    
 .. py:function:: address\.next(ea)
    
@@ -643,18 +654,18 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.next(ea, count)
    
-   Return the next ``count`` address from the address specified by ``ea``.
+   Return the next ``count`` addresses from the address specified by ``ea``.
    
    Aliases: :py:func:`database.next<address\.next>`
    
    :param ea: an address within the database
    :type ea: int or long
-   :param count: the number of addresses to skip
+   :param count: the number of results to skip
    :type count: int or long
    
 .. py:function:: address\.next(ea, predicate, count)
    
-   Return the next ``count`` address from the address ``ea`` that satisfies the provided ``predicate``.
+   Return the next ``count`` addresses from the address ``ea`` that satisfies the provided ``predicate``.
    
    Aliases: :py:func:`database.next<address\.next>`
    
@@ -662,17 +673,18 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
-   :param count: the number of addresses to skip
+   :param count: the number of results to skip
    :type count: int or long
    
-.. py:function:: address\.nextF(predicate)
+.. py:function:: address\.nextF(predicate, \*\*count)
    
    Return the next address from the current one that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
+   :param \*\*count: the number of results to skip
    
-.. py:function:: address\.nextF(ea, predicate)
+.. py:function:: address\.nextF(ea, predicate, \*\*count)
    
    Return the next address from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -680,28 +692,32 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
+   :param \*\*count: the number of results to skip
    
 .. py:function:: address\.nextF(ea, predicate, count)
    
-   Return the next ``count`` address from the address ``ea`` that satisfies the provided ``predicate``.
+   Return the next ``count`` addresses from the address ``ea`` that satisfies the provided ``predicate``.
    
    :param ea: an address within the database
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
-   :param count: the number of addresses to skip
+   :param count: the number of results to skip
    :type count: int or long
    
-.. py:function:: address\.nextbranch()
+.. py:function:: address\.nextbranch(\*\*count)
    
    Return the next branch instruction from the current one.
    
-.. py:function:: address\.nextbranch(predicate)
+   :param \*\*count: the number of branch instructions to skip
+   
+.. py:function:: address\.nextbranch(predicate, \*\*count)
    
    Return the next branch instruction that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions by branch
    :type predicate: callable
+   :param \*\*count: the number of branch instructions to skip
    
 .. py:function:: address\.nextbranch(ea)
    
@@ -710,7 +726,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.nextbranch(ea, predicate)
+.. py:function:: address\.nextbranch(ea, predicate, \*\*count)
    
    Return the next branch instruction from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -718,26 +734,30 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions by branch
    :type predicate: callable
+   :param \*\*count: the number of branch instructions to skip
    
 .. py:function:: address\.nextbranch(ea, count)
    
-   Return the next ``count`` branch instruction from the address ``ea``.
+   Return the next ``count`` branch instructions from the address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
    :param count: the number of branch instructions to skip
    :type count: int or long
    
-.. py:function:: address\.nextcall()
+.. py:function:: address\.nextcall(\*\*count)
    
    Return the next call instruction from the current address.
    
-.. py:function:: address\.nextcall(predicate)
+   :param \*\*count: the number of call instructions to skip
+   
+.. py:function:: address\.nextcall(predicate, \*\*count)
    
    Return the next call instruction from the current address that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions by call
    :type predicate: callable
+   :param \*\*count: the number of call instructions to skip
    
 .. py:function:: address\.nextcall(ea)
    
@@ -746,7 +766,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.nextcall(ea, predicate)
+.. py:function:: address\.nextcall(ea, predicate, \*\*count)
    
    Return the next call instruction from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -754,10 +774,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions by call
    :type predicate: callable
+   :param \*\*count: the number of call instructions to skip
    
 .. py:function:: address\.nextcall(ea, count)
    
-   Return the next ``count`` call instruction from the address ``ea``.
+   Return the next ``count`` call instructions from the address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -800,7 +821,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextcomment(ea, count, \*\*repeatable)
    
-   Return the the next ``count`` addresses from the address ``ea`` that has any type of comment.
+   Return the next ``count`` addresses from the address ``ea`` that has any type of comment.
    
    If the bool ``repeatable`` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
    
@@ -810,13 +831,15 @@ Some examples of using this namespace can be::
    :type count: int or long
    :param \*\*repeatable: used to specify whether to filter by repeatable or non-repeatable comment
    
-.. py:function:: address\.nextcref()
+.. py:function:: address\.nextcref(\*\*count)
    
    Return the next address from the current one that has code referencing it.
    
    Aliases: :py:func:`database.address.nextcode<address\.nextcref>`
    
-.. py:function:: address\.nextcref(predicate)
+   :param \*\*count: the number of code references to skip
+   
+.. py:function:: address\.nextcref(predicate, \*\*count)
    
    Return the next address from the current one that has code referencing it and satisfies the provided ``predicate``.
    
@@ -824,6 +847,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering code references
    :type predicate: callable
+   :param \*\*count: the number of code references to skip
    
 .. py:function:: address\.nextcref(ea)
    
@@ -834,7 +858,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.nextcref(ea, predicate)
+.. py:function:: address\.nextcref(ea, predicate, \*\*count)
    
    Return the next address from the address ``ea`` that has code referencing it and satisfies the provided ``predicate``.
    
@@ -844,10 +868,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering code references
    :type predicate: callable
+   :param \*\*count:
    
 .. py:function:: address\.nextcref(ea, count)
    
-   Return the next ``count`` address from the address ``ea`` that has code referencing it.
+   Return the next ``count`` addresses from the address ``ea`` that has code referencing it.
    
    Aliases: :py:func:`database.address.nextcode<address\.nextcref>`
    
@@ -856,13 +881,15 @@ Some examples of using this namespace can be::
    :param count: the number of code references to skip
    :type count: int or long
    
-.. py:function:: address\.nextdref()
+.. py:function:: address\.nextdref(\*\*count)
    
    Return the next address from the current one that has data referencing it.
    
    Aliases: :py:func:`database.address.nextdata<address\.nextdref>`
    
-.. py:function:: address\.nextdref(predicate)
+   :param \*\*count: the number of data references to skip
+   
+.. py:function:: address\.nextdref(predicate, \*\*count)
    
    Return the next address from the current one that has data referencing it and satisfies the provided ``predicate``.
    
@@ -870,6 +897,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering data references
    :type predicate: callable
+   :param \*\*count: the number of data references to skip
    
 .. py:function:: address\.nextdref(ea)
    
@@ -880,7 +908,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.nextdref(ea, predicate)
+.. py:function:: address\.nextdref(ea, predicate, \*\*count)
    
    Return the next address from the address ``ea`` that has data referencing it and satisfies the provided ``predicate``.
    
@@ -890,10 +918,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering data references
    :type predicate: callable
+   :param \*\*count: the number of data references to skip
    
 .. py:function:: address\.nextdref(ea, count)
    
-   Return the next ``count`` address from the address ``ea`` that has data referencing it.
+   Return the next ``count`` addresses from the address ``ea`` that has data referencing it.
    
    Aliases: :py:func:`database.address.nextdata<address\.nextdref>`
    
@@ -902,16 +931,59 @@ Some examples of using this namespace can be::
    :param count: the number of data references to skip
    :type count: int or long
    
-.. py:function:: address\.nextlabel()
+.. py:function:: address\.nextfunction(\*\*count)
+   
+   Return the next address from the current address that is within a function.
+   
+   Aliases: :py:func:`database.address.nextfunc<address\.nextfunction>`
+   
+   :param \*\*count: the number of function addresses to skip
+   
+.. py:function:: address\.nextfunction(ea)
+   
+   Return the next address from the address ``ea`` that is within a function.
+   
+   Aliases: :py:func:`database.address.nextfunc<address\.nextfunction>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   
+.. py:function:: address\.nextfunction(ea, predicate, \*\*count)
+   
+   Return the next address from the address ``ea`` that is within a function and satisfies the provided ``predicate``.
+   
+   Aliases: :py:func:`database.address.nextfunc<address\.nextfunction>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param predicate: a callable to use when filtering function addresses
+   :type predicate: callable
+   :param \*\*count: the number of function addresses to skip
+   
+.. py:function:: address\.nextfunction(ea, count)
+   
+   Return the next ``count`` addresses from the address ``ea`` that is within a function.
+   
+   Aliases: :py:func:`database.address.nextfunc<address\.nextfunction>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param count: the number of function addresses to skip
+   :type count: int or long
+   
+.. py:function:: address\.nextlabel(\*\*count)
    
    Return the address of the next label from the current address.
    
-.. py:function:: address\.nextlabel(predicate)
+   :param \*\*count: the number of labels to skip
+   
+.. py:function:: address\.nextlabel(predicate, \*\*count)
    
    Return the address of the next label from the current address that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions by label
    :type predicate: callable
+   :param \*\*count: the number of labels to skip
    
 .. py:function:: address\.nextlabel(ea)
    
@@ -920,7 +992,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.nextlabel(ea, predicate)
+.. py:function:: address\.nextlabel(ea, predicate, \*\*count)
    
    Return the address of the next label from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -928,10 +1000,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions by label
    :type predicate: callable
+   :param \*\*count: the number of labels to skip
    
 .. py:function:: address\.nextlabel(ea, count)
    
-   Return the address of the next ``count`` label from the address ``ea``.
+   Return the address of the next ``count`` labels from the address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -945,7 +1018,7 @@ Some examples of using this namespace can be::
    :param mnemonics: a string or iterable of strings containing a mnemonic to match an instruction against
    :type mnemonics: str or list or set or tuple
    
-.. py:function:: address\.nextmnemonic(mnemonics, predicate)
+.. py:function:: address\.nextmnemonic(mnemonics, predicate, \*\*count)
    
    Return the address of the next instruction from the current address that uses any of the specified ``mnemonics`` and satisfies the provided ``predicate``.
    
@@ -953,6 +1026,7 @@ Some examples of using this namespace can be::
    :type mnemonics: str or list or set or tuple
    :param predicate: a callable to use when filtering instructions by mnemonic
    :type predicate: callable
+   :param \*\*count: the number of instructions to skip
    
 .. py:function:: address\.nextmnemonic(mnemonics, count)
    
@@ -972,7 +1046,7 @@ Some examples of using this namespace can be::
    :param mnemonics: a string or iterable of strings containing a mnemonic to match an instruction against
    :type mnemonics: str or list or set or tuple
    
-.. py:function:: address\.nextmnemonic(ea, mnemonics, predicate)
+.. py:function:: address\.nextmnemonic(ea, mnemonics, predicate, \*\*count)
    
    Return the address of the next instruction from the address ``ea`` that uses any of the specified ``mnemonics`` and satisfies the provided ``predicate``.
    
@@ -982,6 +1056,7 @@ Some examples of using this namespace can be::
    :type mnemonics: str or list or set or tuple
    :param predicate: a callable to use when filtering instructions by mnemonic
    :type predicate: callable
+   :param \*\*count: the number of instructions to skip
    
 .. py:function:: address\.nextmnemonic(ea, mnemonics, count)
    
@@ -994,13 +1069,15 @@ Some examples of using this namespace can be::
    :param count: the number of instructions to skip
    :type count: int or long
    
-.. py:function:: address\.nextref()
+.. py:function:: address\.nextref(\*\*count)
    
    Return the next address from the current one that has anything referencing it.
    
    Aliases: :py:func:`database.nextref<address\.nextref>`
    
-.. py:function:: address\.nextref(predicate)
+   :param \*\*count: the number of references to skip
+   
+.. py:function:: address\.nextref(predicate, \*\*count)
    
    Return the next address from the current one that has anything referencing it and satisfies the provided ``predicate``.
    
@@ -1008,6 +1085,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering instruction references
    :type predicate: callable
+   :param \*\*count: the number of references to skip
    
 .. py:function:: address\.nextref(ea)
    
@@ -1018,7 +1096,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.nextref(ea, predicate)
+.. py:function:: address\.nextref(ea, predicate, \*\*count)
    
    Return the next address from the address ``ea`` that has anything referencing it and satisfies the provided ``predicate``.
    
@@ -1028,10 +1106,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instruction references
    :type predicate: callable
+   :param \*\*count: the number of references to skip
    
 .. py:function:: address\.nextref(ea, count)
    
-   Return the next ``count`` address from the address ``ea`` that has anything referencing it.
+   Return the next ``count`` addresses from the address ``ea`` that has anything referencing it.
    
    Aliases: :py:func:`database.nextref<address\.nextref>`
    
@@ -1114,17 +1193,13 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nexttag(\*\*tagname)
    
-   Return the next address that contains a tag.
-   
-   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
+   Return the next address that contains a tag using the specified ``tagname``.
    
    :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.nexttag(predicate, \*\*tagname)
    
-   Return the next address that contains a tag and matches ``predicate``.
-   
-   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
+   Return the next address that contains a tag using the specified ``tagname`` and satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering addresses by tag
    :type predicate: callable
@@ -1132,9 +1207,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nexttag(ea, \*\*tagname)
    
-   Return the next address from ``ea`` that contains a tag.
-   
-   If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
+   Return the next address from ``ea`` that contains a tag using the specified ``tagname``.
    
    Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
    
@@ -1144,9 +1217,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nexttag(ea, predicate, \*\*tagname)
    
-   Return the next address from ``ea`` that contains a tag and matches ``predicate``.
-   
-   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
+   Return the next address from ``ea`` that contains a tag using the specified ``tagname`` and satisfies the provided ``predicate``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1156,7 +1227,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nexttag(ea, count, \*\*tagname)
    
-   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
+   Return the next ``count`` addresses from ``ea`` that contains a tag using the specified ``tagname``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1164,23 +1235,19 @@ Some examples of using this namespace can be::
    :type count: int or long
    :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
-.. py:function:: address\.nextunknown()
+.. py:function:: address\.nextunknown(\*\*count)
    
    Return the next address from the current one that is undefined.
    
-.. py:function:: address\.nextunknown(count)
+   :param \*\*count: the number of unknown addresses to skip
    
-   Return the next ``count`` address from the current one that is undefined.
-   
-   :param count: the number of unknown addresses to skip
-   :type count: int or long
-   
-.. py:function:: address\.nextunknown(predicate)
+.. py:function:: address\.nextunknown(predicate, \*\*count)
    
    Return the next address from the current one that is undefined and satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering unknown addresses
    :type predicate: callable
+   :param \*\*count: the number of unknown addresses to skip
    
 .. py:function:: address\.nextunknown(ea)
    
@@ -1189,7 +1256,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.nextunknown(ea, predicate)
+.. py:function:: address\.nextunknown(ea, predicate, \*\*count)
    
    Return the next address from the address ``ea`` that is undefined and satisfies the provided ``predicate``.
    
@@ -1197,10 +1264,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering unknown addresses
    :type predicate: callable
+   :param \*\*count: the number of unknown addresses to skip
    
 .. py:function:: address\.nextunknown(ea, count)
    
-   Return the next ``count`` address from the address ``ea`` that is undefined.
+   Return the next ``count`` addresses from the address ``ea`` that is undefined.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1219,16 +1287,18 @@ Some examples of using this namespace can be::
    
    Aliases: :py:func:`database.get_offset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`
    
-   :param ea: an address within the database to transform to an offset from the beginning of the database.
+   :param ea: an address within the database to translate to an offset from the beginning of the database.
    :type ea: int or long
    
-.. py:function:: address\.prev()
+.. py:function:: address\.prev(\*\*count)
    
    Return the previous address from the current address.
    
    Aliases: :py:func:`database.prev<address\.prev>`
    
-.. py:function:: address\.prev(predicate)
+   :param \*\*count: the number of results to skip
+   
+.. py:function:: address\.prev(predicate, \*\*count)
    
    Return the previous address from the current address that satisfies the provided ``predicate``.
    
@@ -1236,6 +1306,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
+   :param \*\*count: the number of results to skip
    
 .. py:function:: address\.prev(ea)
    
@@ -1259,18 +1330,18 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prev(ea, count)
    
-   Return the previous ``count`` address from the address specified by ``ea``.
+   Return the previous ``count`` addresses from the address specified by ``ea``.
    
    Aliases: :py:func:`database.prev<address\.prev>`
    
    :param ea: an unaligned address within the database
    :type ea: int or long
-   :param count: the number of addresses to skip
+   :param count: the number of results to skip
    :type count: int or long
    
 .. py:function:: address\.prev(ea, predicate, count)
    
-   Return the previous ``count`` address from the address ``ea`` that satisfies the provided ``predicate``.
+   Return the previous ``count`` addresses from the address ``ea`` that satisfies the provided ``predicate``.
    
    Aliases: :py:func:`database.prev<address\.prev>`
    
@@ -1278,17 +1349,18 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
-   :param count: the number of addresses to skip
+   :param count: the number of results to skip
    :type count: int or long
    
-.. py:function:: address\.prevF(predicate)
+.. py:function:: address\.prevF(predicate, \*\*count)
    
    Return the previous address from the current one that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
+   :param \*\*count: the number of results to skip
    
-.. py:function:: address\.prevF(ea, predicate)
+.. py:function:: address\.prevF(ea, predicate, \*\*count)
    
    Return the previous address from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -1296,28 +1368,32 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
+   :param \*\*count: the number of results to skip
    
 .. py:function:: address\.prevF(ea, predicate, count)
    
-   Return the previous ``count`` address from the address ``ea`` that satisfies the provided ``predicate``.
+   Return the previous ``count`` addresses from the address ``ea`` that satisfies the provided ``predicate``.
    
    :param ea: an address within the database
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions
    :type predicate: callable
-   :param count: the number of addresses to skip
+   :param count: the number of results to skip
    :type count: int or long
    
-.. py:function:: address\.prevbranch()
+.. py:function:: address\.prevbranch(\*\*count)
    
    Return the previous branch instruction from the current one.
    
-.. py:function:: address\.prevbranch(predicate)
+   :param \*\*count: the number of branch instructions to skip
+   
+.. py:function:: address\.prevbranch(predicate, \*\*count)
    
    Return the previous branch instruction from the current one that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions by branch
    :type predicate: callable
+   :param \*\*count: the number of branch instructions to skip
    
 .. py:function:: address\.prevbranch(ea)
    
@@ -1326,7 +1402,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.prevbranch(ea, predicate)
+.. py:function:: address\.prevbranch(ea, predicate, \*\*count)
    
    Return the previous branch instruction from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -1334,26 +1410,30 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions by branch
    :type predicate: callable
+   :param \*\*count: the number of branch instructions to skip
    
 .. py:function:: address\.prevbranch(ea, count)
    
-   Return the previous ``count`` branch instruction from the address ``ea``.
+   Return the previous ``count`` branch instructions from the address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
    :param count: the number of branch instructions to skip
    :type count: int or long
    
-.. py:function:: address\.prevcall()
+.. py:function:: address\.prevcall(\*\*count)
    
    Return the previous call instruction from the current address.
    
-.. py:function:: address\.prevcall(predicate)
+   :param \*\*count: the number of call instructions to skip
+   
+.. py:function:: address\.prevcall(predicate, \*\*count)
    
    Return the previous call instruction from the current address that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions by call
    :type predicate: callable
+   :param \*\*count: the number of call instructions to skip
    
 .. py:function:: address\.prevcall(ea)
    
@@ -1362,7 +1442,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.prevcall(ea, predicate)
+.. py:function:: address\.prevcall(ea, predicate, \*\*count)
    
    Return the previous call instruction from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -1370,10 +1450,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions by call
    :type predicate: callable
+   :param \*\*count: the number of call instructions to skip
    
 .. py:function:: address\.prevcall(ea, count)
    
-   Return the previous ``count`` call instruction from the address ``ea``.
+   Return the previous ``count`` call instructions from the address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1383,8 +1464,6 @@ Some examples of using this namespace can be::
 .. py:function:: address\.prevcomment(\*\*repeatable)
    
    Return the previous address from the current one that has any type of comment.
-   
-   Aliases: :py:func:`database.address.prevcomment<address\.prevcomment>`
    
    :param \*\*repeatable: used to specify whether to filter by repeatable or non-repeatable comment
    
@@ -1428,13 +1507,15 @@ Some examples of using this namespace can be::
    :type count: int or long
    :param \*\*repeatable: used to specify whether to filter by repeatable or non-repeatable comment
    
-.. py:function:: address\.prevcref()
+.. py:function:: address\.prevcref(\*\*count)
    
    Return the previous address from the current one that has code referencing it.
    
    Aliases: :py:func:`database.address.prevcode<address\.prevcref>`
    
-.. py:function:: address\.prevcref(predicate)
+   :param \*\*count: the number of code references to skip
+   
+.. py:function:: address\.prevcref(predicate, \*\*count)
    
    Return the previous address from the current one that has code referencing it and satisfies the provided ``predicate``.
    
@@ -1442,6 +1523,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering data references
    :type predicate: callable
+   :param \*\*count: the number of code references to skip
    
 .. py:function:: address\.prevcref(ea)
    
@@ -1452,7 +1534,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.prevcref(ea, predicate)
+.. py:function:: address\.prevcref(ea, predicate, \*\*count)
    
    Return the previous address from the address ``ea`` that has code referencing it and satisfies the provided ``predicate``.
    
@@ -1462,10 +1544,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering code references
    :type predicate: callable
+   :param \*\*count: the number of code references to skip
    
 .. py:function:: address\.prevcref(ea, count)
    
-   Return the previous ``count`` address from the address ``ea`` that has code referencing it.
+   Return the previous ``count`` addresses from the address ``ea`` that has code referencing it.
    
    Aliases: :py:func:`database.address.prevcode<address\.prevcref>`
    
@@ -1474,13 +1557,15 @@ Some examples of using this namespace can be::
    :param count: the number of code references to skip
    :type count: int or long
    
-.. py:function:: address\.prevdref()
+.. py:function:: address\.prevdref(\*\*count)
    
    Return the previous address from the current one that has data referencing it.
    
    Aliases: :py:func:`database.address.prevdata<address\.prevdref>`
    
-.. py:function:: address\.prevdref(predicate)
+   :param \*\*count: the number of data references to skip
+   
+.. py:function:: address\.prevdref(predicate, \*\*count)
    
    Return the previous address from the current one that has data referencing it and satisfies the provided ``predicate``.
    
@@ -1488,6 +1573,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering data references
    :type predicate: callable
+   :param \*\*count: the number of data references to skip
    
 .. py:function:: address\.prevdref(ea)
    
@@ -1498,7 +1584,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.prevdref(ea, predicate)
+.. py:function:: address\.prevdref(ea, predicate, \*\*count)
    
    Return the previous address from the address ``ea`` that has data referencing it and satisfies the provided ``predicate``.
    
@@ -1508,10 +1594,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering data references
    :type predicate: callable
+   :param \*\*count: the number of data references to skip
    
 .. py:function:: address\.prevdref(ea, count)
    
-   Return the previous ``count`` address from the address ``ea`` that has data referencing it.
+   Return the previous ``count`` addresses from the address ``ea`` that has data referencing it.
    
    Aliases: :py:func:`database.address.prevdata<address\.prevdref>`
    
@@ -1520,16 +1607,59 @@ Some examples of using this namespace can be::
    :param count: the number of data references to skip
    :type count: int or long
    
-.. py:function:: address\.prevlabel()
+.. py:function:: address\.prevfunction(\*\*count)
+   
+   Return the previous address from the current address that is within a function.
+   
+   Aliases: :py:func:`database.address.prevfunc<address\.prevfunction>`
+   
+   :param \*\*count: the number of function addresses to skip
+   
+.. py:function:: address\.prevfunction(ea)
+   
+   Return the previous address from the address ``ea`` that is within a function.
+   
+   Aliases: :py:func:`database.address.prevfunc<address\.prevfunction>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   
+.. py:function:: address\.prevfunction(ea, predicate, \*\*count)
+   
+   Return the previous address from the address ``ea`` that is within a function and satisfies the provided ``predicate``.
+   
+   Aliases: :py:func:`database.address.prevfunc<address\.prevfunction>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param predicate: a callable to use when filtering function addresses
+   :type predicate: callable
+   :param \*\*count: the number of function addresses to skip
+   
+.. py:function:: address\.prevfunction(ea, count)
+   
+   Return the previous ``count`` addresses from the address ``ea`` that is within a function.
+   
+   Aliases: :py:func:`database.address.prevfunc<address\.prevfunction>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param count: the number of function addresses to skip
+   :type count: int or long
+   
+.. py:function:: address\.prevlabel(\*\*count)
    
    Return the address of the previous label from the current address.
    
-.. py:function:: address\.prevlabel(predicate)
+   :param \*\*count: the number of labels to skip
+   
+.. py:function:: address\.prevlabel(predicate, \*\*count)
    
    Return the address of the previous label from the current address that satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering instructions by label
    :type predicate: callable
+   :param \*\*count: the number of labels to skip
    
 .. py:function:: address\.prevlabel(ea)
    
@@ -1538,7 +1668,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.prevlabel(ea, predicate)
+.. py:function:: address\.prevlabel(ea, predicate, \*\*count)
    
    Return the address of the previous label from the address ``ea`` that satisfies the provided ``predicate``.
    
@@ -1546,10 +1676,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instructions by label
    :type predicate: callable
+   :param \*\*count: the number of labels to skip
    
 .. py:function:: address\.prevlabel(ea, count)
    
-   Return the address of the previous ``count`` label from the address ``ea``.
+   Return the address of the previous ``count`` labels from the address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1563,7 +1694,7 @@ Some examples of using this namespace can be::
    :param mnemonics: a string or iterable of strings containing a mnemonic to match an instruction against
    :type mnemonics: str or list or set or tuple
    
-.. py:function:: address\.prevmnemonic(mnemonics, predicate)
+.. py:function:: address\.prevmnemonic(mnemonics, predicate, \*\*count)
    
    Return the address of the previous instruction from the current address that uses any of the specified ``mnemonics`` and satisfies the provided ``predicate``.
    
@@ -1571,6 +1702,7 @@ Some examples of using this namespace can be::
    :type mnemonics: str or list or set or tuple
    :param predicate: a callable to use when filtering instructions by mnemonic
    :type predicate: callable
+   :param \*\*count: the number of instructions to skip
    
 .. py:function:: address\.prevmnemonic(mnemonics, count)
    
@@ -1590,7 +1722,7 @@ Some examples of using this namespace can be::
    :param mnemonics: a string or iterable of strings containing a mnemonic to match an instruction against
    :type mnemonics: str or list or set or tuple
    
-.. py:function:: address\.prevmnemonic(ea, mnemonics, predicate)
+.. py:function:: address\.prevmnemonic(ea, mnemonics, predicate, \*\*count)
    
    Return the address of the previous instruction from the address ``ea`` that uses any of the specified ``mnemonics`` and satisfies the provided ``predicate``.
    
@@ -1600,6 +1732,7 @@ Some examples of using this namespace can be::
    :type mnemonics: str or list or set or tuple
    :param predicate: a callable to use when filtering instructions by mnemonic
    :type predicate: callable
+   :param \*\*count: the number of instructions to skip
    
 .. py:function:: address\.prevmnemonic(ea, mnemonics, count)
    
@@ -1612,13 +1745,15 @@ Some examples of using this namespace can be::
    :param count: the number of instructions to skip
    :type count: int or long
    
-.. py:function:: address\.prevref()
+.. py:function:: address\.prevref(\*\*count)
    
    Return the previous address from the current one that has anything referencing it.
    
    Aliases: :py:func:`database.prevref<address\.prevref>`
    
-.. py:function:: address\.prevref(predicate)
+   :param \*\*count: the number of references to skip
+   
+.. py:function:: address\.prevref(predicate, \*\*count)
    
    Return the previous address from the current one that has anything referencing it and satisfies the provided ``predicate``.
    
@@ -1626,6 +1761,7 @@ Some examples of using this namespace can be::
    
    :param predicate: a callable to use when filtering instruction references
    :type predicate: callable
+   :param \*\*count: the number of references to skip
    
 .. py:function:: address\.prevref(ea)
    
@@ -1636,7 +1772,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.prevref(ea, predicate)
+.. py:function:: address\.prevref(ea, predicate, \*\*count)
    
    Return the previous address from the address ``ea`` that has anything referencing it and satisfies the provided ``predicate``.
    
@@ -1646,10 +1782,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering instruction references
    :type predicate: callable
+   :param \*\*count: the number of references to skip
    
 .. py:function:: address\.prevref(ea, count)
    
-   Return the previous ``count`` address from the address ``ea`` that has anything referencing it.
+   Return the previous ``count`` addresses from the address ``ea`` that has anything referencing it.
    
    Aliases: :py:func:`database.prevref<address\.prevref>`
    
@@ -1732,15 +1869,13 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevtag(\*\*tagname)
    
-   Return the previous address that contains a tag.
+   Return the previous address that contains a tag using the specified ``tagname``.
    
    :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.prevtag(predicate, \*\*tagname)
    
-   Return the previous address that contains a tag and matches ``predicate``.
-   
-   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
+   Return the previous address that contains a tag using the specified ``tagname`` and satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering addresses by tag
    :type predicate: callable
@@ -1748,11 +1883,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevtag(ea, \*\*tagname)
    
-   Return the previous address from ``ea`` that contains a tag.
-   
-   If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
-   
-   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
+   Return the previous address from ``ea`` that contains a tag using the specified ``tagname``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1760,9 +1891,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevtag(ea, predicate, \*\*tagname)
    
-   Return the previous address from ``ea`` that contains a tag and matches ``predicate``.
-   
-   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
+   Return the previous address from ``ea`` that contains a tag using the specified ``tagname`` and satisfies the provided ``predicate``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1772,7 +1901,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevtag(ea, count, \*\*tagname)
    
-   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
+   Return the previous ``count`` addresses from ``ea`` that contains a tag using the specified ``tagname``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -1780,23 +1909,19 @@ Some examples of using this namespace can be::
    :type count: int or long
    :param \*\*tagname: if ``tagname`` is assigned a string, then only match against the specified tag otherwise look for any kind of comment
    
-.. py:function:: address\.prevunknown()
+.. py:function:: address\.prevunknown(\*\*count)
    
    Return the previous address from the current one that is undefined.
    
-.. py:function:: address\.prevunknown(count)
+   :param \*\*count: the number of unknown addresses to skip
    
-   Return the previous ``count`` address from the current one that is undefined.
-   
-   :param count: the number of unknown addresses to skip
-   :type count: int or long
-   
-.. py:function:: address\.prevunknown(predicate)
+.. py:function:: address\.prevunknown(predicate, \*\*count)
    
    Return the previous address from the current one that is undefined and satisfies the provided ``predicate``.
    
    :param predicate: a callable to use when filtering unknown addresses
    :type predicate: callable
+   :param \*\*count: the number of unknown addresses to skip
    
 .. py:function:: address\.prevunknown(ea)
    
@@ -1805,7 +1930,7 @@ Some examples of using this namespace can be::
    :param ea: an address within the database
    :type ea: int or long
    
-.. py:function:: address\.prevunknown(ea, predicate)
+.. py:function:: address\.prevunknown(ea, predicate, \*\*count)
    
    Return the previous address from the address ``ea`` that is undefined and satisfies the provided ``predicate``.
    
@@ -1813,10 +1938,11 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param predicate: a callable to use when filtering unknown addresses
    :type predicate: callable
+   :param \*\*count: the number of unknown addresses to skip
    
 .. py:function:: address\.prevunknown(ea, count)
    
-   Return the previous ``count`` address from the address ``ea`` that is undefined.
+   Return the previous ``count`` addresses from the address ``ea`` that is undefined.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -2311,7 +2437,7 @@ To add extra comments, one can do this like::
    Delete the prefixed comment at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: extra\.prefix(ea)
    
@@ -2336,7 +2462,7 @@ To add extra comments, one can do this like::
    :param ea: the address containing the prefix comment to remove
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: extra\.preinsert(ea, count)
    
@@ -2374,7 +2500,7 @@ To add extra comments, one can do this like::
    Delete the suffixed comment at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: extra\.suffix(ea)
    
@@ -2399,7 +2525,7 @@ To add extra comments, one can do this like::
    :param ea: the address containing the suffix comment to remove
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. _ns-database-functions:
 
@@ -3293,20 +3419,20 @@ from the starting position or forwards.
 
 The :py:obj:`search.iterate` function allows one to iterate through all the results
 discovered in the database. One variation of :py:obj:`search.iterate` takes a 3rd
-parameter ``predicate``. One can provide one of the search methods provided
-or include their own. This function will then yield each matched search
-result.
+parameter ``predicate``. This allows usage of one of the search methods provided
+or to allow a user to include their own. This function will then yield each
+matched search result.
 
-.. py:function:: search(data, \*\*direction)
+.. py:function:: search(pattern, \*\*direction)
    
-   Search through the database at the current address for the bytes specified by ``data``.
+   Search through the database at the current address for the specified ``pattern``.
    
-   :param data: the bytes to search for
+   :param pattern: the bytes or pattern to search for
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
-.. py:function:: search(ea, data, \*\*direction)
+.. py:function:: search(ea, pattern, \*\*direction)
    
-   Search through the database at address ``ea`` for the bytes specified by ``data``.
+   Search through the database at address ``ea`` for the specified ``pattern``.'''
    
    If ``reverse`` is specified as a bool, then search backwards from the given address.
    If ``radix`` is specified, then use it as the numerical radix for describing the bytes.
@@ -3314,7 +3440,7 @@ result.
    
    :param ea: the starting address to search from
    :type ea: int or long
-   :param data: the bytes to search for
+   :param pattern: the bytes or pattern to search for
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
 .. py:function:: search\.by_bytes(data, \*\*direction)
@@ -3323,7 +3449,7 @@ result.
    
    Aliases: :py:func:`database.search.bybytes<search\.by_bytes>`
    
-   :param data: the bytes to search for
+   :param data: the bytes or pattern to search for
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
 .. py:function:: search\.by_bytes(ea, data, \*\*direction)
@@ -3338,20 +3464,18 @@ result.
    
    :param ea: the starting address to search from
    :type ea: int or long
-   :param data: the bytes to search for
+   :param data: the bytes or pattern to search for
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
-.. py:function:: search\.by_name(name, \*\*options)
+.. py:function:: search\.by_name(\*\*options)
    
    Search through the database at the current address for the symbol ``name``.
    
    Aliases: :py:func:`database.by_name<search\.by_name>`, :py:func:`database.search.byname<search\.by_name>`, :py:func:`database.byname<search\.by_name>`
    
-   :param name: the identifier to search for
-   :type name: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
-.. py:function:: search\.by_name(ea, name, \*\*options)
+.. py:function:: search\.by_name(name, \*\*options)
    
    Search through the database at address ``ea`` for the symbol ``name``.
    
@@ -3360,20 +3484,16 @@ result.
    
    Aliases: :py:func:`database.by_name<search\.by_name>`, :py:func:`database.search.byname<search\.by_name>`, :py:func:`database.byname<search\.by_name>`
    
-   :param ea: the starting address to search from
-   :type ea: int or long
    :param name: the identifier to search for
    :type name: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
-.. py:function:: search\.by_regex(string, \*\*options)
+.. py:function:: search\.by_regex(\*\*options)
    
    Search through the database at the current address for the regex matched by ``string``.
    
    Aliases: :py:func:`database.search.byregex<search\.by_regex>`
    
-   :param string: the regex to search for
-   :type string: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
 .. py:function:: search\.by_regex(ea, string, \*\*options)
@@ -3391,14 +3511,12 @@ result.
    :type string: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
-.. py:function:: search\.by_text(string, \*\*options)
+.. py:function:: search\.by_text(\*\*options)
    
    Search through the database at the current address for the text matched by ``string``.
    
    Aliases: :py:func:`database.search.bystring<search\.by_text>`, :py:func:`database.search.by_string<search\.by_text>`, :py:func:`database.search.bytext<search\.by_text>`
    
-   :param string: the text string to search for
-   :type string: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
 .. py:function:: search\.by_text(ea, string, \*\*options)
@@ -3416,40 +3534,42 @@ result.
    :type string: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
-.. py:function:: search\.iterate(data, \*\*options)
+.. py:function:: search\.iterate(pattern, \*\*options)
    
-   Iterate through all search results that match the bytes ``data`` starting at the current address.
+   Iterate through all search results that match the ``pattern`` starting at the current address.
    
-   :param data: the bytes to search for
+   :param pattern: the bytes or pattern to search for
+   :type pattern: str or bytes or bytearray
    :param \*\*options: any options to pass to the ``predicate``
    
-.. py:function:: search\.iterate(data, predicate, \*\*options)
+.. py:function:: search\.iterate(ea, pattern, \*\*options)
    
-   Iterate through all search results matched by the function ``predicate`` with the specified ``data`` starting at the current address.
-   
-   :param data: the bytes to pass to the ``predicate``
-   :param predicate: the callable to search with
-   :type predicate: callable
-   :param \*\*options: any options to pass to the ``predicate``
-   
-.. py:function:: search\.iterate(ea, data, \*\*options)
-   
-   Iterate through all search results that match the bytes ``data`` starting at address ``ea``.
+   Iterate through all search results that match the specified ``pattern`` starting at address ``ea``.
    
    :param ea: the starting address to search from
    :type ea: int or long
-   :param data: the bytes to search for
+   :param pattern:
+   :type pattern: str or bytes or bytearray
    :param \*\*options: any options to search with
    
-.. py:function:: search\.iterate(ea, data, predicate, \*\*options)
+.. py:function:: search\.iterate(pattern, predicate, \*\*options)
    
-   Iterate through all search results matched by the function ``predicate`` with the specified ``data`` starting at address ``ea``.
+   Iterate through all search results matched by the function ``predicate`` with the specified ``pattern`` starting at the current address.
+   
+   :param pattern: the bytes or pattern to pass to the ``predicate``
+   :type pattern: str or bytes or bytearray
+   :param predicate: the callable to search with
+   :param \*\*options: any options to pass to the ``predicate``
+   
+.. py:function:: search\.iterate(ea, pattern, predicate, \*\*options)
+   
+   Iterate through all search results matched by the function ``predicate`` with the specified ``pattern`` starting at address ``ea``.
    
    :param ea: the starting address to search from
    :type ea: int or long
-   :param data: the bytes to pass to the predicate
+   :param pattern: the bytes or pattern to pass to the predicate
+   :type pattern: str or bytes or bytearray
    :param predicate: the callable to search with
-   :type predicate: callable
    :param \*\*options: any options to pass to the ``predicate``
    
 .. _ns-database-segments:
@@ -3541,6 +3661,26 @@ This can be used as in the following examples::
     > database.set.string(ea)
     > database.set.structure(ea, structure.by('mystructure'))
 
+.. py:function:: set(info)
+   
+   Set the type information at the current address to ``info``.
+   
+   Aliases: :py:func:`database.set.typeinfo<set>`, :py:func:`database.set.info<set>`
+   
+   :param info: the type information to apply to the address
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: set(ea, info)
+   
+   Set the type information at the address ``ea`` to ``info``.
+   
+   Aliases: :py:func:`database.set.typeinfo<set>`, :py:func:`database.set.info<set>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param info: the type information to apply to the address
+   :type info: str or idaapi.tinfo_t
+   
 .. py:function:: set\.alignment(\*\*alignment)
    
    Set the data at the current address as aligned with the specified ``alignment``.
@@ -3625,26 +3765,6 @@ This can be used as in the following examples::
    :type size: int or long
    :param \*\*type: if ``type`` is specified then as an IDA type (:py:obj:`idaapi.FF_\*`) or a :py:obj:`structure_t` then apply it to the given address
    
-.. py:function:: set\.info(info)
-   
-   Set the type information at the current address to ``info``.
-   
-   Aliases: :py:func:`database.set.typeinfo<set\.info>`
-   
-   :param info: the type information to apply to the address
-   :type info: str or idaapi.tinfo_t
-   
-.. py:function:: set\.info(ea, info)
-   
-   Set the type information at the address ``ea`` to ``info``.
-   
-   Aliases: :py:func:`database.set.typeinfo<set\.info>`
-   
-   :param ea: an address within the database
-   :type ea: int or long
-   :param info: the type information to apply to the address
-   :type info: str or idaapi.tinfo_t
-   
 .. py:function:: set\.string(\*\*strtype)
    
    Set the data at the current address to a string with the specified ``strtype``.
@@ -3681,6 +3801,24 @@ This can be used as in the following examples::
    :param type: the :py:obj:`structure_t` to apply to the current address
    :type type: structure_t
    
+.. py:function:: set\.structure(name)
+   
+   Set the data at the current address to the structure_t with the given ``name``.
+   
+   Aliases: :py:func:`database.set.struc<set\.structure>`, :py:func:`database.set.struct<set\.structure>`
+   
+   :param name: the name of the structure to apply to the current address
+   :type name: str
+   
+.. py:function:: set\.structure(sptr)
+   
+   Set the data at the current address to the structure_t for the specified ``sptr``.
+   
+   Aliases: :py:func:`database.set.struc<set\.structure>`, :py:func:`database.set.struct<set\.structure>`
+   
+   :param sptr: the ``idaapi.struc_t`` to apply to the current address
+   :type sptr: idaapi.struc_t
+   
 .. py:function:: set\.structure(ea, type)
    
    Set the data at address ``ea`` to the structure_t specified by ``type``.
@@ -3691,6 +3829,39 @@ This can be used as in the following examples::
    :type ea: int or long
    :param type: the :py:obj:`structure_t` to apply to the specified address
    :type type: structure_t
+   
+.. py:function:: set\.structure(ea, name)
+   
+   Set the data at address ``ea`` to the structure_t with the given ``name``.
+   
+   Aliases: :py:func:`database.set.struc<set\.structure>`, :py:func:`database.set.struct<set\.structure>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param name: the name of the structure to apply to the specified address
+   :type name: str
+   
+.. py:function:: set\.structure(ea, sptr)
+   
+   Set the data at address ``ea`` to the structure_t for the specified ``sptr``.
+   
+   Aliases: :py:func:`database.set.struc<set\.structure>`, :py:func:`database.set.struct<set\.structure>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param sptr: the ``idaapi.struc_t`` to apply to the specified address
+   :type sptr: idaapi.struc_t
+   
+.. py:function:: set\.structure(ea, identifier)
+   
+   Set the data at address ``ea`` to the structure_t that has the specified ``identifier``.
+   
+   Aliases: :py:func:`database.set.struc<set\.structure>`, :py:func:`database.set.struct<set\.structure>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param identifier: the identifier of the structure to apply to the specified address
+   :type identifier: int or long
    
 .. py:function:: set\.unknown()
    
@@ -3974,7 +4145,7 @@ Some examples of using this namespace can be::
    Remove the type information from the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type(info)
    
@@ -3998,7 +4169,7 @@ Some examples of using this namespace can be::
    
    :param ea: an address within the database
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type(ea, info)
    

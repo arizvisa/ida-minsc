@@ -80,13 +80,13 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="tagfix.all">
 <code class="descclassname">tagfix.</code><code class="descname">all</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.all" title="Permalink to this definition">¶</a></dt>
-<dd><p>Re-build the cache for all the globals and contents in the database.</p>
+<dd><p>Build the index of references for all the globals and generate the caches for every function in the database.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.contents">
 <code class="descclassname">tagfix.</code><code class="descname">contents</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.contents" title="Permalink to this definition">¶</a></dt>
-<dd><p>Re-build the cache for the contents of the function <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Generate the cache for the contents of the function <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -100,47 +100,47 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="tagfix.customnames">
 <code class="descclassname">tagfix.</code><code class="descname">customnames</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.customnames" title="Permalink to this definition">¶</a></dt>
-<dd><p>Iterate through all of the custom names defined in the database and update the cache with their reference counts.</p>
+<dd><p>Iterate through all of the “custom” names within the database and update their references in either the index or their associated function cache.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.erase">
 <code class="descclassname">tagfix.</code><code class="descname">erase</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.erase" title="Permalink to this definition">¶</a></dt>
-<dd><p>Erase the current cache from the database.</p>
+<dd><p>Erase the index of all the globals and the cache associated with each function from the database.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.erase_contents">
 <code class="descclassname">tagfix.</code><code class="descname">erase_contents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.erase_contents" title="Permalink to this definition">¶</a></dt>
-<dd><p>Erase the contents cache defined for each function in the database.</p>
+<dd><p>Remove the cache associated with each function from the database.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.erase_globals">
 <code class="descclassname">tagfix.</code><code class="descname">erase_globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.erase_globals" title="Permalink to this definition">¶</a></dt>
-<dd><p>Erase the cache defined for all of the global tags in the database.</p>
+<dd><p>Remove the contents of the index from the database which is used for storing information about the global tags.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.everything">
 <code class="descclassname">tagfix.</code><code class="descname">everything</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.everything" title="Permalink to this definition">¶</a></dt>
-<dd><p>Re-create the cache for all the tags found in the database.</p>
+<dd><p>Rebuild the index for all of the globals and the cache for each function from the database.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.extracomments">
 <code class="descclassname">tagfix.</code><code class="descname">extracomments</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.extracomments" title="Permalink to this definition">¶</a></dt>
-<dd><p>Iterate through all of the extra comments defined in the database and update the cache with their reference counts.</p>
+<dd><p>Iterate through all of the “extra” comments within the database and update their references in either the index or their associated function cache.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.fetch_contents">
 <code class="descclassname">tagfix.</code><code class="descname">fetch_contents</code><span class="sig-paren">(</span><em>fn</em><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_contents" title="Permalink to this definition">¶</a></dt>
-<dd><p>Fetch the reference count for the contents of function <code class="docutils literal notranslate"><span class="pre">fn</span></code> in the database.</p>
-<p>Returns the tuple <code class="docutils literal notranslate"><span class="pre">(func,</span> <span class="pre">address,</span> <span class="pre">tags)</span></code> where the <code class="docutils literal notranslate"><span class="pre">address</span></code> and
-<code class="docutils literal notranslate"><span class="pre">tags</span></code> fields are both dictionaries containing the reference count for
-the addresses and tag names. The field <code class="docutils literal notranslate"><span class="pre">func</span></code> contains the address of the
-function.</p>
+<dd><p>Fetch the number of references for the contents of function <code class="docutils literal notranslate"><span class="pre">fn</span></code> from the database.</p>
+<p>Returns the tuple <code class="docutils literal notranslate"><span class="pre">(function,</span> <span class="pre">address,</span> <span class="pre">tags)</span></code> where the <code class="docutils literal notranslate"><span class="pre">address</span></code> and
+<code class="docutils literal notranslate"><span class="pre">tags</span></code> items are both dictionaries containing the number of references
+for the addresses and tag names. The <code class="docutils literal notranslate"><span class="pre">function</span></code> item contains the address
+of the function whose references were counted.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -154,34 +154,72 @@ function.</p>
 <dl class="function">
 <dt id="tagfix.fetch_globals">
 <code class="descclassname">tagfix.</code><code class="descname">fetch_globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_globals" title="Permalink to this definition">¶</a></dt>
-<dd><p>Fetch the reference count of all of the global tags for both functions and non-functions.</p>
+<dd><p>Fetch the number of references for all of the global tags associated with both functions and non-functions from the database.</p>
 <p>Returns the tuple <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="docutils literal notranslate"><span class="pre">address</span></code> and <code class="docutils literal notranslate"><span class="pre">tags</span></code>
-fields are both dictionaries containing the reference count for
-the addresses and tag names.</p>
+items are both dictionaries containing the number of references
+for both addresses and tag names.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.fetch_globals_data">
 <code class="descclassname">tagfix.</code><code class="descname">fetch_globals_data</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_globals_data" title="Permalink to this definition">¶</a></dt>
-<dd><p>Fetch the reference count for the global tags (non-function) in the database.</p>
-<p>Returns the tuple <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="docutils literal notranslate"><span class="pre">address</span></code> and <code class="docutils literal notranslate"><span class="pre">tags</span></code>
-fields are both dictionaries containing the reference count for
-the addresses and tag names.</p>
+<dd><p>Fetch the number of references for all of the global tags (non-functions) from the database.</p>
+<p>Returns a tuple <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="docutils literal notranslate"><span class="pre">address</span></code> and <code class="docutils literal notranslate"><span class="pre">tags</span></code> items
+are both dictionaries containing the number of references for both
+addresses and tag names for every non-function in the database.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.fetch_globals_functions">
 <code class="descclassname">tagfix.</code><code class="descname">fetch_globals_functions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_globals_functions" title="Permalink to this definition">¶</a></dt>
-<dd><p>Fetch the reference count for the global tags (function) in the database.</p>
-<p>Returns the tuple <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="docutils literal notranslate"><span class="pre">address</span></code> and <code class="docutils literal notranslate"><span class="pre">tags</span></code>
-fields are both dictionaries containing the reference count for
-the addresses and tag names.</p>
+<dd><p>Fetch the number of references for all of the global tags (functions) from the database.</p>
+<p>Returns the tuple <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="docutils literal notranslate"><span class="pre">address</span></code> and <code class="docutils literal notranslate"><span class="pre">tags</span></code> items
+are both dictionaries containing the number of references for both
+addresses and tag names for each function from the database.</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="tagfix.globals">
 <code class="descclassname">tagfix.</code><code class="descname">globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.globals" title="Permalink to this definition">¶</a></dt>
-<dd><p>Re-build the cache for all of the globals in the database.</p>
+<dd><p>Build the index of references for all of the globals in the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.verify">
+<code class="descclassname">tagfix.</code><code class="descname">verify</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.verify" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use the index to verify the reference counts for the globals, functions, and the caches containing their contents.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.verify_content">
+<code class="descclassname">tagfix.</code><code class="descname">verify_content</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.verify_content" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the contents cache for an individual function and verify that the addresses in its cache are correct.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the function to verify the cache for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.verify_contents">
+<code class="descclassname">tagfix.</code><code class="descname">verify_contents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.verify_contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Verify the contents of every single function in the index.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.verify_globals">
+<code class="descclassname">tagfix.</code><code class="descname">verify_globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.verify_globals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Verify the globals for every address from the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.verify_index">
+<code class="descclassname">tagfix.</code><code class="descname">verify_index</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.verify_index" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the index and verify that each contents entry is pointing at the right functions.</p>
 </dd></dl>
 
 </div>

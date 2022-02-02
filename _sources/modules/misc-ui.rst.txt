@@ -179,6 +179,26 @@ in the inbox that is displayed to the user.
    :param message: the message to display when asking the user for input
    :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
    
+.. _ns-ui-breakpoints:
+
+**************
+ui.breakpoints
+**************
+
+This namespace is for interacting with the Breakpoints window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-calls:
+
+********
+ui.calls
+********
+
+This namespace is for interacting with the (Function) Calls window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
 .. _ns-ui-clipboard:
 
 ************
@@ -214,9 +234,11 @@ segment, clipboard, widget, or even the current window in use.
    
    Return the current function.
    
-.. py:function:: current\.opnum()
+.. py:function:: current\.operand()
    
    Return the currently selected operand number.
+   
+   Aliases: :py:func:`ui.current.opnum<current\.operand>`
    
 .. py:function:: current\.segment()
    
@@ -258,6 +280,26 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
    
    Refresh the main IDA disassembly view.
    
+.. _ns-ui-dump:
+
+*******
+ui.dump
+*******
+
+This namespace is for interacting with the (Hex) Dump window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-enumerations:
+
+***************
+ui.enumerations
+***************
+
+This namespace is for interacting with the Enumerations window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
 .. _ns-ui-exports:
 
 **********
@@ -265,6 +307,16 @@ ui.exports
 **********
 
 This namespace is for interacting with the Exports window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-frame:
+
+********
+ui.frame
+********
+
+This namespace is for interacting with the (Function) Frame window.
 
 Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
@@ -327,6 +379,16 @@ Base namespace for interacting with the keyboard input.
    
    :param key: the key mapping to unmap
    
+.. _ns-ui-libraries:
+
+************
+ui.libraries
+************
+
+This namespace is for interacting with the (Type) Libraries window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
 .. _ns-ui-menu:
 
 *******
@@ -357,6 +419,16 @@ This namespace is for registering items in IDA's menu system.
    :param path: the menu path containing the item to remove
    :param name: the name of the item to remove
    
+.. _ns-ui-modules:
+
+**********
+ui.modules
+**********
+
+This namespace is for interacting with the Modules window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
 .. _ns-ui-mouse:
 
 ********
@@ -548,6 +620,36 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
    
    Return the number of characters that are currently stored within the notepad window.
    
+.. _ns-ui-problems:
+
+***********
+ui.problems
+***********
+
+This namespace is for interacting with the Problems window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-references:
+
+*************
+ui.references
+*************
+
+This namespace is for interacting with the Cross-References window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-segmentregisters:
+
+*******************
+ui.segmentregisters
+*******************
+
+This namespace is for interacting with the Segments window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
 .. _ns-ui-segments:
 
 ***********
@@ -555,6 +657,36 @@ ui.segments
 ***********
 
 This namespace is for interacting with the Segments window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-selectors:
+
+************
+ui.selectors
+************
+
+This namespace is for interacting with the Selectors window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-signatures:
+
+*************
+ui.signatures
+*************
+
+This namespace is for interacting with the Signatures window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-stack:
+
+********
+ui.stack
+********
+
+This namespace is for interacting with the (Call) Stack window.
 
 Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
@@ -635,6 +767,16 @@ This namespace is for interacting with the Structures window.
 
 Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
+.. _ns-ui-threads:
+
+**********
+ui.threads
+**********
+
+This namespace is for interacting with the Threads window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
 .. _ns-ui-timer:
 
 ********
@@ -661,6 +803,26 @@ This namespace is for registering a python callable to a timer in IDA.
    
    :param id: the unique id of the callable to unregister
    
+.. _ns-ui-tracing:
+
+**********
+ui.tracing
+**********
+
+This namespace is for interacting with the Tracing window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-types:
+
+********
+ui.types
+********
+
+This namespace is for interacting with the Types window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
 .. _ns-ui-widget:
 
 *********

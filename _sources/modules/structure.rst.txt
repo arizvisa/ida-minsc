@@ -147,7 +147,7 @@ functions and aliases. For more information on this, please see
    :param structure: the :py:obj:`structure_t` to remove the comment from
    :type structure: structure_t
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the removed comment should be the repeatable one
    
 .. py:function:: comment(id, cmt, \*\*repeatable)
@@ -169,7 +169,7 @@ functions and aliases. For more information on this, please see
    :param id: the identifier of the structure
    :type id: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the removed comment should be the repeatable one
    
 .. py:function:: fragment(structure, offset, size)
@@ -355,6 +355,7 @@ functions and aliases. For more information on this, please see
    If the integer ``offset`` is provided, then use it as the base offset for the newly created structure.
    
    :param string: a string to use as the name
+   :type string: str or tuple
    :param \*suffix: any other strings to append to the name
    :param \*\*offset: the base offset of the structure that's being created
    
@@ -586,7 +587,7 @@ member_t
       :param key: a string representing the tag name
       :type key: str
       :param none: the value :py:obj:`None`
-      :type none: None
+      :type none: None.__class__
       
 *********
 members_t
@@ -923,7 +924,7 @@ structure_t
       :param key: a string representing the tag name
       :type key: str
       :param none: the value :py:obj:`None`
-      :type none: None
+      :type none: None.__class__
       
    .. py:method:: up(self)
       

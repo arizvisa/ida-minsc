@@ -137,7 +137,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the color from
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(func, rgb)
    
@@ -152,7 +152,7 @@ functions and aliases. For more information on this, please see
    Remove the color for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: comment(\*\*repeatable)
    
@@ -182,7 +182,7 @@ functions and aliases. For more information on this, please see
    Remove the comment for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: comment(func, string, \*\*repeatable)
@@ -204,37 +204,8 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the comment from
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
-   
-.. py:function:: contains()
-   
-   Returns True if the current address is within a function.
-   
-.. py:function:: contains(ea)
-   
-   Returns True if the address ``ea`` is contained by the current function.
-   
-   :param ea: an address within the database to check
-   :type ea: int or long
-   
-.. py:function:: contains(func, ea)
-   
-   Returns True if the address ``ea`` is contained by the function ``func``.
-   
-   :param func: the function to check the address against
-   :param ea: an address within the database to check
-   :type ea: int or long
-   
-.. py:function:: down()
-   
-   Return all the functions that are called by the current function.
-   
-.. py:function:: down(func)
-   
-   Return all the functions that are called by the function ``func``.
-   
-   :param func: the function to return the references for
    
 .. py:function:: marks()
    
@@ -261,7 +232,7 @@ functions and aliases. For more information on this, please see
    Remove the custom-name from the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(string, \*suffix, \*\*flags)
@@ -279,7 +250,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the name for
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(func, string, \*suffix, \*\*flags)
@@ -455,7 +426,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tag(func, key, none)
    
@@ -465,7 +436,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tags()
    
@@ -476,16 +447,6 @@ functions and aliases. For more information on this, please see
    Returns all the content tags for the function ``func``.
    
    :param func: the function to return the tag names for
-   
-.. py:function:: up()
-   
-   Return all the functions that call the current function.
-   
-.. py:function:: up(func)
-   
-   Return all the functions that call the function ``func``.
-   
-   :param func: the function to return the references for
    
 .. py:function:: within()
    
@@ -718,7 +679,7 @@ Some examples of this functionality can be::
    Removes the color of the basic block at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(ea)
    
@@ -748,7 +709,7 @@ Some examples of this functionality can be::
    :param ea: the address of the basic block to remove the color from
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(bounds, none)
    
@@ -757,7 +718,7 @@ Some examples of this functionality can be::
    :param bounds: the boundaries of the basic block to remove the color from
    :type bounds: tuple
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(bb, none)
    
@@ -766,7 +727,7 @@ Some examples of this functionality can be::
    :param bb: the basic block to remove the color from
    :type bb: idaapi.BasicBlock
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(ea, rgb, \*\*frame)
    
@@ -1188,7 +1149,7 @@ Some examples of this namespace's usage::
    :param start: the address of the basic block to start from
    :type start: int or long
    :param exits: the addresses of basic blocks to stop at
-   :type exits: int or long or list or tuple or set
+   :type exits: intlong or list or tuple or set
    
 .. py:function:: blocks\.subgraph(func, start, exits)
    
@@ -1200,7 +1161,7 @@ Some examples of this namespace's usage::
    :param start: the address of the basic block to start from
    :type start: int or long
    :param exits: the addresses of basic blocks to stop at
-   :type exits: int or long or list or tuple or set
+   :type exits: intlong or list or tuple or set
    
 .. py:function:: blocks\.walk()
    
@@ -1890,14 +1851,14 @@ Some simple ways of getting information about a function::
    Remove the type information for the current function.
    
    :param none: the value :py:obj:`None` which will remove the type information from the current function
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type(func)
    
    Return the type information for the function ``func`` as an :py:obj:`idaapi.tinfo_t`.
    
    :param func: the function to return the type information from
-   :type func: int or long or idaapi.func_t
+   :type func: intlong or idaapi.func_t
    
 .. py:function:: type(func, info)
    
@@ -1921,51 +1882,7 @@ Some simple ways of getting information about a function::
    
    :param func: the function to remove the type information from
    :param none: the value :py:obj:`None` which will remove the type information from the function
-   :type none: None
-   
-.. py:function:: type\.argument(index)
-   
-   Return the type information for the argument at the specified ``index`` of the current function.
-   
-   :param index: the index of the argument for the current function to return
-   :type index: int or long
-   
-.. py:function:: type\.argument(index, info)
-   
-   Modify the type information for the argument at the specified ``index`` of the current function and set it to ``info``.
-   
-   :param index: the index of the argument to apply the type to
-   :type index: int or long
-   :param info: the type information to apply to the specified function argument
-   :type info: str or idaapi.tinfo_t
-   
-.. py:function:: type\.argument(func, index)
-   
-   Return the type information for the argument at the specified ``index`` of the function ``func``.
-   
-   :param func: the function containing the argument
-   :param index: the index of the function argument to return
-   :type index: int or long
-   
-.. py:function:: type\.argument(func, index, info)
-   
-   Modify the type information for the argument at the specified ``index`` of the function ``func`` and set it to ``info``.
-   
-   :param func: the function containing the argument
-   :param index: the index of the function argument to apply type information
-   :type index: int or long
-   :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the function argument
-   :type info: idaapi.tinfo_t
-   
-.. py:function:: type\.argument(func, index, info_s)
-   
-   Modify the type information for the argument at the specified ``index`` of the function ``func`` and set it to the string in ``info_s``.
-   
-   :param func: the function containing the argument
-   :param index: the index of the function argument to apply type information
-   :type index: int or long
-   :param info_s: the type information as a string to apply to the function argument
-   :type info_s: str
+   :type none: None.__class__
    
 .. py:function:: type\.convention()
    
@@ -2027,7 +1944,7 @@ Some simple ways of getting information about a function::
    :param mask: a bitmask used to specify the explicit flags to set
    :type mask: int or long
    :param integer: the flags to set on the function
-   :type integer: bool or int or long
+   :type integer: bool or intlong
    
 .. py:function:: type\.has_frame()
    
@@ -2207,9 +2124,13 @@ Some simple ways of getting information about a function::
    
    Return the result type for the current function as an :py:obj:`idaapi.tinfo_t`.
    
+   Aliases: :py:func:`function.result<type\.result>`
+   
 .. py:function:: type\.result(info)
    
    Modify the result type for the current function to the type information provided as an :py:obj:`idaapi.tinfo_t` provided in ``info``.
+   
+   Aliases: :py:func:`function.result<type\.result>`
    
    :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the current function result
    :type info: idaapi.tinfo_t
@@ -2218,11 +2139,15 @@ Some simple ways of getting information about a function::
    
    Return the result type for the function ``func`` as an :py:obj:`idaapi.tinfo_t`.
    
+   Aliases: :py:func:`function.result<type\.result>`
+   
    :param func: the function containing the result to return
    
 .. py:function:: type\.result(func, info)
    
    Modify the result type for the function ``func`` to the type information provided as a string in ``info``.
+   
+   Aliases: :py:func:`function.result<type\.result>`
    
    :param func: the function to modify its result
    :param info: the type information to apply to the result of the function
@@ -2231,6 +2156,8 @@ Some simple ways of getting information about a function::
 .. py:function:: type\.result(func, info)
    
    Modify the result type for the function ``func`` to the type information provided as an :py:obj:`idaapi.tinfo_t` in ``info``.
+   
+   Aliases: :py:func:`function.result<type\.result>`
    
    :param func: the function to modify its result
    :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the function result
@@ -2269,4 +2196,235 @@ Some simple ways of getting information about a function::
    
    :param func: the function to modify the thunk attribute
    :param boolean: a boolean value representing whether the function should be set as a code thunk or not
+   
+.. _ns-function-type-argument:
+
+^^^^^^^^^^^^^^^^^^^^^^
+function.type.argument
+^^^^^^^^^^^^^^^^^^^^^^
+
+This namespace allows one to interaction the with individual
+arguments within a function prototype. This allows one to
+rename or modify the type information for a particular argument
+within a function's definition.
+
+This namespace is aliased as :py:obj:`function.type.arg`.
+
+Some simple ways of fetching or modifying the type of the first parameter
+in a function:
+
+    > print( function.argument(0) )
+    > print( function.argument.name(1) )
+    > oldtype = function.argument(0, 'void*')
+    > oldname = function.argument.name(1)
+
+.. py:function:: type\.argument(index)
+   
+   Return the type information for the argument at the specified ``index`` of the current function.
+   
+   :param index: the index of the argument for the current function to return
+   :type index: int or long
+   
+.. py:function:: type\.argument(index, info)
+   
+   Modify the type information for the argument at the specified ``index`` of the current function and set it to ``info``.
+   
+   :param index: the index of the argument to apply the type to
+   :type index: int or long
+   :param info: the type information to apply to the specified function argument
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: type\.argument(func, index)
+   
+   Return the type information for the argument at the specified ``index`` of the function ``func``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the function argument to return
+   :type index: int or long
+   
+.. py:function:: type\.argument(func, index, info)
+   
+   Modify the type information for the argument at the specified ``index`` of the function ``func`` and set it to ``info``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the function argument to apply type information
+   :type index: int or long
+   :param info: the ``idaapi.tinfo_t`` containing the type information to apply to the function argument
+   :type info: idaapi.tinfo_t
+   
+.. py:function:: type\.argument(func, index, info_s)
+   
+   Modify the type information for the argument at the specified ``index`` of the function ``func`` and set it to the string in ``info_s``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the function argument to apply type information
+   :type index: int or long
+   :param info_s: the type information as a string to apply to the function argument
+   :type info_s: str
+   
+.. py:function:: type\.argument\.name(index)
+   
+   Return the name of the argument at the specified ``index`` in the parameters of the current function.
+   
+   :param index: the index of the argument to return the name of
+   :type index: int or long
+   
+.. py:function:: type\.argument\.name(index, name)
+   
+   Modify the name of the argument at the specified ``index`` of the parameters belonging to the current function.
+   
+   :param index: the index of the argument to rename
+   :type index: int or long
+   :param name: the string to rename the argument to
+   :type name: str
+   
+.. py:function:: type\.argument\.name(func, index)
+   
+   Return the name of the argument at the specified ``index`` in the parameters of the function ``func``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the argument to return the name of
+   :type index: int or long
+   
+.. py:function:: type\.argument\.name(func, index, name)
+   
+   Modify the name of the argument at the specified ``index`` of the parameters belonging to the function ``func``.
+   
+   :param func: the function containing the argument
+   :param index: the index of the argument to rename
+   :type index: int or long
+   :param name: the string to rename the argument to
+   :type name: str
+   
+.. _ns-function-type-arguments:
+
+^^^^^^^^^^^^^^^^^^^^^^^
+function.type.arguments
+^^^^^^^^^^^^^^^^^^^^^^^
+
+This namespace allows one to interaction the with the arguments
+belonging to a function prototype as a whole. This can allow
+one to count the number of arguments, or fetch all their names
+and types in their entirety.
+
+This namespace is aliased as :py:obj:`function.type.args`.
+
+.. py:function:: type\.arguments\.count()
+   
+   Return the number of arguments within the current function's prototype.
+   
+.. py:function:: type\.arguments\.count(func)
+   
+   Return the number of arguments for the prototype of the function identified by ``func``.
+   
+   :param func:
+   
+.. _ns-function-xref:
+
+*************
+function.xref
+*************
+
+This namespace is for navigating the cross-references (xrefs)
+associated with a function in the database. This allows for one
+to return all of the callers for a function, as well as all of
+the functions that it may call.
+
+This namespace is aliased as :py:obj:`function.x`.
+
+The functions within this namespace are also aliased as globals.
+These are:
+
+- :py:obj:`function.up` - Return all the addresses that reference a function
+- :py:obj:`function.down` - Return the callable addresses referenced by a function
+
+Some ways to utilize this namespace can be::
+
+    > print( function.xref.up() )
+    > for ea in function.xref.down(): ...
+
+.. py:function:: xref\.argument(index)
+   
+   Return the address of the argument at the specified ``index`` that is passed to the function reference at the current address.
+   
+   Aliases: :py:func:`function.xref.arg<xref\.argument>`
+   
+   :param index: the index of the parameter for the currently referenced function to return the address of
+   :type index: int or long
+   
+.. py:function:: xref\.argument(index, ea)
+   
+   Return the address of the argument at the specified ``index`` that is passed to the function reference identified by the address ``ea``.
+   
+   Aliases: :py:func:`function.xref.arg<xref\.argument>`
+   
+   :param index: the index of the parameter to return the address of
+   :type index: int or long
+   :param ea: the address of the reference to the function
+   :type ea: int or long
+   
+.. py:function:: xref\.argument(func, index, ea)
+   
+   Return the address of the argument at the specified ``index`` of the function ``func`` that is passed to function reference identifed by the address ``ea``.
+   
+   Aliases: :py:func:`function.xref.arg<xref\.argument>`
+   
+   :param func: the address of the function being referenced
+   :param index: the index of the parameter to return the address of
+   :type index: int or long
+   :param ea: the address of the reference to the function
+   :type ea: int or long
+   
+.. py:function:: xref\.arguments()
+   
+   Return the address of all of the arguments being passed to the function reference at the current address.
+   
+   Aliases: :py:func:`function.xref.args<xref\.arguments>`
+   
+.. py:function:: xref\.arguments(ea)
+   
+   Return the address of all of the arguments being passed to the function reference at address ``ea``.
+   
+   Aliases: :py:func:`function.xref.args<xref\.arguments>`
+   
+   :param ea: the address of the reference to the function to return the arguments for
+   :type ea: int or long
+   
+.. py:function:: xref\.arguments(func, ea)
+   
+   Return the address of all of the arguments for the function ``func`` that are being passed to the reference at address ``ea``.
+   
+   Aliases: :py:func:`function.xref.args<xref\.arguments>`
+   
+   :param func: the address of the function being referenced
+   :param ea: the address of the reference to the function to return the arguments for
+   :type ea: int or long
+   
+.. py:function:: xref\.down()
+   
+   Return all of the addresses that are referenced by the current function.
+   
+   Aliases: :py:func:`function.down<xref\.down>`
+   
+.. py:function:: xref\.down(func)
+   
+   Return all of the addresses that are referenced by the function ``func``.
+   
+   Aliases: :py:func:`function.down<xref\.down>`
+   
+   :param func: the function to return the references for
+   
+.. py:function:: xref\.up()
+   
+   Return all of the addresses that reference to the current function.
+   
+   Aliases: :py:func:`function.up<xref\.up>`
+   
+.. py:function:: xref\.up(func)
+   
+   Return all of the addresses that reference the function ``func``.
+   
+   Aliases: :py:func:`function.up<xref\.up>`
+   
+   :param func: the function to return the references for
    

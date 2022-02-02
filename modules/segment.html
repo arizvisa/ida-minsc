@@ -105,7 +105,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -127,7 +127,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -226,6 +226,40 @@ functions and aliases. For more information on this, please see
 </dd></dl>
 
 <dl class="function">
+<dt id="segment.by_offset">
+<code class="descclassname">segment.</code><code class="descname">by_offset</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#segment.by_offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> translated to the beginning of the current segment.</p>
+<p>Aliases: <a class="reference internal" href="#segment.by_offset" title="segment.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">segment.byoffset</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the offset into the current segment to return as an address</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">segment.</code><code class="descname">by_offset</code><span class="sig-paren">(</span><em>segment</em>, <em>offset</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> translated to the beginning of <code class="docutils literal notranslate"><span class="pre">segment</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#segment.by_offset" title="segment.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">segment.byoffset</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>segment</strong> – an identifier used to specify a segment</li>
+<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the offset into the segment to return as an address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="segment.by_selector">
 <code class="descclassname">segment.</code><code class="descname">by_selector</code><span class="sig-paren">(</span><em>selector</em><span class="sig-paren">)</span><a class="headerlink" href="#segment.by_selector" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the segment associated with <code class="docutils literal notranslate"><span class="pre">selector</span></code>.</p>
@@ -254,7 +288,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -268,7 +302,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None.__class__</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -283,8 +317,8 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>segment</strong> – an identifier used to describe a segment</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>segment</strong> – an identifier used to specify a segment</li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -301,7 +335,7 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>segment</strong> – an identifier used to describe a segment</li>
+<li><strong>segment</strong> – an identifier used to specify a segment</li>
 <li><strong>rgb</strong> (<em>int</em><em> or </em><em>long</em>) – the color as a red, green, and blue integer (<code class="docutils literal notranslate"><span class="pre">0x00RRGGBB</span></code>)</li>
 </ul>
 </td>
@@ -403,7 +437,7 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>segment</strong> – an identifier used to describe a segment</li>
+<li><strong>segment</strong> – an identifier used to specify a segment</li>
 <li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – an offset into the segment</li>
 </ul>
 </td>
@@ -426,7 +460,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -533,7 +567,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">name</s
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -593,7 +627,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>segment</strong> – an identifier used to describe a segment</li>
+<li><strong>segment</strong> – an identifier used to specify a segment</li>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the segment</li>
 </ul>
 </td>
@@ -618,7 +652,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -635,7 +669,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>segment</strong> – an identifier used to describe a segment</li>
+<li><strong>segment</strong> – an identifier used to specify a segment</li>
 <li><strong>contents</strong> – whether to remove the contents of the segment from the database</li>
 </ul>
 </td>
@@ -658,7 +692,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -727,7 +761,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>
@@ -747,7 +781,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to describe a segment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> – an identifier used to specify a segment</td>
 </tr>
 </tbody>
 </table>

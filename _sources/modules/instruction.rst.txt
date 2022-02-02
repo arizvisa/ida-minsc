@@ -283,7 +283,7 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    :param id: the identifer of an enumeration to apply
-   :type id: int or long or tuple or list
+   :type id: intlong or tuple or list
    
 .. py:function:: op_float(opnum)
    
