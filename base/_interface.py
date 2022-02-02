@@ -1384,14 +1384,13 @@ class node(object):
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
 
-        # We completely ignore the bit64Q parameter because it doesn't actually depend
-        # on the program, but rather the database. I couldn't find out how the hell to
-        # figure this out without depending on Python. So to accomplish this, we try
-        # to fetch the netnode for BADADDR and then count the bits in the returned index.
-        fakenode = internal.netnode.get(idaapi.BADADDR)
-        bits = math.trunc(math.ceil(math.log(fakenode, 2)))
+        # Now we can call the correct deserializer based on the database
+        # size which we calculate by using an error returned by tinfo_t.
+        # which we take from the same logic for database.config.size().
+        ti = idaapi.tinfo_t()
+        ti.get_stock(idaapi.STI_PVOID)
+        bits = math.trunc(math.ceil(math.log(ti.get_size(), 2)))
 
-        # Now we can call the correct deserializer based on the number of bits.
         offset, items = id64(sup) if bits > 32 else id32(sup)
         return offset, [Fidentifier(item) for item in items]
 
