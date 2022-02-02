@@ -1286,10 +1286,10 @@ class node(object):
         return builtins.bytes(res)
 
     @staticmethod
-    def sup_opstruct(sup, bit64Q):
+    def sup_opstruct(sup, *bit64Q):
         """Given a supval, return a tuple of the delta and a list of the encoded structure/field ids.
 
-        This string is typically found in a supval[0xF+opnum] of the instruction.
+        This string is typically found in a supval[0xF + opnum] of the instruction.
         """
         le = functools.partial(functools.reduce, lambda agg, by: (agg * 0x100) | by)
         Fidentifier = getattr(idaapi, 'node2ea', internal.utils.fidentity)
@@ -1384,7 +1384,15 @@ class node(object):
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
 
-        offset, items = id64(sup) if bit64Q else id32(sup)
+        # We completely ignore the bit64Q parameter because it doesn't actually depend
+        # on the program, but rather the database. I couldn't find out how the hell to
+        # figure this out without depending on Python. So to accomplish this, we try
+        # to fetch the netnode for BADADDR and then count the bits in the returned index.
+        fakenode = internal.netnode.get(idaapi.BADADDR)
+        bits = math.trunc(math.ceil(math.log(fakenode, 2)))
+
+        # Now we can call the correct deserializer based on the number of bits.
+        offset, items = id64(sup) if bits > 32 else id32(sup)
         return offset, [Fidentifier(item) for item in items]
 
     @internal.utils.multicase(ea=six.integer_types)
