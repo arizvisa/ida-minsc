@@ -1108,32 +1108,141 @@ def segm_moved(source, destination, size, changed_netmap):
     P.close()
 
 # address naming
-def rename(ea, newname):
-    """This hook is when a user adds a name or removes it from the database.
+class naming(changingchanged):
+    @classmethod
+    def updater(cls):
+        get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
 
-    We simply increase the reference count for the "__name__" key, or decrease it
-    if the name is being removed.
-    """
-    fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
-    labelQ, customQ = (fl & item == item for item in [idaapi.FF_LABL, idaapi.FF_NAME])
-    fn = idaapi.get_func(ea)
+        # We first just need to grab the address, the new name, and the old one.
+        ea, expected = (yield)
+        original = idaapi.get_ea_name(ea, idaapi.GN_LOCAL)
 
-    # figure out whether a global or function name is being changed, otherwise it's the function's contents
-    ctx = internal.comment.globals if not fn or (interface.range.start(fn) == ea) else internal.comment.contents
+        # Next we use the address to figure out which context that we'll
+        # need to use. If we're not in a function or the address is an
+        # external segment, then we're in the global context.
+        fn = idaapi.get_func(ea)
+        if fn is None or idaapi.segtype(ea) in {idaapi.SEG_XTRN}:
+            ctx, check, target = internal.comment.globals, False, None
 
-    # if a name is being removed
-    if not newname:
-        # if it's a custom name
-        if (not labelQ and customQ):
-            ctx.dec(ea, '__name__')
-            logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format(__name__, ea, newname, '__name__'))
+        # If we're renaming the beginning of a function, then we're
+        # also in the global context unless we're a local name. So
+        # set a variable that we'll use later to distinguish.
+        elif interface.range.start(fn) == ea:
+            ctx, check, target = internal.comment.globals, True, interface.range.start(fn)
+
+        # Otherwise, we're inside a function and we don't need to verify.
+        else:
+            ctx, check, target = internal.comment.contents, False, interface.range.start(fn)
+
+        # Now that we have the names, we need to figure out how
+        # the name is going to change. For this we use the flags
+        # to check if we're changing from a label to a custom name.
+        flags = get_flags(ea)
+        labelQ, customQ = (flags & item == item for item in [idaapi.FF_LABL, idaapi.FF_NAME])
+
+        # Next we just need to grab the changes.
+        try:
+            new_ea, new_name, local_name = (yield)
+
+        except GeneratorExit:
+            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the name at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
+            return
+
+        # And then we double-check that everything matches. If expected is
+        # cleared, but new_name holds some value then it's likely because
+        # IDA chose some automatic name and so we have to make an assumption.
+        if (ea, expected) != (new_ea, expected and new_name):
+            prefix = expected.split('_', 1)
+
+            # If the prefix is in one of our known names, then demote the loglevel.
+            Flogging = logging.info if prefix[0] in {'sub', 'byte', 'loc'} else logging.fatal
+            Flogging(u"{:s}.event() : Rename is at address {:#x} has desynchronized. Target address at {:#x} should have been renamed from {!r} to {!r} but {!r} was received instead.".format('.'.join([__name__, cls.__name__]), ea, new_ea, original, expected, new_name))
+            return
+
+        # Now that our event matches, we need to figure out whether
+        # the context which depends on whether the name is local or not.
+        context, target = (internal.comment.contents, target) if check and local_name else (ctx, None)
+
+        # Next thing to do is to verify whether we're adding a new name,
+        # removing one, or adding one. If the names are the same, then skip.
+        if expected == original:
+            pass
+
+        # If our new_name is cleared, then we're removing it.
+        elif not expected:
+            context.dec(new_ea, '__name__') if target is None else context.dec(new_ea, '__name__', target=target)
+            logging.info(u"{:s}.event() : Decremented {:s} reference for rename at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original, expected))
+
+        # If our previous name nonexistent, or is a label (and not custom) then we add the reference.
+        elif not original or (labelQ and not customQ):
+            context.inc(new_ea, '__name__') if target is None else context.inc(new_ea, '__name__', target=target)
+            logging.info(u"{:s}.event() : Incremented {:s} reference for rename at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original, expected))
+
+        # If it was both a label and it was custom, then log a warning because we have no idea.
+        elif labelQ and customQ:
+            logging.debug(u"{:s}.event() : Ignoring existing symbol rename ({:s}) received as a {:s} reference for at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ', '.join(itertools.chain(['FF_LABL'] if labelQ else [], ['FF_NAME'] if customQ else [])), 'global' if target is None else 'content', ea, original, expected))
+
+        # Debug log showing that we didn't have to do anything.
+        else:
+            logging.debug(u"{:s}.event() : Skipping rename at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
         return
 
-    # if it's currently a label or is unnamed
-    if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
-        ctx.inc(ea, '__name__')
-        logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, newname, '__name__'))
-    return
+    @classmethod
+    def changing(cls, ea, new_name):
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring renaming to {!r} for identifier {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, new_name, ea))
+
+        # If we're not an identifier, then construct our new state.
+        event = cls.new(ea)
+        try:
+            event.send((ea, new_name))
+        except StopIteration:
+            logging.fatal(u"{:s}.changing({:#x}, {!r}) : Abandoning rename at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea), exc_info=True)
+        return
+
+    @classmethod
+    def changed(cls, ea, new_name, local_name):
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changed({:#x}, {!r}) : Ignoring {:s}rename to {!r} for identifier {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, 'local ' if local_name else '', new_name, ea))
+
+        # If we're not changing an identifier, then resume where we left off.
+        event = cls.resume(ea)
+        try:
+            event.send((ea, new_name, local_name))
+
+        # If we get a StopIteration, then the coroutine has terminated unexpected
+        # and we need to warn the user about what happened.
+        except StopIteration:
+            logging.fatal(u"{:s}.changed({:#x}, {!r}, {!r}) : Abandoning update of name at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea), exc_info=True)
+        event.close()
+
+    @classmethod
+    def rename(ea, newname):
+        """This hook is when a user adds a name or removes it from the database.
+
+        We simply increase the reference count for the "__name__" key, or decrease it
+        if the name is being removed.
+        """
+        fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
+        labelQ, customQ = (fl & item == item for item in [idaapi.FF_LABL, idaapi.FF_NAME])
+        fn = idaapi.get_func(ea)
+
+        # figure out whether a global or function name is being changed, otherwise it's the function's contents
+        ctx = internal.comment.globals if not fn or (interface.range.start(fn) == ea) else internal.comment.contents
+
+        # if a name is being removed
+        if not newname:
+            # if it's a custom name
+            if (not labelQ and customQ):
+                ctx.dec(ea, '__name__')
+                logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format(__name__, ea, newname, '__name__'))
+            return
+
+        # if it's currently a label or is unnamed
+        if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
+            ctx.inc(ea, '__name__')
+            logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, newname, '__name__'))
+        return
 
 class extra_cmt(object):
     """
@@ -1613,10 +1722,12 @@ def make_ida_not_suck_cocks(nw_code):
 
     ## hook renames to support updating the "__name__" implicit tag
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_rename', rename, 0)
+        ui.hook.idp.add('ev_init', naming.database_init, 0)
+        ui.hook.idp.add('ev_rename', naming.changing, 0)
+        ui.hook.idb.add('renamed', naming.changed, 0)
 
     else:
-        ui.hook.idp.add('rename', rename, 0)
+        ui.hook.idp.add('rename', naming.rename, 0)
 
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
