@@ -385,6 +385,26 @@ class config(object):
         return 32 if result & idaapi.LFLG_FLAT_OFF32 else 16
 
     @classmethod
+    def size(cls):
+        '''Return the number of bytes used by the database which can be used to distinguish whether you're running 32-bit or 64-bit.'''
+        import ida_typeinf
+
+        # This is a trick gifted by me by rolfr through his comprehensive
+        # knowledge of IDA internals in order to get this attribute in the
+        # exact way that IDA does it. We use the ida_typeinf module instead
+        # of idaapi in order to preserve this tech throughout history in the
+        # way it was bestowed upon us...
+
+        tif = ida_typeinf.tinfo_t()
+        tif.create_ptr(ida_typeinf.tinfo_t(ida_typeinf.BT_VOID))
+        return tif.get_size()
+
+    @classmethod
+    def bitsize(self):
+        '''Return the number of bits used by the database.'''
+        return 8 * cls.size()
+
+    @classmethod
     def byteorder(cls):
         '''Return a string representing the byte-order used by integers in the database.'''
         if idaapi.__version__ < 7.0:
