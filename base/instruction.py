@@ -2412,9 +2412,10 @@ class operand_types:
         INDEX_NONE, aux_use32, aux_use64, aux_natad = 0x4, 0x8, 0x10, 0x1000
 
         # First we'll extract the necessary attributes from the operand and its instruction.
-        hasSIB, sib, rex = op.specflag1, op.specflag2, insn.insnpref
+        hasSIB, sib, insnpref = op.specflag1, op.specflag2, insn.insnpref
         auxpref, segrg, segsel = insn.auxpref, (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
         bits = 64 if auxpref & aux_use64 else 32 if auxpref & aux_use32 else 16
+        rex, = bytearray(insnpref) if isinstance(insnpref, bytes) else [insnpref]
 
         # Now we can figure out the operand's specifics.
         if hasSIB:
