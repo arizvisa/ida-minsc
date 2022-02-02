@@ -2241,7 +2241,7 @@ def tags(func):
     '''Returns all the content tags for the function `func`.'''
     fn = by(func)
     ea = interface.range.start(fn)
-    return internal.comment.contents.name(ea)
+    return internal.comment.contents.name(ea, target=ea)
 
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -2277,13 +2277,13 @@ def select(func, **boolean):
     If `And` contains an iterable then require the returned address contains them.
     If `Or` contains an iterable then include any other tags that are specified.
     """
-    fn = by(func)
+    target = by(func)
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
 
     # If nothing specific was queried, then yield all tags that are available.
     if not boolean:
-        for ea in sorted(internal.comment.contents.address(interface.range.start(fn))):
+        for ea in sorted(internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target))):
             ui.navigation.analyze(ea)
             address = database.tag(ea)
             if address: yield ea, address
@@ -2293,7 +2293,7 @@ def select(func, **boolean):
     Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
     # Walk through every tagged address and cross-check it against the query.
-    for ea in sorted(internal.comment.contents.address(interface.range.start(fn))):
+    for ea in sorted(internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target))):
         ui.navigation.analyze(ea)
         collected, address = {}, database.tag(ea)
 
