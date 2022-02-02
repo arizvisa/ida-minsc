@@ -1093,8 +1093,13 @@ class range(object):
         '''Return the "end_ea" attribute of the specified `area`.'''
         return area.end_ea
 
-    # Assign them based on the IDA version
+    # Assign them based on the IDA version and add some aliases for it.
     start, end = (start_6x, end_6x) if idaapi.__version__ < 7.0 else (start_7x, end_7x)
+    left, right, stop = start, end, end
+    del(start_6x)
+    del(end_6x)
+    del(start_7x)
+    del(end_7x)
 
     @classmethod
     def unpack(cls, area):
@@ -1112,6 +1117,7 @@ class range(object):
         '''Return whether the address `ea` is contained by the specified `area`.'''
         left, right = cls.unpack(area)
         return left <= ea < right
+    contains = internal.utils.alias(within, 'range')
 
     @classmethod
     def size(cls, area):
