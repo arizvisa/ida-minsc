@@ -2051,7 +2051,7 @@ def addressOfRuntimeOrStatic(func):
             raise internal.exceptions.FunctionNotFoundError(u"addressOfRuntimeOrStatic({:#x}) : Unable to locate function by address.".format(ea))
 
         # ok, we found a mis-defined import
-        return True, func
+        return True, ea
 
     # nope, we're just a function
     return False, ea
