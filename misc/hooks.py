@@ -821,8 +821,8 @@ def __process_functions(percentage=0.10):
 
     It's intended to be called once the database is ready to be tampered with.
     """
-    P = ui.Progress()
-    globals = {item for item in internal.comment.globals.address()}
+    implicit = {'__typeinfo__', '__name__'}
+    P, globals = ui.Progress(), {item for item in internal.comment.globals.address()}
 
     # Now we need to gather all of our imports so that we can clean up any functions
     # that are runtime-linked addresses. This is because IDA seems to create a
@@ -856,10 +856,12 @@ def __process_functions(percentage=0.10):
         contents = {item for item in internal.comment.contents.address(fn, target=fn)}
         for ci, (l, r) in enumerate(chunks):
             P.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
+
+            # Iterate through each address in the function, only updating the
+            # references for tags that are not in our set of implicit ones.
             for ea in database.address.iterate(ui.navigation.analyze(l), database.address.prev(r)):
-                # FIXME: no need to iterate really since we should have
-                #        all of the relevant addresses in our cache.
-                for k, v in database.tag(ea).items():
+                available = {k for k in database.tag(ea)}
+                for k in available - implicit:
                     if ea in globals: internal.comment.globals.dec(ea, k)
                     if ea not in contents: internal.comment.contents.inc(ea, k, target=fn)
                     total += 1
@@ -1539,6 +1541,9 @@ def add_func(pfn):
     from global tags to function tags. This iterates through each chunk belonging
     to the function and does exactly that.
     """
+    implicit = {'__typeinfo__', '__name__'}
+
+    # gather all of the imports
     imports = {item for item in []}
     for idx in range(idaapi.get_import_module_qty()):
         idaapi.enum_import_names(idx, lambda address, name, ordinal: imports.add(address) or True)
@@ -1549,10 +1554,12 @@ def add_func(pfn):
     if idaapi.segtype(ea) == idaapi.SEG_XTRN or ea in imports:
         return
 
-    # convert all globals into contents
+    # convert all globals into contents whilst making sure that we don't
+    # add any of the implicit tags that are handled by other events.
     for l, r in function.chunks(ea):
         for ea in database.address.iterate(l, database.address.prev(r)):
-            for k in database.tag(ea):
+            available = {item for item in database.tag(ea)}
+            for k in available - implicit:
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
                 logging.debug(u"{:s}.add_func({:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
