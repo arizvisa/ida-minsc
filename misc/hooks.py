@@ -1116,7 +1116,6 @@ def rename(ea, newname):
     """
     fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
     labelQ, customQ = (fl & item == item for item in [idaapi.FF_LABL, idaapi.FF_NAME])
-    #r, fn = database.xref.up(ea), idaapi.get_func(ea)
     fn = idaapi.get_func(ea)
 
     # figure out whether a global or function name is being changed, otherwise it's the function's contents
@@ -1127,13 +1126,13 @@ def rename(ea, newname):
         # if it's a custom name
         if (not labelQ and customQ):
             ctx.dec(ea, '__name__')
-            logging.debug(u"{:s}.rename({:#x}, {!s}) : Decreasing reference count for tag {!r} at address due to an empty name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
+            logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format(__name__, ea, newname, '__name__'))
         return
 
     # if it's currently a label or is unnamed
     if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
         ctx.inc(ea, '__name__')
-        logging.debug(u"{:s}.rename({:#x}, {!s}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
+        logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, newname, '__name__'))
     return
 
 class extra_cmt(object):
@@ -1431,9 +1430,18 @@ def add_func(pfn):
     from global tags to function tags. This iterates through each chunk belonging
     to the function and does exactly that.
     """
+    imports = {item for item in []}
+    for idx in range(idaapi.get_import_module_qty()):
+        idaapi.enum_import_names(idx, lambda address, name, ordinal: imports.add(address) or True)
+
+    # check that we're not adding an import as a function. if this happens,
+    # then this is because IDA's ELF loader seems to be loading this.
+    ea = interface.range.start(pfn)
+    if idaapi.segtype(ea) == idaapi.SEG_XTRN or ea in imports:
+        return
 
     # convert all globals into contents
-    for l, r in function.chunks(pfn):
+    for l, r in function.chunks(ea):
         for ea in database.address.iterate(l, database.address.prev(r)):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
@@ -1454,19 +1462,20 @@ def del_func(pfn):
     """
 
     # convert all contents into globals
-    for l, r in function.chunks(pfn):
-        for ea in database.address.iterate(l, database.address.prev(r)):
-            for k in database.tag(ea):
-                internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
-                internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.del_func({:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
-            continue
+    rt, fn = interface.addressOfRuntimeOrStatic(pfn)
+    for ea in internal.comment.contents.address(fn, target=fn):
+        for k in database.tag(ea):
+            internal.comment.contents.dec(ea, k, target=fn)
+            internal.comment.globals.inc(ea, k)
+            logging.debug(u"{:s}.del_func({:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
         continue
 
-    # remove all function tags
-    for k in function.tag(interface.range.start(pfn)):
-        internal.comment.globals.dec(interface.range.start(pfn), k)
-        logging.debug(u"{:s}.del_func({:#x}) : Removing (global) tag {!s} from function.".format(__name__, interface.range.start(pfn), utils.string.repr(k)))
+    # remove all function tags depending on whether our address
+    # is part of a function, runtime-linked, or neither.
+    Ftags = database.tag if rt else function.tag
+    for k in Ftags(fn):
+        internal.comment.globals.dec(fn, k)
+        logging.debug(u"{:s}.del_func({:#x}) : Removing (global) tag {!s} from function.".format(__name__, fn, utils.string.repr(k)))
     return
 
 def set_func_start(pfn, new_start):
@@ -1602,7 +1611,7 @@ def make_ida_not_suck_cocks(nw_code):
     else:
         ui.hook.idb.add('cmt_changed', address.old_changed, 0)
 
-    ## hook naming and "extra" comments to support updating the implicit tags
+    ## hook renames to support updating the "__name__" implicit tag
     if idaapi.__version__ >= 7.0:
         ui.hook.idp.add('ev_rename', rename, 0)
 
