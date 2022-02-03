@@ -289,20 +289,22 @@ class structure_t(object):
 
     def refs(self):
         '''Return all the structure members and operand references which reference this specific structure.'''
-        Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
+        Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
         # First collect all of our identifiers referenced by this structure,
         # whilst making sure to include all the members too.
-        items = itertools.chain([self.id], map(Fnetnode, map(operator.attrgetter('id'), self.members)))
+        iterable = itertools.chain([self.id], map(Fnetnode, map(operator.attrgetter('id'), self.members)))
+        items = [identifier for identifier in iterable]
 
         # Now we need to iterate through all of our members and grab references
         # to those identifiers too.
         refs = []
-        for id in items:
+        for identifier in items:
             X = idaapi.xrefblk_t()
 
-            # Grab the very first reference for the given id.
-            if not X.first_to(id, idaapi.XREF_ALL) or X.frm == idaapi.BADADDR:
+            # Grab the very first reference for the given identifier.
+            if not X.first_to(identifier, idaapi.XREF_ALL) or X.frm == idaapi.BADADDR:
                 continue
             refs.append((X.frm, X.iscode, X.type))
 
@@ -314,7 +316,7 @@ class structure_t(object):
         # That should've given us absolutely every reference related to this
         # structure, so the last thing to do is to filter our list for references
         # to addresses within the database.
-        res = []
+        results, matches = {item for item in []}, {identifier for identifier in items}
         for xrfrom, xriscode, xrtype in refs:
 
             # If the reference is an identifier, then it's not what we're looking
@@ -327,18 +329,46 @@ class structure_t(object):
             if database.type.is_code(xrfrom):
 
                 # Iterate through all of its operands and only care about the
-                # ones that have operand information for it.
+                # ones that have operand information for it. We also keep track
+                # of any operands that have a refinfo_t so we can add those too.
+                references = {item for item in []}
                 for opnum, _ in enumerate(instruction.operands(xrfrom)):
                     opinfo = instruction.opinfo(xrfrom, opnum)
                     if opinfo is None:
                         continue
 
-                    # Verify that we have an opinfo.path and one of our ids is
-                    # contained within it.
-                    if opinfo.path.len > 0 and any(operator.contains(opinfo.path.ids, id) for id in items):
-                        state = instruction.op_state(xrfrom, opnum)
-                        item = interface.opref_t(xrfrom, opnum, interface.reftype_t.of_action(state))
-                        res.append(item)
+                    # Collect the operand information into a proper path in case
+                    # the opinfo_t is damaged...which happens sometimes.
+                    ofs, path = interface.node.get_stroff_path(xrfrom, opnum)
+
+                    # If we grabbed a path, then we can use it to grab the
+                    # structure and all of its member identifiers.
+                    if path:
+                        _, members = interface.node.calculate_stroff_path(ofs, path)
+
+                        # Now we need to convert these pairs into a set so that we can
+                        # test their membership.
+                        iterable = itertools.chain(*(map(operator.attrgetter('id'), pair) for pair in members))
+                        candidates = {identifier for identifier in iterable}
+
+                        # Verify that one of our ids is contained within it.
+                        if candidates & matches:
+                            state = instruction.op_state(xrfrom, opnum)
+                            item = interface.opref_t(xrfrom, opnum, interface.reftype_t.of_action(state))
+                            results.add(item)
+                        continue
+
+                    # Otherwise this is likely a refinfo, and we need to follow
+                    # the reference in order to grab _all_ of its references.
+                    drefs = [ea for ea in database.xref.down(xrfrom) if not interface.node.is_identifier(ea)]
+                    references |= {ea for ea in itertools.chain(*map(database.xref.up, drefs))}
+
+                # Last thing to do is to add the references that we collected while
+                # searching through the operands.
+                for ea in references:
+                    for opnum in filter(functools.partial(instruction.op_refinfo, ea), range(instruction.ops_count(ea))):
+                        state = instruction.op_state(ea, opnum)
+                        results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
                     continue
 
             # Anything else is data which doesn't have an operand associated with
@@ -346,9 +376,9 @@ class structure_t(object):
             # for the reference type since this is being applied to an address.
             else:
                 item = interface.ref_t(xrfrom, None, interface.reftype_t.of_action('*'))
-                res.append(item)
+                results.add(item)
             continue
-        return res
+        return sorted(results)
 
     def up(self):
         '''Return all structure or frame members within the database that reference this particular structure.'''
