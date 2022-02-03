@@ -1325,9 +1325,46 @@ class node(object):
         # We're returning a supval here, so we need to convert our bytearray
         # back to bytes in order for it to be usable.
         return builtins.bytes(res)
+
+    @classmethod
+    def get_stroff_path(cls, ea, opnum):
+        '''Given an address at `ea` and the operand number, return a tuple of the delta and a list of the encoded structure/field identifiers.'''
+        import instruction
+
+        # If there's no get_stroff_path, then call the old implementation that decodes
+        # the path from the supval of the related netnode.
+        if not hasattr(idaapi, 'get_stroff_path'):
+            Fnetnode = getattr(idaapi, 'ea2node', internal.utils.fidentity)
+            bits = math.trunc(math.ceil(math.log(idaapi.BADADDR, 2)))
+            if not internal.netnode.sup.has(Fnetnode(ea), 0xf + opnum):
+                return 0, []
+            sup = internal.netnode.sup.get(Fnetnode(ea), 0xf + opnum, type=memoryview)
+            return cls.sup_opstruct(sup.tobytes(), bits > 32)
+
+        # First grab the instruction, and then use it to get the op_t.
+        insn = instruction.at(ea)
+        op = instruction.operand(insn.ea, opnum)
+
+        # As IDAPython's get_stroff_path() api doesn't tell us how much
+        # space we need to allocate, we need to allocate the maximum first.
+        # Only then will we know the count to actually use.
+        delta, path = idaapi.sval_pointer(), idaapi.tid_array(idaapi.MAXSTRUCPATH)
+        count = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), insn.ea, opnum)
+        if not count:
+            return delta.value(), []
+
+        # Now that we have the right length, we can use IDAPython to
+        # actually populate the tid_array here. Afterwards, we discard
+        # our array by converting it into a list.
+        delta, path = idaapi.sval_pointer(), idaapi.tid_array(count)
+        res = idaapi.get_stroff_path(insn.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), insn.ea, opnum)
+        if res != count:
+            raise E.DisassemblerError(u"{:s}.get_stroff_path({:#x}, {:d}) : The length ({:d}) for the path at operand {:d} changed ({:d}) during calculation.".format('.'.join([__name__, cls.__name__]), insn.ea, opnum, count, opnum, res))
+        return delta.value(), [path[idx] for idx in builtins.range(count)]
+
     @staticmethod
     def sup_opstruct(sup, bit64Q):
-        """Given a supval, return a tuple of the delta and a list of the encoded structure/field ids.
+        """DEPRECATED: Given a supval, return a tuple of the delta and a list of the encoded structure/field ids.
 
         This string is typically found in a supval[0xF + opnum] of the instruction.
         """
