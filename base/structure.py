@@ -1926,233 +1926,6 @@ class member_t(object):
         self.__index__ = index
         self.__parent__ = parent
 
-    def __getstate__(self):
-        t, ti = (self.flag, None if self.typeid is None else __instance__(self.typeid), self.size), self.typeinfo
-
-        # grab its typeinfo and serialize it
-        typeinfo = t, ti.serialize()
-
-        # grab its comments
-        cmtt = idaapi.get_member_cmt(self.id, True)
-        cmtf = idaapi.get_member_cmt(self.id, False)
-        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
-
-        # now we can return them
-        ofs = self.offset - self.__parent__.members.baseoffset
-        return self.__parent__.name, self.__index__, self.name, tuple(res), ofs, typeinfo
-    def __setstate__(self, state):
-        parentname, index, name, (cmtt, cmtf), ofs, typeinfo = state
-        cls, fullname = self.__class__, '.'.join([parentname, name])
-
-        # get the structure owning the member by the name we stored
-        # creating it if necessary.
-        res = utils.string.to(parentname)
-        identifier = idaapi.get_struc_id(res)
-        if identifier == idaapi.BADADDR:
-            logging.info(u"{:s}({:#x}, offset={:+#x}) : Creating structure ({:s}) for member named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, ofs, parentname, utils.string.escape(name, '"'), cmtt or cmtf or ''))
-            identifier = idaapi.add_struc(idaapi.BADADDR, res)
-
-        if identifier == idaapi.BADADDR:
-            raise E.DisassemblerError(u"{:s}({:#x}, offset={:+#x}) : Unable to get structure ({:s}) for member named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, ofs, parentname, utils.string.escape(name, '"'), cmtt or cmtf or ''))
-
-        parent = __instance__(identifier, offset=0)
-
-        # extract the type information of the member so that we can
-        # construct the opinfo_t and deserialize the tinfo_t for it.
-        t, ti_ = typeinfo
-        flag, mytype, nbytes = t
-
-        ti = idaapi.tinfo_t()
-        if ti.deserialize(None, *ti_):
-            logging.info(u"{:s}({:#x}, offset={:+#x}): Successfully parsed type information for member \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, utils.string.escape(fullname, '"'), ti))
-
-        else:
-            ti, _ = None, logging.warning(u"{:s}({:#x}, offset={:+#x}): Skipping corrupted type information {!r} for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ti_, utils.string.escape(fullname, '"')))
-
-        # create an opinfo_t for the member's type
-        # FIXME: handle .strtype (strings), .ec (enums), .cd (custom)
-        opinfo = idaapi.opinfo_t()
-        opinfo.tid = 0 if mytype is None else mytype.id
-
-        # add the member to the database, and then check whether there was a naming
-        # issue of some sort so that we can warn the user or resolve it.
-        res = utils.string.to(name)
-        mem = idaapi.add_struc_member(parent.ptr, res, ofs, flag, opinfo, nbytes)
-
-        # FIXME: handle these naming errors properly
-        # duplicate name
-        if mem == idaapi.STRUC_ERROR_MEMBER_NAME:
-            if idaapi.get_member_by_name(parent.ptr, res).soff != ofs:
-                newname = u"{:s}_{:x}".format(res, ofs)
-                logging.warning(u"{:s}({:#x}, offset={:+#x}): Duplicate name found for member \"{:s}\" of structure ({:s}), renaming to \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, utils.string.escape(name, '"'), parentname, utils.string.escape(newname, '"')))
-                idaapi.set_member_name(parent.ptr, ofs, utils.string.to(newname))
-            else:
-                logging.info(u"{:s}({:#x}, offset={:+#x}): Field at {:+#x} of structure ({:s}) contains the same name \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ofs, parentname, utils.string.escape(name, '"')))
-
-        # duplicate field
-        elif mem == idaapi.STRUC_ERROR_MEMBER_OFFSET:
-            logging.info(u"{:s}({:#x}, offset={:+#x}): Already existing field found at {:+#x} of structure ({:s}). Overwriting with \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ofs, parentname, utils.string.escape(name, '"')))
-            idaapi.set_member_type(parent.ptr, ofs, flag, opinfo, nbytes)
-            idaapi.set_member_name(parent.ptr, ofs, res)
-
-        # invalid size
-        elif mem == idaapi.STRUC_ERROR_MEMBER_SIZE:
-            logging.warning(u"{:s}({:#x}, offset={:+#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, mem, utils.string.escape(fullname, '"')))
-
-        # unknown
-        elif mem != idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.warning(u"{:s}({:#x}, offset={:+#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, mem, utils.string.escape(fullname, '"')))
-
-        # now that we know our parent exists, assign both that and our
-        # index that we deserialized.
-        self.__parent__, self.__index__ = parent, index
-
-        # update both of the member's comments prior to fixing its type.
-        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtt), True)
-        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtf), False)
-
-        # try and assign the typeinfo that we previously deserialized
-        try:
-            if ti:
-                self.typeinfo = ti
-
-        except Exception:
-            logging.warning(u"{:s}({:#x}, offset={:+#x}): Unable to apply type information ({!s}) to member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ti, utils.string.escape(fullname, '"')), exc_info=True)
-        return
-
-    # read-only properties
-    @property
-    def ptr(self):
-        '''Return the pointer of the ``idaapi.member_t``.'''
-        parent = self.parent
-        return parent.ptr.get_member(self.__index__)
-    @property
-    def id(self):
-        '''Return the identifier of the member.'''
-        return self.ptr.id
-    @property
-    def properties(self):
-        '''Return the properties for the current member.'''
-        return self.ptr.props
-    @property
-    def size(self):
-        '''Return the size of the member.'''
-        return idaapi.get_member_size(self.ptr)
-    @property
-    def realoffset(self):
-        '''Return the real offset of the member.'''
-        parent, member = self.parent.ptr, self.ptr
-        return 0 if parent.is_union() else member.get_soff()
-    @property
-    def offset(self):
-        '''Return the offset of the member.'''
-        parent = self.parent
-        return self.realoffset + parent.members.baseoffset
-    @property
-    def flag(self):
-        '''Return the "flag" attribute of the member.'''
-        mptr = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
-        return 0 if mptr is None else mptr.flag
-    @property
-    def fullname(self):
-        '''Return the fullname of the member.'''
-        res = idaapi.get_member_fullname(self.id)
-        return utils.string.of(res)
-    @property
-    def typeid(self):
-        '''Return the identifier of the type of the member.'''
-        opinfo = idaapi.opinfo_t()
-        res = idaapi.retrieve_member_info(self.ptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, self.ptr)
-        if res:
-            return None if res.tid == idaapi.BADADDR else res.tid
-        return None
-    @property
-    def index(self):
-        '''Return the index of the member.'''
-        return self.__index__
-    @property
-    def left(self):
-        '''Return the beginning offset of the member.'''
-        left, _ = self.bounds
-        return left
-    @property
-    def right(self):
-        '''Return the ending offset of the member.'''
-        _, right = self.bounds
-        return right
-    @property
-    def realbounds(self):
-        '''Return the real boundaries of the member.'''
-        sptr, mptr = self.parent.ptr, self.ptr
-        return interface.bounds_t(0 if sptr.is_union() else mptr.soff, mptr.eoff)
-    @property
-    def bounds(self):
-        '''Return the boundaries of the member.'''
-        parent = self.parent
-        bounds, base = self.realbounds, parent.members.baseoffset
-        return bounds.translate(base)
-    @property
-    def parent(self):
-        '''Return the structure_t that owns the member.'''
-        return self.__parent__
-
-    # read/write properties
-    @property
-    def name(self):
-        '''Return the name of the member.'''
-        res = idaapi.get_member_name(self.id) or ''
-        return utils.string.of(res)
-    @name.setter
-    @utils.string.decorate_arguments('string')
-    def name(self, string):
-        '''Set the name of the member to `string`.'''
-        if isinstance(string, tuple):
-            string = interface.tuplename(*string)
-
-        # convert the specified string into a form that IDA can handle
-        ida_string = utils.string.to(string)
-
-        # validate the name
-        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_VISIBLE)
-        if ida_string and ida_string != res:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).name : Stripping invalid chars from structure member name (\"{:s}\") resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
-            ida_string = res
-
-        # now we can set the name of the member at the specified offset
-        oldname = self.name
-        if not idaapi.set_member_name(self.parent.ptr, self.offset - self.parent.members.baseoffset, ida_string):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
-
-        # verify that the name was actually assigned properly
-        assigned = idaapi.get_member_name(self.id) or ''
-        if utils.string.of(assigned) != utils.string.of(ida_string):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
-        return assigned
-
-    @property
-    def comment(self, repeatable=True):
-        '''Return the repeatable comment of the member.'''
-        res = idaapi.get_member_cmt(self.id, repeatable) or idaapi.get_member_cmt(self.id, not repeatable)
-        return utils.string.of(res)
-    @comment.setter
-    @utils.string.decorate_arguments('value')
-    def comment(self, value, repeatable=True):
-        '''Set the repeatable comment of the member to `value`.'''
-        res = utils.string.to(value or '')
-        if not idaapi.set_member_cmt(self.ptr, res, repeatable):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
-
-        # verify that the comment was actually assigned properly
-        assigned = idaapi.get_member_cmt(self.id, repeatable)
-        if utils.string.of(assigned) != utils.string.of(res):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
-        return assigned
-
     @utils.multicase()
     def tag(self):
         '''Return the tags associated with the member.'''
@@ -2202,135 +1975,6 @@ class member_t(object):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
         return res
-
-    @property
-    def dt_type(self):
-        '''Return the `dt_type` attribute of the member.'''
-        m = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
-        if m is None:
-            return 0
-        flag = m.flag & idaapi.DT_TYPE
-        return idaapi.as_uint32(flag)
-    dtype = dt_type
-
-    @property
-    def type(self):
-        '''Return the type of the member in its pythonic form.'''
-        res = interface.typemap.dissolve(self.flag, self.typeid, self.size)
-        if isinstance(res, structure_t):
-            res = __instance__(res.id, offset=self.offset)
-        elif isinstance(res, tuple):
-            t, sz = res
-            if isinstance(t, structure_t):
-                t = __instance__(t.id, offset=self.offset)
-            elif isinstance(t, builtins.list) and isinstance(t[0], structure_t):
-                t[0] = __instance__(t[0].id, offset=self.offset)
-            res = t, sz
-        return res
-    @type.setter
-    def type(self, type):
-        '''Set the type of the member to the provided `type`.'''
-        flag, typeid, nbytes = interface.typemap.resolve(type)
-
-        opinfo = idaapi.opinfo_t()
-        opinfo.tid = typeid
-        if not idaapi.set_member_type(self.parent.ptr, self.offset - self.parent.members.baseoffset, flag, opinfo, nbytes):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, type, utils.string.repr(self.name)))
-
-        items = flag, typeid, nbytes
-        newflag, newtypeid, newsize = self.flag, self.typeid or idaapi.BADADDR, self.size
-        if newflag != flag:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided flags ({:#x}) were incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, flags, newflags))
-
-        if newtypeid != typeid:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, typeid, newtypeid))
-
-        if newsize != nbytes:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided size ({:+#x}) was incorrectly assigned as {:+#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, nbytes, newsize))
-
-        return newflag, newtypeid, newsize
-
-    @property
-    def typeinfo(self):
-        '''Return the type information of the current member.'''
-        ti = idaapi.tinfo_t()
-
-        # Guess the typeinfo for the current member. If we're unable to get the
-        # typeinfo, then raise a critical exception because members need to have
-        # types and it doesn't make sense for them to not.
-        ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr)
-        if not ok:
-            cls = self.__class__
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
-
-        # Return the typeinfo back to the caller.
-        return ti
-
-    @typeinfo.setter
-    def typeinfo(self, info):
-        '''Set the type information of the current member to `info`.'''
-
-        if idaapi.__version__ < 7.0:
-            set_member_tinfo = idaapi.set_member_tinfo2
-        else:
-            set_member_tinfo = idaapi.set_member_tinfo
-
-        # Parse our into parameter into a tinfo_t for us, so that we can assign it to the
-        # typeinfo for the member.
-        ti = internal.declaration.parse(info)
-        if ti is None:
-            cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info))
-
-        # Now we can pass our tinfo_t along with the member information to IDA.
-        res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
-        if res == idaapi.SMT_OK:
-            return
-
-        # We failed, so just raise an exception for the user to handle.
-        elif res == idaapi.SMT_FAILED:
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name)))
-
-        # If we received an alternative return code, then build a relevant
-        # message that we can raise with our exception.
-        if res == idaapi.SMT_BADARG:
-            message = 'invalid parameters'
-        elif res == idaapi.SMT_NOCOMPAT:
-            message = 'incompatible type'
-        elif res == idaapi.SMT_WORSE:
-            message = 'worse type'
-        elif res == idaapi.SMT_SIZE:
-            message = 'invalid type for member size'
-        elif res == idaapi.SMT_ARRAY:
-            message = 'setting function argument as an array is illegal'
-        elif res == idaapi.SMT_OVERLAP:
-            message = 'the specified type would result in member overlap'
-        elif res == idaapi.SMT_KEEP:
-            message = 'the specified type is not ideal'
-        else:
-            message = "unknown error {:#x}".format(res)
-
-        # Finally we can raise our exception so that the user knows whats up.
-        cls = self.__class__
-        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name), message))
-
-    def __str__(self):
-        '''Render the current member in a readable format.'''
-        id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
-        return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
-
-    def __unicode__(self):
-        '''Render the current member in a readable format.'''
-        id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
-        return u"<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
-
-    def __repr__(self):
-        return u"{!s}".format(self)
 
     def refs(self):
         """Return the `(address, opnum, type)` of all the code and data references to this member within the database.
@@ -2444,3 +2088,359 @@ class member_t(object):
                 continue
             continue
         return res
+
+    ### Properties
+    @property
+    def ptr(self):
+        '''Return the pointer of the ``idaapi.member_t``.'''
+        parent = self.parent
+        return parent.ptr.get_member(self.__index__)
+    @property
+    def id(self):
+        '''Return the identifier of the member.'''
+        return self.ptr.id
+    @property
+    def properties(self):
+        '''Return the properties for the current member.'''
+        return self.ptr.props
+    @property
+    def size(self):
+        '''Return the size of the member.'''
+        return idaapi.get_member_size(self.ptr)
+    @property
+    def realoffset(self):
+        '''Return the real offset of the member.'''
+        parent, member = self.parent.ptr, self.ptr
+        return 0 if parent.is_union() else member.get_soff()
+    @property
+    def offset(self):
+        '''Return the offset of the member.'''
+        parent = self.parent
+        return self.realoffset + parent.members.baseoffset
+    @property
+    def flag(self):
+        '''Return the "flag" attribute of the member.'''
+        mptr = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
+        return 0 if mptr is None else mptr.flag
+    @property
+    def fullname(self):
+        '''Return the fullname of the member.'''
+        res = idaapi.get_member_fullname(self.id)
+        return utils.string.of(res)
+    @property
+    def typeid(self):
+        '''Return the identifier of the type of the member.'''
+        opinfo = idaapi.opinfo_t()
+        res = idaapi.retrieve_member_info(self.ptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, self.ptr)
+        if res:
+            return None if res.tid == idaapi.BADADDR else res.tid
+        return None
+    @property
+    def index(self):
+        '''Return the index of the member.'''
+        return self.__index__
+    @property
+    def left(self):
+        '''Return the beginning offset of the member.'''
+        left, _ = self.bounds
+        return left
+    @property
+    def right(self):
+        '''Return the ending offset of the member.'''
+        _, right = self.bounds
+        return right
+    @property
+    def realbounds(self):
+        '''Return the real boundaries of the member.'''
+        sptr, mptr = self.parent.ptr, self.ptr
+        return interface.bounds_t(0 if sptr.is_union() else mptr.soff, mptr.eoff)
+    @property
+    def bounds(self):
+        '''Return the boundaries of the member.'''
+        parent = self.parent
+        bounds, base = self.realbounds, parent.members.baseoffset
+        return bounds.translate(base)
+    @property
+    def parent(self):
+        '''Return the structure_t that owns the member.'''
+        return self.__parent__
+    @property
+    def dt_type(self):
+        '''Return the `dt_type` attribute of the member.'''
+        m = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
+        if m is None:
+            return 0
+        flag = m.flag & idaapi.DT_TYPE
+        return idaapi.as_uint32(flag)
+    dtype = dt_type
+
+    ## Readable/Writeable Properties
+    @property
+    def name(self):
+        '''Return the name of the member.'''
+        res = idaapi.get_member_name(self.id) or ''
+        return utils.string.of(res)
+    @name.setter
+    @utils.string.decorate_arguments('string')
+    def name(self, string):
+        '''Set the name of the member to `string`.'''
+        if isinstance(string, tuple):
+            string = interface.tuplename(*string)
+
+        # convert the specified string into a form that IDA can handle
+        ida_string = utils.string.to(string)
+
+        # validate the name
+        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_VISIBLE)
+        if ida_string and ida_string != res:
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).name : Stripping invalid chars from structure member name (\"{:s}\") resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            ida_string = res
+
+        # now we can set the name of the member at the specified offset
+        oldname = self.name
+        if not idaapi.set_member_name(self.parent.ptr, self.offset - self.parent.members.baseoffset, ida_string):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
+
+        # verify that the name was actually assigned properly
+        assigned = idaapi.get_member_name(self.id) or ''
+        if utils.string.of(assigned) != utils.string.of(ida_string):
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
+        return assigned
+
+    @property
+    def comment(self, repeatable=True):
+        '''Return the repeatable comment of the member.'''
+        res = idaapi.get_member_cmt(self.id, repeatable) or idaapi.get_member_cmt(self.id, not repeatable)
+        return utils.string.of(res)
+    @comment.setter
+    @utils.string.decorate_arguments('value')
+    def comment(self, value, repeatable=True):
+        '''Set the repeatable comment of the member to `value`.'''
+        res = utils.string.to(value or '')
+        if not idaapi.set_member_cmt(self.ptr, res, repeatable):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
+
+        # verify that the comment was actually assigned properly
+        assigned = idaapi.get_member_cmt(self.id, repeatable)
+        if utils.string.of(assigned) != utils.string.of(res):
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
+        return assigned
+
+    @property
+    def type(self):
+        '''Return the type of the member in its pythonic form.'''
+        res = interface.typemap.dissolve(self.flag, self.typeid, self.size)
+        if isinstance(res, structure_t):
+            res = __instance__(res.id, offset=self.offset)
+        elif isinstance(res, tuple):
+            t, sz = res
+            if isinstance(t, structure_t):
+                t = __instance__(t.id, offset=self.offset)
+            elif isinstance(t, builtins.list) and isinstance(t[0], structure_t):
+                t[0] = __instance__(t[0].id, offset=self.offset)
+            res = t, sz
+        return res
+    @type.setter
+    def type(self, type):
+        '''Set the type of the member to the provided `type`.'''
+        flag, typeid, nbytes = interface.typemap.resolve(type)
+
+        opinfo = idaapi.opinfo_t()
+        opinfo.tid = typeid
+        if not idaapi.set_member_type(self.parent.ptr, self.offset - self.parent.members.baseoffset, flag, opinfo, nbytes):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, type, utils.string.repr(self.name)))
+
+        items = flag, typeid, nbytes
+        newflag, newtypeid, newsize = self.flag, self.typeid or idaapi.BADADDR, self.size
+        if newflag != flag:
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided flags ({:#x}) were incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, flags, newflags))
+
+        if newtypeid != typeid:
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, typeid, newtypeid))
+
+        if newsize != nbytes:
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided size ({:+#x}) was incorrectly assigned as {:+#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, nbytes, newsize))
+
+        return newflag, newtypeid, newsize
+
+    @property
+    def typeinfo(self):
+        '''Return the type information of the current member.'''
+        ti = idaapi.tinfo_t()
+
+        # Guess the typeinfo for the current member. If we're unable to get the
+        # typeinfo, then raise a critical exception because members need to have
+        # types and it doesn't make sense for them to not.
+        ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr)
+        if not ok:
+            cls = self.__class__
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
+
+        # Return the typeinfo back to the caller.
+        return ti
+    @typeinfo.setter
+    def typeinfo(self, info):
+        '''Set the type information of the current member to `info`.'''
+
+        if idaapi.__version__ < 7.0:
+            set_member_tinfo = idaapi.set_member_tinfo2
+        else:
+            set_member_tinfo = idaapi.set_member_tinfo
+
+        # Parse our into parameter into a tinfo_t for us, so that we can assign it to the
+        # typeinfo for the member.
+        ti = internal.declaration.parse(info)
+        if ti is None:
+            cls = self.__class__
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info))
+
+        # Now we can pass our tinfo_t along with the member information to IDA.
+        res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
+        if res == idaapi.SMT_OK:
+            return
+
+        # We failed, so just raise an exception for the user to handle.
+        elif res == idaapi.SMT_FAILED:
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name)))
+
+        # If we received an alternative return code, then build a relevant
+        # message that we can raise with our exception.
+        if res == idaapi.SMT_BADARG:
+            message = 'invalid parameters'
+        elif res == idaapi.SMT_NOCOMPAT:
+            message = 'incompatible type'
+        elif res == idaapi.SMT_WORSE:
+            message = 'worse type'
+        elif res == idaapi.SMT_SIZE:
+            message = 'invalid type for member size'
+        elif res == idaapi.SMT_ARRAY:
+            message = 'setting function argument as an array is illegal'
+        elif res == idaapi.SMT_OVERLAP:
+            message = 'the specified type would result in member overlap'
+        elif res == idaapi.SMT_KEEP:
+            message = 'the specified type is not ideal'
+        else:
+            message = "unknown error {:#x}".format(res)
+
+        # Finally we can raise our exception so that the user knows whats up.
+        cls = self.__class__
+        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name), message))
+
+    ### Private methods
+    def __str__(self):
+        '''Render the current member in a readable format.'''
+        id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
+        return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+
+    def __unicode__(self):
+        '''Render the current member in a readable format.'''
+        id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
+        return u"<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+
+    def __repr__(self):
+        return u"{!s}".format(self)
+
+    ## Serialization
+    def __getstate__(self):
+        t, ti = (self.flag, None if self.typeid is None else __instance__(self.typeid), self.size), self.typeinfo
+
+        # grab its typeinfo and serialize it
+        typeinfo = t, ti.serialize()
+
+        # grab its comments
+        cmtt = idaapi.get_member_cmt(self.id, True)
+        cmtf = idaapi.get_member_cmt(self.id, False)
+        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
+
+        # now we can return them
+        ofs = self.offset - self.__parent__.members.baseoffset
+        return self.__parent__.name, self.__index__, self.name, tuple(res), ofs, typeinfo
+    def __setstate__(self, state):
+        parentname, index, name, (cmtt, cmtf), ofs, typeinfo = state
+        cls, fullname = self.__class__, '.'.join([parentname, name])
+
+        # get the structure owning the member by the name we stored
+        # creating it if necessary.
+        res = utils.string.to(parentname)
+        identifier = idaapi.get_struc_id(res)
+        if identifier == idaapi.BADADDR:
+            logging.info(u"{:s}({:#x}, offset={:+#x}) : Creating structure ({:s}) for member named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, ofs, parentname, utils.string.escape(name, '"'), cmtt or cmtf or ''))
+            identifier = idaapi.add_struc(idaapi.BADADDR, res)
+
+        if identifier == idaapi.BADADDR:
+            raise E.DisassemblerError(u"{:s}({:#x}, offset={:+#x}) : Unable to get structure ({:s}) for member named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, ofs, parentname, utils.string.escape(name, '"'), cmtt or cmtf or ''))
+
+        parent = __instance__(identifier, offset=0)
+
+        # extract the type information of the member so that we can
+        # construct the opinfo_t and deserialize the tinfo_t for it.
+        t, ti_ = typeinfo
+        flag, mytype, nbytes = t
+
+        ti = idaapi.tinfo_t()
+        if ti.deserialize(None, *ti_):
+            logging.info(u"{:s}({:#x}, offset={:+#x}): Successfully parsed type information for member \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, utils.string.escape(fullname, '"'), ti))
+
+        else:
+            ti, _ = None, logging.warning(u"{:s}({:#x}, offset={:+#x}): Skipping corrupted type information {!r} for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ti_, utils.string.escape(fullname, '"')))
+
+        # create an opinfo_t for the member's type
+        # FIXME: handle .strtype (strings), .ec (enums), .cd (custom)
+        opinfo = idaapi.opinfo_t()
+        opinfo.tid = 0 if mytype is None else mytype.id
+
+        # add the member to the database, and then check whether there was a naming
+        # issue of some sort so that we can warn the user or resolve it.
+        res = utils.string.to(name)
+        mem = idaapi.add_struc_member(parent.ptr, res, ofs, flag, opinfo, nbytes)
+
+        # FIXME: handle these naming errors properly
+        # duplicate name
+        if mem == idaapi.STRUC_ERROR_MEMBER_NAME:
+            if idaapi.get_member_by_name(parent.ptr, res).soff != ofs:
+                newname = u"{:s}_{:x}".format(res, ofs)
+                logging.warning(u"{:s}({:#x}, offset={:+#x}): Duplicate name found for member \"{:s}\" of structure ({:s}), renaming to \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, utils.string.escape(name, '"'), parentname, utils.string.escape(newname, '"')))
+                idaapi.set_member_name(parent.ptr, ofs, utils.string.to(newname))
+            else:
+                logging.info(u"{:s}({:#x}, offset={:+#x}): Field at {:+#x} of structure ({:s}) contains the same name \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ofs, parentname, utils.string.escape(name, '"')))
+
+        # duplicate field
+        elif mem == idaapi.STRUC_ERROR_MEMBER_OFFSET:
+            logging.info(u"{:s}({:#x}, offset={:+#x}): Already existing field found at {:+#x} of structure ({:s}). Overwriting with \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ofs, parentname, utils.string.escape(name, '"')))
+            idaapi.set_member_type(parent.ptr, ofs, flag, opinfo, nbytes)
+            idaapi.set_member_name(parent.ptr, ofs, res)
+
+        # invalid size
+        elif mem == idaapi.STRUC_ERROR_MEMBER_SIZE:
+            logging.warning(u"{:s}({:#x}, offset={:+#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, mem, utils.string.escape(fullname, '"')))
+
+        # unknown
+        elif mem != idaapi.STRUC_ERROR_MEMBER_OK:
+            logging.warning(u"{:s}({:#x}, offset={:+#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, mem, utils.string.escape(fullname, '"')))
+
+        # now that we know our parent exists, assign both that and our
+        # index that we deserialized.
+        self.__parent__, self.__index__ = parent, index
+
+        # update both of the member's comments prior to fixing its type.
+        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtt), True)
+        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtf), False)
+
+        # try and assign the typeinfo that we previously deserialized
+        try:
+            if ti:
+                self.typeinfo = ti
+
+        except Exception:
+            logging.warning(u"{:s}({:#x}, offset={:+#x}): Unable to apply type information ({!s}) to member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, ofs, ti, utils.string.escape(fullname, '"')), exc_info=True)
+        return
