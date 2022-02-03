@@ -393,9 +393,6 @@ class structure_t(object):
                 # of any operands that have a refinfo_t so we can add those too.
                 references = {item for item in []}
                 for opnum, _ in enumerate(instruction.operands(xrfrom)):
-                    opinfo = instruction.opinfo(xrfrom, opnum)
-                    if opinfo is None:
-                        continue
 
                     # Collect the operand information into a proper path in case
                     # the opinfo_t is damaged...which happens sometimes.
@@ -426,9 +423,23 @@ class structure_t(object):
                 # Last thing to do is to add the references that we collected while
                 # searching through the operands.
                 for ea in references:
-                    for opnum in filter(functools.partial(instruction.op_refinfo, ea), range(instruction.ops_count(ea))):
-                        state = instruction.op_state(ea, opnum)
-                        results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
+                    for opnum in range(instruction.ops_count(ea)):
+                        if instruction.op_refinfo(ea, opnum):
+                            state = instruction.op_state(ea, opnum)
+                            results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
+                            continue
+
+                        # Do a final check to see if we can resolve a structure member.
+                        try:
+                            instruction.op_structure(ea, opnum)
+                        except Exception:
+                            pass
+
+                        # And if so, then we can add the opref_t.
+                        else:
+                            state = instruction.op_state(ea, opnum)
+                            results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
+                        continue
                     continue
 
             # Anything else is data which doesn't have an operand associated with
