@@ -1321,7 +1321,7 @@ class node(object):
                 offset = 0
 
             count, rest = le([builtins.next(iterable)]), [item for item in iterable]
-            itemsize = len(rest) // count
+            itemsize = len(rest) // (count or 1)
 
             iterable = (item for item in rest)
             chunks = [item for item in zip(*(itemsize * [iterable]))]
@@ -1384,13 +1384,7 @@ class node(object):
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
 
-        # Now we can call the correct deserializer based on the database
-        # size which we calculate by using an error returned by tinfo_t.
-        # which we take from the same logic for database.config.size().
-        ti = idaapi.tinfo_t()
-        ti.get_stock(idaapi.STI_PVOID)
-        bits = math.trunc(math.ceil(math.log(ti.get_size(), 2)))
-
+        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR, 2)))
         offset, items = id64(sup) if bits > 32 else id32(sup)
         return offset, [Fidentifier(item) for item in items]
 
