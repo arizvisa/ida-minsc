@@ -1326,6 +1326,57 @@ class node(object):
         # back to bytes in order for it to be usable.
         return builtins.bytes(res)
 
+    # As the get_stroff_path function doesn't return a full path at all,
+    # we need to figure the path ourselves using it as a suggestion.
+    @classmethod
+    def calculate_stroff_path(cls, offset, suggestion):
+        '''Given the provided `offset` and list of identifiers as a `suggestion`, return the delta along with the full structure path as a list of ``idaapi.struc_t``and ``idaapi.member_t` pairs.'''
+        items = suggestion[:]
+
+        # After we get the list of member ids, then we can use it to
+        # compose the path that we will match against later. We grab
+        # the first member (which is the structure id) and convert it
+        # to a structure we that we have some place to start.
+        import structure
+        st = structure.by_identifier(items.pop(0))
+        members = [idaapi.get_member_by_id(item) for item in items]
+        items = [(sptr if cls.is_identifier(sptr.id) else idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id)), mptr) for mptr, _, sptr in members]
+
+        # Now we have a list of members, we format it into a dictionary
+        # so that we can look up the correct member for any given structure.
+        choices = {}
+        for sptr, mptr in items:
+            choices.setdefault(sptr.id, []).append(mptr)
+
+        # Now we can use the members we received to generate a closure
+        # that we'll use to figure out the correct members for the operand.
+        def Ffilter(parent, candidates, choices=choices):
+
+            # If the parent is not in our list of choices, then we leave
+            # because there's nothing we can do with this.
+            if parent.id not in choices:
+                return []
+
+            # Grab the list for the current parent and check to see if
+            # there's a member in our list that we can use. If so, then
+            # we can just return it as the only choice.
+            items = choices[parent.id]
+            if len(items):
+                return [items.pop(0)]
+
+            # If there wasn't anything found, then just return all our
+            # candidates because we're not sure how to proceed here.
+            return []
+
+        # Now we can fetch the delta and path for the requested offset,
+        # and then convert it into a list of sptrs and mptrs in order
+        # to return it to the caller.
+        path, delta = st.members.__walk_to_realoffset__(offset, filter=Ffilter)
+
+        # That was it, so we just need to convert the path into a list
+        # of sptrs and mptrs to return to the caller.
+        return delta, [(item.parent.ptr, item.ptr) for item in path]
+
     @classmethod
     def get_stroff_path(cls, ea, opnum):
         '''Given an address at `ea` and the operand number, return a tuple of the delta and a list of the encoded structure/field identifiers.'''
