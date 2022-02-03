@@ -1116,7 +1116,14 @@ class range(object):
     def within(cls, ea, area):
         '''Return whether the address `ea` is contained by the specified `area`.'''
         left, right = cls.unpack(area)
-        return left <= ea < right
+
+        # In IDA, a range_t consistently has a start address that begins
+        # before the ending address. This means that if the ending address
+        # is less the starting one, that the boundary between them wraps
+        # across the highest address.
+        if left <= right:
+            return left <= ea < right
+        return left <= ea or ea < right
     contains = internal.utils.alias(within, 'range')
 
     @classmethod
@@ -1135,12 +1142,46 @@ class node(object):
     """
     @staticmethod
     def is_identifier(identifier):
-        '''Return truth if the specified `identifier` is valid.'''
-        parameters = 2 * [identifier]
-        if any(F(id) for F, id in zip([idaapi.get_struc, idaapi.get_member_by_id], parameters)):
-            return True
-        iterable = (F(id) for F, id in zip([idaapi.get_enum_idx, idaapi.get_enum_member_enum], parameters))
-        return not all(map(functools.partial(operator.eq, idaapi.BADADDR), iterable))
+        '''Return whether the provided `identifier` is actually valid or not.'''
+
+        # First use the latest official api to get the private range of identifiers.
+        if hasattr(idaapi, 'inf_get_privrange'):
+            res = idaapi.inf_get_privrange()
+            return range.within(identifier, res)
+
+        # Otherwise, ping the module for the next best thing.
+        elif all(hasattr(idaapi, item) for item in ['inf_get_privrange_start_ea', 'inf_get_privrange_end_ea']):
+            start, stop = idaapi.inf_get_privrange_start_ea(), idaapi.inf_get_privrange_end_ea()
+            if start <= stop:
+                return start <= identifier < stop
+            return start <= identifier or identifier < stop
+
+        # If we couldn't find a privrange for the version of IDA that we care about,
+        # then we try and call into IDA's supporting library directly.
+        try:
+            import ida
+            if not hasattr(ida, 'getinf'):
+                raise ImportError
+
+        # Every single possible way has failed, so we fall back to calling each and
+        # every available api to see if any one of them succeeds.
+        except ImportError:
+            parameters = 2 * [identifier]
+            if any(Fapi(id) for Fapi, id in zip([idaapi.get_struc, idaapi.get_member_by_id], parameters)):
+                return True
+            iterable = (Fapi(id) for Fapi, id in zip([idaapi.get_enum_idx, idaapi.get_enum_member_enum], parameters))
+            return not all(map(functools.partial(operator.eq, idaapi.BADADDR), iterable))
+
+        # Otherwise we need to grab the INF index for both boundaries.
+        INF_PRIVRANGE_START_EA = getattr(idaapi, 'INF_PRIVRANGE_START_EA', 27)
+        INF_PRIVRANGE_END_EA = getattr(idaapi, 'INF_PRIVRANGE_END_EA', 28)
+
+        # Then we can query for them with IDC's getinf() before testing them.
+        bounds = map(ida.getinf, [INF_PRIVRANGE_START_EA, INF_PRIVRANGE_END_EA])
+        start, stop = map(functools.partial(operator.and_, idaapi.BADADDR), bounds)
+        if start <= stop:
+            return start <= identifier < stop
+        return start <= identifier or identifier < stop
 
     @internal.utils.multicase(sup=bytes)
     @classmethod
@@ -1284,9 +1325,8 @@ class node(object):
         # We're returning a supval here, so we need to convert our bytearray
         # back to bytes in order for it to be usable.
         return builtins.bytes(res)
-
     @staticmethod
-    def sup_opstruct(sup, *bit64Q):
+    def sup_opstruct(sup, bit64Q):
         """Given a supval, return a tuple of the delta and a list of the encoded structure/field ids.
 
         This string is typically found in a supval[0xF + opnum] of the instruction.
@@ -1321,7 +1361,7 @@ class node(object):
                 offset = 0
 
             count, rest = le([builtins.next(iterable)]), [item for item in iterable]
-            itemsize = len(rest) // (count or 1)
+            itemsize = (len(rest) // count) if count else 1
 
             iterable = (item for item in rest)
             chunks = [item for item in zip(*(itemsize * [iterable]))]
@@ -1337,7 +1377,7 @@ class node(object):
                 #res = map(functools.partial(operator.xor, 0x3f000000), res)
                 return offset, [0x3f000000 ^ le(item) for item in chunks]
 
-            raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id32 : An unsupported itemsize ({:d}) was discovered while trying to decode {:d} chunks at offset {:#x}. These chunks are {!r}.".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), itemsize, count, offset, [bytes().join(item) for item in chunks]))
+            raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id32 : An unsupported itemsize ({:d}) was discovered while trying to decode {:d} chunks at offset {:#x} from value ({:s}).".format('.'.join([__name__, node.__name__]), internal.utils.string.tohex(sup), itemsize, count, offset, ["{:0{:d}x".format(item, 2 * itemsize) for item in chunks]))
 
         # 64-bit
         # 000002 c000888e00 c000889900 -- KEVENT.Header.anonymous_0.anonymous_0.Type
@@ -1372,7 +1412,7 @@ class node(object):
                 count, mask = 5, 0xc0000000ff
 
             else:
-                raise NotImplementedError(u"{:s}.sup_opstruct(\"{:s}\") -> id64 : Error decoding supval from parameter.".format('.'.join([__name__, node.__name__]), rest))
+                raise NotImplementedError(u"{:s}.sup_opstruct({!r}) -> id64 : Error decoding supval from parameter.".format('.'.join([__name__, node.__name__]), sup))
 
             iterable = (item for item in rest)
             chunks = [item for item in zip(*(count * [iterable]))]
@@ -1384,8 +1424,7 @@ class node(object):
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
 
-        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR, 2)))
-        offset, items = id64(sup) if bits > 32 else id32(sup)
+        offset, items = id64(sup) if bit64Q else id32(sup)
         return offset, [Fidentifier(item) for item in items]
 
     @internal.utils.multicase(ea=six.integer_types)
