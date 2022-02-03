@@ -2354,6 +2354,18 @@ class member_t(object):
     def __repr__(self):
         return u"{!s}".format(self)
 
+    ## Hashable
+    def __hash__(self):
+        return self.ptr.id
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    def __eq__(self, other):
+        if isinstance(other, idaapi.member_t):
+            return self.ptr.id == other.id
+        elif isinstance(other, member_t):
+            return self.ptr.id == other.ptr.id
+        return False
+
     ## Serialization
     def __getstate__(self):
         t, ti = (self.flag, None if self.typeid is None else __instance__(self.typeid), self.size), self.typeinfo
