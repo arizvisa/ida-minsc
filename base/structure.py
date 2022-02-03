@@ -713,6 +713,21 @@ class structure_t(object):
             raise TypeError(member)
         return member in self.members
 
+    ## Hashable
+    def __hash__(self):
+        return self.ptr.id
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __eq__(self, other):
+        if isinstance(other, idaapi.struc_t):
+            return self.ptr.id == other.id
+        elif isinstance(other, structure_t):
+            return self.ptr.id == other.ptr.id
+        return False
+
+    ## Serialization
     def __getstate__(self):
         cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), [True, False])
 
