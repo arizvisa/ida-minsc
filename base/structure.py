@@ -1982,8 +1982,9 @@ class member_t(object):
         If `opnum` is ``None``, then the returned `address` has the structure applied to it.
         If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
         """
-        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        cls, FF_STRUCT = self.__class__, idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
+        FF_STROFF = idaapi.stroff_flag() if hasattr(idaapi, 'stroff_flag') else idaapi.stroffflag()
 
         # if structure is a frame..
         if interface.node.is_identifier(self.parent.id) and internal.netnode.name.get(Fnetnode(self.parent.id)).startswith('$ '):
@@ -2018,76 +2019,79 @@ class member_t(object):
         while X.next_to():
             refs.append((X.frm, X.iscode, X.type))
 
-        # collect all structure references that might reference us just in case
-        # we need to verify that a globally defined address is using a structure
-        # that contains our member
-        identifiers = { self.parent } | { member.parent for member in self.parent.up() if isinstance(member, member_t) }
+        # collect the identifiers of all of the members that can possibly
+        # refer to this same one which means we track unions as well. this
+        # requires us to recursively walk through all of the references
+        # for each parent until we've collected everything.
+        parents, members, queue = {self.parent}, {self}, {self.parent}
         while True:
-            current = identifiers.copy()
+            work = {item for item in []}
 
-            # iterate through every single structure that we have, and gather
-            # its member_t references
-            for item in current.copy():
-                for member in item.refs():
-                    if isinstance(item, member_t):
-                        current.add(item)
-                    continue
-                continue
+            # now that we have our work, we can add it to our list. however, we also
+            # need to check if our parent is a union so that we can descend through
+            # its members for ones at the same offset of our referring member.
+            for item in itertools.chain(*map(operator.methodcaller('up'), queue)):
+                if is_union(item.parent):
+                    members |= {member for member in item.parent.members if member.realbounds.contains(item.realoffset)}
+                    work |= {member.type for member in item.parent.members if isinstance(member.type, structure_t)}
+                work |= {item.parent}
+                members |= {item}
 
-            # if nothing changed, then we're good to leave this crazy loop
-            if current == identifiers:
+            # If all of our work is already in our results (parents), then exit our loop.
+            if work & parents == work:
                 break
 
-            # otherwise, merge our findings and try again
-            identifiers |= current
+            # Otherwise we merge it, reload the queue with our new work, and try..try...again.
+            parents, queue = parents | work, work - parents
 
-        # okay, now we can convert this set into a set of identifiers
-        identifiers = { item.id for item in identifiers }
+        # okay, now we can convert this set into a set of structures and members to look for
+        candidates = { item.parent.id for item in members } | { item.id for item in members }
 
         # now figure out which operand has the structure member applied to it
-        res = []
+        results = []
         for ea, _, t in refs:
-            iterable = ((idx, internal.netnode.sup.get(Fnetnode(ea), 0xf + idx, type=memoryview)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.has(Fnetnode(ea), 0xf + idx))
-            listable = [(idx, view.tobytes()) for idx, view in iterable]
+            flags = database.type.flags(ea, idaapi.MS_0TYPE|idaapi.MS_1TYPE)
+            listable = [(opnum, instruction.opinfo(ea, opnum)) for opnum in range(instruction.ops_count(ea)) if instruction.opinfo(ea, opnum)]
 
-            # check if we found any ops that point directly to this member
-            if any(listable):
-                iterable = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in listable)
-                iterable = (idx for idx, (_, ids) in iterable if self.parent.id in ids)    # sanity
-                res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in iterable)
+            # If our list of operand information is empty, then we can skip this reference.
+            if not listable:
+                cls = self.__class__
+                logging.info(u"{:s}.refs() : Skipping reference to member ({:#x}) at {:#x} with flags ({:#x}) due to no operand information.".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
 
-            # otherwise our reference is implicitly pointing to our member, so
-            # now we need to figure out which operand is the one.
+            # If our flags mention a structure offset, then we can just get the structure path.
+            elif flags & FF_STROFF:
+                logging.info(u"{:s}.refs() : Found strpath_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
+                iterable = [(opnum, {identifier for identifier in interface.node.get_stroff_path(ea, opnum)[1]}) for opnum, _ in listable]
+                iterable = (opnum for opnum, identifiers in iterable if operator.contains(identifiers, self.parent.id))
+                results.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in iterable)
+
+            # Otherwise, we need to extract the information from the operand's refinfo_t. We
+            # filter these by only taking the ones which we can use to calculate the target.
             else:
-                fl = database.type.flags(ea)
-                iterable = ((opnum, instruction.opinfo(ea, opnum)) for opnum, _ in enumerate(instruction.operands(ea)))
-                iterable = ((opnum, info) for opnum, info in iterable if isinstance(info, idaapi.opinfo_t))
-
-                # now that we got all the opinfo_t for each operand, we need to
-                # distinguish which operands are capable of being calculated to
-                # determine which ones point to our structure member.
-                iterable = ((opnum, info.ri, instruction.op(ea, opnum)) for opnum, info in iterable if info.ri.is_target_optional())
+                logging.info(u"{:s}.refs() : Found refinfo_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
+                iterable = ((opnum, info.ri, instruction.op(ea, opnum)) for opnum, info in listable if info.ri.is_target_optional())
 
                 # now we can do some math to determine if the operands really
                 # are pointing to our structure member.
-                # pointing at our member exactly..
-                for opnum, ri, opvalue in iterable:
-                    offset = opvalue if isinstance(opvalue, six.integer_types) else builtins.next((getattr(opvalue, attribute) for attribute in {'offset', 'address'} if hasattr(opvalue, attribute)), None)
+                for opnum, ri, value in iterable:
+                    offset = value if isinstance(value, six.integer_types) else builtins.next((getattr(value, attribute) for attribute in {'offset', 'address'} if hasattr(value, attribute)), None)
 
-                    # check if we got a valid offset, because if not then we just
-                    # need to skip to the next iteration
+                    # check if we got a valid offset and align it if so, because if
+                    # not then we can't calculate the target and need to move on.
                     if offset is None or not database.within(offset):
                         continue
-
-                    # align the offset, and check if our address is using one
-                    # of our structure identifiers
                     offset = interface.address.head(offset, silent=True)
-                    if database.type.flags(offset, idaapi.DT_TYPE) == FF_STRUCT and database.type.structure.id(offset) in identifiers:
-                        res.append(interface.opref_t(ea, opnum, interface.reftype_t.of(t)))
+
+                    # all that's left to do is verify that the structure is in our
+                    # list of candidates. although we could do a better job and
+                    # check that the offset is actually pointing at the right
+                    # member after calculating the base address of the structure.
+                    if database.type.flags(offset, idaapi.DT_TYPE) == FF_STRUCT and database.type.structure.id(offset) in candidates:
+                        results.append(interface.opref_t(ea, opnum, interface.reftype_t.of(t)))
                     continue
                 continue
             continue
-        return res
+        return results
 
     ### Properties
     @property
