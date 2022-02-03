@@ -287,6 +287,66 @@ class structure_t(object):
         # so that users can interact with the structure members.
         self.__members__ = members_t(self, baseoffset=offset)
 
+    @utils.multicase()
+    def tag(self):
+        '''Return the tags associated with the structure.'''
+        repeatable = True
+
+        # grab the repeatable and non-repeatable comment for the structure
+        res = utils.string.of(idaapi.get_struc_cmt(self.id, False))
+        d1 = internal.comment.decode(res)
+        res = utils.string.of(idaapi.get_struc_cmt(self.id, True))
+        d2 = internal.comment.decode(res)
+
+        # check for duplicate keys
+        if six.viewkeys(d1) & six.viewkeys(d2):
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).comment() : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+
+        # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
+        res = {}
+        [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
+        return res
+    @utils.multicase(key=six.string_types)
+    @utils.string.decorate_arguments('key')
+    def tag(self, key):
+        '''Return the tag identified by `key` belonging to the structure.'''
+        res = self.tag()
+        return res[key]
+    @utils.multicase(key=six.string_types)
+    @utils.string.decorate_arguments('key', 'value')
+    def tag(self, key, value):
+        '''Set the tag identified by `key` to `value` for the structure.'''
+        state = self.tag()
+        repeatable, res, state[key] = True, state.get(key, None), value
+        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
+        return res
+    @utils.multicase(key=six.string_types, none=None.__class__)
+    @utils.string.decorate_arguments('key')
+    def tag(self, key, none):
+        '''Removes the tag specified by `key` from the structure.'''
+        state = self.tag()
+        repeatable, res = True, state.pop(key)
+        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
+        return res
+
+    def destroy(self):
+        '''Remove the structure from the database.'''
+        return idaapi.del_struc(self.ptr)
+
+    def field(self, offset):
+        '''Return the member at the specified offset.'''
+        return self.members.by_offset(offset + self.members.baseoffset)
+
+    def copy(self, name):
+        '''Copy members into the structure `name`.'''
+        raise NotImplementedError
+
+    def contains(self, offset):
+        '''Return whether the specified `offset` is contained by the structure.'''
+        res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
+        return res <= offset < res + cb
+
     def refs(self):
         '''Return all the structure members and operand references which reference this specific structure.'''
         Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
@@ -452,6 +512,7 @@ class structure_t(object):
             res.append(mem)
         return res
 
+    ### Properties
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.struc_t``.'''
@@ -485,37 +546,6 @@ class structure_t(object):
     def members(self):
         '''Return the members belonging to the structure.'''
         return self.__members__
-
-    def __getstate__(self):
-        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), [True, False])
-
-        # decode the comments that we found in the structure
-        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
-
-        # FIXME: perhaps we should preserve the get_struc_idx result too
-        return (self.name, tuple(res), self.members)
-    def __setstate__(self, state):
-        name, (cmtt, cmtf), members = state
-
-        # try and find the structure in the database by its name
-        res = utils.string.to(name)
-        identifier = idaapi.get_struc_id(res)
-
-        # if we didn't find it, then just add it and notify the user
-        if identifier == idaapi.BADADDR:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}) : Creating structure \"{:s}\" with {:d} fields and the comment \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(name, '"'), len(members), utils.string.escape(cmtf or cmtt or '', '"')))
-            res = utils.string.to(name)
-            identifier = idaapi.add_struc(idaapi.BADADDR, res)
-
-        # now we can apply the comments to it
-        idaapi.set_struc_cmt(identifier, utils.string.to(cmtt), True)
-        idaapi.set_struc_cmt(identifier, utils.string.to(cmtf), False)
-
-        # and set its attributes properly
-        self.__ptr__, self.__name__ = idaapi.get_struc(identifier), name
-        self.__members__ = members
-        return
 
     @property
     def name(self):
@@ -572,49 +602,6 @@ class structure_t(object):
             cls = self.__class__
             logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
         return assigned
-
-    @utils.multicase()
-    def tag(self):
-        '''Return the tags associated with the structure.'''
-        repeatable = True
-
-        # grab the repeatable and non-repeatable comment for the structure
-        res = utils.string.of(idaapi.get_struc_cmt(self.id, False))
-        d1 = internal.comment.decode(res)
-        res = utils.string.of(idaapi.get_struc_cmt(self.id, True))
-        d2 = internal.comment.decode(res)
-
-        # check for duplicate keys
-        if six.viewkeys(d1) & six.viewkeys(d2):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment() : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
-
-        # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
-        res = {}
-        [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
-        return res
-    @utils.multicase(key=six.string_types)
-    @utils.string.decorate_arguments('key')
-    def tag(self, key):
-        '''Return the tag identified by `key` belonging to the structure.'''
-        res = self.tag()
-        return res[key]
-    @utils.multicase(key=six.string_types)
-    @utils.string.decorate_arguments('key', 'value')
-    def tag(self, key, value):
-        '''Set the tag identified by `key` to `value` for the structure.'''
-        state = self.tag()
-        repeatable, res, state[key] = True, state.get(key, None), value
-        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
-        return res
-    @utils.multicase(key=six.string_types, none=None.__class__)
-    @utils.string.decorate_arguments('key')
-    def tag(self, key, none):
-        '''Removes the tag specified by `key` from the structure.'''
-        state = self.tag()
-        repeatable, res = True, state.pop(key)
-        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
-        return res
 
     @property
     def size(self):
@@ -693,10 +680,17 @@ class structure_t(object):
             raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to apply `idaapi.tinfo_t()` to structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), self.name))
         return
 
-    def destroy(self):
-        '''Remove the structure from the database.'''
-        return idaapi.del_struc(self.ptr)
+    @property
+    def realbounds(self):
+        sptr = self.ptr
+        return interface.bounds_t(0, idaapi.get_struc_size(self.ptr))
 
+    @property
+    def bounds(self):
+        bounds, base = self.realbounds, self.members.baseoffset
+        return bounds.translate(base)
+
+    ### Private methods
     def __str__(self):
         '''Render the current structure in a readable format.'''
         sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
@@ -710,21 +704,8 @@ class structure_t(object):
     def __repr__(self):
         return u"{!s}".format(self)
 
-    def field(self, offset):
-        '''Return the member at the specified offset.'''
-        return self.members.by_offset(offset + self.members.baseoffset)
-
-    def copy(self, name):
-        '''Copy members into the structure `name`.'''
-        raise NotImplementedError
-
     def __getattr__(self, name):
         return getattr(self.members, name)
-
-    def contains(self, offset):
-        '''Return whether the specified `offset` is contained by the structure.'''
-        res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
-        return res <= offset < res + cb
 
     def __contains__(self, member):
         '''Return whether the specified `member` is contained by this structure.'''
@@ -732,15 +713,36 @@ class structure_t(object):
             raise TypeError(member)
         return member in self.members
 
-    @property
-    def realbounds(self):
-        sptr = self.ptr
-        return interface.bounds_t(0, idaapi.get_struc_size(self.ptr))
+    def __getstate__(self):
+        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), [True, False])
 
-    @property
-    def bounds(self):
-        bounds, base = self.realbounds, self.members.baseoffset
-        return bounds.translate(base)
+        # decode the comments that we found in the structure
+        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
+
+        # FIXME: perhaps we should preserve the get_struc_idx result too
+        return (self.name, tuple(res), self.members)
+    def __setstate__(self, state):
+        name, (cmtt, cmtf), members = state
+
+        # try and find the structure in the database by its name
+        res = utils.string.to(name)
+        identifier = idaapi.get_struc_id(res)
+
+        # if we didn't find it, then just add it and notify the user
+        if identifier == idaapi.BADADDR:
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}) : Creating structure \"{:s}\" with {:d} fields and the comment \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(name, '"'), len(members), utils.string.escape(cmtf or cmtt or '', '"')))
+            res = utils.string.to(name)
+            identifier = idaapi.add_struc(idaapi.BADADDR, res)
+
+        # now we can apply the comments to it
+        idaapi.set_struc_cmt(identifier, utils.string.to(cmtt), True)
+        idaapi.set_struc_cmt(identifier, utils.string.to(cmtf), False)
+
+        # and set its attributes properly
+        self.__ptr__, self.__name__ = idaapi.get_struc(identifier), name
+        self.__members__ = members
+        return
 
 @utils.multicase()
 def name(id):
