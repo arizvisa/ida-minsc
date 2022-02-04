@@ -119,13 +119,17 @@ idaapi.__notification__ = __notification__
 try:
     idaapi.__notification__.add(idaapi.NW_INITIDA, __import__('hooks').make_ida_not_suck_cocks, -1000)
 
-# If installing that hook failed, then register our hook with a timer, and warn
-# the user about this.
+# If installing that hook failed, then check if we're running in batch mode. If
+# we are, then just immediately register things.
 except Exception:
     TIMEOUT = 5
-    __import__('logging').warning("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
-    idaapi.register_timer(TIMEOUT, __import__('hooks').ida_is_busy_sucking_cocks)
-    __import__('time').sleep(TIMEOUT)
+    if idaapi.cvar.batch:
+        __import__('hooks').ida_is_busy_sucking_cocks()
+
+    # Otherwise warn the user about this and register our hook with a timer.
+    else:
+        __import__('logging').warning("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
+        idaapi.register_timer(TIMEOUT, __import__('hooks').ida_is_busy_sucking_cocks)
     del(TIMEOUT)
 
 # If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
