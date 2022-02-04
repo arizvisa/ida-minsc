@@ -822,7 +822,7 @@ def __process_functions(percentage=0.10):
     It's intended to be called once the database is ready to be tampered with.
     """
     implicit = {'__typeinfo__', '__name__'}
-    P, globals = ui.Progress(), {item for item in internal.comment.globals.address()}
+    P, globals = ui.Progress(), {ea : count for ea, count in internal.comment.globals.iterate()}
 
     # Now we need to gather all of our imports so that we can clean up any functions
     # that are runtime-linked addresses. This is because IDA seems to create a
@@ -851,7 +851,13 @@ def __process_functions(percentage=0.10):
         if i % (int(len(funcs) * percentage) or 1) == 0:
             six.print_(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, 1 + i, len(funcs), i / float(len(funcs)) * 100.0))
 
-        # Grab the currently existing cache for the currnet function, and use
+        # If the current function is not in our globals, but it has a name tag, then
+        # we need to include it. IDA seems to name some addresses before promoting
+        # them to a function.
+        if fn not in globals and function.tag(fn):
+            [ internal.comment.globals.inc(fn, k) for k in implicit if k in function.tag(fn) ]
+
+        # Grab the currently existing cache for the current function, and use
         # it to tally up all of the reference counts for the tags.
         contents = {item for item in internal.comment.contents.address(fn, target=fn)}
         for ci, (l, r) in enumerate(chunks):
@@ -1191,8 +1197,10 @@ class naming(changingchanged):
 
     @classmethod
     def changing(cls, ea, new_name):
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring naming.changing event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
         if interface.node.is_identifier(ea):
-            return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring renaming to {!r} for identifier {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, new_name, ea))
+            return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring naming.changing event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
 
         # If we're not an identifier, then construct our new state.
         event = cls.new(ea)
@@ -1204,8 +1212,10 @@ class naming(changingchanged):
 
     @classmethod
     def changed(cls, ea, new_name, local_name):
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changed({:#x}, {!r}, {!s}) : Ignoring naming.changed event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea))
         if interface.node.is_identifier(ea):
-            return logging.debug(u"{:s}.changed({:#x}, {!r}) : Ignoring {:s}rename to {!r} for identifier {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, 'local ' if local_name else '', new_name, ea))
+            return logging.debug(u"{:s}.changed({:#x}, {!r}, {!s}) : Ignoring naming.changed event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea))
 
         # If we're not changing an identifier, then resume where we left off.
         event = cls.resume(ea)
@@ -1215,16 +1225,21 @@ class naming(changingchanged):
         # If we get a StopIteration, then the coroutine has terminated unexpected
         # and we need to warn the user about what happened.
         except StopIteration:
-            logging.fatal(u"{:s}.changed({:#x}, {!r}, {!r}) : Abandoning update of name at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea), exc_info=True)
+            logging.fatal(u"{:s}.changed({:#x}, {!r}, {!s}) : Abandoning update of name at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea), exc_info=True)
         event.close()
 
     @classmethod
-    def rename(ea, newname):
+    def rename(cls, ea, newname):
         """This hook is when a user adds a name or removes it from the database.
 
         We simply increase the reference count for the "__name__" key, or decrease it
         if the name is being removed.
         """
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.rename({:#x}, {!r}) : Ignoring rename event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.rename({:#x}, {!r}) : Ignoring rename event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
+
         fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
         labelQ, customQ = (fl & item == item for item in [idaapi.FF_LABL, idaapi.FF_NAME])
         fn = idaapi.get_func(ea)
@@ -1237,16 +1252,16 @@ class naming(changingchanged):
             # if it's a custom name
             if (not labelQ and customQ):
                 ctx.dec(ea, '__name__')
-                logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format(__name__, ea, newname, '__name__'))
+                logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format('.'.join([__name__, cls.__name__]), ea, newname, '__name__'))
             return
 
         # if it's currently a label or is unnamed
         if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
             ctx.inc(ea, '__name__')
-            logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, newname, '__name__'))
+            logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format('.'.join([__name__, cls.__name__]), ea, newname, '__name__'))
         return
 
-class extra_cmt(object):
+class extra_cmt(changingchanged):
     """
     This class is pretty much just a namespace for finding information about the
     extra comments in order to distinguish whether the comment is being added or
@@ -1284,19 +1299,20 @@ class extra_cmt(object):
 
     @classmethod
     def changed(cls, ea, line_idx, cmt):
-        # Check that we're not an identifier, because these aren't being cached.
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (database not ready) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
         if interface.node.is_identifier(ea):
-            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not an address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+            return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (not an address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Verify that the address is within our database boundaries because IDA
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
         except E.OutOfBoundsError:
-            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not a valid address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+            return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Determine whether we'll be updating the contents or a global.
-        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+        logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Processing event at address {:#x} for index {:d}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, utils.string.repr(cmt), ea, line_idx))
         ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
         # Figure out what the line_idx boundaries are so that we can use it to check
@@ -1306,12 +1322,12 @@ class extra_cmt(object):
         elif cls.is_suffix(line_idx):
             base_idx, tag = idaapi.E_NEXT, '__extra_suffix__'
         else:
-            return logging.fatal(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Unable to determine type of extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, ea, line_idx))
+            return logging.fatal(u"{:s}.changed({:#x}, {:d}, {!r}) : Unable to determine type of extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Check if this is not the first line_idx. If it isn't, then we can simply leave
         # because all we care about is whether there's a comment here or not.
         if line_idx not in {base_idx}:
-            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Exiting event for address {:#x} due to the index not pointing to the comment start ({:d} != {:d}).".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx, base_idx))
+            return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Exiting event for address {:#x} due to the index ({:d}) not pointing to the comment start ({:d}).".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, ea, line_idx, base_idx))
 
         # Now we need to figure out whether we've added an extra_cmt, or removed it.
         if cmt is None:
@@ -1334,14 +1350,14 @@ class extra_cmt(object):
         # First check that we're not an identifier, because we don't care about
         # caching these.
         if interface.node.is_identifier(ea):
-            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not an address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+            return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not an address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Verify that the address is within our database boundaries because IDA
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
         except E.OutOfBoundsError:
-            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not a valid address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+            return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # XXX: this function is now busted in later versions of IDA because for some
         #      reason, Ilfak, is now updating the extra comment prior to dispatching
@@ -1354,7 +1370,7 @@ class extra_cmt(object):
 
         oldcmt = internal.netnode.sup.get(ea, line_idx, type=memoryview)
         if oldcmt is not None: oldcmt = oldcmt.tobytes().rstrip(b'\0')
-        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for line {:d} with previous comment set to {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx, utils.string.repr(oldcmt)))
+        logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Processing event at address {:#x} for line {:d} with previous comment set to {!r}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, ea, line_idx, oldcmt))
         ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
         MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV - idaapi.E_NEXT
@@ -1365,7 +1381,7 @@ class extra_cmt(object):
             if l <= line_idx < r:
                 if oldcmt is None and cmt is not None: ctx.inc(ea, key)
                 elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
-                logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}, oldcmt={!s}) : {:s} reference count at address for tag {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), utils.string.repr(oldcmt), 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', utils.string.repr(key)))
+                logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}, oldcmt={!r}) : {:s} reference count at address for tag {!r}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, oldcmt, 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', key))
             continue
         return
 
@@ -1543,16 +1559,23 @@ def add_func(pfn):
     """
     implicit = {'__typeinfo__', '__name__'}
 
-    # gather all of the imports
-    imports = {item for item in []}
+    # figure out the newly added function's address, and gather all the imports.
+    ea, imports = interface.range.start(pfn), {item for item in []}
     for idx in range(idaapi.get_import_module_qty()):
         idaapi.enum_import_names(idx, lambda address, name, ordinal: imports.add(address) or True)
 
     # check that we're not adding an import as a function. if this happens,
     # then this is because IDA's ELF loader seems to be loading this.
-    ea = interface.range.start(pfn)
     if idaapi.segtype(ea) == idaapi.SEG_XTRN or ea in imports:
         return
+
+    # if the database is ready then we can trust the changingchanged-based classes
+    # to add all the implicit tags and thus we can exclude them here. otherwise,
+    # we'll do it ourselves because the functions get post-processed after building
+    # in order to deal with the events that we didn't receive.
+    exclude = implicit if changingchanged.is_ready() else {item for item in []}
+    available = {k for k in function.tag(ea)}
+    [ internal.comment.globals.inc(ea, k) for k in available - exclude ]
 
     # convert all globals into contents whilst making sure that we don't
     # add any of the implicit tags that are handled by other events.
