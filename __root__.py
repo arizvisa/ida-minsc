@@ -121,10 +121,11 @@ try:
 
 # If installing that hook failed, then register our hook with a timer, and warn
 # the user about this.
-except NameError:
+except Exception:
     TIMEOUT = 5
     __import__('logging').warning("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
     idaapi.register_timer(TIMEOUT, __import__('hooks').ida_is_busy_sucking_cocks)
+    __import__('time').sleep(TIMEOUT)
     del(TIMEOUT)
 
 # If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
@@ -133,5 +134,5 @@ else:
         idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, +1000)
 
     # Installing the termination hook failed, but it's not really too important...
-    except NameError:
+    except Exception:
         __import__('logging').warning("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
