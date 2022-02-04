@@ -343,9 +343,10 @@ class prioritybase(object):
     def unhook(self):
         '''Physically disconnect all of the hooks controlled by this class.'''
         notok = False
+        items = [item for item in self.__cache__]
 
         # Simply disconnect everything
-        for target in self.__cache__:
+        for target in items:
             ok = self.disconnect(target)
             if not ok:
                 logging.warning(u"{:s}.unhook() : Error trying to disconnect from the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
@@ -780,8 +781,8 @@ class priorityhook(prioritybase):
     def connect(self, name, callable):
         '''Connect the hook `callable` to the specified `name`.'''
         if not hasattr(self.__type__, name):
-            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError(u"{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
+            cls = self.__class__
+            raise NameError(u"{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
         # if the name attribute already exists, then we're already connected.
         if name in self.available:
@@ -801,14 +802,22 @@ class priorityhook(prioritybase):
 
     def disconnect(self, name):
         '''Disconnect the hook from the specified `name`.'''
+        cls = self.__class__
         def closure(instance, *parameters):
             supermethod = getattr(super(cls, instance), name)
             return supermethod(*parameters)
 
         if not hasattr(self.object, name):
-            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError(u"{:s}.disconnect({!r}, {!s}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            raise NameError(u"{:s}.disconnect({!r}) : Unable to disconnect the hook ({:s}) from the non-existent method ({:s}).".format('.'.join([__name__, cls.__name__]), name, name, self.__formatter__(name)))
 
+        # When disconnecting, we need to empty the cache for the provided target
+        # before we actually unhook things.
+        for callable in self.get(name):
+            ok = self.discard(name, callable)
+            Flogging = logging.info if ok else logging.warning
+            Flogging(u"{:s}.disconnect({!r}) : {:s} the callable ({!s}) connected to the requested hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(name)))
+
+        # Now we can re-assign a dummy closure, and perform the actual disconnect.
         method = internal.utils.pycompat.method.new(closure, self.object, self.__type__)
         setattr(self.object, name, method)
         return super(priorityhook, self).disconnect(name)
@@ -821,7 +830,8 @@ class priorityhook(prioritybase):
         # Try and connect to the target with a closure that will handle all its hooks.
         ok = self.connect(target, self.apply(target))
         if not ok:
-            raise ValueError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            cls = self.__class__
+            raise ValueError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
 
         # We should've connected, so all that's left is to enable the hook.
         ok = super(priorityhook, self).add(target, callable, priority)
@@ -830,15 +840,15 @@ class priorityhook(prioritybase):
     def discard(self, name, callable):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
-            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            cls = self.__class__
+            raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
         return super(priorityhook, self).discard(name, callable)
 
     def apply(self, name):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
-            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError(u"{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
+            cls = self.__class__
+            raise NameError(u"{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
         return super(priorityhook, self).apply(name)
 
     def __repr__(self):
@@ -873,6 +883,15 @@ class prioritynotification(prioritybase):
         '''Disconnect from the specified `notification` so that nothing will execute.'''
         def closure(*parameters):
             return True
+
+        # Iterate through all of our callables, and empty the cache since we're
+        # actually shutting everything down here.
+        cls = self.__class__
+        for callable in self.get(notification):
+            ok = self.discard(notification, callable)
+            Flogging = logging.info if ok else logging.warning
+            Flogging(u"{:s}.disconnect({:#x}) : {:s} the callable ({!s}) connected to the requested notification {:s}.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(notification)))
+
         ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
         return ok and super(prioritynotification, self).disconnect(notification)
 
@@ -884,7 +903,8 @@ class prioritynotification(prioritybase):
         # Notifications are always connected and enabled.
         ok = self.connect(notification, self.apply(notification))
         if not ok:
-            raise ValueError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            cls = self.__class__
+            raise ValueError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to connect the specified hook {:s}.".format('.'.join([__name__, cls.__name__]), notification, callable, priority, self.__formatter__(notification)))
 
         # Add the callable to our connected notification.
         ok = super(prioritynotification, self).add(notification, callable, priority)
@@ -894,7 +914,7 @@ class prioritynotification(prioritybase):
         '''Return a closure that will execute all of the hooks for the specified `notification`.'''
         if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
             cls = self.__class__
-            raise ValueError(u"{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, notification))
+            raise ValueError(u"{:s}.apply({:#x}): Unable to apply the specified notification {:s} due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification)))
 
         return super(prioritynotification, self).apply(notification)
 
