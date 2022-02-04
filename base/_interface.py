@@ -567,7 +567,7 @@ class prioritybase(object):
         # in the table and then we grab the first index for the given priority.
         if priority not in table:
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
-            raise NameError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the requested priority ({:+d}).".format('.'.join([__name__, cls.__name__]), target, format(priority), format(priority)))
+            raise internal.exceptions.ItemNotfoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the requested priority ({:+d}).".format('.'.join([__name__, cls.__name__]), target, format(priority), format(priority)))
         index = table[priority].pop(0)
 
         # We now can pop the index directly out of the state. Afterwards, we
@@ -624,7 +624,7 @@ class prioritybase(object):
                     break
 
                 cls = self.__class__
-                raise TypeError(u"{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
             return
 
         # That's it!
@@ -831,7 +831,7 @@ class priorityhook(prioritybase):
         ok = self.connect(target, self.apply(target))
         if not ok:
             cls = self.__class__
-            raise ValueError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
 
         # We should've connected, so all that's left is to enable the hook.
         ok = super(priorityhook, self).add(target, callable, priority)
@@ -841,7 +841,7 @@ class priorityhook(prioritybase):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
-            raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
+            raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the method ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
         return super(priorityhook, self).discard(name, callable)
 
     def apply(self, name):
@@ -904,7 +904,7 @@ class prioritynotification(prioritybase):
         ok = self.connect(notification, self.apply(notification))
         if not ok:
             cls = self.__class__
-            raise ValueError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to connect the specified hook {:s}.".format('.'.join([__name__, cls.__name__]), notification, callable, priority, self.__formatter__(notification)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to connect the specified hook {:s}.".format('.'.join([__name__, cls.__name__]), notification, callable, priority, self.__formatter__(notification)))
 
         # Add the callable to our connected notification.
         ok = super(prioritynotification, self).add(notification, callable, priority)
@@ -914,7 +914,7 @@ class prioritynotification(prioritybase):
         '''Return a closure that will execute all of the hooks for the specified `notification`.'''
         if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
             cls = self.__class__
-            raise ValueError(u"{:s}.apply({:#x}): Unable to apply the specified notification {:s} due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification)))
+            raise NameError(u"{:s}.apply({:#x}): Unable to apply the specified notification {:s} due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification)))
 
         return super(prioritynotification, self).apply(notification)
 
