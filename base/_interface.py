@@ -639,9 +639,13 @@ class priorityhook(prioritybase):
         '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
         super(priorityhook, self).__init__()
 
+        # create a blacklist for hooks that shouldn't be used as they trigger
+        # a re-entrancy issue related to a CriticalSection in IDA 7.7.
+        exclude = {'create_desktop_widget', 'ev_extract_address', 'get_custom_viewer_hint', 'ev_decorate_name', 'ev_get_reg_name', 'get_widget_config', 'ev_demangle_name', 'ev_use_regarg_type'}
+
         # construct a new class definition, but do it dynamically for SWIG
         res = { name for name in hooktype.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
-        cls = type(hooktype.__name__, (hooktype, ), { name : self.__make_dummy_method(name) for name in res })
+        cls = type(hooktype.__name__, (hooktype, ), { name : self.__make_dummy_method(name) for name in res - exclude })
 
         # now we can finally use it
         self.__type__ = cls
