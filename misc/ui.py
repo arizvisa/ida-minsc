@@ -1346,7 +1346,7 @@ class hook(object):
     the targets available for notification hooks.
     """
     @classmethod
-    def __start_ida__(cls):
+    def __start_ida__(ns):
         api = [
             ('idp', idaapi.IDP_Hooks),
             ('idb', idaapi.IDB_Hooks),
@@ -1355,38 +1355,36 @@ class hook(object):
 
         # Create an alias so we save typing 19 chars..
         priorityhook = internal.interface.priorityhook
-        for attr, hookcls in api:
+        for attribute, klass in api:
 
             # If there's an instance already attached to us, then use it.
-            if hasattr(cls, attr):
-                instance = getattr(cls, attr)
+            if hasattr(ns, attribute):
+                instance = getattr(ns, attribute)
 
             # Otherwise instantiate the priority hooks for each hook type,
             # and assign it directly into our class.
             else:
-                instance = priorityhook(hookcls)
-                setattr(cls, attr, instance)
-
-            # Now we can enable all the hooks so the user can use them
-            instance.hook()
+                instance = priorityhook(klass)
+                setattr(ns, attribute, instance)
+            continue
 
         # If the idaapi.__notification__ object exists, then also
         # assign it directly into our namespace.
-        if not hasattr(cls, 'notification') and hasattr(idaapi, '__notification__'):
-            setattr(cls, 'notification', idaapi.__notification__)
+        if not hasattr(ns, 'notification') and hasattr(idaapi, '__notification__'):
+            setattr(ns, 'notification', idaapi.__notification__)
         return
 
     @classmethod
-    def __stop_ida__(cls):
+    def __stop_ida__(ns):
         for api in ['idp', 'idb', 'ui']:
 
             # grab the invidual class that was used to hook things
-            hooker = getattr(cls, api)
+            instance = getattr(ns, api)
 
             # and then unhook it completely, because IDA on linux
             # seems to still dispatch to those hooks...even when
             # the language extension is unloaded.
-            hooker.unhook()
+            instance.close()
         return
 
     idp = internal.interface.priorityhook(idaapi.IDP_Hooks)
