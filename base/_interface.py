@@ -647,6 +647,7 @@ class priorityhook(prioritybase):
 
         # now we can finally use it
         self.object = cls()
+        self.__attachable__ = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
 
     def __supermethod__(self, name):
         '''Generate a method that calls the super method specified by `name`.'''
@@ -772,7 +773,7 @@ class priorityhook(prioritybase):
     def connect(self, name):
         '''Connect the hook `callable` to the specified `name`.'''
         cls = self.__class__
-        if not hasattr(self.object.__class__, name):
+        if not operator.contains(self.__attachable__, name):
             raise NameError(u"{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
         # if the attribute is already assigned to our hook object, then
@@ -812,7 +813,7 @@ class priorityhook(prioritybase):
     def disconnect(self, name):
         '''Disconnect the hook from the specified `name`.'''
         cls = self.__class__
-        if not hasattr(self.object, name):
+        if not operator.contains(self.__attachable__, name):
             raise NameError(u"{:s}.disconnect({!r}) : Unable to disconnect the hook ({:s}) from the non-existent method ({:s}).".format('.'.join([__name__, cls.__name__]), name, name, self.__formatter__(name)))
 
         # When disconnecting, we need to empty the cache for the provided target
@@ -845,7 +846,7 @@ class priorityhook(prioritybase):
 
     def discard(self, name, callable):
         '''Discard the specified `callable` from hooking the event `name`.'''
-        if not hasattr(self.object, name):
+        if not operator.contains(self.__attachable__, name):
             cls = self.__class__
             raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the method ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
         return super(priorityhook, self).discard(name, callable)
