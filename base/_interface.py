@@ -329,30 +329,27 @@ class prioritybase(object):
 
     def hook(self):
         '''Physically connect all of the hooks controlled by this class.'''
-        notok = False
+        ok = True if self.__cache__ else False
 
         # Just iterate through each target and connect a closure for it
         for target in self.__cache__:
-            ok = self.connect(target, self.apply(target))
-            if not ok:
+            if not self.connect(target):
                 logging.warning(u"{:s}.hook() : Error trying to connect to the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
-                notok = True
+                ok = False
             continue
-        return not notok
+        return ok
 
     def unhook(self):
         '''Physically disconnect all of the hooks controlled by this class.'''
-        notok = False
-        items = [item for item in self.__cache__]
+        ok, items = True if self.__cache__ else False, [item for item in self.__cache__]
 
         # Simply disconnect everything
         for target in items:
-            ok = self.disconnect(target)
-            if not ok:
+            if not self.disconnect(target):
                 logging.warning(u"{:s}.unhook() : Error trying to disconnect from the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
-                notok = True
+                ok = False
             continue
-        return not notok
+        return ok
 
     @property
     def available(self):
@@ -767,18 +764,19 @@ class priorityhook(prioritybase):
             return False
         return super(priorityhook, self).unhook()
 
-    def connect(self, name, callable):
+    def connect(self, name):
         '''Connect the hook `callable` to the specified `name`.'''
         if not hasattr(self.object.__class__, name):
             cls = self.__class__
-            raise NameError(u"{:s}.connect({!r}, {!s}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
+            raise NameError(u"{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
         # if the name attribute already exists, then we're already connected.
         if name in self.available:
             return True
 
-        # create a closure that calls our callable, and its supermethod
-        supermethod = self.__supermethod__(name)
+        # create a closure that calls our applied function and then returns
+        # its result from the supermethod for the object.
+        callable, supermethod = self.apply(name), self.__supermethod__(name)
         def closure(instance, *args, **kwargs):
             callable(*args, **kwargs)
             return supermethod(instance, *args, **kwargs)
@@ -817,7 +815,7 @@ class priorityhook(prioritybase):
             return super(priorityhook, self).add(target, callable, priority)
 
         # Try and connect to the target with a closure that will handle all its hooks.
-        ok = self.connect(target, self.apply(target))
+        ok = self.connect(target)
         if not ok:
             cls = self.__class__
             raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:+d}) : Unable to connect the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
@@ -863,8 +861,9 @@ class prioritynotification(prioritybase):
         name = self.__lookup.get(notification, '')
         return "{:s}({:#x})".format(name, notification) if name else "{:#x}".format(notification)
 
-    def connect(self, notification, closure):
+    def connect(self, notification):
         '''Connect to the specified `notification` in order to execute any callables provided by the user.'''
+        closure = self.apply(notification)
         ok = idaapi.notify_when(notification, closure)
         return ok and super(prioritynotification, self).connect(notification)
 
@@ -890,7 +889,7 @@ class prioritynotification(prioritybase):
             return super(prioritynotification, self).add(notification, callable, priority)
 
         # Notifications are always connected and enabled.
-        ok = self.connect(notification, self.apply(notification))
+        ok = self.connect(notification)
         if not ok:
             cls = self.__class__
             raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to connect the specified hook {:s}.".format('.'.join([__name__, cls.__name__]), notification, callable, priority, self.__formatter__(notification)))
