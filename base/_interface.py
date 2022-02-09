@@ -332,30 +332,6 @@ class prioritybase(object):
         logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to it not being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
         raise False
 
-    def hook(self):
-        '''Physically connect all of the hooks controlled by this class.'''
-        ok = True if self.__cache__ else False
-
-        # Just iterate through each target and connect a closure for it
-        for target in self.__cache__:
-            if not self.attach(target):
-                logging.warning(u"{:s}.hook() : Error trying to attach to the specified target ({:s}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
-                ok = False
-            continue
-        return ok
-
-    def unhook(self):
-        '''Physically disconnect all of the hooks controlled by this class.'''
-        ok, items = True if self.__cache__ else False, [item for item in self.__cache__]
-
-        # Simply disconnect everything
-        for target in items:
-            if not self.detach(target):
-                logging.warning(u"{:s}.unhook() : Error trying to detach from the specified target ({:s}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
-                ok = False
-            continue
-        return ok
-
     def close(self):
         '''Disconnect from all of the targets that are currently attached'''
         ok, items = True, [item for item in self.__cache__]
@@ -804,22 +780,6 @@ class priorityhook(prioritybase):
             logging.critical(u"{:s}.__instance__() : Unable to reconnect new instance ({!s}) during modification.".format('.'.join([__name__, cls.__name__]), instance.__class__))
         return
 
-    def hook(self):
-        '''Physically connect all of the hooks managed by this class.'''
-        if not self.object.hook():
-            cls = self.__class__
-            logging.debug(u"{:s}.hook(...) : Unable to hook with object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
-            return False
-        return super(priorityhook, self).hook()
-
-    def unhook(self):
-        '''Physically disconnect all of the hooks managed by this class.'''
-        if not self.object.unhook():
-            cls = self.__class__
-            logging.debug(u"{:s}.unhook(...) : Error trying to unhook object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
-            return False
-        return super(priorityhook, self).unhook()
-
     def close(self):
         '''Detach from all of the targets that are currently attached and disconnect the instance.'''
         cls = self.__class__
@@ -936,7 +896,6 @@ class prioritynotification(prioritybase):
     """
     def __init__(self):
         super(prioritynotification, self).__init__()
-        self.hook()
         self.__lookup = { getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('NW_') }
 
     def __formatter__(self, notification):
