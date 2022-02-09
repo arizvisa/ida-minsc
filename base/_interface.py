@@ -641,6 +641,10 @@ class priorityhook(prioritybase):
         self.__attachable__ = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
         self.__attached__ = {}
 
+        # now that we have everything setup, connect our instance so that
+        # when the user modifies it, the call to unhook() wil succeed.
+        self.object.hook()
+
     def __supermethod__(self, name):
         '''Generate a method that calls the super method specified by `name`.'''
         def method(self, *parameters, **keywords):
