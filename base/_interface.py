@@ -356,6 +356,18 @@ class prioritybase(object):
             continue
         return ok
 
+    def close(self):
+        '''Disconnect from all of the targets that are currently attached'''
+        ok, items = True, [item for item in self.__cache__]
+
+        # Simply detach every available target one-by-one.
+        for target in items:
+            if not self.disconnect(target):
+                logging.warning(u"{:s}.close() : Error trying to detach from the specified target ({:s}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
+                ok = False
+            continue
+        return ok
+
     @property
     def available(self):
         '''Return all of the available targets that can be either enabled or disabled.'''
@@ -807,6 +819,21 @@ class priorityhook(prioritybase):
             logging.debug(u"{:s}.unhook(...) : Error trying to unhook object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
             return False
         return super(priorityhook, self).unhook()
+
+    def close(self):
+        '''Detach from all of the targets that are currently attached and disconnect the instance.'''
+        cls = self.__class__
+        if not super(priorityhook, self).close():
+            logging.critical(u"{:s}.close() : Error trying to detach from all of the targets attached by ({!s}).".format('.'.join([__name__, cls.__name__]), self.object))
+            [logging.debug(u"{:s}.close() : Instance ({!r}) is still attached to target {:s}.".format('.'.join([__name__, cls.__name__]), self.object, self.__formatter__(target))) for target in self.available]
+
+        # Now that everything has been detached, disconnect the instance from all of its events.
+        if self.object.unhook():
+            return True
+
+        # Log a warning if we were unable to disconnect our instance.
+        logging.warning(u"{:s}.close() : Error trying to disconnect the instance ({!r}) from its events.".format('.'.join([__name__, cls.__name__]), self.object))
+        return False
 
     def attach(self, name):
         '''Attach to the target specified by `name`.'''
