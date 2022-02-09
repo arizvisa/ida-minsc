@@ -641,13 +641,14 @@ class priorityhook(prioritybase):
         '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
         super(priorityhook, self).__init__()
 
-        # construct a new class definition, but do it dynamically for SWIG
-        res = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
-        cls = type(klass.__name__, (klass, ), { name : self.__supermethod__(name) for name in res })
+        # stash away our hook class and instantiate a dummy instance of
+        # the class that we're going to be connecting our hooks to.
+        self.__klass__, self.object = klass, klass()
 
-        # now we can finally use it
-        self.object = cls()
+        # enumerate all of the attachable methods, and create a dictionary
+        # that will contain the methods that are currently attached.
         self.__attachable__ = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
+        self.__attached__ = {}
 
     def __supermethod__(self, name):
         '''Generate a method that calls the super method specified by `name`.'''
@@ -743,15 +744,49 @@ class priorityhook(prioritybase):
         return method
 
     def __formatter__(self, name):
-        cls = self.object.__class__
+        cls = self.__klass__
         return '.'.join([cls.__name__, name])
 
     @contextlib.contextmanager
-    def __context__(self):
-        try:
-            yield self.object.unhook()
-        finally:
-            self.object.hook()
+    def __instance__(self):
+        '''Return a dictionary upon context entry, and then attach its items to a new hook object upon context exit.'''
+        klass, attributes = self.__klass__, {}
+
+        # Check that our object was unhooked, and raise an exception if it
+        # not. This way we don't tamper with any hooks that are in use.
+        if not self.object.unhook():
+            cls = self.__class__
+            logging.warning(u"{:s}.__instance__() : Unable to disconnect the current hook object ({!s}) during modification.".format('.'.join([__name__, cls.__name__]), self.object.__class__))
+
+        # Now we need to yield the attributes to the caller for them to modify.
+        yield attributes
+
+        # Then we need to iterate through all of the attributes in order to
+        # gather the items that we'll use to generate a closure.
+        methods = {}
+        for name, callable in attributes.items():
+            __methodname__, __callable__, __supermethod__ = name, callable, self.__supermethod__(name)
+
+            # Generate a closure that will later be converted into a method.
+            def closure(instance, *args, __methodname__=__methodname__, __callable__=__callable__, __supermethod__=__supermethod__, **kwargs):
+                result = __callable__(*args, **kwargs)
+                if result:
+                    logging.warning(u"{:s}.method({:s}) : Callback for {:s} returned an unexpected result ({!r}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(__methodname__), __callable__, result))
+                return __supermethod__(instance, *args, **kwargs)
+
+            # We've generated the closure to use and so we can store it in
+            # our dictionary that will be converted into methods.
+            methods[name] = closure
+
+        # Now we can use the methods we generated and stored in our dictionary to
+        # create a new type and use it to instantiate a new hook object.
+        cls = type(klass.__name__, (klass,), {attribute : callable for attribute, callable in methods.items()})
+        instance = cls()
+
+        # Then we just stash away our object and then install the hooks.
+        self.object = instance
+        if not instance.hook():
+            logging.critical(u"{:s}.__instance__() : Unable to reconnect new hook object ({!s}) during modification.".format('.'.join([__name__, cls.__name__]), instance.__class__))
         return
 
     def hook(self):
@@ -778,7 +813,7 @@ class priorityhook(prioritybase):
 
         # if the attribute is already assigned to our hook object, then
         # the target name has already been connected.
-        if name in self.available:
+        if name in self.__attached__:
             logging.warning(u"{:s}.connect({!r}) : The requested target ({:s}) has already been attached to the hook object.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
             return True
 
@@ -786,17 +821,15 @@ class priorityhook(prioritybase):
         # generate the supermethod for the target in preparation for a closure.
         ok, callable = super(priorityhook, self).connect(name)
         if ok:
-            method = self.__supermethod__(name)
+            self.__attached__[name] = callable
 
-            # now that we have our callable, we'll need to wrap it in a closure
-            # that calls the original supermethod before we actually connect it.
-            def closure(instance, *args, **kwargs):
-                callable(*args, **kwargs)
-                return method(instance, *args, **kwargs)
+            # now we can create a new instance of the hook object and update it
+            # with the currently attached methods.
+            with self.__instance__() as attach:
+                attach.update(self.__attached__)
 
-            # now we can convert our closure to a method and attach it to the object.
-            with self.__context__():
-                setattr(self.object, name, internal.utils.pycompat.method.new(closure, self.object, self.object.__class__))
+            # log some information and then leave because we were successful.
+            logging.info(u"{:s}.connect({!r}) : Connected the specified hook ({:s}) to the hook object.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
             return True
 
         # otherwise we failed, and we need to try to disconnect the target using
@@ -816,6 +849,11 @@ class priorityhook(prioritybase):
         if not operator.contains(self.__attachable__, name):
             raise NameError(u"{:s}.disconnect({!r}) : Unable to disconnect the hook ({:s}) from the non-existent method ({:s}).".format('.'.join([__name__, cls.__name__]), name, name, self.__formatter__(name)))
 
+        # Check that the target name is currently attached.
+        if not operator.contains(self.__attached__, name):
+            logging.warning(u"{:s}.disconnect({!r}) : Unable to disconnect the requested hook ({:s}) as it is not currently connected to {:s}.".format('.'.join([__name__, cls.__name__]), name, name, self.__formatter__(name)))
+            return False
+
         # When disconnecting, we need to empty the cache for the provided target
         # before we actually unhook things.
         for callable in self.get(name):
@@ -823,10 +861,11 @@ class priorityhook(prioritybase):
             Flogging = logging.info if ok else logging.warning
             Flogging(u"{:s}.disconnect({!r}) : {:s} the callable ({!s}) connected to the requested hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(name)))
 
-        # Now we can remove the method from our hook object and then
-        # we can disconnect the target name from the cache.
-        with self.__context__():
-            delattr(self.object, name)
+        # Now we just need to detach the target name from our attachable
+        # state, and then apply it to a new instance of the hook object.
+        self.__attachable.pop(name)
+        with self.__instance__() as attach:
+            attach.update(self.__attached__)
         return super(priorityhook, self).disconnect(name)
 
     def add(self, name, callable, priority):
