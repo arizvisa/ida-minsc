@@ -750,20 +750,6 @@ class priorityhook(prioritybase):
         cls = self.__type__
         return '.'.join([cls.__name__, name])
 
-    def __hook(self):
-        if not self.object.hook():
-            cls = self.__class__
-            logging.debug(u"{:s}.hook(...) : Unable to hook with object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
-            return False
-        return True
-
-    def __unhook(self):
-        if not self.object.unhook():
-            cls = self.__class__
-            logging.debug(u"{:s}.unhook(...) : Error trying to unhook object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
-            return False
-        return True
-
     @contextlib.contextmanager
     def __context__(self):
         try:
@@ -774,13 +760,19 @@ class priorityhook(prioritybase):
 
     def hook(self):
         '''Physically connect all of the hooks managed by this class.'''
-        ok = super(priorityhook, self).hook()
-        return ok and self.__hook()
+        if not self.object.hook():
+            cls = self.__class__
+            logging.debug(u"{:s}.hook(...) : Unable to hook with object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
+            return False
+        return super(priorityhook, self).hook()
 
     def unhook(self):
         '''Physically disconnect all of the hooks managed by this class.'''
-        ok = self.__unhook()
-        return ok and super(priorityhook, self).unhook()
+        if not self.object.unhook():
+            cls = self.__class__
+            logging.debug(u"{:s}.unhook(...) : Error trying to unhook object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
+            return False
+        return super(priorityhook, self).unhook()
 
     def connect(self, name, callable):
         '''Connect the hook `callable` to the specified `name`.'''
