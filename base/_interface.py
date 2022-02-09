@@ -641,19 +641,17 @@ class priorityhook(prioritybase):
 
         # construct a new class definition, but do it dynamically for SWIG
         res = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
-        cls = type(klass.__name__, (klass, ), { name : self.__make_dummy_method(name) for name in res })
+        cls = type(klass.__name__, (klass, ), { name : self.__supermethod__(name) for name in res })
 
         # now we can finally use it
         self.object = cls()
 
-    @staticmethod
-    def __make_dummy_method(name):
+    def __supermethod__(self, name):
         '''Generate a method that calls the super method specified by `name`.'''
         def method(self, *parameters, **keywords):
-            cls = self.__class__
-            supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
-            return supermethod(*parameters, **keywords)
+            cls = super(self.__class__, self)
+            method = getattr(cls, name)
+            return method(*parameters, **keywords)
 
         def ev_set_idp_options(self, keyword, value_type, value, idb_loaded):
             cls = self.__class__
@@ -773,14 +771,14 @@ class priorityhook(prioritybase):
         '''Connect the hook `callable` to the specified `name`.'''
         if not hasattr(self.object.__class__, name):
             cls = self.__class__
-            raise NameError(u"{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
+            raise NameError(u"{:s}.connect({!r}, {!s}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
 
         # if the name attribute already exists, then we're already connected.
         if name in self.available:
             return True
 
         # create a closure that calls our callable, and its supermethod
-        supermethod = self.__make_dummy_method(name)
+        supermethod = self.__supermethod__(name)
         def closure(instance, *args, **kwargs):
             callable(*args, **kwargs)
             return supermethod(instance, *args, **kwargs)
