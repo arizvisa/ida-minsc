@@ -756,18 +756,25 @@ class priorityhook(prioritybase):
         # gather the items that we'll use to generate a closure.
         methods = {}
         for name, callable in attributes.items():
-            __methodname__, __callable__, __supermethod__ = name, callable, self.__supermethod__(name)
+            locals = {}
+
+            # Assign some parameters that we need to feed into our closure.
+            locals['target'], locals['callable'] = name, callable
+            locals['supermethod'] = self.__supermethod__(name)
 
             # Generate a closure that will later be converted into a method.
-            def closure(instance, *args, __methodname__=__methodname__, __callable__=__callable__, __supermethod__=__supermethod__, **kwargs):
-                result = __callable__(*args, **kwargs)
-                if result:
-                    logging.warning(u"{:s}.method({:s}) : Callback for {:s} returned an unexpected result ({!r}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(__methodname__), __callable__, result))
-                return __supermethod__(instance, *args, **kwargs)
+            def closure(locals):
+                def method(instance, *args, **kwargs):
+                    target, callable, supermethod = (locals[item] for item in ['target', 'callable', 'supermethod'])
+                    result = callable(*args, **kwargs)
+                    if result:
+                        logging.warning(u"{:s}.method({:s}) : Callback for {:s} returned an unexpected result ({!r}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target), callable, result))
+                    return supermethod(instance, *args, **kwargs)
+                return method
 
             # We've generated the closure to use and so we can store it in
             # our dictionary that will be converted into methods.
-            methods[name] = closure
+            methods[name] = closure(locals)
 
         # Now we can use the methods we generated and stored in our dictionary to
         # create a new type and use it to instantiate a new hook object.
