@@ -785,18 +785,17 @@ class priorityhook(prioritybase):
         # generate the supermethod for the target in preparation for a closure.
         ok, callable = super(priorityhook, self).connect(name)
         if ok:
-            supermethod = self.__supermethod__(name)
+            method = self.__supermethod__(name)
 
             # now that we have our callable, we'll need to wrap it in a closure
             # that calls the original supermethod before we actually connect it.
             def closure(instance, *args, **kwargs):
                 callable(*args, **kwargs)
-                return supermethod(instance, *args, **kwargs)
+                return method(instance, *args, **kwargs)
 
             # now we can convert our closure to a method and attach it to the object.
             with self.__context__():
-                method = internal.utils.pycompat.method.new(closure, self.object, self.object.__class__)
-                setattr(self.object, name, method)
+                setattr(self.object, name, internal.utils.pycompat.method.new(closure, self.object, self.object.__class__))
             return True
 
         # otherwise we failed, and we need to try to disconnect the target using
@@ -813,10 +812,6 @@ class priorityhook(prioritybase):
     def disconnect(self, name):
         '''Disconnect the hook from the specified `name`.'''
         cls = self.__class__
-        def closure(instance, *parameters):
-            supermethod = getattr(super(cls, instance), name)
-            return supermethod(*parameters)
-
         if not hasattr(self.object, name):
             raise NameError(u"{:s}.disconnect({!r}) : Unable to disconnect the hook ({:s}) from the non-existent method ({:s}).".format('.'.join([__name__, cls.__name__]), name, name, self.__formatter__(name)))
 
@@ -827,9 +822,10 @@ class priorityhook(prioritybase):
             Flogging = logging.info if ok else logging.warning
             Flogging(u"{:s}.disconnect({!r}) : {:s} the callable ({!s}) connected to the requested hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(name)))
 
-        # Now we can re-assign a dummy closure, and perform the actual disconnect.
-        method = internal.utils.pycompat.method.new(closure, self.object, self.object.__class__)
-        setattr(self.object, name, method)
+        # Now we can remove the method from our hook object and then
+        # we can disconnect the target name from the cache.
+        with self.__context__():
+            delattr(self.object, name)
         return super(priorityhook, self).disconnect(name)
 
     def add(self, name, callable, priority):
