@@ -635,21 +635,16 @@ class priorityhook(prioritybase):
     Helper class for allowing one to apply a number of hooks to the
     different hook points within IDA.
     """
-    def __init__(self, hooktype):
+    def __init__(self, klass):
         '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
         super(priorityhook, self).__init__()
 
-        # create a blacklist for hooks that shouldn't be used as they trigger
-        # a re-entrancy issue related to a CriticalSection in IDA 7.7.
-        exclude = {'create_desktop_widget', 'ev_extract_address', 'get_custom_viewer_hint', 'ev_decorate_name', 'ev_get_reg_name', 'get_widget_config', 'ev_demangle_name', 'ev_use_regarg_type'}
-
         # construct a new class definition, but do it dynamically for SWIG
-        res = { name for name in hooktype.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
-        cls = type(hooktype.__name__, (hooktype, ), { name : self.__make_dummy_method(name) for name in res - exclude })
+        res = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
+        cls = type(klass.__name__, (klass, ), { name : self.__make_dummy_method(name) for name in res })
 
         # now we can finally use it
-        self.__type__ = cls
-        self.object = self.__type__()
+        self.object = cls()
 
     @staticmethod
     def __make_dummy_method(name):
@@ -747,7 +742,7 @@ class priorityhook(prioritybase):
         return method
 
     def __formatter__(self, name):
-        cls = self.__type__
+        cls = self.object.__class__
         return '.'.join([cls.__name__, name])
 
     @contextlib.contextmanager
@@ -776,7 +771,7 @@ class priorityhook(prioritybase):
 
     def connect(self, name, callable):
         '''Connect the hook `callable` to the specified `name`.'''
-        if not hasattr(self.__type__, name):
+        if not hasattr(self.object.__class__, name):
             cls = self.__class__
             raise NameError(u"{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
@@ -792,7 +787,7 @@ class priorityhook(prioritybase):
 
         # unhook, assign our new method, and then re-hook
         with self.__context__():
-            method = internal.utils.pycompat.method.new(closure, self.object, self.__type__)
+            method = internal.utils.pycompat.method.new(closure, self.object, self.object.__class__)
             setattr(self.object, name, method)
         return super(priorityhook, self).connect(name)
 
@@ -814,7 +809,7 @@ class priorityhook(prioritybase):
             Flogging(u"{:s}.disconnect({!r}) : {:s} the callable ({!s}) connected to the requested hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(name)))
 
         # Now we can re-assign a dummy closure, and perform the actual disconnect.
-        method = internal.utils.pycompat.method.new(closure, self.object, self.__type__)
+        method = internal.utils.pycompat.method.new(closure, self.object, self.object.__class__)
         setattr(self.object, name, method)
         return super(priorityhook, self).disconnect(name)
 
