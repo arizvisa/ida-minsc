@@ -583,7 +583,7 @@ class prioritybase(object):
         priority, result = item
         return result
 
-    def apply(self, target):
+    def __apply__(self, target):
         '''Return a closure that will execute all of the hooks for the specified `target`.'''
 
         ## Define the closure that we'll hand off to connect
@@ -776,7 +776,7 @@ class priorityhook(prioritybase):
 
         # create a closure that calls our applied function and then returns
         # its result from the supermethod for the object.
-        callable, supermethod = self.apply(name), self.__supermethod__(name)
+        callable, supermethod = self.__apply__(name), self.__supermethod__(name)
         def closure(instance, *args, **kwargs):
             callable(*args, **kwargs)
             return supermethod(instance, *args, **kwargs)
@@ -831,12 +831,12 @@ class priorityhook(prioritybase):
             raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the method ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, self.__formatter__(name)))
         return super(priorityhook, self).discard(name, callable)
 
-    def apply(self, name):
+    def __apply__(self, name):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
             raise NameError(u"{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
-        return super(priorityhook, self).apply(name)
+        return super(priorityhook, self).__apply__(name)
 
     def __repr__(self):
         hObject = self.object
@@ -863,7 +863,7 @@ class prioritynotification(prioritybase):
 
     def connect(self, notification):
         '''Connect to the specified `notification` in order to execute any callables provided by the user.'''
-        closure = self.apply(notification)
+        closure = self.__apply__(notification)
         ok = idaapi.notify_when(notification, closure)
         return ok and super(prioritynotification, self).connect(notification)
 
@@ -898,13 +898,13 @@ class prioritynotification(prioritybase):
         ok = super(prioritynotification, self).add(notification, callable, priority)
         return ok and self.enable(notification)
 
-    def apply(self, notification):
+    def __apply__(self, notification):
         '''Return a closure that will execute all of the hooks for the specified `notification`.'''
         if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
             cls = self.__class__
             raise NameError(u"{:s}.apply({:#x}): Unable to apply the specified notification {:s} due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification)))
 
-        return super(prioritynotification, self).apply(notification)
+        return super(prioritynotification, self).__apply__(notification)
 
     def __repr__(self):
         if not self.available:
