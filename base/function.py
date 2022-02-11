@@ -3256,7 +3256,7 @@ class type(object):
         @classmethod
         def count(cls, func):
             '''Return the number of arguments for the prototype of the function identified by `func`.'''
-            ti = type()
+            ti = type(func)
             return ti.get_nargs()
 
     args = arguments
