@@ -3248,6 +3248,15 @@ class type(object):
         This namespace is aliased as ``function.type.args``.
         """
         @utils.multicase()
+        def __new__(cls):
+            '''Return the type information for all of the arguments belonging to the current function as a list.'''
+            return cls.types(ui.current.address())
+        @utils.multicase()
+        def __new__(cls, func):
+            '''Return the type information for all of the arguments belonging to the function `func` as a list.'''
+            return cls.types(func)
+
+        @utils.multicase()
         @classmethod
         def count(cls):
             '''Return the number of arguments within the current function's prototype.'''
@@ -3259,6 +3268,95 @@ class type(object):
             ti = type(func)
             return ti.get_nargs()
 
+        @utils.multicase()
+        @classmethod
+        def types(cls):
+            '''Return the type information for all of the arguments belonging to the current function as a list.'''
+            return cls.types(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def types(cls, func):
+            '''Return the type information for all of the arguments belonging to the function `func` as a list.'''
+            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            ti = type(ea)
+
+            # If our type is a function pointer, then we need to dereference it
+            # in order to get the type that we want to extract the argument from.
+            if rt and ti.is_funcptr():
+                pi = idaapi.ptr_type_data_t()
+                if not ti.get_ptr_details(pi):
+                    raise E.DisassemblerError(u"{:s}.types({:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
+                tinfo = pi.obj_type
+
+            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
+            elif not rt and ti.is_func():
+                tinfo = ti
+
+            # Anything else is a type error that we need to raise to the user.
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}.types({:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
+
+            # Now we can check to see if the type has details that we can grab the
+            # argument type out of. If there are no details, then we raise an
+            # exception informing the user.
+            if not tinfo.has_details():
+                raise E.MissingTypeOrAttribute(u"{:s}.types({:#x}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
+
+            # Now we can grab our function details and process them according to
+            # what the user is asking us to do.
+            ftd = idaapi.func_type_data_t()
+            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
+                raise E.DisassemblerError(u"{:s}.types({:#x}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
+
+            # Then we just have to return each element as a list.
+            iterable = (ftd[index] for index in builtins.range(ftd.size()))
+            return [item.type for item in iterable]
+        type = utils.alias(types, 'type.arguments')
+
+        @utils.multicase()
+        @classmethod
+        def names(cls):
+            '''Return the names for all of the arguments belonging to the current function as a list.'''
+            return cls.names(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def names(cls, func):
+            '''Return the names for all of the arguments belonging to the function `func` as a list.'''
+            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            ti = type(ea)
+
+            # If our type is a function pointer, then we need to dereference it
+            # in order to get the type that we want to extract the argument from.
+            if rt and ti.is_funcptr():
+                pi = idaapi.ptr_type_data_t()
+                if not ti.get_ptr_details(pi):
+                    raise E.DisassemblerError(u"{:s}.names({:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
+                tinfo = pi.obj_type
+
+            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
+            elif not rt and ti.is_func():
+                tinfo = ti
+
+            # Anything else is a type error that we need to raise to the user.
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}.names({:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
+
+            # Now we can check to see if the type has details that we can grab the
+            # argument type out of. If there are no details, then we raise an
+            # exception informing the user.
+            if not tinfo.has_details():
+                raise E.MissingTypeOrAttribute(u"{:s}.names({:#x}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
+
+            # Now we can grab our function details and process them according to
+            # what the user is asking us to do.
+            ftd = idaapi.func_type_data_t()
+            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
+                raise E.DisassemblerError(u"{:s}.names({:#x}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
+
+            # Then we just have to return each name as a list.
+            iterable = (ftd[index] for index in builtins.range(ftd.size()))
+            return [item.name for item in iterable]
+        name = utils.alias(names, 'type.arguments')
     args = arguments
 
 t = type # XXX: ns alias
