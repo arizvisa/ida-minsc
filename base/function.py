@@ -573,9 +573,9 @@ class chunk(object):
             if ch.referers is None and count > 1:
                 raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to read more than one referrer ({:d}) for the function tail at {!s}. The \"{:s}\" attribute is {!s}.".format('.'.join([__name__, cls.__name__]), ea, count, bounds, 'referers', ch.referers))
 
-            # Otherwise, we can handle this by using the function that
-            # we snagged in order to determine the owner of the address.
-            elif ch.referers is None:
+            # If it's still None or there's only one referrer, then we
+            # use the func_t we snagged in order to determine the owner.
+            elif ch.referers is None or count == 1:
                 referers = [ internal.interface.range.start(fn) ]
 
             # Our referers are normal, so we can simply convert them

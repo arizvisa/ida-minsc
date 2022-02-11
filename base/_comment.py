@@ -831,15 +831,15 @@ class contents(tagging):
                 logging.critical(u"{:s}._key({:#x}) : Unable to read more than one referrer ({:d}) for the function tail at {!s}. The \"{:s}\" attribute is {!s}.".format('.'.join([__name__, cls.__name__]), ea, count, bounds, 'referers', ch.referers))
                 return internal.interface.range.start(res)
 
-            # Otherwise we can just use idaapi.get_func() to get the owner.
-            elif ch.referers is None:
+            # If there's no referrers or the number of them is one, then
+            # we'll just rely on idaapi.get_func() to get the owner.
+            elif ch.referers is None or count == 1:
                 return internal.interface.range.start(res)
 
             # If we didn't get an array with a count, then we're using
             # an older version of IDA where we need to construct it.
             referers = ch.referers if hasattr(ch.referers, 'count') else tids.frompointer(ch.referers)
-            owners = [referers[index] for index in range(count)]
-            return owners if len(owners) > 1 else owners[0]
+            return [referers[index] for index in range(count)]
         return internal.interface.range.start(res)
 
     @classmethod
