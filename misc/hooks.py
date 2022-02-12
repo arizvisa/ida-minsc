@@ -1688,73 +1688,112 @@ class supermethods(object):
     the initialization of them by the ui.hook namepsace.
     """
 
-    ## idaapi.__version__ >= 7.5
-    def ev_set_idp_options(self, keyword, value_type, value, idb_loaded):
-        cls = self.__class__
-        if value_type == idaapi.IDPOPT_STR:     # string constant (char*)
-            res = idaapi.uchar_array(1 + len(value))
-            for index, item in enumerate(bytearray(value + b'\0')):
-                res[index] = item
-            pvalue = res
-        elif value_type == idaapi.IDPOPT_NUM:   # number (uval_t*)
-            res = idaapi.uvalvec_t()
-            res.push_back(value)
-            pvalue = res
-        elif value_type == idaapi.IDPOPT_BIT:   # bit, yes/no (int*)
-            res = idaapi.intvec_t()
-            res.push_back(value)
-            pvalue = res
-        elif value_type == idaapi.IDPOPT_FLT:   # float, yes/no (double*)
-            # FIXME: is there a proper way to get a double* type?
-            res = idaapi.uint64vec_t()
-            res.push_back(internal.utils.float_to_integer(value, 52, 11, 1))
-            pvalue = res
-        elif value_type == idaapi.IDPOPT_I64:   # 64bit number (int64*)
-            res = idaapi.int64vec_t()
-            res.push_back(value)
-            pvalue = res
-        else:
-            raise ValueError(u"ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
+    class IDP_Hooks(object):
+        """
+        This is just a namespace for the the list of supermethods that
+        we need to override with when using the IDP_Hooks object.
+        """
 
-        # We need to figure out the original supermethod to call into
-        # ourselves because we don't have the method name as a cellvar.
-        supercls = super(cls, self)
-        supermethod = getattr(supercls, 'ev_set_idp_options')
-        return supermethod(keyword, value_type, pvalue, idb_loaded)
+        def ev_set_idp_options(self, keyword, value_type, value, idb_loaded):
+            "idaapi.__version__ >= 7.5"
+            cls = self.__class__
+            if value_type == idaapi.IDPOPT_STR:     # string constant (char*)
+                res = idaapi.uchar_array(1 + len(value))
+                for index, item in enumerate(bytearray(value + b'\0')):
+                    res[index] = item
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_NUM:   # number (uval_t*)
+                res = idaapi.uvalvec_t()
+                res.push_back(value)
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_BIT:   # bit, yes/no (int*)
+                res = idaapi.intvec_t()
+                res.push_back(value)
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_FLT:   # float, yes/no (double*)
+                # FIXME: is there a proper way to get a double* type?
+                res = idaapi.uint64vec_t()
+                res.push_back(internal.utils.float_to_integer(value, 52, 11, 1))
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_I64:   # 64bit number (int64*)
+                res = idaapi.int64vec_t()
+                res.push_back(value)
+                pvalue = res
+            else:
+                raise ValueError(u"ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
 
-    ## idaapi.__version__ >= 7.6
-    def compiler_changed(self, adjust_inf_fields):
-        cls = self.__class__
-        supercls = super(cls, self)
-        supermethod = getattr(supercls, 'compiler_changed')
-        return supermethod(adjust_inf_fields)
+            # We need to figure out the original supermethod to call into
+            # ourselves because we don't have the method name as a cellvar.
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'ev_set_idp_options')
+            return supermethod(keyword, value_type, pvalue, idb_loaded)
 
-    def renamed(self, ea, new_name, local_name):
-        cls = self.__class__
-        supercls = super(cls, self)
-        supermethod = getattr(supercls, 'renamed')
-        return supermethod(ea, new_name, local_name or None, '')
+        # Initialize a dictionary containing the version contraints for each
+        # of the supermethods defined for the IDP_Hooks class.
+        mapping = {}
+        idaapi.__version__ >= 7.5 and mapping.setdefault('ev_set_idp_options', ev_set_idp_options)
 
-    def saved(self, path):
-        cls = self.__class__
-        supercls = super(cls, self)
-        supermethod = getattr(supercls, 'saved')
-        return supermethod(path)
+    class IDB_Hooks(object):
+        """
+        This is just a namespace for the the list of supermethods that
+        we need to override with when using the IDB_Hooks object.
+        """
 
-    def bookmark_changed(self, index, pos, desc, operation):
+        def compiler_changed(self, adjust_inf_fields):
+            "idaapi.__version__ >= 7.6"
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'compiler_changed')
+            return supermethod(adjust_inf_fields)
+
+        def renamed(self, ea, new_name, local_name):
+            "idaapi.__version__ >= 7.6"
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'renamed')
+            return supermethod(ea, new_name, local_name or None, '')
+
         # /home/user/idapro-7.6/python/3/ida_idp.py:5801 # expected 5, got 4
-        cls = self.__class__
-        supercls = super(cls, self)
-        supermethod = getattr(supercls, 'bookmark_changed')
-        return supermethod(index, pos, desc, operation)
+        def bookmark_changed(self, index, pos, desc, operation):
+            "idaapi.__version__ >= 7.6"
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'bookmark_changed')
+            return supermethod(index, pos, desc, operation)
 
-    ## idaapi.__version__ >= 7.7
-    def segm_deleted(self, start_ea, end_ea, flags):
         # /home/user/idapro-7.6/python/3/ida_idp.py:5189 # expected 4, got 3
-        cls = self.__class__
-        supercls = super(cls, self)
-        supermethod = getattr(supercls, 'segm_deleted')
-        return supermethod(start_ea, end_ea, flags)
+        def segm_deleted(self, start_ea, end_ea, flags):
+            "idaapi.__version__ >= 7.7"
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'segm_deleted')
+            return supermethod(start_ea, end_ea, flags)
+
+        # Initialize a dictionary containing the version contraints for each
+        # of the supermethods defined for the IDP_Hooks class.
+        mapping = {}
+        idaapi.__version__ >= 7.6 and mapping.setdefault('compiler_changed', compiler_changed)
+        idaapi.__version__ >= 7.6 and mapping.setdefault('renamed', renamed)
+        idaapi.__version__ >= 7.6 and mapping.setdefault('bookmark_changed', bookmark_changed)
+        idaapi.__version__ >= 7.7 and mapping.setdefault('segm_deleted', segm_deleted)
+
+    class UI_Hooks(object):
+        """
+        This is just a namespace for the the list of supermethods that
+        we need to override with when using the UI_Hooks object.
+        """
+
+        def saved(self, path):
+            "idaapi.__version__ >= 7.6"
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'saved')
+            return supermethod(path)
+
+        # Initialize a dictionary containing the version contraints for each
+        # of the supermethods defined for the IDP_Hooks class.
+        mapping = {}
+        idaapi.__version__ >= 7.6 and mapping.setdefault('saved', saved)
 
     # Create a dictionary that's used to find the correct supermethod
     # according to the version that's involved. We need this because
@@ -1764,16 +1803,16 @@ class supermethods(object):
     # needs to change its parameters when dispatching to the original.
     mapping = {}
     if idaapi.__version__ >= 7.5:
-        mapping['ev_set_idp_options'] = ev_set_idp_options
+        mapping['ev_set_idp_options'] = IDP_Hooks.ev_set_idp_options
 
     if idaapi.__version__ >= 7.6:
-        mapping['compiler_changed'] = compiler_changed
-        mapping['renamed'] = renamed
-        mapping['saved'] = saved
-        mapping['bookmark_changed'] = bookmark_changed
+        mapping['compiler_changed'] = IDB_Hooks.compiler_changed
+        mapping['renamed'] = IDB_Hooks.renamed
+        mapping['saved'] = UI_Hooks.saved
+        mapping['bookmark_changed'] = IDB_Hooks.bookmark_changed
 
     if idaapi.__version__ >= 7.7:
-        mapping['segm_deleted'] = segm_deleted
+        mapping['segm_deleted'] = IDB_Hooks.segm_deleted
 
 def make_ida_not_suck_cocks(nw_code):
     '''Start hooking all of IDA's API.'''
