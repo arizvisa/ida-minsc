@@ -1345,6 +1345,7 @@ class hook(object):
     the documentation for ``idaapi.notify_when`` can be used to list
     the targets available for notification hooks.
     """
+
     @classmethod
     def __start_ida__(ns):
         api = [
@@ -1362,9 +1363,12 @@ class hook(object):
                 instance = getattr(ns, attribute)
 
             # Otherwise instantiate the priority hooks for each hook type,
-            # and assign it directly into our class.
+            # and assign it directly into our class. We attach a supermethod
+            # mapping dictionary to deal with original hook supermethods which
+            # have a completely different number of parameters or types than
+            # what is listed within the documentation.
             else:
-                instance = priorityhook(klass)
+                instance = priorityhook(klass, mapping=__import__('hooks').supermethods.mapping)
                 setattr(ns, attribute, instance)
             continue
 
@@ -1387,9 +1391,9 @@ class hook(object):
             instance.close()
         return
 
-    idp = internal.interface.priorityhook(idaapi.IDP_Hooks)
-    idb = internal.interface.priorityhook(idaapi.IDB_Hooks)
-    ui = internal.interface.priorityhook(idaapi.UI_Hooks)
+    idp = internal.interface.priorityhook(idaapi.IDP_Hooks, __import__('hooks').supermethods.mapping)
+    idb = internal.interface.priorityhook(idaapi.IDB_Hooks, __import__('hooks').supermethods.mapping)
+    ui = internal.interface.priorityhook(idaapi.UI_Hooks, __import__('hooks').supermethods.mapping)
 
     # if there's a __notification__ attribute attached to IDA, then
     # assign it to our namespace so it can be used.
