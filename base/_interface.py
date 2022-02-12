@@ -679,39 +679,39 @@ class priorityhook(prioritybase):
             else:
                 raise ValueError(u"ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
             supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
+            supermethod = getattr(supercls, 'ev_set_idp_options')
             return supermethod(keyword, value_type, pvalue, idb_loaded)
 
         def segm_deleted(self, start_ea, end_ea, flags):
             # /home/user/idapro-7.6/python/3/ida_idp.py:5189 # expected 4, got 3
             cls = self.__class__
             supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
+            supermethod = getattr(supercls, 'segm_deleted')
             return supermethod(start_ea, end_ea, flags)
 
         def bookmark_changed(self, index, pos, desc, operation):
             # /home/user/idapro-7.6/python/3/ida_idp.py:5801 # expected 5, got 4
             cls = self.__class__
             supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
+            supermethod = getattr(supercls, 'bookmark_changed')
             return supermethod(index, pos, desc, operation)
 
         def compiler_changed(self, adjust_inf_fields):
             cls = self.__class__
             supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
+            supermethod = getattr(supercls, 'compiler_changed')
             return supermethod(adjust_inf_fields)
 
         def renamed(self, ea, new_name, local_name):
             cls = self.__class__
             supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
+            supermethod = getattr(supercls, 'renamed')
             return supermethod(ea, new_name, local_name or None, '')
 
         def saved(self, path):
             cls = self.__class__
             supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
+            supermethod = getattr(supercls, 'saved')
             return supermethod(path)
 
         # patch-methods because SWIG+IDAPython is fucking stupid and Ilfak keeps
