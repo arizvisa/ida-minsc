@@ -1348,15 +1348,19 @@ class hook(object):
 
     @classmethod
     def __start_ida__(ns):
-        api = [
-            ('idp', idaapi.IDP_Hooks),
-            ('idb', idaapi.IDB_Hooks),
-            ('ui', idaapi.UI_Hooks),
-        ]
+        import hooks
 
-        # Create an alias so we save typing 19 chars..
-        priorityhook = internal.interface.priorityhook
-        for attribute, klass in api:
+        # Create an alias to save some typing and a table of the attribute
+        # name, the base hook class, and the supermethods we need to patch.
+        priorityhook, api = internal.interface.priorityhook, {
+            'idp':  (idaapi.IDP_Hooks,  hooks.supermethods.IDP_Hooks.mapping),
+            'idb':  (idaapi.IDB_Hooks,  hooks.supermethods.IDB_Hooks.mapping),
+            'ui':   (idaapi.UI_Hooks,   hooks.supermethods.UI_Hooks.mapping),
+        }
+
+        # Iterate through our table and use it to instantiate the necessary
+        # objects for each hook type whilst attaching the patched supermethods.
+        for attribute, (klass, supermethods) in api.items():
 
             # If there's an instance already attached to us, then use it.
             if hasattr(ns, attribute):
@@ -1364,18 +1368,22 @@ class hook(object):
 
             # Otherwise instantiate the priority hooks for each hook type,
             # and assign it directly into our class. We attach a supermethod
-            # mapping dictionary to deal with original hook supermethods which
-            # have a completely different number of parameters or types than
-            # what is listed within the documentation.
+            # mapping to patch the original supermethods of each hook where
+            # it can either have a completely different number of parameters
+            # or different types than what is listed within the documentation.
             else:
-                instance = priorityhook(klass, mapping=__import__('hooks').supermethods.mapping)
+                instance = priorityhook(klass, supermethods)
                 setattr(ns, attribute, instance)
-            continue
+
+            # Log some information about what we've just done.
+            logging.info(u"{:s} : Attached an instance of `{:s}` to `{:s}` which is now available at `{:s}`.".format('.'.join([__name__, ns.__name__]), instance.__class__.__name__, klass.__name__, '.'.join([__name__, ns.__name__, attribute])))
 
         # If the idaapi.__notification__ object exists, then also
         # assign it directly into our namespace.
         if not hasattr(ns, 'notification') and hasattr(idaapi, '__notification__'):
-            setattr(ns, 'notification', idaapi.__notification__)
+            instance = idaapi.__notification__
+            setattr(ns, 'notification', instance)
+            logging.info(u"{:s} : Attached an instance of `{:s}` to {:s} which is now accessible at `{:s}`.".format('.'.join([__name__, ns.__name__]), instance.__class__.__name__, 'notifications', '.'.join([__name__, ns.__name__, 'notification'])))
         return
 
     @classmethod
@@ -1391,9 +1399,11 @@ class hook(object):
             instance.close()
         return
 
-    idp = internal.interface.priorityhook(idaapi.IDP_Hooks, __import__('hooks').supermethods.mapping)
-    idb = internal.interface.priorityhook(idaapi.IDB_Hooks, __import__('hooks').supermethods.mapping)
-    ui = internal.interface.priorityhook(idaapi.UI_Hooks, __import__('hooks').supermethods.mapping)
+    # pre-instantiate the namespaces so that users can interact with them from
+    # their dotfiles or just by importing the module.
+    idp = internal.interface.priorityhook(idaapi.IDP_Hooks, __import__('hooks').supermethods.IDP_Hooks.mapping)
+    idb = internal.interface.priorityhook(idaapi.IDB_Hooks, __import__('hooks').supermethods.IDB_Hooks.mapping)
+    ui = internal.interface.priorityhook(idaapi.UI_Hooks, __import__('hooks').supermethods.UI_Hooks.mapping)
 
     # if there's a __notification__ attribute attached to IDA, then
     # assign it to our namespace so it can be used.
