@@ -628,7 +628,7 @@ class priorityhook(prioritybase):
     Helper class for allowing one to apply a number of hooks to the
     different hook points within IDA.
     """
-    def __init__(self, klass):
+    def __init__(self, klass, mapping={}):
         '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
         super(priorityhook, self).__init__()
 
@@ -641,13 +641,23 @@ class priorityhook(prioritybase):
         self.__attachable__ = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
         self.__attached__ = {}
 
+        # stash away our mapping of supermethods so that we can return the
+        # right one when we're asked to generate them for __supermethod__.
+        self.__mapping__ = mapping
+
         # now that we have everything setup, connect our instance so that
         # when the user modifies it, the call to unhook() wil succeed.
         self.object.hook()
 
     def __supermethod__(self, name):
         '''Generate a method that calls the super method specified by `name`.'''
-        def method(self, *parameters, **keywords):
+
+        # This closure uses a cell (name) in order to generically determine
+        # the correct supermethod. Implementors will have to figure out the
+        # particular attribute name for the corresponding supermethod themselves
+        # and so they'll need to hardcoded it in order to avoid us having to
+        # inject the correct supermethod directly into their scope ourselves.
+        def supermethod(self, *parameters, **keywords):
             cls = super(self.__class__, self)
             method = getattr(cls, name)
             return method(*parameters, **keywords)
@@ -736,7 +746,10 @@ class priorityhook(prioritybase):
             if name in {'segm_deleted'}:
                 return segm_deleted
 
-        return method
+        # Check the mapping of supermethods, and if one exists then return it
+        # instead of our generic supermethod that was just defined.
+        mapping = self.__mapping__
+        return mapping.get(name, supermethod)
 
     def __formatter__(self, name):
         cls = self.__klass__
