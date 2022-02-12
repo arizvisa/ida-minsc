@@ -816,31 +816,42 @@ class contents(tagging):
         ch = idaapi.get_fchunk(ea)
         if ch is None:
             return None
+        owner, bounds = map(internal.interface.range.bounds, [res, ch])
 
         # If we're a function tail, then there's a chance that the
         # owner of the function is owned by multiple functions.
         if ch.flags & idaapi.FUNC_TAIL:
-            count, tids = ch.refqty, idaapi.tid_array(ch.refqty)
+            count, iterator = ch.refqty, idaapi.func_parent_iterator_t(ch)
 
-            # If the referers are None, then our chunk might be busted
-            # beccause IDAPython is fucking garbage. If there's only
-            # more than one referrer, then we need to log a failure
-            # here and return the function that we grabbed.
-            if ch.referers is None and count > 1:
-                bounds = internal.interface.range.bounds(ch)
-                logging.critical(u"{:s}._key({:#x}) : Unable to read more than one referrer ({:d}) for the function tail at {!s}. The \"{:s}\" attribute is {!s}.".format('.'.join([__name__, cls.__name__]), ea, count, bounds, 'referers', ch.referers))
-                return internal.interface.range.start(res)
+            # Seek the iterator to its first position so we can grab each owner
+            # for the chunk at the requested address. If we can't, then that's
+            # okay because we can return the function unless the count is > 1.
+            if not iterator.first():
+                Flogging = logging.warning if count > 1 else logging.info
+                Flogging(u"{:s}._key({:#x}) : Returning {:d} owner{:s}{:s} for the function tail at {!s} instead of {:d} due to being unable to seek with the initialized `{:s}`.".format('.'.join([__name__, cls.__name__]), ea, 1 if count else 0, '' if count else 's', " ({!s})".format(owner) if count else '', bounds, count, iterator.__class__.__name__))
 
-            # If there's no referrers or the number of them is one, then
-            # we'll just rely on idaapi.get_func() to get the owner.
-            elif ch.referers is None or count == 1:
-                return internal.interface.range.start(res)
+                # Gather the single function into a list of items, and return
+                # its starting address if our "refqty" is larger than 0.
+                items = [owner] if count else []
+                iterable = (ea for ea, _ in items)
 
-            # If we didn't get an array with a count, then we're using
-            # an older version of IDA where we need to construct it.
-            referers = ch.referers if hasattr(ch.referers, 'count') else tids.frompointer(ch.referers)
-            return [referers[index] for index in range(count)]
-        return internal.interface.range.start(res)
+            # Now we can grab the first parent address, and continue looping
+            # while saving each parent that we get into our result list.
+            else:
+                items = []
+                while iterator.next():
+                    ea = iterator.parent()
+                    items.append(ea)
+                iterable = (ea for ea in items)
+
+            # Last thing to do is to figure out whether we return a list,
+            # a single address, or None if we didn't find anything.
+            result = sorted(iterable)
+            return result if len(result) > 1 else result[0] if result else None
+
+        # Otherwise we can unpack our owner and return its start address.
+        result, _ = owner
+        return result
 
     @classmethod
     def _read_header(cls, target, ea):
