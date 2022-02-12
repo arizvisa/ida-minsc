@@ -547,46 +547,58 @@ class chunk(object):
     @classmethod
     def owners(cls, ea):
         '''Yield each of the owners which have the function chunk containing the address `ea` associated with it.'''
-        fn = idaapi.get_func(ea)
+        res = idaapi.get_func(ea)
 
         # If we're not associated with a function, then we just leave. Otherwise,
         # we grab the function chunk for the requested address.
-        if fn is None:
+        if res is None:
             return
 
         # If we were unable to get the function chunk for the provided address,
         # then we can just return because there's nothing that owns it.
         ch = idaapi.get_fchunk(ea)
         if ch is None:
-            raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to read the chunk belonging to the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, internal.interface.range.start(fn)))
-        bounds = internal.interface.range.bounds(ch)
+            raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to read the chunk at {:#x} belonging to the function at {!s}.".format('.'.join([__name__, cls.__name__]), ea, ea, internal.interface.range.bounds(res)))
+        owner, bounds = map(internal.interface.range.bounds, [res, ch])
 
         # If this is a function tail, then we need to iterate through the referers
         # for the chunk so that we can yield each address. Older versions of IDA
         # don't always give us an array, so we construct it if we don't get one.
         if ch.flags & idaapi.FUNC_TAIL:
-            count, tids = ch.refqty, idaapi.tid_array(ch.refqty)
+            count, iterator = ch.refqty, idaapi.func_parent_iterator_t(ch)
 
-            # If the referers are None, then our chunk might be busted
-            # because IDAPython is fucking garbage. If there's only
-            # more than one referrer, then we need to fail here.
-            if ch.referers is None and count > 1:
-                raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to read more than one referrer ({:d}) for the function tail at {!s}. The \"{:s}\" attribute is {!s}.".format('.'.join([__name__, cls.__name__]), ea, count, bounds, 'referers', ch.referers))
+            # Try and seek to the very first member of the iterator. This should
+            # always succeed, so if it errors out then this is critical...but only
+            # if our "refqty" is larger than 1. If it's less than 1, then we can
+            # just warn the user..but we're gonna fall back to the func_t anyways.
+            if not iterator.first():
+                if count > 1:
+                    raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to seek to the first element of the `{:s}` for the function tail at {!s}.".format('.'.join([__name__, cls.__name__]), ea, iterator.__class__.__name__, bounds))
 
-            # If it's still None or there's only one referrer, then we
-            # use the func_t we snagged in order to determine the owner.
-            elif ch.referers is None or count == 1:
-                referers = [ internal.interface.range.start(fn) ]
+                # We should only have one single referrer to return. Just in case,
+                # though, we return an empty list if our "refqty" is actually 0.
+                logging.warning(u"{:s}.owners({:#x}) : Returning initial owner ({!s}) for the function tail at {!s} due to being unable to seek to the first element of the associated `{:s}`.".format('.'.join([__name__, cls.__name__]), ea, owner, bounds, iterator.__class__.__name__))
+                referrers = [ea for ea, _ in ([owner] if count else [])]
 
-            # Our referers are normal, so we can simply convert them
-            # into an iterable so that they get yielded later.
+            # Grab the first parent address. Afterwards we continue looping
+            # whilst stashing parents in our list of referrers.
             else:
-                referers = ch.referers if hasattr(ch.referers, 'count') else tids.frompointer(ch.referers)
-            iterable = (referers[index] for index in builtins.range(count))
+                referrers = [iterator.parent()]
+                while iterator.next():
+                    item = iterator.parent()
+                    referrers.append(item)
+
+            # That was easy enough, so now we just need to confirm that the
+            # number of our referrers matches to the "refqty" of the chunk.
+            if count != len(referrers):
+                logging.warning(u"{:s}.owners({:#x}) : Expected to find {:d} referrer{:s} for the function tail at {!s}, but {:s}{:s} returned.".format('.'.join([__name__, cls.__name__]), ea, count, '' if count == 1 else 's', bounds, 'only ' if len(referrers) < count else '', "{:d} was".format(len(referrers)) if len(referrers) == 1 else "{:d} were".format(len(referrers))))
+
+            # That was it, we just need to convert our results to an iterator.
+            iterable = (ea for ea in referrers)
 
         # Otherwise, we just need to yield the function that owns this chunk.
         else:
-            iterable = (ea for ea, _ in [bounds])
+            iterable = (ea for ea, _ in [owner])
 
         # We've collected all of our items, so iterate through what we've collected
         # and then yield them to the caller before returning.
