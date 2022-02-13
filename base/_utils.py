@@ -433,26 +433,27 @@ class multicase(object):
         return '\n'.join(result)
 
     @classmethod
+    def flatten(cls, iterable):
+        '''Take the provided `iterable` (or tree) and then yield each individual element resulting in it being "flattened".'''
+        duplicates = {item for item in []}
+        for item in iterable:
+            if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
+                for item in cls.flatten(item):
+                    if item in duplicates:
+                        continue
+                    yield item
+                    duplicates |= {item}
+                continue
+            if item in duplicates:
+                continue
+            yield item
+            duplicates |= {item}
+        return
+
+    @classmethod
     def prototype(cls, function, constraints={}, ignored={item for item in []}):
         '''Generate a prototype for an instance of a `function`.'''
         args, defaults, (star, starstar) = cls.ex_args(function)
-
-        def flatten(iterable):
-            '''This closure takes the provided `iterable` (or tree) and then flattens it into a list.'''
-            duplicates = {item for item in []}
-            for item in iterable:
-                if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
-                    for item in flatten(item):
-                        if item in duplicates:
-                            continue
-                        yield item
-                        duplicates |= {item}
-                    continue
-                if item in duplicates:
-                    continue
-                yield item
-                duplicates |= {item}
-            return
 
         def Femit_arguments(names, constraints, ignored):
             '''Yield a tuple for each individual parameter composed of the name and its constraints.'''
@@ -475,7 +476,7 @@ class multicase(object):
                 if isinstance(constraint, builtins.type) or constraint in {callable}:
                     yield item, constraint.__name__
                 elif hasattr(constraint, '__iter__'):
-                    yield item, '|'.join(type.__name__ for type in flatten(constraint))
+                    yield item, '|'.join(type.__name__ for type in cls.flatten(constraint))
                 else:
                     yield item, "{!s}".format(constraint)
                 continue
@@ -577,14 +578,14 @@ class multicase(object):
             elif not parameter_wildargs and parameter_ignore_count + len(argument_values) != len(parameter_names):
                 continue
 
-            # Third, we need to actually check our type constraints that our current match we
+            # Third, we need to actually check our type constraints that our current match was
             # decorated with. If our constraint is a builtins.callable, then we just need to
             # ensure that the parameter can be called. Otherwise our constraint should be an
             # iterable of types that we can simply pass long to the isinstance() function.
             critiqueF = lambda constraint: builtins.callable if constraint == builtins.callable else frpartial(builtins.isinstance, constraint)
 
             # Zip our parameter names along with our argument values so that we can extract
-            # the contraint, and check the value against it. If any of these checks fail,
+            # the constraint, and check the value against it. If any of these checks fail,
             # then it's not a match and we need to move on to the next iteration.
             parameter_names_and_values = zip(parameter_names[parameter_ignore_count:], argument_values)
             if not all(critiqueF(constraints[name])(value) for name, value in parameter_names_and_values if name in constraints):
