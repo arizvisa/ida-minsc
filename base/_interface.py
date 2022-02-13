@@ -2096,7 +2096,7 @@ class reftype_t(object):
         resP = str().join(sorted(res))
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a valid cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), resP, resP, cls.__name__))
 
-class ref_t(namedtypedtuple):
+class ref_t(integerish):
     """
     This tuple is used to represent references that include an operand number
     and has the format `(address, opnum, reftype_t)`. The operand number is
@@ -2104,6 +2104,7 @@ class ref_t(namedtypedtuple):
     """
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, (six.integer_types, None.__class__), reftype_t)
+    _operands = (internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant)
 
     @property
     def ea(self):
@@ -2111,24 +2112,57 @@ class ref_t(namedtypedtuple):
         res, _, _ = self
         return res
 
+    def __int__(self):
+        address, _, _ = self
+        return address
+
+    def __same__(self, other):
+        _, num, state = self
+        _, onum, ostate = other
+        return all(this == that for this, that in [(num, onum), (state, ostate)])
+
+    def __similar__(self, other):
+        if isinstance(other, opref_t):
+            _, num, state = self
+            _, onum, ostate = other
+            return any([num is None, num == onum]) and state & ostate
+        return False
+
     def __repr__(self):
         cls, fields = self.__class__, {'address'}
         res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
-class opref_t(namedtypedtuple):
+class opref_t(integerish):
     """
     This tuple is used to represent references that include an operand number
     and has the format `(address, opnum, reftype_t)`.
     """
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, six.integer_types, reftype_t)
+    _operands = (internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant)
 
     @property
     def ea(self):
         '''Return the address field that is associated with the operand being referenced.'''
         res, _, _ = self
         return res
+
+    def __int__(self):
+        address, _, _ = self
+        return address
+
+    def __same__(self, other):
+        _, num, state = self
+        _, onum, ostate = other
+        return all(this == that for this, that in [(num, onum), (state, ostate)])
+
+    def __similar__(self, other):
+        if isinstance(other, ref_t):
+            _, num, state = self
+            _, onum, ostate = other
+            return any([onum is None, num == onum]) and state & ostate
+        return False
 
     def __repr__(self):
         cls, fields = self.__class__, {'address'}
