@@ -2537,7 +2537,7 @@ class intelops:
     This internal namespace contains the different operand types that
     can be returned for the Intel architecture.
     """
-    class SegmentOffset(interface.namedtypedtuple, interface.symbol_t):
+    class SegmentOffset(interface.integerish, interface.symbol_t):
         """
         A tuple representing an address with a segment register attached on the Intel architecture.
 
@@ -2548,6 +2548,7 @@ class intelops:
             (None.__class__, interface.register_t),
             six.integer_types,
         )
+        _operands = (internal.utils.fconstant, internal.utils.fcurry)
 
         @property
         def symbols(self):
@@ -2557,12 +2558,21 @@ class intelops:
                 yield segment
             return
 
+        def __int__(self):
+            _, offset = self
+            return offset
+
+        def __same__(self, other):
+            segment, _ = self
+            osegment, _ = other
+            return any([segment is None, osegment is None, segment == osegment])
+
         def __repr__(self):
             cls, fields = self.__class__, {'offset'}
             res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
             return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
-    class SegmentOffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
+    class SegmentOffsetBaseIndexScale(interface.integerish, interface.symbol_t):
         """
         A tuple representing a memory phrase operand on the Intel architecture.
 
@@ -2578,6 +2588,7 @@ class intelops:
             (None.__class__, interface.register_t),
             six.integer_types,
         )
+        _operands = (internal.utils.fconstant, internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant, internal.utils.fconstant)
 
         @property
         def symbols(self):
@@ -2591,12 +2602,21 @@ class intelops:
                 yield index
             return
 
+        def __int__(self):
+            _, offset, _, _, _ = self
+            return offset
+
+        def __same__(self, other):
+            segment, _, base, index, scale = self
+            osegment, _, obase, oindex, oscale = other
+            return all(any([this == that, this is None, that is None]) for this, that in [(segment, osegment), (base, obase), (index, oindex)])
+
         def __repr__(self):
             cls, fields = self.__class__, {'offset'}
             res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
             return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
-    class OffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
+    class OffsetBaseIndexScale(interface.integerish, interface.symbol_t):
         """
         A tuple representing a memory phrase for the Intel architecture.
 
@@ -2620,6 +2640,15 @@ class intelops:
             if index:
                 yield index
             return
+
+        def __int__(self):
+            offset, _, _, _ = self
+            return offset
+
+        def __same__(self, other):
+            _, base, index, scale = self
+            _, obase, oindex, oscale = other
+            return all(any([this == that, this is None, that is None]) for this, that in [(base, obase), (index, oindex), (scale, oscale)])
 
         def __repr__(self):
             cls, fields = self.__class__, {'offset'}
@@ -2675,7 +2704,7 @@ class armops:
                 yield register
             return
 
-    class immediatephrase(interface.namedtypedtuple, interface.symbol_t):
+    class immediatephrase(interface.integerish, interface.symbol_t):
         """
         A tuple representing a memory displacement operand on either the AArch32 or AArch64 architectures.
 
@@ -2687,6 +2716,7 @@ class armops:
             interface.register_t,
             six.integer_types,
         )
+        _operands = (internal.utils.fconstant, internal.utils.fcurry)
 
         register = property(fget=operator.itemgetter(0))
         offset = property(fget=operator.itemgetter(1))
@@ -2696,6 +2726,15 @@ class armops:
             '''Yield the `Rn` register from the tuple.'''
             register, _ = self
             yield register
+
+        def __int__(self):
+            _, offset = self
+            return offset
+
+        def __same__(self, other):
+            register, _ = self
+            oregister, _ = other
+            return any([register is None, oregister is None, register == oregister])
 
         def __repr__(self):
             cls, fields = self.__class__, {'offset'}
@@ -2741,6 +2780,93 @@ class armops:
             raise StopIteration
             yield   # so that this function is still treated as a generator
 
+        # we need to write some really stupid code here...like seriously dumb.
+        # since we're not storing any operand information other than the address
+        # and its dereferenced value, we have no idea of the length of the
+        # deref'd operand or if it's signed...so, we actually have to guess it.
+
+        @classmethod
+        def __consume_integer(cls, ea):
+            get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
+
+            # depending on the byteorder, we shift either the aggregate or the multiplier.
+            shifts = [1, 0x100] if database.config.byteorder() in {'little'} else [0x100, 1]
+            Fs = [functools.partial(operator.mul, item) for item in shifts]
+
+            # we need extra vars here, because of for-loops and not having pre or post.
+            result, shift, position = 0, 1, 0
+            for size in map(functools.partial(operator.pow, 2), builtins.range(4)):
+                for item in bytearray(get_bytes(ea + position, size - position) or b''):
+                    res = item * shift
+                    result, shift = (F(item) for F, item in zip(Fs, [result, shift]))
+                    result |= res
+                yield size, result
+                position = size
+            return
+
+        @classmethod
+        def __guess_size(cls, address, goal):
+            '''Return the number of bytes to read at the specified `address` in order to return the specified value.'''
+            for size, integer in cls.__consume_integer(address):
+                result = {integer : +size, integer - pow(2, 8 * size) : -size}
+                if goal in result:
+                    return result[goal]
+                continue
+            return 0
+
+        def __remake(self, address):
+            '''Use the guessed size of the current instance to create another one pointing to a different address.'''
+            cls, get_bytes = self.__class__, idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
+
+            # Re-read the old address and figure out what our size could be. If we
+            # figure it out, then we read from the new address and reconstruct.
+            size = self.__guess_size(*self)
+            res, maximum = get_bytes(address, abs(size)) or b'', pow(2, 8 * size)
+
+            # Handle the byteorder and reduce it to an integer before we signify it.
+            res = res[::-1] if database.config.byteorder() in {'little'} else res[:]
+            res = functools.reduce(lambda agg, item: (agg * 0x100) | item, bytearray(res), 0)
+
+            # Now we "calculate" the sign flag if our previous value allowed us to
+            # sign it, and then we can use it to reconstruct this thing.
+            SF = maximum // 2 if size < 0 else 0
+            return cls(address, res - maximum if res & SF else res)
+
+        def __int__(self):
+            result, _ = self
+            return result
+
+        def __operator__(self, operation, other):
+            address, _ = self
+            if isinstance(other, six.integer_types):
+                return self.__remake(operation(address, other))
+            elif isinstance(other, self.__class__):
+                return self.__operator__(operation, int(other))
+            elif hasattr(other, '__int__'):
+                logging.warning(u"{:s}.__operator__({!s}, {!r}) : Coercing the instance of type `{:s}` to an integer due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, other.__class__.__name__, self.__class__.__name__))
+                return self.__operator__(operation, int(other))
+            raise TypeError(u"{:s}.__operator__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+
+        def __operation__(self, operation):
+            return self.__remake(operation(int(self)))
+
+        def __add__(self, other):
+            return self.__operator__(operator.add, other)
+        def __sub__(self, other):
+            return self.__operator__(operator.sub, other)
+        def __and__(self, other):
+            return self.__operator__(operator.and_, other)
+        def __or__(self, other):
+            return self.__operator__(operator.or_, other)
+        def __xor__(self, other):
+            return self.__operator__(operator.xor_, other)
+
+        __radd__ = __add__
+        __rsub__ = __sub__
+        __rand__ = __and__
+        __ror__ = __or__
+        __rxor__ = __xor__
+
         def __repr__(self):
             cls, fields = self.__class__, {'address', 'value'}
             res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
@@ -2753,7 +2879,7 @@ class mipsops:
     are used by the MIPS architectures.
     """
 
-    class phrase(interface.namedtypedtuple, interface.symbol_t):
+    class phrase(interface.integerish, interface.symbol_t):
         """
         A tuple for representing a memory phrase operand on the MIPS architectures.
 
@@ -2762,6 +2888,7 @@ class mipsops:
         """
         _fields = ('Rn', 'Offset')
         _types = (interface.register_t, six.integer_types)
+        _operands = (internal.utils.fconstant, internal.utils.fcurry)
 
         register = property(fget=operator.itemgetter(0))
         immediate = property(fget=operator.itemgetter(1))
@@ -2771,6 +2898,15 @@ class mipsops:
             '''Yield the `Rn` register from this tuple.'''
             register, _ = self
             yield register
+
+        def __int__(self):
+            _, offset = self
+            return offset
+
+        def __same__(self, other):
+            register, _ = self
+            oregister, _ = other
+            return any([register is None, oregister is None, register == oregister])
 
         def __repr__(self):
             cls, fields = self.__class__, {'Offset'}
