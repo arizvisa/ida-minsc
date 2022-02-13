@@ -1689,6 +1689,120 @@ class namedtypedtuple(tuple):
     def __getnewargs__(self): return tuple(self)
     def __getstate__(self): return
 
+class integerish(namedtypedtuple):
+    """
+    This is a namedtypedtuple that allows an implementor to treat it
+    as an integer and perform various types of arithmetic upon it.
+
+    The "_operand" attribute specifies which member of the tuple is
+    used for performing any of the integral operations. The other
+    members of the tuple are preserved. Unless one of them is None,
+    which then means that the contents of that tuple are merged.
+    """
+
+    @property
+    def _operands(self):
+        '''This property is intended to be explicitly overwritten by the implementor.'''
+        return builtins.tuple(*len(self._fields) * [internal.utils.fconstant])
+
+    def __same__(self, other):
+        '''Return true if `other` is the same type and can be used as an operand.'''
+        raise NotImplementedError
+
+    def __int__(self):
+        raise NotImplementedError
+
+    def __operator__(self, operation, other):
+        cls, transform = self.__class__, [F(item) for F, item in zip(self._operands, self)]
+        if isinstance(other, six.integer_types):
+            result = [Fitem(operation, other) for Fitem in transform]
+        elif isinstance(other, self.__class__) and self.__same__(other):
+            result = [item if Fitem(operation, item) is None else Fitem(operation, item) for Fitem, item in zip(transform, other)]
+        elif any([hasattr(self, '__similar__') and self.__similar__(other), hasattr(other, '__similar__') and other.__similar__(self)]):
+            result = [item if Fitem(operation, item) is None else Fitem(operation, item) for Fitem, item in zip(transform, other)]
+        elif hasattr(other, '__int__'):
+            logging.warning(u"{:s}.__operator__({!s}, {!r}) : Coercing the instance of type `{:s}` to an integer due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, other.__class__.__name__, cls.__name__))
+            return self.__operator__(operation, int(other))
+        else:
+            raise TypeError(u"{:s}.__operator__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+        return self.__class__(*result)
+
+    def __operation__(self, operation):
+        cls, transform = self.__class__, [F(item) for F, item in zip(self._operands, self)]
+        result = [item if Fitem(operation) is None else Fitem(operation) for Fitem in transform]
+        return self.__class__(*result)
+
+    # general arithmetic
+    def __add__(self, other):
+        return self.__operator__(operator.add, other)
+    def __sub__(self, other):
+        return self.__operator__(operator.sub, other)
+    def __and__(self, other):
+        return self.__operator__(operator.and_, other)
+    def __or__(self, other):
+        return self.__operator__(operator.or_, other)
+    def __xor__(self, other):
+        return self.__operator__(operator.xor_, other)
+    def __lshift__(self, other):
+        return self.__operator__(operator.lshift, other)
+    def __rshift__(self, other):
+        return self.__operator__(operator.rshift, other)
+
+    # conversion expressions
+    def __abs__(self):
+        return self.__operation__(operator.abs)
+    def __neg__(self):
+        return self.__operation__(operator.neg)
+    def __invert__(self):
+        return self.__operation__(operator.invert)
+
+    # methods that don't make sense...
+    @classmethod
+    def __mul__(cls, other):
+        operation = operator.mul
+        raise TypeError(u"{:s}.__mul__({!r}) : Refusing to perform nonsensical {:s} operation with type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+    @classmethod
+    def __div__(cls, other):
+        operation = operator.div
+        raise TypeError(u"{:s}.__div__({!r}) : Refusing to perform nonsensical {:s} operation with type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+    @classmethod
+    def __pow__(cls, other):
+        operation = operator.pow
+        raise TypeError(u"{:s}.__pow__({!r}) : Refusing to perform nonsensical {:s} operation with type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+    @classmethod
+    def __mod__(cls, other):
+        operation = operator.mod
+        raise TypeError(u"{:s}.__mod__({!r}) : Refusing to perform nonsensical {:s} operation with type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+    @classmethod
+    def __floordiv__(cls, other):
+        operation = operator.floordiv
+        raise TypeError(u"{:s}.__floordiv__({!r}) : Refusing to perform nonsensical {:s} operation with type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+    @classmethod
+    def __truediv__(cls, other):
+        operation = operator.truediv
+        raise TypeError(u"{:s}.__truediv__({!r}) : Refusing to perform nonsensical {:s} operation with type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+    @classmethod
+    def __divmod__(cls, other):
+        operation = operator.divmod
+        raise TypeError(u"{:s}.__divmod__({!r}) : Refusing to perform nonsensical {:s} operation with type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+
+    # ...and finally opposites.
+    __radd__ = __add__
+    __rsub__ = __sub__
+    __rand__ = __and__
+    __ror__ = __or__
+    __rxor__ = __xor__
+
+    # oh, but then there's nonsensical opposites too.
+    @classmethod
+    def __rlshift__(cls, other):
+        operation = operator.lshift
+        raise TypeError(u"{:s}.__rlshift__({!r}) : Refusing to perform nonsensical {:s} operation from type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+    @classmethod
+    def __rrshift__(cls, other):
+        operation = operator.rshift
+        raise TypeError(u"{:s}.__rrshift__({!r}) : Refusing to perform nonsensical {:s} operation from type `{:s}`.".format('.'.join([__name__, cls.__name__]), other, operation.__name__, other.__class__.__name__))
+
 class symbol_t(object):
     """
     An object that is used to describe something that is symbolic in nature
