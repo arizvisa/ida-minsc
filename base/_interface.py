@@ -1986,13 +1986,13 @@ else:
 class reftype_t(object):
     """
     An object representing a reference type that allows one to easily extract
-    semantics using set membership. This type uses "rwx" from posix file
-    permissions to simplify reference semantics. It is bests to treat this
-    object as a string.
+    semantics using membership operators. This type uses more familiar "rwx"
+    that is most commonly associated with posix file permissions in order to
+    simplify the semantics of the numerous available reference types.
 
-    When testing membership, "r" means read, "w" means write, and "x" means
-    execute. This makes it very easy to test whether a reference is reading
-    and executing something, or it's writing to its target.
+    When testing membership, "r" means read, "w" means write, "x" means execute,
+    and "&" means reference. The intention of this is to make it easier for one
+    to verify whether a reference is reading, writing, or executing something.
     """
 
     if idaapi.__version__ < 7.0:
@@ -2025,13 +2025,17 @@ class reftype_t(object):
     def __hash__(self):
         return hash(self.F)
     def __or__(self, other):
-        return self.__operator__(operator.or_, other)
+        return self.__operator__(operator.or_, {item for item in other})
     def __and__(self, other):
-        return self.__operator__(operator.and_, other)
+        return self.__operator__(operator.and_, {item for item in other})
+    def __xor__(self, other):
+        return self.__operator__(operator.xor, {item for item in other})
     def __eq__(self, other):
-        return self.__operator__(operator.eq, other)
+        return self.__operator__(operator.eq, {item for item in other})
     def __ne__(self, other):
-        return self.__operator__(operator.ne, other)
+        return self.__operator__(operator.ne, {item for item in other})
+    def __sub__(self, other):
+        return self.__operator__(operator.sub, {item for item in other})
     def __contains__(self, type):
         if isinstance(type, six.integer_types):
             res = self.F & type
@@ -2062,7 +2066,7 @@ class reftype_t(object):
     def of_type(cls, xrtype):
         '''Convert an IDA reference type in `xrtype` to a ``reftype_t``.'''
         if not isinstance(xrtype, six.integer_types):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing coercion of a non-integral {!s} into the necessary type ({!s}).".format('.'.join([__name__, cls.__name__]), xrtype, xrtype.__class__, 'xrtype'))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing the coercion of a non-integral {!s} into the required type ({!s}).".format('.'.join([__name__, cls.__name__]), xrtype, xrtype.__class__, 'xrtype'))
         items = cls.__mapper__.get(xrtype, '')
         iterable = (item for item in items)
         return cls(xrtype, iterable)
@@ -2081,7 +2085,7 @@ class reftype_t(object):
             (item for item in state)
 
         except TypeError:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), state, state, cls.__name__))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to coerce the requested state ({!r}) into a valid cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), state, state, cls.__name__))
 
         # Search through our mapper for the correct contents of the reftype_t.
         res = { item for item in state }
@@ -2090,7 +2094,7 @@ class reftype_t(object):
                 return cls(F, res)
             continue
         resP = str().join(sorted(res))
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), resP, resP, cls.__name__))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a valid cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), resP, resP, cls.__name__))
 
 class ref_t(namedtypedtuple):
     """
