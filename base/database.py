@@ -400,7 +400,7 @@ class config(object):
         return tif.get_size()
 
     @classmethod
-    def bitsize(self):
+    def bitsize(cls):
         '''Return the number of bits used by the database.'''
         return 8 * cls.size()
 
