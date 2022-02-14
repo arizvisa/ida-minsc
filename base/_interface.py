@@ -302,10 +302,18 @@ class prioritybase(object):
         self.__traceback = {}
 
     def __iter__(self):
-        '''Return the id of each target that is hooked by this object.'''
+        '''Return the each target that is attached to this object.'''
         for target in self.__cache__:
             yield target
         return
+
+    def __contains__(self, target):
+        '''Return whether the provied `target` is currently attached to this object.'''
+        return target in self.__cache__
+
+    def __len__(self):
+        '''Return the number of targets that are attached to this object.'''
+        return len(self.__cache__)
 
     def __formatter__(self, target):
         raise NotImplementedError
@@ -334,7 +342,7 @@ class prioritybase(object):
 
     def close(self):
         '''Disconnect from all of the targets that are currently attached'''
-        ok, items = True, [item for item in self.__cache__]
+        ok, items = True, {item for item in self.__cache__}
 
         # Simply detach every available target one-by-one.
         for target in items:
@@ -346,19 +354,19 @@ class prioritybase(object):
 
     @property
     def available(self):
-        '''Return all of the available targets that can be either enabled or disabled.'''
+        '''Return all of the attached targets that can be either enabled or disabled.'''
         return {item for item in self.__cache__}
     @property
     def disabled(self):
-        '''Return all of the available targets that are currently disabled.'''
+        '''Return all of the attached targets that are currently disabled.'''
         return {item for item in self.__disabled}
     @property
     def enabled(self):
-        '''Return all of the available targets that are currently enabled.'''
-        return self.available - self.disabled
+        '''Return all of the attached targets that are currently enabled.'''
+        return {item for item in self.__cache__} - {item for item in self.__disabled}
 
     def __repr__(self):
-        cls = self.__class__
+        cls, enabled = self.__class__, {item for item in self.__cache__} - {item for item in self.__disabled}
 
         # Extract the parameters from a function. This is just a
         # wrapper around utils.multicase.ex_args so we can extract
@@ -410,22 +418,22 @@ class prioritybase(object):
             return priority, name, args
 
         # If there aren't any targets available, then return immediately.
-        if not self.available:
+        if not self.__cache__:
             return '\n'.join(["{!s}".format(cls), "...No targets are being used...".format(cls)])
 
-        alignment_enabled = max(len(self.__formatter__(target)) for target in self.enabled) if self.enabled else 0
-        alignment_disabled = max(len("{:s} (disabled)".format(self.__formatter__(target))) for target in self.disabled) if self.disabled else 0
+        alignment_enabled = max(len(self.__formatter__(target)) for target in enabled) if enabled else 0
+        alignment_disabled = max(len("{:s} (disabled)".format(self.__formatter__(target))) for target in self.__disabled) if self.__disabled else 0
         res = ["{!s}".format(cls)]
 
         # First gather all our enabled hooks.
-        for target in sorted(self.enabled):
+        for target in sorted(enabled):
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
             res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items) if items else '...nothing attached...'))
 
         # Now we can append all the disabled ones.
-        for target in sorted(self.disabled):
+        for target in sorted(self.__disabled):
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
@@ -725,7 +733,7 @@ class priorityhook(prioritybase):
         cls = self.__class__
         if not super(priorityhook, self).close():
             logging.critical(u"{:s}.close() : Error trying to detach from all of the targets attached by ({!s}).".format('.'.join([__name__, cls.__name__]), self.object))
-            [logging.debug(u"{:s}.close() : Instance ({!r}) is still attached to target {:s}.".format('.'.join([__name__, cls.__name__]), self.object, self.__formatter__(target))) for target in self.available]
+            [logging.debug(u"{:s}.close() : Instance ({!r}) is still attached to target {:s}.".format('.'.join([__name__, cls.__name__]), self.object, self.__formatter__(target))) for target in self]
 
         # Now that everything has been detached, disconnect the instance from all of its events.
         if self.object.unhook():
@@ -800,16 +808,19 @@ class priorityhook(prioritybase):
 
     def add(self, name, callable, priority):
         '''Add the `callable` to the queue for the specified `name` with the provided `priority`.'''
-        if name in self.available:
+
+        # If it's already attached, then we can simply add it.
+        if name in self:
             return super(priorityhook, self).add(name, callable, priority)
 
         # Try and attach to the target name with a closure.
         ok = self.attach(name)
         if not ok:
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
-            raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:s}) : Unable to attach to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, format(priority,), self.__formatter__(name)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:s}) : Unable to attach to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, format(priority), self.__formatter__(name)))
 
-        # We should've attached, so all that's left is to enable the hook.
+        # We should've attached, so all that's left is to add it for
+        # tracking and then ensure the hook is enabled.
         ok = super(priorityhook, self).add(name, callable, priority)
         return ok and self.enable(name)
 
@@ -821,13 +832,11 @@ class priorityhook(prioritybase):
         return super(priorityhook, self).discard(name, callable)
 
     def __repr__(self):
-        hObject = self.object
-        hType = hObject.__class__
-        hName = hType.__name__
-        if not self.available:
-            return "Events currently connected to {:s}: {:s}".format(hName, 'No events are connected.')
-        res, items = "Events currently connected to {:s}:".format(hName), super(priorityhook, self).__repr__().split('\n')
-        return '\n'.join([res] + items[1:])
+        klass = self.__klass__
+        if len(self):
+            res, items = "Events currently connected to {:s}:".format(klass.__name__), super(priorityhook, self).__repr__().split('\n')
+            return '\n'.join([res] + items[1:])
+        return "Events currently connected to {:s}: {:s}".format(klass.__name__, 'No events are connected.')
 
 class prioritynotification(prioritybase):
     """
@@ -865,7 +874,7 @@ class prioritynotification(prioritybase):
 
     def add(self, notification, callable, priority):
         '''Add the provided `callable` to the queue with the given `priority` for the specified `notification`.'''
-        if notification in self.available:
+        if notification in self:
             return super(prioritynotification, self).add(notification, callable, priority)
 
         # Notifications are always attached and enabled.
@@ -879,10 +888,10 @@ class prioritynotification(prioritybase):
         return ok and self.enable(notification)
 
     def __repr__(self):
-        if not self.available:
-            return "Notifications currently tracked: {:s}".format('No notifications are being tracked.')
-        res, items = 'Notifications currently tracked:', super(prioritynotification, self).__repr__().split('\n')
-        return '\n'.join([res] + items[1:])
+        if len(self):
+            res, items = 'Notifications currently tracked:', super(prioritynotification, self).__repr__().split('\n')
+            return '\n'.join([res] + items[1:])
+        return "Notifications currently tracked: {:s}".format('No notifications are being tracked.')
 
 class address(object):
     """
