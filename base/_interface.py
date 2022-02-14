@@ -302,24 +302,24 @@ class prioritybase(object):
         self.__traceback = {}
 
     def __iter__(self):
-        '''Return the each target that is attached to this object.'''
+        '''Iterate through each target that is currently attached to this object.'''
         for target in self.__cache__:
             yield target
         return
 
     def __contains__(self, target):
-        '''Return whether the provied `target` is currently attached to this object.'''
+        '''Return whether the specified `target` is currently attached to this object.'''
         return target in self.__cache__
 
     def __len__(self):
-        '''Return the number of targets that are attached to this object.'''
+        '''Return the number of targets that are currently attached to this object.'''
         return len(self.__cache__)
 
     def __formatter__(self, target):
         raise NotImplementedError
 
     def attach(self, target):
-        '''Intended to be called as a supermethod for the specified `target` that returns True or False and the callable that should be applied to the hook.'''
+        '''Intended to be called as a supermethod for the specified `target` that returns True or False along with the callable that should be applied to the hook.'''
         if target in self.__cache__:
             logging.warning(u"{:s}.attach({!r}) : Unable to attach to target ({:s}) due to it already being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
             return False, internal.utils.fidentity
@@ -467,7 +467,7 @@ class prioritybase(object):
         return '\n'.join(res)
 
     def enable(self, target):
-        '''Enable any callables for the specified `target` that has been previously disabled.'''
+        '''Enable any callables for the specified `target` that have been previously disabled.'''
         cls = self.__class__
         if target not in self.__cache__:
             logging.fatal(u"{:s}.enable({!r}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently disabled targets are: {:s}".format(', '.join(map(self.__formatter__, self.__disabled))) if self.__disabled else 'There are no disabled targets that may be enabled.'))
@@ -498,7 +498,7 @@ class prioritybase(object):
         return True
 
     def add(self, target, callable, priority):
-        '''Add the `callable` to our queue for the specified `target` with the provided `priority`.'''
+        '''Add the `callable` to the queue for the specified `target` with the given `priority`.'''
 
         # attach to the requested target if possible
         if target not in self.__cache__:
@@ -897,8 +897,8 @@ class priorityhook(prioritybase):
             attach.update(self.__attached__)
         return super(priorityhook, self).detach(name)
 
-    def add(self, name, callable, priority):
-        '''Add the `callable` to the queue for the specified `name` with the provided `priority`.'''
+    def add(self, name, callable, priority=0):
+        '''Add the `callable` to the queue for the specified `name` with the given `priority`.'''
 
         # If it's already attached, then we can simply add it.
         if name in self:
@@ -971,8 +971,8 @@ class prioritynotification(prioritybase):
         ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
         return ok and super(prioritynotification, self).detach(notification)
 
-    def add(self, notification, callable, priority):
-        '''Add the provided `callable` to the queue with the given `priority` for the specified `notification`.'''
+    def add(self, notification, callable, priority=0):
+        '''Add the `callable` to the queue with the given `priority` for the specified `notification`.'''
         if notification in self:
             return super(prioritynotification, self).add(notification, callable, priority)
 
