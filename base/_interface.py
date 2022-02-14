@@ -610,7 +610,7 @@ class prioritybase(object):
 
             # Iterate through our priorityqueue extracting each callable and
             # executing it with the parameters we received
-            hookq = self.__cache__[target][:]
+            hookq, captured = self.__cache__[target][:], None
             for priority, callable in heapq.nsmallest(len(hookq), hookq, key=operator.attrgetter('priority')):
                 logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) to callable ({!s}) with priority ({:+d}).".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
 
@@ -631,15 +631,37 @@ class prioritybase(object):
 
                     result = self.STOP
 
-                if not isinstance(result, self.result) or result == self.CONTINUE:
+                # Check if it's one of our valid return types. If we're being
+                # asked to continue, then move onto the next one.
+                if result == self.CONTINUE:
                     continue
 
+                # If we're being asked to stop, then break the loop and terminate.
                 elif result == self.STOP:
                     break
 
-                cls = self.__class__
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callable({:s}) : Unable to determine the result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
-            return
+                # If we received an unexpected type, then throw up an exception.
+                elif isinstance(result, self.result):
+                    cls = self.__class__
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callable({:s}) : Unable to determine the type of result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
+
+                # If there was no result, then just continue on like nothing happened.
+                elif result is None:
+                    continue
+
+                # Otherwise we need to save what we got. If it was different, then
+                # warn the user that someone is trying to interfere with results.
+                elif captured is None:
+                    cls = self.__class__
+                    logging.info(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({!s}) to return to caller.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), callable))
+
+                elif result != captured:
+                    cls = self.__class__
+                    logging.warning(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({!s}) that is different than the previous ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), callable, captured))
+
+                # Assign the captured return code now that we know what it is.
+                captured = captured if result is None else result
+            return captured
 
         # That's it!
         return closure
@@ -721,9 +743,15 @@ class priorityhook(prioritybase):
                 def method(instance, *args, **kwargs):
                     target, callable, supermethod = (locals[item] for item in ['target', 'callable', 'supermethod'])
                     result = callable(*args, **kwargs)
-                    if result:
-                        logging.warning(u"{:s}.method({:s}) : Callback for {:s} returned an unexpected result ({!r}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target), callable, result))
-                    return supermethod(instance, *args, **kwargs)
+
+                    # If we didn't get a result to return, then just dispatch
+                    # to the supermethod so that we don't interfere with anything.
+                    if result is None:
+                        return supermethod(instance, *args, **kwargs)
+
+                    # Otherwise we return the code that was given to us.
+                    logging.debug(u"{:s}.method({:s}) : Received a value ({!r}) to return from {!s} for {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target), result, callable, self.__formatter__(target)))
+                    return result
                 return method
 
             # We've generated the closure to use and so we can store it in
