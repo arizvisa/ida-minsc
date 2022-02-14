@@ -838,7 +838,7 @@ class contents(tagging):
             # Now we can grab the first parent address, and continue looping
             # while saving each parent that we get into our result list.
             else:
-                items = []
+                items = [iterator.parent()]
                 while iterator.next():
                     ea = iterator.parent()
                     items.append(ea)
