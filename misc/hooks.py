@@ -1169,7 +1169,7 @@ class naming(changingchanged):
 
         # Now that our event matches, we need to figure out whether
         # the context which depends on whether the name is local or not.
-        context, target = (internal.comment.contents, target) if check and local_name else (ctx, None)
+        context, target = (internal.comment.contents, target) if check and local_name else (ctx, target)
 
         # Next thing to do is to verify whether we're adding a new name,
         # removing one, or adding one. If the names are the same, then skip.
