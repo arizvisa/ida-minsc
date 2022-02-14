@@ -355,15 +355,23 @@ class prioritybase(object):
     @property
     def available(self):
         '''Return all of the attached targets that can be either enabled or disabled.'''
-        return {item for item in self.__cache__}
+
+        # This property is intended to be part of the public api and
+        # thus it can reimplemented by one if considered necessary.
+
+        result = {item for item in self.__cache__}
+        return sorted(result)
+
     @property
     def disabled(self):
         '''Return all of the attached targets that are currently disabled.'''
-        return {item for item in self.__disabled}
+        result = {item for item in self.__disabled}
+        return sorted(result)
     @property
     def enabled(self):
         '''Return all of the attached targets that are currently enabled.'''
-        return {item for item in self.__cache__} - {item for item in self.__disabled}
+        result = {item for item in self.__cache__} - {item for item in self.__disabled}
+        return sorted(result)
 
     def __repr__(self):
         cls, enabled = self.__class__, {item for item in self.__cache__} - {item for item in self.__disabled}
@@ -494,6 +502,11 @@ class prioritybase(object):
 
     def get(self, target):
         '''Return all of the callables that are attached to the specified `target`.'''
+        if target not in self.__cache__:
+            cls = self.__class__
+            raise NameError(u"{:s}.get({!r}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no currently attached targets to get from.'))
+
+        # Return the callables attached to the specified target.
         res = self.__cache__[target]
         return tuple(callable for _, callable in res)
 
@@ -646,7 +659,7 @@ class priorityhook(prioritybase):
 
         # enumerate all of the attachable methods, and create a dictionary
         # that will contain the methods that are currently attached.
-        self.__attachable__ = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
+        self.__attachable__ = { name for name in klass.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook', 'thisown'} }
         self.__attached__ = {}
 
         # stash away our mapping of supermethods so that we can return the
@@ -654,7 +667,7 @@ class priorityhook(prioritybase):
         self.__mapping__ = mapping
 
         # now that we have everything setup, connect our instance so that
-        # when the user modifies it, the call to unhook() wil succeed.
+        # when the user modifies it, the call to unhook() will succeed.
         self.object.hook()
 
     def __supermethod__(self, name):
@@ -728,6 +741,12 @@ class priorityhook(prioritybase):
             logging.critical(u"{:s}.__instance__() : Unable to reconnect new instance ({!s}) during modification.".format('.'.join([__name__, cls.__name__]), instance.__class__))
         return
 
+    @property
+    def available(self):
+        '''Return all of the targets that may be attached to.'''
+        result = {name for name in self.__attachable__}
+        return sorted(result)
+
     def close(self):
         '''Detach from all of the targets that are currently attached and disconnect the instance.'''
         cls = self.__class__
@@ -746,7 +765,7 @@ class priorityhook(prioritybase):
     def attach(self, name):
         '''Attach to the target specified by `name`.'''
         cls = self.__class__
-        if not operator.contains(self.__attachable__, name):
+        if name not in self.__attachable__:
             raise NameError(u"{:s}.attach({!r}) : Unable to attach to the target ({:s}) due to the target being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
         # if the attribute is already assigned to our instance, then
@@ -784,11 +803,11 @@ class priorityhook(prioritybase):
     def detach(self, name):
         '''Detach from the target specified by `name`.'''
         cls = self.__class__
-        if not operator.contains(self.__attachable__, name):
+        if name not in self.__attachable__:
             raise NameError(u"{:s}.detach({!r}) : Unable to detach from the target ({:s}) due to the target being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
         # Check that the target name is currently attached.
-        if not operator.contains(self.__attached__, name):
+        if name not in self.__attached__:
             logging.warning(u"{:s}.detach({!r}) : Unable to detach from the target ({:s}) as it is not currently attached.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
             return False
 
@@ -801,7 +820,7 @@ class priorityhook(prioritybase):
 
         # Now we just need to detach the target name from our attachable
         # state, and then apply it to a new instance of the hook object.
-        self.__attachable.pop(name)
+        self.__attached__.pop(name)
         with self.__instance__() as attach:
             attach.update(self.__attached__)
         return super(priorityhook, self).detach(name)
@@ -814,19 +833,18 @@ class priorityhook(prioritybase):
             return super(priorityhook, self).add(name, callable, priority)
 
         # Try and attach to the target name with a closure.
-        ok = self.attach(name)
-        if not ok:
+        if not self.attach(name):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
             raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:s}) : Unable to attach to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, format(priority), self.__formatter__(name)))
 
         # We should've attached, so all that's left is to add it for
-        # tracking and then ensure the hook is enabled.
+        # tracking using the parent method then ensure it is enabled.
         ok = super(priorityhook, self).add(name, callable, priority)
         return ok and self.enable(name)
 
     def discard(self, name, callable):
         '''Discard the specified `callable` from hooking the event `name`.'''
-        if not operator.contains(self.__attachable__, name):
+        if name not in self.__attachable__:
             cls = self.__class__
             raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard the callable ({!s}) from the cache due to the target ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, callable, self.__formatter__(name)))
         return super(priorityhook, self).discard(name, callable)
@@ -851,6 +869,12 @@ class prioritynotification(prioritybase):
         name = self.__lookup.get(notification, '')
         return "{:s}({:#x})".format(name, notification) if name else "{:#x}".format(notification)
 
+    @property
+    def available(self):
+        '''Return all of the notifications that may be attached to.'''
+        result = {notification for notification in self.__lookup}
+        return sorted(result)
+
     def attach(self, notification):
         '''Attach to the specified `notification` in order to receive events from it.'''
         ok, callable = super(prioritynotification, self).attach(notification)
@@ -858,8 +882,6 @@ class prioritynotification(prioritybase):
 
     def detach(self, notification):
         '''Detach from the specified `notification` so that events from it will not be received.'''
-        def closure(*parameters):
-            return True
 
         # Iterate through all of our callables, and empty the cache since we're
         # actually shutting everything down here.
@@ -869,6 +891,11 @@ class prioritynotification(prioritybase):
             Flogging = logging.info if ok else logging.warning
             Flogging(u"{:s}.detach({:#x}) : {:s} the callable ({!s}) attached to the notification {:s}.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(notification)))
 
+        # Define a dummy closure to pass to the api to avoid a dereference.
+        def closure(*parameters):
+            return True
+
+        # Now we can actually pass the correct flag to remove the notification.
         ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
         return ok and super(prioritynotification, self).detach(notification)
 
