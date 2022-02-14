@@ -1679,6 +1679,129 @@ def set_func_end(pfn, new_end):
         return
     return
 
+class supermethods(object):
+    """
+    Define all of the functions that will be used as supermethods for
+    the situation when the original hook supermethod does not take the
+    same parameters as listed in IDAPython's documentation. This is
+    used when setting up the hooks via the priorityhook class during
+    the initialization of them by the ui.hook namepsace.
+    """
+
+    class IDP_Hooks(object):
+        """
+        This is just a namespace for the the list of supermethods that
+        we need to override with when using the IDP_Hooks object.
+        """
+        mapping = {}
+
+        # idaapi.__version__ >= 7.5
+        def ev_set_idp_options(self, keyword, value_type, value, idb_loaded):
+            '''This patch is needed as the supermethod wants a vector type for its value.'''
+            cls = self.__class__
+            if value_type == idaapi.IDPOPT_STR:     # string constant (char*)
+                res = idaapi.uchar_array(1 + len(value))
+                for index, item in enumerate(bytearray(value + b'\0')):
+                    res[index] = item
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_NUM:   # number (uval_t*)
+                res = idaapi.uvalvec_t()
+                res.push_back(value)
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_BIT:   # bit, yes/no (int*)
+                res = idaapi.intvec_t()
+                res.push_back(value)
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_FLT:   # float, yes/no (double*)
+                # FIXME: is there a proper way to get a double* type?
+                res = idaapi.uint64vec_t()
+                res.push_back(internal.utils.float_to_integer(value, 52, 11, 1))
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_I64:   # 64bit number (int64*)
+                res = idaapi.int64vec_t()
+                res.push_back(value)
+                pvalue = res
+            else:
+                raise ValueError(u"ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
+
+            # We need to figure out the original supermethod to call into
+            # ourselves because we don't have the method name as a cellvar.
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'ev_set_idp_options')
+            return supermethod(keyword, value_type, pvalue, idb_loaded)
+
+        # Populate the dictionary with each of the supermethods that need
+        # to be patched for the IDB_Hooks class by checking the version
+        # in order to determine whether it should be assigned or not.
+        idaapi.__version__ >= 7.5 and mapping.setdefault('ev_set_idp_options', ev_set_idp_options)
+
+    class IDB_Hooks(object):
+        """
+        This is just a namespace for the the list of supermethods that
+        we need to override with when using the IDB_Hooks object.
+        """
+        mapping = {}
+
+        # idaapi.__version__ >= 7.6
+        def compiler_changed(self, adjust_inf_fields):
+            '''This patch is needed due to the supermethod not wanting *this as its first parameter.'''
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'compiler_changed')
+            return supermethod(adjust_inf_fields)
+
+        # idaapi.__version__ >= 7.6
+        def renamed(self, ea, new_name, local_name):
+            '''This patch is needed due to the supermethod wanting a different number of parameters.'''
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'renamed')
+            return supermethod(ea, new_name, local_name or None, '')
+
+        # idaapi.__version__ >= 7.6
+        def bookmark_changed(self, index, pos, desc, operation):
+            '''This patch is needed due to the supermethod not wanting *this as its first parameter.'''
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'bookmark_changed')
+            return supermethod(index, pos, desc, operation)
+
+        # idaapi.__version__ >= 7.7
+        def segm_deleted(self, start_ea, end_ea, flags):
+            '''This patch is needed due to the supermethod not wanting *this as its first parameter.'''
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'segm_deleted')
+            return supermethod(start_ea, end_ea, flags)
+
+        # Populate the dictionary with each of the supermethods that need
+        # to be patched for the IDB_Hooks class by checking the version
+        # in order to determine whether it should be assigned or not.
+        idaapi.__version__ >= 7.6 and mapping.setdefault('compiler_changed', compiler_changed)
+        idaapi.__version__ >= 7.6 and mapping.setdefault('renamed', renamed)
+        idaapi.__version__ >= 7.6 and mapping.setdefault('bookmark_changed', bookmark_changed)
+        idaapi.__version__ >= 7.7 and mapping.setdefault('segm_deleted', segm_deleted)
+
+    class UI_Hooks(object):
+        """
+        This is just a namespace for the the list of supermethods that
+        we need to override with when using the UI_Hooks object.
+        """
+        mapping = {}
+
+        # idaapi.__version__ >= 7.6
+        def saved(self, path):
+            '''This patch is needed due to the supermethod not wanting *this as its first parameter.'''
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'saved')
+            return supermethod(path)
+
+        # Populate the dictionary with each of the supermethods that need
+        # to be patched for the IDB_Hooks class by checking the version
+        # in order to determine whether it should be assigned or not.
+        idaapi.__version__ >= 7.6 and mapping.setdefault('saved', saved)
+
 def make_ida_not_suck_cocks(nw_code):
     '''Start hooking all of IDA's API.'''
 
