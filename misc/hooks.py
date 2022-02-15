@@ -1125,23 +1125,6 @@ class naming(changingchanged):
         ea, expected = (yield)
         original = idaapi.get_ea_name(ea, idaapi.GN_LOCAL)
 
-        # Next we use the address to figure out which context that we'll
-        # need to use. If we're not in a function or the address is an
-        # external segment, then we're in the global context.
-        fn = idaapi.get_func(ea)
-        if fn is None or idaapi.segtype(ea) in {idaapi.SEG_XTRN}:
-            ctx, check, target = internal.comment.globals, False, None
-
-        # If we're renaming the beginning of a function, then we're
-        # also in the global context unless we're a local name. So
-        # set a variable that we'll use later to distinguish.
-        elif interface.range.start(fn) == ea:
-            ctx, check, target = internal.comment.globals, True, interface.range.start(fn)
-
-        # Otherwise, we're inside a function and we don't need to verify.
-        else:
-            ctx, check, target = internal.comment.contents, False, interface.range.start(fn)
-
         # Now that we have the names, we need to figure out how
         # the name is going to change. For this we use the flags
         # to check if we're changing from a label to a custom name.
@@ -1167,9 +1150,23 @@ class naming(changingchanged):
             Flogging(u"{:s}.event() : Rename is at address {:#x} has desynchronized. Target address at {:#x} should have been renamed from {!r} to {!r} but {!r} was received instead.".format('.'.join([__name__, cls.__name__]), ea, new_ea, original, expected, new_name))
             return
 
-        # Now that our event matches, we need to figure out whether
-        # the context which depends on whether the name is local or not.
-        context, target = (internal.comment.contents, target) if check and local_name else (ctx, target)
+        # Now we use the address to figure out which context that we'll
+        # need to update. If we're not in a function or the address is an
+        # external segment, then we're in the global context.
+        fn = idaapi.get_func(ea)
+        if fn is None or idaapi.segtype(ea) in {idaapi.SEG_XTRN}:
+            if local_name and fn is None:
+                logging.warning(u"{:s}.event() : Received rename for address {:#x} where \"{:s}\" is set ({!s}) but the address is not within a function.".format('.'.join([__name__, cls.__name__]), ea, 'local_name', local_name))
+            context, target = internal.comment.globals, None
+
+        # If we're renaming the beginning of a function, then we're also
+        # in the global context unless it's considered a "local_name".
+        elif interface.range.start(fn) == ea and not local_name:
+            context, target = internal.comment.globals, None
+
+        # Otherwise, we're inside a function and we should be good.
+        else:
+            context, target = internal.comment.contents, interface.range.start(fn)
 
         # Next thing to do is to verify whether we're adding a new name,
         # removing one, or adding one. If the names are the same, then skip.
