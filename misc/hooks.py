@@ -1961,7 +1961,7 @@ def make_ida_not_suck_cocks(nw_code):
 
 def make_ida_suck_cocks(nw_code):
     '''Unhook all of IDA's API.'''
-    idaapi.__notification__.unhook()
+    idaapi.__notification__.close()
     ui.hook.__stop_ida__()
 
 def ida_is_busy_sucking_cocks(*args, **kwargs):
