@@ -2009,7 +2009,7 @@ def tag(ea, key, value):
     # Now we can finally update the comment in the database. However, we need
     # to guard the modification so that the hooks don't interfere with the
     # references that we updated. We guard this situation by disabling the hooks.
-    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
     try:
         [ ui.hook.idb.disable(item) for item in hooks ]
 
@@ -2096,7 +2096,7 @@ def tag(ea, key, none):
     # Now we can do our update and encode our modified dictionary, but we need
     # to guard the modification so that the hooks don't also interfere with the
     # references that we're updating. We guard by disabling the relevant hooks.
-    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
     try:
         [ ui.hook.idb.disable(item) for item in hooks ]
 
