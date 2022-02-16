@@ -6103,9 +6103,60 @@ class set(object):
 
     @utils.multicase()
     @classmethod
+    def array(cls):
+        '''Set the data at the current selection to an array of the type at the current address.'''
+        ea, item = ui.current.address(), type.array()
+
+        # Extract the type from the current address and use it to get its size.
+        original_type, original_length = item
+        _, _, nbytes = interface.typemap.resolve(original_type)
+
+        # If the length at the current address is irrelevant, then we can just
+        # chain to the other selection code using the type that we snagged.
+        if original_length <= 1:
+            return cls.array(original_type)
+
+        # Otherwise we grab the selection and unpack it in order to calculate
+        # the new length and determine if we need to warn the user about it.
+        start, stop = ui.current.selection()
+        result = math.ceil((stop - start) / nbytes)
+
+        # Now we compare if the user is asking us to change the length in some way.
+        length = math.trunc(result)
+        if length != original_length:
+            logging.warning(u"{:s}.array() : Modifying the number of elements ({:d}) for the array at the current selection ({:#x}<>{:#x}) to {:d}.".format('.'.join([__name__, cls.__name__]), original_length, start, stop, length))
+        return cls.array(original_type, length)
+    @utils.multicase(length=six.integer_types)
+    @classmethod
+    def array(cls, length):
+        '''Set the data at the current selection to an array of the specified `length` using the type at the current address.'''
+        ea, item = ui.current.address(), type.array()
+        original_type, original_length = item
+
+        # If the length is not being changed, then we can just use the
+        # current address and the original type when setting the length.
+        if original_length == length:
+            return cls.array(ea, original_type, length)
+
+        # Otherwise we need to warn the user that we're changing the length.
+        logging.warning(u"{:s}.array({:d}) : Modifying the number of elements ({:d}) for the array at the current address ({:#x}) to {:d}.".format('.'.join([__name__, cls.__name__]), length, original_length, ea, length))
+        return cls.array(ea, original_type, length)
+    @utils.multicase()
+    @classmethod
     def array(cls, type):
         '''Set the data at the current address to an array of the specified `type`.'''
-        return cls.array(ui.current.address(), type)
+        selection = ui.current.selection()
+        if isinstance(type, list) or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.array(ui.current.address(), type)
+
+        # otherwise since we already checked if this was a list, we can
+        # just resolve the type to get the number of bytes for the size.
+        _, _, nbytes = interface.typemap.resolve(type)
+        start, stop = selection
+
+        # last thing to do is to calculate the array length and use it.
+        length = (stop - start) / nbytes
+        return cls.array(start, type, math.trunc(math.ceil(length)))
     @utils.multicase(length=six.integer_types)
     @classmethod
     def array(cls, type, length):
@@ -6481,7 +6532,15 @@ class get(object):
     @classmethod
     def array(cls, **length):
         '''Return the values of the array at the current address.'''
-        return cls.array(ui.current.address(), **length)
+        address, selection = ui.current.address(), ui.current.selection()
+        if 'length' in length or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.array(address, **length)
+
+        # otherwise we need to calculate what the user selected so that
+        # we can actually figure out what the length is.
+        start, stop = selection
+        length = (stop - start) / type.size(address)
+        return cls.array(start, length=math.trunc(math.ceil(length)))
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, **length):
