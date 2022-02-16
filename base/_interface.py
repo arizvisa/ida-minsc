@@ -346,7 +346,7 @@ class prioritybase(object):
 
         # Simply detach every available target one-by-one.
         for target in items:
-            if not self.disconnect(target):
+            if not self.detach(target):
                 logging.warning(u"{:s}.close() : Error trying to detach from the specified target ({:s}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
                 ok = False
             continue
