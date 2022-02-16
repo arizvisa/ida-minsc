@@ -6123,7 +6123,7 @@ class set(object):
 
         # Now we compare if the user is asking us to change the length in some way.
         length = math.trunc(result)
-        if length != original_length:
+        if original_length > 1 and length != original_length:
             logging.warning(u"{:s}.array() : Modifying the number of elements ({:d}) for the array at the current selection ({:#x}<>{:#x}) to {:d}.".format('.'.join([__name__, cls.__name__]), original_length, start, stop, length))
         return cls.array(original_type, length)
     @utils.multicase(length=six.integer_types)
@@ -6133,45 +6133,54 @@ class set(object):
         ea, item = ui.current.address(), type.array()
         original_type, original_length = item
 
-        # If the length is not being changed, then we can just use the
-        # current address and the original type when setting the length.
-        if original_length == length:
-            return cls.array(ea, original_type, length)
-
-        # Otherwise we need to warn the user that we're changing the length.
-        logging.warning(u"{:s}.array({:d}) : Modifying the number of elements ({:d}) for the array at the current address ({:#x}) to {:d}.".format('.'.join([__name__, cls.__name__]), length, original_length, ea, length))
+        # If the length is being changed, then warn the user about it.
+        if original_length > 1 and original_length != length:
+            logging.warning(u"{:s}.array({:d}) : Modifying the number of elements ({:d}) for the array at the current address ({:#x}) to {:d}.".format('.'.join([__name__, cls.__name__]), length, original_length, ea, length))
         return cls.array(ea, original_type, length)
     @utils.multicase()
     @classmethod
-    def array(cls, type):
-        '''Set the data at the current address to an array of the specified `type`.'''
+    def array(cls, type, **length):
+        '''Set the data at the current address to an array of the specified `type` using the length determined from the current selection if `length` is not specified.'''
+        if 'length' in length and isinstance(type, list):
+            ttype, tlength = type
+            if tlength != length['length']:
+                raise E.InvalidParameterError(u"{:s}.array({!r}{:s}) : Multiple values for the array length were passed in the type ({:d}) and the parameter ({:d}).".format('.'.join([__name__, cls.__name__]), ttype, ", {:s}".format(utils.string.kwargs(length)) if length else '', tlength, length['length']))
+            return cls.array(ui.current.address(), ttype, tlength)
+        elif isinstance(type, list):
+            type, length = type
+            return cls.array(ui.current.address(), type, length)
+        elif 'length' in length:
+            return cls.array(ui.current.address(), type, length['length'])
+
+        # If no length was specified, then we'll check the current selection.
         selection = ui.current.selection()
-        if isinstance(type, list) or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.array(ui.current.address(), type)
-
-        # otherwise since we already checked if this was a list, we can
-        # just resolve the type to get the number of bytes for the size.
-        _, _, nbytes = interface.typemap.resolve(type)
-        start, stop = selection
-
-        # last thing to do is to calculate the array length and use it.
-        length = (stop - start) / nbytes
-        return cls.array(start, type, math.trunc(math.ceil(length)))
-    @utils.multicase(length=six.integer_types)
-    @classmethod
-    def array(cls, type, length):
-        '''Set the data at the current address to an array with the specified `length` and `type`.'''
-        return cls.array(ui.current.address(), type, length)
+        return cls.array(selection, type)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, type):
-        '''Set the data at the address `ea` to an array of the specified `type`.'''
+        '''Set the data at the address `ea` to an array of the given `type`.'''
         type, length = type if isinstance(type, builtins.list) else (type, 1)
         return cls.array(ea, type, length)
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def array(cls, bounds, type):
+        '''Set the data at the provided `bounds` to an array of the given `type`.'''
+        if isinstance(type, builtins.list):
+            raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Unable to set the provided boundary ({!r}) to the specified type ({!s}) due to it resulting in another array.".format('.'.join([__name__, cls.__name__]), bounds, type, bounds, type))
+
+        # Calculate the size of the type that we were given.
+        _, _, nbytes = interface.typemap.resolve(type)
+        start, stop = bounds
+
+        # Now we can use it to calculate the length and apply it.
+        length = (stop - start) / nbytes
+        return cls.array(start, type, math.trunc(math.ceil(length)))
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
-        '''Set the data at the address `ea` to an array with the specified `length` and `type`.'''
+        '''Set the data at the address `ea` to an array with the given `length` and `type`.'''
 
         # if the type is already specifying a list, then combine it with
         # the specified length
@@ -6535,11 +6544,13 @@ class get(object):
         address, selection = ui.current.address(), ui.current.selection()
         if 'length' in length or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.array(address, **length)
-
-        # otherwise we need to calculate what the user selected so that
-        # we can actually figure out what the length is.
-        start, stop = selection
-        length = (stop - start) / type.size(address)
+        return cls.array(selection)
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def array(cls, bounds):
+        '''Return the values within the provided `bounds` as an array.'''
+        start, stop = bounds
+        length = (stop - start) / type.size(start)
         return cls.array(start, length=math.trunc(math.ceil(length)))
     @utils.multicase(ea=six.integer_types)
     @classmethod
