@@ -2169,7 +2169,7 @@ def tag(func, key, value):
 
     # Now we need to guard the modification of the comment so that we don't
     # mistakenly tamper with any of the reference counts in the tag cache.
-    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
     try:
         [ ui.hook.idb.disable(item) for item in hooks ]
 
@@ -2244,7 +2244,7 @@ def tag(func, key, none):
 
     # Before modifying the comment, we first need to guard its modification
     # so that the hooks don't also tamper with the reference count in the cache.
-    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
     try:
         [ ui.hook.idb.disable(item) for item in hooks ]
 
