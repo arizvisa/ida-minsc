@@ -119,12 +119,21 @@ class PatternAny(Pattern):
         return "{:s}({:s})".format('Pattern', '*')
 class PatternAnyType(Pattern):
     '''Object for matching against any type it is compared against.'''
-    def __init__(self, other):
-        self.type = other
+    def __init__(self, *other):
+        self.types = other
     def __cmp__(self, other):
-        return 0 if isinstance(other, self.type) else -1
+        return 0 if isinstance(other, self.types) else -1
+    def __types__(self):
+        items = {item for item in []}
+        for item in self.types:
+            if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
+                for item in item:
+                    items |= {item.__name__}
+                continue
+            items |= {item.__name__}
+        return sorted(items)
     def __repr__(self):
-        return "{:s}({:s})".format('Pattern', '|'.join(n.__name__ for n in self.type) if hasattr(self.type, '__iter__') else self.type.__name__)
+        return "{:s}({:s})".format('Pattern', '|'.join(self.__types__()))
 
 ### compatibility namespace
 class pycompat(object):
