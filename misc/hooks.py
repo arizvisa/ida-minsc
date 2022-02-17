@@ -758,7 +758,9 @@ def on_newfile(fname):
         State = state.loaded
     else:
         logging.debug(u"{:s}.on_newfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
+
     # FIXME: save current state like base addresses and such
+    __execute_rcfile()
 
 def nw_on_newfile(nw_code, is_old_database):
     if is_old_database:
@@ -777,7 +779,9 @@ def on_oldfile(fname):
         __check_functions()
     else:
         logging.debug(u"{:s}.on_oldfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
+
     # FIXME: save current state like base addresses and such
+    __execute_rcfile()
 
 def nw_on_oldfile(nw_code, is_old_database):
     if not is_old_database:
@@ -876,6 +880,22 @@ def __process_functions(percentage=0.10):
         continue
     six.print_(u"Successfully built tag-cache composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
     P.close()
+
+def __execute_rcfile():
+    '''Look in the current IDB directory for an rcfile that might need to be executed.'''
+    ns, filename = sys.modules['__main__'].__dict__ if '__main__' in sys.modules else globals(), 'idapythonrc.py'
+    path = database.config.path(filename)
+
+    try:
+        with open(path) as infile:
+            logging.warning(u"{:s}.execute_rcfile() : Found a `{:s}` file to execute in the database directory at `{:s}`.".format(__name__, filename, path))
+            exec(infile.read(), ns, ns)
+
+    except IOError:
+        logging.info(u"{:s}.execute_rcfile() : Skipping execution of `{:s}` file as it does not exist at `{:s}`.".format(__name__, filename, path))
+    except Exception:
+        logging.warning(u"{:s}.execute_rcfile() : Unexpected exception raised while trying to execute `{:s}`.".format(__name__, path), exc_info=True)
+    return
 
 def relocate(info):
     """This is for when the user relocates a number of segments in newer versions of IDA.
