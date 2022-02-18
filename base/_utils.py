@@ -229,7 +229,17 @@ class pycompat(object):
             argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
             return types.CodeType(*attributes)
 
-    class code_3x(code_2x):
+    class code_37(code_2x):
+        @classmethod
+        def unpack_extra(cls, object):
+            return object.co_kwonlyargcount,
+        @classmethod
+        def new(cls, attributes, extra=(0,)):
+            argcount, nlocals, stacksize, flags, code, consts, names, varnames,filename, name, firstlineno, lnotab, freevars, cellvars = attributes
+            kwonlyargcount, = extra
+            return types.CodeType(argcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
+
+    class code_38(code_2x):
         @classmethod
         def unpack_extra(cls, object):
             return object.co_posonlyargcount, object.co_kwonlyargcount
@@ -239,7 +249,7 @@ class pycompat(object):
             posonlyargcount, kwonlyargcount = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
-    code = code_2x if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_3x
+    code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38
 
     class method_2x(object):
         @classmethod
