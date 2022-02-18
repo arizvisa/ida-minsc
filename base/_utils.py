@@ -239,7 +239,7 @@ class pycompat(object):
             posonlyargcount, kwonlyargcount = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
-    code = code_2x if sys.version_info.major < 3 else code_3x
+    code = code_2x if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_3x
 
     class method_2x(object):
         @classmethod
