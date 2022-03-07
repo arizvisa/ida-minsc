@@ -20,7 +20,7 @@ window that they wish to expose to the user.
 
 import six, builtins
 import sys, os, time, functools, inspect, itertools
-import logging
+import logging, ctypes
 
 import idaapi, internal
 import database as _database, segment as _segment
@@ -1518,13 +1518,13 @@ class DisplayHook(object):
         else:
             self.orig_displayhook = sys.displayhook
 
-    def format_seq(self, num_printer, storage, item, opn, cls):
-        storage.append(opn)
+    def format_seq(self, num_printer, storage, item, open, close):
+        storage.append(open)
         for idx, el in enumerate(item):
             if idx > 0:
                 storage.append(', ')
             self.format_item(num_printer, storage, el)
-        storage.append(cls)
+        storage.append(close)
 
     def format_basestring(self, string):
         # FIXME: rather than automatically evaluating the string as we're
@@ -1546,6 +1546,16 @@ class DisplayHook(object):
             result = u"'{!s}'".format(encoded)
         return result
 
+    def format_ctypes(self, num_printer, storage, item):
+        cls, size = item.__class__, ctypes.sizeof(item)
+        if isinstance(item, ctypes._SimpleCData):
+            storage.append("{:s}({:#0{:d}x})".format(cls.__name__, item.value, 2 + 2 * size))
+
+        # if it's anything else (or an unknown), then use the default formatter.
+        else:
+            storage.append("{!r}".format(item))
+        return
+
     def format_item(self, num_printer, storage, item):
         if item is None or isinstance(item, bool):
             storage.append("{!s}".format(item))
@@ -1555,6 +1565,8 @@ class DisplayHook(object):
             storage.append(num_printer(item))
         elif isinstance(item, idaapi.tinfo_t):
             storage.append("{!s}".format(item.dstr()))
+        elif isinstance(item, (ctypes._SimpleCData, ctypes._Pointer, ctypes._CFuncPtr, ctypes.Array, ctypes.Structure)):
+            self.format_ctypes(num_printer, storage, item)
         elif item.__class__ is list:
             self.format_seq(num_printer, storage, item, '[', ']')
         elif item.__class__ is tuple:
