@@ -558,8 +558,8 @@ class chunk(object):
         # then we can just return because there's nothing that owns it.
         ch = idaapi.get_fchunk(ea)
         if ch is None:
-            raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to read the chunk at {:#x} belonging to the function at {!s}.".format('.'.join([__name__, cls.__name__]), ea, ea, internal.interface.range.bounds(res)))
-        owner, bounds = map(internal.interface.range.bounds, [res, ch])
+            raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to read the chunk at {:#x} belonging to the function at {!s}.".format('.'.join([__name__, cls.__name__]), ea, ea, interface.range.bounds(res)))
+        owner, bounds = map(interface.range.bounds, [res, ch])
 
         # If this is a function tail, then we need to iterate through the referers
         # for the chunk so that we can yield each address. Older versions of IDA
@@ -731,6 +731,22 @@ class chunk(object):
         '''Return the top address of the chunk at address `ea`.'''
         left, _ = cls(ea)
         return left
+    @utils.multicase(ea=six.integer_types, address=six.integer_types)
+    @classmethod
+    def top(cls, ea, address):
+        '''Change the top address of the chunk at address `ea` to the specified `address`.'''
+        bounds = cls(ea)
+        left, _ = bounds
+
+        # Set the function start and return the previous top if we modified it successfully.
+        result = idaapi.set_func_start(left, address)
+        if result == idaapi.MOVE_FUNC_OK:
+            return left
+
+        # Otherwise we got an error code and we need to raise an exception.
+        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('MOVE_FUNC_')}
+        raise E.DisassemblerError(u"{:s}.top({:#x}, {:#x}) : Unable to modify the top of the specified chunk with `idaapi.set_func_start({:#x}, {:#x})` due to error ({:s}).".format('.'.join([__name__, cls.__name__]), ea, address, left, address, errors.get(result, "{:#x}".format(result))))
+
     @utils.multicase()
     @classmethod
     def bottom(cls):
@@ -742,6 +758,15 @@ class chunk(object):
     def bottom(cls, ea):
         '''Return the bottom address of the chunk at address `ea`.'''
         _, right = cls(ea)
+        return right
+    @utils.multicase(ea=six.integer_types, address=six.integer_types)
+    @classmethod
+    def bottom(cls, ea, address):
+        '''Change the bottom address of the chunk at address `ea` to the specified `address`.'''
+        bounds = cls(ea)
+        left, right = bounds
+        if not idaapi.set_func_end(left, address):
+            raise E.DisassemblerError(u"{:s}.bottom({:#x}, {:#x}) : Unable to modify the bottom of the specified chunk with `idaapi.set_func_end({:#x}, {:#x})`.".format('.'.join([__name__, cls.__name__]), ea, address, left, address))
         return right
 
     @utils.multicase()
