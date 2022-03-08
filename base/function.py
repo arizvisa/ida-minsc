@@ -1076,17 +1076,30 @@ class blocks(object):
         fVisibleTags = lambda items: {tag for tag in items if not tag.startswith('__')}
 
         # create a node for each block in the flowchart
-        for B in cls.iterate(fn):
+        nodes_iterable, edges_iterable = itertools.tee(cls.iterate(fn), 2)
+        for B in nodes_iterable:
             bounds = block(B)
-            items = [item for item in database.address.iterate(bounds)]
-            tags = [database.tag(item) for item in items]
-            last = database.address.prev(bounds.right)
 
+            # check if the boundary is zero-sized and handle it differently if so.
+            if bounds.size:
+                items = [item for item in database.address.iterate(bounds)]
+                last = database.address.prev(bounds.right)
+
+            # as the boundaries are defining an empty basic-block, we only need
+            # to find the one address that it's actually pointing to.
+            else:
+                items = [item for item in {bound for bound in bounds}]
+                last, = items
+
+            # figure out all of the tags in the list of addresses (items).
+            tags = [database.tag(item) for item in items]
+
+            # now we can continue to collect attributes to add to our graph.
             attrs = database.tag(bounds.left)
             attrs.setdefault('__count__', len(items))
             attrs.setdefault('__bounds__', bounds)
             attrs.setdefault('__address__', bounds.left)
-            attrs.setdefault('__edge__', database.address.prev(bounds.right))
+            attrs.setdefault('__edge__', last)
             attrs.setdefault('__size__', getattr(bounds, 'size', bounds.right - bounds.left))
 
             attrs.setdefault('__entry__', bounds.left == ea or not any(B.preds()))
@@ -1131,7 +1144,7 @@ class blocks(object):
             G.add_node(bounds.left, **attrs)
 
         # for every single basic-block from the flowchart...
-        for B in cls.iterate(fn):
+        for B in edges_iterable:
 
             # ...add an edge for its predecessors
             for Bp in B.preds():
