@@ -935,10 +935,11 @@ class blocks(object):
         # are actually contained by the function, so we collect this too.
         for bb in idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS):
             bounds = interface.range.bounds(bb)
+            ea, _ = bounds
 
             # unpack the boundaries of the basic block to verify it's in our
             # chunks and warn the user if it isn't.
-            ea, _ = bounds
+            ea = ui.navigation.set(ea)
             if not any(left <= ea < right for left, right in boundaries):
                 f = interface.range.start(fn)
                 logging.warning(u"{:s}.iterate({:#x}) : The block ({!s}) being returned at {!s} from `idaapi.FlowChart` is outside the boundaries of the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), f, bb, bounds, f))
