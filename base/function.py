@@ -1097,6 +1097,9 @@ class blocks(object):
 
             # now we can continue to collect attributes to add to our graph.
             attrs = database.tag(bounds.left)
+            comment = attrs.pop('', None)
+            comment and attrs.setdefault('__comment__', comment)
+
             attrs.setdefault('__count__', len(items))
             attrs.setdefault('__bounds__', bounds)
             attrs.setdefault('__address__', bounds.left)
