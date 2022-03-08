@@ -928,7 +928,22 @@ class blocks(object):
     def iterate(cls, func):
         '''Returns each ``idaapi.BasicBlock`` for the function `func`.'''
         fn = by(func)
+        boundaries = [bounds for bounds in chunks(fn)]
+
+        # iterate through all the basic-blocks in the flow chart and yield
+        # each of them back to the caller. we need to ensure that the bounds
+        # are actually contained by the function, so we collect this too.
         for bb in idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS):
+            bounds = interface.range.bounds(bb)
+
+            # unpack the boundaries of the basic block to verify it's in our
+            # chunks and warn the user if it isn't.
+            ea, _ = bounds
+            if not any(left <= ea < right for left, right in boundaries):
+                f = interface.range.start(fn)
+                logging.warning(u"{:s}.iterate({:#x}) : The block ({!s}) being returned at {!s} from `idaapi.FlowChart` is outside the boundaries of the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), f, bb, bounds, f))
+
+            # yield the basic block that we were given.
             yield bb
         return
 
