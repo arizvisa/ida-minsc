@@ -139,6 +139,7 @@ class config(object):
         res = idaapi.cvar.database_idb if idaapi.__version__ < 7.0 else idaapi.get_path(idaapi.PATH_TYPE_IDB)
         res = utils.string.of(res)
         return res.replace(os.sep, '/')
+    database = utils.alias(idb, 'config')
 
     @classmethod
     def module(cls):
