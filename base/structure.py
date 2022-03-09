@@ -2125,8 +2125,8 @@ class member_t(object):
     @property
     def realoffset(self):
         '''Return the real offset of the member.'''
-        parent, member = self.parent.ptr, self.ptr
-        return 0 if parent.is_union() else member.get_soff()
+        parent = self.parent.ptr
+        return 0 if parent.is_union() else self.ptr.get_soff()
     @property
     def offset(self):
         '''Return the offset of the member.'''
@@ -2135,8 +2135,8 @@ class member_t(object):
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
-        mptr = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
-        return 0 if mptr is None else mptr.flag
+        res = self.ptr.flag
+        return idaapi.as_uint32(res)
     @property
     def fullname(self):
         '''Return the fullname of the member.'''
@@ -2182,11 +2182,8 @@ class member_t(object):
     @property
     def dt_type(self):
         '''Return the `dt_type` attribute of the member.'''
-        m = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
-        if m is None:
-            return 0
-        flag = m.flag & idaapi.DT_TYPE
-        return idaapi.as_uint32(flag)
+        res = self.ptr.flag & idaapi.DT_TYPE
+        return idaapi.as_uint32(res)
     dtype = dt_type
 
     ## Readable/Writeable Properties
