@@ -3184,17 +3184,17 @@ class type(object):
         @utils.multicase(index=six.integer_types)
         @classmethod
         def name(cls, index):
-            '''Return the name of the argument at the specified `index` in the parameters of the current function.'''
+            '''Return the name of the parameter at the specified `index` in the current function.'''
             return cls.name(ui.current.address(), index)
-        @utils.multicase(index=six.integer_types, name=six.string_types)
+        @utils.multicase(index=six.integer_types, string=six.string_types)
         @classmethod
-        def name(cls, index, name):
-            '''Modify the name of the argument at the specified `index` of the parameters belonging to the current function.'''
-            return cls.name(ui.current.address(), index, name)
+        def name(cls, index, string, *suffix):
+            '''Modify the name of the parameter at the specified `index` of the current function to `string`.'''
+            return cls.name(ui.current.address(), index, string, *suffix)
         @utils.multicase(index=six.integer_types)
         @classmethod
         def name(cls, func, index):
-            '''Return the name of the argument at the specified `index` in the parameters of the function `func`.'''
+            '''Return the name of the parameter at the specified `index` in the function `func`.'''
             rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
@@ -3233,13 +3233,14 @@ class type(object):
             # Now we can grab the argument using the index we were given and return its name.
             result = ftd[index]
             return utils.string.of(result.name)
-        @utils.multicase(index=six.integer_types, name=six.string_types)
+        @utils.multicase(index=six.integer_types, string=six.string_types)
         @classmethod
-        @utils.string.decorate_arguments('name')
-        def name(cls, func, index, name):
-            '''Modify the name of the argument at the specified `index` of the parameters belonging to the function `func`.'''
+        @utils.string.decorate_arguments('string', 'suffix')
+        def name(cls, func, index, string, *suffix):
+            '''Modify the name of the parameter at the specified `index` of the function `func` to `string`.'''
             rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
             set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
+            name = interface.tuplename(*itertools.chain([string], suffix))
 
             # First we need to figure out if our type is a function. If it is, then
             # we need to dereference it in order to get the information that we'll
