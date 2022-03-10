@@ -2421,6 +2421,14 @@ class type(object):
     or a user has applied to a function within the database. This alows
     one to filter functions according to their particular attributes.
 
+    This namespace is aliased as ``function.t``.
+
+    Some of the functions within this namespace are also aliased as
+    the following globals:
+
+        ``function.convention`` - Interact with the calling convention (``idaapi.CM_CC_*``) for a function's prototype.
+        ``function.result`` - Interact with the result type associated with a function's prototype.
+
     Some simple ways of getting information about a function::
 
         > print( function.type.has_noframe() )
@@ -3042,7 +3050,7 @@ class type(object):
         rename or modify the type information for a particular argument
         within a function's definition.
 
-        This namespace is aliased as ``function.type.arg``.
+        This namespace is aliased as ``function.type.arg`` and ``function.type.parameter``.
 
         Some simple ways of fetching or modifying the type of the first parameter
         in a function:
@@ -3056,15 +3064,15 @@ class type(object):
 
         @utils.multicase(index=six.integer_types)
         def __new__(cls, index):
-            '''Return the type information for the argument at the specified `index` of the current function.'''
+            '''Return the type information for the parameter at the specified `index` of the current function.'''
             return cls(ui.current.address(), index)
         @utils.multicase(index=six.integer_types, info=(six.string_types, idaapi.tinfo_t))
         def __new__(cls, index, info):
-            '''Modify the type information for the argument at the specified `index` of the current function and set it to `info`.'''
+            '''Modify the type information for the parameter at the specified `index` of the current function to `info`.'''
             return cls(ui.current.address(), index, info)
         @utils.multicase(index=six.integer_types)
         def __new__(cls, func, index):
-            '''Return the type information for the argument at the specified `index` of the function `func`.'''
+            '''Return the type information for the parameter at the specified `index` of the function `func`.'''
             rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
@@ -3105,7 +3113,7 @@ class type(object):
             return result.type
         @utils.multicase(index=six.integer_types, info=idaapi.tinfo_t)
         def __new__(cls, func, index, info):
-            '''Modify the type information for the argument at the specified `index` of the function `func` and set it to `info`.'''
+            '''Modify the type information for the parameter at the specified `index` of the function `func` to `info`.'''
             rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
             set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
 
@@ -3175,7 +3183,7 @@ class type(object):
         @utils.multicase(index=six.integer_types, info_s=six.string_types)
         @utils.string.decorate_arguments('info_s')
         def __new__(cls, func, index, info_s):
-            '''Modify the type information for the argument at the specified `index` of the function `func` and set it to the string in `info_s`.'''
+            '''Modify the type information for the parameter at the specified `index` of the function `func` to the string in `info_s`.'''
             tinfo = internal.declaration.parse(info_s)
             if tinfo is None:
                 raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), ea, index, info_s, info_s))
@@ -3306,7 +3314,7 @@ class type(object):
                 raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}, {!s}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(newinfo), ea))
             return result
 
-    arg = argument  # XXX: ns alias
+    arg = parameter = argument  # XXX: ns alias
 
     class arguments(object):
         """
@@ -3315,38 +3323,38 @@ class type(object):
         one to count the number of arguments, or fetch all their names
         and types in their entirety.
 
-        This namespace is aliased as ``function.type.args``.
+        This namespace is aliased as ``function.type.args`` and ``function.type.parameters``.
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the type information for all of the arguments belonging to the current function as a list.'''
+            '''Return the type information for each of the parameters belonging to the current function.'''
             return cls.types(ui.current.address())
         @utils.multicase()
         def __new__(cls, func):
-            '''Return the type information for all of the arguments belonging to the function `func` as a list.'''
+            '''Return the type information for each of the parameters belonging to the function `func`.'''
             return cls.types(func)
 
         @utils.multicase()
         @classmethod
         def count(cls):
-            '''Return the number of arguments within the current function's prototype.'''
+            '''Return the number of parameters in the prototype for the current function.'''
             return cls.count(ui.current.address())
         @utils.multicase()
         @classmethod
         def count(cls, func):
-            '''Return the number of arguments for the prototype of the function identified by `func`.'''
+            '''Return the number of parameters in the prototype of the function identified by `func`.'''
             ti = type(func)
             return ti.get_nargs()
 
         @utils.multicase()
         @classmethod
         def types(cls):
-            '''Return the type information for all of the arguments belonging to the current function as a list.'''
+            '''Return the type information for each of the parameters belonging to the current function.'''
             return cls.types(ui.current.address())
         @utils.multicase()
         @classmethod
         def types(cls, func):
-            '''Return the type information for all of the arguments belonging to the function `func` as a list.'''
+            '''Return the type information for each of the parameters belonging to the function `func`.'''
             rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
@@ -3386,12 +3394,12 @@ class type(object):
         @utils.multicase()
         @classmethod
         def names(cls):
-            '''Return the names for all of the arguments belonging to the current function as a list.'''
+            '''Return the names for each of the parameters belonging to the current function.'''
             return cls.names(ui.current.address())
         @utils.multicase()
         @classmethod
         def names(cls, func):
-            '''Return the names for all of the arguments belonging to the function `func` as a list.'''
+            '''Return the names for each of the parameters belonging to the function `func`.'''
             rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
@@ -3427,7 +3435,7 @@ class type(object):
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [item.name for item in iterable]
         name = utils.alias(names, 'type.arguments')
-    args = arguments
+    args = parameters = arguments
 
 t = type # XXX: ns alias
 convention = cc = utils.alias(type.convention, 'type')
@@ -3442,8 +3450,8 @@ class xref(object):
 
     This namespace is aliased as ``function.x``.
 
-    The functions within this namespace are also aliased as globals.
-    These are:
+    Some of the functions within this namespace are also aliased as
+    the following globals:
 
         ``function.up`` - Return all the addresses that reference a function
         ``function.down`` - Return the callable addresses referenced by a function
@@ -3459,12 +3467,12 @@ class xref(object):
     @utils.multicase()
     @classmethod
     def down(cls):
-        '''Return all of the addresses that are referenced by the current function.'''
+        '''Return all of the callable addresses that are referenced from the current function.'''
         return down(ui.current.function())
     @utils.multicase()
     @classmethod
     def down(cls, func):
-        '''Return all of the addresses that are referenced by the function `func`.'''
+        '''Return all of the callable addresses that are referenced from the function `func`.'''
         def codeRefs(fn):
             data, code = [], []
             for ea in iterate(fn):
@@ -3482,7 +3490,7 @@ class xref(object):
     @utils.multicase()
     @classmethod
     def up(cls):
-        '''Return all of the addresses that reference to the current function.'''
+        '''Return all of the addresses that reference the current function.'''
         return up(ui.current.address())
     @utils.multicase()
     @classmethod
@@ -3498,19 +3506,19 @@ class xref(object):
     @utils.multicase(index=six.integer_types)
     @classmethod
     def argument(cls, index):
-        '''Return the address of the argument at the specified `index` that is passed to the function reference at the current address.'''
+        '''Return the address of the parameter being passed to the function reference at the current address for the specified `index`.'''
         items = cls.arguments(ui.current.address())
         return items[index]
     @utils.multicase(index=six.integer_types, ea=six.integer_types)
     @classmethod
     def argument(cls, index, ea):
-        '''Return the address of the argument at the specified `index` that is passed to the function reference identified by the address `ea`.'''
+        '''Return the address of the parameter being passed to the function reference at the address `ea` for the specified `index`.'''
         items = cls.arguments(ea)
         return items[index]
     @utils.multicase(index=six.integer_types, ea=six.integer_types)
     @classmethod
     def argument(cls, func, index, ea):
-        '''Return the address of the argument at the specified `index` of the function `func` that is passed to function reference identifed by the address `ea`.'''
+        '''Return the address of the parameter from the specified `index` of the function `func` that is being passed to the function reference at the address `ea`.'''
         items = cls.arguments(func, ea)
         return items[index]
     arg = utils.alias(argument, 'xref')
@@ -3518,12 +3526,12 @@ class xref(object):
     @utils.multicase()
     @classmethod
     def arguments(cls):
-        '''Return the address of all of the arguments being passed to the function reference at the current address.'''
+        '''Return the address of each of the parameters being passed to the function reference at the current address.'''
         return cls.arguments(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def arguments(cls, ea):
-        '''Return the address of all of the arguments being passed to the function reference at address `ea`.'''
+        '''Return the address of each of the parameters being passed to the function reference at address `ea`.'''
         if not database.xref.code_down(ea):
             raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) is not referencing a code type.".format('.'.join([__name__, cls.__name__]), ea, ea))
         items = idaapi.get_arg_addrs(ea)
@@ -3531,7 +3539,7 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def arguments(cls, func, ea):
-        '''Return the address of all of the arguments for the function `func` that are being passed to the reference at address `ea`.'''
+        '''Return the address of each of the parameters for the function `func` that are being passed to the function reference at address `ea`.'''
         refs = {ref for ref in cls.up(func)}
         if ea not in refs:
             logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, cls.__name__]), func, ea, address(func), ea))
