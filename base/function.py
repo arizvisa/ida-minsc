@@ -3466,13 +3466,16 @@ class xref(object):
     ## referencing
     @utils.multicase()
     @classmethod
-    def down(cls):
-        '''Return all of the callable addresses that are referenced from the current function.'''
-        return down(ui.current.function())
+    def down(cls, **source):
+        '''Return all of the addresses that are referenced by a branch instruction from the current function.'''
+        return down(ui.current.function(), **source)
     @utils.multicase()
     @classmethod
-    def down(cls, func):
-        '''Return all of the callable addresses that are referenced from the function `func`.'''
+    def down(cls, func, **source):
+        """Return all of the addresses that are referenced by a branch instruction from the function `func`.
+
+        If the boolean `source` is true, then include the source address of each instruction along with its target reference.
+        """
         def codeRefs(fn):
             for ea in iterate(fn):
 
@@ -3515,9 +3518,17 @@ class xref(object):
                 continue
             return
 
-        # grab our function and then extract the target of each reference that we discovered.
+        # grab our function and then grab all of the references from it.
         fn = by(func)
-        return sorted({d for _, d in codeRefs(fn)})
+        iterable = codeRefs(fn)
+
+        # now we need to figure out if we're just going to return the referenced addresses.
+        if not source.get('source', False):
+            return sorted({d for _, d in iterable})
+
+        # otherwise we're being asked to return the source with its target reference for each one.
+        results = {ea : d for ea, d in iterable}
+        return [(ea, results[ea]) for ea in sorted(results)]
 
     @utils.multicase()
     @classmethod
