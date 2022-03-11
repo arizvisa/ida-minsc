@@ -3477,21 +3477,26 @@ class xref(object):
         If the boolean `source` is true, then include the source address of each instruction along with its target reference.
         """
         def codeRefs(fn):
+            branches = [instruction.is_call, instruction.is_branch]
             for ea in iterate(fn):
 
                 # if it isn't code, then we skip it.
                 if not database.type.is_code(ea):
                     continue
 
-                # if it's a branching type instruction that has no xrefs, then log a warning for the user.
-                elif not len(database.xref.down(ea)) and instruction.type.is_branch(ea):
+                # if it's a branching or call-type instruction that has no xrefs, then log a warning for the user.
+                elif not len(database.xref.down(ea)) and any(F(ea) for F in branches):
                     logging.warning(u"{:s}.down({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolved.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
                     continue
 
                 # now we need to check which code xrefs are actually going to be something we care
                 # about by checking to see if there's an xref pointing outside our function.
-                for xref in database.xref.code_down(ea):
+                for xref in filter(database.within, database.xref.code_down(ea)):
                     if not contains(fn, xref):
+                        yield ea, xref
+
+                    # if it's a branching or call-type instruction, but referencing non-code, then we care about it.
+                    elif not database.type.is_code(xref) and any(F(ea) for F in branches):
                         yield ea, xref
 
                     # if we're recursive and there's a code xref that's referencing our entrypoint,
@@ -3500,19 +3505,21 @@ class xref(object):
                         yield ea, xref
                     continue
 
-                # then we need to check which data xrefs are going to be relevant as we only
-                # care about branch instructions that may execute our dataref.
+                # then we need to check which data xrefs are going to be relevant
+                # which only includes things that reference code outside of us.
                 for xref in filter(database.within, database.xref.data_down(ea)):
-                    if not instruction.type.is_branch(ea):
-                        continue
-
-                    # if it's a branch to an external, then yeah..this is definitely an xref we want.
-                    elif idaapi.segtype(xref) in {idaapi.SEG_XTRN}:
+                    if database.type.is_code(xref) and not contains(fn, xref):
                         yield ea, xref
 
-                    # if for some reason we're not referencing a function, but it's still a branch
-                    # then that's definitely one too (a global containing a code pointer).
-                    elif not within(xref):
+                    # if it's referencing an external, then yeah...this is definitely an xref we want.
+                    elif idaapi.segtype(xref) in {idaapi.SEG_XTRN}:
+                        # FIXME: technically an external could also be a non-callable address, but we
+                        #        don't care because the user is gonna wanna know about it anyways.
+                        yield ea, xref
+
+                    # otherwise if it's a branch, but not referencing any code
+                    # then this is probably a global containing a code pointer.
+                    elif not database.type.is_code(xref) and any(F(ea) for F in branches):
                         yield ea, xref
                     continue
                 continue
