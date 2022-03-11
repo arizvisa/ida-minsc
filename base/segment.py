@@ -412,6 +412,33 @@ def contains(segment, ea):
     '''Returns true if the address `ea` is contained within the ``idaapi.segment_t`` specified by `segment`.'''
     return interface.range.within(ea, segment)
 
+@utils.multicase()
+def type():
+    '''Return the type of the current segment.'''
+    return type(ui.current.segment())
+@utils.multicase(ea=six.integer_types)
+def type(ea):
+    '''Return the type of the segment containing the address `ea`.'''
+    result = idaapi.segtype(ea)
+    if result == idaapi.SEG_UNDF and not database.within(ea):
+        bounds, results = "{:#x}<>{:#x}".format(*database.config.bounds()), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('SEG_')}
+        logging.warning(u"{:s}.type({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, bounds))
+    return result
+@utils.multicase(name=six.string_types)
+@utils.string.decorate_arguments('name')
+def type(name):
+    '''Return the type of the segment with the specified `name`.'''
+    seg = by_name(name)
+    return type(seg)
+@utils.multicase(segment=idaapi.segment_t)
+def type(segment):
+    '''Return the type of the ``idaapi.segment_t`` specified by `segment`.'''
+    return segment.type
+@utils.multicase(segtype=six.integer_types)
+def type(segment, segtype):
+    '''Return whether the given `segment` is of the provided `segtype`.'''
+    return type(segment) == segtype
+
 ## functions
 # shamefully ripped from idc.py
 def __load_file(filename, ea, size, offset=0):
@@ -559,8 +586,8 @@ def remove(segment, contents=False):
     If the bool `contents` is specified, then remove the contents of the segment from the database.
     """
     if not isinstance(segment, idaapi.segment_t):
-        cls = idaapi.segment_t
-        raise E.InvalidParameterError(u"{:s}.remove({!r}) : Expected an `idaapi.segment_t`, but received a {!s}.".format(__name__, segment, type(segment)))
+        cls = segment.__class__
+        raise E.InvalidParameterError(u"{:s}.remove({!r}) : Expected a `{:s}`, but received a {!s}.".format(__name__, segment, idaapi.segment_t.__name__, cls))
 
     # delete the selector defined by the segment_t
     res = idaapi.del_selector(segment.sel)
