@@ -3474,18 +3474,50 @@ class xref(object):
     def down(cls, func):
         '''Return all of the callable addresses that are referenced from the function `func`.'''
         def codeRefs(fn):
-            data, code = [], []
             for ea in iterate(fn):
-                if len(database.down(ea)) == 0:
-                    if database.type.is_code(ea) and instruction.type.is_call(ea):
-                        logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.disassemble(ea), '"')))
-                        #code.append((ea, 0))
+
+                # if it isn't code, then we skip it.
+                if not database.type.is_code(ea):
                     continue
-                data.extend( (ea, x) for x in database.xref.data_down(ea) )
-                code.extend( (ea, x) for x in database.xref.code_down(ea) if interface.range.start(fn) == x or not contains(fn, x) )
-            return data, code
+
+                # if it's a branching type instruction that has no xrefs, then log a warning for the user.
+                elif not len(database.xref.down(ea)) and instruction.type.is_branch(ea):
+                    logging.warning(u"{:s}.down({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolved.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
+                    continue
+
+                # now we need to check which code xrefs are actually going to be something we care
+                # about by checking to see if there's an xref pointing outside our function.
+                for xref in database.xref.code_down(ea):
+                    if not contains(fn, xref):
+                        yield ea, xref
+
+                    # if we're recursive and there's a code xref that's referencing our entrypoint,
+                    # then we're going to want that too.
+                    elif interface.range.start(fn) == xref:
+                        yield ea, xref
+                    continue
+
+                # then we need to check which data xrefs are going to be relevant as we only
+                # care about branch instructions that may execute our dataref.
+                for xref in filter(database.within, database.xref.data_down(ea)):
+                    if not instruction.type.is_branch(ea):
+                        continue
+
+                    # if it's a branch to an external, then yeah..this is definitely an xref we want.
+                    elif idaapi.segtype(xref) in {idaapi.SEG_XTRN}:
+                        yield ea, xref
+
+                    # if for some reason we're not referencing a function, but it's still a branch
+                    # then that's definitely one too (a global containing a code pointer).
+                    elif not within(xref):
+                        yield ea, xref
+                    continue
+                continue
+            return
+
+        # grab our function and then extract the target of each reference that we discovered.
         fn = by(func)
-        return sorted({d for _, d in codeRefs(fn)[1]})
+        return sorted({d for _, d in codeRefs(fn)})
 
     @utils.multicase()
     @classmethod
