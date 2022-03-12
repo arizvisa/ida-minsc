@@ -7068,14 +7068,30 @@ class get(object):
             switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a `{:s}` using the branch instruction at the given address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
 
+        @classmethod
+        def __of_block__(cls, ea):
+            if not function.within(ea):
+                switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a `{:s}` using the given address ({:#x}) due to it not being within a function.".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
+            bounds = function.block(ea)
+
+            # Now that we have the block, grab the last address as it could be
+            # a branch that enters the switch, and feed it back into another method.
+            left, right = bounds
+            last = address.prev(right)
+            return cls.__of_address__(last)
+
         @utils.multicase()
         def __new__(cls):
-            '''Return the switch at the current address.'''
+            '''Return the switch that is referenced at the current address.'''
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the switch at the address `ea`.'''
+            '''Return the switch that is referenced by the address at `ea`.'''
             ea = interface.address.within(ea)
+
+            # Try literally everything we can with the specifeid address in order to
+            # traverse to the branch instruction that is used by the switch.
             try:
                 return cls.__of_address__(ea)
             except E.MissingTypeOrAttribute:
@@ -7088,6 +7104,12 @@ class get(object):
                 return cls.__of_label__(ea)
             except E.MissingTypeOrAttribute:
                 pass
+            try:
+                return cls.__of_block__(ea)
+            except E.MissingTypeOrAttribute:
+                pass
+
+            # Nope. Absolutely nothing we tried actually worked and we need to give up.
             switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to determine how to instantiate a `{:s}` using the information at the given address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
 
