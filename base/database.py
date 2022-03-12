@@ -6968,38 +6968,61 @@ class get(object):
 
         """
         @classmethod
-        def __getlabel(cls, ea):
-            get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+        def __of_label__(cls, ea):
+            F, get_switch_info = type.flags(ea), idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
-            f = type.flags(ea)
-            if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
-                drefs = (ea for ea in xref.data_up(ea))
-                refs = (ea for ea in itertools.chain(*map(xref.up, drefs)) if get_switch_info(ea) is not None)
-                try:
-                    ea = builtins.next(refs)
-                    si = get_switch_info(ea)
-                    if si:
-                        return interface.switch_t(si)
-                except StopIteration:
-                    pass
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at target label.".format('.'.join([__name__, 'type', cls.__name__]), ea))
+            # Verify that the label at the specified address has an actual name.
+            # We can then use its address to grab all of the data references to it.
+            if idaapi.has_dummy_name(F) or idaapi.has_user_name(F):
+                drefs = (ref for ref in xref.data_up(ea))
+
+                # With the data references, we need need to walk up one more step
+                # and grab all types of references to it while looking for a switch.
+                refs = (ref for ref in itertools.chain(*map(xref.up, drefs)) if get_switch_info(ref) is not None)
+
+                # Now we'll just grab the very first reference we found. If we
+                # got an address, then use it to grab the switch_info_t we want.
+                ref = builtins.next(refs, None)
+                si = None if ref is None else get_switch_info(ref)
+
+            # Without a label, there's nothing we can do to find the switch_info_t.
+            else:
+                si = None
+
+            # If we didn't find a switch_info_t, then raise a warning. Otherwise
+            # the only thing left to do is to wrap it up for the user and return it.
+            if si is None:
+                switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a `{:s}` at the target label for the given address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
+            return interface.switch_t(si)
 
         @classmethod
-        def __getarray(cls, ea):
+        def __of_array__(cls, ea):
             get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
+            # Grab all of the upward references to the array at the given address
+            # that can give us an actual switch_info_t.
             refs = (ea for ea in xref.up(ea) if get_switch_info(ea) is not None)
-            try:
-                ea = builtins.next(refs)
-                si = get_switch_info(ea)
-                if si:
-                    return interface.switch_t(si)
-            except StopIteration:
-                pass
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at switch array.".format('.'.join([__name__, 'type', cls.__name__]), ea))
+
+            # Then we can grab the first one and use it. If we didn't get a valid
+            # reference, then we're not going to get a valid switch.
+            ref = builtins.next(refs, None)
+            if ref is None:
+                si = None
+
+            # We have an address, so now we can just straight-up snag the switch.
+            else:
+                si = get_switch_info(ref)
+
+            # If we were unable to get a switch, then just raise an exception. If we
+            # did grab it, however, then we just need to wrap it up and then return.
+            if si is None:
+                switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a `{:s}` using the array at the given address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
+            return interface.switch_t(si)
 
         @classmethod
-        def __getinsn(cls, ea):
+        def __of_address__(cls, ea):
             get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
             # Try and get a switch from the given address. If it worked, then
@@ -7008,46 +7031,42 @@ class get(object):
             if si is not None:
                 return interface.switch_t(si)
 
-            # Otherwise, we iterate through all of its downrefs to see if any
-            # valid candidates can be produced.
-            for item in xref.down(ea):
-                found = not (get_switch_info(item) is None)
+            # Otherwise, we iterate through all of the address' downward
+            # references to see if any valid candidates can be derived.
+            for ref in xref.down(ea):
+                found = not (get_switch_info(ref) is None)
 
-                try:
-                    # If this reference is pointing to data, then treat it
-                    # an array that we needs to be checked.
-                    if not found and type.is_data(item):
-                        items = (case for case in get.array(item))
-                        candidates = (label for label in itertools.chain(*map(xref.up, items)) if get_switch_info(label))
-                        res = builtins.next(candidates)
+                # If we actually grabbed the switch, then the current reference
+                # actually is our only candidate and we should use it.
+                if found:
+                    candidates = (item for item in [ref])
 
-                    # If the reference didn't turn up anything, then check
-                    # each of its uprefs to look for candidates.
-                    elif not found:
-                        candidates = (label for label in xref.up(item) if get_switch_info(label))
-                        res = builtins.next(candidates)
+                # Otherwise if the reference is pointing to data, then treat
+                # it an array where we need to follow the downward references.
+                elif type.is_data(ref):
+                    items = (case for case in xref.down(ref))
+                    candidates = (label for label in itertools.chain(*map(xref.up, items)) if get_switch_info(label))
 
-                    # Otherwise, the ref directly points to a switch and we
-                    # simply need to use it.
-                    else:
-                        res = item
+                # Otherwise this must be code and so we'll check any of its
+                # upward references to derive the necessary candidates.
+                elif not found:
+                    candidates = (label for label in xref.up(ref) if get_switch_info(label))
 
-                # If no candidates for the ref were found (StopIteration),
-                # then we continue onto the next available ref.
-                except StopIteration:
-                    pass
+                # Grab the first location from our available candidates, and
+                # try and get a switch_info_t using it.
+                location = builtins.next(candidates, None)
+                si = None if location is None else get_switch_info(location)
 
-                # If no exception was raised, then we should've gotten an
-                # address with a switch. All we need to do is get the switch_info_t
-                # and wrap it up for the user before we return it.
-                else:
-                    si = get_switch_info(res)
+                # If we did grab a switch_info_t, then all we have to do is to
+                # simply wrap it up before we can return it to the user.
+                if si is not None:
                     return interface.switch_t(si)
                 continue
 
-            # If the loop went through all of the refs for the given address, then
-            # we didn't find shit and we need to let the user know here.
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at branch instruction.".format('.'.join([__name__, 'type', cls.__name__]), ea))
+            # If the loop exhaused all of the references for the given address,
+            # then we didn't find shit and so we need to let the user know.
+            switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a `{:s}` using the branch instruction at the given address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
 
         @utils.multicase()
         def __new__(cls):
@@ -7058,16 +7077,17 @@ class get(object):
             '''Return the switch at the address `ea`.'''
             ea = interface.address.within(ea)
             try:
-                return cls.__getinsn(ea)
+                return cls.__of_address__(ea)
             except E.MissingTypeOrAttribute:
                 pass
             try:
-                return cls.__getarray(ea)
+                return cls.__of_array__(ea)
             except E.MissingTypeOrAttribute:
                 pass
             try:
-                return cls.__getlabel(ea)
+                return cls.__of_label__(ea)
             except E.MissingTypeOrAttribute:
                 pass
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t`.".format('.'.join([__name__, 'type', cls.__name__]), ea))
+            switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to determine how to instantiate a `{:s}` using the information at the given address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
 
