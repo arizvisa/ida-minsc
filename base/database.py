@@ -1424,8 +1424,8 @@ def name(ea, string, *suffix, **flags):
 
     ## define some closures that perform the different tasks necessary to
     ## apply a name to a given address
-    def apply_name(ea, string, flag):
-        '''Apply the given ``string`` to the address ``ea`` with the specified ``flag``.'''
+    def apply_name(ea, string, F):
+        '''Apply the name in `string` to the address `ea` with the flags specified in `F`.'''
 
         # convert the specified string into a form that IDA can handle
         ida_string = utils.string.to(string)
@@ -1436,59 +1436,60 @@ def name(ea, string, *suffix, **flags):
             logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
-        # set the name and use the value of 'flag' if it was explicit
-        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flag)
+        # fetch the old name and set the new one at the same time.
+        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", F)
 
         if not ok:
-            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), flag))
+            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), F))
         return res
 
-    def name_within(ea, string, flag):
-        '''Add or rename a label named ``string`` at the address ``ea`` with the specified ``flags``.'''
+    def name_within(ea, string, F):
+        '''Add or rename the label at the address `ea` using the name in `string` with the flags in `F`.'''
         func, realname, localname = idaapi.get_func(ea), idaapi.get_visible_name(ea), idaapi.get_visible_name(ea, idaapi.GN_LOCAL)
 
-        # if there's a public name at this address then use the flag to determine
-        # how to update the public name.
-        if idaapi.is_public_name(ea) or any(flag & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
-            flag |= idaapi.SN_PUBLIC if flag & idaapi.SN_PUBLIC else idaapi.SN_NON_PUBLIC
+        # if there's a public name at this address then use the
+        # flags to determine how to update the public name.
+        if idaapi.is_public_name(ea) or any(F & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
+            F |= idaapi.SN_PUBLIC if F & idaapi.SN_PUBLIC else idaapi.SN_NON_PUBLIC
 
-        # if we're pointing to the start of the function, then unless public was explicitly
-        # specified we need to set the local name.
-        elif interface.range.start(func) == ea and not builtins.all(flag & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
-            flag |= idaapi.SN_LOCAL
+        # if we're pointing to the start of the function, then unless
+        # public was explicitly ,specified we need to set the local name.
+        elif interface.range.start(func) == ea and not builtins.all(F & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
+            F |= idaapi.SN_LOCAL
 
         # if the name is supposed to be in the list, then we need to check if there's a
         # local name.
-        elif not flag & idaapi.SN_NOLIST:
+        elif not F & idaapi.SN_NOLIST:
             if localname and realname != localname:
                 idaapi.del_local_name(ea), idaapi.set_name(ea, localname, idaapi.SN_NOLIST)
-            flag &= ~idaapi.SN_LOCAL
+            F &= ~idaapi.SN_LOCAL
 
         # if a regular name is defined, but not a local one, then we need to set the local
         # one first.
         elif realname and realname == localname:
-            flag |= idaapi.SN_NOLIST
+            F |= idaapi.SN_NOLIST
 
         # otherwise we're using a local name because we're inside a function.
         else:
-            flag |= idaapi.SN_LOCAL
+            F |= idaapi.SN_LOCAL
 
         # now we can apply the name with the flags that we determined.
-        return apply_name(ea, string, flag)
+        return apply_name(ea, string, F)
 
-    def name_outside(ea, string, flag):
-        '''Add or rename a global named ``string`` at the address ``ea`` with the specified ``flags``.'''
+    def name_outside(ea, string, F):
+        '''Add or rename the global at the address `ea` using the name in `string` with the flags in `F`.'''
         realname, localname = idaapi.get_visible_name(ea), idaapi.get_visible_name(ea, idaapi.GN_LOCAL)
 
         # preserve the name if its public
-        flag |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+        F |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
 
-        # if 'listed' wasn't explicitly specified then ensure it's not listed as requested.
+        # if 'listed' wasn't explicitly specified then ensure it's
+        # not listed as requested.
         if 'listed' not in flags:
-            flag |= idaapi.SN_NOLIST
+            F |= idaapi.SN_NOLIST
 
         # then finally apply the name.
-        return apply_name(ea, string, flag)
+        return apply_name(ea, string, F)
 
     ## now we can define the actual logic for naming the given address
     flag = idaapi.SN_NON_AUTO
@@ -5085,22 +5086,22 @@ class extra(object):
     @utils.multicase()
     @classmethod
     def has_prefix(cls):
-        '''Return true if the item at the current address has extra prefix lines.'''
+        '''Return true if there are any extra comments that prefix the item at the current address.'''
         return cls.__has_extra__(ui.current.address(), idaapi.E_PREV)
     @utils.multicase()
     @classmethod
     def has_suffix(cls):
-        '''Return true if the item at the current address has extra suffix lines.'''
+        '''Return true if there are any extra comments that suffix the item at the current address.'''
         return cls.__has_extra__(ui.current.address(), idaapi.E_NEXT)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def has_prefix(cls, ea):
-        '''Return true if the item at the address `ea` has extra prefix lines.'''
+        '''Return true if there are any extra comments that prefix the item at the address `ea`.'''
         return cls.__has_extra__(ea, idaapi.E_PREV)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def has_suffix(cls, ea):
-        '''Return true if the item at the address `ea` has extra suffix lines.'''
+        '''Return true if there are any extra comments that suffix the item at the address `ea`.'''
         return cls.__has_extra__(ea, idaapi.E_NEXT)
     prefixQ, suffixQ = utils.alias(has_prefix, 'extra'), utils.alias(has_suffix, 'extra')
 
@@ -5115,7 +5116,7 @@ class extra(object):
     if idaapi.__version__ < 7.0:
         @classmethod
         def __hide__(cls, ea):
-            '''Hide the extra comment(s) at address ``ea``.'''
+            '''Hide the extra comments at the address `ea`.'''
             if type.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
                 type.flags(ea, idaapi.FF_LINE, 0)
                 return True
@@ -5123,7 +5124,7 @@ class extra(object):
 
         @classmethod
         def __show__(cls, ea):
-            '''Show the extra comment(s) at address ``ea``.'''
+            '''Show the extra comments at the address `ea`.'''
             if type.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
                 type.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE)  # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
                 return True
@@ -5131,7 +5132,7 @@ class extra(object):
 
         @classmethod
         def __get__(cls, ea, base):
-            '''Fetch the extra comment(s) for the address ``ea`` at the index ``base``.'''
+            '''Fetch the extra comments from the address `ea` that are specified by the index in `base`.'''
             sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
 
             # count the number of rows
@@ -5149,7 +5150,7 @@ class extra(object):
         @classmethod
         @utils.string.decorate_arguments('string')
         def __set__(cls, ea, string, base):
-            '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
+            '''Set the newline-delimited `string` as the extra comments for the address `ea` at the index specified by `base`.'''
             cls.__hide__(ea)
             sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
 
@@ -5166,7 +5167,7 @@ class extra(object):
             return True
         @classmethod
         def __delete__(cls, ea, base):
-            '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
+            '''Remove the extra comments from the address `ea` that start at the index in `base`.'''
             sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
 
             # count the number of rows to remove
@@ -5185,7 +5186,7 @@ class extra(object):
     else:
         @classmethod
         def __get__(cls, ea, base):
-            '''Fetch the extra comment(s) for the address ``ea`` at the index ``base``.'''
+            '''Fetch the extra comments from the address `ea` that are specified by the index in `base`.'''
             # count the number of rows
             count = cls.__count__(ea, base)
             if count is None: return None
@@ -5199,7 +5200,7 @@ class extra(object):
         @classmethod
         @utils.string.decorate_arguments('string')
         def __set__(cls, ea, string, base):
-            '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
+            '''Set the newline-delimited `string` as the extra comments for the address `ea` at the index specified by `base`.'''
             # break the string up into rows, and encode each type for IDA
             iterable = (utils.string.to(item) for item in string.split('\n'))
 
@@ -5210,7 +5211,7 @@ class extra(object):
             return string.count('\n')
         @classmethod
         def __delete__(cls, ea, base):
-            '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
+            '''Remove the extra comments from the address `ea` that start at the index in `base`.'''
 
             # count the number of extra comments to remove
             res = cls.__count__(ea, base)
