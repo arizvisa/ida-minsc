@@ -3476,6 +3476,9 @@ class xref(object):
 
         If the boolean `source` is true, then include the source address of each instruction along with its target reference.
         """
+        get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+
+        # define a closure that will get us all of the related code references so we can process them.
         def codeRefs(fn):
             branches = [instruction.is_call, instruction.is_branch]
             for ea in iterate(fn):
@@ -3505,7 +3508,12 @@ class xref(object):
                         yield ea, xref
                     continue
 
-                # then we need to check which data xrefs are going to be relevant
+                # if we're at a switch branch, then we don't need to follow any
+                # data references, and we can just skip the rest of our logic.
+                if get_switch_info(ea):
+                    continue
+
+                # last thing we need to determine is which data xrefs are relevant
                 # which only includes things that reference code outside of us.
                 for xref in filter(database.within, database.xref.data_down(ea)):
                     if database.type.is_code(xref) and not contains(fn, xref):
