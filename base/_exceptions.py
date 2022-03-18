@@ -111,6 +111,11 @@ class MissingMethodError(UnicodeException, E.NotImplementedError):
     A method belonging to a superclass that is required to be overloaded was called.
     """
 
+class MissingNameError(UnicodeException, E.NameError):
+    """
+    A name that was required was found missing and was unable to be recovered.
+    """
+
 class UnsupportedVersion(UnicodeException, E.NotImplementedError):
     """
     This functionality is not supported on the current version of IDA.
