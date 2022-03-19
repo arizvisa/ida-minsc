@@ -529,6 +529,12 @@ class structure_t(object):
         '''Return the pointer of the ``idaapi.struc_t``.'''
         ptr, name = self.__ptr__, self.__name__
 
+        # If the pointer has been deleted out from underneath us,
+        # then we need to raise an exception to inform the user.
+        if ptr is None:
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({!r}).ptr : The structure with the name (\"{:s}\") is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+
         # Verify if our ptr is still within scope by verifying
         # that its identifier is valid. Otherwise we need to use
         # the name that we've cached to fetch it.
@@ -543,7 +549,16 @@ class structure_t(object):
         # sptr from the identifier we just grabbed.
         else:
             result = self.__ptr__ = idaapi.get_struc(identifier)
-        return result
+
+        # Do one final check on our result to make sure that we actually
+        # got something in case we're racing against SWIG's removal of it.
+        if result:
+            return result
+
+        # This means that we lost the race against SWIG, and it scoped
+        # out our result before we got a chance to actually use it...
+        cls = self.__class__
+        raise E.DisassemblerError(u"{:s}({!r}).ptr : The structure with the name (\"{:s}\") is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
 
     @property
     def id(self):
@@ -561,8 +576,31 @@ class structure_t(object):
     @property
     def name(self):
         '''Return the name of the structure.'''
-        res = idaapi.get_struc_name(self.id)
-        return utils.string.of(res)
+        ptr = self.__ptr__
+
+        # if there's no pointer, then use the name that we have cached, but
+        # make sure we log a critical message for the user to freak out about.
+        if ptr is None:
+            cls, name = self.__class__, self.__name__
+            logging.critical(u"{:s}({!r}).name : Returning the cached name (\"{:s}\") for a structure that is unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+            return name
+
+        # otherwise we can extract the identifier and get the actual name, but
+        # go figure that sometimes IDAPython will return None when the structure
+        # was deleted, so we need to check what it actually gave us.
+        res = idaapi.get_struc_name(ptr.id)
+        if res is not None:
+            return utils.string.of(res)
+
+        # if the name is undefined, then we actually have to raise an exception.
+        cls, name = self.__class__, self.__name__
+        if name is None:
+            raise E.DisassemblerError(u"{:s}({:#x}).name : The structure with the identifier ({:#x}) is currently unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), ptr.id, ptr.id))
+
+        # otherwise, we can return the one that's cached while logging a message.
+        logging.critical(u"{:s}({!r}).name : Returning the cached name (\"{:s}\") for a structure that is unavailable and was likely removed from the database.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+        return name
+
     @name.setter
     @utils.string.decorate_arguments('string')
     def name(self, string):
