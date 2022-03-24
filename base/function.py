@@ -2325,14 +2325,31 @@ def tag(func, key, none):
 
 @utils.multicase()
 def tags():
-    '''Returns all the content tags for the current function.'''
-    return tags(ui.current.function())
+    '''Returns all of the content tags for the function at the current address.'''
+    return tags(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def tags(ea):
+    '''Returns all of the content tags for the function at the address `ea`.'''
+    fn, owners = by(ea), {item for item in chunk.owners(ea)}
+
+    # If we have multiple owners, then consolidate all of their tags into a set.
+    if len(owners) > 1:
+        logging.warning(u"{:s}.tags({:#x}) : Returning all of the tags for the functions owning the given address ({:#x}) as it is owned by multiple functions ({:s}).".format(__name__, ea, ea, ', '.join(map("{:#x}".format, owners))))
+        return {item for item in itertools.chain(*map(tags, owners))}
+
+    # If we have only one owner, then we just need to point ourselves at it.
+    item, = owners
+
+    # Although if the chunk address wasn't in the owner list, then warn the user that we fixed it.
+    if interface.range.start(fn) not in owners:
+        logging.warning(u"{:s}.tags({:#x}) : Returning the tags for the function at address ({:#x}) as the chunk address ({:#x}) is not referencing a function ({:s}).".format(__name__, ea, item, interface.range.start(fn), ', '.join(map("{:#x}".format, owners))))
+    return internal.comment.contents.name(item, target=item)
 @utils.multicase()
 def tags(func):
-    '''Returns all the content tags for the function `func`.'''
+    '''Returns all of the content tags for the function `func`.'''
     fn = by(func)
     ea = interface.range.start(fn)
-    return internal.comment.contents.name(ea, target=ea)
+    return tags(ea)
 
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
