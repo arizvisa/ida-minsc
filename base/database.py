@@ -2200,10 +2200,11 @@ def selectcontents(**boolean):
     if not boolean:
         for ea, _ in sorted(internal.comment.contents.iterate()):
             if function.within(ui.navigation.procedure(ea)):
-                contents = internal.comment.contents.name(ea, target=ea)
+                contents, owners, Flogging = internal.comment.contents.name(ea, target=ea), {f for f in function.chunk.owners(ea)}, logging.info
             else:
-                contents, _ = None, logging.warning(u"{:s}.selectcontents() : Detected cache inconsistency where address ({:#x}) should be within a function.".format(__name__, ea))
-            if contents: yield ea, contents
+                contents, owners, Flogging = [], {f for f in []}, logging.warning
+            if contents and ea in owners: yield ea, contents
+            elif ea not in owners: Flogging(u"{:s}.selectcontents() : Refusing to yield {:d} contents tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format(__name__, len(contents), '' if len(contents) == 1 else 's', 'function address' if function.within(ea) else 'address', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
         return
 
     # Collect the tagnames to query as specified by the user.
@@ -2219,7 +2220,7 @@ def selectcontents(**boolean):
         # and we need to skip this iteration.
         else:
             q = utils.string.kwargs(boolean)
-            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency where address ({:#x}) should be within a function.".format(__name__, q, ea))
+            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency where address ({:#x}) should be referencing a function.".format(__name__, q, ea))
             continue
 
         # Check to see that the global contents cache (supval) matches the actual
@@ -2230,10 +2231,10 @@ def selectcontents(**boolean):
         if blob != sup:
             f, q = function.address(ea), utils.string.kwargs(boolean)
             sup_formatted, blob_formatted = (', '.join(items) for items in [sup, blob])
-            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency between contents of function ({:#x}) and address ({:#x}) - supval ({:s}) is different from blob ({:s}).".format(__name__, q, f, ea, sup_formatted, blob_formatted))
+            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency between contents of {:s} address ({:#x}) and address ({:#x}) due to a difference between the supval ({:s}) and its corresponding blob ({:s}).".format(__name__, q, f, 'function', ea, sup_formatted, blob_formatted))
 
         # Now start aggregating the tagnames that the user is searching for.
-        collected, names = {item for item in []}, internal.comment.contents.name(ea, target=ea)
+        collected, names, owners = {item for item in []}, internal.comment.contents.name(ea, target=ea), {item for item in function.chunk.owners(ea)}
 
         # Or(|) includes the address if any of the tagnames matched.
         collected.update(Or & names)
@@ -2246,7 +2247,8 @@ def selectcontents(**boolean):
 
         # If anything was collected (tagnames were matched), then yield the
         # address along with the matching tagnames.
-        if collected: yield ea, collected
+        if collected and ea in owners: yield ea, collected
+        elif ea not in owners: logging.info(u"{:s}.selectcontents({:s}) : Refusing to select from {:d} contents tag{:s} for {:s} address ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format(__name__, utils.string.kwargs(boolean), len(names), '' if len(names) == 1 else 's', 'function', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
     return
 selectcontent = utils.alias(selectcontents)
 
