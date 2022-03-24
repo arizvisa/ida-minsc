@@ -2147,31 +2147,35 @@ def select(**boolean):
 
     # Nothing specific was queried, so just yield all tags that are available.
     if not boolean:
-        for ea in sorted(internal.comment.globals.address()):
+        for ea in internal.comment.globals.address():
             ui.navigation.set(ea)
-            address = function.tag(ea) if function.within(ea) else tag(ea)
-            if address: yield ea, address
+            Ftag, owners = (function.tag, {f for f in function.chunk.owners(ea)}) if function.within(ea) else (tag, {ea})
+            tags = Ftag(ea)
+            if tags and ea in owners: yield ea, tags
+            elif ea not in owners: logging.info(u"{:s}.select() : Refusing to yield {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, len(tags), '' if len(tags) == 1 else 's', 'function address' if function.within(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
         return
 
     # Collect the tagnames to query as specified by the user.
     Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
     # Walk through every tagged address so we can cross-check them with the query.
-    for ea in sorted(internal.comment.globals.address()):
-        ui.navigation.set(ea)
-        collected, address = {}, function.tag(ea) if function.within(ea) else tag(ea)
+    for ea in internal.comment.globals.address():
+        collected, _ = {}, ui.navigation.set(ea)
+        Ftag, owners = (function.tag, {f for f in function.chunk.owners(ea)}) if function.within(ea) else (tag, {ea})
+        tags = Ftag(ea)
 
         # Or(|) includes any of the tagnames that were queried.
-        collected.update({key : value for key, value in address.items() if key in Or})
+        collected.update({key : value for key, value in tags.items() if key in Or})
 
         # And(&) includes any tags that include all of the queried tagnames.
         if And:
-            if And & six.viewkeys(address) == And:
-                collected.update({key : value for key, value in address.items() if key in And})
+            if And & six.viewkeys(tags) == And:
+                collected.update({key : value for key, value in tags.items() if key in And})
             else: continue
 
         # If we collected anything (matches), then yield the address and the matching tags.
-        if collected: yield ea, collected
+        if collected and ea in owners: yield ea, collected
+        elif ea not in owners: logging.info(u"{:s}.select({:s}) : Refusing to select from {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, utils.string.kwargs(boolean), len(tags), '' if len(tags) == 1 else 's', 'function address' if function.within(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
     return
 
 @utils.multicase(tag=six.string_types)
