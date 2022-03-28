@@ -3608,7 +3608,7 @@ class xref(object):
     def arguments(cls, ea):
         '''Return the address of each of the parameters being passed to the function reference at address `ea`.'''
         if not database.xref.code_down(ea):
-            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) is not referencing a code type.".format('.'.join([__name__, cls.__name__]), ea, ea))
+            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.is_call(ea) else 'is not a call instruction with'))
         items = idaapi.get_arg_addrs(ea)
         return [] if items is None else [ea for ea in items]
     @utils.multicase(ea=six.integer_types)
