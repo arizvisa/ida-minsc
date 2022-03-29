@@ -6924,7 +6924,7 @@ class get(object):
 
         res = {}
         for m in st.members:
-            t, val = m.type, read(m.offset, m.size) or ''
+            t, val = m.type, read(m.offset, m.size) or b''
 
             # try and lookup the individual type + size
             try:
