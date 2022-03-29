@@ -6087,7 +6087,7 @@ class set(object):
         ok = cls.data(ea, type.size, type=type)
         if not ok:
             raise E.DisassemblerError(u"{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join([__name__, cls.__name__]), ea, type))
-        return get.structure(ea, structure=type)
+        return get.structure(ea, type)
     @utils.multicase(ea=six.integer_types, name=six.string_types)
     @classmethod
     def structure(cls, ea, name):
