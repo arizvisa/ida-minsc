@@ -6893,27 +6893,39 @@ class get(object):
     @utils.multicase()
     @classmethod
     def structure(cls):
-        '''Return the ``structure_t`` at the current address.'''
+        '''Return a dictionary of ctypes for the ``structure_t`` that is applied to the current address.'''
         return cls.structure(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def structure(cls, ea, **structure):
-        """Return the ``structure_t`` at address `ea` as a dict of ctypes.
-
-        If the `structure` argument is specified, then use that specific structure type.
-        """
+    def structure(cls, ea):
+        '''Return a dictionary of ctypes for the ``structure_t`` that is applied to the address `ea`.'''
+        sid = type.structure.id(ea)
+        return cls.structure(ea, sid)
+    @utils.multicase(ea=six.integer_types, sptr=idaapi.struc_t)
+    @classmethod
+    def structure(cls, ea, sptr):
+        '''Return a dictionary of ctypes for the ``structure_t`` identified by `sptr` at the address `ea`.'''
+        return cls.structure(ea, sptr.id)
+    @utils.multicase(ea=six.integer_types, name=six.string_types)
+    @classmethod
+    def structure(cls, ea, name):
+        '''Return a dictionary of ctypes for the ``structure_t`` with the specified `name` at the address `ea`.'''
+        st = struc.by(name)
+        return cls.structure(ea, st)
+    @utils.multicase(ea=six.integer_types, type=_structure.structure_t)
+    @classmethod
+    def structure(cls, ea, type):
+        '''Return a dictionary of ctypes for the ``structure_t`` specified by `type` at the address `ea`.'''
+        return cls.structure(ea, type.id)
+    @utils.multicase(ea=six.integer_types, identifier=six.integer_types)
+    @classmethod
+    def structure(cls, ea, identifier):
+        '''Return a dictionary of ctypes for the ``structure_t`` with the specified `identifier` at the address `ea`.'''
         ea = interface.address.within(ea)
-
-        key = builtins.next((k for k in ['structure', 'struct', 'struc', 'sid', 'id'] if k in structure), None)
-        if key is None:
-            sid = type.structure.id(ea)
-        else:
-            res = structure.get(key, None)
-            sid = res.id if isinstance(res, _structure.structure_t) else res
 
         # FIXME: add support for string types
         # FIXME: consolidate this conversion into interface or something
-        st = _structure.by_identifier(sid, offset=ea)
+        st = _structure.by_identifier(identifier, offset=ea)
         typelookup = {
             (int, -1) : ctypes.c_int8,   (int, 1) : ctypes.c_uint8,
             (int, -2) : ctypes.c_int16,  (int, 2) : ctypes.c_uint16,
