@@ -5555,7 +5555,7 @@ class set(object):
             ok = create_data(ea, idaapi.FF_STRUCT if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
 
         # Otherwise we can create structures normally
-        elif isinstance(res, _structure.structure_t):
+        elif isinstance(res, (_structure.structure_t, idaapi.struc_t)):
             ok = create_struct(ea, size, res.id)
 
         # Or apply alignment properly...
@@ -6084,7 +6084,7 @@ class set(object):
     @classmethod
     def structure(cls, ea, type):
         '''Set the data at address `ea` to the structure_t specified by `type`.'''
-        ok = cls.data(ea, type.size, type=type)
+        ok = cls.data(ea, type.size, type=type.ptr)
         if not ok:
             raise E.DisassemblerError(u"{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join([__name__, cls.__name__]), ea, type))
         return get.structure(ea, type)
