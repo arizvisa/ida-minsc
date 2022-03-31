@@ -893,26 +893,26 @@ class blocks(object):
 
     """
     @utils.multicase()
-    def __new__(cls):
+    def __new__(cls, **silent):
         '''Return the bounds of each basic block for the current function.'''
-        return cls(ui.current.function())
+        return cls(ui.current.function(), **silent)
     @utils.multicase()
-    def __new__(cls, func):
+    def __new__(cls, func, **silent):
         '''Returns the bounds of each basic block for the function `func`.'''
-        for bb in cls.iterate(func):
+        for bb in cls.iterate(func, **silent):
             yield interface.range.bounds(bb)
         return
     @utils.multicase(bounds=tuple)
-    def __new__(cls, bounds):
+    def __new__(cls, bounds, **silent):
         '''Return each basic block contained within the specified `bounds`.'''
         left, right = bounds
-        return cls(left, right)
+        return cls(left, right, **silent)
     @utils.multicase()
-    def __new__(cls, left, right):
+    def __new__(cls, left, right, **silent):
         '''Returns each basic block contained within the addresses `left` and `right`.'''
         fn = by_address(left)
         (left, _), (_, right) = block(left), block(database.address.prev(right))
-        for bb in cls.iterate(fn):
+        for bb in cls.iterate(fn, **silent):
             if (interface.range.start(bb) >= left and interface.range.end(bb) <= right):
                 yield interface.range.bounds(bb)
             continue
@@ -920,12 +920,12 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
-    def iterate(cls):
+    def iterate(cls, **silent):
         '''Return each ``idaapi.BasicBlock`` for the current function.'''
-        return cls.iterate(ui.current.function())
+        return cls.iterate(ui.current.function(), **silent)
     @utils.multicase()
     @classmethod
-    def iterate(cls, func):
+    def iterate(cls, func, **silent):
         '''Returns each ``idaapi.BasicBlock`` for the function `func`.'''
         fn = by(func)
         boundaries = [bounds for bounds in chunks(fn)]
@@ -937,15 +937,23 @@ class blocks(object):
             bounds = interface.range.bounds(bb)
             ea, _ = bounds
 
-            # unpack the boundaries of the basic block to verify it's in our
-            # chunks and warn the user if it isn't.
+            # if we've been asked to be silent, then just yield what we got.
             ea = ui.navigation.set(ea)
-            if not any(left <= ea < right for left, right in boundaries):
-                f = interface.range.start(fn)
-                logging.warning(u"{:s}.iterate({:#x}) : The block ({!s}) being returned at {!s} from `idaapi.FlowChart` is outside the boundaries of the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), f, bb, bounds, f))
+            if silent.get('silent', False):
+                yield bb
 
-            # yield the basic block that we were given.
-            yield bb
+            # unpack the boundaries of the basic block to verify it's in one
+            # of them, so that way we can yield it to the user if so.
+            elif any(left <= ea < right for left, right in boundaries):
+                yield bb
+
+            # otherwise warn the user about it just in case they're processing
+            # them and are always expecting an address within the function.
+            else:
+                f, api = interface.range.start(fn), idaapi.FlowChart
+                logging.warning(u"{:s}.iterate({:#x}) : The block ({!s}) being returned at {!s} by `{:s}` is outside the boundaries of the requested function ({:#x}).".format('.'.join([__name__, cls.__name__]), f, bb, bounds, '.'.join([api.__module__, api.__name__]), f))
+                yield bb
+            continue
         return
 
     @utils.multicase()
@@ -1004,7 +1012,7 @@ class blocks(object):
     def at(cls, func, ea):
         '''Return the ``idaapi.BasicBlock`` in function `func` at address `ea`.'''
         fn = by(func)
-        for bb in cls.iterate(fn):
+        for bb in cls.iterate(fn, silent=True):
             if interface.range.within(ea, bb):
                 return bb
             continue
@@ -1014,7 +1022,7 @@ class blocks(object):
     def at(cls, func, bb):
         '''Return the ``idaapi.BasicBlock`` in function `func` identifed by `bb`.'''
         fn = by(func)
-        iterable = (item for item in cls.iterate(fn) if item.id == bb.id)
+        iterable = (item for item in cls.iterate(fn, silent=True) if item.id == bb.id)
         result = builtins.next(iterable, None)
         if result is None:
             raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate `idaapi.BasicBlock` with the specified id ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.bounds(bb), bb.id, interface.range.start(fn)))
