@@ -593,7 +593,7 @@ class functions(object):
 
             # Prior to IDA 7.0, interacting with marks forces the mark window to appear...so we'll ignore them
             marks = max(len([] if idaapi.__version__ < 7.0 else builtins.list(function.marks(func))), marks)
-            blocks = max(len(builtins.list(function.blocks(func))), blocks)
+            blocks = max(len(builtins.list(function.blocks(func, silent=True))), blocks)
             exits = max(len(builtins.list(function.bottom(func))), exits)
             lvars = max(len(builtins.list(flvars(func))) if func.frsize else lvars, lvars)
             avars = max(len(builtins.list(favars(func))) if func.frsize else avars, avars)
@@ -625,7 +625,7 @@ class functions(object):
                 unmangled, math.trunc(maxname if internal.declaration.mangledQ(realname) else maxunmangled),
                 len(builtins.list(favars(func))) if func.frsize else 0, 1 + math.trunc(cavars),
                 len(builtins.list(flvars(func))), 1 + math.trunc(clvars),
-                len(builtins.list(function.blocks(func))), 1 + math.trunc(cblocks),
+                len(builtins.list(function.blocks(func, silent=True))), 1 + math.trunc(cblocks),
                 len(builtins.list(function.bottom(func))), 1 + math.trunc(cexits),
                 '' if idaapi.__version__ < 7.0 else " marks:{:<{:d}d}".format(len(builtins.list(function.marks(func))), 1 + math.trunc(cmarks))
             ))
