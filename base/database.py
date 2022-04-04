@@ -6742,7 +6742,7 @@ class get(object):
             cb = _structure.size(tid)
             # FIXME: this math doesn't work with dynamically sized structures (of course)
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ cls.structure(ea + index * cb, id=tid) for index in builtins.range(count) ]
+            return [ cls.structure(ea + index * cb, identifier=tid) for index in builtins.range(count) ]
 
         # If the DT_TYPE was found in our numerics dictionary, then we're able
         # to use a native _array with the decode_array closure.
