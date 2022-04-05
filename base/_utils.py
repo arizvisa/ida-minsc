@@ -622,8 +622,24 @@ class multicase(object):
         ignored = min(ignore_count for _, _, (ignore_count, _, _, _) in heap) if heap else 0
         error_arguments = [item.__class__.__name__ for item in args[ignored:]]
         error_keywords = ["{:s}={!s}".format(name, kwds[name].__class__.__name__) for name in kwds]
-        error_prototypes = [cls.prototype(F, constraints) for F, constraints, _ in heap]
-        raise internal.exceptions.UnknownPrototypeError(u"@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(error_prototypes)))
+
+        # Here we extract all of the possible cases so that we can present a descriptive error
+        # message. We also need to do something incredibly dirty here which involves re-splitting
+        # the name from the prototypes to avoid re-calculating the name returned by cls.prototype.
+        prototypes = ((F.__module__ if hasattr(F, '__module__') else None, cls.prototype(F, constraints)) for F, constraints, _ in heap)
+        error_prototypes = ['.'.join([module, name]) if module else name for module, name in prototypes]
+        error_names = sorted({prototype.split('(', 1)[0] for prototype in error_prototypes})
+
+        # Now we can collect all of our components into individual lists of availability,
+        # and then format them as a proper fucking sentence because we "love" our users.
+        Fnames, Fhelp, Fprototype = "`{:s}`".format, "`help({:s})`".format, "{:s}".format
+        available_names      = ', '.join(map(Fnames,     error_names[:-1]))      + (", and {:s}".format(*map(Fnames,     error_names[-1:]))      if len(error_names) > 1      else Fnames(error_names[0]))
+        available_help       = ', '.join(map(Fhelp,      error_names[:-1]))      + (", and {:s}".format(*map(Fhelp,      error_names[-1:]))      if len(error_names) > 1      else Fhelp(error_names[0]))
+        available_prototypes = ', '.join(map(Fprototype, error_prototypes[:-1])) + (", or {:s}".format( *map(Fprototype, error_prototypes[-1:])) if len(error_prototypes) > 1 else Fprototype(error_prototypes[0]))
+
+        # Now we can format our description, create our exception, and finally raise it.
+        description = ', '.join("{:s}({:s}{:s})".format(name, ', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '') for name in error_names)
+        raise internal.exceptions.UnknownPrototypeError(u"{:s}: The given parameter{:s} not match any of the available prototypes for {:s}. The prototypes which are available via {:s} are: {:s}".format(description, ' does' if sum(map(len, [error_arguments, error_keywords])) == 1 else 's do', available_names, available_help, available_prototypes))
 
     @classmethod
     def new_wrapper(cls, func, cache):
