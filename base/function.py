@@ -267,30 +267,38 @@ range = utils.alias(bounds)
 
 @utils.multicase()
 def color():
-    '''Return the color of the current function.'''
+    '''Return the color (RGB) of the current function.'''
     return color(ui.current.function())
 @utils.multicase()
 def color(func):
-    '''Return the color of the function `func`.'''
-    fn = by(func)
+    '''Return the color (RGB) of the function `func`.'''
+    fn, DEFCOLOR = by(func), 0xffffffff
     b, r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
-    return None if fn.color == 0xffffffff else (r<<16) | (fn.color&0x00ff00) | b
+    return None if fn.color == DEFCOLOR else (r<<16) | (fn.color&0x00ff00) | b
 @utils.multicase(none=None.__class__)
 def color(func, none):
     '''Remove the color for the function `func`.'''
-    fn = by(func)
-    fn.color = 0xffffffff
-    return bool(idaapi.update_func(fn))
+    fn, DEFCOLOR = by(func), 0xffffffff
+    res, fn.color = fn.color, DEFCOLOR
+    if not idaapi.update_func(fn):
+        F, ea = idaapi.update_func, interface.range.start(fn)
+        raise E.DisassemblerError(u"{:s}.color({:#x}, {!s}) : Unable to clear the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, none, ea, '.'.join([F.__module__ or '', F.__name__]), ea))
+    b, r = (res&0xff0000)>>16, res&0x0000ff
+    return None if res == DEFCOLOR else (r<<16) | (res&0x00ff00) | b
 @utils.multicase(rgb=six.integer_types)
 def color(func, rgb):
-    '''Set the color of the function `func` to `rgb`.'''
+    '''Set the color (RGB) of the function `func` to `rgb`.'''
     r, b = (rgb&0xff0000)>>16, rgb&0x0000ff
-    fn = by(func)
-    fn.color = (b<<16) | (rgb&0x00ff00) | r
-    return bool(idaapi.update_func(fn))
+    fn, DEFCOLOR = by(func), 0xffffffff
+    res, fn.color = fn.color, (b<<16) | (rgb&0x00ff00) | r
+    if not idaapi.update_func(fn):
+        F, ea = idaapi.update_func, interface.range.start(fn)
+        raise E.DisassemblerError(u"{:s}.color({:#x}, {:#x}) : Unable to set the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, rgb, ea, '.'.join([F.__module__ or '', F.__name__]), ea))
+    b, r = (res&0xff0000)>>16, res&0x0000ff
+    return None if res == DEFCOLOR else (r<<16) | (res&0x00ff00) | b
 @utils.multicase(none=None.__class__)
 def color(none):
-    '''Remove the color for the current function.'''
+    '''Remove the color from the current function.'''
     return color(ui.current.function(), None)
 
 @utils.multicase()
