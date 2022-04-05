@@ -1521,27 +1521,31 @@ def name(ea, none, **flags):
 
 @utils.multicase()
 def color():
-    '''Return the rgb color at the current address.'''
+    '''Return the color (RGB) for the item at the current address.'''
     return color(ui.current.address())
 @utils.multicase(none=None.__class__)
 def color(none):
-    '''Remove the color from the current address.'''
+    '''Remove the color from the item at the current address.'''
     return color(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types)
 def color(ea):
-    '''Return the rgb color at the address `ea`.'''
+    '''Return the color (RGB) for the item at the address specified by `ea`.'''
+    DEFCOLOR = 0xffffffff
     res = idaapi.get_item_color(interface.address.inside(ea))
     b, r = (res&0xff0000)>>16, res&0x0000ff
-    return None if res == 0xffffffff else (r<<16)|(res&0x00ff00)|b
+    return None if res == DEFCOLOR else (r<<16)|(res&0x00ff00)|b
 @utils.multicase(ea=six.integer_types, none=None.__class__)
 def color(ea, none):
-    '''Remove the color at the address `ea`.'''
-    return idaapi.set_item_color(interface.address.inside(ea), 0xffffffff)
+    '''Remove the color from the item at the the address specified by `ea`.'''
+    DEFCOLOR = 0xffffffff
+    res, void = color(ea), idaapi.set_item_color(interface.address.inside(ea), DEFCOLOR)
+    return res
 @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
 def color(ea, rgb):
-    '''Set the color at address `ea` to `rgb`.'''
+    '''Set the color for the item at address `ea` to `rgb`.'''
     r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
-    return idaapi.set_item_color(interface.address.inside(ea), (b<<16)|(rgb&0x00ff00)|r)
+    res, void = color(ea), idaapi.set_item_color(interface.address.inside(ea), (b<<16)|(rgb&0x00ff00)|r)
+    return res
 
 @utils.multicase()
 def comment(**repeatable):
