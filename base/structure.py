@@ -1529,7 +1529,7 @@ class members_t(object):
     def pop(self, index):
         '''Remove the member at the specified `index`.'''
         item = self[index]
-        return self.remove(item.offset - self.baseoffset)
+        return self.remove(item.offset)
 
     @utils.multicase()
     def remove(self, offset):
