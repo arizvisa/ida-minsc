@@ -873,13 +873,14 @@ def write(ea, data, **persist):
 
 class names(object):
     """
-    This namespace is used for listing all the names (or symbols)
-    within the database. By default the `(address, name)` is yielded.
+    This namespace is used for listing all of the names (symbols) within the
+    database. By default the `(address, name)` is yielded in its mangled form.
 
-    The different types that one can filter the symbols with are the following:
+    The available types that one can filter the symbols with are as follows:
 
         `address` - Match according to the address of the symbol
-        `name` - Match according to the name of the symbol
+        `name` - Match according to the name of the unmangled symbol
+        `unmangled` - Filter the unmangled symbol names according to a regular-expression
         `like` - Filter the symbol names according to a glob
         `regex` - Filter the symbol names according to a regular-expression
         `index` - Match the symbol according to its index
@@ -895,9 +896,11 @@ class names(object):
     """
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', idaapi.get_nlist_ea), __matcher__.mapping('ea', idaapi.get_nlist_ea)
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_nlist_name, utils.string.of)
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
+    __matcher__.combinator('unmangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
+    __matcher__.combinator('demangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.predicate('predicate', idaapi.get_nlist_ea)
     __matcher__.predicate('pred', idaapi.get_nlist_ea)
     __matcher__.attribute('index')
