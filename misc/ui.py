@@ -244,15 +244,34 @@ class current(object):
         raise internal.exceptions.UnsupportedCapability(u"{:s}.status() : Unable to get the current disassembler status.".format('.'.join([__name__, cls.__name__])))
     @classmethod
     def symbol(cls):
-        '''Return the current highlighted symbol name.'''
+        '''Return the current highlighted symbol name or register.'''
         if idaapi.__version__ < 7.0:
             return idaapi.get_highlighted_identifier()
 
+        HIF_IDENTIFIER, HIF_REGISTER = getattr(idaapi, 'HIF_IDENTIFIER', 1), getattr(idaapi, 'HIF_REGISTER', 2)
+
         # IDA 7.0 way of getting the currently selected text
         viewer = idaapi.get_current_viewer()
-        res = idaapi.get_highlight(viewer)
-        if res and res[1]:
-            return res[0]
+        identifier_and_flags = idaapi.get_highlight(viewer)
+        if identifier_and_flags is None:
+            return None
+        identifier, flags = identifier_and_flags
+
+        # If it wasn't a register, then we can just return the identifier as a string.
+        if flags & HIF_REGISTER == 0:
+            return identifier
+
+        # Otherwise we need to lookup our identifier in the current architecture.
+        import instruction
+        try:
+            res = instruction.architecture.by_name(identifier)
+
+        # If we got an exception, then only log a warning if the architecture is known.
+        except Exception as E:
+            if hasattr(instruction, 'architecture'):
+                architecture = instruction.architecture.__class__
+                logging.warning(u"{:s}.symbol(): Returning a string due to the returned identifier (\"{:s}\") not being available within the current architecture ({:s}).".format('.'.join([__name__, cls.__name__]), identifier, architecture.__name__))
+            return identifier
         return res
     @classmethod
     def selection(cls):
