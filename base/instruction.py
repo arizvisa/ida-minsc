@@ -2299,31 +2299,68 @@ class operand_types:
     def memory(insn, op):
         '''Operand type decoder for returning a memory address including a segment on the Intel architecture.'''
         global architecture
-        aux_use32, aux_use64, aux_natad = 0x8, 0x10, 0x1000
+        REX_B, REX_X, REX_R, REX_W, VEX_L, SEGREG_IMM = 1, 2, 4, 8, 0x80, 0xffff
+        INDEX_NONE, aux_use32, aux_use64, aux_natad = 0x4, 0x8, 0x10, 0x1000
 
         # First we'll extract the necessary attributes from the operand and its instruction.
+        hasSIB, sib, insnpref = op.specflag1, op.specflag2, insn.insnpref
         auxpref, segrg, segsel = insn.auxpref, (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
         bits = 64 if auxpref & aux_use64 else 32 if auxpref & aux_use32 else 16
+        rex, = bytearray(insnpref) if isinstance(insnpref, bytes) else [insnpref]
 
         # FIXME: verify that support for 16-bit addressing actually works if we're 32-bit
         #        and the prefix has been toggled.
 
-        # Now all we need to do is to clamp our operand address using the number
-        # of bits for the instruction's segment type.
-        maximum = pow(2, bits)
-        address = op.addr & (maximum - 1)
+        # If there's no SIB, then all we need to do is to clamp our operand address
+        # using the number of bits for the instruction's segment type.
+        if not hasSIB:
+            maximum = pow(2, bits)
+            address = op.addr & (maximum - 1)
 
-        # Finally we can calculate all of the components for the operand, and
-        # then return them to the user.
-        reg = architecture.by_index(segrg)
-        return intelops.SegmentOffset(reg, address)
+            # We've figured out all that we've needed, so just determine whether
+            # we're using a segment register or a selector and return it.
+            sel = segsel if segrg == SEGREG_IMM else architecture.by_index(segrg)
+            return intelops.SegmentOffset(sel, address)
+
+        # Otherwise we have to figure out the specifics about the operand type. The
+        # base register doesn't actually exist in o_mem types, so we label it as unknown.
+        unknown, index = (sib & 0x07) >> 0, (sib & 0x38) >> 3
+
+        # If the index register is INDEX_NONE, then there there's nothing here.
+        # We still process our unknown index though so that it follows rules for o_phrase.
+        if index in {INDEX_NONE}:
+            index = None
+            unknown |= 8 if rex & REX_B else 0
+
+        # Otherwise, we're good and all we need to do is to add the 64-bit
+        # flag to the index registers if it's relevant.
+        else:
+            index |= 8 if rex & REX_X else 0
+            unknown |= 8 if rex & REX_B else 0
+
+        # Now we need to figure out what the displacement actually is for the operand.
+        offset = op.addr
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+        maximum, dtype = pow(2, bits), dtype_by_size(bits // 8)
+        res = idaapi.as_signed(offset, bits)
+
+        # We do this using the exact same methodology implemented by o_phrase and o_displ.
+        regular = res if res < 0 else offset & (maximum - 1)
+        inverted = offset & (maximum - 1) if res < 0 else offset - maximum
+
+        # Finally we can use these values to populate our tuple.
+        sel = segsel if segrg == SEGREG_IMM else architecture.by_index(segrg)
+        offset_ = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
+        index_ = None if index is None else architecture.by_indextype(index, dtype)
+        scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
+        return intelops.SegmentOffsetBaseIndexScale(sel, offset_, None, index_, scale_)
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
     def phrase(insn, op):
         '''Operand type decoder for returning a phrase or displacement on the Intel architecture.'''
         global architecture
-        REX_B, REX_X, REX_R, REX_W, VEX_L = 1, 2, 4, 8, 0x80
+        REX_B, REX_X, REX_R, REX_W, VEX_L, SEGREG_IMM = 1, 2, 4, 8, 0x80, 0xffff
         INDEX_NONE, aux_use32, aux_use64, aux_natad = 0x4, 0x8, 0x10, 0x1000
 
         # First we'll extract the necessary attributes from the operand and its instruction.
@@ -2350,11 +2387,22 @@ class operand_types:
                 base |= 8 if rex & REX_B else 0
                 index |= 8 if rex & REX_X else 0
 
+                # FIXME: we need to check insn.itype to support the VSIB variant of
+                #        SIB which requires we promote the index to xmm, ymm, or zmm.
+
         # If this is a 16-bit addressing scheme, then we need to explicitly
         # figure out what phrase type is being used.
         elif not (auxpref & (aux_use32 | aux_use64)):
-            # FIXME: Implement this whenever a user complains about it.
-            raise E.UnsupportedCapability(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the phrase for {:d}-bit addressing schemes.".format('.'.join([__name__, 'operand_types']), insn.ea, op, 16))
+
+            # FIXME: Test this thing out whenever a user complains about it.
+            R_bx, R_bp, R_si, R_di, R_sp = (architecture.by_index(name).id for name in ['bx', 'bp', 'si', 'di', 'sp'])
+            phrase_table = {
+                0: (R_bx, R_si), 1: (R_bx, R_di), 2: (R_bx, None),
+                2: (R_bp, R_si), 3: (R_bp, R_di), 6: (R_bp, None),
+                4: (R_si, None), 5: (R_di, None),-1: (R_sp, None),
+            }
+            base, index = phrase_table[op.phrase]
+            logging.warning(u"{:s}.phrase({:#x}, {!r}) : {:d}-bit phrases are implemented but untested. If the registers in the phrase (`{:s}`) does not match the operand, please open a new issue.".format('.'.join([__name__, 'operand_types']), insn.ea, op, 16, "[{:s}]".format(architecture.by_index(base).name) if index is None else "[{:s}+{:s}]".format(architecture.by_index(base).name, architecture.by_index(index).name)))
 
         # If there isn't an SIB, then the base register is in op_t.phrase.
         else:
@@ -2387,11 +2435,12 @@ class operand_types:
 
         # Finally we can calculate all of the components for the operand, and
         # then return them to the user.
+        sel = segsel if segrg == SEGREG_IMM else architecture.by_index(segrg)
         offset_ = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
         base_ = None if base is None else architecture.by_indextype(base, dtype)
         index_ = None if index is None else architecture.by_indextype(index, dtype)
         scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
-        return intelops.OffsetBaseIndexScale(offset_, base_, index_, scale_)
+        return intelops.SegmentOffsetBaseIndexScale(sel, offset_, base_, index_, scale_)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(insn, op):
@@ -2545,7 +2594,7 @@ class intelops:
         """
         _fields = ('segment', 'offset')
         _types = (
-            (None.__class__, interface.register_t),
+            (None.__class__, interface.register_t, six.integer_types),
             six.integer_types,
         )
         _operands = (internal.utils.fconstant, internal.utils.fcurry)
@@ -2582,7 +2631,7 @@ class intelops:
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
         _types = (
-            (None.__class__, interface.register_t),
+            (None.__class__, interface.register_t, six.integer_types),
             six.integer_types,
             (None.__class__, interface.register_t),
             (None.__class__, interface.register_t),
