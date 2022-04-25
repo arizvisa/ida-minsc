@@ -6175,7 +6175,8 @@ class set(object):
         selection = ui.current.selection()
         if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.array(ui.current.address(), type)
-        return cls.array(selection, type)
+        start, stop = selection
+        return cls.array((start, address.next(stop)), type)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, type):
