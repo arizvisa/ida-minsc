@@ -5466,8 +5466,12 @@ class set(object):
     @utils.multicase()
     @classmethod
     def unknown(cls):
-        '''Set the data at the current address to undefined.'''
-        return cls.unknown(ui.current.address())
+        '''Set the data at the current address or selection to undefined.'''
+        selection = ui.current.selection()
+        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.unknown(ui.current.address())
+        start, stop = selection
+        return cls.unknown(start, address.next(stop) - start)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def unknown(cls, ea):
