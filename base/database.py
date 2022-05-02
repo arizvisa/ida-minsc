@@ -2572,8 +2572,12 @@ class address(object):
 
     @utils.multicase()
     def __new__(cls):
-        '''Return the address of the current address.'''
-        return cls.head(ui.current.address())
+        '''Return the current address or a list of addresses for the current selection.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.head(address)
+        start, stop = selection
+        return [ea for ea in cls.iterate(start, stop)]
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
         '''Return the address of the item containing the address `ea`.'''
@@ -2582,8 +2586,12 @@ class address(object):
     @utils.multicase()
     @classmethod
     def bounds(cls):
-        '''Return the bounds of the current address in a tuple formatted as `(left, right)`.'''
-        return cls.bounds(ui.current.address())
+        '''Return the bounds of the current address or selection in a tuple formatted as `(left, right)`.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.bounds(address)
+        start, stop = selection
+        return interface.bounds_t(start, cls.next(stop))
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def bounds(cls, ea):
@@ -2649,13 +2657,13 @@ class address(object):
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
         left, right = bounds
-        return cls.iterate(left, cls.prev(right))
+        return cls.iterate(left, cls.tail(cls.prev(right)))
     @utils.multicase(bounds=tuple, step=callable)
     @classmethod
     def iterate(cls, bounds, step):
         '''Iterate through all of the addresses defined within `bounds` using the callable `step` to determine the next address.'''
         left, right = bounds
-        return cls.iterate(left, cls.prev(right), step)
+        return cls.iterate(left, cls.tail(cls.prev(right)), step)
 
     @utils.multicase()
     @classmethod
