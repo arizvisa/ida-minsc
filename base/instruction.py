@@ -2525,6 +2525,7 @@ class operand_types:
         '''Operand type decoder for the coprocessor register list (LDC/STC) on either the AArch32 or AArch64 architectures.'''
 
         # FIXME: This information was found in the sdk by @BrunoPujos.
+        # op.reg == register number
         # op.specflag1 == processor number
 
         raise E.UnsupportedCapability(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
@@ -2553,11 +2554,12 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5 + 1)
     def condition(insn, op):
         '''Operand type decoder for dealing with an undocumented operand type found on AArch64.'''
+        global architecture
 
         # FIXME: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
         # op.value == condition
-
-        raise E.UnsupportedCapability(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
+        cc = op.value & 0x0f
+        return architecture.by_condition(cc)
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(insn, op):
@@ -2921,6 +2923,71 @@ class armops:
             res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
             return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
+    class condition_t(interface.symbol_t):
+        """
+        A symbol for representing a condition operand on either the AArch32 or AArch64 architectures.
+        """
+        __flags__ = {
+            0x0 : {'Z': 1}, 0x1 : {'Z': 0},
+            0x2 : {'C': 1}, 0x3 : {'C': 0},
+            0x4 : {'N': 1}, 0x5 : {'N': 0},
+            0x6 : {'V': 1}, 0x7 : {'V': 0},
+        }
+
+        # FIXME: define the required flag state needed to satisfy the specified condition.
+        __cflags__ = {}
+
+        def __init__(self, index):
+            cc = {
+                0x0 : 'EQ', 0x1 : 'NE', 0x2 : 'CS', 0x3 : 'CC',
+                0x4 : 'MI', 0x5 : 'PL', 0x6 : 'VS', 0x7 : 'VC',
+                0x8 : 'HI', 0x9 : 'LS', 0xa : 'GE', 0xb : 'LT',
+                0xc : 'GT', 0xd : 'LE', 0xe : 'AL', 0xf : 'NV',
+            }
+            self.__cond__, self.__name__ = index, cc[index]
+
+        def __hash__(self):
+            items = armops.condition_t, self.__cond__
+            return hash(items)
+
+        @property
+        def flags(self):
+            '''Return the required flags for the current condition to be true.'''
+            cc, flags = self.__cond__, self.__flags__
+            if cc < 8:
+                flag, value = next(item for item in flags[cc].items())
+                return [(flag, True if value else False)]
+            raise NotImplementedError("{:s}.condition_t({:#x}) : Unable to return the flags needed to satisfy condition ({:s}) due to its code ({:d} being unimplemented.".format(__name__, cc, self.name, cc))
+
+        @property
+        def symbols(self):
+            '''A condition_t is actually a symbol that yields itself.'''
+            yield self
+
+        @property
+        def name(self):
+            return self.__name__
+
+        def __str__(self):
+            return self.__name__
+
+        def __repr__(self):
+            cls, cc = armops.condition_t, self.__cond__
+            if cc < 8:
+                description = ','.join("{:s}={:d}".format(*item) for item in self.flags)
+                return "<class '{:s}' name='{!s}' flags='{:s}'>".format(cls.__name__, internal.utils.string.escape(self.name, '\''), description)
+            return "<class '{:s}' name='{!s}'>".format(cls.__name__, internal.utils.string.escape(self.name, '\''))
+
+        def __eq__(self, other):
+            if isinstance(other, six.string_types):
+                return self.name.lower() == other.lower()
+            elif isinstance(other, armops.condition_t):
+                return self.__cond__ == other.__cond__
+            return other is self
+
+        def __ne__(self, other):
+            return not (self == other)
+
 ## mips operands
 class mipsops:
     """
@@ -3254,6 +3321,14 @@ class AArch(interface.architecture_t):
         setitem('acc0', self.new('acc0', 32, idaname='acc0'))
 
         # XXX: for some reason IDA defines the CS and DS registers??
+
+        # Conditions (not really registers, but armops.condition_t)
+        [ setitem(_, armops.condition_t(index)) for index, _ in enumerate(['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 'HI', 'LS', 'GE', 'LT', 'GT', 'LE', 'AL', 'NV']) ]
+
+    def by_condition(self, index):
+        '''Return the condition type for the specified `index`.'''
+        cc = ['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 'HI', 'LS', 'GE', 'LT', 'GT', 'LE', 'AL', 'NV']
+        return self.by_name(cc[index])
 
 class AArch32(AArch):
     """
