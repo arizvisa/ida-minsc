@@ -6930,7 +6930,7 @@ class get(object):
     @classmethod
     def structure(cls, ea, name):
         '''Return a dictionary of ctypes for the ``structure_t`` with the specified `name` at the address `ea`.'''
-        st = struc.by(name)
+        st = _structure.by(name)
         return cls.structure(ea, st)
     @utils.multicase(ea=six.integer_types, type=_structure.structure_t)
     @classmethod
