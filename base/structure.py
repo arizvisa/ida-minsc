@@ -743,12 +743,12 @@ class structure_t(object):
     def __str__(self):
         '''Render the current structure in a readable format.'''
         sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
-        return "<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        return "<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if is_union(sptr) else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __unicode__(self):
         '''Render the current structure in a readable format.'''
         sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
-        return u"<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        return u"<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if is_union(sptr) else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __repr__(self):
         return u"{!s}".format(self)
@@ -946,7 +946,7 @@ def members(id):
 
     # Grab some attributes like the structure's size, and whether or not
     # it's a union so that we can figure out each member's offset.
-    size, unionQ = idaapi.get_struc_size(st), st.is_union()
+    size, unionQ = idaapi.get_struc_size(st), is_union(st)
 
     # Iterate through all of the member in the structure.
     offset = 0
@@ -1243,9 +1243,9 @@ class members_t(object):
 
         # Now we call our members_t.__members_at__ helper-method so that we can check the
         # members that are returned to verify that they're within our search boundaries.
-        items, unionQ = [], owner.ptr.is_union
+        items, unionQ = [], is_union(owner.ptr)
         for mptr in self.__members_at__(offset):
-            mleft, mright = 0 if unionQ() else mptr.soff, mptr.eoff
+            mleft, mright = 0 if unionQ else mptr.soff, mptr.eoff
 
             # Check the offset is within our current member's boundaries, and add it to
             # our list if it is so that we can count our results later.
@@ -1322,7 +1322,7 @@ class members_t(object):
                 # Next we need to check if it's a structure, because if so then
                 # we need to find out if it directly aligns with a particular
                 # member.
-                elif isinstance(res, structure_t) and res.ptr.is_union():
+                elif isinstance(res, structure_t) and is_union(res.ptr):
                     selected.append(mptr) if realoffset else selected.insert(0, mptr)
 
                 # Finally, check if it's a structure and our real offset points
@@ -1466,7 +1466,7 @@ class members_t(object):
         # If the member is being added to a union, then the offset doesn't
         # matter because it's always zero. We need to check this however because
         # we're aiming to be an "intuitive" piece of software.
-        if owner.ptr.is_union():
+        if is_union(owner.ptr):
 
             # If the offset is zero, then maybe the user does know what they're
             # doing, but they don't know that they need to use the base offset.
@@ -1573,7 +1573,7 @@ class members_t(object):
         # If we're a union, then we need to raise an exception because
         # there's a likely chance that the user might empty out the
         # union entirely.
-        if sptr.is_union():
+        if is_union(sptr):
             raise E.InvalidParameterError(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Refusing to remove members from the specified union by the specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, offset))
 
         # First we'll need to figure out the index of the member that
@@ -1671,7 +1671,7 @@ class members_t(object):
         # be only one member at any given offset. It appears that IDAPython's api
         # seems to figure everything out for us and so we can just use it to
         # fetch the things we need to yield, and then return immediately after.
-        if not owner.ptr.is_union():
+        if not is_union(owner.ptr):
             mptr = idaapi.get_member(owner.ptr, realoffset)
             if mptr:
                 yield mptr
@@ -1720,7 +1720,7 @@ class members_t(object):
         # Start out by finding all of the members at our current offset.
         items = []
         for mptr in self.__members_at__(offset):
-            mleft, mright = 0 if owner.ptr.is_union() else mptr.soff, mptr.eoff
+            mleft, mright = 0 if is_union(owner.ptr) else mptr.soff, mptr.eoff
 
             # Check the offset is within our current member's boundaries, and
             # add it to our list if it is so that we can count our results later.
@@ -1746,7 +1746,7 @@ class members_t(object):
             # If it's a union, then we just return an offset relative to
             # the structure itself. Generally, the caller needs to tell
             # us which union member to choose using the filter parameter.
-            if owner.ptr.is_union():
+            if is_union(owner.ptr):
                 return (), offset
 
             # Otherwise, grab the nearest member to the offset and check
@@ -1766,7 +1766,7 @@ class members_t(object):
         # we need to continue recursing into something and what exactly
         # we're recursing into.
         mptr, = filtered
-        mtype, moffset = dissolve(mptr), 0 if owner.ptr.is_union() else mptr.soff
+        mtype, moffset = dissolve(mptr), 0 if is_union(owner.ptr) else mptr.soff
 
         # If our member type is an array, then we need to do some things
         # to try and figure out which index we're actually going to be
@@ -2177,7 +2177,7 @@ class member_t(object):
     def realoffset(self):
         '''Return the real offset of the member.'''
         parent = self.parent.ptr
-        return 0 if parent.is_union() else self.ptr.get_soff()
+        return 0 if is_union(parent) else self.ptr.get_soff()
     @property
     def offset(self):
         '''Return the offset of the member.'''
@@ -2219,7 +2219,7 @@ class member_t(object):
     def realbounds(self):
         '''Return the real boundaries of the member.'''
         sptr, mptr = self.parent.ptr, self.ptr
-        return interface.bounds_t(0 if sptr.is_union() else mptr.soff, mptr.eoff)
+        return interface.bounds_t(0 if is_union(sptr) else mptr.soff, mptr.eoff)
     @property
     def bounds(self):
         '''Return the boundaries of the member.'''
