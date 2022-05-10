@@ -2014,8 +2014,9 @@ class member_t(object):
 
         # now we need to check the name via is_dummy_member_name, and explicitly
         # check to see if the name begins with field_ so that we don't use it if so.
-        name = utils.string.of(idaapi.get_member_name(self.id) or '')
-        anonymousQ = True if any(F(name) for F in [idaapi.is_dummy_member_name, idaapi.is_anonymous_member_name, operator.methodcaller('startswith', 'field_')]) else False
+        idaname = idaapi.get_member_name(self.id) or ''
+        anonymousQ = True if any(F(idaname) for F in [idaapi.is_dummy_member_name, idaapi.is_anonymous_member_name, operator.methodcaller('startswith', 'field_')]) else False
+        name = utils.string.of(idaname)
 
         # if the name is defined and not special in any way, then its a tag.
         aname = '' if any([specialQ, anonymousQ]) else name
@@ -2311,10 +2312,15 @@ class member_t(object):
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
-        # If our string is None, then we need to actually clear the name. This
-        # is actually a little tricky because we have a default name for a
-        # structure (field_%X) and one for a frame (var_%X, arg_%X).
-        elif string is None:
+        # Type safety is fucking valuable.
+        if not isinstance(string, (None.__class__, six.string_types)):
+            cls = self.__class__
+            raise E.InvalidParameterError(u"{:s}({:#x}).name({!r}) : Unable to assign the provided type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), self.id, string, string.__class__))
+
+        # If our string is empty, then we need to actually clear the name. This
+        # is actually a little tricky because the default name for a field is
+        # (field_%X) and two different ones for a frame (var_%X, arg_%X).
+        if not string:
             sptr, mptr = self.parent.ptr, self.ptr
 
             # Define our name formatters that we will eventually use.
@@ -2485,8 +2491,13 @@ class member_t(object):
         '''Set the type information of the current member to `info`.'''
         set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
 
-        # If our parameter is None, then we need to re-assign an empty type to clear it.
-        if info is None:
+        # Type safety is fucking valuable, and anything that doesn't match gives you an exception.
+        if not isinstance(info, (idaapi.tinfo_t, None.__class__, six.string_types)):
+            cls = self.__class__
+            raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info.__class__))
+
+        # If our parameter is empty, then we need to re-assign an empty type to clear it.
+        if not info:
             ti = idaapi.tinfo_t()
 
             # FIXME: clearing the type is probably not the semantics the user would expect,
@@ -2505,11 +2516,6 @@ class member_t(object):
         # If it's a tinfo_t, then we can just use it as-is.
         elif isinstance(info, idaapi.tinfo_t):
             ti = info
-
-        # Anything else is an invalid parameter that we need to raise an exception for.
-        else:
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info))
 
         # Now we can pass our tinfo_t along with the member information to IDA.
         res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
