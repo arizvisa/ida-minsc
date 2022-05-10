@@ -2004,38 +2004,99 @@ class member_t(object):
             cls = self.__class__
             logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
-        # merge the dictionaries into one and return it
-        # XXX: it'd be cool to return an object with a dictionary
-        #      that automatically synchronizes itself to the
-        #      comment when a value is actually updated.
+        # merge the dictionaries into one before adding implicit tags.
         res = {}
         [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
+
+        # the format of the implicit tags depend on the type of the member, which
+        # we actually extract from a combination of the name, and is_special_member.
+        specialQ = True if idaapi.is_special_member(self.id) else False
+
+        # now we need to check the name via is_dummy_member_name, and explicitly
+        # check to see if the name begins with field_ so that we don't use it if so.
+        name = utils.string.of(idaapi.get_member_name(self.id) or '')
+        anonymousQ = True if any(F(name) for F in [idaapi.is_dummy_member_name, idaapi.is_anonymous_member_name, operator.methodcaller('startswith', 'field_')]) else False
+
+        # if the name is defined and not special in any way, then its a tag.
+        aname = '' if any([specialQ, anonymousQ]) else name
+        if aname:
+            res.setdefault('__name__', aname)
+
+        # next one is the type information, which requires us to handle the
+        # name if it's been mangled in some way.
+        try:
+            if database.type.has_typeinfo(self.id):
+                ti = self.typeinfo
+
+                # now we need to attach the name to our type if it's not special.
+                ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(aname), '')
+                res.setdefault('__typeinfo__', ti_s)
+
+        # if we got an exception, then there's no type and we don't need it.
+        except E.MissingTypeOrValueError:
+            pass
+
         return res
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the member.'''
         res = self.tag()
-        return res[key]
+        if key in res:
+            return res[key]
+        cls = self.__class__
+        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read tag (\"{:s}\") from the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"')))
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the member.'''
+        if value is None:
+            cls = self.__class__
+            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.escape(key, '"'), value))
+
+        # grab our original state so we can return the previous value.
         state = self.tag()
+
+        # If any of the implicit tags were specified, then figure out
+        # the correct one to assign it to the member correctly.
+        if key == '__name__':
+            result, self.name = state.get(key, None), value
+            return result
+        elif key == '__typeinfo__':
+            result, self.typeinfo = state.get(key, None), value
+            return result
+
+        # now we just need to modify the state with the new value and re-encoded it.
         repeatable, res, state[key] = True, state.get(key, None), value
         if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to apply the encoded tags to the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, value))
         return res
     @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
         state = self.tag()
+
+        # Check which implicit tag we're being asked to remove so that we
+        # can remove it from whatever it represents.
+        if key == '__name__':
+            result, self.name = state[key], None
+            return result
+        elif key == '__typeinfo__':
+            result, self.typeinfo = state[key], None
+            return result
+
+        # Now we just need to mdoify the state and we should be good to go.
+        if key not in state:
+            cls = self.__class__
+            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"')))
         repeatable, res, = True, state.pop(key)
+
+        # Then the very last thing to do is to encode our state into the comment.
         if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!s}) : Unable to apply the encoded tags to the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, value))
         return res
 
     def refs(self):
@@ -2250,6 +2311,75 @@ class member_t(object):
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
+        # If our string is None, then we need to actually clear the name. This
+        # is actually a little tricky because we have a default name for a
+        # structure (field_%X) and one for a frame (var_%X, arg_%X).
+        elif string is None:
+            sptr, mptr = self.parent.ptr, self.ptr
+
+            # Define our name formatters that we will eventually use.
+            fmtField = "field_{:X}".format
+            fmtVar = "var_{:X}".format
+            fmtArg = "arg_{:X}".format
+
+            # If it's not a function frame, then this is easy as we can just
+            # use mptr.get_soff() to get the correct offset exactly.
+            if not is_frame(sptr):
+                result, self.name = self.name, fmtField(mptr.get_soff())
+                return result
+
+            # To process the frame, we first need the address of the function
+            # to get the func_t and the actual member offset to calculate with.
+            ea = idaapi.get_func_by_frame(sptr.id)
+            if ea == idaapi.BADADDR:
+                cls = self.__class__
+                raise E.DisassemblerError(u"{:s}({:#x}).name({!s}) : Unable to get the function for the frame ({:#x}) containing the structure member.".format('.'.join([__name__, cls.__name__]), self.id, string, sptr.id))
+
+            # We need to figure out all of the attributes we need in order to
+            # calculate the position within a frame this includes the integer size.
+            information = idaapi.get_inf_structure()
+            integersize = 8 if information.is_64bit() else 4 if information.is_32bit() else 2
+
+            fn, soff = idaapi.get_func(ea), mptr.get_soff()
+            if fn is None:
+                cls = self.__class__
+                raise E.FunctionNotFoundError(u"{:s}({:#x}).name({!s}) : Unable to get the function at the specified address ({:#x}) which owns the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, string, ea, sptr.id))
+
+            # Now we need to figure out whether where our member is. If it's
+            # within the func_t.frsize, then we're a var_.
+            if soff < sum([fn.frsize]):
+                fmt, offset = fmtVar, fn.frsize - soff
+
+            # If it's within func_t.frregs, then we're a special ' s' name.
+            elif soff < sum([fn.frsize, fn.frregs]):
+                fmt, offset = (lambda _: ' s'), None
+
+            # If it's at the saved register, then we're a special ' r' name.
+            elif soff < sum([fn.frsize, fn.frregs, integersize]):
+                fmt, offset = (lambda _: ' r'), None
+
+            # Anything else should be an argument so we will use 'arg_'
+            elif soff < sum([fn.frsize, fn.frregs, integersize, fn.fpd, fn.argsize]):
+                fmt, offset = fmtArg, soff - sum([fn.frsize, fn.frregs, integersize])
+
+            # Anything else though...is a bug, it shouldn't happen unless IDA is not
+            # actually populating the fields correctly (looking at you x64). So, lets
+            # just be silently pedantic here.
+            else:
+                fmt, offset = fmtArg, soff - sum([fn.frsize, fn.frregs, integersize])
+                cls = self.__class__
+                logging.debug(u"{:s}({:#x}).name({!s}) : Treating the name for the member at offset ({:#x}) as an argument due being located outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, string, soff, sum([fn.frsize, fn.frregs, integersize, fn.fpd, fn.argsize])))
+
+            # Okay, now the last thing to do is to format our name and assign it..weeee, that was fun.
+            result, self.name = self.name, fmt(offset)
+            return result
+
+        # for the sake of being pedantic here too, we check to see if this is a special
+        # member, because if we touch it...it becomes non-special for some reason.
+        if idaapi.is_special_member(self.id):
+            cls = self.__class__
+            logging.warning(u"{:s}({:#x}).name({!r}) : Modifying the name for the special member at offset ({:#x}) will unfortunately demote its special properties.".format('.'.join([__name__, cls.__name__]), self.id, string, self.ptr.get_soff()))
+
         # convert the specified string into a form that IDA can handle
         ida_string = utils.string.to(string)
 
@@ -2257,21 +2387,21 @@ class member_t(object):
         res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_VISIBLE)
         if ida_string and ida_string != res:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).name : Stripping invalid chars from structure member name (\"{:s}\") resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure member name (\"{:s}\") resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
         # now we can set the name of the member at the specified offset
         oldname = self.name
         if not idaapi.set_member_name(self.parent.ptr, self.offset - self.parent.members.baseoffset, ida_string):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
+            raise E.DisassemblerError(u"{:s}({:#x}).name({!r}) : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(ida_string), utils.string.repr(oldname)))
 
         # verify that the name was actually assigned properly
         assigned = idaapi.get_member_name(self.id) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
-        return assigned
+            logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
+        return oldname
 
     @property
     def comment(self, repeatable=True):
@@ -2353,18 +2483,33 @@ class member_t(object):
     @typeinfo.setter
     def typeinfo(self, info):
         '''Set the type information of the current member to `info`.'''
+        set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
 
-        if idaapi.__version__ < 7.0:
-            set_member_tinfo = idaapi.set_member_tinfo2
+        # If our parameter is None, then we need to re-assign an empty type to clear it.
+        if info is None:
+            ti = idaapi.tinfo_t()
+
+            # FIXME: clearing the type is probably not the semantics the user would expect,
+            #        and so we should probably transform the current type to remove any
+            #        array or other weird attributes as long as it retains the same size.
+            ti.clear()
+
+        # Otherwise if it's a string, then we'll need to parse our info parameter into a
+        # tinfo_t, so that we can assign it to the typeinfo for the member.
+        elif isinstance(info, six.string_types):
+            ti = internal.declaration.parse(info)
+            if ti is None:
+                cls = self.__class__
+                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info))
+
+        # If it's a tinfo_t, then we can just use it as-is.
+        elif isinstance(info, idaapi.tinfo_t):
+            ti = info
+
+        # Anything else is an invalid parameter that we need to raise an exception for.
         else:
-            set_member_tinfo = idaapi.set_member_tinfo
-
-        # Parse our into parameter into a tinfo_t for us, so that we can assign it to the
-        # typeinfo for the member.
-        ti = internal.declaration.parse(info)
-        if ti is None:
             cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info))
+            raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info))
 
         # Now we can pass our tinfo_t along with the member information to IDA.
         res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
