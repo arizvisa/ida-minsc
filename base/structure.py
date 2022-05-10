@@ -904,15 +904,28 @@ def size(id):
 @utils.multicase(id=six.integer_types)
 def is_union(id):
     '''Return whether the structure identified by `id` is a union or not.'''
-    structure = idaapi.get_struc(id)
-    return is_union(structure)
+    sptr = idaapi.get_struc(id)
+    return is_union(sptr)
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def is_union(structure):
     '''Return whether the provided `structure` is defined as a union.'''
-    if isinstance(structure, structure_t):
-        return is_union(structure.ptr)
-    return structure.is_union()
+    SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+    sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+    return True if sptr.props & SF_UNION else False
 unionQ = isunion = utils.alias(is_union)
+
+@utils.multicase(id=six.integer_types)
+def is_frame(id):
+    '''Return whether the structure identified by `id` is a frame or not.'''
+    sptr = idaapi.get_struc(id)
+    return is_frame(sptr)
+@utils.multicase(structure=(idaapi.struc_t, structure_t))
+def is_frame(structure):
+    '''Return whether the provided `structure` is a frame or not.'''
+    SF_FRAME = getattr(idaapi, 'SF_FRAME', 0x40)
+    sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+    return True if sptr.props & SF_FRAME else False
+frameQ = isframe = utils.alias(is_frame)
 
 @utils.multicase(structure=structure_t)
 def members(structure):
