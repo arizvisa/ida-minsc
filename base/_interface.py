@@ -998,6 +998,137 @@ class prioritynotification(prioritybase):
             return '\n'.join([res] + items[1:])
         return "Notifications currently tracked: {:s}".format('No notifications are being tracked.')
 
+class priorityhxevent(prioritybase):
+    """
+    Helper class for allowing one to apply an arbitrary number of hooks to the
+    different event points within Hex-Rays.
+    """
+    def __init__(self):
+        super(priorityhxevent, self).__init__()
+        try:
+            import ida_hexrays
+        except Exception:
+            cls = self.__class__
+            raise internal.exceptions.UnsupportedCapability(u"{:s} : Unable to instantiate class due to missing module ({:s}).".format('.'.join([__name__, cls.__name__]), 'ida_hexrays'))
+        else:
+            self.__module = module = ida_hexrays
+
+        # Initialize the hexrays plugin and make sure we're good to go.
+        if not module.init_hexrays_plugin():
+            cls = self.__class__
+            raise internal.exceptions.DisassemblerError(u"{:s} : Failure while trying initialize the Hex-Rays plugin ({:s}).".format('.'.join([__name__, cls.__name__]), 'init_hexrays_plugin'))
+
+        # Stash our events so that we can pretty-print them and keep a dict
+        # that contains the callable that is currently attached to the event.
+        self.__events__ = { getattr(ida_hexrays, name) : name for name in dir(ida_hexrays) if name.startswith(('hxe_', 'lxe_')) }
+        self.__attached__ = {}
+
+    def __formatter__(self, event):
+        name = self.__events__.get(event, '')
+        return "{:s}({:#x})".format(name, event) if name else "{:#x}".format(event)
+
+    @property
+    def available(self):
+        '''Return all of the events that one may want to attach to.'''
+        result = {event for event in self.__events__}
+        return sorted(result)
+
+    def attach(self, event):
+        '''Attach to the specified `event` in order to receive them from Hex-Rays.'''
+        cls = self.__class__
+        if event not in self.__events__:
+            raise NameError(u"{:s}.attach({!r}) : Unable to attach to the event {:s} due to the event being unavailable.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+
+        # If the event is already there, then the target has been attached
+        if event in self.__attached__:
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} as it has already been attached to.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+            return True
+
+        # Attach using the super class to figure out what callable we should use.
+        ok, callable = super(priorityhxevent, self).attach(event)
+
+        # We failed...nothing to see here.
+        if not ok:
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+            return False
+
+        # Now we have a callable to use, so we just need to install it.
+        if not self.__module.install_hexrays_callback(callable):
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} with the specified callable ({!s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), callable))
+            return False
+
+        # Last thing to do is to save our state so that we can remove it later.
+        self.__attached__[event] = callable
+        return True
+
+    def detach(self, event):
+        '''Detach from the specified `event` so that they will not be received by Hex-Rays.'''
+        cls = self.__class__
+        if event not in self.__events__:
+            raise NameError(u"{:s}.detach({!r}) : Unable to detach from the event {:s} due to the event being unavailable.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+
+        # If it's not connected, then we need to freak out at the user.
+        if event not in self.__attached__:
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from the event {:s} as it is not currently attached.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+            return False
+
+        # When detaching, we need to empty the cache for the provided target
+        # before we can remove the hexrays callback.
+        for callable in self.get(event):
+            ok = self.discard(event, callable)
+            Flogging = logging.info if ok else logging.warning
+            Flogging(u"{:s}.detach({!r}) : {:s} the callable ({!s}) attached to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(event)))
+
+        # Because Hex-Rays callback API wants the original callable that we gave it,
+        # we need to rip it out of our state so we can remove it.
+        callable = self.__attached__.pop(event)
+        count = self.__module.remove_hexrays_callback(callable)
+        logging.info(u"{:s}.detach({!r}) : Removed {:d} callback{:s} for the callable ({!s}) attached to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', callable, self.__formatter__(event)))
+
+        return super(priorityhxevent, self).detach(event)
+
+    def close(self):
+        '''Remove all of the events that are currently attached.'''
+        cls = self.__class__
+        if not super(priorityhxevent, self).close():
+            logging.critical(u"{:s}.close() : Error trying to detach from all of the events that are attached.".format('.'.join([__name__, cls.__name__])))
+            [logging.debug(u"{:s}.close() : Event {:s} is still attached{:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event), " by callable {!s}".format(self.__attached__[event]) if event in self.__attached__ else '')) for event in self]
+
+        # We only fail here if our state is not empty.
+        return False if self.__attached__ else True
+
+    def add(self, event, callable, priority=0):
+        '''Add the `callable` to the queue with the given `priority` for the specified `event`.'''
+        if event in self:
+            return super(priorityhxevent, self).add(event, callable, priority)
+
+        # Attach to the event so that we can actually do stupid things with it.
+        if not self.attach(event):
+            cls = self.__class__
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, callable, priority, self.__formatter__(event)))
+
+        # Add the callable to our current events to call.
+        ok = super(priorityhxevent, self).add(event, callable, priority)
+        return ok and self.enable(event)
+
+    def __apply__(self, event):
+        '''Return a closure that will execute all of the callables for the specified `event`.'''
+        original = super(priorityhxevent, self).__apply__(event)
+
+        # We need to define this closure because Hex-Rays absolutely requires
+        # you to return a 0 unless the event type specifies otherwise.
+        def closure(ev, *parameters):
+            if ev == event:
+                return original(*parameters) or 0
+            return 0
+        return closure
+
+    def __repr__(self):
+        if len(self):
+            res, items = 'Events currently attached:', super(priorityhxevent, self).__repr__().split('\n')
+            return '\n'.join([res] + items[1:])
+        return "Events currently attached: {:s}".format('No events are currently attached to.')
+
 class address(object):
     """
     This namespace provides tools that assist with correcting
