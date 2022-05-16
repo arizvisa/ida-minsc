@@ -333,7 +333,7 @@ class prioritybase(object):
         '''Intended to be called as a supermethod for the specified `target` that removes the target from the cache.'''
         if target in self.__cache__:
             if len(self.__cache__[target]):
-                logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to items still in its cache.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+                logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to callable items still existing in its cache.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
                 return False
             self.__cache__.pop(target, None)
             return True
@@ -481,7 +481,7 @@ class prioritybase(object):
 
         # But if there were no entries in the cache, then warn the user about it.
         if not len(self.__cache__[target]):
-            logging.warning(u"{:s}.enable({!r}) : The requested target ({:s}) does not have any callables in its cache.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target)))
+            logging.warning(u"{:s}.enable({!r}) : The requested target ({:s}) does not have any callables to enable.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target)))
             return True
         return True
 
@@ -589,15 +589,15 @@ class prioritybase(object):
 
         # Iterate through our cache for the specified target and save
         # both the state and the index of every single priority.
-        for index, (priority, F) in enumerate(self.__cache__[target][:]):
-            state.append((priority, F))
-            table.setdefault(priority, []).append(index)
+        for index, (prio, F) in enumerate(self.__cache__[target][:]):
+            state.append((prio, F))
+            table.setdefault(prio, []).append(index)
 
         # Before we do anything, we need to ping the priority we're searching for
         # in the table and then we grab the first index for the given priority.
         if priority not in table:
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
-            raise internal.exceptions.ItemNotfoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the requested priority ({:+d}).".format('.'.join([__name__, cls.__name__]), target, format(priority), format(priority)))
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the specific priority ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(prio), format(prio)))
         index = table[priority].pop(0)
 
         # We now can pop the index directly out of the state. Afterwards, we
@@ -864,7 +864,7 @@ class priorityhook(prioritybase):
         # otherwise we failed, and we need to try to detach from the target using
         # the supermethod in order to remove the target name from the cache.
         if not super(priorityhook, self).detach(name):
-            logging.critical(u"{:s}.attach({!r}) : Unable to remove the specified target ({:s}) from the cache.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
+            logging.critical(u"{:s}.attach({!r}) : Unable to remove the specified target ({:s}) from the cache of callable items.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
             return False
 
         # we've removed the target name from the cache, so just warn the user
