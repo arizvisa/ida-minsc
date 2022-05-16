@@ -936,10 +936,9 @@ def members(structure):
 def members(id):
     """Yield each member of the structure identified by `id`.
 
-    Each iteration yields the `((offset, size), (name, comment, repeatable-comment))` of each member.
+    Each iteration yields the `(offset, size, tags)` of each member.
     """
-
-    st = idaapi.get_struc(id)
+    st, struc = (F(id) for F in [idaapi.get_struc, by])
 
     # If we couldn't get the structure, then blow up in the user's face.
     if st is None:
@@ -952,9 +951,9 @@ def members(id):
     # Iterate through all of the member in the structure.
     offset = 0
     for i in range(st.memqty):
+        m, mem = st.get_member(i), struc.members[i]
 
         # Grab the member and its properties.
-        m = st.get_member(i)
         msize, munionQ = idaapi.get_member_size(m), m.props & idaapi.MF_UNIMEM
 
         # Figure out the boundaries of the member. If our structure is a union,
@@ -966,16 +965,17 @@ def members(id):
         # then this is an empty field, or undefined. We yield this to the caller
         # so that they know that there's some padding they need to know about.
         if offset < left:
-            yield (offset, left - offset), (None, None, None)
+            yield offset, left - offset, {}
             offset = left
 
         # Grab the attributes about the member that we plan on yielding.
-        iterable = (utils.string.of(cmt) for cmt in [idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1)])
-        items = builtins.tuple(iterable)
+        # However, we need to force any critical implicit tags (like the name).
+        items = mem.tag()
+        items.setdefault('__name__', idaapi.get_member_name(m.id))
 
         # That was everything that our caller should care about, so we can
         # just yield it and continue onto the next member.
-        yield (offset, msize), items
+        yield offset, msize, items
 
         # If we're a union, then the offset just never changes. Continue onto
         # the next member without updating it.
@@ -1010,7 +1010,7 @@ def fragment(id, offset, size):
 
     # seek
     for item in iterable:
-        (m_offset, m_size), state = item
+        m_offset, m_size, state = item
 
         left, right = m_offset, m_offset + m_size
         if (offset >= left) and (offset < right):
@@ -1022,7 +1022,7 @@ def fragment(id, offset, size):
     # return
     for item in iterable:
         if size > 0:
-            (m_offset, m_size), state = item
+            m_offset, m_size, state = item
             yield m_offset, m_size, state
             size -= 0 if unionQ else m_size
         continue
