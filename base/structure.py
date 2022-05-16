@@ -748,7 +748,7 @@ def has(name):
     '''Return if a structure with the specified `name` exists within the database.'''
     res = utils.string.to(name)
     return has(idaapi.get_struc_id(res))
-@utils.multicase(structure=idaapi.struc_t)
+@utils.multicase(structure=(idaapi.struc_t, structure_t))
 def has(structure):
     '''Return whether the database includes the provided `structure`.'''
     return has(structure.id)
@@ -764,7 +764,7 @@ def by(id, **options):
     if interface.node.is_identifier(id):
         return __instance__(id, **options)
     return by_index(id, **options)
-@utils.multicase(sptr=idaapi.struc_t)
+@utils.multicase(sptr=(idaapi.struc_t, structure_t))
 def by(sptr, **options):
     '''Return the structure for the specified `sptr`.'''
     return __instance__(sptr.id, **options)
