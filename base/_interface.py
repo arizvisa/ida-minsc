@@ -499,6 +499,12 @@ class prioritybase(object):
 
     def add(self, target, callable, priority):
         '''Add the `callable` to the queue for the specified `target` with the given `priority`.'''
+        if not builtins.callable(callable):
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a non-callable ({!s}) for the requested target with the given priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, format(priority)))
+        elif not isinstance(priority, six.integer_types):
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({!s}) for the requested target with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, format(priority)))
 
         # attach to the requested target if possible
         if target not in self.__cache__:
