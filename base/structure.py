@@ -51,21 +51,6 @@ from internal import utils, interface, exceptions as E
 
 import idaapi
 
-@utils.multicase(id=six.integer_types)
-def has(id):
-    '''Return whether a structure with the specified `id` exists within the database.'''
-    return True if interface.node.is_identifier(id) and idaapi.get_struc(id) else False
-@utils.multicase(name=six.string_types)
-@utils.string.decorate_arguments('name')
-def has(name):
-    '''Return if a structure with the specified `name` exists within the database.'''
-    res = utils.string.to(name)
-    return has(idaapi.get_struc_id(res))
-@utils.multicase(structure=idaapi.struc_t)
-def has(structure):
-    '''Return whether the database includes the provided `structure`.'''
-    return has(structure.id)
-
 def __instance__(identifier, **options):
     '''Create a new instance of the structure identified by `identifier`.'''
     return structure_t(identifier, **options)
@@ -151,62 +136,6 @@ def new(string, *suffix, **offset):
 
     # return a new instance using the specified identifier
     return __instance__(id, **offset)
-
-@utils.multicase(name=six.string_types)
-@utils.string.decorate_arguments('name')
-def by(name, **options):
-    '''Return the structure with the given `name`.'''
-    return by_name(name, **options)
-@utils.multicase(id=six.integer_types)
-def by(id, **options):
-    '''Return the structure with the specified `id` or index.'''
-    if interface.node.is_identifier(id):
-        return __instance__(id, **options)
-    return by_index(id, **options)
-@utils.multicase(sptr=idaapi.struc_t)
-def by(sptr, **options):
-    '''Return the structure for the specified `sptr`.'''
-    return __instance__(sptr.id, **options)
-@utils.multicase(tinfo=idaapi.tinfo_t)
-def by(tinfo, **options):
-    '''Return the structure for the specified `tinfo`.'''
-    if tinfo.is_struct():
-        return by_name(tinfo.get_type_name(), **options)
-
-    # If the type information is not a pointer, then we really don't know what
-    # to do with this and so we raise an exception.
-    elif not tinfo.is_ptr():
-        raise E.InvalidTypeOrValueError(u"{:s}.by(\"{:s}\"{:s}) : Unable to locate structure for the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
-
-    # If there are no details, then raise an exception because we need to
-    # dereference the pointer to get the real name.
-    if not tinfo.has_details():
-        raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : The provided type information ({!r}) does not contain any details.".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
-
-    # Now we can grab our pointer and extract the object from it, At this
-    # point we continue by recursing back into ourselves. This way we can
-    # repeatedly dereference a pointer until we get to a structure.
-    pi = idaapi.ptr_type_data_t()
-    if not tinfo.get_ptr_details(pi):
-        raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : Unable to get the pointer target from the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
-    return by(pi.obj_type, **options)
-@utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
-def by(**type):
-    '''Return the structure matching the keyword specified by `type`.'''
-    searchstring = utils.string.kwargs(type)
-
-    listable = [item for item in iterate(**type)]
-    if len(listable) > 1:
-        messages = ((u"[{:d}] {:s}".format(idaapi.get_struc_idx(st.id), st.name)) for i, st in enumerate(listable))
-        [ logging.info(msg) for msg in messages ]
-        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, returning the first one {!s}.".format(__name__, searchstring, len(listable), listable[0]))
-
-    iterable = (item for item in listable)
-    res = next(iterable, None)
-    if res is None:
-        raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
-    return res
 
 @utils.multicase(string=six.string_types)
 def search(string):
@@ -807,6 +736,78 @@ class structure_t(object):
         self.__ptr__, self.__name__ = idaapi.get_struc(identifier), name
         self.__members__ = members
         return
+
+### Functions that are related to finding and using a structure_t.
+@utils.multicase(id=six.integer_types)
+def has(id):
+    '''Return whether a structure with the specified `id` exists within the database.'''
+    return True if interface.node.is_identifier(id) and idaapi.get_struc(id) else False
+@utils.multicase(name=six.string_types)
+@utils.string.decorate_arguments('name')
+def has(name):
+    '''Return if a structure with the specified `name` exists within the database.'''
+    res = utils.string.to(name)
+    return has(idaapi.get_struc_id(res))
+@utils.multicase(structure=idaapi.struc_t)
+def has(structure):
+    '''Return whether the database includes the provided `structure`.'''
+    return has(structure.id)
+
+@utils.multicase(name=six.string_types)
+@utils.string.decorate_arguments('name')
+def by(name, **options):
+    '''Return the structure with the given `name`.'''
+    return by_name(name, **options)
+@utils.multicase(id=six.integer_types)
+def by(id, **options):
+    '''Return the structure with the specified `id` or index.'''
+    if interface.node.is_identifier(id):
+        return __instance__(id, **options)
+    return by_index(id, **options)
+@utils.multicase(sptr=idaapi.struc_t)
+def by(sptr, **options):
+    '''Return the structure for the specified `sptr`.'''
+    return __instance__(sptr.id, **options)
+@utils.multicase(tinfo=idaapi.tinfo_t)
+def by(tinfo, **options):
+    '''Return the structure for the specified `tinfo`.'''
+    if tinfo.is_struct():
+        return by_name(tinfo.get_type_name(), **options)
+
+    # If the type information is not a pointer, then we really don't know what
+    # to do with this and so we raise an exception.
+    elif not tinfo.is_ptr():
+        raise E.InvalidTypeOrValueError(u"{:s}.by(\"{:s}\"{:s}) : Unable to locate structure for the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+
+    # If there are no details, then raise an exception because we need to
+    # dereference the pointer to get the real name.
+    if not tinfo.has_details():
+        raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : The provided type information ({!r}) does not contain any details.".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+
+    # Now we can grab our pointer and extract the object from it, At this
+    # point we continue by recursing back into ourselves. This way we can
+    # repeatedly dereference a pointer until we get to a structure.
+    pi = idaapi.ptr_type_data_t()
+    if not tinfo.get_ptr_details(pi):
+        raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : Unable to get the pointer target from the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+    return by(pi.obj_type, **options)
+@utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
+def by(**type):
+    '''Return the structure matching the keyword specified by `type`.'''
+    searchstring = utils.string.kwargs(type)
+
+    listable = [item for item in iterate(**type)]
+    if len(listable) > 1:
+        messages = ((u"[{:d}] {:s}".format(idaapi.get_struc_idx(st.id), st.name)) for i, st in enumerate(listable))
+        [ logging.info(msg) for msg in messages ]
+        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, returning the first one {!s}.".format(__name__, searchstring, len(listable), listable[0]))
+
+    iterable = (item for item in listable)
+    res = next(iterable, None)
+    if res is None:
+        raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
+    return res
 
 @utils.multicase()
 def name(id):
