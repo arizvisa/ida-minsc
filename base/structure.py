@@ -930,14 +930,14 @@ frameQ = isframe = utils.alias(is_frame)
 
 @utils.multicase()
 def members(structure, **base):
-    '''Yield each member of the specified `structure`.'''
+    '''Yield each member of the given `structure` as a tuple containing its attributes.'''
     st = by(structure)
     return members(st.id, **base)
 @utils.multicase(id=six.integer_types)
 def members(id, **base):
-    """Yield each member of the structure identified by `id`.
+    """Yield each member of the structure with the specified `id` as a tuple of containing its `(offset, size, tags)`.
 
-    Each iteration yields the `(offset, size, tags)` of each member.
+    If the integer `base` is defined, then the offset of each member will be translated by the given value.
     """
     st, struc = (F(id) for F in [idaapi.get_struc, by])
 
@@ -990,24 +990,19 @@ def members(id, **base):
 
 @utils.multicase(offset=six.integer_types)
 def fragment(structure, offset, **base):
-    '''Yield each member of the specified `structure` starting from the given `offset`.'''
+    '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
     st = by(structure)
     return fragment(st.id, offset, st.size, **base)
 @utils.multicase(offset=six.integer_types, size=six.integer_types)
 def fragment(structure, offset, size, **base):
-    '''Yield each member of the specified `structure` from the given `offset` up to the `size`.'''
+    '''Yield each member of the given `structure` from the specified `offset` up to `size` as a tuple containing its attributes.'''
     st = by(structure)
     return fragment(st.id, offset, size, **base)
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
 def fragment(id, offset, size, **base):
-    """Yield each member of the structure identified by `id` from the given `offset` up to the `size`.
+    """Yield each member of the structure with the specified `id` from the given `offset` up to `size` as a tuple containing its `(offset, size, tags)`.
 
-    Each iteration yields a tuple of the following format for each
-    member within the requested bounds. This allows one to select
-    certain fragments of a structure which can then be used to export
-    to other programs or applications.
-
-    `(offset, size, state)`
+    If the integer `base` is defined, then the offset of each member will be translated by the given value.
     """
     iterable, unionQ = members(id, **base), is_union(id)
 
