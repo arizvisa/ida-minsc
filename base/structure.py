@@ -928,10 +928,11 @@ def is_frame(structure):
     return True if sptr.props & SF_FRAME else False
 frameQ = isframe = utils.alias(is_frame)
 
-@utils.multicase(structure=structure_t)
+@utils.multicase()
 def members(structure, **base):
     '''Yield each member of the specified `structure`.'''
-    return members(structure.id, **base)
+    st = by(structure)
+    return members(st.id, **base)
 @utils.multicase(id=six.integer_types)
 def members(id, **base):
     """Yield each member of the structure identified by `id`.
@@ -987,13 +988,19 @@ def members(id, **base):
         offset += msize
     return
 
-@utils.multicase(structure=structure_t, offset=six.integer_types, size=six.integer_types)
+@utils.multicase(offset=six.integer_types)
+def fragment(structure, offset, **base):
+    '''Yield each member of the specified `structure` starting from the given `offset`.'''
+    st = by(structure)
+    return fragment(st.id, offset, st.size, **base)
+@utils.multicase(offset=six.integer_types, size=six.integer_types)
 def fragment(structure, offset, size, **base):
-    '''Yield each member of the specified `structure` from the `offset` up to the `size`.'''
-    return fragment(structure.id, offset, size, **base)
+    '''Yield each member of the specified `structure` from the given `offset` up to the `size`.'''
+    st = by(structure)
+    return fragment(st.id, offset, size, **base)
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
 def fragment(id, offset, size, **base):
-    """Yield each member of the structure identified by `id` from the `offset` up to the `size`.
+    """Yield each member of the structure identified by `id` from the given `offset` up to the `size`.
 
     Each iteration yields a tuple of the following format for each
     member within the requested bounds. This allows one to select
