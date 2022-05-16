@@ -2055,16 +2055,31 @@ class member_t(object):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.escape(key, '"'), value))
 
-        # grab our original state so we can return the previous value.
-        state = self.tag()
+        # grab the repeatable and non-repeatable comment so we capture the
+        # tag state, but exclude any of hte implicit tags.
+        res = utils.string.of(idaapi.get_member_cmt(self.id, False))
+        d1 = internal.comment.decode(res)
+        res = utils.string.of(idaapi.get_member_cmt(self.id, True))
+        d2 = internal.comment.decode(res)
+
+        # check for duplicate keys to warn the user about what we're going to do.
+        if six.viewkeys(d1) & six.viewkeys(d2):
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+
+        # then we merge the dictionaries into one before updating it and
+        # encoding it back into the member's comments.
+        state, repeatable = {}, True
+        [state.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
 
         # If any of the implicit tags were specified, then figure out
         # the correct one to assign it to the member correctly.
+        tags = self.tag()
         if key == '__name__':
-            result, self.name = state.get(key, None), value
+            result, self.name = tags.pop(key, None), value
             return result
         elif key == '__typeinfo__':
-            result, self.typeinfo = state.get(key, None), value
+            result, self.typeinfo = tags.pop(key, None), value
             return result
 
         # now we just need to modify the state with the new value and re-encoded it.
@@ -2077,18 +2092,35 @@ class member_t(object):
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
-        state = self.tag()
+
+        # grab the repeatable and non-repeatable comment so we capture the
+        # tag state, but exclude any of hte implicit tags.
+        res = utils.string.of(idaapi.get_member_cmt(self.id, False))
+        d1 = internal.comment.decode(res)
+        res = utils.string.of(idaapi.get_member_cmt(self.id, True))
+        d2 = internal.comment.decode(res)
+
+        # check for duplicate keys to warn the user about what we're going to do.
+        if six.viewkeys(d1) & six.viewkeys(d2):
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+
+        # then we merge the dictionaries into one before updating it and
+        # encoding it back into the member's comments.
+        state, repeatable = {}, True
+        [state.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
 
         # Check which implicit tag we're being asked to remove so that we
         # can remove it from whatever it represents.
+        tags = self.tag()
         if key == '__name__':
-            result, self.name = state[key], None
+            result, self.name = tags.pop(key, None), None
             return result
         elif key == '__typeinfo__':
-            result, self.typeinfo = state[key], None
+            result, self.typeinfo = tags.pop(key, None), None
             return result
 
-        # Now we just need to mdoify the state and we should be good to go.
+        # Now we just need to modify the state and we should be good to go.
         if key not in state:
             cls = self.__class__
             raise E.MissingTagError(u"{:s}({:#x}).tag({!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"')))
