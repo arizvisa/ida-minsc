@@ -929,11 +929,11 @@ def is_frame(structure):
 frameQ = isframe = utils.alias(is_frame)
 
 @utils.multicase(structure=structure_t)
-def members(structure):
+def members(structure, **base):
     '''Yield each member of the specified `structure`.'''
-    return members(structure.id)
+    return members(structure.id, **base)
 @utils.multicase(id=six.integer_types)
-def members(id):
+def members(id, **base):
     """Yield each member of the structure identified by `id`.
 
     Each iteration yields the `(offset, size, tags)` of each member.
@@ -949,7 +949,7 @@ def members(id):
     size, unionQ = idaapi.get_struc_size(st), is_union(st)
 
     # Iterate through all of the member in the structure.
-    offset = 0
+    offset, translated = 0, next((base[key] for key in ['offset', 'base', 'baseoffset'] if key in base), 0)
     for i in range(st.memqty):
         m, mem = st.get_member(i), struc.members[i]
 
@@ -965,7 +965,7 @@ def members(id):
         # then this is an empty field, or undefined. We yield this to the caller
         # so that they know that there's some padding they need to know about.
         if offset < left:
-            yield offset, left - offset, {}
+            yield translated + offset, left - offset, {}
             offset = left
 
         # Grab the attributes about the member that we plan on yielding.
@@ -975,7 +975,7 @@ def members(id):
 
         # That was everything that our caller should care about, so we can
         # just yield it and continue onto the next member.
-        yield offset, msize, items
+        yield translated + offset, msize, items
 
         # If we're a union, then the offset just never changes. Continue onto
         # the next member without updating it.
@@ -988,11 +988,11 @@ def members(id):
     return
 
 @utils.multicase(structure=structure_t, offset=six.integer_types, size=six.integer_types)
-def fragment(structure, offset, size):
+def fragment(structure, offset, size, **base):
     '''Yield each member of the specified `structure` from the `offset` up to the `size`.'''
-    return fragment(structure.id, offset, size)
+    return fragment(structure.id, offset, size, **base)
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
-def fragment(id, offset, size):
+def fragment(id, offset, size, **base):
     """Yield each member of the structure identified by `id` from the `offset` up to the `size`.
 
     Each iteration yields a tuple of the following format for each
@@ -1001,12 +1001,8 @@ def fragment(id, offset, size):
     to other programs or applications.
 
     `(offset, size, state)`
-
-    In this tuple, the field `comment` represents the non-repeatable
-    comment whereas `repeatable` contains the member's `repeatable`
-    comment.
     """
-    iterable, unionQ = members(id), is_union(id)
+    iterable, unionQ = members(id, **base), is_union(id)
 
     # seek
     for item in iterable:
