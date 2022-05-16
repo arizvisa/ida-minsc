@@ -1000,7 +1000,7 @@ def fragment(id, offset, size):
     certain fragments of a structure which can then be used to export
     to other programs or applications.
 
-    `((offset, size), (name, comment, repeatable))`
+    `(offset, size, state)`
 
     In this tuple, the field `comment` represents the non-repeatable
     comment whereas `repeatable` contains the member's `repeatable`
@@ -1010,11 +1010,11 @@ def fragment(id, offset, size):
 
     # seek
     for item in iterable:
-        (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
+        (m_offset, m_size), state = item
 
         left, right = m_offset, m_offset + m_size
         if (offset >= left) and (offset < right):
-            yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
+            yield m_offset, m_size, state
             size -= 0 if unionQ else m_size
             break
         continue
@@ -1022,8 +1022,8 @@ def fragment(id, offset, size):
     # return
     for item in iterable:
         if size > 0:
-            (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
-            yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
+            (m_offset, m_size), state = item
+            yield m_offset, m_size, state
             size -= 0 if unionQ else m_size
         continue
     return
