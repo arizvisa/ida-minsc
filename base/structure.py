@@ -1017,7 +1017,8 @@ def fragment(id, offset, size, **base):
 
         left, right = m_offset, m_offset + m_size
         if (offset >= left) and (offset < right):
-            yield m_offset, m_size, state
+            delta = max(m_offset, offset) - m_offset
+            yield m_offset + delta, m_size - delta, state
             size -= 0 if unionQ else m_size
             break
         continue
