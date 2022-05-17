@@ -149,5 +149,6 @@ def breakpoints(f=None, **kwargs):
         # escape all of the commands since we're going to join them together
         commands = (escape(cmd) for cmd in commands)
 
-        six.print_('bp {:s} "{:s}"'.format(reference(ea, **kwargs), escape(';'.join(commands), depth=1)))
+        parameters = next((kwargs[kw] for kw in ['parameters', 'params', 'param'] if kw in kwargs), '')
+        six.print_('bp {:s}{:s} "{:s}"'.format("{:s} ".format(parameters) if parameters else '', reference(ea, **kwargs), escape(';'.join(commands), depth=1)))
     return
