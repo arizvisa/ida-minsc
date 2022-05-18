@@ -1920,8 +1920,8 @@ class frame(object):
                 logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), cc))
 
             base = frame.lvars.size(fn) + frame.regs.size(fn)
-            for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
-                yield off - base, name, size
+            for off, size, content in structure.fragment(fr.id, base, cls.size(fn)):
+                yield off - base, content.get('__name__', None), size
             return
 
         @utils.multicase()
@@ -2040,8 +2040,8 @@ class frame(object):
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             base = -fn.frsize
-            for (off, size), (name, _, _) in structure.fragment(fr.id, 0, cls.size(fn)):
-                yield off + base, name, size
+            for off, size, content in structure.fragment(fr.id, 0, cls.size(fn)):
+                yield off + base, content.get('__name__', None), size
             return
 
         @utils.multicase()
@@ -2083,8 +2083,8 @@ class frame(object):
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             base = frame.lvars.size(fn)
-            for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
-                yield off - base, name, size
+            for off, size, content in structure.fragment(fr.id, base, cls.size(fn)):
+                yield off - base, content.get('__name__', None), size
             return
 
         @utils.multicase()
