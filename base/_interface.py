@@ -155,6 +155,8 @@ class typemap(object):
         inverted[f & FF_MASKSIZE] = (float, s)
     for s, (f, _) in stringmap.items():
         inverted[f & FF_MASKSIZE] = (str, s)
+    for s, (f, _) in nonemap.items():
+        inverted[f & FF_MASKSIZE] = (None, s)
 
     # Add all the available flag types to support all available pointer types.
     for s, (f, _) in ptrmap.items():
