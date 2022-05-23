@@ -70,9 +70,9 @@ class typemap(object):
     and thus can be used to quickly read or apply a type to a
     field within a structure.
     """
-
+    MS_0TYPE, MS_1TYPE = idaapi.MS_0TYPE, idaapi.MS_1TYPE
     FF_MASKSIZE = idaapi.as_uint32(idaapi.DT_TYPE)  # Mask that select's the flag's size
-    FF_MASK = FF_MASKSIZE | 0xfff00000              # Mask that select's the flag's repr
+    FF_MASK = FF_MASKSIZE | MS_0TYPE | MS_1TYPE     # Mask that select's the flag's repr
 
     # FIXME: In some cases FF_nOFF (where n is 0 or 1) does not actually
     #        get auto-treated as an pointer by ida. Instead, it appears to
@@ -155,8 +155,12 @@ class typemap(object):
         inverted[f & FF_MASKSIZE] = (float, s)
     for s, (f, _) in stringmap.items():
         inverted[f & FF_MASKSIZE] = (str, s)
+
+    # Add all the available flag types to support all available pointer types.
     for s, (f, _) in ptrmap.items():
         inverted[f & FF_MASK] = (type, s)
+        inverted[f & FF_MASK & ~MS_0TYPE] = (type, s)
+        inverted[f & FF_MASK & ~MS_1TYPE] = (type, s)
     del f
 
     # FIXME: this is a hack for dealing with structures that
@@ -189,32 +193,33 @@ class typemap(object):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
         structure = sys.modules.get('structure', __import__('structure'))
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-        dt = flag & cls.FF_MASKSIZE
+        dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
 
         # Check if the dtype is a structure and our type-id is an integer so that we
         # figure out the structure's size. We also do an explicit check if the type-id
         # is a structure because in some cases, IDA will forget to set the FF_STRUCT
         # flag but still assign the structure type-id to a union member.
-        if (dt == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
+        if (dtype == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
             t = structure.by_identifier(typeid)
             sz = t.size
             return t if sz == size else [t, size // sz]
 
         # Verify that we actually have the datatype mapped and that we can look it up.
-        if dt not in cls.inverted:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dt, typeid, size))
+        if all(item not in cls.inverted for item in [dsize, dtype]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dtype, typeid, size))
 
         # Now that we know the datatype exists, extract the actual type and the
-        # type's size from the inverted map that we previously created.
-        t, sz = cls.inverted[dt]
+        # type's size from the inverted map that we previously created. We start
+        # by checking the dtype first for pointers and then fall back to the size.
+        t, sz = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dsize]
 
         # If the datatype size is not an integer, then we need to calculate the
         # size ourselves using the size parameter we were given and the element
         # size of the datatype that we extracted from the flags.
         if not isinstance(sz, six.integer_types):
-            count = size // idaapi.get_data_elsize(idaapi.BADADDR, dt, idaapi.opinfo_t())
+            count = size // idaapi.get_data_elsize(idaapi.BADADDR, dtype, idaapi.opinfo_t())
             return [t, count] if count > 1 else t
 
         # If the size matches the datatype size, then this is a single element
