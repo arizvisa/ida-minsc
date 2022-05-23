@@ -4457,6 +4457,26 @@ class types(object):
     defined within the database. The functions within this namespace
     can be used to create, query, or fetch the types that have been
     defined.
+
+    The available types that one can filter the local types with are as follows:
+
+        `ordinal` - Match according to the ordinal of the local type.
+        `name` - Match according to the name of the local type.
+        `like` - Filter the names of the local types according to a glob.
+        `definition` - Filter the local types by applying a glob to their definition.
+        `regex` - Filter the local types by applying a regular-expression to their definition.
+        `size` - Filter the local types according to their size.
+        `greater` or `ge` - Filter the local types for the ones that are larger or equal to a certain size.
+        `gt` - Filter the local types for the ones that are larger than a certain size.
+        `less` or `le` - Filter the local types for the ones that are less or equal to a certain size.
+        `lt` - Filter the local types for the ones that are less than a certain size.
+        `predicate` - Filter the types by passing their ordinal and ``idaapi.tinfo_t`` to a callable.
+
+    Some examples of using these keywords are as follows::
+
+        > database.types.list('*::*')
+        > iterable = database.types.iterate(definition='*Cookie*')
+        > result = database.types.search(regex='.*const.*')
     """
 
     @utils.multicase(library=idaapi.til_t)
@@ -4486,11 +4506,13 @@ class types(object):
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1))
     __matcher__.predicate('predicate'), __matcher__.predicate('pred')
     __matcher__.boolean('ordinal', operator.eq, operator.itemgetter(0)), __matcher__.boolean('index', operator.eq, operator.itemgetter(0))
-    __matcher__.combinator('type', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
+    __matcher__.combinator('definition', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.boolean('size', operator.eq, operator.itemgetter(2), operator.methodcaller('get_size'))
-    __matcher__.boolean('greater', operator.le, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('gt', operator.lt, operator.itemgetter(2), operator.methodcaller('get_size')),
-    __matcher__.boolean('less', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('lt', operator.gt, operator.itemgetter(2), operator.methodcaller('get_size'))
+    __matcher__.boolean('greater', operator.le, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('ge', operator.le, operator.itemgetter(2), operator.methodcaller('get_size'))
+    __matcher__.boolean('gt', operator.lt, operator.itemgetter(2), operator.methodcaller('get_size')),
+    __matcher__.boolean('less', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('le', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size'))
+    __matcher__.boolean('lt', operator.gt, operator.itemgetter(2), operator.methodcaller('get_size'))
 
     @utils.multicase()
     @classmethod
