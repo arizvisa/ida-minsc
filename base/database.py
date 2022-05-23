@@ -4459,59 +4459,559 @@ class types(object):
     defined.
     """
 
+    @utils.multicase(library=idaapi.til_t)
+    @classmethod
+    def __formatter__(cls, library):
+        lcls, description = library.__class__, library.desc
+        return "<{:s}; <{:s}>>".format('.'.join([lcls.__module__, lcls.__name__]), utils.string.of(description))
+    @utils.multicase(library=idaapi.til_t, ordinal=six.integer_types)
+    @classmethod
+    def __formatter__(cls, library, ordinal):
+        ocls, name = idaapi.tinfo_t, idaapi.get_numbered_type_name(library, ordinal)
+        if idaapi.get_type_ordinal(library, name) == ordinal:
+            return "<{:s}; #{:d} \"{:s}\">".format('.'.join([lcls.__module__, lcls.__name__]), ordinal, utils.string.of(name))
+        count = idaapi.get_ordinal_qty(library)
+        if name is None:
+            return "<{:s}; #{:s}>".format('.'.join([lcls.__module__, lcls.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???')
+        return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lcls.__module__, lcls.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???', name)
+    @utils.multicase(library=idaapi.til_t, name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def __formatter__(cls, library, name):
+        ocls, ordinal = idaapi.tinfo_t, idaapi.get_type_ordinal(library, utils.string.to(name))
+        return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lcls.__module__, lcls.__name__]), "{:d}".format(ordinal) if ordinal else '???', name)
+
+    __matcher__ = utils.matcher()
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), operator.itemgetter(1))
+    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1))
+    __matcher__.predicate('predicate'), __matcher__.predicate('pred')
+    __matcher__.boolean('ordinal', operator.eq, operator.itemgetter(0)), __matcher__.boolean('index', operator.eq, operator.itemgetter(0))
+    __matcher__.combinator('type', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
+    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
+    __matcher__.boolean('size', operator.eq, operator.itemgetter(2), operator.methodcaller('get_size'))
+    __matcher__.boolean('greater', operator.le, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('gt', operator.lt, operator.itemgetter(2), operator.methodcaller('get_size')),
+    __matcher__.boolean('less', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('lt', operator.gt, operator.itemgetter(2), operator.methodcaller('get_size'))
+
     @utils.multicase()
     @classmethod
     def __iterate__(cls):
+        '''Iterates through all of the types in the current type library.'''
         til = idaapi.get_idati()
         return cls.__iterate__(til)
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     def __iterate__(cls, library):
-        count = idaapi.get_ordinal_qty(library)
+        '''Iterates through all of the types in the specified type `library`.'''
+        count, errors = idaapi.get_ordinal_qty(library), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
         for ordinal in builtins.range(1, count):
-            yield ordinal
+            name, serialized = idaapi.get_numbered_type_name(library, ordinal), idaapi.get_numbered_type(library, ordinal)
+
+            # if we didn't get any information returned, then this ordinal was deleted.
+            if serialized is None:
+                logging.warning(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it having been deleted.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
+                continue
+
+            # try and create a new type from the serialized information. if we
+            # fail at this, then this is a critical error.
+            ti = cls.get(serialized, library)
+            if ti is None:
+                logging.fatal(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to an error during deserialization.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
+                continue
+
+            # if the type is empty, then we can just issue a warning and skip it.
+            elif ti.empty():
+                logging.warning(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it being empty.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
+                continue
+
+            yield ordinal, utils.string.of(name or ''), ti
         return
 
+    @utils.multicase(string=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def iterate(cls, string):
+        '''Iterate through all of the types in current type library with a glob that matches `string`.'''
+        til = idaapi.get_idati()
+        return cls.iterate(til, like=string)
+    @utils.multicase(string=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def iterate(cls, string, library):
+        '''Iterate through all of the types in the specified type `library` with a glob that matches `string`.'''
+        return cls.iterate(library, like=string)
     @utils.multicase()
     @classmethod
-    def get(cls, ordinal):
+    @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
+    def iterate(cls, **type):
+        '''Iterate through all of the types in the current type library that match the keyword specified by `type`.'''
         til = idaapi.get_idati()
-        return cls.get(ordinal, til)
-    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+        return cls.iterate(til, **type)
+    @utils.multicase(library=idaapi.til_t)
     @classmethod
-    def get(cls, ordinal, library):
-        if 0 < ordinal < idaapi.get_ordinal_qty(library):
-            parameters = idaapi.get_numbered_type(library, ordinal)
-            name = idaapi.get_numbered_type_name(library, ordinal)
-            return (name, parameters) if parameters else None
-        return None
-    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
+    def iterate(cls, library, **type):
+        '''Iterate through all of the types in the specified type `library` that match the keyword specified by `type`.'''
+        iterable = cls.__iterate__(library)
+        for key, value in (type or {'predicate': utils.fconstant(True)}).items():
+            iterable = cls.__matcher__.match(key, value, iterable)
+        for item in iterable: yield item
+
+    @utils.multicase(string=six.string_types)
     @classmethod
-    def get(cls, name, library):
-        ordinal = idaapi.get_type_ordinal(library, name)
-        return cls.get(ordinal, library)
+    @utils.string.decorate_arguments('string')
+    def search(cls, string):
+        '''Search through all of the type names in the current type library matching the glob `string` and return the first result.'''
+        til = idaapi.get_idati()
+        return cls.search(til, like=string)
+    @utils.multicase(string=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def search(cls, string, library):
+        '''Search through all of the type names in the specified type `library` matching the glob `string` and return the first result.'''
+        return cls.search(library, like=string)
+    @utils.multicase()
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
+    def search(cls, **type):
+        '''Search through all of the types in the current type library that match the keyword specified by `type`.'''
+        til = idaapi.get_idati()
+        return cls.search(til, **type)
+    @utils.multicase(library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
+    def search(cls, library, **type):
+        '''Search through all of the types in the specified type `library` that match the keyword specified by `type`.'''
+        query_s = utils.string.kwargs(type)
+
+        listable = [item for item in cls.iterate(library, **type)]
+        if len(listable) > 1:
+            messages = ((u"[{:d}] {:+#x} {!s}".format(ordinal, ti.get_size() if ti.present() else 0, item)) for ordinal, item, ti in listable)
+            [ logging.info(msg) for msg in messages ]
+            ordinal, name, _ = listable[0]
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first type (#{:d}) \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), ordinal, utils.string.escape("{!s}".format(name), '"')))
+
+        iterable = (ti for ordinal, name, ti in listable)
+        res = builtins.next(iterable, None)
+        if res is None:
+            raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), query_s))
+        return res
+
+    @utils.multicase(string=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def list(cls, string):
+        '''List all of the types in the current type library with a glob that matches `string`.'''
+        til = idaapi.get_idati()
+        return cls.list(til, like=string)
+    @utils.multicase(string=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def list(cls, string, library):
+        '''List all of the types in the specified type `library` with a glob that matches `string`.'''
+        return cls.list(library, like=string)
+    @utils.multicase()
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
+    def list(cls, **type):
+        '''List all of the types in the specified type `library` that match the keyword specified by `type`.'''
+        til = idaapi.get_idati()
+        return cls.list(til, **type)
+    @utils.multicase(library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
+    def list(cls, library, **type):
+        '''List all of the types in the specified type `library` that match the keyword specified by `type`.'''
+        listable = []
+
+        # Set some reasonable defaults for the list of types
+        maxordinal = maxname = maxsize = 0
+
+        # Perform the first pass through our listable grabbing all the lengths.
+        for ordinal, name, ti in cls.iterate(library, **type):
+            maxordinal = max(ordinal, maxordinal)
+            maxname = max(len(name or ''), maxname)
+            maxsize = max(ti.get_size(), maxsize)
+            listable.append((ordinal, name, ti))
+
+        # We just need to calculate the number of digits for the largest and size.
+        cordinal = 2 + utils.string.digits(maxordinal, 10)
+        csize = 2 + utils.string.digits(maxsize, 16)
+
+        # Now we can list each type information located within the type library.
+        for ordinal, name, ti in listable:
+            six.print_(u"{:<{:d}s} {:>+#{:d}x} {:<{:d}s}".format("[{:d}]".format(ordinal), cordinal, ti.get_size() if ti.present() else 0, csize, name, maxname))
+        return
 
     @utils.multicase(ordinal=six.integer_types)
     @classmethod
-    def set(cls, ordinal, name, parameters):
-        til = idaapi.get_idati()
-        return cls.set(ordinal, name, parameters, til)
+    def by(cls, ordinal):
+        '''Return the type information that is at the given `ordinal`.'''
+        return cls.by_index(ordinal)
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def by(cls, name):
+        '''Return the type information that has the specified `name`.'''
+        return cls.by_name(name)
     @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
     @classmethod
-    def set(cls, ordinal, name, parameters, library):
-        flags, count = idaapi.NTF_TYPE, 1 + idaapi.get_ordinal_qty(library)
-        if 0 < ordinal < count:
-            flags |= idaapi.NTF_REPLACE
-        elif 0 < ordinal:
-            new = idaapi.alloc_type_ordinals(library, ordinal - count)
-        else:
-            raise ValueError(ordinal)
+    def by(cls, ordinal, library):
+        '''Return the type information from the specified `library` that is at the given `ordinal`.'''
+        return cls.by_index(ordinal, library)
+    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def by(cls, name, library):
+        '''Return the type information from the specified `library` that is using the given `name`.'''
+        return cls.by_name(name, library)
 
-        ok = idaapi.set_numbered_type(library, ordinal, flags, name, *parameters)
-        if ok != idaapi.TERR_OK:
-            raise ValueError(ok)
-            return ok
-        return ok
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def by_name(cls, name):
+        '''Return the type information that has the specified `name`.'''
+        til = idaapi.get_idati()
+        return cls.by_name(name, til)
+    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def by_name(cls, name, library):
+        '''Return the type information from the specified `library` that is using the given `name`.'''
+        ordinal = idaapi.get_type_ordinal(library, utils.string.to(name))
+        if ordinal:
+            return cls.by_index(ordinal, library)
+        raise E.ItemNotFoundError(u"{:s}.by_name({!r}, {:s}) : No type information was found in the type library with the specified name (\"{:s}\").".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), utils.string.escape(name, '"')))
+
+    @utils.multicase(ordinal=six.integer_types)
+    @classmethod
+    def by_index(cls, ordinal):
+        '''Return the type information that is at the given `ordinal`.'''
+        til = idaapi.get_idati()
+        return cls.by_index(ordinal, til)
+    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+    @classmethod
+    def by_index(cls, ordinal, library):
+        '''Return the type information from the specified `library` that is at the given `ordinal`.'''
+        serialized = idaapi.get_numbered_type(library, ordinal)
+        if serialized:
+            return cls.get(serialized, library)
+        raise E.ItemNotFoundError(u"{:s}.by_index({:d}, {:s}) : No type information was found in the type library for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def name(cls, info):
+        '''Return the name of the type from the current type library that matches the given type `info`.'''
+        til = idaapi.get_idati()
+        return cls.name(info, til)
+    @utils.multicase(ordinal=six.integer_types)
+    @classmethod
+    def name(cls, ordinal):
+        '''Return the name of the type from the current type library at the specified `ordinal`.'''
+        til = idaapi.get_idati()
+        return cls.name(ordinal, til)
+    @utils.multicase(info=idaapi.tinfo_t, library=idaapi.til_t)
+    @classmethod
+    def name(cls, info, library):
+        '''Return the name of the type from the specified type `library` that matches the given type `info`.'''
+        # FIXME: i seriously doubt that this is actually possible
+        raise NotImplementedError
+    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+    @classmethod
+    def name(cls, ordinal, library):
+        '''Return the name of the type from the specified type `library` at the given `ordinal`.'''
+        res = idaapi.get_numbered_type_name(library, ordinal)
+        if res is None:
+            raise E.ItemNotFoundError(u"{:s}.name({:d}, {:s}) : Unable to return the name of specified ordinal ({:d}) from the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+        # FIXME: which one do we get? the mangled or unmangled name?
+        return utils.string.of(res)
+    @utils.multicase(ordinal=six.integer_types, string=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def name(cls, ordinal, string, **mangled):
+        '''Set the name of the type at the specified `ordinal` from the current library to `string`.'''
+        til = idaapi.get_idati()
+        return cls.name(ordinal, string, til, **mangled)
+    @utils.multicase(ordinal=six.integer_types, string=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def name(cls, ordinal, string, library, **mangled):
+        """Set the name of the type at the specified `ordinal` of the given type `library` to `string`.
+
+        If the boolean `mangled` is specified, then the given name is mangled.
+        """
+        name, ti = cls.name(ordinal, library), cls.get(ordinal, library)
+        if ti is None:
+            raise E.DisassemblerError(u"{:s}.name({:d}, {!r}, {:s}{:s}) : Unable to get the type information from the given ordinal ({:d}) of the type library.".format('.'.join([__name__, cls.__name__]), ordinal, string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
+
+        # now that we saved the type information, we can re-assign the type
+        # and change the ordinal's name at the very same tie.
+        res = cls.set(ordinal, utils.string.to(string), ti, library, **mangled)
+        if ti.serialize() != res.serialize():
+            logging.warning(u"{:s}.name({:d}, {!r}, {:s}{:s}) : The type information for the given ordinal ({:d}) applied the type library has changed during the assignment of the new name ({!r}).".format('.'.join([__name__, cls.__name__]), ordinal, string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, utils.string.of(string)))
+        return name
+
+    @utils.multicase(ordinal=six.integer_types)
+    @classmethod
+    def get(cls, ordinal):
+        '''Get the type information at the given `ordinal` of the current type library and return it.'''
+        til = idaapi.get_idati()
+        return cls.get(ordinal, til)
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def get(cls, name):
+        '''Get the type information with the given `name` from the current type library and return it.'''
+        til = idaapi.get_idati()
+        return cls.get(name, til)
+    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+    @classmethod
+    def get(cls, ordinal, library):
+        '''Get the type information at the given `ordinal` of the specified type `library` and return it.'''
+        if 0 < ordinal < idaapi.get_ordinal_qty(library):
+            serialized = idaapi.get_numbered_type(library, ordinal)
+            if serialized is not None:
+                return cls.get(serialized, library)
+        raise E.ItemNotFoundError(u"{:s}.get({:d}, {:s}) : No type information was found for the specified ordinal ({:d}) in the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def get(cls, name, library):
+        '''Get the type information with the given `name` from the specified type `library` and return it.'''
+        ordinal = idaapi.get_type_ordinal(library, utils.string.to(name))
+        if ordinal:
+            return cls.get(ordinal, library)
+        raise E.ItemNotFoundError(u"{:s}.get({!r}, {:s}) : No type information with the specified name (\"{:s}\") was found in the type library.".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), utils.string.escape(name, '"')))
+
+    # The following cases for the "types.get" functon are actually a lie and
+    # only exist as a way to get an "idaapi.tinfo_t" from any IDAPython API
+    # that returns the information in its serialized form.
+
+    @utils.multicase(serialized=builtins.tuple)
+    @classmethod
+    def get(cls, serialized):
+        '''Convert the `serialized` type information from the current type library and return it.'''
+        til = idaapi.get_idati()
+        return cls.get(serialized, til)
+    @utils.multicase(serialized=builtins.tuple, library=idaapi.til_t)
+    @classmethod
+    def get(cls, serialized, library):
+        '''Convert the `serialized` type information from the specified type `library` and return it.'''
+        type, fields, cmt, fieldcmts, sclass = serialized
+
+        # ugh..because ida can return a non-bytes as one of the comments, we
+        # need to convert it so that the api will fucking understand us.
+        res = cmt or fieldcmts or b''
+        comments = res if isinstance(res, bytes) else res.encode('latin1')
+
+        # we need to generate a description so that we can format error messages the user will understand.
+        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
+        names = ['type', 'fields', 'cmt', 'fieldcmts']
+        description = ["{:s}={!r}".format(name, item) for name, item in zip(names, serialized) if item] + ["{:s}={:d}".format('sclass', sclass)]
+
+        # try and deserialize the type information. if we succeeded then we
+        # can actually return the damned thing.
+        ti = idaapi.tinfo_t()
+        if ti.deserialize(library, type, fields, comments):
+            return ti
+
+        # if we were unable to do that, then we need to log a critical error
+        # that's somewhat useful before returning None back to the user.
+        logging.fatal(u"{:s}.get({:s}{:s}) : Unable to deserialize the type information for a type using the returned storage class {:s}.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(til), ", {:s}".format(', '.format(description)) if description else '', "{:s}({:d})".format(errors[sclass], sclass) if sclass in errors else "({:d})".format(sclass)))
+        return
+
+    @utils.multicase(ordinal=six.integer_types, info=(six.string_types, idaapi.tinfo_t))
+    @classmethod
+    def set(cls, ordinal, info):
+        '''Assign the type information `info` to the type at the specified `ordinal` of the current type library.'''
+        til = idaapi.get_idati()
+        return cls.set(ordinal, info, til)
+    @utils.multicase(ordinal=six.integer_types, name=six.string_types, info=(six.string_types, idaapi.tinfo_t))
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def set(cls, ordinal, name, info, **mangled):
+        '''Assign the type information `info` with the specified `name` to the given `ordinal` of the current type library.'''
+        til = idaapi.get_idati()
+        return cls.set(ordinal, name, info, til, **mangled)
+    @utils.multicase(ordinal=six.integer_types, info=(six.string_types, idaapi.tinfo_t), library=idaapi.til_t)
+    @classmethod
+    def set(cls, ordinal, info, library):
+        '''Assign the type information `info` to the type at the `ordinal` of the specified type `library`.'''
+        try:
+            # FIXME: do we get the mangled or unmangled name?
+            name = cls.name(ordinal, library)
+
+        except Exception:
+            # FIXME: if we couldn't find a name, can we create one based on the ordinal number (is_ordinal_name)?
+            raise E.MissingNameError(u"{:s}.set({:d}, {!r}, {:s}) : Unable to assign the type information to the specified ordinal ({:d}) because it needs a name and a previous one was not found.".format('.'.join([__name__, cls.__name__]), ordinal, "{!s}".format(info), cls.__formatter__(library), ordinal))
+        return cls.set(ordinal, name, info, library)
+    @utils.multicase(ordinal=six.integer_types, name=six.string_types, string=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'string')
+    def set(cls, ordinal, name, string, library, **mangled):
+        '''Assign the type information in `string` with the specified `name` to the specified `ordinal` of the given type `library`.'''
+        ti = internal.declaration.parse(string)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.set({:d}, {!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ordinal, name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(string)))
+        return cls.set(ordinal, name, ti, library, **mangled)
+    @utils.multicase(ordinal=six.integer_types, name=six.string_types, info=idaapi.tinfo_t, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def set(cls, ordinal, name, info, library, **mangled):
+        """Assign the type information `info` with the specified `name` to the given `ordinal` of the type `library`.
+
+        If the boolean `mangled` is specified, then the given name is mangled.
+        """
+        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
+
+        # first try to get the type information at the given ordinal so that we can return it.
+        try:
+            ti = cls.get(ordinal, library)
+        except Exception:
+            ti = None
+
+        # serialize the type information that we're being asked to assign.
+        serialized = info.serialize()
+        if serialized is None:
+            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}{:s}) : Unable to serialize the given type information to assign to the ordinal ({:d}) of the type library.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
+
+        # we aren't given all of the necessary parameters for set_numbered_type,
+        # so we assign some defaults so we can actually set it.
+        type, fields, fieldcmts = serialized
+        cmt, sclass, fieldcmts = b'', idaapi.sc_unk, fieldcmts or b''
+
+        # set the default flags that we're going to use when using set_numbered_type.
+        flags = mangled.get('flags', idaapi.NTF_CHKSYNC)
+        flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
+
+        # now we need to actually validate the name that we were given. IDA's names
+        # handle the first character differently (like an identifier), so we need
+        # to check that first before we figure out the rest of them.
+        iterable = (item for item in name)
+        item = builtins.next(iterable, '_')
+        identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
+        identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
+
+        # we need to now assign the serialized data we were given, making sure
+        # that any of the any of the comments are properly being passed as bytes
+        # and then we can check to see if it returned an error.
+        res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, bytes) else cmt, fieldcmts if isinstance(fieldcmts, bytes) else fieldcmts.encode('latin1'), sclass)
+        if res == idaapi.TERR_WRONGNAME:
+            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the type library with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
+        elif res != idaapi.TERR_OK:
+            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
+        return ti
+
+    @utils.multicase(ordinal=six.integer_types)
+    @classmethod
+    def remove(cls, ordinal):
+        '''Remove the type information at the specified `ordinal` of the current type library.'''
+        til = idaapi.get_idati()
+        return cls.remove(ordinal, til)
+    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+    @classmethod
+    def remove(cls, ordinal, library):
+        '''Remove the type information at the `ordinal` of the specified type `library`.'''
+        res = cls.get(ordinal, library)
+        if not idaapi.del_numbered_type(library, ordinal):
+            raise E.ItemNotFoundError(u"{:s}.remove({:d}, {:s}) : Unable to delete the type information at the specified ordinal ({:d}) of the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+        return res
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def remove(cls, name, **mangled):
+        '''Remove the type information with the specified `name` from the current type library.'''
+        til = idaapi.get_idati()
+        return cls.remove(name, til, **mangled)
+    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def remove(cls, name, library, **mangled):
+        """Remove the type information with the specified `name` from the specified type `library`.
+
+        If the boolean `mangled` is specified, then the given name is mangled.
+        """
+        res = cls.get(ordinal, library)
+
+        # we need to figure out what flags to use from the keyword parameters.
+        flags = mangled.get('flags', 0)
+        flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
+
+        # now we can actually try using del_named_type with our given name and flags.
+        if not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
+            raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to delete the type information with the specified name (\"{:s}\") from the type library.".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
+        return res
+
+    @utils.multicase(name=six.string_types, info=(six.string_types, idaapi.tinfo_t))
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def add(cls, name, info, **mangled):
+        '''Add the type information in `info` to the current type library using the provided `name`.'''
+        til = idaapi.get_idati()
+        return cls.add(name, info, til, **mangled)
+    @utils.multicase(name=six.string_types, string=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def add(cls, name, string, library, **mangled):
+        '''Add the type information in `string` to the specified type `library` using the provided `name`.'''
+        ti = internal.declaration.parse(string)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({:s}).".format('.'.join([__name__, cls.__name__]), name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(info_s)))
+        return cls.add(name, ti, library, **mangled)
+    @utils.multicase(name=six.string_types, info=idaapi.tinfo_t, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def add(cls, name, info, library, **mangled):
+        """Add the type information in `info` to the specified type `library` using the provided `name`.
+
+        If the boolean `mangled` is specified, then the given name is mangled.
+        """
+        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
+
+        # FIXME: check if last element was recently deleted so that we can reuse its ordinal if so.
+        count = idaapi.get_ordinal_qty(library)
+
+        # first we'll try to serialize the type before we make any perma-changes.
+        serialized = info.serialize()
+        if serialized is None:
+            raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to serialize the type information that will be added to the type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else ''))
+
+        # serialization does not give us all of the parameters required to actually
+        # use set_numbered_type, so we assign some defaults to use.
+        type, fields, fieldcmts = serialized
+        cmt, sclass, fieldcmts = b'', idaapi.sc_unk, fieldcmts or b''
+
+        # now we can allocate a slot for the ordinal within the type library.
+        ordinal = idaapi.alloc_type_ordinals(library, count + 1)
+        if not ordinal:
+            raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to allocate an ordinal within the specified type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else ''))
+
+        # set the default flags that we're going to use when using set_numbered_type.
+        flags = mangled.get('flags', idaapi.NTF_CHKSYNC | idaapi.NTF_TYPE)
+        flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
+
+        # last thing we need to do is correct the name we were given to a valid one
+        # since IDA wants these to follow the format (character set) for a general C
+        # identifier. so we'll simply do the first character, then finish the rest.
+        iterable = (item for item in name)
+        item = builtins.next(iterable, '_')
+        identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
+        identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
+
+        # we can now assign the serialized data that we got, making sure that
+        # the comments are properly being passed as bytes before checking for error.
+        res = idaapi.set_numbered_type(library, ordinal, flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, bytes) else cmt, fieldcmts if isinstance(fieldcmts, bytes) else fieldcmts.encode('latin1'), sclass)
+        if res == idaapi.TERR_OK:
+            return ordinal
+
+        # if we got an error, then we need to delete the ordinal we just added
+        # and then we can just raise an exception for the user to deal with.
+        if not idaapi.del_numbered_type(library, ordinal):
+            logging.fatal(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to delete the recently added ordinal ({:d}) from the specified type library.".format('.'.join([__name__, cls.__name__]), name, info, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
+
+        # now we can check the error code and fail properly with an exception.
+        if res == idaapi.TERR_WRONGNAME:
+            raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
+        raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
 
 ## information about a given address
 size = utils.alias(type.size, 'type')
