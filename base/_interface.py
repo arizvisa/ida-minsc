@@ -106,7 +106,7 @@ class typemap(object):
         if hasattr(builtins, 'unicode'):
             stringmap.setdefault(builtins.unicode, (idaapi.asciflag(), idaapi.ASCSTR_UNICODE))
 
-        ptrmap = { sz : (idaapi.offflag() | flg, tid) for sz, (flg, tid) in integermap.items() }
+        ptrmap = { sz : (idaapi.offflag() | flg, 0) for sz, (flg, _) in integermap.items() }
         nonemap = { None :(idaapi.alignflag(), -1) }
 
     ## IDA 7.0 types
@@ -133,7 +133,7 @@ class typemap(object):
         if hasattr(builtins, 'unicode'):
             stringmap.setdefault(builtins.unicode, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
 
-        ptrmap = { sz : (idaapi.off_flag() | flg, tid) for sz, (flg, tid) in integermap.items() }
+        ptrmap = { sz : (idaapi.off_flag() | flg, 0) for sz, (flg, _) in integermap.items() }
         nonemap = { None :(idaapi.align_flag(), -1) }
 
     # Generate the lookup table for looking up the correct tables for a given type.
