@@ -1191,7 +1191,7 @@ class string(object):
         # will likely be just enough to calculate it properly.
         if base in {10}:
             logarithm = math.log10(number or 1)
-            return 1 + math.floor(logarithm)
+            return math.trunc(1 + math.floor(logarithm))
 
         # Otherwise, we check if it's an even number or not in order to determine
         # that we need to use the base-less math.log implementation.
@@ -1200,7 +1200,7 @@ class string(object):
 
             # This should only use the exponent field inside a floating point number
             if number < pow(2, maxpower2):
-                return 1 + math.floor(logarithm)
+                return math.trunc(1 + math.floor(logarithm))
 
             # To deal with IEEE754's imprecision, we just use Python to format
             # this number as a hexadecimal string and then use its length to
