@@ -3907,32 +3907,27 @@ class type(object):
 
         return result
 
-    @utils.multicase(ea=six.integer_types, info=six.string_types)
-    @utils.string.decorate_arguments('info')
-    def __new__(cls, ea, info):
-        '''Parse the type information string in `info` into an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
+    @utils.multicase(ea=six.integer_types, string=six.string_types)
+    @utils.string.decorate_arguments('string')
+    def __new__(cls, ea, string):
+        '''Parse the type information in `string` into an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
 
         # Check if we're pointing at an export or directly at a function. If we
         # are, then we need to use function.type.
         try:
             rt, ea = interface.addressOfRuntimeOrStatic(ea)
             if rt or function.address(ea) == ea:
-                return function.type(ea, info)
+                return function.type(ea, string)
 
         except E.FunctionNotFoundError:
             pass
 
-        # Strip out any invalid characters and replace them with '_'
-        # declaration next.
-        valid = {item for item in ': &*()[]@,' + string.digits}
-        info_s = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in info)
-
-        # Now that we've prepped everything, ask IDA to parse this into a
-        # tinfo_t for us. If we received None, then raise an exception due
-        # to there being a parsing error of some sort.
-        ti = internal.declaration.parse(info_s)
+        # Now we can just ask IDA to parse this into a tinfo_t for
+        # us. If we received None, then raise an exception due to
+        # there being a parsing error of some sort.
+        ti = internal.declaration.parse(string)
         if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info)))
+            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(string)))
 
         # Recurse into ourselves now that we have the actual typeinfo.
         return cls(ea, ti)
