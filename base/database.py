@@ -5035,6 +5035,18 @@ class types(object):
             raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
         raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
 
+    @utils.multicase()
+    @classmethod
+    def count(cls):
+        '''Return the number of types that are available in the current type library.'''
+        til = idaapi.get_idati()
+        return cls.count(til)
+    @utils.multicase(library=idaapi.til_t)
+    @classmethod
+    def count(cls, library):
+        '''Return the number of types that are available in the specified type `library`.'''
+        return idaapi.get_ordinal_qty(library)
+
 ## information about a given address
 size = utils.alias(type.size, 'type')
 is_code = utils.alias(type.is_code, 'type')
