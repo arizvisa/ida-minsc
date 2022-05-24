@@ -127,7 +127,7 @@ class read(object):
 
         for member in res.members:
             # if ida has named it and there's no comment, then skip
-            if lvarNameQ(member.name) and not member.comment:
+            if lvarNameQ(member.name) and not member.tag():
                 continue
 
             # if it's a structure, then the type is the structure name
@@ -135,12 +135,12 @@ class read(object):
                 logging.debug(u"{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!s}.".format('.'.join([__name__, cls.__name__]), ea, member.offset, internal.utils.string.repr(member.type)))
                 type = member.type.name
 
-            # otherwise, the type is a tuple that we can serializer
+            # otherwise, the type is a tuple that we can serialize
             else:
                 type = member.type
 
             # otherwise, it's just a regular field. so we can just save what's important.
-            yield member.offset, (member.name, type, member.comment)
+            yield member.offset, (member.name, type, member.tag())
         return
 
     ## reading everything from the entire database
@@ -310,7 +310,7 @@ class apply(object):
             F = func.frame.new(ea, abs(minimum), regs, abs(maximum) - regs)
 
         # iterate through our dictionary of members
-        for offset, (name, type, comment) in frame.items():
+        for offset, (name, type, saved) in frame.items():
 
             # first try and locate the member
             try:
@@ -320,11 +320,11 @@ class apply(object):
 
             # if we didn't find a member, then try and add it with what we currently know
             if member is None:
-                logging.warning(u"{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Attempting to create the member with the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\").".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
+                logging.warning(u"{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Attempting to create the member with the name (\"{:s}\"), type ({!s}), and tags (\"{:s}\").".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.repr(saved)))
                 try:
                     member = F.members.add(name, type, offset)
                 except:
-                    logging.fatal(u"{:s}.frame({:#x}, ...{:s}) : Unable to add frame member at {:+#x}. Skipping application of the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\") to it.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
+                    logging.fatal(u"{:s}.frame({:#x}, ...{:s}) : Unable to add frame member at {:+#x}. Skipping application of the name (\"{:s}\"), type ({!s}), and tags (\"{:s}\") to it.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.repr(saved)))
                     continue
 
             # check if the name has changed or is different in some way
@@ -334,7 +334,7 @@ class apply(object):
                 member.name = name
 
             # check what's going to be overwritten with different values prior to doing it
-            state, res = (internal.comment.decode(cmt) for cmt in [member.comment, comment])
+            state, res = member.tag(), saved
 
             # transform the new tag state using the tagmap
             new = { tagmap.get(name, name) : value for name, value in res.items() }
@@ -356,8 +356,8 @@ class apply(object):
             mapstate = { name : value for name, value in new.items() if state.get(name, dummy) != value }
             state.update(mapstate)
 
-            # convert it back to a multi-lined comment and assign it
-            member.comment = internal.comment.encode(state)
+            # apply each tag directly to the field that it belongs to.
+            [ member.tag(name, value) for name, value in state.items() ]
 
             # if the type is a string, then figure out which structure to use
             if isinstance(type, six.string_types):
@@ -557,20 +557,19 @@ class export(object):
         tags_ = { tag for tag in tags }
 
         for ofs, item in read.frame(F):
-            field, type, comment = item
+            field, type, state = item
 
-            # if the entire comment is in tags (like None) or no tags were specified, then save the entire member
-            if not tags or comment in tags_:
-                yield ofs, item
+            # if no tags were specified or the entire state is in the requested tags, then save the entire member
+            if not tags_ or all(name in tags_ for name in state):
+                yield ofs, (field, type, state)
                 continue
 
-            # otherwise, decode the comment into a dictionary using only the tags the user asked for
-            comment_ = internal.comment.decode(comment)
-            comment_keys = {item for item in comment_.keys()}
-            res = { name : comment_[name] for name in comment_keys & tags_ }
+            # otherwise, store the state in a dictionary using only the tags the user asked for.
+            state_keys = {item for item in state}
+            save = { name : state[name] for name in state_keys & tags_ }
 
             # if anything was found, then re-encode it and yield to the user
-            if res: yield ofs, (field, type, internal.comment.encode(res))
+            if res: yield ofs, (field, type, save)
         return
 
     ## query the entire database for the specified tags
