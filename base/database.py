@@ -4818,7 +4818,7 @@ class types(object):
     @classmethod
     def get(cls, serialized, library):
         '''Convert the `serialized` type information from the specified type `library` and return it.'''
-        type, fields, cmt, fieldcmts, sclass = serialized
+        type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
 
         # ugh..because ida can return a non-bytes as one of the comments, we
         # need to convert it so that the api will fucking understand us.
@@ -4828,7 +4828,9 @@ class types(object):
         # we need to generate a description so that we can format error messages the user will understand.
         errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
         names = ['type', 'fields', 'cmt', 'fieldcmts']
-        description = ["{:s}={!r}".format(name, item) for name, item in zip(names, serialized) if item] + ["{:s}={:d}".format('sclass', sclass)]
+
+        items = itertools.chain(["{:s}={!r}".format(name, item) for name, item in zip(names, serialized) if item], ["{:s}={!s}".format('sclass', sclass)] if len(serialized) == 5 else [])
+        description = [item for item in items]
 
         # try and deserialize the type information. if we succeeded then we
         # can actually return the damned thing.
@@ -4838,7 +4840,7 @@ class types(object):
 
         # if we were unable to do that, then we need to log a critical error
         # that's somewhat useful before returning None back to the user.
-        logging.fatal(u"{:s}.get({:s}{:s}) : Unable to deserialize the type information for a type using the returned storage class {:s}.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(til), ", {:s}".format(', '.format(description)) if description else '', "{:s}({:d})".format(errors[sclass], sclass) if sclass in errors else "({:d})".format(sclass)))
+        logging.fatal(u"{:s}.get({:s}{:s}) : Unable to deserialize the type information for a type using the returned storage class {:s}.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(', '.join(description)) if description else '', "{:s}({:d})".format(errors[sclass], sclass) if sclass in errors else "({:d})".format(sclass)))
         return
 
     @utils.multicase(ordinal=six.integer_types, info=(six.string_types, idaapi.tinfo_t))
