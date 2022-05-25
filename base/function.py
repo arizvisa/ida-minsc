@@ -3213,13 +3213,13 @@ class type(object):
             if not set_tinfo(ea, newinfo):
                 raise E.DisassemblerError(u"{:s}({:#x}, {:d}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(newinfo), ea))
             return result
-        @utils.multicase(index=six.integer_types, info_s=six.string_types)
-        @utils.string.decorate_arguments('info_s')
-        def __new__(cls, func, index, info_s):
-            '''Modify the type information for the parameter at the specified `index` of the function `func` to the string in `info_s`.'''
-            tinfo = internal.declaration.parse(info_s)
+        @utils.multicase(index=six.integer_types, info=six.string_types)
+        @utils.string.decorate_arguments('info')
+        def __new__(cls, func, index, info):
+            '''Modify the type information for the parameter at the specified `index` of the function `func` to the string in `info`.'''
+            tinfo = internal.declaration.parse(info)
             if tinfo is None:
-                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), ea, index, info_s, info_s))
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), func, index, info, info))
             return cls(func, index, tinfo)
 
         @utils.multicase(index=six.integer_types)
