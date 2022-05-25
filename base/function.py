@@ -3499,20 +3499,20 @@ class xref(object):
     ## referencing
     @utils.multicase()
     @classmethod
-    def down(cls, **source):
+    def down(cls, **references):
         '''Return all of the addresses that are referenced by a branch instruction from the current function.'''
-        return down(ui.current.function(), **source)
+        return down(ui.current.function(), **references)
     @utils.multicase()
     @classmethod
-    def down(cls, func, **source):
+    def down(cls, func, **references):
         """Return all of the addresses that are referenced by a branch instruction from the function `func`.
 
-        If the boolean `source` is true, then include the source address of each instruction along with its target reference.
+        If the boolean `references` is true, then include the reference address of each instruction along with its.
         """
         get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
         # define a closure that will get us all of the related code references so we can process them.
-        def codeRefs(fn):
+        def Freferences(fn):
             branches = [instruction.is_call, instruction.is_branch]
             for ea in iterate(fn):
 
@@ -3568,10 +3568,10 @@ class xref(object):
 
         # grab our function and then grab all of the references from it.
         fn = by(func)
-        iterable = codeRefs(fn)
+        iterable = Freferences(fn)
 
         # now we need to figure out if we're just going to return the referenced addresses.
-        if not source.get('source', False):
+        if not builtins.next((references[k] for k in ['reference', 'references', 'refs'] if k in references), False):
             return sorted({d for _, d in iterable})
 
         # otherwise we're being asked to return the source with its target reference for each one.
