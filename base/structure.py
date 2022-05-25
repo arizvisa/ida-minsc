@@ -1565,7 +1565,7 @@ class members_t(object):
     @utils.multicase()
     def remove(self, offset, size):
         '''Remove all the members from the structure from the specified `offset` up to `size` bytes.'''
-        sptr, soffset = self.owner.ptr, offset - self.baseoffset
+        cls, sptr, soffset = self.__class__, self.owner.ptr, offset - self.baseoffset
         if not sptr.memqty:
             logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : The structure has no members that are able to be removed.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size))
             return []
@@ -1610,7 +1610,7 @@ class members_t(object):
 
             # now we can dissolve it, and than append things to our results.
             type = interface.typemap.dissolve(mptr.flag, tid, msize)
-            result.append((mptr.id, name, type, moffset))
+            result.append((mptr.id, name, type, moffset, msize))
 
         # Figure out whether we're just going to remove one element, or
         # multiple elements so that we can call the correct api and figure
@@ -1625,27 +1625,29 @@ class members_t(object):
         # If we didn't remove anything and we were supposed to, then let
         # the user know that it didn't happen.
         if result and not count:
-            logging.fatal(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove the requested elements ({:+#x}<>{:+#x}) from the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, result[0].soff, result[-1].eoff))
+            start, stop = result[0], result[-1]
+            logging.fatal(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove the requested elements ({:+#x}<>{:+#x}) from the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, start[3], stop[3] + stop[4]))
             return []
 
         # If our count matches what was expected, then we're good and can
         # just return our results to the user.
         if len(result) == count:
-            return [(name, type, offset) for _, name, type, offset in result]
+            return [(name, type, moffset) for _, name, type, moffset, msize in result]
 
         # Otherwise, we only removed some of the elements and we need to
         # figure out what happened so we can let the user know.
-        removed, expected = {id for id in []}, {id : (name, type, offset) for id, name, type, offset in result}
-        for id, name, _, offset in result:
-            if idaapi.get_member(sptr, offset - self.baseoffset):
-                logging.debug(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove member {:s} at offset {:+#x} with the specified id ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, name, offset, id))
+        removed, expected = {id for id in []}, {id : (name, type, moffset) for id, name, type, moffset, msize in result}
+        for id, name, _, moffset, msize in result:
+            if idaapi.get_member(sptr, moffset - self.baseoffset):
+                logging.debug(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove member {:s} at offset {:+#x} with the specified id ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, name, moffset, id))
                 continue
             removed.add(id)
 
         # We have the list of identities that were removed. So let's proceed
         # with our warnings and return whatever we successfully removed.
-        logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove {:d} members out of an expected {:d} members within the specified range ({:+#x}<>{:+#x}) of the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, len(expected) - len(removed), len(expected), result[0].soff, result[-1].eoff))
-        return [(name, type, offset) for id, name, type, offset in result if id in removed]
+        start, stop = result[0], result[-1]
+        logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove {:d} members out of an expected {:d} members within the specified range ({:+#x}<>{:+#x}) of the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, len(expected) - len(removed), len(expected), start[3], stop[3] + stop[4]))
+        return [(name, type, moffset) for id, name, type, moffset, _ in result if id in removed]
 
     ### Properties
     @property
