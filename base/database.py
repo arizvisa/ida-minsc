@@ -6220,11 +6220,14 @@ class set(object):
         else:
             realtype, reallength = [type, length], length
 
-        # now we can figure out its IDA type
+        # now we can figure out its IDA type and create the data. after
+        # that, though, we need to update its refinfo before we leave.
         flags, typeid, nbytes = interface.typemap.resolve(realtype)
-        ok = idaapi.create_data(ea, flags, nbytes, typeid)
-        if not ok:
+        if not idaapi.create_data(ea, flags, nbytes, typeid):
             raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join([__name__, cls.__name__]), ea, type, length))
+        interface.typemap.update_refinfo(ea, flags)
+
+        # return the array that we just created.
         return get.array(ea, length=reallength)
 
 class get(object):
