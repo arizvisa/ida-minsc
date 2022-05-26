@@ -74,10 +74,6 @@ class typemap(object):
     FF_MASKSIZE = idaapi.as_uint32(idaapi.DT_TYPE)  # Mask that select's the flag's size
     FF_MASK = FF_MASKSIZE | MS_0TYPE | MS_1TYPE     # Mask that select's the flag's repr
 
-    # FIXME: In some cases FF_nOFF (where n is 0 or 1) does not actually
-    #        get auto-treated as an pointer by ida. Instead, it appears to
-    #        only get marked as an "offset" and rendered as an integer.
-
     # FIXME: Figure out how to update this to use/create an idaapi.tinfo_t()
     #        and also still remain backwards-compatible with the older idaapi.opinfo_t()
 
@@ -168,6 +164,12 @@ class typemap(object):
     # FIXME: this is a hack for dealing with structures that
     #        have the flag set but aren't actually structures..
     inverted[idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU] = (int, 1)
+
+    # refinfo map for the sizes (IDA 6.9 uses the same names)
+    refinfomap = {
+        1 : idaapi.REF_OFF8,    2 : idaapi.REF_OFF16,
+        4 : idaapi.REF_OFF32,   8 : idaapi.REF_OFF64,
+    }
 
     # Assign the default values for the processor that was selected for the database.
     @classmethod
@@ -297,6 +299,48 @@ class typemap(object):
         # order to describe the correct type requested by the user.
         typeid = idaapi.BADADDR if typeid < 0 else typeid
         return flag | (idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz) * count
+
+    @classmethod
+    def update_refinfo(cls, identifier, flag):
+        '''This updates the refinfo for the given `identifer` according to the provided `flag`.'''
+        get_refinfo = (lambda ri, ea, opnum: idaapi.get_refinfo(ea, opnum, ri)) if idaapi.__version__ < 7.0 else idaapi.get_refinfo
+        set_refinfo, opmasks = idaapi.set_refinfo, [idaapi.FF_0OFF, idaapi.FF_1OFF]
+
+        # Refinfo seems to be relevant to a given operand, but users really only
+        # apply types to addresse unless it's an explicit operand type. So, what
+        # we'll do to deal with this is take the flag that we're given and use
+        # it to figure out which actual operand is being updated so that we don't
+        # have to assume the one that IDA uses based on whatever's being updated.
+        dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
+
+        # First we'll grab the size and make sure that we actually support it.
+        # We should.. because we support all of IDA's native types. Then we
+        # generate a list of all of the available operands to apply the ref to.
+        _, size = cls.inverted[dsize]
+        ptrmask, _ = cls.ptrmap[size]
+        operands = [index for index, opmask in enumerate([idaapi.FF_0OFF, idaapi.FF_1OFF]) if dtype & ptrmask & opmask]
+
+        # Before we change anything, do a smoke-test to ensure that we actually
+        # are able to choose a default reference size if we're going to update.
+        if len(operands) > 0 and size not in cls.refinfomap:
+            logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : Unable to determine a default reference type for the given size ({:d}).".format('.'.join([__name__, cls.__name__]), identifier, flag, size))
+            return 0
+
+        # Now we can choose our type from the refinfomap, and apply it to each
+        # operand in our list of operands that we just resolved. The set_refinfo
+        # api should _never_ fail, so we only log warnings if they do.
+        api = [set_refinfo.__module__, set_refinfo.__name__] if hasattr(set_refinfo, '__module__') else [set_refinfo.__name__]
+        for opnum in operands:
+            if not set_refinfo(identifier, opnum, cls.refinfomap[size]):
+                logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : The api call to `{:s}(ea={:#x}, n={:d}, ri={:d})` returned failure.".format('.'.join([__name__, cls.__name__]), identifier, flag, '.'.join(api), identifier, opnum, cls.refinfomap[size]))
+            continue
+
+        # FIXME: figure out how to update the ui so that it references the new
+        #        information but without any dumb performance issues (that might
+        #        be caused by asking it to redraw everything).
+
+        # Just return the total number of operands that we updated...for now.
+        return len(operands)
 
 class prioritybase(object):
     result = type('result', (object,), {})
