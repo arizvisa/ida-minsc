@@ -2023,13 +2023,15 @@ class member_t(object):
         if aname:
             res.setdefault('__name__', aname)
 
-        # next one is the type information, which requires us to handle the
-        # name if it's been mangled in some way.
+        # next one is the type information which we need to explicitly check for
+        # because IDA will always figure it out, and we only want the tag to exist
+        # if the user has explicitly specified the type through some means.
         try:
             if database.type.has_typeinfo(self.id):
                 ti = self.typeinfo
 
-                # now we need to attach the name to our type if it's not special.
+                # now we need to attach the name to our type if it's not special
+                # in that we it's been mangled in some way that we need to consider.
                 ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(aname), '')
                 res.setdefault('__typeinfo__', ti_s)
 
@@ -2517,14 +2519,11 @@ class member_t(object):
         ti = idaapi.tinfo_t()
 
         # Guess the typeinfo for the current member. If we're unable to get the
-        # typeinfo, then raise a critical exception because members need to have
-        # types and it doesn't make sense for them to not.
+        # typeinfo then we just raise whatever we have. Let IDA figure it out.
         ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr)
         if not ok:
             cls = self.__class__
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
-
-        # Return the typeinfo back to the caller.
+            logging.debug(u"{:s}({:#x}).typeinfo : Returning the guessed type that was determined for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
         return ti
     @typeinfo.setter
     def typeinfo(self, info):
@@ -2594,12 +2593,12 @@ class member_t(object):
     def __str__(self):
         '''Render the current member in a readable format.'''
         id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
-        return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if typeinfo else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __unicode__(self):
         '''Render the current member in a readable format.'''
         id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
-        return u"<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        return u"<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}>{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if typeinfo else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __repr__(self):
         return u"{!s}".format(self)
