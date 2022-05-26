@@ -200,11 +200,12 @@ class typemap(object):
         dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
 
-        # Check if the dtype is a structure and our type-id is an integer so that we
+        # Check if the dtype's size field (dsize) is describing a structure and
+        # verify that our type-id is an integer so that we know that we need to
         # figure out the structure's size. We also do an explicit check if the type-id
         # is a structure because in some cases, IDA will forget to set the FF_STRUCT
         # flag but still assign the structure type-id to a union member.
-        if (dtype == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
+        if (dsize == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
             t = structure.by_identifier(typeid)
             sz = t.size
@@ -214,16 +215,17 @@ class typemap(object):
         if all(item not in cls.inverted for item in [dsize, dtype]):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dtype, typeid, size))
 
-        # Now that we know the datatype exists, extract the actual type and the
-        # type's size from the inverted map that we previously created. We start
-        # by checking the dtype first for pointers and then fall back to the size.
+        # Now that we know the datatype exists, extract the actual type (dtype)
+        # and the type's size (dsize) from the inverted map while giving priority
+        # to the type. This way we're checking the dtype for pointers (references)
+        # and then only afterwards do we fall back to depending on the size.
         t, sz = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dsize]
 
         # If the datatype size is not an integer, then we need to calculate the
         # size ourselves using the size parameter we were given and the element
-        # size of the datatype that we extracted from the flags.
+        # size of the datatype as determined by the flags (DT_TYPE | MS_CLS).
         if not isinstance(sz, six.integer_types):
-            count = size // idaapi.get_data_elsize(idaapi.BADADDR, dtype, idaapi.opinfo_t())
+            count = size // idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
             return [t, count] if count > 1 else t
 
         # If the size matches the datatype size, then this is a single element
