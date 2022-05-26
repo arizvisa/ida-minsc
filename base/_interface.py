@@ -70,13 +70,9 @@ class typemap(object):
     and thus can be used to quickly read or apply a type to a
     field within a structure.
     """
-
+    MS_0TYPE, MS_1TYPE = idaapi.MS_0TYPE, idaapi.MS_1TYPE
     FF_MASKSIZE = idaapi.as_uint32(idaapi.DT_TYPE)  # Mask that select's the flag's size
-    FF_MASK = FF_MASKSIZE | 0xfff00000              # Mask that select's the flag's repr
-
-    # FIXME: In some cases FF_nOFF (where n is 0 or 1) does not actually
-    #        get auto-treated as an pointer by ida. Instead, it appears to
-    #        only get marked as an "offset" and rendered as an integer.
+    FF_MASK = FF_MASKSIZE | MS_0TYPE | MS_1TYPE     # Mask that select's the flag's repr
 
     # FIXME: Figure out how to update this to use/create an idaapi.tinfo_t()
     #        and also still remain backwards-compatible with the older idaapi.opinfo_t()
@@ -106,7 +102,7 @@ class typemap(object):
         if hasattr(builtins, 'unicode'):
             stringmap.setdefault(builtins.unicode, (idaapi.asciflag(), idaapi.ASCSTR_UNICODE))
 
-        ptrmap = { sz : (idaapi.offflag() | flg, tid) for sz, (flg, tid) in integermap.items() }
+        ptrmap = { sz : (idaapi.offflag() | flg, 0) for sz, (flg, _) in integermap.items() }
         nonemap = { None :(idaapi.alignflag(), -1) }
 
     ## IDA 7.0 types
@@ -133,7 +129,7 @@ class typemap(object):
         if hasattr(builtins, 'unicode'):
             stringmap.setdefault(builtins.unicode, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
 
-        ptrmap = { sz : (idaapi.off_flag() | flg, tid) for sz, (flg, tid) in integermap.items() }
+        ptrmap = { sz : (idaapi.off_flag() | flg, 0) for sz, (flg, _) in integermap.items() }
         nonemap = { None :(idaapi.align_flag(), -1) }
 
     # Generate the lookup table for looking up the correct tables for a given type.
@@ -155,13 +151,25 @@ class typemap(object):
         inverted[f & FF_MASKSIZE] = (float, s)
     for s, (f, _) in stringmap.items():
         inverted[f & FF_MASKSIZE] = (str, s)
+    for s, (f, _) in nonemap.items():
+        inverted[f & FF_MASKSIZE] = (None, s)
+
+    # Add all the available flag types to support all available pointer types.
     for s, (f, _) in ptrmap.items():
         inverted[f & FF_MASK] = (type, s)
+        inverted[f & FF_MASK & ~MS_0TYPE] = (type, s)
+        inverted[f & FF_MASK & ~MS_1TYPE] = (type, s)
     del f
 
     # FIXME: this is a hack for dealing with structures that
     #        have the flag set but aren't actually structures..
     inverted[idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU] = (int, 1)
+
+    # refinfo map for the sizes (IDA 6.9 uses the same names)
+    refinfomap = {
+        1 : idaapi.REF_OFF8,    2 : idaapi.REF_OFF16,
+        4 : idaapi.REF_OFF32,   8 : idaapi.REF_OFF64,
+    }
 
     # Assign the default values for the processor that was selected for the database.
     @classmethod
@@ -189,32 +197,35 @@ class typemap(object):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
         structure = sys.modules.get('structure', __import__('structure'))
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-        dt = flag & cls.FF_MASKSIZE
+        dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
 
-        # Check if the dtype is a structure and our type-id is an integer so that we
+        # Check if the dtype's size field (dsize) is describing a structure and
+        # verify that our type-id is an integer so that we know that we need to
         # figure out the structure's size. We also do an explicit check if the type-id
         # is a structure because in some cases, IDA will forget to set the FF_STRUCT
         # flag but still assign the structure type-id to a union member.
-        if (dt == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
+        if (dsize == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
             t = structure.by_identifier(typeid)
             sz = t.size
             return t if sz == size else [t, size // sz]
 
         # Verify that we actually have the datatype mapped and that we can look it up.
-        if dt not in cls.inverted:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dt, typeid, size))
+        if all(item not in cls.inverted for item in [dsize, dtype]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dtype, typeid, size))
 
-        # Now that we know the datatype exists, extract the actual type and the
-        # type's size from the inverted map that we previously created.
-        t, sz = cls.inverted[dt]
+        # Now that we know the datatype exists, extract the actual type (dtype)
+        # and the type's size (dsize) from the inverted map while giving priority
+        # to the type. This way we're checking the dtype for pointers (references)
+        # and then only afterwards do we fall back to depending on the size.
+        t, sz = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dsize]
 
         # If the datatype size is not an integer, then we need to calculate the
         # size ourselves using the size parameter we were given and the element
-        # size of the datatype that we extracted from the flags.
+        # size of the datatype as determined by the flags (DT_TYPE | MS_CLS).
         if not isinstance(sz, six.integer_types):
-            count = size // idaapi.get_data_elsize(idaapi.BADADDR, dt, idaapi.opinfo_t())
+            count = size // idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
             return [t, count] if count > 1 else t
 
         # If the size matches the datatype size, then this is a single element
@@ -290,6 +301,48 @@ class typemap(object):
         # order to describe the correct type requested by the user.
         typeid = idaapi.BADADDR if typeid < 0 else typeid
         return flag | (idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz) * count
+
+    @classmethod
+    def update_refinfo(cls, identifier, flag):
+        '''This updates the refinfo for the given `identifer` according to the provided `flag`.'''
+        get_refinfo = (lambda ri, ea, opnum: idaapi.get_refinfo(ea, opnum, ri)) if idaapi.__version__ < 7.0 else idaapi.get_refinfo
+        set_refinfo, opmasks = idaapi.set_refinfo, [idaapi.FF_0OFF, idaapi.FF_1OFF]
+
+        # Refinfo seems to be relevant to a given operand, but users really only
+        # apply types to addresse unless it's an explicit operand type. So, what
+        # we'll do to deal with this is take the flag that we're given and use
+        # it to figure out which actual operand is being updated so that we don't
+        # have to assume the one that IDA uses based on whatever's being updated.
+        dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
+
+        # First we'll grab the size and make sure that we actually support it.
+        # We should.. because we support all of IDA's native types. Then we
+        # generate a list of all of the available operands to apply the ref to.
+        _, size = cls.inverted[dsize]
+        ptrmask, _ = cls.ptrmap[size]
+        operands = [index for index, opmask in enumerate([idaapi.FF_0OFF, idaapi.FF_1OFF]) if dtype & ptrmask & opmask]
+
+        # Before we change anything, do a smoke-test to ensure that we actually
+        # are able to choose a default reference size if we're going to update.
+        if len(operands) > 0 and size not in cls.refinfomap:
+            logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : Unable to determine a default reference type for the given size ({:d}).".format('.'.join([__name__, cls.__name__]), identifier, flag, size))
+            return 0
+
+        # Now we can choose our type from the refinfomap, and apply it to each
+        # operand in our list of operands that we just resolved. The set_refinfo
+        # api should _never_ fail, so we only log warnings if they do.
+        api = [set_refinfo.__module__, set_refinfo.__name__] if hasattr(set_refinfo, '__module__') else [set_refinfo.__name__]
+        for opnum in operands:
+            if not set_refinfo(identifier, opnum, cls.refinfomap[size]):
+                logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : The api call to `{:s}(ea={:#x}, n={:d}, ri={:d})` returned failure.".format('.'.join([__name__, cls.__name__]), identifier, flag, '.'.join(api), identifier, opnum, cls.refinfomap[size]))
+            continue
+
+        # FIXME: figure out how to update the ui so that it references the new
+        #        information but without any dumb performance issues (that might
+        #        be caused by asking it to redraw everything).
+
+        # Just return the total number of operands that we updated...for now.
+        return len(operands)
 
 class prioritybase(object):
     result = type('result', (object,), {})

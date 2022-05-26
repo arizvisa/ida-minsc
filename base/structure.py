@@ -1504,17 +1504,10 @@ class members_t(object):
         # parameters that we were given and/or figured out.
         res = idaapi.add_struc_member(owner.ptr, utils.string.to(name), realoffset, flag, opinfo, nbytes)
 
-        # Now we can check whether the addition was succesful or not. If the
-        # addition didn't return an error code, then log the success in order
-        # to assist with debugging.
-        if res == idaapi.STRUC_ERROR_MEMBER_OK:
-            cls = self.__class__
-            logging.debug(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes))
-
         # If we received a failure error code, then we convert the error code to
         # an error message so that we can raise an exception that actually means
         # something and enables the user to correct it.
-        else:
+        if res != idaapi.STRUC_ERROR_MEMBER_OK:
             error = {
                 idaapi.STRUC_ERROR_MEMBER_NAME : 'Duplicate field name',
                 idaapi.STRUC_ERROR_MEMBER_OFFSET : 'Invalid offset',
@@ -1525,13 +1518,18 @@ class members_t(object):
             cls = self.__class__
             raise e(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
 
-        # We added the member, but now we need to return it to the caller. Since
+        # Now we need to return the newly created member to the caller. Since
         # all we get is an error code from IDAPython's api, we try and fetch the
         # member that was just added by the offset it's supposed to be at.
         mptr = idaapi.get_member(owner.ptr, realoffset)
         if mptr is None:
             cls = self.__class__
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at offset {:s}{:+#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(name, '"'), realoffset, nbytes))
+
+        # We can now log our small success and update the member's refinfo if it
+        # was actually necessary.
+        cls, refcount = self.__class__, interface.typemap.update_refinfo(mptr.id, flag)
+        logging.debug(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success{:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes, " ({:d} references)".format(refcount) if refcount > 0 else ''))
 
         # If we successfully grabbed the member, then we need to figure out its
         # actual index in our structure. Then we can use the index to instantiate
@@ -2489,21 +2487,29 @@ class member_t(object):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, type, utils.string.repr(self.name)))
 
-        items = flag, typeid, nbytes
-        newflag, newtypeid, newsize = self.flag, self.typeid or idaapi.BADADDR, self.size
-        if newflag != flag:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided flags ({:#x}) were incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, flags, newflags))
+        # verify that our type has been applied before we update its refinfo,
+        # because if it hasn't then we need to warn the user about it so that
+        # they know what's up and why didn't do what we were asked.
+        expected, expected_tid = (flag, nbytes), typeid
+        resulting, resulting_tid = (self.flag, self.size), self.typeid
 
-        if newtypeid != typeid:
+        if expected == resulting:
+            interface.typemap.update_refinfo(self.id, flag)
+        else:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, typeid, newtypeid))
+            logging.warning(u"{:s}({:#x}).type({!s}) : Applying the given flags and size ({:#x}, {:d}) resulted in different flags and size being assigned ({:#x}, {:d}).".format('.'.join([__name__, cls.__name__]), self.id, type, *itertools.chain(expected, resulting)))
 
-        if newsize != nbytes:
+        # smoke-test that we actually updated the type identifier and log it if it
+        # didn't actually work. this is based on my ancient logic which assumed
+        # that opinfo.tid should be BADADDR which isn't actually the truth when
+        # you're working with a refinfo. hence we try to be quiet about it.
+        if expected_tid != (resulting_tid or idaapi.BADADDR):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided size ({:+#x}) was incorrectly assigned as {:+#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, nbytes, newsize))
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, type, expected_tid, resulting_tid))
 
-        return newflag, newtypeid, newsize
+        # return the stuff that actually applied.
+        flag, size = resulting
+        return flag, resulting_tid, size
 
     @property
     def typeinfo(self):
