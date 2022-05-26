@@ -343,6 +343,56 @@ class state(object):
 
 wait, beep, refresh = internal.utils.alias(state.wait, 'state'), internal.utils.alias(state.beep, 'state'), internal.utils.alias(state.refresh, 'state')
 
+class message(object):
+    """
+    This namespace is for displaying a modal dialog box with the different
+    icons that are available from IDA's user interface. The functions within
+    will block IDA from being interacted with while their dialog is displayed.
+    """
+    def __new__(cls, message, **icon):
+        '''Display a modal information dialog box using the provided `message`.'''
+        if not idaapi.is_msg_inited():
+            raise internal.exceptions.DisassemblerError(u"{:s}({!r}{:s}) : Unable to display the requested modal dialog due to the user interface not yet being initialized.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else ''))
+
+        # because ida is fucking hil-ar-ious...
+        def why(F, *args):
+            name = '.'.join([F.__module__, F.__name__] if hasattr(F, '__module__') else [F.__name__])
+            raise internal.exceptions.DisassemblerError(u"{:s}({!r}{:s}) : Refusing to display the requested modal dialog with `{:s}` due it explicitly terminating the host application.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else '', name))
+
+        # these are all of the ones that seem to be available.
+        mapping = {
+            'information': idaapi.info, 'info': idaapi.info,
+            'warning': idaapi.warning, 'warn': idaapi.warning,
+            'error': functools.partial(why, idaapi.error), 'fatal': functools.partial(why, idaapi.error),
+            'nomem': functools.partial(why, idaapi.nomem), 'fuckyou': functools.partial(why, idaapi.nomem),
+        }
+        F = builtins.next((mapping[k] for k in icon if mapping.get(k, False)), idaapi.info)
+
+        # format it and give a warning if it's not the right type.
+        formatted = message if isinstance(message, six.string_types) else "{!s}".format(message)
+        if not isinstance(message, six.string_types):
+            logging.warning(u"{:s}({!r}{:s}) : Formatted the given message ({!r}) as a string ({!r}) prior to displaying it.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else '', message, formatted))
+
+        # set it off...
+        return F(internal.utils.string.to(formatted))
+
+    @classmethod
+    def information(cls, message):
+        '''Display a modal information dialog box using the provided `message`.'''
+        return cls(message, information=True)
+    info = internal.utils.alias(information, 'message')
+
+    @classmethod
+    def warning(cls, message):
+        '''Display a modal warning dialog box using the provided `message`.'''
+        return cls(message, warning=True)
+    warn = internal.utils.alias(warning, 'message')
+
+    @classmethod
+    def error(cls, message):
+        '''Display a modal error dialog box using the provided `message`.'''
+        return cls(message, error=True)
+
 class appwindow(object):
     """
     Base namespace used for interacting with the windows provided by IDA.
