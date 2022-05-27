@@ -118,6 +118,57 @@ def list(**type):
         six.print_(u"[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), u" // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
     return
 
+@utils.multicase(tag=six.string_types)
+@utils.string.decorate_arguments('And', 'Or')
+def select(tag, *And, **boolean):
+    '''Query all of the structure tags for the specified `tag` and any others specified as `And`.'''
+    res = {tag} | {item for item in And}
+    boolean['And'] = {item for item in boolean.get('And', [])} | res
+    return select(**boolean)
+@utils.multicase()
+@utils.string.decorate_arguments('And', 'Or')
+def select(**boolean):
+    """Query all the structures (linearly) for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
+
+    If `And` contains an iterable then require the returned structure contains them.
+    If `Or` contains an iterable then include any other tags that are specified.
+    """
+    containers = (builtins.tuple, builtins.set, builtins.list)
+    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
+
+    # User is not asking for anything specifically, so just yield all the
+    # structures that are available.
+    if not boolean:
+        for st in __iterate__():
+            content = st.tag()
+
+            # All structures have type information, which we shouldn't
+            # be indexing anyways. So we remove it...just in case.
+            content.pop('__typeinfo__', None)
+            if content: yield st, content
+        return
+
+    # Collect the tags we're supposed to look for in the typical lame way.
+    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+
+    # Now we slowly iterate through our structures looking for matches,
+    # while ensuring that we pop off any typeinfo since its not relevant.
+    for st in __iterate__():
+        collected, content = {}, st.tag()
+
+        # Simply collect all tagnames being queried with Or(|).
+        collected.update({key : value for key, value in content.items() if key in Or})
+
+        # And(&) is a little more specific...
+        if And:
+            if And & six.viewkeys(content) == And:
+                collected.update({key : value for key, value in content.items() if key in And})
+            else: continue
+
+        # That's all folks. Yield it if you got it.
+        if collected: yield st, collected
+    return
+
 @utils.multicase(string=(six.string_types, tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def new(string, *suffix, **offset):
