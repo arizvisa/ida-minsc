@@ -1910,6 +1910,56 @@ class members_t(object):
             yield member_t(self.owner, idx)
         return
 
+    @utils.multicase(tag=six.string_types)
+    @utils.string.decorate_arguments('And', 'Or')
+    def select(self, tag, *And, **boolean):
+        '''Query all of the members for the specified `tag` and any others specified as `And`.'''
+        res = {tag} | {item for item in And}
+        boolean['And'] = {item for item in boolean.get('And', [])} | res
+        return self.select(**boolean)
+    @utils.multicase()
+    @utils.string.decorate_arguments('And', 'Or')
+    def select(self, **boolean):
+        """Query all of the members (linearly) for any tags specified by `boolean`. Yields each member found along with the matching tags as a dictionary.
+
+        If `And` contains an iterable then require the returned members contains them.
+        If `Or` contains an iterable then include any other tags that are specified.
+        """
+        containers = (builtins.tuple, builtins.set, builtins.list)
+        boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
+
+        # For some reason the user wants to iterate through everything, so
+        # we'll try and do as we're told but only if they have tags.
+        if not boolean:
+            for m in self.__iterate__():
+                content = m.tag()
+                if content:
+                    yield m, content
+                continue
+            return
+
+        # Do the same thing we've always done to consoldate our parameters
+        # into a form that we can do basic set arithmetic with.
+        Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+
+        # All that's left to do is to slowly iterate through all of our
+        # members while looking for the matches requested by the user.
+        for m in self.__iterate__():
+            collected, content = {}, m.tag()
+
+            # Start out by collecting any tagnames specified by Or(|).
+            collected.update({key : value for key, value in content.items() if key in Or})
+
+            # Then we need to include any specific tags that come from And(&).
+            if And:
+                if And & six.viewkeys(content) == And:
+                    collected.update({key : value for key, value in content.items() if key in And})
+                else: continue
+
+            # Easy to do and easy to yield.
+            if collected: yield m, collected
+        return
+
     ### Private methods
     def __str__(self):
         '''Render all of the fields within the current structure.'''
