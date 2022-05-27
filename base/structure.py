@@ -2074,22 +2074,18 @@ class member_t(object):
         if aname:
             res.setdefault('__name__', aname)
 
-        # next one is the type information which we need to explicitly check for
-        # because IDA will always figure it out, and we only want the tag to exist
-        # if the user has explicitly specified the type through some means.
-        try:
-            if database.type.has_typeinfo(self.id):
-                ti = self.typeinfo
+        # next one is the type information which we need to check because IDA will
+        # always figure it out and only want it if the user has explicitly specified
+        # the type through some means. so this means that we need to distinguish it
+        # by checking the NALT_AFLAGS(8) or really the aflags_t of the member.
+        aflags = idaapi.get_aflags(self.id)
+        if aflags & idaapi.AFL_USERTI == idaapi.AFL_USERTI:
+            ti = self.typeinfo
 
-                # now we need to attach the name to our type if it's not special
-                # in that we it's been mangled in some way that we need to consider.
-                ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(aname), '')
-                res.setdefault('__typeinfo__', ti_s)
-
-        # if we got an exception, then there's no type and we don't need it.
-        except E.MissingTypeOrValueError:
-            pass
-
+            # now we need to attach the name to our type as long as it's not special
+            # which means that it's not mangled in some way that we need to consider.
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(aname), '')
+            res.setdefault('__typeinfo__', ti_s)
         return res
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key')
