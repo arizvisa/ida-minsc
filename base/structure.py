@@ -2124,16 +2124,23 @@ class member_t(object):
         if aname:
             res.setdefault('__name__', aname)
 
-        # next one is the type information which we need to check because IDA will
-        # always figure it out and only want it if the user has explicitly specified
-        # the type through some means. so this means that we need to distinguish it
-        # by checking the NALT_AFLAGS(8) or really the aflags_t of the member.
-        aflags = idaapi.get_aflags(self.id)
-        if aflags & idaapi.AFL_USERTI == idaapi.AFL_USERTI:
+        # The next tag is the type information that we'll need to explicitly check for
+        # because IDA will always figure it out and only want to include it iff the
+        # user has created the type through some explicit action.
+
+        # The documentation says that we should be checking the NALT_AFLAGS(8) or really
+        # the aflags_t of the member which works on structures (since the user will always
+        # be creating them). However, for frames we miss out on types that are applied by
+        # prototypes or ones that have been propagated to the member by Hex-Rays. So for
+        # frames it definitely seems like NSUP_TYPEINFO(0x3000) is the way to go here.
+        user_tinfoQ = idaapi.get_aflags(self.id) & idaapi.AFL_USERTI == idaapi.AFL_USERTI
+        sup_tinfoQ = internal.netnode.sup.has(self.id, idaapi.NSUP_TYPEINFO)
+        has_typeinfo = sup_tinfoQ if is_frame(self.parent) else user_tinfoQ
+        if has_typeinfo:
             ti = self.typeinfo
 
-            # now we need to attach the name to our type as long as it's not special
-            # which means that it's not mangled in some way that we need to consider.
+            # Now we need to attach the member name to our type. Hopefully it's not
+            # mangled in some way that will need consideration if it's re-applied.
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(aname), '')
             res.setdefault('__typeinfo__', ti_s)
         return res
