@@ -1880,14 +1880,11 @@ class frame(object):
 
         @utils.multicase()
         def __new__(cls):
-            '''Yield each argument in the current function.'''
+            '''Yield the `(offset, name, size)` of each argument relative to the stack pointer of the current function.'''
             return cls(ui.current.address())
         @utils.multicase()
         def __new__(cls, func):
-            """Yield each argument for the function `func` in order.
-
-            Each result is of the format (offset, name, size).
-            """
+            '''Yield the `(offset, name, size)` of each argument relative to the stack pointer of the function `func`.'''
             rt, ea = interface.addressOfRuntimeOrStatic(func)
             if rt:
                 target = func
@@ -1919,9 +1916,9 @@ class frame(object):
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
                 logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), cc))
 
-            base = frame.lvars.size(fn) + frame.regs.size(fn)
-            for off, size, content in structure.fragment(fr.id, base, cls.size(fn)):
-                yield off - base, content.get('__name__', None), size
+            base = sum([fn.frsize, fn.frregs, database.config.bits() // 8])
+            for off, size, content in structure.fragment(fr.id, base, structure.size(fr.id) - base):
+                yield off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size
             return
 
         @utils.multicase()
@@ -2110,11 +2107,11 @@ class frame(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Yield each frame member of the current function.'''
+            '''Yield the `(offset, name, size)` of each local variable relative to the stack pointer for the current function.'''
             return cls(ui.current.address())
         @utils.multicase()
         def __new__(cls, func):
-            '''Yield each frame member of the function `func`.'''
+            '''Yield the `(offset, name, size)` of each local variable relative to the stack pointer for the function `func`.'''
             fn = by(func)
 
             # figure out the frame
@@ -2122,9 +2119,8 @@ class frame(object):
             if fr is None:  # unable to figure out arguments
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
-            base = -fn.frsize
-            for off, size, content in structure.fragment(fr.id, 0, cls.size(fn)):
-                yield off + base, content.get('__name__', None), size
+            for off, size, content in structure.fragment(fr.id, 0, fn.frsize):
+                yield off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size
             return
 
         @utils.multicase()
@@ -2153,11 +2149,11 @@ class frame(object):
 
         @utils.multicase()
         def __new__(cls):
-            '''Yield each saved register frame of the current function.'''
+            '''Yield the `(offset, name, size)` of each saved register relative to the stack pointer of the current function.'''
             return cls(ui.current.address())
         @utils.multicase()
         def __new__(cls, func):
-            '''Yield each saved register frame of the function `func`.'''
+            '''Yield the `(offset, name, size)` of each saved register relative to the stack pointer of the function `func`.'''
             fn = by(func)
 
             # figure out the frame
@@ -2165,9 +2161,8 @@ class frame(object):
             if fr is None:  # unable to figure out arguments
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
-            base = frame.lvars.size(fn)
-            for off, size, content in structure.fragment(fr.id, base, cls.size(fn)):
-                yield off - base, content.get('__name__', None), size
+            for off, size, content in structure.fragment(fr.id, fn.frsize, sum([fn.frregs, database.config.bits() // 8])):
+                yield off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size
             return
 
         @utils.multicase()
