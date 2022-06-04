@@ -1868,63 +1868,153 @@ class frame(object):
         within a function's frame. By default, this namespace will yield
         each argument as a tuple containing the `(offset, name, size)`.
 
-        At the moment, register-based calling conventions are not
-        supported.
-
         Some ways of using this are::
 
             > print( function.frame.args(f) )
-            > print( function.frame.args.size(ea) )
+            > print( function.frame.args.registers(f) )
+            > print( function.frame.args.size(f) )
+            > print( function.frame.args.location(ea) )
 
         """
 
         @utils.multicase()
         def __new__(cls):
-            '''Yield the `(offset, name, size)` of each argument relative to the stack pointer of the current function.'''
+            '''Yield the `(offset, name, size)` of each argument belonging to the current function.'''
             return cls(ui.current.address())
         @utils.multicase()
         def __new__(cls, func):
-            '''Yield the `(offset, name, size)` of each argument relative to the stack pointer of the function `func`.'''
-            rt, ea = interface.addressOfRuntimeOrStatic(func)
-            if rt:
-                target = func
-                database.imports.at(target)
+            '''Yield the `(offset, name, size)` of each argument belonging to the function `func`.'''
+            _, ea = interface.addressOfRuntimeOrStatic(func)
 
-                # grab from declaration
-                o = 0
-                for arg in internal.declaration.arguments(target):
-                    sz = internal.declaration.size(arg)
-                    yield o, arg, sz
-                    o += sz
+            # first we'll need to check if there's a tinfo_t for the address that
+            # we're looking at so that we can give it priority over the frame.
+            if database.type.has_typeinfo(ea):
+                tinfo = type(ea)
+
+                # if the tinfo_t that we grabbed is a function pointer (import),
+                # then make sure we dereference it so we can get its details.
+                ti = tinfo.get_pointed_object() if tinfo.is_ptr() else tinfo
+                if not ti.has_details():
+                    raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to extract the type information for the arguments belonging to function ({:#x}) due to a missing prototype.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+                # grab the details containing the function's actual parameters.
+                ftd = idaapi.func_type_data_t()
+                if not ti.get_func_details(ftd):
+                    raise E.DisassemblerError(u"{:s}({:#x}) : Unable to extract the argument details of function ({:#x}) from its type information ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ea, ti._print()))
+
+                # iterate through the parameters and collect only arguments that
+                # are allocated on the stack so that we can use their information
+                # when yielding our results.
+                items = []
+                for index in builtins.range(ftd.size()):
+                    arg, loc = ftd[index], ftd[index].argloc
+
+                    # not allocated on the stack? then we skip it..
+                    if loc.atype() != idaapi.ALOC_STACK:
+                        continue
+
+                    # extract the stack offset, and then add the argument
+                    # information that we collected to our list.
+                    stkoff = loc.stkoff()
+                    items.append((index, stkoff, utils.string.of(arg.name), arg.type))
+
+                # our results shouldn't have duplicates, but they might. actually,
+                # our results could technically be overlapping too. still, this is
+                # just to priority the tinfo_t and we only care about the stkoff.
+                locations = {}
+                for index, offset, name, tinfo in items:
+                    if operator.contains(locations, offset):
+                        old_index, old_name, _ = result[offset]
+                        logging.warning(u"{:s}({:#x}) : Overwriting the parameter {:s}(index {:d}) for function ({:#x}) due to parameter {:s}(index {:d}) being allocated at the same frame offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(old_name, '"')) if old_name else '', old_index, ea, "\"{:s}\" ".format(utils.string.escape(name, '"')) if name else '', index, offset))
+                    locations[offset] = (index, name, tinfo)
+
+                # that was it, we have our locations and we can proceed.
+                locations = locations
+
+            # if there was no type information, then we have no locations to reference.
+            else:
+                locations = {}
+
+            # now we need to check if our address actually includes a frame. if it
+            # doesn't, then we need to explicitly process our locations here.
+            fr = idaapi.get_frame(ea)
+            if fr is None:
+                items = [offset for offset in locations]
+
+                # before we do anything, we need to figure out our lowest offset
+                # so that we can return the unnamed members that will exist in
+                # between our $pc and any actual args allocated on the stack.
+                delta = min(locations) if locations else 0
+                if delta:
+                    yield 0, None, delta
+
+                # now we can iterate through all our locations and yield each one.
+                for offset in sorted(locations):
+                    _, name, ti = locations[offset]
+                    yield offset, name or None, ti.get_size()
                 return
 
-            # grab the function
-            fn = by(ea)
+            # to proceed, we need to know the function to get its frame sizes.
+            else:
+                fn = idaapi.get_func(ea)
 
-            # now the calling convention
-            try:
-                cc = convention(ea)
-            except E.MissingTypeOrAttribute:
-                cc = idaapi.CM_CC_UNKNOWN
+            # once we have our locations, we can grab a fragment from the frame
+            # and yield all of the members that are considered as arguments.
+            current, base = 0, sum([fn.frsize, fn.frregs, database.config.bits() // 8])
+            for offset, size, content in structure.fragment(fr.id, base, structure.size(fr.id) - base):
+                stkoff = offset - base
 
-            # grab from structure
-            fr = idaapi.get_frame(fn)
-            if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
+                # check our locations to see if we have any type information for
+                # the given stkoff so that way we can prioritize it.
+                if operator.contains(locations, stkoff):
+                    index, tname, tinfo = locations.pop(stkoff)
 
-            # FIXME: The calling conventions should be defined within the interface.architecture_t
-            if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), cc))
+                    # grab the tinfo name and tinfo size. if the name wasn't found,
+                    # then fall back to using the member name from the frame.
+                    name, tsize = tname or content.get('__name__', None), tinfo.get_size()
 
-            base = sum([fn.frsize, fn.frregs, database.config.bits() // 8])
-            for off, size, content in structure.fragment(fr.id, base, structure.size(fr.id) - base):
-                yield off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size
+                    # if our member size matches our tinfo size, then we can yield it.
+                    if tsize == size:
+                        yield stkoff, name, tsize
+
+                    # if the tinfo size is smaller then the member's, then we're
+                    # going to need to pad it up to the expected member size.
+                    elif tsize < size:
+                        yield stkoff, name, tsize
+                        yield stkoff + tsize, None, size - tsize
+
+                    # otherwise, the member size is smaller than the tinfo size.
+                    # if this is the case, then we need to use the member size
+                    # but log a warning that we're ignoring the size of the tinfo.
+                    else:
+                        logging.warning(u"{:s}({:#x}) : Ignoring the type size for parameter {:s}(index {:d}) for function ({:#x}) due to the frame member at offset ({:+#x}) being smaller ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(tname, '"')) if tname else '', index, ea, stkoff, size))
+                        yield stkoff, name, size
+
+                # otherwise we'll just yield the information from the member.
+                else:
+                    yield stkoff, content.get('__name__', None), size
+
+                # update our current offset and proceed to the next member.
+                current = stkoff + size
+
+            # iterate through all of the locations that we have left.
+            for stkoff in sorted(locations):
+                _, name, ti = locations[stkoff]
+
+                # if our current position is not pointing at the expected stkoff,
+                # then we need to yield some padding that will put us there.
+                if current < stkoff:
+                    yield current, None, stkoff - current
+
+                # now we can yield the next member and adjust our current position.
+                yield stkoff, name or None, ti.get_size()
+                current = stkoff + ti.get_size()
             return
 
         @utils.multicase()
         @classmethod
         def location(cls):
-            '''Return the list of address locations for each of the parameters that are passed to the function call near the current address.'''
+            '''Return the list of address locations for each of the parameters that are passed to the function call at the current address.'''
             return cls.location(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
@@ -2183,6 +2273,9 @@ get_args_size = utils.alias(frame.args.size, 'frame.args')
 get_vars_size = utils.alias(frame.lvars.size, 'frame.lvars')
 get_regs_size = utils.alias(frame.regs.size, 'frame.regs')
 get_spdelta = spdelta = utils.alias(frame.delta, 'frame')
+
+# FIXME: this should really be its own namespace or its own function so that
+#        way we can yield register and stack locations for each argument.
 arguments = args = frame.args
 
 ## instruction iteration/searching
