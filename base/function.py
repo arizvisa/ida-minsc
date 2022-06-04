@@ -1954,16 +1954,17 @@ class frame(object):
         @classmethod
         def registers(cls):
             '''Return the register information associated with the arguments for the current function.'''
-            return cls.registers(ui.current.function())
+            return cls.registers(ui.current.address())
         @utils.multicase()
         @classmethod
         def registers(cls, func):
             '''Returns the register information associated with the arguments for the function `func`.'''
-            fn = by(func)
+            rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-            # If our func_t has a regargqty set, then we can extract arguments directly from the func_t.
-            if fn.regargqty:
-                items = []
+            # If we're not working with a runtime function (import) and the func_t.regargqty is larger
+            # than zero, then we're supposed to extract the arguments directly from the func_t.
+            if not rt and by(ea).regargqty:
+                fn, items = by(ea), []
 
                 # If regargqty is set, but regargs is None...then we need to call read_regargs on our
                 # fn to get IDA to actually read it...The funny thing is, on earlier versions of IDA
@@ -1986,7 +1987,7 @@ class frame(object):
 
                     # If we failed, then log a warning and try to append a void* as a placeholder.
                     elif ti.deserialize(None, bytes(bytearray([idaapi.BT_PTR, idaapi.BT_VOID])), None):
-                        logging.warning(u"{:s}.registers({:#x}) : Using the type {!r} as a placeholder due to being unable to decode the type information ({!s}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ti._print(), regarg.type, index))
+                        logging.warning(u"{:s}.registers({:#x}) : Using the type {!r} as a placeholder due to being unable to decode the type information ({!s}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, ti._print(), regarg.type, index))
                         items.append((regarg, ti))
 
                     # If we couldn't even create a void*, then this is a critical failure and we
@@ -2000,8 +2001,8 @@ class frame(object):
                             128: idaapi.BT_INT128,
                         }
                         if not operator.contains(lookup, bits) or not ti.deserialize(None, bytes(bytearray([lookup[bits]])), None):
-                            raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to create a type that fits within the number of bits for the database ({:d}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bits))
-                        logging.critical(u"{:s}.registers({:#x}) : Falling back to the type {!r} as a placeholder due to being unable to cast the type information ({!r}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ti._print(), regarg.type, index))
+                            raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to create a type that fits within the number of bits for the database ({:d}).".format('.'.join([__name__, cls.__name__]), ea, bits))
+                        logging.critical(u"{:s}.registers({:#x}) : Falling back to the type {!r} as a placeholder due to being unable to cast the type information ({!r}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, ti._print(), regarg.type, index))
                         items.append((regarg, ti))
                     continue
 
@@ -2013,17 +2014,20 @@ class frame(object):
                     result.append((reg, ti, utils.string.of(regarg.name)))
                 return result
 
-            # Otherwise, we need to extract it from the details for the tinfo_t
-            # belonging to the prototype of the function. If there are no details
-            # then this is a critical error and we can't do shit about it.
-            ti = type(fn)
+            # Otherwise, we need to extract them from the details for the tinfo_t
+            # for the function. If it's a pointer (like an import), then we make
+            # sure to dereference it before checking the type's details. If there
+            # are no details for us, then this is a critical error and we really
+            # can't do shit about it.
+            tinfo = type(ea)
+            ti = tinfo.get_pointed_object() if tinfo.is_ptr() else tinfo
             if not ti.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}.registers({:#x}) : Unable to extract the type information for the arguments belonging to function ({:#x}) due to a missing prototype.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.start(fn)))
+                raise E.MissingTypeOrAttribute(u"{:s}.registers({:#x}) : Unable to extract the type information for the arguments belonging to function ({:#x}) due to a missing prototype.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
             # If we couldn't grab the details, then just fail...super hard.
             ftd = idaapi.func_type_data_t()
             if not ti.get_func_details(ftd):
-                raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to extract the argument details of function ({:#x}) from its type information ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.start(fn), ti._print()))
+                raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to extract the argument details of function ({:#x}) from its type information ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ea, ti._print()))
 
             # Now we just need to iterate through our parameters while grabbing
             # any one of them that's located within a register. We also preserve
@@ -2035,7 +2039,7 @@ class frame(object):
                 # If the location type is register-based, then add the current
                 # argument to the list that we will process.
                 if loc.atype() in {idaapi.ALOC_REG1, idaapi.ALOC_REG2, idaapi.ALOC_RREL}:
-                    items.append((index, arg.name, arg.type, loc))
+                    items.append((index, utils.string.of(arg.name), arg.type, loc))
                 continue
 
             # Last thing that we need to do is to extract the registers from the
@@ -2072,7 +2076,7 @@ class frame(object):
                 # should not contain any kind of register information.
                 else:
                     lookup = {getattr(idaapi, k) : k for k in dir(idaapi) if k.startswith('ALOC_')}
-                    raise E.InvalidTypeOrValueError(u"{:s}.registers({:#x}) : Unable to extract register information from argument \"{:s}\" (index {:d}) of function ({:#x}) due to an unsupported location type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(name, '"'), index, interface.range.start(fn), lookup.get(atype, ''), atype))
+                    raise E.InvalidTypeOrValueError(u"{:s}.registers({:#x}) : Unable to extract register information from argument \"{:s}\" (index {:d}) of function ({:#x}) due to an unsupported location type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(name, '"'), index, ea, lookup.get(atype, ''), atype))
 
                 # Aggregate the new knowledge into our list of results.
                 result.append((reg, ti, name))
