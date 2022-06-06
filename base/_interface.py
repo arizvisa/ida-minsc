@@ -1859,6 +1859,537 @@ class node(object):
         flag = AFL_BNOT1 if opnum else AFL_BNOT0
         return result & flag == flag
 
+class strpath(object):
+    """
+    This namespace contains utilities that interact with a structure path
+    which includes the generation of filters, etc.
+
+    A structure path is a tuple composed of `(sptr, mptr, offset)`.
+    """
+    @classmethod
+    def candidates(cls, sptr, offset):
+        '''Given the specified offset, return the `(sptr, [mptrs], offset)` that it can point to.'''
+        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
+
+        # Define a closure that checks whether the given member contains the specified
+        # offset and then translates it. If sptr is a union, the offset needs to come
+        # before the end of the member. If it's variable-sized and the last member's
+        # id matches the mptr, then the offset should come after the last member. If
+        # both mptr.soff and mptr.eoff are the same then the member itself is
+        # variable-sized and requires us to check that the offset is in front of it.
+        # Anything else requires us to just check against the member's boundaries.
+        def contains(sptr, mptr, offset):
+            '''Return whether the given `mptr` contains the specified offset.'''
+            if sptr.props & SF_UNION:
+                return offset < mptr.eoff
+            elif mptr.soff == mptr.eoff:
+                return mptr.eoff <= offset
+            elif sptr.props & SF_VAR and sptr.memqty > 0 and sptr.get_member(sptr.memqty - 1).id == mptr.id:
+                return mptr.soff <= offset
+            return mptr.soff <= offset < mptr.eoff
+
+        # First grab all the members and then use them to collect the boundaries for
+        # all of the candidate members that are within the requested offset.
+        members = [sptr.get_member(index) for index in builtins.range(sptr.memqty)]
+        if any([0 <= offset < idaapi.get_struc_size(sptr), sptr.props & SF_VAR]):
+            candidates = [mptr for mptr in members if contains(sptr, mptr, offset)]
+        else:
+            candidates = members if sptr.props & SF_UNION else members[:1] if offset < 0 else members[-1:]
+
+        # We just need to return our candidates, and use the offset from wherever they
+        # begin to translate the offset we were given so that it's relative to the
+        # member. If we're a union, then the members start at 0 and our offset is always
+        # going to be the same. No candidates, means we have no members to return.
+        if candidates:
+            delta = 0 if sptr.props & SF_UNION else next(mptr.soff for mptr in candidates)
+            assert(sptr.props & SF_UNION or all(delta == mptr.soff for mptr in candidates))
+            return sptr, candidates, offset - delta
+        return sptr, [], offset
+
+    @classmethod
+    def collect(cls, struc, Fcollect):
+        '''This is a utility function that starts at the given sptr in `struc` and consumes either an `sptr`, `mptr`, or an `offset` while adding completed items via `Fcollect`.'''
+        SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+
+        sptr, mptr, offset = struc, None, 0
+        while True:
+            try:
+                item = (yield sptr)
+
+            # We're being told that we need to gtfo so save what's left and exit our loop.
+            except GeneratorExit:
+                Fcollect((sptr, mptr, offset))
+                break
+
+            # If we were given an offset and we have a member, then we can just update our
+            # current offset with it. This allows one to consolidate multiple offsets, but
+            # as there's a chance of there being no member defined yet will result in an
+            # error as soon as they try to transition to one.
+            if isinstance(item, six.integer_types):
+                offset += item
+
+            # If we were given a structure and it's the same as the one that we're on,
+            # then that means the user wants the size to be used for the member.
+            elif isinstance(item, idaapi.struc_t) and item.id == sptr.id:
+                mptr = item
+
+            # If we were given a structure, then we need to check that it matches the
+            # structure that we expect. If so then we can switch into it.
+            elif isinstance(item, idaapi.struc_t) and idaapi.get_sptr(mptr) and idaapi.get_sptr(mptr).id == item.id:
+                Fcollect((sptr, mptr, offset))
+                sptr, mptr, offset = item, None, 0
+
+            # If we were given a member, then we need to check to see if we've encountered
+            # it yet for the current result. We also need to check to ensure it's within
+            # the current sptr that we're processing in order to log a warning if otherwise.
+            elif isinstance(item, idaapi.member_t):
+                expected = idaapi.get_member_struc(idaapi.get_member_fullname(item.id))
+
+                # If we haven't assigned an item into the mptr and the item's parent is the
+                # same as our current sptr, then we can just assign it and move on.
+                if mptr is None and expected.id == sptr.id:
+                    mptr = item
+
+                # If we've already assigned the mptr and the item's parent is the same
+                # as our current sptr, then we issue a warning and re-assign it.
+                elif expected.id == sptr.id:
+                    logging.warning(u"{:s}.collect({:#x}, result={!s}) : Overwriting {:s} \"{:s}\" ({:#x}) of collected results with {:s} \"{:s}\" ({:#x}) due to it belonging to the current {:s} \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), struc.id, Fcollect, mptr.__class__.__name__, internal.utils.string.escape(internal.netnode.name.get(mptr.id), '"'), mptr.id, item.__class__.__name__, internal.utils.string.escape(internal.netnode.name.get(item.id), '"'), item.id, sptr.__class__.__name__, internal.utils.string.escape(internal.netnode.name.get(sptr.id), '"'), sptr.id))
+                    mptr = item
+
+                # If we got here we need to append our state. However, mptr is None and so
+                # we need to fix it up so that it points to an actual member before reset.
+                elif mptr is None:
+                    mptr = idaapi.get_member(sptr, offset)
+                    Fcollect((sptr, mptr, offset - (0 if sptr.props & SF_UNION else mptr.soff)))
+                    sptr, mptr, offset = expected, item, 0
+
+                # If we're here, then our sptr doesn't match and we need to append our
+                # state to our current results and then transition to the new sptr.
+                else:
+                    Fcollect((sptr, mptr, offset))
+                    sptr, mptr, offset = expected, item, 0
+
+            # If we were given the completely wrong type (or wrong order), and we have no
+            # idea what to do. So, add our current position and raise an exception.
+            else:
+                Fcollect((sptr, mptr, offset))
+                description = [item.__class__.__module__, item.__class__.__name__] if hasattr(item.__class__, '__module__') else [item.__class__.__name__]
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.collect({:#x}, result={!s}) : Unable to continue collecting results due to the received item ({!r}) being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), struc.id, Fcollect, item, '.'.join(description)))
+            continue
+        return
+
+    @classmethod
+    def fullname(cls, path, sep='.'):
+        '''Return the given structure path as an easily-read string.'''
+        result = []
+        for sptr, mptr, offset in path:
+            if mptr:
+                _, fullname, owner = idaapi.get_member_by_id(mptr.id)
+                name, msize, size = idaapi.get_member_name(mptr.id), idaapi.get_data_elsize(mptr.id, mptr.flag), idaapi.get_member_size(mptr)
+                sname, oname = (internal.netnode.name.get(ptr.id) for ptr in [sptr, owner])
+                arrayQ, hindex = msize != size, (size - 1) // msize
+                index, item = divmod(offset, msize) if arrayQ else (0, offset)
+                index, offset = (index, item) if index * msize < size or mptr.soff == mptr.eoff else (hindex, item + (offset - hindex * msize))
+                item = "{:s}{:s}{:s}".format(fullname if not result else name if owner.id == sptr.id else "{{ERR!{:s}|{:s}}}{:s}".format(sname, oname, name), "[{:d}]".format(index) if arrayQ else '', "({:+#x})".format(offset) if offset else '' if mptr else "{:+#x}".format(offset))
+            elif sptr:
+                item = ''.join([internal.netnode.name.get(sptr.id), "({:+#x})".format(offset) if offset else ''])
+            else:
+                item = "{{ERR!{:+#x}}}".format(offset)
+            result.append(item)
+        return sep.join(result) if sep else result
+
+    @classmethod
+    def format(cls, sptr, mptr, offset=0):
+        '''Return the description of an individual item for a structure path.'''
+        MF_UNIMEM = getattr(idaapi, 'MF_UNIMEM', 0x2)
+
+        sptr_t, mptr_t = idaapi.struc_t if sptr is None else sptr.__class__, idaapi.member_t if mptr is None else mptr.__class__
+        sptr_description = '.'.join([sptr_t.__module__, sptr_t.__name__] if hasattr(sptr_t, '__module__') else [sptr_t.__name__])
+        mptr_description = '.'.join([mptr_t.__module__, mptr_t.__name__] if hasattr(mptr_t, '__module__') else [mptr_t.__name__])
+        offset_description = "{:+#x}".format(offset) if offset else ''
+
+        # If there's no mptr or they're the same, then we're simply a structure and an offset.
+        if sptr and (mptr is None or sptr.id == mptr.id):
+            sname = internal.netnode.name.get(sptr.id) or ''
+            return "{:s}({:#x}, \"{:s}\"){:s}".format(sptr_description, sptr.id, internal.utils.string.escape(sname, '"'), offset_description)
+
+        # If sptr is None, then we simply figure it out for them and try again.
+        elif not sptr:
+            _, _, sptr = idaapi.get_member_by_id(mptr.id)
+            return cls.format(sptr, mptr, offset)
+
+        # Now we need to check that the member is actually a member. So we
+        # grab its name, and try and get the member by its id.
+        sname, mname = ((internal.netnode.name.get(item.id) or '') for item in [sptr, mptr])
+        result = idaapi.get_member_by_id(mptr.id)
+
+        # If we got something then we need to check that the mptr is related
+        # to the sptr by comparing it to the member's structure id that we got.
+        if result and sptr.id == result[2].id:
+            name = mname[len(sname):]
+            return "{:s}({:#x}, {:#x}{:s} {:s}={:#x}{:s})".format(mptr_description, mptr.id, sptr.id, internal.utils.string.escape(name, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
+
+        # Anything else means the member is not part of the structure and we
+        # clarify that by listing the full name of the member and the parent.
+        member = "{:s}({:#x}, \"{:s}\" {:s}={:#x}{:s})".format(mptr_description, mptr.id, internal.utils.string.escape(mname, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
+        parent = "{:s}({:#x}, \"{:s}\")".format(sptr_description, sptr.id, internal.utils.string.escape(sname, '"'))
+        return ' '.join(['(ERROR)', parent, 'is unrelated to', member])
+
+    @classmethod
+    def resolve(cls, Fcollect, sptr, offset):
+        """Start resolving a path at the given offset of sptr whilst allowing the caller to make decisions at each member.
+
+        The `Fcollect` parameter contains the callable that will be used to store each path item.
+        """
+        SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+
+        # Seed some variables that we'll use to emit some friendlier error messages.
+        count, position = 0, 0
+        formatlog = functools.partial(u"{:s}.resolve(Fcollect={:s}, {:#x}, {:+#x}) : {:s}".format, '.'.join([__name__, cls.__name__]), '...', sptr.id, offset)
+
+        description = "{:s} ({:#x}) of size ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sptr.id, idaapi.get_struc_size(sptr))
+        logging.debug(formatlog(u"Resolving path for the {:s} towards the offset {:+#x}.".format(description, offset)))
+
+        # Continue looping while we still have choices left. We start each iteration
+        # by figuring out what members are at the chosen offset for the user to choose.
+        # If there aren't any candidates, then add our current position and leave.
+        while sptr:
+            sptr, candidates, carry = cls.candidates(sptr, offset)
+
+            # Give the caller the candidates and the offset we aimed for
+            # for so that they can either make a choice or re-adjust it.
+            [ logging.debug(formatlog(u"Potential {:s}candidate ({:d} of {:d}) for item {:d} (offset {:#x}{:+#x}) of path : {:s}".format('union ' if sptr.props & SF_UNION else '', 1 + index, len(candidates), count, position, offset, cls.format(sptr, item)))) for index, item in enumerate(candidates) ]
+            try:
+                choice, shift = (yield (sptr, candidates, carry))
+
+            # If we're being told to clean up, then ignore the decision, use
+            # the carry value that we determined on their behalf and quit.
+            except GeneratorExit:
+                mptr, offset = None, carry
+                break
+
+            # If they didn't give us a value to shift by, then assume they want the
+            # offset that we used to determine the member candidates with.
+            else:
+                offset = carry if shift is None else shift
+
+            # If we weren't given a choice then we have to make some decisions on
+            # their behalf. If there was only one candidate, then use it. Otherwise
+            # we'll just do what they tell us and use None (which will terminate).
+            if not choice and len(candidates or []) in {0, 1}:
+                mptr = candidates[0] if candidates else None
+
+            # If their choice is one of our candidates, then we'll take it.
+            elif isinstance(choice, idaapi.member_t) and choice.id in {item.id for item in (candidates or [])}:
+                mptr = choice
+
+            # If their choice is the structure (which is not a candidate), then they're
+            # choosing its size. We're friendly, though, and honor their desired offset.
+            elif choice and choice.id == sptr.id:
+                mptr = choice
+                break
+
+            # Anything else is because their choice was wrong or we're not going to
+            # decide for them. So we need to freak out. If they want to recover, the
+            # they'll will need to compare the length of what they gave us with the
+            # results we've been aggregating in order to determine what happened.
+            else:
+                description = 'union' if sptr.props & SF_UNION else "{:+#x} structure".format(idaapi.get_struc_size(sptr.id))
+                message = "no valid candidates being chosen ({:s})".format(', '.join(map("{:#x}".format, (mptr.id for mptr in candidates)))) if choice is None else "an invalid candidate ({:s}) being chosen".format("{:#x}".format(choice.id) if hasattr(choice, 'id') else "{!r}".format(choice))
+                raise internal.exceptions.MemberNotFoundError(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) of {:s} ({:#x}) due to {:s}.".format(count, position, offset, description, sptr.id, message)))
+
+            # Now that we determined the mptr for the user's choice, figure out the
+            # member's total size and it's member size. From this we'll check if it's
+            # actually an array, and determine its maximum index as necessary.
+            size, msize = (idaapi.get_member_size(mptr), idaapi.get_data_elsize(mptr.id, mptr.flag)) if mptr else (0, 1)
+            arrayQ, maxindex = mptr and msize != size, (size - 1) // msize
+
+            # Using their offset and the mptr's member size, calculate what index the user
+            # referenced. We then adjust the index so that it's clamped at the maximum possible
+            # array index in order to carry the correct offset into the next item we receive.
+            uindex, ubytes = divmod(offset, msize) if arrayQ else (0, offset)
+            index, bytes = (uindex, ubytes) if any([uindex * msize < size, arrayQ and mptr.soff == mptr.eoff]) else (maxindex, ubytes + (offset - maxindex * msize))
+            logging.debug(formatlog(u"Sender chose {:s} which will result in {:s}carrying offset {:+#x}.".format(cls.format(sptr, mptr, offset), "preserving offset {:+#x} (index {:d}) and ".format(index * msize, index) if arrayQ else '', bytes)))
+
+            # If we've landed on a member (get_sptr returns None from either the mptr
+            # being invalid or it not being a structure), then there's nothing to
+            # do but exit our loop with whatever state the user has given us.
+            if not idaapi.get_sptr(mptr):
+                break
+
+            # Store the caller's choice but adjust it by the offset that we received
+            # (relative to carry) and the index that needs to be preserved in the item.
+            Fcollect((sptr, mptr, (offset - carry) + index * msize))
+
+            # Now we'll update our state for error messages, and then transition to the next
+            # item while adjusting our offset so that way it points to the next member.
+            count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff) + index * msize
+            sptr, offset = idaapi.get_sptr(mptr), bytes
+
+        # No path members left to process, so the whole path should be resolved and we
+        # only need to add the last member that was determined.
+        Fcollect((sptr, mptr, offset))
+        count, position = count + 1, position + (0 if sptr.props & SF_UNION else mptr.soff if mptr else 0)
+
+        # Before we go, send the user off with a friendly message to thank them for their business.
+        if mptr is None:
+            left, right = 0, idaapi.get_struc_size(sptr)
+            description = ' '.join(["{:s} ({:#x})".format('union' if sptr.props & SF_UNION else 'structure', sptr.id), "{:#x}<>{:+#x}".format(left, right)])
+        else:
+            left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
+            description = ' '.join(["field ({:#x})".format(mptr.id), "{:#x}<>{:s}".format(left, "{:+#x}({:+#x})".format(right, idaapi.get_struc_size(sptr)) if mptr.soff == mptr.eoff else "{:+#x}".format(right))])
+        logging.debug(formatlog(u"Path terminated at item {:d} (offset {:#x}{:+#x}) with {:s}.".format(count, position, offset, description)))
+
+    @classmethod
+    def calculate(cls, delta=0, Fcollect=operator.truth):
+        '''This is just a utility function that consumes `(sptr, mptr, offset)` items and yields the resulting delta to get to it.'''
+        SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+
+        # Spin in while always returning the current delta that we've calculated on. If we
+        # received an empty value, then yield our state because that's all we're good for.
+        while True:
+            item = (yield delta)
+            if item is None:
+                continue
+
+            # This is super simple as we only need to check if our sptr is a union. We
+            # don't care about validating this path because someone else should've.
+            sptr, mptr, offset = item
+            delta = sum([delta, 0 if sptr.props & SF_UNION else 0 if mptr is None else idaapi.get_struc_size(mptr) if mptr.id == sptr.id else mptr.soff, offset])
+            Fcollect((sptr, mptr, offset))
+
+            # If our path has actually stopped at a field, then we can just break out
+            # of our loop because there's nothing that can change anything
+            if isinstance(mptr, idaapi.member_t) and not idaapi.get_sptr(mptr):
+                break
+            continue
+
+        # This loop just continuously yields the delta because technically our path is
+        # over since we've already encountered a non-structure field.
+        while True:
+            (yield delta)
+        return
+
+    @classmethod
+    def of_tids(cls, offset, tids):
+        """Just a utility functions that uses the provided offset and a list of tids (`tid_array`) to return the complete path.
+
+        This utilizes the "resolve" implementation to fill in the gaps when returning the complete path.
+        """
+        SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+
+        # Start out by grabbing the first tid and converting it to an sptr before we start.
+        iterable = (tid for tid in tids)
+        sptr = idaapi.get_struc(builtins.next(iterable))
+        if sptr is None:
+            raise internal.exceptions.StructureNotFoundError(u"{:s}.of_tids({:#x}, {:s}) : Unable to find a structure for the given identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), sid))
+
+        # Now we can rely on cls.resolve to figure out where our decisions actually belong.
+        result = []
+        resolver = cls.resolve(result.append, sptr, offset)
+
+        # Start by grabbing the first decision we need to make before entering. Each iteration, we
+        # convert our candidates into a dict keyed by their identifier so that we can simply check
+        # if our next identifier is one of the available candidates.  If there's no decision to
+        # make (0 or 1 candidates), then set our choice to None so that the resolver figures it out.
+        _, candidates, carry = builtins.next(resolver)
+        try:
+            while True:
+                choices = {mptr.id : mptr for mptr in candidates}
+                if len(choices) < 2:
+                    choice = None
+
+                # Anything else means that we need to check the next tid. If it doesn't exist
+                # in our choices, then we need to log a warning, place the item back into the
+                # iterator, and choose None so that the resolver handles it. This should exit
+                # our loop and result in returning an incomplete path.
+                else:
+                    mid = builtins.next(iterable)
+                    if not operator.contains(choices, mid):
+                        logging.warning(u"{:s}.of_tids({:#x}, {:s}) : The given member identifier ({:#x}) for index {:d} (offset {:+#x}) was not one of the candidate members ({:s}).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), mid, len(result), carry, ', '.join(map("{:#x}".format, choices))))
+                    choice = choices.get(mid, None)
+                _, candidates, carry = resolver.send((choice, carry))
+
+        # We're done so we should have our result. However, we need to trim off any non-members
+        # that we resolved because we leave those up to IDA to figure out.
+        except StopIteration:
+            resolver.close()
+        rindex = builtins.next((rindex for rindex, (_, mptr, _) in enumerate(reversed(result)) if mptr), 0)
+        return result[:-rindex] if rindex else result
+
+    @classmethod
+    def to_tids(cls, path):
+        '''This is just a utility function that converts the final path into a list of tids (`tid_array`) containing the decisions required for unions to be displayed properly.'''
+        SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+
+        # First we'll collect all of the identifiers that we were given
+        # within our path since that's all we really care about. Then we
+        # need to extract the first sptr, and then put it back so we can
+        # process only the members that are part of a union.
+        iterable = ((sptr, mptr) for sptr, mptr, _ in path)
+        item = builtins.next(iterable)
+        sptr, _ = item
+        identifiers = [sptr.id]
+        iterable = itertools.chain([item], iterable)
+
+        # Now we can process all of the members in our iterator that contain
+        # a user-made decision (represented by being part of a union) and
+        # then just combine them into a single list of our items to return.
+        members = [mptr.id for sptr, mptr in iterable if sptr.props & SF_UNION and mptr]
+        return identifiers + members
+
+    @classmethod
+    def suggest(cls, struc, suggestion):
+        '''This takes a path given by the user and returns the resulting path along with its delta.'''
+
+        # We first need to convert the path that the user gave us into the actual
+        # path that we'll apply to the operand. We also need to calculate the delta
+        # so we'll just connect our collector to our calculator which will then
+        # add any items that get processed to our items.
+        result, items = [], [item for item in suggestion]
+        calculator = cls.calculate(0, result.append)
+        collector = cls.collect(struc, calculator.send)
+
+        # Now we can start both of them so we can feed inputs to our collector
+        # until we're asked to stop. We keep track of the last sptr to ensure
+        # that we don't send two mptrs in a row for the exact same structure.
+        delta, sptr = (builtins.next(coro) for coro in [calculator, collector])
+        try:
+            # We leave our items as a list so that if an error occurs, we can
+            # better explain what we were unable to process.
+            last = sptr
+            while items:
+                item = items.pop(0)
+
+                # If our item is a structure or a member, then we need to convert
+                # it into either an idaapi.struc_t or an idaapi.member_t.
+                if hasattr(item, 'ptr'):
+                    mptr = item.ptr
+
+                # If it's a string and the previous element was an mptr, then we need
+                # to transition to the last member's type (sptr) and then look it up.
+                elif isinstance(item, six.string_types) and isinstance(last, idaapi.member_t):
+                    last = idaapi.get_sptr(last)
+                    sptr = collector.send(last)
+                    mptr = idaapi.get_member_by_name(sptr, internal.utils.string.to(item))
+
+                # If it's a string, then we can just look it up in our current
+                # sptr to figure out which member_t it is.
+                elif isinstance(item, six.string_types):
+                    mptr = idaapi.get_member_by_name(sptr, internal.utils.string.to(item))
+
+                # Anything else should by one of the native types or an offset.
+                else:
+                    mptr = item
+
+                # Submit it to the collector and save it away if it's not an integer.
+                sptr, last = collector.send(mptr), last if isinstance(mptr, six.integer_types) else mptr
+
+        # If we received an exception, then that's because there was a busted type
+        # in the collected path which we'll need to add back to our list.
+        except internal.exceptions.InvalidTypeOrValueError as exc:
+            ok, items = False, [mptr] + items
+            logging.debug(u"{:s}.suggestion({:#x}, {!r}) : Collection was terminated with {:d} items left ({!r}) due to an invalid type ({!r}).".format('.'.join([__name__, cls.__name__]), struc.id, suggestion, len(items), items, mptr))
+
+        # If we had no issues, then we only have to do one thing
+        else:
+            ok, _ = True, collector.close()
+
+        # We should now be able to grab our delta out of the calculator, and then
+        # we can close it before displaying what suggestions actually worked.
+        finally:
+            delta, _ = builtins.next(calculator), calculator.close()
+
+        # Now we can check for any issues that happened while collecting their path.
+        suggested = (''.join(['.'.join(map("{:#x}".format, [sptr.id, mptr.id] if mptr else [sptr.id])), "{:+#x}".format(offset) if offset else '']) for sptr, mptr, offset in result)
+        suggestion_description = [item for item in itertools.chain(suggested, map("{!r}".format, items))]
+        if ok:
+            [ logging.debug(u"{:s}.suggestion({:#x}, [{:s}]) : Successfully interpreted path suggestion at index {:d} as {:s}.".format('.'.join([__name__, cls.__name__]), struc.id, ', '.join(suggestion_description), index, cls.format(*item))) for index, item in enumerate(result) ]
+
+        # Verify that our path is empty and that we successfully consumed everything.
+        else:
+            logging.warning(u"{:s}.suggestion({:#x}, [{:s}]) : There was an error trying to interpret the suggestions for the path and was truncated to {:s}.".format('.'.join([__name__, cls.__name__]), struc.id, ', '.join(suggestion_description), cls.fullname(result)))
+
+        [ logging.info(u"{:s}.suggestion({:#x}, [{:s}]) : Unable to interpret path suggestion at index {:d} from {!r}.".format('.'.join([__name__, cls.__name__]), struc.id, ', '.join(suggestion_description), len(suggestion) - len(items) + index, item)) for index, item in enumerate(items) ]
+        return delta, result
+
+    @classmethod
+    def guide(cls, goal, struc, suggestion):
+        '''This tries to determine a complete path from the sptr in `struc` to the offset `goal` using `suggestion` as a sloppy (sorta) guidance.'''
+        result = []
+
+        # Now we have the suggested path and the delta that they're aiming at. All
+        # they really did was give us a suggestion as guidance, so we need to resolve
+        # it to make sure it makes sense and that way we can store it in our real path.
+        calculator = cls.calculate(0, result.append)
+        resolver = cls.resolve(calculator.send, struc, goal)
+        delta = builtins.next(calculator)
+
+        # Seed our resolver, and then use an index to figure out where we are in our
+        # suggestion. If their suggestion is busted, then we'll later use this to flail
+        # around and figure out what item they actually meant when we need a decision.
+        index, (owner, candidates, carry) = 0, builtins.next(resolver)
+        try:
+            # Now we can process all the crap they might've given us in their suggestion.
+            while index < len(suggestion):
+                sptr, mptr, offset = suggestion[index]
+                index = index + 1
+
+                # If we don't have an mptr, then we use the offset we were given.
+                if not mptr:
+                    carry = carry + offset
+
+                # If our choice is not one of the candidates, then we need to bail so that we
+                # can start flailing trying to figure out what the suggestion actually meant.
+                elif mptr.id not in {item.id for item in candidates}:
+                    break
+
+                # Our suggestion still makes sense, so send our choice to the resolver
+                # with the adjusted offset and continue with the next suggestion.
+                (owner, candidates, carry) = resolver.send((mptr, carry))
+
+            # If our index hasn't reached the length of the suggestion, then we now enter
+            # "flailing" mode. This requires us to reformat the suggestions into a lookup
+            # table and choose the default candidate when our lookup table doesn't work.
+            if index < len(suggestion):
+                flailing = {}
+                for rindex, item in enumerate(suggestion[index:]):
+                    index, _ = index + 1, flailing.setdefault(sptr.id, []).append(item)
+
+                # Enter flailing mode where we just look up the current structure in our
+                # table and then use it to determine candidates. Otherwise, we choose the
+                # default choice that's available until we can finally leave.
+                while candidates:
+                    choices = flailing.get(owner.id, [])
+                    if choices:
+                        iterable = (choice for choice, (_, mptr, _) in enumerate(choices) if mptr.id in candidates)
+                        choice = builtins.next(iterable, len(choices))
+                        _, mptr, offset = choices.pop(choice) if choice < len(choices) else (owner, None, carry)
+
+                    # If there's nothing to flail with, then we choose the default (None).
+                    else:
+                        mptr, offset = None, carry
+
+                    # Just a smoke test if our offset doesn't match our carried offset.
+                    if carry != offset:
+                        logging.warning(u"{:s}.guide({:#x}, {:#x}, {!r}) : The resolution of the path item at index {:d} {:s} had a different offset ({:#x}) than expected ({:#x}) while flailing.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), len(result), cls.format(sptr, mptr, offset), offset, carry))
+
+                    # Send it off.. pray that our flailing accomplished something.
+                    owner, candidates, carry = resolver.send((mptr, offset))
+
+            # We are finally done and we can stop resolving things.
+            resolver.close()
+
+        # If our loop has terminated before resolving the path, then we're still okay as
+        # we only need to check how far we got and log where our path stops.
+        except StopIteration:
+            for rindex, item in enumerate(suggestion[index:]):
+                logging.warning(u"{:s}.guide({:#x}, {:#x}, {!r}) : The suggestion for path index {:d} {:s} was not needed.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), index + rindex, cls.format(*item)))
+
+        # We should now have our result resolved and we can now grab our delta.
+        delta, _ = builtins.next(calculator), calculator.close()
+        return delta, result
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = ("{:x}".format(abs(item)) if isinstance(item, six.integer_types) else item for item in names)
