@@ -1192,193 +1192,58 @@ def op_structure(ea, opnum, sptr, *path, **force):
     else:
         raise E.UnsupportedCapability(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}).".format(__name__, ea, opnum, sptr.id, path, value.__class__, opnum, insn.ea))
 
-    # We have to start somewhere and our first element in the path should be a
-    # a member of the sptr we were given. So, now we begin to traverse through
-    # all of the members in the path the user gave us so that we can figure out
-    # the user wanted and what mptrs and sptrs should be in that path.
-    st, offset, delta = structure.__instance__(sptr.id), 0, 0
-    items = []
-    while path and sptr:
-        item = path.pop(0)
+    # First we use the path the user gave us to figure out the suggested path. This
+    # should give us the suggestion and its expected delta that we can use for warnings.
+    st = structure.__instance__(sptr.id)
+    userdelta, userpath = interface.strpath.suggest(sptr, path)
 
-        # If we found an integer in the path, then just use it to adjust the
-        # delta and proceed through the rest of the path.
-        if isinstance(item, six.integer_types):
-            delta += item
-            continue
+    # Precalculate a description of the path to make our error messages look good.
+    path_description = []
+    for sptr, mptr, offset in userpath:
+        sname = utils.string.of(idaapi.get_struc_name(sptr.id))
+        mname = utils.string.of(idaapi.get_member_name(mptr.id)) if mptr else ''
+        fullname = '.'.join([sname, mname] if mname else [sname])
+        path_description.append("{:s}{:+#x}".format(fullname, offset) if offset or mname else fullname)
 
-        # Members can be specified in all sorts of ways, so we need to check
-        # what the user gave us. If we were given a string, then look up the
-        # member by its name.
-        elif isinstance(item, six.string_types):
-            mptr = idaapi.get_member_by_name(sptr, utils.string.to(item))
+    logging.info(u"{:s}.op_structure({:#x}, {:d}, {:#x}, [{:s}]) : The user suggested the path {:s} with a delta of {:+#x} for the given value ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), interface.strpath.fullname(userpath), userdelta, value))
 
-        # If we were given a structure.member_t, then we can just take its
-        # member_t.ptr property and use that.
-        elif isinstance(item, structure.member_t):
-            mptr = item.ptr
+    # If the suggested path has only 1 element, no members, and the sum of the delta
+    # and the value matches the structure size, then this is simply the structure size.
+    if len(userpath) == 1 and all(mptr is None for _, mptr, _ in userpath) and userdelta + value == st.size:
+        realdelta, realpath = 0, userpath
 
-        # If we were given an explicit idaapi.member_t, then we can use it as-is.
-        elif isinstance(item, idaapi.member_t):
-            mptr = item
-
-        # Anything else is not a supported type, and as such is an error.
-        else:
-            suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
-            suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
-            summary = itertools.chain(suggested, [item], path)
-            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The member ({!s}) at index {:d} of the suggested path is using an unsupported type ({!s}).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary], item, len(items), item.__class__))
-
-        # If mptr is undefined, then that's it. We have to stop our traversal,
-        # and warn the user about what happened.
-        if mptr is None:
-            suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
-            suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
-            summary = itertools.chain(suggested, [item], path)
-            logging.warn(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The member ({!s}) at index {:d} of the suggested path was not found in the parent structure ({!s}).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary], item, len(items), utils.string.of(idaapi.get_struc_name(sptr.id))))
-            break
-
-        # We got an mptr, so now we can extract its owning sptr and verify that
-        # it matches the structure that our path traversal is currently in.
-        _, _, res = idaapi.get_member_by_id(mptr.id)
-        if not interface.node.is_identifier(res.id):
-            res = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
-
-        if res.id != sptr.id:
-            suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
-            suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
-            summary = itertools.chain(suggested, [utils.string.of(idaapi.get_member_fullname(mptr.id))], path)
-            logging.warning(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The member ({!s}) at index {:d} of the suggested path is using a structure ({:#x}) that is different from the expected structure ({:#x}).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary], utils.string.of(idaapi.get_member_fullname(mptr.id)), len(items), res.id, sptr.id))
-        sptr = res
-
-        # Now we can add the mptr to our list, and update the member offset that
-        # we're tracking during this traversal. If it's a union, then our member
-        # offset doesn't change at all.
-        items.append((sptr, mptr))
-        offset += 0 if sptr.is_union() else mptr.soff
-
-        # If the member that we're currently at during our traversal is not a
-        # structure, then our loop should stop here.
-        sptr = idaapi.get_sptr(mptr)
-
-    # Consume the rest of the integers in the path so that we can finish
-    # updating the delta that the user suggested to us.
-    while path and isinstance(path[0], six.integer_types):
-        delta += path.pop(0)
-
-    # Verify that our path is empty and that we successfully consumed everything.
-    if len(path):
-        suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
-        suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
-        summary = itertools.chain(suggested, path)
-        logging.warning(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : There was an error trying to traverse the path for the list of members (path will be truncated).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary]))
-
-    # FIXME: figure out whether we really need to calculate the structure offset,
-    #        or we're just applying a reference or the structure size to the operand.
-
-    # Now that we have the suggested path and thus the desired offset, we're
-    # going to use it to generate a filter that we will use to determine the
-    # union members to choose along the desired offset. We'll start by formatting
-    # these items into a lookup table.
-    table = {}
-    for sptr, mptr in items:
-        if sptr.is_union():
-            table.setdefault(sptr.id, []).append(mptr.id)
-        continue
-
-    # Now we can define a closure that uses this table to get as close as we can
-    # to what the user suggsted. If the path doesn't correspond, then we're
-    # forced to return all the members and bailing, which sorts itself out.
-    def filter(sptr, members, table=table):
-        if sptr.id not in table:
-            return []
-
-        # Grab our choices and convert our candidates into identifiers.
-        choices, candidates = table[sptr.id], {mptr.id for mptr in members}
-        if len(choices) == 0:
-            return []
-
-        # Check the next item on the stack is a valid candidate, and
-        # pop it off it is.
-        mid = choices[0]
-        if mid not in candidates:
-            return []
-        choice = choices.pop(0)
-
-        # Filter our list of members for the one that matches our choice.
-        res = [mptr for mptr in members if mptr.id == choice]
-        return res
-
-    # If our structure has some members, then we need to use the requested offset
-    # to descend through the structure that we're starting with and then hope it
-    # matches the path that was recommended to us. We need to shift whatever this
-    # offset is by the delta that we were given, and then gather our results into
-    # both an sptr and mptrs.
-    if len(st.members):
-        rp, rpdelta = st.members.__walk_to_realoffset__(offset + delta, filter=filter)
-        results = [(item.parent.ptr, item.ptr) for item in rp]
-
-        # Count the number of members that are unions because we will be using it
-        # to allocate the path that we write to the supval for the designated
-        # instruction operand.
-        length = 1 + sum(1 for sptr, mptr in results if sptr.is_union())
-
-        # Now that we've carved an actual path through the structure and its
-        # descendants, we can allocate the tid_array using the starting structure and
-        # adding each individual member to it. If we didn't get any members for our
-        # results, then that's okay since we still have the structure to start at.
-        sptr, _ = results[0] if results else (st.ptr, None)
-        index, tid = 1, idaapi.tid_array(length)
-        tid[0] = sptr.id
-        for sptr, mptr in results:
-            if sptr.is_union():
-                tid[index] = mptr.id
-                index += 1
-            continue
-
-        # Verify our length just to be certain.
-        if index != length:
-            raise AssertionError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The number of elements in the path ({:d}) does not correspond to the number of elements that were calculated ({:d}).".format(__name__, ea, opnum, st.ptr.id, index, length))
-        rpoffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
-
-    # If there are no members in the structure, then we build a tid_array composed
-    # of just the structure identifier, and then use the path that we were given
-    # that includes just the offset and the delta.
+    # Now we can calculate the path to the value that the user is trying to suggest
+    # a path for. We don't really need the delta, but we can use it to determine
+    # the path that the user stopped at with the path that we'll actually apply.
     else:
-        length, rpdelta, rpoffset = 1, delta, offset
-        tid = idaapi.tid_array(length)
-        tid[0] = sptr.id
+        realdelta, realpath = interface.strpath.guide(value, st.ptr, userpath)
 
-    # If the user asked us to force this path, then we just trust the value
-    # that was returned by our traversal.
-    if any(k in force for k in ['force', 'forced']) and builtins.next((force[k] for k in ['force', 'forced'] if k in force), False):
-        res = rpoffset + rpdelta
+    logging.info(u"{:s}.op_structure({:#x}, {:d}, {:#x}, [{:s}]) : The determined (real) path was {:s} with a delta of {:+#x} for the given value ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), interface.strpath.fullname(realpath), realdelta, value))
 
-    # Otherwise, we take the difference between the user's offset and our
-    # traversal's offset, and then add the delta we figured out.
-    else:
-        res = (rpoffset - offset) + rpdelta
+    # Now if the userdelta and realdelta are different, then either the path they
+    # suggested to us is wrong (user > real) or we ended up having to complete
+    # their path for them (user < real).
+    if userdelta != realdelta:
+        delta = realdelta - userdelta
+        Flogging = logging.debug if userdelta < realdelta else logging.info
+        Fdescription = "incomplete ({:#x} < {:#x})".format if userdelta < realdelta else "incorrect ({:#x} > {:#x})".format
+        action = 'resolving additional members' if userdelta < realdelta else 'adjusting suggested members'
 
-    # Now we can apply our tid_array to the operand, and include our original
-    # member offset from the path the user gave us so that way the user can
-    # fetch it later if they so desire.
-    if idaapi.__version__ < 7.0:
-        ok = idaapi.op_stroff(insn.ea, opnum, tid.cast(), length, res)
+        # FIXME: We should probably refactor the previous logic so that way we can
+        #        render the suggested members that were ignored or the any of the
+        #        members that needed to be resolved.
+        Flogging(u"{:s}.op_structure({:#x}, {:d}, {:#x}, [{:s}]) : The suggested path was {:s} and required {:+#x} bytes ({:s}) to reach the operand target value ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), Fdescription(userdelta, realdelta), delta, action, value))
 
-    # If we're using IDAPython from v7.0 or later, then we're required to grab
-    # the instruction to apply our tid_array to its operand.
-    else:
-        ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, res)
+    # Finally we can convert our realpath into a tid_array that we will apply.
+    items = interface.strpath.to_tids(realpath)
+    tid, length = idaapi.tid_array(len(items)), len(items)
+    for index in builtins.range(length):
+        tid[index] = items[index]
 
-    # If we failed applying our structure, then we'll just raise an exception.
-    if not ok:
-        suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
-        suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
-        resolved = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in results)
-        resolved = ('.'.join(map(utils.string.of, pair)) for pair in resolved)
-        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply the resolved structure path ({!r}) to the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, [item for item in suggested], [item for item in resolved], insn.ea))
-
-    # Otherwise, we can chain into our other case to return what was just applied.
+    # Now we can apply our tid_array to the operand and then return what
+    # we just applied to the user using the other op_structure case.
+    if not idaapi.op_stroff(insn.ea if idaapi.__version__ < 7.0 else insn, opnum, tid.cast(), length, 0):
+        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply the resolved structure path ({:s}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), ', '.join(map("{:#x}".format, items)), opnum, insn.ea))
     return op_structure(insn.ea, opnum)
 op_struc = op_struct = utils.alias(op_structure)
 
