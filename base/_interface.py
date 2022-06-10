@@ -2172,50 +2172,89 @@ class strpath(object):
 
     @classmethod
     def of_tids(cls, offset, tids):
-        """Just a utility functions that uses the provided offset and a list of tids (`tid_array`) to return the complete path.
-
-        This utilizes the "resolve" implementation to fill in the gaps when returning the complete path.
-        """
-        SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+        '''Just a utility functions that uses the provided offset and a list of tids (`tid_array`) to return the complete path.'''
+        iterable = (tid for tid in tids)
 
         # Start out by grabbing the first tid and converting it to an sptr before we start.
-        iterable = (tid for tid in tids)
-        sptr = idaapi.get_struc(builtins.next(iterable))
+        sid = builtins.next(iterable, idaapi.BADADDR)
+        sptr = idaapi.get_struc(sid)
         if sptr is None:
             raise internal.exceptions.StructureNotFoundError(u"{:s}.of_tids({:#x}, {:s}) : Unable to find a structure for the given identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), sid))
 
-        # Now we can rely on cls.resolve to figure out where our decisions actually belong.
-        result = []
-        resolver = cls.resolve(result.append, sptr, offset)
+        # Define a class that we'll use to aggregate our results from visit_stroff_fields.
+        class visitor_t(idaapi.struct_field_visitor_t):
+            def visit_field(self, sptr, mptr):
+                calculator.send((sptr, mptr, 0))
+                return 0
 
-        # Start by grabbing the first decision we need to make before entering. Each iteration, we
-        # convert our candidates into a dict keyed by their identifier so that we can simply check
-        # if our next identifier is one of the available candidates.  If there's no decision to
-        # make (0 or 1 candidates), then set our choice to None so that the resolver figures it out.
-        _, candidates, carry = builtins.next(resolver)
+        # We plan on both collecting and calculating our path so that we can figure out how
+        # we should resolve what IDA spits back at us. So, seed a calculator for our results.
+        visitorpath = []
+        calculator = cls.calculate(0, visitorpath.append)
+        visitordelta = builtins.next(calculator)
+
+        visitor = visitor_t()
+        length, path = len(tids), idaapi.tid_array(len(tids))
+        for index, item in enumerate(tids):
+            path[index] = item
+        disp = idaapi.sval_pointer()
+        disp.assign(offset)
+        visit_zero = 1
+
+        res = idaapi.visit_stroff_fields(visitor, path, length, disp, visit_zero) if idaapi.__version__ < 7.0 else  idaapi.visit_stroff_fields(visitor, tids, disp.cast(), visit_zero)
+        leftover, visitordelta = disp.value(), builtins.next(calculator)
+        calculator.close()
+
+        if idaapi.BADADDR & offset != idaapi.BADADDR & (visitordelta + leftover):
+            callable = idaapi.visit_stroff_fields
+            raise internal.exceptions.DisassemblerError(u"{:s}.of_tids({:#x}, {:s}) : Expected the call to `{:s}` to return {:#x} bytes but {:#x}{:+#x} ({:#x}) was returned instead.".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), '.'.join(getattr(callable, attribute) for attribute in ['__module__', '__name__'] if hasattr(callable, attribute)), offset, visitordelta, leftover, visitordelta + leftover))
+
+        # Now we can rely on cls.resolve to figure out where our decisions actually belong. We can
+        # target the offset the user gave us because IDA did all of the work for the path, and we
+        # only need to figure out which fields the offset is applied to.
+        result = []
+        calculator = cls.calculate(0, result.append)
+        resolver = cls.resolve(calculator.send, sptr, offset - leftover)
+        flailer = cls.flail(visitorpath)
+
+        resultdelta, _ = (builtins.next(item) for item in [calculator, flailer])
+
+        # Begin resolving using the flailer till there's nothing left. We also ensure that we
+        # always return an item within the bounds of the structure so we get as far as we can.
+        sptr, candidates, carry = builtins.next(resolver)
         try:
             while True:
-                choices = {mptr.id : mptr for mptr in candidates}
-                if len(choices) < 2:
-                    choice = None
+                owner, choice, zero = flailer.send((sptr, candidates, carry))
+                if choice and choice.id not in {item.id for item in candidates}:
+                    logging.info(u"{:s}.of_tids({:#x}, {:s}) : Ignoring the recommended choice ({:#x}) for index {:d} at offset ({:+#x}) as it was not in the list of candidates ([{:s}]).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), choice.id, len(result), builtins.next(calculator), ', '.join("{:#x}".format(item.id) for item in candidates)))
+                    break
 
-                # Anything else means that we need to check the next tid. If it doesn't exist
-                # in our choices, then we need to log a warning, place the item back into the
-                # iterator, and choose None so that the resolver handles it. This should exit
-                # our loop and result in returning an incomplete path.
-                else:
-                    mid = builtins.next(iterable)
-                    if not operator.contains(choices, mid):
-                        logging.warning(u"{:s}.of_tids({:#x}, {:s}) : The given member identifier ({:#x}) for index {:d} (offset {:+#x}) was not one of the candidate members ({:s}).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), mid, len(result), carry, ', '.join(map("{:#x}".format, choices))))
-                    choice = choices.get(mid, None)
-                _, candidates, carry = resolver.send((choice, carry))
+                sptr, candidates, carry = resolver.send((choice, carry))
 
-        # We're done so we should have our result. However, we need to trim off any non-members
-        # that we resolved because we leave those up to IDA to figure out.
-        except StopIteration:
-            resolver.close()
-        rindex = builtins.next((rindex for rindex, (_, mptr, _) in enumerate(reversed(result)) if mptr), 0)
-        return result[:-rindex] if rindex else result
+            # Always complete our path with whatever the default is.
+            while True:
+                resolver.send((None, None))
+
+        except (StopIteration, internal.exceptions.MemberNotFoundError):
+            pass
+
+        finally:
+            flailer.close(), resolver.close()
+            resultdelta, _ = builtins.next(calculator), calculator.close()
+
+        # Now we can check our delta which contains the full path of the result against the
+        # sum of the visitordelta and the leftover bytes that IDA gave us.
+        if resultdelta == visitordelta:
+            logging.debug(u"{:s}.of_tids({:#x}, {:s}) : Successfully resolved {:#x}{:+#x} bytes for the path {:s} to {:s}.".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), resultdelta, leftover, cls.fullname(visitorpath), cls.fullname(result)))
+
+        # Otherwise our resolved path was not completely resolved. Still, we'll honor what IDA
+        # gave us by adjusting the visitor path despite it being busted.
+        else:
+            logging.info(u"{:s}.of_tids({:#x}, {:s}) : The delta ({:#x}) for the resolved path does not match the expected delta ({:#x}).".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), resultdelta, visitordelta))
+            logging.debug(u"{:s}.of_tids({:#x}, {:s}) : Truncated {:+#x} bytes from the path {:s} resulting in {:s}.".format('.'.join([__name__, cls.__name__]), offset, "[{:s}]".format(', '.join(map("{:#x}".format, tids))), resultdelta, cls.fullname(visitorpath), cls.fullname(result)))
+
+        # If we were unable to resolve a path, then we explicitly trust the visitorpath.
+        return result or visitorpath
 
     @classmethod
     def to_tids(cls, path):
