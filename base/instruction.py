@@ -1220,7 +1220,84 @@ def op_structurepath(reference):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structurepath(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
-    raise NotImplementedError
+    F, insn, op = database.type.flags(ea), at(ea), operand(ea, opnum)
+
+    # If it's a memory address, then this is the wrong API and we should be using
+    # the op_structure function. Log something, and then chain to the correct one.
+    if op.type in {idaapi.o_mem}:
+        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a memory address referenced.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
+        return op_structure(ea, opnum)
+
+    # If it's a stack variable, then this is also the wrong API and we should be
+    # using the op_structure function. Log it and continue onto the right one.
+    elif idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
+        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a stack variable operand.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
+        return op_structure(ea, opnum)
+
+    # If it wasn't a stack variable, then check that the operand is actually a
+    # structure offset. If it isn't, then bail because we have no idea what to do.
+    elif not idaapi.is_stroff(F, opnum):
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
+
+    # Start out by collecting the operand value, the delta and the tids from the
+    # chosen operand and grab its sptr so that we can figure out what path was applied.
+    value = idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr)
+
+    delta, tids = interface.node.get_stroff_path(insn.ea, opnum)
+    logging.debug(u"{:s}.op_structurepath({:#x}, {:d}) : Processing {:d} members ({:s}) from path that was returned from `{:s}`.".format(__name__, ea, opnum, len(tids), ', '.join("{:#x}".format(mid) for mid in tids), "{!s}({:#x}, {:d})".format('.'.join(getattr(interface.node.get_stroff_path, attribute) for attribute in ['__module__', '__name__']), insn.ea, opnum)))
+
+    sid, target = tids[0], value + delta
+    sptr = idaapi.get_struc(sid)
+
+    # Before we do anything, we need to figure out exactly what the leftover
+    # bytes are after properly resolving our path for the operand and delta.
+    # To do this, we resolve for our target address using strpath.of_tids to
+    # resolve each individual member and store it in our path.
+    path = []
+    calculator = interface.strpath.calculate(0)
+    resolver = interface.strpath.resolve(path.append, sptr, target)
+
+    position = builtins.next(calculator)
+    try:
+        sptr, candidates, carry = builtins.next(resolver)
+        for owner, mptr, offset in interface.strpath.of_tids(target, tids):
+            assert owner.id == sptr.id
+            position = calculator.send((owner, mptr, offset))
+            sptr, candidates, carry = resolver.send((mptr, carry))
+
+        resolver.send((None, None))
+        raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}) : Expected path to have been resolved at offset {:#x} of index {:d} with {:s}.".format(__name__, ea, opnum, builtins.next(calculator), len(path), interface.strpath.format(owner, mptr)))
+
+    # If we're done resolving, then save our position for calculating the delta later.
+    except (StopIteration, E.MemberNotFoundError):
+        position = builtins.next(calculator)
+
+    finally:
+        resolver.close(), calculator.close()
+        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Resolved the path ({:d} elements) for the specified instruction operand to {:s}.".format(__name__, ea, opnum, len(path), interface.strpath.fullname(path)))
+
+    # Now we have the correct resolved path with each offset in it being correct. We
+    # need to translate it by our carried value and then we can determine the correct
+    # offset for each member of the path that we'll return.
+    calculator = interface.strpath.calculate(carry - target)
+    result, position = [], builtins.next(calculator)
+    for sptr, mptr, offset in path:
+        st = structure.__instance__(sptr.id, offset=position)
+        item = st.members.by_identifier(mptr.id) if mptr else st
+        result.append(item)
+        position = calculator.send((sptr, mptr, offset))
+
+    # Just like the op_structure implementation, we need to figure out if
+    # there's an array being referenced to convert our result to a list.
+    if any(isinstance(member.type, builtins.list) for member in result if isinstance(member, structure.member_t)):
+        return result + [carry]
+
+    # Otherwise it's just a path with the carried offset, so we check the
+    # carryied offset for non-zero in case we need to return it.
+    results = tuple(result)
+    if carry:
+        return results + (carry,)
+    return results
 
 ## current address and opnum with variable-length path
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
