@@ -1063,39 +1063,33 @@ def op_structure(ea, opnum):
 
 ## current address and opnum with variable-length path
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
-def op_structure(opnum, structure, *path, **delta):
+def op_structure(opnum, structure, *path):
     '''Apply the specified `structure` along with any members in `path` to the instruction operand `opnum` at the current address.'''
-    deltapath = [delta.pop('delta', 0)] if delta else []
-    return op_structure(ui.current.address(), opnum, [item for item in itertools.chain([structure], path, deltapath)])
+    return op_structure(ui.current.address(), opnum, [item for item in itertools.chain([structure], path)])
 @utils.multicase(opnum=six.integer_types, member=(structure.member_t, idaapi.member_t))
-def op_structure(opnum, member, *path, **delta):
+def op_structure(opnum, member, *path):
     '''Apply the specified `member` along with any members in `path` to the instruction operand `opnum` at the current address.'''
-    deltapath = [delta.pop('delta', 0)] if delta else []
-    return op_structure(ui.current.address(), opnum, [item for item in itertools.chain([member], path, deltapath)])
+    return op_structure(ui.current.address(), opnum, [item for item in itertools.chain([member], path)])
 
 ## address and opnum with variable-length path
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
-def op_structure(ea, opnum, structure, *path, **delta):
+def op_structure(ea, opnum, structure, *path):
     '''Apply the specified `structure` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
-    deltapath = [delta.pop('delta', 0)] if delta else []
-    return op_structure(ea, opnum, [item for item in itertools.chain([structure], path, deltapath)])
+    return op_structure(ea, opnum, [item for item in itertools.chain([structure], path)])
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, member=(structure.member_t, idaapi.member_t))
-def op_structure(ea, opnum, member, *path, **delta):
+def op_structure(ea, opnum, member, *path):
     '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
-    deltapath = [delta.pop('delta', 0)] if delta else []
-    return op_structure(ea, opnum, [item for item in itertools.chain([member], path, deltapath)])
+    return op_structure(ea, opnum, [item for item in itertools.chain([member], path)])
 
 ## operand reference with variable-length path
 @utils.multicase(reference=interface.opref_t, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
-def op_structure(reference, structure, *path, **delta):
+def op_structure(reference, structure, *path):
     '''Apply the specified `structure` along with the members in `path` to the operand pointed to by `reference`.'''
-    deltapath = [delta.pop('delta', 0)] if delta else []
-    return op_structure(reference, [item for item in itertools.chain([structure], path, deltapath)])
+    return op_structure(reference, [item for item in itertools.chain([structure], path)])
 @utils.multicase(reference=interface.opref_t, member=(structure.member_t, idaapi.member_t))
-def op_structure(reference, member, *path, **delta):
+def op_structure(reference, member, *path):
     '''Apply the specified `member` along with the members in `path` to the instruction operand pointed to by `reference`.'''
-    deltapath = [delta.pop('delta', 0)] if delta else []
-    return op_structure(reference, [item for item in itertools.chain([member], path, deltapath)])
+    return op_structure(reference, [item for item in itertools.chain([member], path)])
 
 ## all variations that take a tuple/list to apply to a given operand.
 @utils.multicase(reference=interface.opref_t, path=(builtins.tuple, builtins.list))
