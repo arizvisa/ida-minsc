@@ -1207,6 +1207,91 @@ def op_structure(ea, opnum, sptr, path):
     return op_structure(insn.ea, opnum)
 op_struc = op_struct = utils.alias(op_structure)
 
+# Just some aliases for reading from the current location
+@utils.multicase(opnum=six.integer_types)
+def op_structurepath(opnum):
+    '''Return the structure and members for operand `opnum` at the current instruction.'''
+    return op_structurepath(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_structurepath(reference):
+    '''Return the structure and members for the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_structurepath(address, opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_structurepath(ea, opnum):
+    '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
+    raise NotImplementedError
+
+## current address and opnum with variable-length path
+@utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
+def op_structurepath(opnum, structure, *path, **delta):
+    '''Apply the specified `structure` along with any members in `path` to the instruction operand `opnum` at the current address.'''
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structurepath(ui.current.address(), opnum, [item for item in itertools.chain([structure], path, deltapath)])
+@utils.multicase(opnum=six.integer_types, member=(structure.member_t, idaapi.member_t))
+def op_structurepath(opnum, member, *path, **delta):
+    '''Apply the specified `member` along with any members in `path` to the instruction operand `opnum` at the current address.'''
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structurepath(ui.current.address(), opnum, [item for item in itertools.chain([member], path, deltapath)])
+
+## address and opnum with variable-length path
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
+def op_structurepath(ea, opnum, structure, *path, **delta):
+    '''Apply the specified `structure` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structurepath(ea, opnum, [item for item in itertools.chain([structure], path, deltapath)])
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, member=(structure.member_t, idaapi.member_t))
+def op_structurepath(ea, opnum, member, *path, **delta):
+    '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structurepath(ea, opnum, [item for item in itertools.chain([member], path, deltapath)])
+
+## operand reference with variable-length path
+@utils.multicase(reference=interface.opref_t, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
+def op_structurepath(reference, structure, *path, **delta):
+    '''Apply the specified `structure` along with the members in `path` to the operand pointed to by `reference`.'''
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structurepath(reference, [item for item in itertools.chain([structure], path, deltapath)])
+@utils.multicase(reference=interface.opref_t, member=(structure.member_t, idaapi.member_t))
+def op_structurepath(reference, member, *path, **delta):
+    '''Apply the specified `member` along with the members in `path` to the instruction operand pointed to by `reference`.'''
+    deltapath = [delta.pop('delta', 0)] if delta else []
+    return op_structurepath(reference, [item for item in itertools.chain([member], path, deltapath)])
+
+## all variations that take a tuple/list to apply to a given operand.
+@utils.multicase(reference=interface.opref_t, path=(builtins.tuple, builtins.list))
+def op_structurepath(reference, path):
+    '''Apply the structure members in `path` to the instruction operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_structurepath(address, opnum, path)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(builtins.tuple, builtins.list))
+def op_structurepath(ea, opnum, path):
+    '''Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.'''
+    items = [item for item in path]
+    member = items.pop(0) if len(items) else ''
+    if isinstance(member, six.string_types):
+        sptr, fullpath = structure.by(member).ptr, items
+    elif isinstance(member, idaapi.struc_t):
+        sptr, fullpath = structure.by(member.id), items
+    elif isinstance(member, structure.structure_t):
+        sptr, fullpath = member.ptr, items
+    elif isinstance(member, idaapi.member_t):
+        _,_, sptr = idaapi.get_member_by_id(member.id)
+        if not interface.node.is_identifier(sptr.id):
+            sptr = idaapi.get_member_struc(idaapi.get_member_fullname(member.id))
+        fullpath = itertools.chain([member], items)
+    elif isinstance(member, structure.member_t):
+        sptr, fullpath = member.parent.ptr, itertools.chain([member], items)
+    else:
+        raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {!r}) : Unable to determine the structure from the provided path due to the first item being of an unsupported type ({!s}).".format(__name__, ea, opnum, path, member.__class__))
+    return op_structurepath(ea, opnum, sptr, [item for item in fullpath])
+
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, sptr=idaapi.struc_t, path=(builtins.tuple, builtins.list))
+def op_structurepath(ea, opnum, sptr, path):
+    '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
+    raise NotImplementedError
+op_strucpath = op_strpath = utils.alias(op_structurepath)
+
 @utils.multicase(opnum=six.integer_types)
 def op_enumeration(opnum):
     '''Return the enumeration member id for the operand `opnum` belonging to the current instruction.'''
