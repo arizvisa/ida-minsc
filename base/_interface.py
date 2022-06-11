@@ -2393,7 +2393,7 @@ class strpath(object):
     @classmethod
     def guide(cls, goal, struc, suggestion):
         '''This tries to determine a complete path from the sptr in `struc` to the offset `goal` using `suggestion` as a sloppy (sorta) guidance.'''
-        result = []
+        result, suggestion_description = [], [item for item in itertools.starmap(cls.format, suggestion)]
 
         # Now we have the suggested path and the delta that they're aiming at. All
         # they really did was give us a suggestion as guidance, so we need to resolve
@@ -2405,12 +2405,10 @@ class strpath(object):
         # Seed our resolver, and then use an index to figure out where we are in our
         # suggestion. If their suggestion is busted, then we'll later use this to flail
         # around and figure out what item they actually meant when we need a decision.
-        index, (owner, candidates, carry) = 0, builtins.next(resolver)
+        (owner, candidates, carry) = builtins.next(resolver)
         try:
             # Now we can process all the crap they might've given us in their suggestion.
-            while index < len(suggestion):
-                sptr, mptr, offset = suggestion[index]
-                index = index + 1
+            for index, (sptr, mptr, offset) in enumerate(suggestion):
 
                 # If we don't have an mptr, then we use the offset we were given.
                 if not mptr:
@@ -2424,46 +2422,75 @@ class strpath(object):
                 # Our suggestion still makes sense, so send our choice to the resolver
                 # with the adjusted offset and continue with the next suggestion.
                 (owner, candidates, carry) = resolver.send((mptr, carry))
+            index += 1
 
-            # If our index hasn't reached the length of the suggestion, then we now enter
-            # "flailing" mode. This requires us to reformat the suggestions into a lookup
-            # table and choose the default candidate when our lookup table doesn't work.
-            if index < len(suggestion):
-                flailing = {}
-                for rindex, item in enumerate(suggestion[index:]):
-                    index, _ = index + 1, flailing.setdefault(sptr.id, []).append(item)
+        # If our loop has terminated before resolving the path, then we still have some
+        # suggestions that we need to consume. Log what's left, and proceed to the next loop.
+        except StopIteration:
+            Flogging, discard_reason = logging.debug, 'was unnecessary and will be reused when flailing'
 
-                # Enter flailing mode where we just look up the current structure in our
-                # table and then use it to determine candidates. Otherwise, we choose the
-                # default choice that's available until we can finally leave.
-                while candidates:
-                    choices = flailing.get(owner.id, [])
-                    if choices:
-                        iterable = (choice for choice, (_, mptr, _) in enumerate(choices) if mptr.id in candidates)
-                        choice = builtins.next(iterable, len(choices))
-                        _, mptr, offset = choices.pop(choice) if choice < len(choices) else (owner, None, carry)
+        # If we received this exception, then the user is doing something crazy and wants an
+        # invalid path. Bump up the logging level and just leave since we can't do anything.
+        except internal.exceptions.MemberNotFoundError:
+            logging.critical(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was invalid for offset {:#x} and was truncated at index {:d} ({:s}).".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), goal, index, cls.fullname(result)))
+            Flogging, discard_reason = logging.info, 'was discarded'
 
-                    # If there's nothing to flail with, then we choose the default (None).
-                    else:
-                        mptr, offset = None, carry
+        # We are finally done and we can stop resolving things. Any other elements that are
+        # left weren't actually needed to get to the goal the user wanted.
+        else:
+            Flogging, discard_reason = logging.debug, 'was not actually used'
 
-                    # Just a smoke test if our offset doesn't match our carried offset.
-                    if carry != offset:
-                        logging.warning(u"{:s}.guide({:#x}, {:#x}, {!r}) : The resolution of the path item at index {:d} {:s} had a different offset ({:#x}) than expected ({:#x}) while flailing.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), len(result), cls.format(sptr, mptr, offset), offset, carry))
+        # If there's any suggestions left, then just log them so we can see what's left to do.
+        finally:
+            for rindex, item in enumerate(suggestion[index:]):
+                Flogging(u"{:s}.guide({:#x}, {:#x}, {:s}) : The path suggestion at index {:d} {:s} {:s}.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), index + rindex, cls.format(*item), discard_reason))
 
-                    # Send it off.. pray that our flailing accomplished something.
-                    owner, candidates, carry = resolver.send((mptr, offset))
+        # If we didn't end up processing all of our suggestions, then we need to flail using
+        # everything that's left in case the user's path was busted and needs to be repaired.
+        flailer = cls.flail(suggestion[index:])
+        try:
+            # Now we can start it and continue to choose candidates until there's none left.
+            builtins.next(flailer)
+            while True:
+                sptr, mptr, offset = flailer.send((owner, candidates, carry))
+                owner, candidates, carry = resolver.send((mptr, offset))
 
-            # We are finally done and we can stop resolving things.
+        # If we have no suggestions left or we've stopped. Then we should be good to go.
+        except StopIteration:
+            logging.debug(u"{:s}.guide({:#x}, {:#x}, {:s}) : Successfully processed {:d} suggestion{:s} and terminated at index {:d} after processing {:s}.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), len(suggestion[index:]), '' if len(suggestion[index:]) == 1 else 's', len(result), cls.format(sptr, mptr, offset)))
+
+        # If resolving gave us an exception, then we couldn't do anything with the suggestion
+        # even when we were flailing when trying to use all of them.
+        except internal.exceptions.MemberNotFoundError:
+            logging.info(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was invalid for offset {:#x} and was truncated at index {:d} ({:s}).".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), goal, len(result), cls.fullname(result)))
+
+        # Completed flailing our arms around trying to make sense of the user's suggestion.
+        finally:
+            flailer.close()
+
+        # At this point, there's absolutely nothing left to do but to keep choosing the
+        # default member until the resolver is complete.
+        try:
+            while True:
+                owner, candidates, carry = resolver.send((None, carry))
+
+        # We're finally done resolving the path. The path is now complete and in our result.
+        except StopIteration:
+            pass
+
+        # If we got an exception here, then we needed to make a choice but didn't. It's
+        # okay, though, because the user's path was completely resolved.
+        except internal.exceptions.MemberNotFoundError:
+            logging.info(u"{:s}.guide({:#x}, {:#x}, {:s}) : The suggested path was terminated at index {:d} of the result with {:d} candidate{:s} left{:s}.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), len(result), len(candidates), '' if len(candidates) == 1 else 's', " ({:s})".format(', '.join("{:#x}".format(item.id) for item in candidates) if candidates else '')))
+
+        finally:
             resolver.close()
 
-        # If our loop has terminated before resolving the path, then we're still okay as
-        # we only need to check how far we got and log where our path stops.
-        except StopIteration:
-            for rindex, item in enumerate(suggestion[index:]):
-                logging.warning(u"{:s}.guide({:#x}, {:#x}, {!r}) : The suggestion for path index {:d} {:s} was not needed.".format('.'.join([__name__, cls.__name__]), goal, struc.id, "[{:s}]".format(', '.join(suggestion_description)), index + rindex, cls.format(*item)))
+        # If our result is empty, then the path the user gave us didn't even come close to
+        # the goal that they wanted. We did get a structure, though, so use it instead.
+        result if result else calculator.send([owner, None, carry])
 
-        # We should now have our result resolved and we can now grab our delta.
+        # We should now have our result resolved so we can grab our delta to return it.
         delta, _ = builtins.next(calculator), calculator.close()
         return delta, result
 
