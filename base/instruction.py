@@ -1366,7 +1366,126 @@ def op_structurepath(ea, opnum, path):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, sptr=idaapi.struc_t, path=(builtins.tuple, builtins.list))
 def op_structurepath(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
-    raise NotImplementedError
+    ea = interface.address.inside(ea)
+    if not database.type.is_code(ea):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!r}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, sptr.id, path, ea))
+
+    # Convert the path to a list, and then validate it before we use it.
+    path, accepted = [item for item in path], (idaapi.member_t, structure.member_t, six.string_types, six.integer_types)
+    if any(not isinstance(item, accepted) for item in path):
+        index, item = next((index, item) for index, item in enumerate(path) if not isinstance(item, accepted))
+        raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!r}) : The path member at index {:d} has a type ({!s}) that is not supported.".format(__name__, ea, opnum, sptr.id, path, index, item.__class__))
+
+    # Grab information about our instruction and operand so that we can decode
+    # it to get the structure offset to use.
+    insn, op = at(ea), operand(ea, opnum)
+
+    # If the operand type is not a valid type, then raise an exception so that
+    # we don't accidentally apply a structure to an invalid operand type.
+    if op.type not in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ, idaapi.o_imm}:
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sptr.id, path, opnum, insn.ea, op.type))
+
+    # Similar to op_structure, we first need to figure out the path that the user
+    # has suggested to us to apply to the operand and we calculate our goal.
+    st = structure.__instance__(sptr.id)
+    usergoal, userpath = interface.strpath.suggest(st.ptr, path)
+
+    # Precalculate a description of the path to make our logging events look good.
+    path_description = []
+    for sptr, mptr, offset in userpath:
+        sname = utils.string.of(idaapi.get_struc_name(sptr.id))
+        mname = utils.string.of(idaapi.get_member_name(mptr.id)) if mptr else ''
+        fullname = '.'.join([sname, mname] if mname else [sname])
+        path_description.append("{:s}{:+#x}".format(fullname, offset) if offset or mname else fullname)
+
+    # We're looking for the "exact" path which should always be within the bounds
+    # of the structure so we'll simply flail around for its value.
+    calculator = interface.strpath.calculate(0, operator.truth)
+    resolver = interface.strpath.resolve(calculator.send, st.ptr, usergoal)
+    flailer = interface.strpath.flail(userpath)
+    builtins.next(calculator), builtins.next(flailer)
+
+    sptr, candidates, carry = builtins.next(resolver)
+    try:
+        while candidates:
+            owner, choice, offset = flailer.send((sptr, candidates, carry))
+            sptr, candidates, carry = resolver.send((choice, offset))
+
+    except (StopIteration, E.MemberNotFoundError):
+        pass
+
+    finally:
+        flailer.close()
+
+    # Now we can simply choose the default members and at the end we should have both
+    # the goal delta that we'll be able to traverse the suggestions with.
+    try:
+        while True:
+            sptr, candidates, carry = resolver.send((None, carry))
+
+    except (StopIteration, E.MemberNotFoundError):
+        pass
+
+    finally:
+        resolver.close()
+        goaldelta = builtins.next(calculator)
+        calculator.close()
+
+    # If our realdelta is different from our userdelta, then the user's path
+    # didn't actually resolve completely and we need to let them know.
+    if usergoal != goaldelta:
+        Flogging = logging.debug if usergoal < goaldelta else logging.warning
+        Fdescription = "incomplete ({:#x} < {:#x})".format if usergoal < goaldelta else "incorrect ({:#x} > {:#x})".format
+        action = 'of members were added' if usergoal < goaldelta else 'of the last members were discarded'
+        Flogging(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : The suggested path was {:s} and {:+#x} bytes {:s} before applying it to the operand.".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), Fdescription(usergoal, goaldelta), goaldelta - usergoal, action))
+
+    # Finally we can really flail for the exact member the user wanted using the
+    # delta that we're using as our goal and then choose the defaults for the rest.
+    realpath = []
+    calculator = interface.strpath.calculate(0, realpath.append)
+    resolver = interface.strpath.resolve(calculator.send, st.ptr, goaldelta)
+    flailer = interface.strpath.flail(userpath)
+    realdelta, _ = builtins.next(calculator), builtins.next(flailer)
+
+    sptr, candidates, carry = builtins.next(resolver)
+    try:
+        while True:
+            owner, choice, offset = flailer.send((sptr, candidates, carry))
+            sptr, candidates, carry = resolver.send((choice, carry))
+
+    except (StopIteration, E.MemberNotFoundError):
+        pass
+
+    finally:
+        flailer.close()
+
+    try:
+        while True:
+            sptr, candidates, carry = resolver.send((None, carry))
+
+    except (StopIteration, E.MemberNotFoundError):
+        pass
+
+    finally:
+        resolver.close()
+        realdelta = builtins.next(calculator)
+        calculator.close()
+
+    # Very last thing to do is to calculate the delta for the path with our
+    # value, and then we can apply the whole thing to the operand.
+    delta = realdelta - idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr)
+    items = interface.strpath.to_tids(realpath)
+    tid, length = idaapi.tid_array(len(items)), len(items)
+    for index in builtins.range(length):
+        tid[index] = items[index]
+
+    # Only thing that's left to do is apply the tids that we collected along with
+    # the delta that we calculated from the user's input to the desired operand.
+    if not idaapi.op_stroff(insn.ea if idaapi.__version__ < 7.0 else insn, opnum, tid.cast(), length, delta):
+        raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : Unable to apply the resolved structure path ({:s}) and delta ({:+#x}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), ', '.join(map("{:#x}".format, items)), delta, opnum, insn.ea))
+
+    # And then we can call into our other case to return what we just applied.
+    return op_structurepath(insn.ea, opnum)
 op_strucpath = op_strpath = utils.alias(op_structurepath)
 
 @utils.multicase(opnum=six.integer_types)
