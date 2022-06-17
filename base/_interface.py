@@ -464,7 +464,7 @@ class prioritybase(object):
             # If a method is passed to us, then we need to extract all
             # of the relevant components that describe it.
             if isinstance(object, (types.MethodType, staticmethod, classmethod)):
-                cls = pycompat.method.self(object)
+                cls = pycompat.method.type(object)
                 func = pycompat.method.function(object)
                 module, name = func.__module__, pycompat.function.name(func)
                 iterable = parameters(func)
@@ -603,10 +603,9 @@ class prioritybase(object):
         if state:
             self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # Otherwise our target is now empty and we need to disable it.
+        # Otherwise our target will need to be emptied.
         else:
             self.__cache__[target][:] = []
-            self.__disabled.add(target)
 
         # Now we can return whatever it was they removed.
         priority, result = item
@@ -632,10 +631,9 @@ class prioritybase(object):
         if state:
             self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # Otherwise we found nothing and we should just disable the target.
+        # Otherwise we found nothing and we should just empty the target.
         else:
             self.__cache__[target][:] = []
-            self.__disabled.add(target)
 
         return True if found else False
 
@@ -665,11 +663,9 @@ class prioritybase(object):
         if state:
             self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # If our state is empty, then we go ahead and disable the target.
-        # cache and then discard the the target.
+        # If our state is empty, then we go ahead and empty the target.
         else:
             self.__cache__[target][:] = []
-            self.__disabled.add(target)
 
         # We have an item that we can now return.
         priority, result = item
@@ -969,9 +965,8 @@ class priorityhook(prioritybase):
             raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:s}) : Unable to attach to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, format(priority), self.__formatter__(name)))
 
         # We should've attached, so all that's left is to add it for
-        # tracking using the parent method then ensure it is enabled.
-        ok = super(priorityhook, self).add(name, callable, priority)
-        return ok and self.enable(name)
+        # tracking using the parent method.
+        return super(priorityhook, self).add(name, callable, priority)
 
     def discard(self, name, callable):
         '''Discard the specified `callable` from hooking the event `name`.'''
@@ -1042,8 +1037,7 @@ class prioritynotification(prioritybase):
             raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the notification {:s}.".format('.'.join([__name__, cls.__name__]), notification, callable, priority, self.__formatter__(notification)))
 
         # Add the callable to our attached notification.
-        ok = super(prioritynotification, self).add(notification, callable, priority)
-        return ok and self.enable(notification)
+        return super(prioritynotification, self).add(notification, callable, priority)
 
     def __repr__(self):
         if len(self):
@@ -1161,8 +1155,7 @@ class priorityhxevent(prioritybase):
             raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, callable, priority, self.__formatter__(event)))
 
         # Add the callable to our current events to call.
-        ok = super(priorityhxevent, self).add(event, callable, priority)
-        return ok and self.enable(event)
+        return super(priorityhxevent, self).add(event, callable, priority)
 
     def __apply__(self, event):
         '''Return a closure that will execute all of the callables for the specified `event`.'''
