@@ -1467,7 +1467,8 @@ def op_enumeration(ea, opnum):
 
     # After grabbing the member, lets grab the actual value that we're going to
     # need to process the member identifier out of.
-    value, bits, signed = op(ea, opnum), op_bits(ea, opnum), interface.node.alt_opinverted(ea, opnum)
+    op = operand(ea, opnum)
+    value, bits, signed = op.value if op.type in {idaapi.o_imm} else op.addr, op_bits(ea, opnum), interface.node.alt_opinverted(ea, opnum)
 
     # FIXME: recalculate the operand value if the operand is negated (~)
 
