@@ -2171,6 +2171,44 @@ class strpath(object):
         return
 
     @classmethod
+    def flail(cls, suggestion):
+        '''A utility function that continuously yields decisions from a suggestion until there are no more available.'''
+        flailer = {}
+
+        # First we'll initialize our dictionary that we'll use to lookup decisions
+        # that the user gave us in the suggested path and collect our description.
+        suggestion_description = []
+        for sptr, mptr, offset in suggestion:
+            items = flailer.setdefault(sptr.id, [])
+            items.append((mptr, offset))
+            suggestion_description.append(cls.format(sptr, mptr, offset))
+
+        # Now we can enter our main loop that just looks up the current structure
+        # in our table and chooses the default candidate when it doesn't exist.
+        sptr, candidates, carry = (yield)
+        while flailer:
+            items = flailer[sptr.id] if flailer.get(sptr.id, []) else flailer.pop(sptr.id, [])
+
+            # If we know about this structure, then grab the element out of it and
+            # adjust our offset by the delta we found within our suggestion.
+            if items:
+                mptr, delta = items.pop(0)
+
+            # If there's nothing to flail with, then carry with the default item.
+            else:
+                mptr, delta = None, 0
+
+            # If our current item has an offset, then log that we're adjusting it.
+            if mptr and carry != delta:
+                logging.debug(u"{:s}.flail([{:s}]) : The suggested path item {:s} does not match {:s} and its difference ({:+#x}) will likely be carried into the next member.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, mptr, delta), cls.format(sptr, None, carry), delta))
+
+            # Send it off.. pray that our flailing accomplished something.
+            sptr, candidates, carry = (yield (sptr, mptr, carry))
+
+        # We terminated, so let the caller know where we actually stopped at.
+        logging.debug(u"{:s}.flail([{:s}]) : Flailing ended at {:s} with {:d} possible candidates ({:s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, None, carry), len(candidates), ', '.join("{:#x}".format(item.id) for item in candidates)))
+
+    @classmethod
     def of_tids(cls, offset, tids):
         '''Just a utility functions that uses the provided offset and a list of tids (`tid_array`) to return the complete path.'''
         iterable = (tid for tid in tids)
