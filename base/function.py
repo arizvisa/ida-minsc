@@ -3651,6 +3651,140 @@ class type(object):
             '''Return the registers for each of the parameters belonging to the function `func`.'''
             return [reg for reg, ti, name in frame.args.registers(func)]
         regs = utils.alias(registers, 'type.arguments')
+
+        @utils.multicase()
+        @classmethod
+        def iterate(cls):
+            '''Yield the `(name, type, location)` of each of the parameters belonging to the current function.'''
+            return cls.iterate(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def iterate(cls, func):
+            '''Yield the `(name, type, location)` of each of the parameters belonging to the function `func`.'''
+            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            ti = type(ea)
+
+            # If our type is a function pointer, then we need to dereference it
+            # in order to get the type that we want to extract the argument from.
+            if rt and ti.is_funcptr():
+                pi = idaapi.ptr_type_data_t()
+                if not ti.get_ptr_details(pi):
+                    raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
+                tinfo = pi.obj_type
+
+            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
+            elif not rt and ti.is_func():
+                tinfo = ti
+
+            # Anything else is a type error that we need to raise to the user.
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}.iterate({:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
+
+            # Now we can check to see if the type has details that we can grab the
+            # argument type out of. If there are no details, then we raise an
+            # exception informing the user.
+            if not tinfo.has_details():
+                raise E.MissingTypeOrAttribute(u"{:s}.iterate({:#x}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(tinfo), ea))
+
+            # Now we can grab our function details and process every argloc.
+            ftd = idaapi.func_type_data_t()
+            if not tinfo.get_func_details(ftd):
+                raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(tinfo), ea))
+
+            # Define a closure that is responsible for acting on an argument location
+            # and processes it using the lookup table that's provided to it.
+            def process_location(location, table):
+                atype = location.atype()
+                F = table.get(atype, utils.fidentity)
+                return atype, F(location)
+
+            # A lookup table for how to process each location type. We support
+            # scattered types (which we recurse for), but we don't really support
+            # custom types instead opting to return them as-is since they're
+            # declared as movable and so they should be safely refcounted.
+            location_table = {
+                idaapi.ALOC_STACK: operator.methodcaller('stkoff'),
+                idaapi.ALOC_STATIC: operator.methodcaller('stkoff'),
+                idaapi.ALOC_REG1: operator.methodcaller('get_reginfo'),
+                idaapi.ALOC_REG2: operator.methodcaller('get_reginfo'),
+            }
+
+            # Scattered types are pretty much recursive...afaict.
+            process_items = lambda ftd, table: [ process_location(ftd[index], table) for index in builtins.range(ftd.size()) ]
+            location_table[idaapi.ALOC_DIST] = utils.fcompose(operator.methodcaller('scattered'), lambda scatter_t: process_items(scatter_t, location_table))
+
+            # Custom types are supported...but not really.
+            location_table[idaapi.ALOC_CUSTOM] = operator.methodcaller('get_custom')
+
+            # Since we're iterating through this, we need to go through each
+            # one and extract the location to rip out its type and information.
+            items = []
+            for index in builtins.range(ftd.size()):
+                loc, name, ti = ftd[index].argloc, ftd[index].name, ftd[index].type
+                items.append((utils.string.of(name), ti, process_location(loc, location_table)))
+
+            # Now we'll define another closure that's responsible for converting
+            # one of the argloc types into a native python type that we can yield.
+            def process_item(loc):
+                ltype, linfo = loc
+
+                # This just contains an offset relative to the bottom of the args.
+                if ltype == idaapi.ALOC_STACK:
+                    return interface.location_t(linfo, ti.get_size())
+
+                # This is just an address for the user to figure out on their own.
+                elif ltype == idaapi.ALOC_STATIC:
+                    return linfo
+
+                # A single register and its offset. Offset seems to only be used
+                # when using scattered (ALOC_DIST) argument location types.
+                elif ltype == idaapi.ALOC_REG1:
+                    ridx1, regoff = (linfo & 0x0000ffff) >> 0, (linfo & 0xffff0000) >> 16
+                    reg = instruction.architecture.by_indexsize(ridx1, ti.get_size())
+                    return reg, regoff
+
+                # A pair of registers gets returned as a tuple.
+                elif ltype == idaapi.ALOC_REG2:
+                    ridx1, ridx2 = (linfo & 0x0000ffff) >> 0, (linfo & 0xffff0000) >> 16
+                    reg1, reg2 = (instruction.architecture.by_indexsize(ridx, ti.get_size() // 2) for ridx in [ridx1, ridx2])
+                    return reg1, reg2
+
+                # Seems to be a value relative to a register (reg+off).
+                elif ltype in {idaapi.ALOC_RREL}:
+                    ridx, roff = linfo
+                    return instruction.architecture.by_indexsize(ridx, ti.get_size())
+
+                # Scattered shit should really just be a list of things, and we
+                # can just recurse into it in order to extract our results.
+                elif ltype in {idaapi.ALOC_DIST}:
+                    return [ process_item(item) for item in linfo ]
+
+                # FIXME: We're not supporting this because I've never used this fucker.
+                elif ltype in {idaapi.ALOC_CUSTOM}:
+                    pass
+
+                # Anything else we just return, because we have no context to even
+                # raise an exception that can inform the user about what happened.
+                return linfo
+
+            # Now we can iterate through each of these items safely and yield
+            # each item to the caller.
+            for index, item in enumerate(items):
+                name, ti, location = item
+                result = process_item(location)
+
+                # Check to see if we got an error. We do this with a hack, by
+                # doing an identity check on what was returned.
+                ltype, linfo = location
+                if result is linfo:
+                    ltype_table = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
+                    ltype_s = ltype_table.get(ltype, '')
+                    logging.warning(u"{:s}.iterate({:#x}) : Unable to handle the unsupported type {:s}({:#x}) for argument at index {:d}{:s}{:s}.".format('.'.join([__name__, cls.__name__]), ea, ltype_s, ltype, index, " with the name \"{:s}\"".format(utils.string.escape(name, '"')) if name else '', " of the type {!s}".format(ti) if ti.is_well_defined() else ''))
+
+                # Now we can yield our result that we determined for each parameter.
+                yield name, ti, result
+            return
+
     args = parameters = arguments
 
 t = type # XXX: ns alias
