@@ -3642,18 +3642,6 @@ class type(object):
 
         @utils.multicase()
         @classmethod
-        def registers(cls):
-            '''Return the registers for each of the parameters belonging to the current function.'''
-            return cls.registers(ui.current.address())
-        @utils.multicase()
-        @classmethod
-        def registers(cls, func):
-            '''Return the registers for each of the parameters belonging to the function `func`.'''
-            return [reg for reg, ti, name in frame.args.registers(func)]
-        regs = utils.alias(registers, 'type.arguments')
-
-        @utils.multicase()
-        @classmethod
         def iterate(cls):
             '''Yield the `(name, type, location)` of each of the parameters belonging to the current function.'''
             return cls.iterate(ui.current.address())
@@ -3784,6 +3772,18 @@ class type(object):
                 # Now we can yield our result that we determined for each parameter.
                 yield name, ti, result
             return
+
+        @utils.multicase()
+        @classmethod
+        def registers(cls):
+            '''Return the registers for each of the parameters belonging to the current function.'''
+            return cls.registers(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def registers(cls, func):
+            '''Return the registers for each of the parameters belonging to the function `func`.'''
+            return [reg for reg, ti, name in frame.args.registers(func)]
+        regs = utils.alias(registers, 'type.arguments')
 
     args = parameters = arguments
 
