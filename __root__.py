@@ -99,7 +99,7 @@ Any = utils.PatternAny()
 del(utils)
 
 # some types that the user might want to compare with
-architecture_t, register_t, symbol_t, bounds_t = (getattr(__import__('internal').interface, item) for item in ['architecture_t', 'register_t', 'symbol_t', 'bounds_t'])
+architecture_t, register_t, symbol_t, bounds_t, location_t = (getattr(__import__('internal').interface, item) for item in ['architecture_t', 'register_t', 'symbol_t', 'bounds_t', 'location_t'])
 ref_t, opref_t = (getattr(__import__('internal').interface, item) for item in ['ref_t', 'opref_t'])
 
 # other miscellaneous modules to expose to the user
