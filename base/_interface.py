@@ -3439,7 +3439,7 @@ class architecture_t(object):
             return register if register.size == size else self.promote(parent(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({:s}{:s}) : Unable to determine the register to promote to.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size)))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to promote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size), size, register))
 
     def demote(self, register, size=None):
         '''Demote the specified `register` to its next smaller `size`.'''
@@ -3451,7 +3451,7 @@ class architecture_t(object):
             return register if register.size == size else self.demote(firstchild(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({:s}{:s}) : Unable to determine the register to demote to.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size)))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size), size, register))
 
 class bounds_t(namedtypedtuple):
     """
