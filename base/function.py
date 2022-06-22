@@ -3812,6 +3812,26 @@ class type(object):
             return [reg for reg, ti, name in frame.args.registers(func)]
         regs = utils.alias(registers, 'type.arguments')
 
+        @utils.multicase()
+        @classmethod
+        def locations(cls):
+            '''Return the locations of each of the parameters belonging to the current function.'''
+            return cls.locations(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def locations(cls, func):
+            '''Return the locations of each of the parameters belonging to the function `func`.'''
+            iterable = (location for _, _, location in cls.iterate(func))
+            result = []
+            for _, _, item in cls.iterate(func):
+                if isinstance(item, builtins.tuple) and isinstance(item[1], six.integer_types):
+                    register, offset = item
+                    result.append(item if offset else register)
+                else:
+                    result.append(item)
+                continue
+            return result
+
     args = parameters = arguments
 
 t = type # XXX: ns alias
