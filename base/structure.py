@@ -675,6 +675,11 @@ class structure_t(object):
         if res != index:
             logging.info(u"{:s}({:#x}).index({:+d}) : The index that the structure was moved to ({:#x}) does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), self.id, index, res, index))
         return res
+    @property
+    def ordinal(self):
+        '''Return the ordinal number of the structure within the current type library.'''
+        sptr = self.ptr
+        return max(0, sptr.ordinal)
 
     @property
     def typeinfo(self):
