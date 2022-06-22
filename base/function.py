@@ -3518,6 +3518,33 @@ class type(object):
                 raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}, {!s}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(newinfo), ea))
             return result
 
+        @utils.multicase(index=six.integer_types)
+        @classmethod
+        def location(cls, index):
+            '''Return the location of the parameter at the specified `index` in the current function.'''
+            return cls.location(ui.current.address(), index)
+        @utils.multicase(index=six.integer_types)
+        @classmethod
+        def location(cls, func, index):
+            '''Return the location of the parameter at the specified `index` in the function `func`.'''
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            locations = [item for _, _, item in type.arguments.iterate(func)]
+
+            # As always, check our bounds and raise an exception...cleanly.
+            if not (0 <= index < len(locations)):
+                raise E.InvalidTypeOrValueError(u"{:s}.location({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, len(locations), ea))
+            location = locations[index]
+
+            # Otherwise, this might be a tuple and we return the whole thing
+            # unless its a (register, offset). If it is, then check that it's
+            # a zero-offset because then we can return just the register.
+            if isinstance(location, builtins.tuple):
+                reg, off = location
+                if isinstance(off, six.integer_types) and off == 0:
+                    return reg
+                return location
+            return location
+
     arg = parameter = argument  # XXX: ns alias
 
     class arguments(object):
