@@ -3540,3 +3540,26 @@ class bounds_t(namedtypedtuple):
 
     def __repr__(self):
         return u"{!s}".format(self)
+
+class location_t(integerish):
+    """
+    This tuple is used to represent the size at a given location and has the format `(offset, size)`.
+    """
+    _fields = ('offset', 'size')
+    _types = ((six.integer_types, register_t), six.integer_types)
+    _operands = (internal.utils.fcurry, internal.utils.fconstant)
+
+    def __new__(cls, offset, size):
+        return super(location_t, cls).__new__(cls, offset, max(0, size))
+
+    def __int__(self):
+        offset, size = self
+        if isinstance(offset, six.integer_types):
+            return offset
+        cls = self.__class__
+        raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to convert the offset type of the location ({!s}) to an integer.".format(self, offset.__class__))
+
+    def __same__(self, other):
+        thisoffset, thissize = self
+        thatoffset, thatsize = other
+        return all([thisoffset == thatoffset], [thissize == thatsize])
