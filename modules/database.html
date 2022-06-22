@@ -84,13 +84,13 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="database.color">
 <code class="descclassname">database.</code><code class="descname">color</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.color" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the rgb color at the current address.</p>
+<dd><p>Return the color (RGB) for the item at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">color</code><span class="sig-paren">(</span><em>none</em><span class="sig-paren">)</span></dt>
-<dd><p>Remove the color from the current address.</p>
+<dd><p>Remove the color from the item at the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -104,7 +104,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">color</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the rgb color at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the color (RGB) for the item at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -118,7 +118,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">color</code><span class="sig-paren">(</span><em>ea</em>, <em>none</em><span class="sig-paren">)</span></dt>
-<dd><p>Remove the color at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Remove the color from the item at the the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -136,7 +136,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">color</code><span class="sig-paren">(</span><em>ea</em>, <em>rgb</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the color at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">rgb</span></code>.</p>
+<dd><p>Set the color for the item at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">rgb</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -159,7 +159,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**repeatable</strong> – whether the comment should be repeatable or not</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be returned</td>
 </tr>
 </tbody>
 </table>
@@ -176,7 +176,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>**repeatable</strong> – whether the comment should be repeatable or not</li>
+<li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be returned</li>
 </ul>
 </td>
 </tr>
@@ -194,7 +194,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>string</strong> (<em>str</em>) – the comment to apply</li>
-<li><strong>**repeatable</strong> – whether the comment should be repeatable or not</li>
+<li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be modified</li>
 </ul>
 </td>
 </tr>
@@ -212,7 +212,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
-<li><strong>**repeatable</strong> – whether the repeatable comment should be removed instead of the non-repeatable one</li>
+<li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be removed</li>
 </ul>
 </td>
 </tr>
@@ -232,7 +232,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>string</strong> (<em>str</em>) – the comment to apply</li>
-<li><strong>**repeatable</strong> – whether the comment should be repeatable or not</li>
+<li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be modified</li>
 </ul>
 </td>
 </tr>
@@ -252,7 +252,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
-<li><strong>**repeatable</strong> – whether the repeatable comment should be removed instead of the non-repeatable one</li>
+<li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be removed</li>
 </ul>
 </td>
 </tr>
@@ -592,7 +592,7 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries to return bytes from</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – a tuple containing the boundaries to return the bytes from</td>
 </tr>
 </tbody>
 </table>
@@ -907,7 +907,7 @@ determining the next valid address. These are:</p>
 <dl class="function">
 <dt id="database.address">
 <code class="descclassname">database.</code><code class="descname">address</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the address of the current address.</p>
+<dd><p>Return the current address or a list of addresses for the current selection.</p>
 </dd></dl>
 
 <dl class="function">
@@ -979,7 +979,7 @@ determining the next valid address. These are:</p>
 <dl class="function">
 <dt id="database.address.bounds">
 <code class="descclassname">address.</code><code class="descname">bounds</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address.bounds" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the bounds of the current address in a tuple formatted as <code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">right)</span></code>.</p>
+<dd><p>Return the bounds of the current address or selection in a tuple formatted as <code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">right)</span></code>.</p>
 </dd></dl>
 
 <dl class="function">
@@ -990,7 +990,7 @@ determining the next valid address. These are:</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address within the database to return an <code class="docutils literal notranslate"><span class="pre">interface.bounds_t</span></code> from</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address within the database to return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">interface.bounds_t</span></code> from</td>
 </tr>
 </tbody>
 </table>
@@ -3700,6 +3700,12 @@ for determining the type of the binary are also included.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="database.config.bitsize">
+<code class="descclassname">config.</code><code class="descname">bitsize</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.bitsize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the number of bits used by the database.</p>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.config.bounds">
 <code class="descclassname">config.</code><code class="descname">bounds</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.bounds" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the bounds of the current database in a tuple formatted as <code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">right)</span></code>.</p>
@@ -3774,7 +3780,7 @@ for determining the type of the binary are also included.</p>
 <dt id="database.config.idb">
 <code class="descclassname">config.</code><code class="descname">idb</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.idb" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the full path to the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.config.idb" title="database.config.idb"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.idb</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.config.idb" title="database.config.idb"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.config.database</span></code></a>, <a class="reference internal" href="#database.config.idb" title="database.config.idb"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.idb</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -3917,6 +3923,12 @@ for determining the type of the binary are also included.</p>
 <dt id="database.config.processor">
 <code class="descclassname">config.</code><code class="descname">processor</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.processor" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the name of the processor used by the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.config.size">
+<code class="descclassname">config.</code><code class="descname">size</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.size" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the number of bytes used by the database which can be used to distinguish whether you’re running 32-bit or 64-bit.</p>
 </dd></dl>
 
 <dl class="function">
@@ -4238,20 +4250,20 @@ multilined or paragraph comment.</p>
 <dl class="function">
 <dt id="database.extra.has_prefix">
 <code class="descclassname">extra.</code><code class="descname">has_prefix</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.extra.has_prefix" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return true if the item at the current address has extra prefix lines.</p>
+<dd><p>Return true if there are any extra comments that prefix the item at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#database.extra.has_prefix" title="database.extra.has_prefix"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.extra.prefixQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">extra.</code><code class="descname">has_prefix</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return true if the item at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> has extra prefix lines.</p>
+<dd><p>Return true if there are any extra comments that prefix the item at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.extra.has_prefix" title="database.extra.has_prefix"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.extra.prefixQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check for a prefix comment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check for the existence of a prefix comment</td>
 </tr>
 </tbody>
 </table>
@@ -4260,20 +4272,20 @@ multilined or paragraph comment.</p>
 <dl class="function">
 <dt id="database.extra.has_suffix">
 <code class="descclassname">extra.</code><code class="descname">has_suffix</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.extra.has_suffix" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return true if the item at the current address has extra suffix lines.</p>
+<dd><p>Return true if there are any extra comments that suffix the item at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#database.extra.has_suffix" title="database.extra.has_suffix"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.extra.suffixQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">extra.</code><code class="descname">has_suffix</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return true if the item at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> has extra suffix lines.</p>
+<dd><p>Return true if there are any extra comments that suffix the item at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.extra.has_suffix" title="database.extra.has_suffix"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.extra.suffixQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check for a suffix comment</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check for the existence of a suffix comment</td>
 </tr>
 </tbody>
 </table>
@@ -4725,6 +4737,20 @@ following examples can be used:</p>
 
 <dl class="function">
 <dt>
+<code class="descclassname">get.</code><code class="descname">array</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the values within the provided <code class="docutils literal notranslate"><span class="pre">bounds</span></code> as an array.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – a tuple containing the boundaries of the array to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">get.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em>, <em>**length</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the values of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it as the number of elements for the array.
@@ -4827,7 +4853,7 @@ If <code class="docutils literal notranslate"><span class="pre">byteorder</span>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**length</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**length</strong> – an integer specifying the <code class="xref py py-obj docutils literal notranslate"><span class="pre">length</span></code> to use for the string or a <code class="xref py py-obj docutils literal notranslate"><span class="pre">strtype</span></code> describing the type of the string</td>
 </tr>
 </tbody>
 </table>
@@ -4845,8 +4871,8 @@ If a tuple <code class="docutils literal notranslate"><span class="pre">strtype<
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
-<li><strong>**length</strong> – </li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the string to return</li>
+<li><strong>**length</strong> – an integer specifying the <code class="xref py py-obj docutils literal notranslate"><span class="pre">length</span></code> to use for the string or a <code class="xref py py-obj docutils literal notranslate"><span class="pre">strtype</span></code> describing the type of the string</li>
 </ul>
 </td>
 </tr>
@@ -4857,21 +4883,94 @@ If a tuple <code class="docutils literal notranslate"><span class="pre">strtype<
 <dl class="function">
 <dt id="database.get.structure">
 <code class="descclassname">get.</code><code class="descname">structure</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.get.structure" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> at the current address.</p>
+<dd><p>Return a dictionary of ctypes for the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> that is applied to the current address.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struct</span></code></a>, <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struc</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">get.</code><code class="descname">structure</code><span class="sig-paren">(</span><em>ea</em>, <em>**structure</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> as a dict of ctypes.</p>
-<p>If the <code class="docutils literal notranslate"><span class="pre">structure</span></code> argument is specified, then use that specific structure type.</p>
+<code class="descclassname">get.</code><code class="descname">structure</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a dictionary of ctypes for the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> that is applied to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struct</span></code></a>, <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of a structure within the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">structure</code><span class="sig-paren">(</span><em>ea</em>, <em>sptr</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a dictionary of ctypes for the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> identified by <code class="docutils literal notranslate"><span class="pre">sptr</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struct</span></code></a>, <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of a structure within the database</li>
-<li><strong>**structure</strong> – if <code class="docutils literal notranslate"><span class="pre">structure</span></code> contains a <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> then cast the address to it</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address within the database</li>
+<li><strong>sptr</strong> (<em>idaapi.struc_t</em>) – an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> of the structure to decode from the specified address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">structure</code><span class="sig-paren">(</span><em>ea</em>, <em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a dictionary of ctypes for the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struct</span></code></a>, <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address within the database</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the structure to decode from the specified address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">structure</code><span class="sig-paren">(</span><em>ea</em>, <em>type</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a dictionary of ctypes for the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> specified by <code class="docutils literal notranslate"><span class="pre">type</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struct</span></code></a>, <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address within the database</li>
+<li><strong>type</strong> (<a class="reference internal" href="structure.html#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> to decode from the specified address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">structure</code><span class="sig-paren">(</span><em>ea</em>, <em>identifier</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a dictionary of ctypes for the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">identifier</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struct</span></code></a>, <a class="reference internal" href="#database.get.structure" title="database.get.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address within the database</li>
+<li><strong>identifier</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the structure to decode from the specified address</li>
 </ul>
 </td>
 </tr>
@@ -5536,13 +5635,13 @@ an <code class="xref py py-obj docutils literal notranslate"><span class="pre">i
 <dl class="function">
 <dt id="database.get.switch">
 <code class="descclassname">get.</code><code class="descname">switch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.get.switch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the switch at the current address.</p>
+<dd><p>Return the switch that is referenced at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">get.</code><code class="descname">switch</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the switch at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the switch that is referenced by the address at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5908,12 +6007,13 @@ navigation to a mark.</p>
 </div>
 <div class="section" id="database-names">
 <span id="ns-database-names"></span><h3>3.1.1.2.9. database.names<a class="headerlink" href="#database-names" title="Permalink to this headline">¶</a></h3>
-<p>This namespace is used for listing all the names (or symbols)
-within the database. By default the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">name)</span></code> is yielded.</p>
-<p>The different types that one can filter the symbols with are the following:</p>
+<p>This namespace is used for listing all of the names (symbols) within the
+database. By default the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">name)</span></code> is yielded in its mangled form.</p>
+<p>The available types that one can filter the symbols with are as follows:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">address</span></code> - Match according to the address of the symbol</li>
-<li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match according to the name of the symbol</li>
+<li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match according to the name of the unmangled symbol</li>
+<li><code class="docutils literal notranslate"><span class="pre">unmangled</span></code> - Filter the unmangled symbol names according to a regular-expression</li>
 <li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the symbol names according to a glob</li>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the symbol names according to a regular-expression</li>
 <li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match the symbol according to its index</li>
@@ -6561,13 +6661,19 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 
 <dl class="function">
 <dt id="database.set.array">
-<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>type</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.array" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to an array of the specified <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.array" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current selection to an array of the type at the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>length</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at the current selection to an array of the specified <code class="docutils literal notranslate"><span class="pre">length</span></code> using the type at the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>type</strong> – a pythonic type to apply to the current address</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>length</strong> (<em>int</em><em> or </em><em>long</em>) – the number of elements to use when applying the array</td>
 </tr>
 </tbody>
 </table>
@@ -6575,15 +6681,15 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>type</em>, <em>length</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at the current address to an array with the specified <code class="docutils literal notranslate"><span class="pre">length</span></code> and <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>type</em>, <em>**length</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at the current address to an array of the specified <code class="docutils literal notranslate"><span class="pre">type</span></code> using the length determined from the current selection if <code class="docutils literal notranslate"><span class="pre">length</span></code> is not specified.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>type</strong> – a pythonic type to apply as an array element to the current address</li>
-<li><strong>length</strong> (<em>int</em><em> or </em><em>long</em>) – the number of elements in the array</li>
+<li><strong>**length</strong> – the number of elements to use when applying the array</li>
 </ul>
 </td>
 </tr>
@@ -6594,14 +6700,32 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <dl class="function">
 <dt>
 <code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em>, <em>type</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an array of the specified <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<dd><p>Set the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an array of the given <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
-<li><strong>type</strong> – a pythonic type to apply to the specified address</li>
+<li><strong>type</strong> – a pythonic type to use as the array element for the specified address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>bounds</em>, <em>type</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at the provided <code class="docutils literal notranslate"><span class="pre">bounds</span></code> to an array of the given <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bounds</strong> (<em>tuple</em>) – a tuple containing the boundaries of the array to apply</li>
+<li><strong>type</strong> – a pythonic type to use as the array element for the specified address</li>
 </ul>
 </td>
 </tr>
@@ -6612,15 +6736,15 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <dl class="function">
 <dt>
 <code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em>, <em>type</em>, <em>length</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an array with the specified <code class="docutils literal notranslate"><span class="pre">length</span></code> and <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<dd><p>Set the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an array with the given <code class="docutils literal notranslate"><span class="pre">length</span></code> and <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
-<li><strong>type</strong> – a pythonic type to apply as element to the specified address</li>
-<li><strong>length</strong> (<em>int</em><em> or </em><em>long</em>) – the number of elements in the array</li>
+<li><strong>type</strong> – a pythonic type to use as the array element for the specified address</li>
+<li><strong>length</strong> (<em>int</em><em> or </em><em>long</em>) – the number of elements to use for the array</li>
 </ul>
 </td>
 </tr>
@@ -6778,7 +6902,7 @@ If the tuple <code class="docutils literal notranslate"><span class="pre">strtyp
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to apply to the current address</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to apply to the current address</td>
 </tr>
 </tbody>
 </table>
@@ -6833,7 +6957,7 @@ If the tuple <code class="docutils literal notranslate"><span class="pre">strtyp
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
-<li><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to apply to the specified address</li>
+<li><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to apply to the specified address</li>
 </ul>
 </td>
 </tr>
@@ -6863,7 +6987,7 @@ If the tuple <code class="docutils literal notranslate"><span class="pre">strtyp
 <dl class="function">
 <dt id="database.set.unknown">
 <code class="descclassname">set.</code><code class="descname">unknown</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.unknown" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to undefined.</p>
+<dd><p>Set the data at the current address or selection to undefined.</p>
 <p>Aliases: <a class="reference internal" href="#database.set.unknown" title="database.set.unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.undef</span></code></a>, <a class="reference internal" href="#database.set.unknown" title="database.set.unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.undefined</span></code></a></p>
 </dd></dl>
 
@@ -7310,7 +7434,7 @@ specified address.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
-<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to apply to the address</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to apply to the address</li>
 </ul>
 </td>
 </tr>
@@ -7338,15 +7462,15 @@ specified address.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Parse the type information string in <code class="docutils literal notranslate"><span class="pre">info</span></code> into an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em><span class="sig-paren">)</span></dt>
+<dd><p>Parse the type information in <code class="docutils literal notranslate"><span class="pre">string</span></code> into an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
-<li><strong>info</strong> (<em>str</em>) – the type information as a string to apply to the address</li>
+<li><strong>string</strong> (<em>str</em>) – a string describing the type information to apply to the address</li>
 </ul>
 </td>
 </tr>
@@ -8212,14 +8336,257 @@ will return the <code class="xref py py-obj docutils literal notranslate"><span 
 defined within the database. The functions within this namespace
 can be used to create, query, or fetch the types that have been
 defined.</p>
+<p>The available types that one can filter the local types with are as follows:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">ordinal</span></code> - Match according to the ordinal of the local type.</li>
+<li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match according to the name of the local type.</li>
+<li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the names of the local types according to a glob.</li>
+<li><code class="docutils literal notranslate"><span class="pre">definition</span></code> - Filter the local types by applying a glob to their definition.</li>
+<li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the local types by applying a regular-expression to their definition.</li>
+<li><code class="docutils literal notranslate"><span class="pre">size</span></code> - Filter the local types according to their size.</li>
+<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">ge</span></code> - Filter the local types for the ones that are larger or equal to a certain size.</li>
+<li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the local types for the ones that are larger than a certain size.</li>
+<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Filter the local types for the ones that are less or equal to a certain size.</li>
+<li><code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the local types for the ones that are less than a certain size.</li>
+<li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the types by passing their ordinal and <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to a callable.</li>
+</ul>
+<p>Some examples of using these keywords are as follows:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">list</span><span class="p">(</span><span class="s1">&#39;*::*&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">iterable</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">definition</span><span class="o">=</span><span class="s1">&#39;*Cookie*&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">result</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s1">&#39;.*const.*&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
 <dl class="function">
-<dt id="database.types.get">
-<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>ordinal</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.get" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dt id="database.types.add">
+<code class="descclassname">types.</code><code class="descname">add</code><span class="sig-paren">(</span><em>name</em>, <em>info</em>, <em>**mangled</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add the type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current type library using the provided <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ordinal</strong> – the numerical index of the type to get</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to add</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the string or <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> of the type to add</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">add</code><span class="sig-paren">(</span><em>name</em>, <em>string</em>, <em>library</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Add the type information in <code class="docutils literal notranslate"><span class="pre">string</span></code> to the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> using the provided <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to add</li>
+<li><strong>string</strong> (<em>str</em>) – a string describing the type to add</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to be added to</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">add</code><span class="sig-paren">(</span><em>name</em>, <em>info</em>, <em>library</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Add the type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> using the provided <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<p>If the boolean <code class="docutils literal notranslate"><span class="pre">mangled</span></code> is specified, then the given name is mangled.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to add</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to use when adding the type</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to be added to</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.by">
+<code class="descclassname">types.</code><code class="descname">by</code><span class="sig-paren">(</span><em>ordinal</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type information that is at the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">by</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type information that has the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the type to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">by</code><span class="sig-paren">(</span><em>ordinal</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type information from the specified <code class="docutils literal notranslate"><span class="pre">library</span></code> that is at the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to return</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to return the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">by</code><span class="sig-paren">(</span><em>name</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type information from the specified <code class="docutils literal notranslate"><span class="pre">library</span></code> that is using the given <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to return</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to return the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.by_index">
+<code class="descclassname">types.</code><code class="descname">by_index</code><span class="sig-paren">(</span><em>ordinal</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.by_index" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type information that is at the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">by_index</code><span class="sig-paren">(</span><em>ordinal</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type information from the specified <code class="docutils literal notranslate"><span class="pre">library</span></code> that is at the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to return</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to return the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.by_name">
+<code class="descclassname">types.</code><code class="descname">by_name</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.by_name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type information that has the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the type to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">by_name</code><span class="sig-paren">(</span><em>name</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type information from the specified <code class="docutils literal notranslate"><span class="pre">library</span></code> that is using the given <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to return</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to return the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.count">
+<code class="descclassname">types.</code><code class="descname">count</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.types.count" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the number of types that are available in the current type library.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">count</code><span class="sig-paren">(</span><em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the number of types that are available in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to return the number of types from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.get">
+<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>ordinal</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.get" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the type information at the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the current type library and return it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to get</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Get the type information with the given <code class="docutils literal notranslate"><span class="pre">name</span></code> from the current type library and return it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the type to get</td>
 </tr>
 </tbody>
 </table>
@@ -8228,13 +8595,14 @@ defined.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>ordinal</em>, <em>library</em><span class="sig-paren">)</span></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>Get the type information at the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> and return it.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to get</li>
-<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> to fetch the type from</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to fetch the type from</li>
 </ul>
 </td>
 </tr>
@@ -8245,31 +8613,14 @@ defined.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>name</em>, <em>library</em><span class="sig-paren">)</span></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>Get the type information with the given <code class="docutils literal notranslate"><span class="pre">name</span></code> from the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> and return it.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>name</strong> (<em>str</em>) – the name of the type to get</li>
-<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> to fetch the type from</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="database.types.set">
-<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>name</em>, <em>parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.set" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to set</li>
-<li><strong>name</strong> – the name of the type to set</li>
-<li><strong>parameters</strong> – the extra parameters to include during serialization</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to fetch the type from</li>
 </ul>
 </td>
 </tr>
@@ -8279,16 +8630,495 @@ defined.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>name</em>, <em>parameters</em>, <em>library</em><span class="sig-paren">)</span></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>serialized</em><span class="sig-paren">)</span></dt>
+<dd><p>Convert the <code class="docutils literal notranslate"><span class="pre">serialized</span></code> type information from the current type library and return it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>serialized</strong> (<em>tuple</em>) – the tuple containing the fields that describe the serialized type</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">get</code><span class="sig-paren">(</span><em>serialized</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Convert the <code class="docutils literal notranslate"><span class="pre">serialized</span></code> type information from the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> and return it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>serialized</strong> (<em>tuple</em>) – the tuple containing the fields that describe the serialized type</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to serialize the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.iterate">
+<code class="descclassname">types.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the types in current type library with a glob that matches <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to filter the names of the types with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>string</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all of the types in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> with a glob that matches <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to filter the names of the types with</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> containing the types to iterate</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all of the types in the current type library that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**type</strong> – any keyword that can be used to filter types with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>library</em>, <em>**type</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all of the types in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library containing the types</li>
+<li><strong>**type</strong> – any keyword that can be used to filter types with</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.list">
+<code class="descclassname">types.</code><code class="descname">list</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.list" title="Permalink to this definition">¶</a></dt>
+<dd><p>List all of the types in the current type library with a glob that matches <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to filter the type names with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">list</code><span class="sig-paren">(</span><em>string</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>List all of the types in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> with a glob that matches <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to filter the type names with</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> containing the types to list</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">list</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
+<dd><p>List all of the types in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**type</strong> – any keyword that can be used to filter the types with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">list</code><span class="sig-paren">(</span><em>library</em>, <em>**type</em><span class="sig-paren">)</span></dt>
+<dd><p>List all of the types in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> containing the types to list</li>
+<li><strong>**type</strong> – any keyword that can be used to filter the types with</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.name">
+<code class="descclassname">types.</code><code class="descname">name</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the name of the type from the current type library that matches the given type <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the type information to return the name of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">name</code><span class="sig-paren">(</span><em>ordinal</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the name of the type from the current type library at the specified <code class="docutils literal notranslate"><span class="pre">ordinal</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to get the name from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">name</code><span class="sig-paren">(</span><em>info</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the name of the type from the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> that matches the given type <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the type information to return the name of</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library containing the type</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">name</code><span class="sig-paren">(</span><em>ordinal</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the name of the type from the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> at the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to get the name from</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library containing the type</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">name</code><span class="sig-paren">(</span><em>ordinal</em>, <em>string</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the name of the type at the specified <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> from the current library to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to rename</li>
+<li><strong>string</strong> (<em>str</em>) – the new name of the type</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">name</code><span class="sig-paren">(</span><em>ordinal</em>, <em>string</em>, <em>library</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the name of the type at the specified <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the given type <code class="docutils literal notranslate"><span class="pre">library</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<p>If the boolean <code class="docutils literal notranslate"><span class="pre">mangled</span></code> is specified, then the given name is mangled.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to rename</li>
+<li><strong>string</strong> (<em>str</em>) – the new name of the type</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library containing the type to rename</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.remove">
+<code class="descclassname">types.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>ordinal</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.remove" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the type information at the specified <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the current type library.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to remove</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>ordinal</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the type information at the <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to remove</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to remove the type from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>name</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the type information with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> from the current type library.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to remove</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>name</em>, <em>library</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the type information with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> from the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code>.</p>
+<p>If the boolean <code class="docutils literal notranslate"><span class="pre">mangled</span></code> is specified, then the given name is mangled.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the type to remove</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to remove the type from</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.search">
+<code class="descclassname">types.</code><code class="descname">search</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.search" title="Permalink to this definition">¶</a></dt>
+<dd><p>Search through all of the type names in the current type library matching the glob <code class="docutils literal notranslate"><span class="pre">string</span></code> and return the first result.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to filter the names of the types with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">search</code><span class="sig-paren">(</span><em>string</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Search through all of the type names in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> matching the glob <code class="docutils literal notranslate"><span class="pre">string</span></code> and return the first result.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to filter the names of the types with</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> containing the types to search</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">search</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
+<dd><p>Search through all of the types in the current type library that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**type</strong> – any keyword that can be used to filter the types with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">search</code><span class="sig-paren">(</span><em>library</em>, <em>**type</em><span class="sig-paren">)</span></dt>
+<dd><p>Search through all of the types in the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> containing the types to search</li>
+<li><strong>**type</strong> – any keyword that can be used to filter the types with</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.set">
+<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>info</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.set" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assign the type information <code class="docutils literal notranslate"><span class="pre">info</span></code> to the type at the specified <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the current type library.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to set</li>
-<li><strong>name</strong> – the name of the type to set</li>
-<li><strong>parameters</strong> – the extra parameters to include during serialization</li>
-<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> to set the type in</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the string or <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> of the type to assign</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>name</em>, <em>info</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Assign the type information <code class="docutils literal notranslate"><span class="pre">info</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> to the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the current type library.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to set</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the type to set</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the string or <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> of the type to assign</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>info</em>, <em>library</em><span class="sig-paren">)</span></dt>
+<dd><p>Assign the type information <code class="docutils literal notranslate"><span class="pre">info</span></code> to the type at the <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to set</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the string or <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> of the type to assign</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library for the type</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>name</em>, <em>string</em>, <em>library</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Assign the type information in <code class="docutils literal notranslate"><span class="pre">string</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> to the specified <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the given type <code class="docutils literal notranslate"><span class="pre">library</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to set</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the type to set</li>
+<li><strong>string</strong> (<em>str</em>) – a string describing the type to assign</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library for the type</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ordinal</em>, <em>name</em>, <em>info</em>, <em>library</em>, <em>**mangled</em><span class="sig-paren">)</span></dt>
+<dd><p>Assign the type information <code class="docutils literal notranslate"><span class="pre">info</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> to the given <code class="docutils literal notranslate"><span class="pre">ordinal</span></code> of the type <code class="docutils literal notranslate"><span class="pre">library</span></code>.</p>
+<p>If the boolean <code class="docutils literal notranslate"><span class="pre">mangled</span></code> is specified, then the given name is mangled.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ordinal</strong> (<em>int</em><em> or </em><em>long</em>) – the numerical index of the type to set</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the type to set</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> of the type to assign</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library for the type</li>
+<li><strong>**mangled</strong> – a boolean that specifies whether the name of the type is mangled</li>
 </ul>
 </td>
 </tr>

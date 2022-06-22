@@ -406,6 +406,39 @@ functions and aliases. For more information on this, please see
    
    :param segment: an identifier used to specify a segment
    
+.. py:function:: type()
+   
+   Return the type of the current segment.
+   
+.. py:function:: type(ea)
+   
+   Return the type of the segment containing the address ``ea``.
+   
+   :param ea:
+   :type ea: int or long
+   
+.. py:function:: type(name)
+   
+   Return the type of the segment with the specified ``name``.
+   
+   :param name: the name of the segment to return the type for
+   :type name: str
+   
+.. py:function:: type(segment)
+   
+   Return the type of the :py:obj:`idaapi.segment_t` specified by ``segment``.
+   
+   :param segment: an :py:obj:`idaapi.segment_t` to return the type for
+   :type segment: idaapi.segment_t
+   
+.. py:function:: type(segment, segtype)
+   
+   Return whether the given ``segment`` is of the provided ``segtype``.
+   
+   :param segment: an :py:obj:`idaapi.segment_t` to check the type for
+   :param segtype: an integer containing the :py:obj:`idaapi.SEG_\*` value to check the type against
+   :type segtype: int or long
+   
 .. py:function:: within()
    
    Returns true if the current address is within any segment.

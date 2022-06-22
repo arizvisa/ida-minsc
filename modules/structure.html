@@ -141,7 +141,7 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>sptr</strong> (<em>idaapi.struc_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to return</li>
+<li><strong>sptr</strong> (<em>idaapi.struc_t</em><em> or </em><a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> to return</li>
 <li><strong>**options</strong> – if <code class="docutils literal notranslate"><span class="pre">offset</span></code> is specified, then use it as the base offset of the structure</li>
 </ul>
 </td>
@@ -159,7 +159,7 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>tinfo</strong> (<em>idaapi.tinfo_t</em>) – </li>
+<li><strong>tinfo</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to return the structure for</li>
 <li><strong>**options</strong> – </li>
 </ul>
 </td>
@@ -355,16 +355,16 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt id="structure.fragment">
-<code class="descclassname">structure.</code><code class="descname">fragment</code><span class="sig-paren">(</span><em>structure</em>, <em>offset</em>, <em>size</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.fragment" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yield each member of the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code> from the <code class="docutils literal notranslate"><span class="pre">offset</span></code> up to the <code class="docutils literal notranslate"><span class="pre">size</span></code>.</p>
+<code class="descclassname">structure.</code><code class="descname">fragment</code><span class="sig-paren">(</span><em>structure</em>, <em>offset</em>, <em>**base</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.fragment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yield each member of the given <code class="docutils literal notranslate"><span class="pre">structure</span></code> from the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> as a tuple containing its attributes.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>structure</strong> (<a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to yield the members for</li>
+<li><strong>structure</strong> – the structure to yield the members from</li>
 <li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the starting offset of the fragment</li>
-<li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the size of the members to yield</li>
+<li><strong>**base</strong> – </li>
 </ul>
 </td>
 </tr>
@@ -374,24 +374,38 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">structure.</code><code class="descname">fragment</code><span class="sig-paren">(</span><em>id</em>, <em>offset</em>, <em>size</em><span class="sig-paren">)</span></dt>
-<dd><p>Yield each member of the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code> from the <code class="docutils literal notranslate"><span class="pre">offset</span></code> up to the <code class="docutils literal notranslate"><span class="pre">size</span></code>.</p>
-<p>Each iteration yields a tuple of the following format for each
-member within the requested bounds. This allows one to select
-certain fragments of a structure which can then be used to export
-to other programs or applications.</p>
-<p><code class="docutils literal notranslate"><span class="pre">((offset,</span> <span class="pre">size),</span> <span class="pre">(name,</span> <span class="pre">comment,</span> <span class="pre">repeatable))</span></code></p>
-<p>In this tuple, the field <code class="docutils literal notranslate"><span class="pre">comment</span></code> represents the non-repeatable
-comment whereas <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> contains the member’s <code class="docutils literal notranslate"><span class="pre">repeatable</span></code>
-comment.</p>
+<code class="descclassname">structure.</code><code class="descname">fragment</code><span class="sig-paren">(</span><em>structure</em>, <em>offset</em>, <em>size</em>, <em>**base</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield each member of the given <code class="docutils literal notranslate"><span class="pre">structure</span></code> from the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> up to <code class="docutils literal notranslate"><span class="pre">size</span></code> as a tuple containing its attributes.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifer of the structure to yield the members for</li>
+<li><strong>structure</strong> – the structure to yield the members from</li>
 <li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the starting offset of the fragment</li>
 <li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the size of the members to yield</li>
+<li><strong>**base</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">fragment</code><span class="sig-paren">(</span><em>id</em>, <em>offset</em>, <em>size</em>, <em>**base</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield each member of the structure with the specified <code class="docutils literal notranslate"><span class="pre">id</span></code> from the given <code class="docutils literal notranslate"><span class="pre">offset</span></code> up to <code class="docutils literal notranslate"><span class="pre">size</span></code> as a tuple containing its <code class="docutils literal notranslate"><span class="pre">(offset,</span> <span class="pre">size,</span> <span class="pre">tags)</span></code>.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">base</span></code> is defined, then the offset of each member will be translated by the given value.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifer of the structure to yield the members from</li>
+<li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the starting offset of the fragment</li>
+<li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the size of the members to yield</li>
+<li><strong>**base</strong> – </li>
 </ul>
 </td>
 </tr>
@@ -435,7 +449,7 @@ comment.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<em>idaapi.struc_t</em>) – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<em>idaapi.struc_t</em><em> or </em><a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> or the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to check</td>
 </tr>
 </tbody>
 </table>
@@ -506,6 +520,36 @@ comment.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="structure.is_frame">
+<code class="descclassname">structure.</code><code class="descname">is_frame</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.is_frame" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code> is a frame or not.</p>
+<p>Aliases: <a class="reference internal" href="#structure.is_frame" title="structure.is_frame"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.isframe</span></code></a>, <a class="reference internal" href="#structure.is_frame" title="structure.is_frame"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.frameQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the structure to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">is_frame</code><span class="sig-paren">(</span><em>structure</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the provided <code class="docutils literal notranslate"><span class="pre">structure</span></code> is a frame or not.</p>
+<p>Aliases: <a class="reference internal" href="#structure.is_frame" title="structure.is_frame"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.isframe</span></code></a>, <a class="reference internal" href="#structure.is_frame" title="structure.is_frame"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.frameQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<em>idaapi.struc_t</em><em> or </em><a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> or <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="structure.is_union">
 <code class="descclassname">structure.</code><code class="descname">is_union</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.is_union" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return whether the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code> is a union or not.</p>
@@ -529,7 +573,7 @@ comment.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<em>idaapi.struc_t</em><em> or </em><a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> or <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to check</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<em>idaapi.struc_t</em><em> or </em><a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> or <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to check</td>
 </tr>
 </tbody>
 </table>
@@ -593,13 +637,17 @@ comment.</p>
 
 <dl class="function">
 <dt id="structure.members">
-<code class="descclassname">structure.</code><code class="descname">members</code><span class="sig-paren">(</span><em>structure</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yield each member of the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code>.</p>
+<code class="descclassname">structure.</code><code class="descname">members</code><span class="sig-paren">(</span><em>structure</em>, <em>**base</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yield each member of the given <code class="docutils literal notranslate"><span class="pre">structure</span></code> as a tuple containing its attributes.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to yield the members for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>structure</strong> – the structure to yield the members from</li>
+<li><strong>**base</strong> – a base address to translate the offset of each yielded member with</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -607,14 +655,18 @@ comment.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">structure.</code><code class="descname">members</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span></dt>
-<dd><p>Yield each member of the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code>.</p>
-<p>Each iteration yields the <code class="docutils literal notranslate"><span class="pre">((offset,</span> <span class="pre">size),</span> <span class="pre">(name,</span> <span class="pre">comment,</span> <span class="pre">repeatable-comment))</span></code> of each member.</p>
+<code class="descclassname">structure.</code><code class="descname">members</code><span class="sig-paren">(</span><em>id</em>, <em>**base</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield each member of the structure with the specified <code class="docutils literal notranslate"><span class="pre">id</span></code> as a tuple of containing its <code class="docutils literal notranslate"><span class="pre">(offset,</span> <span class="pre">size,</span> <span class="pre">tags)</span></code>.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">base</span></code> is defined, then the offset of each member will be translated by the given value.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the structure to yield the members for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the structure to yield the members from</li>
+<li><strong>**base</strong> – a base address to translate the offset of each yielded member with</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -628,7 +680,7 @@ comment.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> – the identifier of the structure to return the name for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> – the identifier of the structure to return the name of</td>
 </tr>
 </tbody>
 </table>
@@ -641,7 +693,7 @@ comment.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to return the name for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>structure</strong> (<a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to return the name of</td>
 </tr>
 </tbody>
 </table>
@@ -697,7 +749,7 @@ comment.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>string</strong> (<em>str</em><em> or </em><em>tuple</em>) – a string to use as the name</li>
 <li><strong>*suffix</strong> – any other strings to append to the name</li>
-<li><strong>**offset</strong> – the base offset of the structure that’s being created</li>
+<li><strong>**offset</strong> – the base offset of the structure that is being created</li>
 </ul>
 </td>
 </tr>
@@ -788,6 +840,41 @@ comment.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**type</strong> – any keyword that can be used to filter the structures with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="structure.select">
+<code class="descclassname">structure.</code><code class="descname">select</code><span class="sig-paren">(</span><em>tag</em>, <em>*And</em>, <em>**boolean</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.select" title="Permalink to this definition">¶</a></dt>
+<dd><p>Query all of the structure tags for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">And</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>tag</strong> (<em>str</em>) – a required tag name to search for</li>
+<li><strong>*And</strong> – any other required tag names</li>
+<li><strong>**boolean</strong> – either <code class="docutils literal notranslate"><span class="pre">And</span></code> or <code class="docutils literal notranslate"><span class="pre">Or</span></code> which specifies required or optional tags (respectively)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">select</code><span class="sig-paren">(</span><em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query all the structures (linearly) for any tags specified by <code class="docutils literal notranslate"><span class="pre">boolean</span></code>. Yields each address found along with the matching tags as a dictionary.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">And</span></code> contains an iterable then require the returned structure contains them.
+If <code class="docutils literal notranslate"><span class="pre">Or</span></code> contains an iterable then include any other tags that are specified.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**boolean</strong> – either <code class="docutils literal notranslate"><span class="pre">And</span></code> or <code class="docutils literal notranslate"><span class="pre">Or</span></code> which specifies required or optional tags (respectively)</td>
 </tr>
 </tbody>
 </table>
@@ -1009,20 +1096,16 @@ database that references said member.</p>
 <dl class="attribute">
 <dt id="structure.member_t.offset">
 <code class="descname">offset</code><a class="headerlink" href="#structure.member_t.offset" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="docutils">
-<dt>The offset of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code> relative to the structure’s base offset.</dt>
-<dd><table class="first last docutils field-list" frame="void" rules="none">
+<dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the offset of the member.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Return the offset of the member.</td>
 </tr>
 </tbody>
 </table>
-</dd>
-</dl>
+</dd></dl>
+
 <dl class="attribute">
 <dt id="structure.member_t.parent">
 <code class="descname">parent</code><a class="headerlink" href="#structure.member_t.parent" title="Permalink to this definition">¶</a></dt>
@@ -1093,7 +1176,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The real offset of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
+<dt>The offset of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code> relative to the structure’s base offset.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1425,6 +1508,20 @@ specified. The keywords that are available to filter members are:</p>
 </dd></dl>
 
 <dl class="method">
+<dt>
+<code class="descname">by</code><span class="sig-paren">(</span><em>self</em>, <em>location</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the member at the specified <code class="docutils literal notranslate"><span class="pre">location</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>location</strong> – a <code class="xref py py-obj docutils literal notranslate"><span class="pre">location_t</span></code> to use when locating the member</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="structure.members_t.by_fullname">
 <code class="descname">by_fullname</code><span class="sig-paren">(</span><em>self</em>, <em>fullname</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.by_fullname" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the member with the specified <code class="docutils literal notranslate"><span class="pre">fullname</span></code>.</p>
@@ -1644,6 +1741,41 @@ specified. The keywords that are available to filter members are:</p>
 </table>
 </dd></dl>
 
+<dl class="method">
+<dt id="structure.members_t.select">
+<code class="descname">select</code><span class="sig-paren">(</span><em>self</em>, <em>tag</em>, <em>*And</em>, <em>**boolean</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.select" title="Permalink to this definition">¶</a></dt>
+<dd><p>Query all of the members for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">And</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>tag</strong> (<em>str</em>) – a required tag name to search for</li>
+<li><strong>*And</strong> – any other required tag names</li>
+<li><strong>**boolean</strong> – either <code class="docutils literal notranslate"><span class="pre">And</span></code> or <code class="docutils literal notranslate"><span class="pre">Or</span></code> which specifies required or optional tags (respectively)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt>
+<code class="descname">select</code><span class="sig-paren">(</span><em>self</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query all of the members (linearly) for any tags specified by <code class="docutils literal notranslate"><span class="pre">boolean</span></code>. Yields each member found along with the matching tags as a dictionary.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">And</span></code> contains an iterable then require the returned members contains them.
+If <code class="docutils literal notranslate"><span class="pre">Or</span></code> contains an iterable then include any other tags that are specified.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**boolean</strong> – either <code class="docutils literal notranslate"><span class="pre">And</span></code> or <code class="docutils literal notranslate"><span class="pre">Or</span></code> which specifies required or optional tags (respectively)</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </dd></dl>
 
 </div>
@@ -1802,6 +1934,19 @@ already existing one.</p>
 </table>
 </dd>
 </dl>
+<dl class="attribute">
+<dt id="structure.structure_t.ordinal">
+<code class="descname">ordinal</code><a class="headerlink" href="#structure.structure_t.ordinal" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Return the ordinal number of the structure within the current type library.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="attribute">
 <dt id="structure.structure_t.properties">
 <code class="descname">properties</code><a class="headerlink" href="#structure.structure_t.properties" title="Permalink to this definition">¶</a></dt>

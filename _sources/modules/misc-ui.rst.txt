@@ -79,7 +79,7 @@ in the inbox that is displayed to the user.
    
    Request the user choose from the options "yes", "no", or "cancel".
    
-   :param \*\*default:
+   :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
    
 .. py:function:: ask(message, \*\*default)
    
@@ -92,7 +92,7 @@ in the inbox that is displayed to the user.
    
    Request the user provide an address.
    
-   :param \*\*default:
+   :param \*\*default: the default address for the user to change. if one was not specified, then use the current address.
    
 .. py:function:: ask\.address(message, \*\*default)
    
@@ -110,7 +110,7 @@ in the inbox that is displayed to the user.
    
    Request the user provide an integer.
    
-   :param \*\*default:
+   :param \*\*default: the default integer for the user to change. if one was not specified, then use the previous integer that the user input.
    
 .. py:function:: ask\.integer(message, \*\*default)
    
@@ -123,7 +123,7 @@ in the inbox that is displayed to the user.
    
    Request the user provide a multi-lined string.
    
-   :param \*\*default:
+   :param \*\*default: the default string for the user to change
    
 .. py:function:: ask\.note(message, \*\*default)
    
@@ -139,7 +139,7 @@ in the inbox that is displayed to the user.
    
    Request the user provide a segment.
    
-   :param \*\*default:
+   :param \*\*default: the default segment for the user to change. if one was not specified, then use the address of the current segment.
    
 .. py:function:: ask\.segment(message, \*\*default)
    
@@ -152,7 +152,7 @@ in the inbox that is displayed to the user.
    
    Request the user provide a string.
    
-   :param \*\*default:
+   :param \*\*default: the default string for the user to change
    
 .. py:function:: ask\.string(message, \*\*default)
    
@@ -256,7 +256,7 @@ segment, clipboard, widget, or even the current window in use.
    
 .. py:function:: current\.symbol()
    
-   Return the current highlighted symbol name.
+   Return the current highlighted symbol name or register.
    
 .. py:function:: current\.widget()
    
@@ -418,6 +418,45 @@ This namespace is for registering items in IDA's menu system.
    
    :param path: the menu path containing the item to remove
    :param name: the name of the item to remove
+   
+.. _ns-ui-message:
+
+**********
+ui.message
+**********
+
+This namespace is for displaying a modal dialog box with the different
+icons that are available from IDA's user interface. The functions within
+will block IDA from being interacted with while their dialog is displayed.
+
+.. py:function:: message(message, \*\*icon)
+   
+   Display a modal information dialog box using the provided ``message``.
+   
+   :param message: the message to display in the dialog box
+   :param \*\*icon: a boolean specifying the icon to include in the dialog which can be either ``information`` or ``warning``
+   
+.. py:function:: message\.error(message)
+   
+   Display a modal error dialog box using the provided ``message``.
+   
+   :param message: the message to display in the dialog box
+   
+.. py:function:: message\.information(message)
+   
+   Display a modal information dialog box using the provided ``message``.
+   
+   Aliases: :py:func:`ui.message.info<message\.information>`
+   
+   :param message: the message to display in the dialog box
+   
+.. py:function:: message\.warning(message)
+   
+   Display a modal warning dialog box using the provided ``message``.
+   
+   Aliases: :py:func:`ui.message.warn<message\.warning>`
+   
+   :param message: the message to display in the dialog box
    
 .. _ns-ui-modules:
 

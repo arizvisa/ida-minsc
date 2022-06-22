@@ -788,6 +788,72 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 </dd></dl>
 
 <dl class="function">
+<dt id="segment.type">
+<code class="descclassname">segment.</code><code class="descname">type</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#segment.type" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type of the current segment.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">segment.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type of the segment containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">segment.</code><code class="descname">type</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type of the segment with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the segment to return the type for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">segment.</code><code class="descname">type</code><span class="sig-paren">(</span><em>segment</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type of the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.segment_t</span></code> specified by <code class="docutils literal notranslate"><span class="pre">segment</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>segment</strong> (<em>idaapi.segment_t</em>) – an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.segment_t</span></code> to return the type for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">segment.</code><code class="descname">type</code><span class="sig-paren">(</span><em>segment</em>, <em>segtype</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the given <code class="docutils literal notranslate"><span class="pre">segment</span></code> is of the provided <code class="docutils literal notranslate"><span class="pre">segtype</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>segment</strong> – an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.segment_t</span></code> to check the type for</li>
+<li><strong>segtype</strong> (<em>int</em><em> or </em><em>long</em>) – an integer containing the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SEG_*</span></code> value to check the type against</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="segment.within">
 <code class="descclassname">segment.</code><code class="descname">within</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#segment.within" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the current address is within any segment.</p>

@@ -67,15 +67,15 @@ functions and aliases. For more information on this, please see
    
    Return the structure for the specified ``sptr``.
    
-   :param sptr: the ``idaapi.struc_t`` to return
-   :type sptr: idaapi.struc_t
+   :param sptr: the :py:obj:`idaapi.struc_t` to return
+   :type sptr: idaapi.struc_t or structure_t
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
    
 .. py:function:: by(tinfo, \*\*options)
    
    Return the structure for the specified ``tinfo``.
    
-   :param tinfo:
+   :param tinfo: the :py:obj:`idaapi.tinfo_t` to return the structure for
    :type tinfo: idaapi.tinfo_t
    :param \*\*options:
    
@@ -172,38 +172,39 @@ functions and aliases. For more information on this, please see
    :type none: None
    :param \*\*repeatable: whether the removed comment should be the repeatable one
    
-.. py:function:: fragment(structure, offset, size)
+.. py:function:: fragment(structure, offset, \*\*base)
    
-   Yield each member of the specified ``structure`` from the ``offset`` up to the ``size``.
+   Yield each member of the given ``structure`` from the specified ``offset`` as a tuple containing its attributes.
    
-   :param structure: the :py:obj:`structure_t` to yield the members for
-   :type structure: structure_t
+   :param structure: the structure to yield the members from
+   :param offset: the starting offset of the fragment
+   :type offset: int or long
+   :param \*\*base:
+   
+.. py:function:: fragment(structure, offset, size, \*\*base)
+   
+   Yield each member of the given ``structure`` from the specified ``offset`` up to ``size`` as a tuple containing its attributes.
+   
+   :param structure: the structure to yield the members from
    :param offset: the starting offset of the fragment
    :type offset: int or long
    :param size: the size of the members to yield
    :type size: int or long
+   :param \*\*base:
    
-.. py:function:: fragment(id, offset, size)
+.. py:function:: fragment(id, offset, size, \*\*base)
    
-   Yield each member of the structure identified by ``id`` from the ``offset`` up to the ``size``.
+   Yield each member of the structure with the specified ``id`` from the given ``offset`` up to ``size`` as a tuple containing its ``(offset, size, tags)``.
    
-   Each iteration yields a tuple of the following format for each
-   member within the requested bounds. This allows one to select
-   certain fragments of a structure which can then be used to export
-   to other programs or applications.
+   If the integer ``base`` is defined, then the offset of each member will be translated by the given value.
    
-   ``((offset, size), (name, comment, repeatable))``
-   
-   In this tuple, the field ``comment`` represents the non-repeatable
-   comment whereas ``repeatable`` contains the member's ``repeatable``
-   comment.
-   
-   :param id: the identifer of the structure to yield the members for
+   :param id: the identifer of the structure to yield the members from
    :type id: int or long
    :param offset: the starting offset of the fragment
    :type offset: int or long
    :param size: the size of the members to yield
    :type size: int or long
+   :param \*\*base:
    
 .. py:function:: has(id)
    
@@ -223,8 +224,8 @@ functions and aliases. For more information on this, please see
    
    Return whether the database includes the provided ``structure``.
    
-   :param structure:
-   :type structure: idaapi.struc_t
+   :param structure: the :py:obj:`idaapi.struc_t` or the :py:obj:`structure_t` to check
+   :type structure: idaapi.struc_t or structure_t
    
 .. py:function:: index(id)
    
@@ -258,6 +259,24 @@ functions and aliases. For more information on this, please see
    :param index: the index to move the structure to
    :type index: int or long
    
+.. py:function:: is_frame(id)
+   
+   Return whether the structure identified by ``id`` is a frame or not.
+   
+   Aliases: :py:func:`structure.isframe<is_frame>`, :py:func:`structure.frameQ<is_frame>`
+   
+   :param id: the identifier of the structure to check
+   :type id: int or long
+   
+.. py:function:: is_frame(structure)
+   
+   Return whether the provided ``structure`` is a frame or not.
+   
+   Aliases: :py:func:`structure.isframe<is_frame>`, :py:func:`structure.frameQ<is_frame>`
+   
+   :param structure: the :py:obj:`idaapi.struc_t` or :py:obj:`structure_t` to check
+   :type structure: idaapi.struc_t or structure_t
+   
 .. py:function:: is_union(id)
    
    Return whether the structure identified by ``id`` is a union or not.
@@ -273,7 +292,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`structure.unionQ<is_union>`, :py:func:`structure.isunion<is_union>`
    
-   :param structure: the ``idaapi.struc_t`` or :py:obj:`structure_t` to check
+   :param structure: the :py:obj:`idaapi.struc_t` or :py:obj:`structure_t` to check
    :type structure: idaapi.struc_t or structure_t
    
 .. py:function:: iterate(string)
@@ -302,31 +321,32 @@ functions and aliases. For more information on this, please see
    
    :param \*\*type: any keyword that can be used to filter structures with
    
-.. py:function:: members(structure)
+.. py:function:: members(structure, \*\*base)
    
-   Yield each member of the specified ``structure``.
+   Yield each member of the given ``structure`` as a tuple containing its attributes.
    
-   :param structure: the :py:obj:`structure_t` to yield the members for
-   :type structure: structure_t
+   :param structure: the structure to yield the members from
+   :param \*\*base: a base address to translate the offset of each yielded member with
    
-.. py:function:: members(id)
+.. py:function:: members(id, \*\*base)
    
-   Yield each member of the structure identified by ``id``.
+   Yield each member of the structure with the specified ``id`` as a tuple of containing its ``(offset, size, tags)``.
    
-   Each iteration yields the ``((offset, size), (name, comment, repeatable-comment))`` of each member.
+   If the integer ``base`` is defined, then the offset of each member will be translated by the given value.
    
-   :param id: the identifier of the structure to yield the members for
+   :param id: the identifier of the structure to yield the members from
    :type id: int or long
+   :param \*\*base: a base address to translate the offset of each yielded member with
    
 .. py:function:: name(id)
    
    Return the name of the structure identified by ``id``.
    
-   :param id: the identifier of the structure to return the name for
+   :param id: the identifier of the structure to return the name of
    
 .. py:function:: name(structure)
    
-   :param structure: the :py:obj:`structure_t` to return the name for
+   :param structure: the :py:obj:`structure_t` to return the name of
    :type structure: structure_t
    
 .. py:function:: name(id, string, \*suffix)
@@ -357,7 +377,7 @@ functions and aliases. For more information on this, please see
    :param string: a string to use as the name
    :type string: str or tuple
    :param \*suffix: any other strings to append to the name
-   :param \*\*offset: the base offset of the structure that's being created
+   :param \*\*offset: the base offset of the structure that is being created
    
 .. py:function:: remove(structure)
    
@@ -406,6 +426,24 @@ functions and aliases. For more information on this, please see
    Search through all of the structures and return the first result matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter the structures with
+   
+.. py:function:: select(tag, \*And, \*\*boolean)
+   
+   Query all of the structure tags for the specified ``tag`` and any others specified as ``And``.
+   
+   :param tag: a required tag name to search for
+   :type tag: str
+   :param \*And: any other required tag names
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
+   
+.. py:function:: select(\*\*boolean)
+   
+   Query all the structures (linearly) for any tags specified by ``boolean``. Yields each address found along with the matching tags as a dictionary.
+   
+   If ``And`` contains an iterable then require the returned structure contains them.
+   If ``Or`` contains an iterable then include any other tags that are specified.
+   
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: size(structure)
    
@@ -499,7 +537,6 @@ member_t
    
    .. py:attribute:: offset
    
-   The offset of this ``member_t`` relative to the structure's base offset.
       :param getter: Return the offset of the member.
    
    .. py:attribute:: parent
@@ -523,7 +560,7 @@ member_t
    
    .. py:attribute:: realoffset
    
-   The real offset of this ``member_t``.
+   The offset of this ``member_t`` relative to the structure's base offset.
       :param getter: Return the real offset of the member.
    
    .. py:attribute:: right
@@ -683,6 +720,12 @@ members_t
       :param offset: the offset of the member to return
       :type offset: int or long
       
+   .. py:method:: by(self, location)
+      
+      Return the member at the specified ``location``.
+      
+      :param location: a :py:obj:`location_t` to use when locating the member
+      
    .. py:method:: by_fullname(self, fullname)
       
       Return the member with the specified ``fullname``.
@@ -788,6 +831,24 @@ members_t
       :param offset: the offset of the starting member to remove
       :param size: the size of the members that follow to remove
       
+   .. py:method:: select(self, tag, \*And, \*\*boolean)
+      
+      Query all of the members for the specified ``tag`` and any others specified as ``And``.
+      
+      :param tag: a required tag name to search for
+      :type tag: str
+      :param \*And: any other required tag names
+      :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
+      
+   .. py:method:: select(self, \*\*boolean)
+      
+      Query all of the members (linearly) for any tags specified by ``boolean``. Yields each member found along with the matching tags as a dictionary.
+      
+      If ``And`` contains an iterable then require the returned members contains them.
+      If ``Or`` contains an iterable then include any other tags that are specified.
+      
+      :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
+      
 ***********
 structure_t
 ***********
@@ -849,6 +910,10 @@ structure_t
       :param getter: Return the base offset of the structure.
       :param setter: Set the base offset of the structure to ``offset``.
       :param offset: the new base offset to assign to the structure
+   
+   .. py:attribute:: ordinal
+   
+      :param getter: Return the ordinal number of the structure within the current type library.
    
    .. py:attribute:: properties
    

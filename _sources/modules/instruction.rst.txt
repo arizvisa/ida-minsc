@@ -649,7 +649,7 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
-.. py:function:: op_structure(opnum, structure, \*path, \*\*delta)
+.. py:function:: op_structure(opnum, structure, \*path)
    
    Apply the specified ``structure`` along with any members in ``path`` to the instruction operand ``opnum`` at the current address.
    
@@ -658,88 +658,22 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
-   :type structure: structure_t
-   :param \*path: any structure members to include in the path
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   :type structure: structure_t or idaapi.struc_t or str
+   :param \*path: any structure members, names, or integers that is used to specify the path to apply to the operand
    
-.. py:function:: op_structure(opnum, sptr, \*path, \*\*delta)
+.. py:function:: op_structure(opnum, member, \*path)
    
-   Apply the :py:obj:`idaapi.struc_t`in ``sptr`` along with any members in ``path`` to the instruction operand ``opnum`` at the current address.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param opnum: the operand number of the current instruction
-   :type opnum: int or long
-   :param sptr: the :py:obj:`idaapi.struc_t` to apply
-   :type sptr: idaapi.struc_t
-   :param \*path: any structure members to include in the path
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(opnum, name, \*path, \*\*delta)
-   
-   Apply the structure with the specified ``name`` and the members in ``path`` to the instruction operand ``opnum`` at the current address.
+   Apply the specified ``member`` along with any members in ``path`` to the instruction operand ``opnum`` at the current address.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
-   :param name:
-   :type name: str
-   :param \*path: any structure name or member names to include in the path
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   :param member: the :py:obj:`member_t` to apply
+   :type member: member_t or idaapi.member_t
+   :param \*path: any structure members, names, or integers that is used to specify the path to apply to the operand
    
-.. py:function:: op_structure(opnum, member, \*path, \*\*delta)
-   
-   Apply the specified ``member`` to the instruction operand ``opnum`` at the current address.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param opnum: the operand number of the current instruction
-   :type opnum: int or long
-   :param member: the :py:obj:`structure.member_t` to apply
-   :type member: member_t
-   :param \*path: any structure name or member names to include in the path
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(opnum, mptr, \*path, \*\*delta)
-   
-   Apply the :py:obj:`idaapi.member_t`in ``mptr`` to the instruction operand ``opnum`` at the current address.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param opnum: the operand number of the current instruction
-   :type opnum: int or long
-   :param mptr: the :py:obj:`idaapi.member_t` to apply
-   :type mptr: idaapi.member_t
-   :param \*path: any structure name or member names to include in the path
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(opnum, path, \*\*delta)
-   
-   Apply the structure members in ``path`` to the instruction operand ``opnum`` at the current address.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param opnum: the operand number of the current instruction
-   :type opnum: int or long
-   :param path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
-   :type path: tuple or list
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(reference, structure_or_sptr, \*path, \*\*delta)
-   
-   Apply the specified ``structure_or_sptr`` along with the members in ``path`` to the operand pointed to by ``reference``.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param reference: the :py:obj:`opref_t` of the instruction and operand
-   :type reference: interface.opref_t
-   :param structure_or_sptr: the :py:obj:`structure_t` or :py:obj:`idaapi.sptr_t` to apply
-   :type structure_or_sptr: structure_t or idaapi.struc_t
-   :param \*path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(ea, opnum, structure, \*path, \*\*delta)
+.. py:function:: op_structure(ea, opnum, structure, \*path)
    
    Apply the specified ``structure`` along with the members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
    
@@ -750,52 +684,10 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
-   :type structure: structure_t
-   :param \*path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   :type structure: structure_t or idaapi.struc_t or str
+   :param \*path: any structure members, names, or integers that is used to specify the path to apply to the operand
    
-.. py:function:: op_structure(reference, name, \*path, \*\*delta)
-   
-   Apply the structure with the specified ``name`` and any members in ``path`` to the operand pointed to by ``reference``.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param reference: the :py:obj:`opref_t` of the instruction and operand
-   :type reference: interface.opref_t
-   :param name: the name of the structure to apply
-   :type name: str
-   :param \*path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(ea, opnum, name, \*path, \*\*delta)
-   
-   Apply the structure with the specified ``name`` and any members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param ea: the address of an instruction
-   :type ea: int or long
-   :param opnum: the operand number of the instruction
-   :type opnum: int or long
-   :param name: the name of the structure to apply
-   :type name: str
-   :param \*path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(reference, member_or_mptr, \*path, \*\*delta)
-   
-   Apply the specified ``member_or_mptr`` to the instruction operand pointed to by ``reference``.
-   
-   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
-   
-   :param reference: the :py:obj:`opref_t` of the instruction and operand
-   :type reference: interface.opref_t
-   :param member_or_mptr: the :py:obj:`member_t` or :py:obj:`idaapi.mptr_t` to apply
-   :type member_or_mptr: member_t or idaapi.member_t
-   :param \*path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
-   
-.. py:function:: op_structure(ea, opnum, member, \*path, \*\*delta)
+.. py:function:: op_structure(ea, opnum, member, \*path)
    
    Apply the specified ``member`` to the instruction operand ``opnum`` at the address ``ea``.
    
@@ -803,29 +695,37 @@ functions and aliases. For more information on this, please see
    
    :param ea: the address of an instruction
    :type ea: int or long
-   :param opnum: the operand number of the current instruction
+   :param opnum: the operand number of the instruction
    :type opnum: int or long
-   :param member: the :py:obj:`structure.member_t` to apply
-   :type member: member_t
-   :param \*path: any structure name or member names to include in the path
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   :param member:
+   :type member: member_t or idaapi.member_t
+   :param \*path: any structure members, names, or integers that is used to specify the path to apply to the operand
    
-.. py:function:: op_structure(ea, opnum, mptr, \*path, \*\*delta)
+.. py:function:: op_structure(reference, structure, \*path)
    
-   Apply the :py:obj:`idaapi.member_t`in ``mptr`` to the instruction operand ``opnum`` at the address ``ea``.
+   Apply the specified ``structure`` along with the members in ``path`` to the operand pointed to by ``reference``.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
-   :param ea: the address of an instruction
-   :type ea: int or long
-   :param opnum: the operand number of the current instruction
-   :type opnum: int or long
-   :param mptr: the :py:obj:`idaapi.member_t` to apply
-   :type mptr: idaapi.member_t
-   :param \*path: any structure name or member names to include in the path
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   :param structure: the structure to apply as a type or a name
+   :type structure: structure_t or idaapi.struc_t or str
+   :param \*path: any structure members, names, or integers that is used to specify the path to apply to the operand
    
-.. py:function:: op_structure(reference, path, \*\*delta)
+.. py:function:: op_structure(reference, member, \*path)
+   
+   Apply the specified ``member`` along with the members in ``path`` to the instruction operand pointed to by ``reference``.
+   
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   :param member:
+   :type member: member_t or idaapi.member_t
+   :param \*path: an iterable containing structures, members, or integers that is used to specify the path to apply to the operand
+   
+.. py:function:: op_structure(reference, path)
    
    Apply the structure members in ``path`` to the instruction operand pointed to by ``reference``.
    
@@ -833,11 +733,10 @@ functions and aliases. For more information on this, please see
    
    :param reference: the :py:obj:`opref_t` of the instruction and operand
    :type reference: interface.opref_t
-   :param path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
+   :param path: an iterable containing structures, members, or integers that is used to specify the path to apply to the operand
    :type path: tuple or list
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
-.. py:function:: op_structure(ea, opnum, path, \*\*delta)
+.. py:function:: op_structure(ea, opnum, path)
    
    Apply the structure members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
    
@@ -847,11 +746,10 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param opnum: the operand number of the instruction
    :type opnum: int or long
-   :param path: an iterable containing structure, members, or integers that are used to calculate the offset into the structure when applying it to the operand
+   :param path: an iterable containing structures, members, or integers that is used to specify the path to apply to the operand
    :type path: tuple or list
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
-.. py:function:: op_structure(ea, opnum, sptr, \*path, \*\*force)
+.. py:function:: op_structure(ea, opnum, sptr, path)
    
    Apply the structure identified by ``sptr`` along with the members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
    
@@ -863,8 +761,158 @@ functions and aliases. For more information on this, please see
    :type opnum: int or long
    :param sptr: the :py:obj:`idaapi.struc_t` to apply
    :type sptr: idaapi.struc_t
-   :param \*path: any structure members to include in the path
-   :param \*\*force: if ``force`` is specified as a boolean, then adjust the offset to point to the field that was given. if ``delta`` is specified as an integer, then offset the structure by it.
+   :param path: an iterable containing any structure members, names, or integers that is used to specify the path to apply to the operand
+   :type path: tuple or list
+   
+.. py:function:: op_structurepath(opnum)
+   
+   Return the structure and members for operand ``opnum`` at the current instruction.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_structurepath(reference)
+   
+   Return the structure and members for the operand pointed to by ``reference``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   
+.. py:function:: op_structurepath(ea, opnum)
+   
+   Return the structure and members for the operand ``opnum`` at the instruction ``ea``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
+.. py:function:: op_structurepath(opnum, structure, \*path, \*\*delta)
+   
+   Apply the specified ``structure`` along with any members in ``path`` to the instruction operand ``opnum`` at the current address.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param structure: the :py:obj:`structure_t` to apply
+   :type structure: structure_t or idaapi.struc_t or str
+   :param \*path: any structure members, names, or integers that describes the full path to the member that gets applied to the operand
+   :param \*\*delta:
+   
+.. py:function:: op_structurepath(opnum, member, \*path, \*\*delta)
+   
+   Apply the specified ``member`` along with any members in ``path`` to the instruction operand ``opnum`` at the current address.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param member: the :py:obj:`member_t` to apply
+   :type member: member_t or idaapi.member_t
+   :param \*path: any structure members, names, or integers that describes the full path to the member that gets applied to the operand
+   :param \*\*delta:
+   
+.. py:function:: op_structurepath(ea, opnum, structure, \*path, \*\*delta)
+   
+   Apply the specified ``structure`` along with the members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   :param structure: the :py:obj:`structure_t` to apply
+   :type structure: structure_t or idaapi.struc_t or str
+   :param \*path: any structure members, names, or integers that describes the full path to the member that gets applied to the operand
+   :param \*\*delta:
+   
+.. py:function:: op_structurepath(ea, opnum, member, \*path, \*\*delta)
+   
+   Apply the specified ``member`` to the instruction operand ``opnum`` at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   :param member:
+   :type member: member_t or idaapi.member_t
+   :param \*path: any structure members, names, or integers that describes the full path to the member that gets applied to the operand
+   :param \*\*delta:
+   
+.. py:function:: op_structurepath(reference, structure, \*path, \*\*delta)
+   
+   Apply the specified ``structure`` along with the members in ``path`` to the operand pointed to by ``reference``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   :param structure: the structure to apply as a type or a name
+   :type structure: structure_t or idaapi.struc_t or str
+   :param \*path: any structure members, names, or integers that describes the full path to the member that gets applied to the operand
+   :param \*\*delta:
+   
+.. py:function:: op_structurepath(reference, member, \*path, \*\*delta)
+   
+   Apply the specified ``member`` along with the members in ``path`` to the instruction operand pointed to by ``reference``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   :param member:
+   :type member: member_t or idaapi.member_t
+   :param \*path: an iterable containing structures, members, or integers that describes the full path to the member that gets applied to the operand
+   :param \*\*delta:
+   
+.. py:function:: op_structurepath(reference, path)
+   
+   Apply the structure members in ``path`` to the instruction operand pointed to by ``reference``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   :param path: an iterable containing structures, members, or integers that describes the full path to the member that gets applied to the operand
+   :type path: tuple or list
+   
+.. py:function:: op_structurepath(ea, opnum, path)
+   
+   Apply the structure members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   :param path: an iterable containing structures, members, or integers that describes the full path to the member that gets applied to the operand
+   :type path: tuple or list
+   
+.. py:function:: op_structurepath(ea, opnum, sptr, path)
+   
+   Apply the structure identified by ``sptr`` along with the members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.op_strpath<op_structurepath>`, :py:func:`instruction.op_strucpath<op_structurepath>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   :param sptr: the :py:obj:`idaapi.struc_t` to apply
+   :type sptr: idaapi.struc_t
+   :param path: an iterable containing any structure members, names, or integers that describes the full path to the member that gets applied to the operand
+   :type path: tuple or list
    
 .. py:function:: operand(opnum)
    
@@ -1266,6 +1314,28 @@ instruction.armops
 This internal namespace contains the different operand types that
 can be returned for the AArch32 and AArch64 architectures.
 
+^^^^^^^^^^^^^^^^^^
+armops.condition_t
+^^^^^^^^^^^^^^^^^^
+
+.. py:class:: armops.condition_t
+   
+   Bases: :py:class:`symbol_t`
+   
+   A symbol for representing a condition operand on either the AArch32 or AArch64 architectures.
+   
+   .. py:attribute:: flags
+   
+      :param getter: Return the required flags for the current condition to be true.
+   
+   .. py:attribute:: name
+   
+      :param getter: 
+   
+   .. py:attribute:: symbols
+   
+      :param getter: A condition_t is actually a symbol that yields itself.
+   
 ^^^^^^^^^^^
 armops.flex
 ^^^^^^^^^^^
@@ -1289,7 +1359,7 @@ armops.immediatephrase
 
 .. py:class:: armops.immediatephrase
    
-   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
+   Bases: :py:class:`interface.integerish`, :py:class:`symbol_t`
    
    A tuple representing a memory displacement operand on either the AArch32 or AArch64 architectures.
    
@@ -1366,7 +1436,7 @@ intelops.OffsetBaseIndexScale
 
 .. py:class:: intelops.OffsetBaseIndexScale
    
-   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
+   Bases: :py:class:`interface.integerish`, :py:class:`symbol_t`
    
    A tuple representing a memory phrase for the Intel architecture.
    
@@ -1383,7 +1453,7 @@ intelops.SegmentOffset
 
 .. py:class:: intelops.SegmentOffset
    
-   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
+   Bases: :py:class:`interface.integerish`, :py:class:`symbol_t`
    
    A tuple representing an address with a segment register attached on the Intel architecture.
    
@@ -1399,7 +1469,7 @@ intelops.SegmentOffsetBaseIndexScale
 
 .. py:class:: intelops.SegmentOffsetBaseIndexScale
    
-   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
+   Bases: :py:class:`interface.integerish`, :py:class:`symbol_t`
    
    A tuple representing a memory phrase operand on the Intel architecture.
    
@@ -1426,7 +1496,7 @@ mipsops.phrase
 
 .. py:class:: mipsops.phrase
    
-   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
+   Bases: :py:class:`interface.integerish`, :py:class:`symbol_t`
    
    A tuple for representing a memory phrase operand on the MIPS architectures.
    
