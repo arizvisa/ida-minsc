@@ -3639,6 +3639,18 @@ class type(object):
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [item.name for item in iterable]
         name = utils.alias(names, 'type.arguments')
+
+        @utils.multicase()
+        @classmethod
+        def registers(cls):
+            '''Return the registers for each of the parameters belonging to the current function.'''
+            return cls.registers(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def registers(cls, func):
+            '''Return the registers for each of the parameters belonging to the function `func`.'''
+            return [reg for reg, ti, name in frame.args.registers(func)]
+        regs = utils.alias(registers, 'type.arguments')
     args = parameters = arguments
 
 t = type # XXX: ns alias
