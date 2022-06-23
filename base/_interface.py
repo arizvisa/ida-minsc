@@ -3465,13 +3465,14 @@ class architecture_t(object):
         cls = self.__class__
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
-class bounds_t(namedtypedtuple):
+class bounds_t(integerish):
     """
     This tuple is used to represent references that describe a bounds
     and has the format `(left, right)`.
     """
     _fields = ('left', 'right')
     _types = (six.integer_types, six.integer_types)
+    _operands = (internal.utils.fcurry, internal.utils.fcurry)
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 2 and not kwargs:
@@ -3538,14 +3539,8 @@ class bounds_t(namedtypedtuple):
         left, right = self
         return idaapi.range_t(left, right)
 
-    def translate(self, offset):
-        '''Return an instance of the class with its boundaries translated by the provided `offset`.'''
-        cls = self.__class__
-        left, right = self
-        return cls(offset + left, offset + right)
-
     def contains(self, ea):
-        '''Return if the address `ea` is contained by the ``bounds_t``.'''
+        '''Return if the address `ea` is contained by the current boundary.'''
         left, right = self
         return left <= ea < right if left < right else right <= ea < left
     __contains__ = contains
