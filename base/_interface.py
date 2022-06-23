@@ -2715,12 +2715,13 @@ class register_t(symbol_t):
 
     @property
     def symbols(self):
-        '''A register is technically a symbol, so we yield ourself.'''
+        '''Yield the symbolic components that compose the register.'''
+        # a register is technically a symbol, so we yield ourselves.
         yield self
 
     @property
     def id(self):
-        '''Returns the index of the register.'''
+        '''Return the index of the register as ordered in IDA's list of registers.'''
         res = idaapi.ph.regnames
         try: return res.index(self.realname or self.name)
         except ValueError: pass
@@ -2728,20 +2729,28 @@ class register_t(symbol_t):
 
     @property
     def name(self):
-        '''Returns the register's name.'''
+        '''Return the name of the register.'''
         return self.__name__
     @property
     def dtype(self):
-        '''Returns the IDA dtype of the register.'''
+        '''Return the IDA dtype of the register.'''
         return self.__dtype__
     @property
     def bits(self):
-        '''Returns the size of the register in bits.'''
+        '''Return the size of the register in bits.'''
         return self.__size__
     @property
+    def size(self):
+        '''Return the size of the register in bytes.'''
+        return self.__size__ // 8
+    @property
     def position(self):
-        '''Returns the binary offset into the full register which owns it.'''
+        '''Return the binary offset of the current register into its full register that contains it.'''
         return self.__position__
+    @property
+    def type(self):
+        '''Return the pythonic type of the register.'''
+        return self.__ptype__, self.__size__ // 8
 
     def __str__(self):
         '''Return the architecture's register prefix concatenated to the register's name.'''
@@ -2769,12 +2778,12 @@ class register_t(symbol_t):
         return not (self == other)
 
     def __contains__(self, other):
-        '''Returns True if the `other` register is a sub-part of `self`.'''
+        '''Return true if the `other` register is any of the components of the current register.'''
         viewvalues = {item for item in self.__children__.values()}
         return other in viewvalues
 
     def subsetQ(self, other):
-        '''Returns true if the `other` register is a part of `self`.'''
+        '''Return true if the `other` register is a component of the current register.'''
         def collect(node):
             res = {node}
             [res.update(collect(item)) for item in node.__children__.values()]
@@ -2782,7 +2791,7 @@ class register_t(symbol_t):
         return other in self.alias or other in collect(self)
 
     def supersetQ(self, other):
-        '''Returns true if the `other` register actually contains `self`.'''
+        '''Return true if the `other` register uses the current register as a component.'''
         res, pos = {item for item in []}, self
         while pos is not None:
             res.add(pos)
@@ -2790,7 +2799,7 @@ class register_t(symbol_t):
         return other in self.alias or other in res
 
     def relatedQ(self, other):
-        '''Returns true if both `other` and `self` affect each other when one is modified.'''
+        '''Return true if the `other` register may overlap with the current one and thus might be affected when one is modified.'''
         return self.supersetQ(other) or self.subsetQ(other)
 
 class regmatch(object):
@@ -3498,9 +3507,19 @@ class bounds_t(namedtypedtuple):
 
     @property
     def size(self):
-        '''Return the size of the ``bounds_t``.'''
+        '''Return the size of the area described by this boundary.'''
         left, right = self
         return right - left if left < right else left - right
+
+    @property
+    def bits(self):
+        '''Return the size of the area described by this boundary in bits.'''
+        return 8 * self.size
+
+    @property
+    def type(self):
+        '''Return the pythonic type that may contain this boundary.'''
+        return [(int, 1), self.size]
 
     @property
     def top(self):
@@ -3566,3 +3585,29 @@ class location_t(integerish):
         thisoffset, thissize = self
         thatoffset, thatsize = other
         return all([thisoffset == thatoffset], [thissize == thatsize])
+
+    @property
+    def bits(self):
+        '''Return the size of the location in bits.'''
+        offset, size = self
+        return 8 * size
+
+    @property
+    def symbols(self):
+        '''Yield the symbolic components of this location.'''
+        offset, size = self
+        if not isinstance(offset, six.integer_types):
+            yield offset
+        return
+
+    @property
+    def type(self):
+        '''Return the pythonic type describing this location.'''
+        offset, size = self
+
+        # if our size is in the typemap's integermap, then we can simply use it.
+        if size in typemap.integermap:
+            return int, size
+
+        # otherwise, we need to form ourselves into an array of bytes.
+        return [(int, 1), size]
