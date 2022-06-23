@@ -932,8 +932,8 @@ def relocate(info):
     We update the entire database in two parts. First we iterate through all
     the functions, and transform its cache to its new address. Next we iterate
     through all of the known global tags and then transform those. As we don't
-    received the "changed_netmap" parameter, we don't know whether IDA has
-    actually relocated the netnodes or not.
+    receive the "changed_netmap" parameter, we don't know whether IDA has actually
+    relocated the netnodes or not.
     """
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
     functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.comment.globals.iterate()])
@@ -947,7 +947,7 @@ def relocate(info):
     # Output the amount of work (number of segments) that we'll need to perform.
     scount, segmap = info.size(), {info[si].to : info[si]._from for si in range(info.size())}
     listable = sorted(segmap)
-    logging.info(u"{:s}.relocate({:#x}, {:#x}) : Relocating tagcache for {:d} segment{:s}.".format(__name__, segmap[listable[0]], listable[0], scount, '' if scount == 1 else 's'))
+    logging.info(u"{:s}.relocate({:#x}, {:#x}) : Relocating the tag cache and index for {:d} segment{:s}.".format(__name__, segmap[listable[0]], listable[0], scount, '' if scount == 1 else 's'))
 
     # Now we'll need to iterate through our functions and globals in order to filter
     # them and calculate the number of items we'll be expecting to process.
@@ -957,17 +957,30 @@ def relocate(info):
     # Create our progress bar that we'll continuously update using the number of
     # items that we just calculated from filtering our functions and globals.
     P = ui.Progress()
-    P.update(current=0, min=0, max=count, title=u"Relocating tagcache for {:d} segment{:s}...".format(scount, '' if scount == 1 else 's'))
+    P.update(current=0, min=0, max=count, title=u"Relocating the tag cache and index for {:d} segment{:s}...".format(scount, '' if scount == 1 else 's'))
     fcount = gcount = 0
 
-    # Itreate through each work item (segment) in order to process them.
+    # Iterate through each work item (segment) in order to process them.
     P.open()
     for si in range(scount):
         seg = idaapi.getseg(info[si].to)
 
+        # If the user canceled this process, then really confirm things. Because if they
+        # abort this process, then the index will be desynchronized. Or really, it'll be
+        # completely out-of-sync and should likely be removed since it's corrupt.
+        if P.canceled:
+            message = []
+            message.append(u'If you abort this process, the tag cache and its index will become desynchronized (corrupt) which will result in spectacular failures when querying.')
+            message.append(u"We are currently relocating segment {:d} of {:d} from {:#x} to {:#x}.".format(1 + si, scount, info[si]._from, info[si].to))
+            message.append(u'Are you REALLY sure?')
+            if ui.ask.yn('\n'.join(message), no=True):
+                six.print_(u"User aborted relocating the tag cache and its index at segment {:d} of {:d} from {:#x} to {:#x}.".format(1 + si, scount, info[si]._from, info[si].to))
+                break
+            P.canceled = False
+
         # Format the description for the current work item (segment) that we're processing.
         description = "{:d} of {:d}{:s}".format(1 + si, scount, " ({:s})".format(get_segment_name(seg)) if seg else '') if scount > 1 else "{:s}".format(get_segment_name(seg) if seg else '')
-        msg = u"Relocating tagcache for segment{:s}: {:#x} ({:+#x}) -> {:#x}".format(" {:s}".format(description) if description else '', info[si]._from, info[si].size, info[si].to)
+        msg = u"Relocating the tag cache and index for segment{:s}: {:#x} ({:+#x}) -> {:#x}".format(" {:s}".format(description) if description else '', info[si]._from, info[si].size, info[si].to)
         P.update(title=msg), six.print_(msg)
 
         # Iterate through each function that was moved and relocate its contents. If we're
