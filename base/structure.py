@@ -722,7 +722,7 @@ class structure_t(object):
     @property
     def bounds(self):
         bounds, base = self.realbounds, self.members.baseoffset
-        return bounds.translate(base)
+        return operator.add(bounds, base)
 
     ### Private methods
     def __str__(self):
@@ -2439,7 +2439,7 @@ class member_t(object):
         '''Return the boundaries of the member.'''
         parent = self.parent
         bounds, base = self.realbounds, parent.members.baseoffset
-        return bounds.translate(base)
+        return operator.add(bounds, base)
     @property
     def parent(self):
         '''Return the structure_t that owns the member.'''
