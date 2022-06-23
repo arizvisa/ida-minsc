@@ -1574,7 +1574,7 @@ class Progress(object):
 
     def __new__(cls, *args, **kwargs):
         '''Figure out which progress bar to use and instantiate it with the provided parameters `args` and `kwargs`.'''
-        if 'UIProgress' not in globals():
+        if not all([idaapi.is_idaq(), 'UIProgress' in globals()]):
             logging.warning(u"{:s}(...) : Using console-only implementation of the `ui.Progress` class.".format('.'.join([__name__, cls.__name__])))
             return ConsoleProgress(*args, **kwargs)
 
