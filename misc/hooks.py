@@ -830,7 +830,7 @@ def auto_queue_empty(type):
         on_ready()
 
 def __process_functions(percentage=0.10):
-    """This prebuilds the tag-cache for the entire database.
+    """This prebuilds the tag cache and index for the entire database so that we can differentiate tags made by the user and the application.
 
     It's intended to be called once the database is ready to be tampered with.
     """
@@ -846,11 +846,30 @@ def __process_functions(percentage=0.10):
 
     # Now that we have our imports, we can iterate through all of the functions.
     total, funcs = 0, [ea for ea in database.functions()]
-    P.update(current=0, max=len(funcs), title=u"Pre-building tagcache...")
+    P.update(current=0, max=len(funcs), title=u"Pre-building the tag cache and its index...")
     P.open()
-    six.print_(u"Pre-building tagcache for {:d} functions.".format(len(funcs)))
+    six.print_(u"Indexing the tags for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
         chunks = [item for item in function.chunks(fn)]
+
+        # Check to see if the progress bar was cancelled for "some reason". If
+        # so, we double-check if that's what the user really wanted.
+        if P.canceled:
+            six.print_(u"User opted to cancel building the tag cache at function {:#x} ({:d} of {:d}) after having indexed {:d} tag{:s}.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
+
+            # Confirm with the user that they really don't care for indexing.
+            message = []
+            start, stop = database.config.bounds()
+            message.append(u"We are {:.02f}% complete at function {:#x} ({:d} of {:d}) having indexed only {:d} tag{:s} for the range {:#x}<>{:#x}.".format(100. * i / float(len(funcs)), fn, 1 + i, len(funcs),  total, '' if total == 1 else 's', start, stop))
+            message.append(u"If you cancel now, some of the notations made by the application prior to this process will be non-queryable via select.")
+            message.append(u'Are you sure?')
+            if ui.ask.yn('\n'.join(message), no=True):
+                six.print_(u"User aborted the build of the tag cache at function {:#x} ({:d} of {:d}) and has indexed only {:d} tag{:s}.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
+                break
+
+            # Okay, so they changed their mind...
+            six.print_(u"Resuming build of tag cache at function {:#x} ({:d} of {:d}) with {:d} tag{:s} having been indexed.".format(fn, 1 + i, len(funcs), total, '' if total == 1 else 's'))
+            P.canceled = False
 
         # If the current function is in our imports, then we skip it because
         # it's a runtime-linked address and shouldn't have been cached anyways.
@@ -887,7 +906,8 @@ def __process_functions(percentage=0.10):
                 continue
             continue
         continue
-    six.print_(u"Successfully built tag-cache composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
+    else:
+        six.print_(u"Successfully seeded the tag cache with its index which was composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
     P.close()
 
 def __execute_rcfile():
