@@ -304,15 +304,26 @@ def ops_size(ea):
 
 @utils.multicase()
 def opts():
-    '''Returns a tuple of the types for all the operands in the instruction at the current address.'''
+    '''Returns a tuple of the pythonic types for all the operands in the instruction at the current address.'''
     return ops_type(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def opts(ea):
-    '''Returns a tuple of the types for all the operands in the instruction at the address `ea`.'''
+    '''Returns a tuple of the pythonic types for all the operands in the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(opt, ea)
     return tuple(map(f, range(ops_count(ea))))
 ops_type = utils.alias(opts)
+
+@utils.multicase()
+def ops_decoder():
+    '''Return a tuple of the names of the decoders that will be used for all the operands in the instruction at the current address.'''
+    return ops_decoder(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def ops_decoder(ea):
+    '''Return a tuple of the names of the decoders that will be used for all the operands in the instruction at the address `ea`.'''
+    ea = interface.address.inside(ea)
+    f = functools.partial(op_decoder, ea)
+    return tuple(map(f, range(ops_count(ea))))
 
 @utils.multicase()
 def ops_state():
@@ -517,23 +528,50 @@ def op_bits(ea, opnum):
     return 8 * op_size(ea, opnum)
 
 @utils.multicase(opnum=six.integer_types)
-def opt(opnum):
-    '''Returns the type of the operand `opnum` belonging to the current instruction.'''
-    return opt(ui.current.address(), opnum)
+def op_decoder(opnum):
+    '''Returns the name of the decoder that will be used when decoding the operand `opnum` belonging to the current instruction.'''
+    return op_decoder(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
-def opt(reference):
-    '''Returns the type of the operand pointed to by `reference`.'''
+def op_decoder(reference):
+    '''Returns the name of the decoder that will be used when decoding the operand pointed to by `reference`.'''
     address, opnum, _ = reference
-    return opt(address, opnum)
+    return op_decoder(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def opt(ea, opnum):
-    """Returns the type of the operand `opnum` belonging to the instruction at the address `ea`.
+def op_decoder(ea, opnum):
+    """Returns the name of the decoder that will be used when decoding the operand `opnum` belonging to the instruction at the address `ea`.
 
-    The types returned are dependant on the architecture.
+    The string that is returned is dependent on the processor module used by the database.
     """
     res = operand(ea, opnum)
     return __optype__.type(res)
-op_type = utils.alias(opt)
+
+@utils.multicase(opnum=six.integer_types)
+def op_type(opnum):
+    '''Returns the pythonic type of the operand `opnum` belonging to the current instruction.'''
+    return op_type(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_type(reference):
+    '''Returns the pythonic type of the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_type(address, opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_type(ea, opnum):
+    '''Returns the pythonic type of the operand `opnum` belonging to the instruction at the address `ea`.'''
+    op, opsize = operand(ea, opnum), op_size(ea, opnum)
+
+    # if our operand is not a register, then we can use the operand type.
+    if op.type not in {idaapi.o_reg}:
+        return __optype__.ptype(op), opsize
+
+    # now we have the register and we only decode the instruction with its
+    # operand and then we can verify that its operand size matches.
+    insn = at(ea)
+    regtype, size = __optype__.decode(insn, op).type
+    if size != opsize:
+        logging.info(u"{:s}.op_type({:#x}, {:d}) : Returning the operand size ({:d}) as it is different from the register size ({:d}).".format(__name__, ea, opnum, opsize, size))
+    return regtype, opsize
+
+opt = utils.alias(op_type)
 
 @utils.multicase(opnum=six.integer_types)
 def op(opnum):
