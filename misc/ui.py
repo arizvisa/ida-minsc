@@ -19,7 +19,7 @@ window that they wish to expose to the user.
 """
 
 import six, builtins
-import sys, os, time, functools, inspect, itertools
+import sys, os, operator, threading, time, functools, inspect, itertools
 import logging, ctypes
 
 import idaapi, internal
@@ -1512,7 +1512,7 @@ class ConsoleProgress(object):
         self.__min__, self.__max__ = 0, 0
         return
 
-    canceled = property(fget=lambda self: False, fset=lambda self, value: None)
+    canceled = property(fget=operator.not_, fset=operator.eq)
     maximum = property(fget=lambda self: self.__max__)
     minimum = property(fget=lambda self: self.__min__)
     current = property(fget=lambda self: self.__value__)
