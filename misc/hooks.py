@@ -735,6 +735,15 @@ class state(object):
 
 State = None
 
+def on_close():
+    '''IDB_Hooks.closebase'''
+
+    # Database was closed, so we need to reset our state.
+    global State
+    if state:
+        logging.debug(u"{:s}.on_close() : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(State)))
+    State = None
+
 def on_init(idp_modname):
     '''IDP_Hooks.init'''
 
@@ -1853,6 +1862,8 @@ def make_ida_not_suck_cocks(nw_code):
         idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
         idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
         ui.hook.idp.add('auto_empty', on_ready, 0)
+
+    ui.hook.idb.add('closebase', on_close, 10000)
 
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:
