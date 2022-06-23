@@ -59,30 +59,38 @@ class __optype__(object):
     """
     cache = {}
     @classmethod
-    def define(cls, processor, type):
+    def define(cls, processor, type, ptype=None):
         '''Register the operand decoder for the specfied `processor` and `type`'''
         def decorator(fn):
             res = processor, type
-            return cls.cache.setdefault(res, fn)
+            cls.cache.setdefault(res, (fn, ptype))
+            return fn
         return decorator
 
     @classmethod
     def lookup(cls, type, processor=None):
-        '''Lookup the operand decoder for a specific `type` and `processor`.'''
-        try: return cls.cache[processor or idaapi.ph.id, type]
-        except KeyError: return cls.cache[0, type]
+        '''Lookup the operand decoder and type for a specific `type` and `processor`.'''
+        try: Fdecoder, ptype = cls.cache[processor or idaapi.ph.id, type]
+        except KeyError: Fdecoder, ptype = cls.cache[0, type]
+        return Fdecoder, ptype
 
     @classmethod
     def decode(cls, insn, op, processor=None):
         '''Using the specified `processor`, decode the operand `op` for the specified instruction `insn`.'''
-        res = cls.lookup(op.type, processor=processor)
-        return res(insn, op)
+        F, _ = cls.lookup(op.type, processor=processor)
+        return F(insn, op)
 
     @classmethod
     def type(cls, op, processor=None):
-        '''Return the operand type's name for the specified `processor` and `op`.'''
-        res = cls.lookup(op.type, processor=processor)
-        return res.__name__
+        '''Return the operand decoder type's name for the specified `processor` and `op`.'''
+        F, _ = cls.lookup(op.type, processor=processor)
+        return F.__name__
+
+    @classmethod
+    def ptype(cls, op, processor=None):
+        '''Return the pythonic type for the specified `processor` and `op`.'''
+        _, t = cls.lookup(op.type, processor=processor)
+        return t
 
     @classmethod
     def size(cls, op, processor=None):
