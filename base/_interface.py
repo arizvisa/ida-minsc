@@ -2735,8 +2735,8 @@ class register_t(symbol_t):
         '''Returns the IDA dtype of the register.'''
         return self.__dtype__
     @property
-    def size(self):
-        '''Returns the size of the register.'''
+    def bits(self):
+        '''Returns the size of the register in bits.'''
         return self.__size__
     @property
     def position(self):
@@ -2754,7 +2754,7 @@ class register_t(symbol_t):
         except (AttributeError, ValueError):
             dt = 'unknown'
         cls = register_t
-        return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, internal.utils.string.escape(self.name, '\''), self.position, self.size)
+        return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, internal.utils.string.escape(self.name, '\''), self.position, self.bits)
 
     def __eq__(self, other):
         if isinstance(other, six.string_types):
@@ -3430,28 +3430,28 @@ class architecture_t(object):
         return self.by_indextype(index, dtype)
     byindexsize = internal.utils.alias(by_indexsize)
 
-    def promote(self, register, size=None):
-        '''Promote the specified `register` to its next larger `size`.'''
+    def promote(self, register, bits=None):
+        '''Promote the specified `register` to its next larger size as specified by `bits`.'''
         parent = internal.utils.fcompose(operator.attrgetter('__parent__'), (lambda *items: items), functools.partial(filter, None), iter, next)
         try:
-            if size is None:
+            if bits is None:
                 return parent(register)
-            return register if register.size == size else self.promote(parent(register), size=size)
+            return register if register.bits == bits else self.promote(parent(register), bits=bits)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to promote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size), size, register))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to promote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
-    def demote(self, register, size=None):
-        '''Demote the specified `register` to its next smaller `size`.'''
+    def demote(self, register, bits=None):
+        '''Demote the specified `register` to its next smaller size as specified by `bits`.'''
         childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('items'))
         firstchild = internal.utils.fcompose(childitems, functools.partial(sorted, key=operator.itemgetter(0)), iter, next, operator.itemgetter(1))
         try:
-            if size is None:
+            if bits is None:
                 return firstchild(register)
-            return register if register.size == size else self.demote(firstchild(register), size=size)
+            return register if register.bits == bits else self.demote(firstchild(register), bits=bits)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size), size, register))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
 class bounds_t(namedtypedtuple):
     """
