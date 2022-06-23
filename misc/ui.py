@@ -1259,7 +1259,13 @@ try:
             res.setVisible(False)
             res.setWindowModality(blocking)
             res.setAutoClose(True)
-            path = os.path.join(_database.config.path(), _database.config.filename())
+
+            self.__evrunning = event = threading.Event()
+            res.canceled.connect(event.set)
+
+            pwd = _database.config.path() or os.getcwd()
+            path = os.path.join(pwd, _database.config.filename()) if _database.config.filename() else pwd
+
             self.update(current=0, min=0, max=0, text=u'Processing...', tooltip=u'...', title=path)
 
         # properties
@@ -1267,6 +1273,14 @@ try:
         maximum = property(fget=lambda self: self.object.maximum())
         minimum = property(fget=lambda self: self.object.minimum())
         current = property(fget=lambda self: self.object.value())
+
+        @property
+        def canceled(self):
+            return self.__evrunning.is_set()
+        @canceled.setter
+        def canceled(self, set):
+            event = self.__evrunning
+            event.set() if set else event.clear()
 
         # methods
         def open(self, width=0.8, height=0.1):
@@ -1310,6 +1324,8 @@ try:
 
         def close(self):
             '''Close the current progress bar.'''
+            event = self.__evrunning
+            self.object.canceled.disconnect(event.set)
             self.object.close(), application().processEvents()
 
         def update(self, **options):
