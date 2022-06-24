@@ -397,3 +397,72 @@ class DisplayHook(object):
             import traceback
             traceback.print_exc()
             self.orig_displayhook(item)
+
+# The following logic is actually responsible for starting up the whole
+# plugin. This is done with by trying with a notification, falling back
+# to a timer, and then straight-up executing things if all else fails.
+def startup():
+    '''Patch in a notification hander and start up everything left in the plugin.'''
+
+    # First check that we've installed the version patch and it's the
+    # right type as everything literally revolves around that critical step.
+    if not hasattr(idaapi, '__version__'):
+        raise SystemError("{:s} : Unable to start up plugin due to the \"{:s}\" attribute not having been assigned.".format(__name__, '.'.join([idaapi.__module__, '__version_'])))
+
+    if not isinstance(idaapi.__version__, float):
+        raise SystemError("{:s} : Unable to start up plugin due to the \"{:s}\" attribute not being a valid type ({!r})".format(__name__, '.'.join([idaapi.__module__, '__version_']), idaapi.__version__))
+
+    # Now we need to make sure we have access to our internal module.
+    # We can simply trap for ImportError to ensure this works.
+    try:
+        import internal
+        internal.interface
+
+    except ImportError:
+        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
+        raise SystemError("{:s} : Unable to start up plugin without being able to access its \"{:s}\" modules.".format(__name__, 'internal'))
+
+    except AttributeError:
+        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, '.'.join(['internal', 'interface'])), exc_info=True)
+        raise SystemError("{:s} : Unable to start up plugin due to an error while loading its \"{:s}\" modules.".format(__name__, 'internal'))
+
+    # The next module we need to make sure we have access to is our
+    # hooks module which contains all of our startup logic.
+    try:
+        import hooks
+
+    except ImportError:
+        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, 'hooks'), exc_info=True)
+        raise SystemError("{:s} : Unable to start up plugin without being able to access its \"{:s}\" module.".format(__name__, 'hooks'))
+
+    # Finally we can construct our priority notification class and
+    # inject it into IDA. This needs to exist in order for everything
+    # to initialize and deinitialize properly.
+    idaapi.__notification__ = notification = internal.interface.prioritynotification()
+
+    # Now we can install our hooks that initialize/uninitialize MINSC
+    try:
+        notification.add(idaapi.NW_INITIDA, hooks.make_ida_not_suck_cocks, -1000)
+
+    # If installing that hook failed, then check if we're running in batch mode. If
+    # we are, then just immediately register things.
+    except Exception:
+        TIMEOUT = 5
+        if idaapi.cvar.batch:
+            hooks.ida_is_busy_sucking_cocks()
+
+        # Otherwise warn the user about this and register our hook with a timer.
+        else:
+            logging.warning("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
+            idaapi.register_timer(TIMEOUT, hooks.ida_is_busy_sucking_cocks)
+        del(TIMEOUT)
+
+    # If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
+    else:
+        try:
+            notification.add(idaapi.NW_TERMIDA, hooks.make_ida_suck_cocks, +1000)
+
+        # Installing the termination hook failed, but it's not really too important...
+        except Exception:
+            logging.warning("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
+    return
