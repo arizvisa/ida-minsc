@@ -1,6 +1,6 @@
-import sys, os
-import imp, fnmatch, ctypes, types
-import idaapi, logging
+import sys, os, logging
+import six, imp, fnmatch, ctypes, types
+import idaapi
 
 # Point this at the repository directory
 root = idaapi.get_user_idadir()
@@ -288,3 +288,112 @@ def patch_version(module):
     version = host_version()
     module.__version_major__, module.__version_minor__, module.__version__ = version
     return version
+
+# The following logic is the display hook that we install in order to
+# control how all of our output renders in the REPL.
+class DisplayHook(object):
+    """
+    Re-implementation of IDAPython's displayhook that doesn't tamper with
+    classes that inherit from base classes
+    """
+    def __init__(self, output, displayhook):
+        self.orig_displayhook = displayhook or sys.displayhook
+
+        # Save our output callable so we can use it to write raw
+        # and unprocessed information to it.
+        self.output = output
+
+    def format_seq(self, num_printer, storage, item, open, close):
+        storage.append(open)
+        for idx, el in enumerate(item):
+            if idx > 0:
+                storage.append(', ')
+            self.format_item(num_printer, storage, el)
+        storage.append(close)
+
+    def format_basestring(self, string):
+        # FIXME: rather than automatically evaluating the string as we're
+        #        currently doing, it'd be much cleaner if we just format the
+        #        result from a function with some sort of wrapper object. This
+        #        way we can check its type, and then choose whether to unwrap it
+        #        or not. This can be done with a decorator of some sort that
+        #        communicates to this implementation that it will need to
+        #        distinguish between printable strings that we can output and
+        #        strings that should be processed by the user.
+        # XXX: maybe we can even use this wrapper object to allow this class to
+        #      handle aligning columns in a table automatically such as when
+        #      more than one element in a row is being returned.
+        try:
+            result = u"{!r}".format(string)
+        except UnicodeDecodeError:
+            import codecs
+            encoded, _ = codecs.escape_encode(string)
+            result = u"'{!s}'".format(encoded)
+        return result
+
+    def format_ctypes(self, num_printer, storage, item):
+        cls, size = item.__class__, ctypes.sizeof(item)
+        if isinstance(item, ctypes._SimpleCData):
+            storage.append("{:s}({:#0{:d}x})".format(cls.__name__, item.value, 2 + 2 * size))
+
+        # if it's anything else (or an unknown), then use the default formatter.
+        else:
+            storage.append("{!r}".format(item))
+        return
+
+    def format_item(self, num_printer, storage, item):
+        if item is None or isinstance(item, bool):
+            storage.append("{!s}".format(item))
+        elif isinstance(item, six.string_types):
+            storage.append(self.format_basestring(item))
+        elif isinstance(item, six.integer_types):
+            storage.append(num_printer(item))
+        elif isinstance(item, idaapi.tinfo_t):
+            storage.append("{!s}".format(item.dstr()))
+        elif isinstance(item, (ctypes._SimpleCData, ctypes._Pointer, ctypes._CFuncPtr, ctypes.Array, ctypes.Structure)):
+            self.format_ctypes(num_printer, storage, item)
+        elif item.__class__ is list:
+            self.format_seq(num_printer, storage, item, '[', ']')
+        elif item.__class__ is tuple:
+            self.format_seq(num_printer, storage, item, '(', ')')
+        elif item.__class__ is set:
+            self.format_seq(num_printer, storage, item, 'set([', '])')
+        elif item.__class__ is dict:
+            storage.append('{')
+            for idx, pair in enumerate(item.items()):
+                if idx > 0:
+                    storage.append(', ')
+                self.format_item(num_printer, storage, pair[0])
+                storage.append(": ")
+                self.format_item(num_printer, storage, pair[1])
+            storage.append('}')
+        else:
+            storage.append("{!r}".format(item))
+
+    def _print_hex(self, x):
+        return "{:#x}".format(x)
+
+    def displayhook(self, item):
+        if item is None or not hasattr(item, '__class__') or item.__class__ is bool:
+            self.orig_displayhook(item)
+            return
+        try:
+            storage = []
+            if idaapi.__version__ < 7.0:
+                import idaapi as ida_idp
+            else:
+                import ida_idp
+            num_printer = self._print_hex
+            dn = ida_idp.ph_get_flag() & ida_idp.PR_DEFNUM
+            if dn == ida_idp.PRN_OCT:
+                num_printer = oct
+            elif dn == ida_idp.PRN_DEC:
+                num_printer = str
+            elif dn == ida_idp.PRN_BIN:
+                num_printer = bin
+            self.format_item(num_printer, storage, item)
+            self.output("%s\n" % "".join(storage))
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            self.orig_displayhook(item)
