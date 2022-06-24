@@ -3260,10 +3260,9 @@ class type(object):
 
     class argument(object):
         """
-        This namespace allows one to interaction the with individual
-        arguments within a function prototype. This allows one to
-        rename or modify the type information for a particular argument
-        within a function's definition.
+        This namespace allows one to interact with individual arguments
+        within a function prototype. This allows one to rename or modify
+        the type information for a particular argument within its definition.
 
         This namespace is aliased as ``function.type.arg`` and ``function.type.parameter``.
 
@@ -3560,7 +3559,7 @@ class type(object):
 
     class arguments(object):
         """
-        This namespace allows one to interaction the with the arguments
+        This namespace allows one to interact the with the arguments
         belonging to a function prototype as a whole. This can allow
         one to count the number of arguments, or fetch all their names
         and types in their entirety.
