@@ -13,48 +13,21 @@ to the user's idapythonrc.py in their home directory.
 print_banner()
 
 # some general python modules that we use for meta_path
-import sys, os
-import imp, fnmatch, ctypes, types
+import sys, os, imp
 import idaapi
 
-library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
-
-# grab ida's user directory and remove from path since we use meta_path to all
-# of our modules. we also use this path to find where our loader actually is.
+# grab ida's user directory and remove from it from the path since we use
+# python's meta_path to locate all of our modules. we also use this path
+# to find out where our loader logic is actually located.
 root = idaapi.get_user_idadir()
 sys.path.remove(root)
 
+# grab the loader, and then use it to seed python's meta_path.
 loader = imp.load_source('__loader__', os.path.join(root, 'plugins', 'minsc.py'))
+sys.meta_path.extend(loader.finders())
 
-## IDA's native lower-level api
-if sys.platform in {'darwin'}:
-    sys.meta_path.append( loader.internal_object('ida', library(idaapi.idadir("libida{:s}.dylib".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
-
-elif sys.platform in {'linux', 'linux2'}:
-    sys.meta_path.append( loader.internal_object('ida', library(idaapi.idadir("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
-
-elif sys.platform in {'win32'}:
-    if __import__('os').path.exists(idaapi.idadir('ida.wll')):
-        sys.meta_path.append( loader.internal_object('ida', library(idaapi.idadir('ida.wll'))) )
-    else:
-        sys.meta_path.append( loader.internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
-
-else:
-    __import__('logging').warning("{:s} : Unable to successfully load IDA's native api via ctypes. Ignoring...".format(__name__))
-
-## private (internal) api
-sys.meta_path.append( loader.internal_submodule('internal', os.path.join(root, 'base'), include='_*.py') )
-
-## public api
-sys.meta_path.append( loader.internal_path(os.path.join(root, 'base'), exclude='_*.py') )
-sys.meta_path.append( loader.internal_path(os.path.join(root, 'misc')) )
-
-# user and application api's
-for subdir in ('custom', 'app'):
-    sys.meta_path.append( loader.internal_submodule(subdir, os.path.join(root, subdir)) )
-del(subdir)
-
-## now we can just load the plugin into the globals() namespace.
+# now we can just load it into the globals() namespace. we don't need
+# to delete it, because it gets popped out of existence during load.
 loader.load(globals(), preserve={'_orig_stdout', '_orig_stderr'})
 
 # try and execute our user's idapythonrc.py
