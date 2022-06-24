@@ -1013,6 +1013,12 @@ UIProgress
    
    Helper class used to simplify the showing of a progress bar in IDA's UI.
    
+   .. py:attribute:: canceled
+   
+      :param getter: 
+      :param setter: 
+      :param set:
+   
    .. py:method:: close(self)
       
       Close the current progress bar.

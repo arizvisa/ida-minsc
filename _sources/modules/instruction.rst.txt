@@ -209,6 +209,31 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
+.. py:function:: op_decoder(opnum)
+   
+   Returns the name of the decoder that will be used when decoding the operand ``opnum`` belonging to the current instruction.
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_decoder(reference)
+   
+   Returns the name of the decoder that will be used when decoding the operand pointed to by ``reference``.
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   
+.. py:function:: op_decoder(ea, opnum)
+   
+   Returns the name of the decoder that will be used when decoding the operand ``opnum`` belonging to the instruction at the address ``ea``.
+   
+   The string that is returned is dependent on the processor module used by the database.
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
 .. py:function:: op_enumeration(opnum)
    
    Return the enumeration member id for the operand ``opnum`` belonging to the current instruction.
@@ -914,6 +939,35 @@ functions and aliases. For more information on this, please see
    :param path: an iterable containing any structure members, names, or integers that describes the full path to the member that gets applied to the operand
    :type path: tuple or list
    
+.. py:function:: op_type(opnum)
+   
+   Returns the pythonic type of the operand ``opnum`` belonging to the current instruction.
+   
+   Aliases: :py:func:`instruction.opt<op_type>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_type(reference)
+   
+   Returns the pythonic type of the operand pointed to by ``reference``.
+   
+   Aliases: :py:func:`instruction.opt<op_type>`
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   
+.. py:function:: op_type(ea, opnum)
+   
+   Returns the pythonic type of the operand ``opnum`` belonging to the instruction at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.opt<op_type>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
 .. py:function:: operand(opnum)
    
    Returns the :py:obj:`idaapi.op_t` for the operand ``opnum`` belonging to the instruction at the current address.
@@ -1044,6 +1098,17 @@ functions and aliases. For more information on this, please see
    Returns the number of operands of the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: ops_decoder()
+   
+   Return a tuple of the names of the decoders that will be used for all the operands in the instruction at the current address.
+   
+.. py:function:: ops_decoder(ea)
+   
+   Return a tuple of the names of the decoders that will be used for all the operands in the instruction at the address ``ea``.
+   
+   :param ea:
    :type ea: int or long
    
 .. py:function:: ops_read()
@@ -1237,46 +1302,15 @@ functions and aliases. For more information on this, please see
    :param ea: the address of an instruction
    :type ea: int or long
    
-.. py:function:: opt(opnum)
-   
-   Returns the type of the operand ``opnum`` belonging to the current instruction.
-   
-   Aliases: :py:func:`instruction.op_type<opt>`
-   
-   :param opnum: the operand number of the current instruction
-   :type opnum: int or long
-   
-.. py:function:: opt(reference)
-   
-   Returns the type of the operand pointed to by ``reference``.
-   
-   Aliases: :py:func:`instruction.op_type<opt>`
-   
-   :param reference: the :py:obj:`opref_t` of the instruction and operand
-   :type reference: interface.opref_t
-   
-.. py:function:: opt(ea, opnum)
-   
-   Returns the type of the operand ``opnum`` belonging to the instruction at the address ``ea``.
-   
-   The types returned are dependant on the architecture.
-   
-   Aliases: :py:func:`instruction.op_type<opt>`
-   
-   :param ea: the address of an instruction
-   :type ea: int or long
-   :param opnum: the operand number of the instruction
-   :type opnum: int or long
-   
 .. py:function:: opts()
    
-   Returns a tuple of the types for all the operands in the instruction at the current address.
+   Returns a tuple of the pythonic types for all the operands in the instruction at the current address.
    
    Aliases: :py:func:`instruction.ops_type<opts>`
    
 .. py:function:: opts(ea)
    
-   Returns a tuple of the types for all the operands in the instruction at the address ``ea``.
+   Returns a tuple of the pythonic types for all the operands in the instruction at the address ``ea``.
    
    Aliases: :py:func:`instruction.ops_type<opts>`
    

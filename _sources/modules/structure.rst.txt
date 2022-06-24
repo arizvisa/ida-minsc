@@ -725,6 +725,7 @@ members_t
       Return the member at the specified ``location``.
       
       :param location: a :py:obj:`location_t` to use when locating the member
+      :type location: interface.location_t
       
    .. py:method:: by_fullname(self, fullname)
       
