@@ -2494,6 +2494,221 @@ class strpath(object):
         delta, _ = builtins.next(calculator), calculator.close()
         return delta, result
 
+class tinfo(object):
+    """
+    This namespace provides miscellaneous utilities for interacting
+    with IDA's ``idaapi.tinfo_t``. This includes both extracting
+    and modification of the information contained within it.
+    """
+    # A lookup table for how to process locations types within tinfo_t.
+    location_table = {
+        idaapi.ALOC_STACK: operator.methodcaller('stkoff'),
+        idaapi.ALOC_STATIC: operator.methodcaller('stkoff'),
+        idaapi.ALOC_REG1: operator.methodcaller('get_reginfo'),
+        idaapi.ALOC_REG2: operator.methodcaller('get_reginfo'),
+    }
+
+    # Define a throwaway closure that we use for entering and recursing
+    # into the location_table. This is needed because scattered types
+    # are recursive, and we want to return everything that we can.
+    def process_location(atype, location, table):
+        F = table.get(atype, internal.utils.fidentity)
+        return atype, F(location)
+
+    # Our first user of process_location which handles any argloc_t items
+    # that are stored within an iterator based around a vector.
+    process_items = lambda vectorator, table, process=process_location: [ process(vectorator[index].atype(), vectorator[index], table) for index in builtins.range(vectorator.size()) ]
+
+    # Now we can use these two closures to support scattered types.
+    location_table[idaapi.ALOC_DIST] = internal.utils.fcompose(operator.methodcaller('scattered'), lambda scatter_t, process=process_items, table=location_table: process(scatter_t.atype(), scatter_t, table))
+
+    # Custom types are supported...but not really.
+    location_table[idaapi.ALOC_CUSTOM] = operator.methodcaller('get_custom')
+
+    # Now we'll re-use the throwaway closure as an entrypoint to rip
+    # the raw location information. This is needed because argloc_t
+    # are weakly referenced when we iterate through them, so we use
+    # our table to extract their information into gc'd references.
+    @classmethod
+    def location_raw(cls, loc, process=process_location, table=location_table):
+        return process(loc.atype(), loc, table)
+
+    # Now we can define our real entrypoint that will process a raw location
+    # in order to convert an argloc_t into one of our symbolic types. We also
+    # stash the process_location closure because we need a reference to it
+    # in order to access the location_table with our entries.
+    @classmethod
+    def location(cls, ti, architecture, loctype, locinfo, process=process_location):
+        '''Return the symbolic location for the raw `loctype` and `locinfo` using the ``tinfo_t`` in `ti` and the ``architecture_t`` within the `architecture` parameter.'''
+
+        # This just contains an offset relative to the bottom of the args.
+        if loctype == idaapi.ALOC_STACK:
+            return location_t(locinfo, ti.get_size())
+
+        # This is just an address for the user to figure out on their own.
+        elif loctype == idaapi.ALOC_STATIC:
+            return locinfo
+
+        # A single register and its offset. Offset seems to only be used
+        # when using scattered (ALOC_DIST) argument location types.
+        elif loctype == idaapi.ALOC_REG1:
+            ridx1, regoff = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
+            try: reg = architecture.by_indexsize(ridx1, ti.get_size())
+            except KeyError: reg = architecture.by_index(ridx1)
+            return reg, regoff
+
+        # A pair of registers gets returned as a tuple.
+        elif loctype == idaapi.ALOC_REG2:
+            ridx1, ridx2 = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
+            try: reg1 = architecture.by_indexsize(ridx1, ti.get_size() // 2)
+            except KeyError: reg1 = architecture.by_index(ridx1)
+
+            try: reg2 = architecture.by_indexsize(ridx2, ti.get_size() // 2)
+            except KeyError: reg2 = architecture.by_index(ridx2)
+
+            return reg1, reg2
+
+        # Seems to be a value relative to a register (reg+off).
+        elif loctype in {idaapi.ALOC_RREL}:
+            ridx, roff = locinfo
+            try: reg = architecture.by_indexsize(ridx, ti.get_size())
+            except KeyError: reg = architecture.by_index(ridx)
+            return reg, roff
+
+        # Scattered shit should really just be a list of things, and we
+        # can just recurse into it in order to extract our results.
+        elif loctype in {idaapi.ALOC_DIST}:
+            return [ cls.location(item) for item in locinfo ]
+
+        # FIXME: We're not supporting this because I've never used this fucker.
+        elif loctype in {idaapi.ALOC_CUSTOM}:
+            pass
+
+        # Anything else we just return, because we have no context to even
+        # raise an exception that can inform the user about what happened.
+        return locinfo
+
+    # Now we can delete the closures we defined and its location_table, because
+    # they're already attached to the function that needs them.
+    del(process_location)
+    del(process_items)
+
+    @classmethod
+    def function_details(cls, func, ti):
+        '''Given a function location in `func` and its type information as `ti`, return the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it.'''
+        rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+
+        # If our type is a function pointer, then we need to dereference it
+        # in order to get the type that we want to extract the argument from.
+        if rt and ti.is_funcptr():
+            pi = idaapi.ptr_type_data_t()
+            if not ti.get_ptr_details(pi):
+                raise internal.exceptions.DisassemblerError(u"{:s}.function_details({:#x}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
+            tinfo = pi.obj_type
+
+        # If our type is not a function pointer, but it is a pointer...then we
+        # dereference it and raise an exception so the user knows it's not callable.
+        elif rt and ti.is_ptr():
+            tinfo = ti.get_pointed_object()
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.function_details({:#x}, {!r}) : The target of the pointer type ({!r}) at the specified address ({:#x}) is not a function.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
+        elif not rt and ti.is_func():
+            tinfo = ti
+
+        # Anything else is a type error that we need to raise to the user.
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.function_details({:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
+
+        # Now we can check to see if the type has details that we can grab the
+        # argument type out of. If there are no details, then we raise an
+        # exception informing the user.
+        if not tinfo.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.function_details({:#x}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        # Now we can grab our function details and return them to the caller.
+        ftd = idaapi.func_type_data_t()
+        if not tinfo.get_func_details(ftd):
+            raise internal.exceptions.DisassemblerError(u"{:s}.function_details({:#x}, {!s}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+        return tinfo, ftd
+
+    @classmethod
+    def update_function_details(cls, func, ti):
+        '''Given a function location in `func` and its type information as `ti`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the function with the ``idaapi.func_type_data_t`` that is sent back.'''
+        rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+        set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
+
+        # Similar to function_details, we first need to figure out if our type is a
+        # function so that we can dereference it to get the information that we yield.
+        if rt and ti.is_funcptr():
+            pi = idaapi.ptr_type_data_t()
+            if not ti.get_ptr_details(pi):
+                raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
+            tinfo = pi.obj_type
+
+        # If the previous case failed, then we're our type isn't related to a function
+        # and we were used on a non-callable address. If this is the case, then we need
+        # to raise an exception to let the user know exactly what happened.
+        elif rt and ti.is_ptr():
+            tinfo = ti.get_pointed_object()
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The target of the pointer type ({!r}) at the specified address ({:#x}) is not a function.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
+        elif not rt and ti.is_func():
+            tinfo = ti
+
+        # Anything else is a type error that we need to raise to the user.
+        else:
+            raise E.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
+
+        # Next we need to ensure that the type information has details that
+        # we can modify. If they aren't there, then we need to bail.
+        if not tinfo.has_details():
+            raise E.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        # Now we can grab our function details from the tinfo.
+        ftd = idaapi.func_type_data_t()
+        if not tinfo.get_func_details(ftd):
+            raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        # Yield the function type along with the details to the caller and then
+        # receive one back (tit-for-tat) which we'll use to re-create the tinfo_t
+        # that we'll apply back to the address.
+        ftd = (yield (tinfo, ftd))
+        if not tinfo.create_func(ftd):
+            raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        # If we were a runtime-linked address, then we're a pointer and we need
+        # to re-create it for our tinfo_t.
+        if rt:
+            pi.obj_type = tinfo
+            if not ti.create_ptr(pi):
+                raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(tinfo), ea))
+            newinfo = ti
+
+        # If it wasn't a runtime function, then we're fine and can just apply the
+        # tinfo that we started out using.
+        else:
+            newinfo = tinfo
+
+        # Finally we have a proper idaapi.tinfo_t that we can apply. After we apply it,
+        # all we need to do is return the previous one to the caller and we're good.
+        if not set_tinfo(ea, newinfo):
+            raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(newinfo), ea))
+
+        # Spinning on that dizzy edge.. I kissed her face and kissed her head..
+        # And dreamed of all the ways.. That I had to make her glow. Why are you
+        # so far way, she said why won't you ever know..that I'm in love with you.
+        # That I'm in love with you.
+        try:
+            while True:
+                ftd = yield (newinfo, ftd)
+
+        # ...and now we're safe.
+        except GeneratorExit:
+            pass
+        return
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = ("{:x}".format(abs(item)) if isinstance(item, six.integer_types) else item for item in names)
