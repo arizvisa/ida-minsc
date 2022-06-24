@@ -13,8 +13,7 @@ import functools, operator, itertools, types
 import collections, heapq, traceback, ctypes, math
 import unicodedata as _unicodedata, string as _string, array as _array
 
-import ui, internal
-import idaapi
+import idaapi, internal
 
 class typemap(object):
     """
