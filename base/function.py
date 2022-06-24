@@ -2029,13 +2029,13 @@ class frame(object):
 
         @utils.multicase()
         @classmethod
-        def registers(cls):
-            '''Return the register information associated with the arguments for the current function.'''
-            return cls.registers(ui.current.address())
+        def iterate(cls):
+            '''Yield the `(member, type, name)` associated with the arguments for the current function.'''
+            return cls.iterate(ui.current.address())
         @utils.multicase()
         @classmethod
-        def registers(cls, func):
-            '''Returns the register information associated with the arguments for the function `func`.'''
+        def iterate(cls, func):
+            '''Yield the `(member, type, name)` associated with the arguments for the function `func`.'''
             rt, ea = interface.addressOfRuntimeOrStatic(func)
 
             # If we're not working with a runtime function (import) and the func_t.regargqty is larger
@@ -2085,78 +2085,68 @@ class frame(object):
 
                 # Now that we have the regarg and its tinfo_t, we just need to extract
                 # its properties to turn it into a register_t and grab its name.
-                result = []
                 for regarg, ti in items:
                     try:
                         reg = instruction.architecture.by_indexsize(regarg.reg, ti.get_size())
                     except KeyError:
                         reg = instruction.architecture.by_index(regarg.reg)
-                    result.append((reg, ti, utils.string.of(regarg.name)))
-                return result
+                    yield reg, ti, utils.string.of(regarg.name)
+                return
 
             # Grab the type at the given address, and then the function details.
             tinfo = type(ea)
-            _, ftd = interface.tinfo.function_details(ea, ti)
+            _, ftd = interface.tinfo.function_details(ea, tinfo)
 
-            # Now we just need to iterate through our parameters while grabbing
-            # any one of them that's located within a register. We also preserve
-            # the type information and its name which we'll need for later.
+            # Now we just need to iterate through our parameters collecting the
+            # raw location information for all of them. We preserve the type
+            # information in case we're unable to find the argument in a member.
             items = []
             for index in builtins.range(ftd.size()):
                 arg, loc = ftd[index], ftd[index].argloc
+                items.append((index, utils.string.of(arg.name), arg.type, interface.tinfo.location_raw(loc)))
 
-                # If the location type is register-based, then add the current
-                # argument to the list that we will process.
-                if loc.atype() in {idaapi.ALOC_REG1, idaapi.ALOC_REG2, idaapi.ALOC_RREL}:
-                    items.append((index, utils.string.of(arg.name), arg.type, loc))
-                continue
+            # Last thing that we need to do is to extract each location and
+            # figure out whether we return it as a register or an actual member.
+            fr = None if rt else frame() if idaapi.get_frame(ea) else None
+            for index, name, ti, location in items:
+                atype, ainfo = location
+                loc = interface.tinfo.location(ti, instruction.architecture, atype, ainfo)
 
-            # Last thing that we need to do is to extract the registers from the
-            # locations and collect it all into a list that we can return.
-            result = []
-            for index, name, ti, loc in items:
-                atype = loc.atype()
+                # If it's a location, then we can just add the register size
+                # to find where the member is located at. This becomes our
+                # result if we have a frame...otherwise, we return the location.
+                if isinstance(loc, interface.location_t):
+                    translated = operator.add(loc, frame.regs.size())
+                    item = fr.members.by(translated) if fr else translated
+                    yield item, ti, name
 
-                # If there was only one register (with an offset), then we can
-                # just grab it and convert it to a register_t. If the register
-                # size doesn't fit, then we just fall back to the register index.
-                if atype == idaapi.ALOC_REG1:
-                    ridx, roff = loc.reg1(), loc.regoff()
-                    try: reg = instruction.architecture.by_indexsize(ridx, ti.get_size())
-                    except KeyError: reg = instruction.architecture.by_index(ridx)
+                # If it's a tuple, then we check if it contains any registers
+                # so that way we can process them if necessary. If its a register
+                # offset where its second item is an integer and it's zero, then
+                # we can simply exclude the offset from our results.
+                elif isinstance(loc, builtins.tuple) and any(isinstance(item, interface.register_t) for item in loc):
+                    reg, offset = loc
+                    yield loc if offset else reg, ti, name
 
-                # FIXME: This is untested, but the idea is that if there's two
-                #        of them (without an offset), then not only do we need
-                #        both, but we need to half their size so that they can
-                #        cover the complete size of the type that they represent.
-                elif atype == idaapi.ALOC_REG2:
-                    ridx, ridx2 = loc.reg1(), loc.reg2()
-
-                    try: reg1 = instruction.architecture.by_indexsize(ridx, ti.get_size() // 2)
-                    except KeyError: reg1 = instruction.architecture.by_index(ridx)
-
-                    try: reg2 = instruction.architecture.by_indexsize(ridx2, ti.get_size() // 2)
-                    except KeyError: reg2 = instruction.architecture.by_index(ridx2)
-
-                    reg = (reg1, reg2)
-
-                # FIXME: This is untested, but the final register type requires
-                #        us to grab an rrel_t in order to extract the index as
-                #        well as its offset.
-                elif atype == idaapi.ALOC_RREL:
-                    rrel = loc.get_rrel()
-                    ridx, roff = rrel.reg, rrel.off
-                    try: reg = instruction.architecture.by_indexsize(ridx, ti.get_size())
-                    except KeyError: reg = instruction.architecture.by_index(ridx)
-
-                # We should never hit this case because any other argument type
-                # should not contain any kind of register information.
+                # Otherwise, it's one of the custom locations that we don't
+                # support. So we can just return it as we received it.
                 else:
-                    lookup = {getattr(idaapi, k) : k for k in dir(idaapi) if k.startswith('ALOC_')}
-                    raise E.InvalidTypeOrValueError(u"{:s}.registers({:#x}) : Unable to extract register information from argument \"{:s}\" (index {:d}) of function ({:#x}) due to an unsupported location type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(name, '"'), index, ea, lookup.get(atype, ''), atype))
+                    yield loc, ti, name
+                continue
+            return
 
-                # Aggregate the new knowledge into our list of results.
-                result.append((reg, ti, name))
+        @utils.multicase()
+        @classmethod
+        def registers(cls):
+            '''Return the register information associated with the arguments of the current function.'''
+            return cls.registers(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def registers(cls, func):
+            '''Return the register information associated with the arguments of the function `func`.'''
+            result = []
+            for reg, ti, name in cls.iterate(func):
+                result.append(reg) if any([isinstance(reg, interface.register_t), isinstance(reg, builtins.tuple) and all(isinstance(item, interface.register_t) for item in reg)]) else None
             return result
         regs = utils.alias(registers, 'frame.args')
 
