@@ -262,3 +262,29 @@ def finders():
     for subdir in ['custom', 'app']:
         yield internal_submodule(subdir, os.path.join(root, subdir))
     return
+
+# The following logic is simply for detecting the version of IDA and
+# for stashing it directly into the "idaapi" module.
+
+# needed because IDA 6.95 is fucking stupid and sets the result of idaapi.get_kernel_version() to a string
+def host_version():
+    '''Return the version of the host application as the major, minor, and a floating-point variation.'''
+
+    # if the api doesn't exist, then go back to some crazy version.
+    if not hasattr(idaapi, 'get_kernel_version'):
+        return 6, 0, 6.0
+
+    import math
+    res = str(idaapi.get_kernel_version())      # force it to a str because IDA 7.0 "fixed" it
+    major, minor = map(int, res.split('.', 2))
+    minor = int("{:<02d}".format(minor))
+    if minor > 0:
+        count = 1 + math.floor(math.log10(minor))
+        return major, minor, float(major) + minor * pow(10, -count)
+    return major, minor, float(major)
+
+def patch_version(module):
+    '''Patch the version of the host application into a given module.'''
+    version = host_version()
+    module.__version_major__, module.__version_minor__, module.__version__ = version
+    return version
