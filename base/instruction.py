@@ -2295,9 +2295,9 @@ class operand_types:
         '''Operand type decoder for ``idaapi.o_void``.'''
         return ()
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_reg)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_reg)
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_reg, int)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_reg, int)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg, int)
     def register(insn, op):
         '''Operand type decoder for ``idaapi.o_reg`` which returns a ``register_t``.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
@@ -2312,9 +2312,9 @@ class operand_types:
         global architecture
         return architecture.by_indextype(op.reg, get_dtype_attribute(op))
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm, int)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_imm, int)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm, int)
     def immediate(insn, op):
         '''Operand type decoder for ``idaapi.o_imm`` which returns an immediate integer.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
@@ -2342,56 +2342,56 @@ class operand_types:
         inverted = res if res < 0 else value - maximum
         return res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
 
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_mem)
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_far, builtins.type)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_near, builtins.type)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_mem, builtins.type)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near, builtins.type)
     def address(insn, op):
         '''Operand type decoder for address operands which return just an immediate address.'''
         segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
         return op.addr
 
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0, int)
     def trregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec0`` which returns a trap register on the Intel architecture.'''
         global architecture
         raise E.UnsupportedCapability(u"{:s}.trregister({:#x}, ...) : Trap registers (`%trX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), insn.ea))
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1, int)
     def dbregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec1`` which returns a Db register on the Intel architecture.'''
         global architecture
         raise E.UnsupportedCapability(u"{:s}.dbregister({:#x}, ...) : Db registers (`%dbX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), insn.ea))
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2, int)
     def crregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec2`` which returns a control register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_control(regnum)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3, float)
     def fpregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec3`` which returns an FPU register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_float(regnum)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4, int)
     def mmxregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec4`` which returns an MMX register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_mmx(regnum)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5, float)
     def xmmregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec5`` which returns an XMM register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_xmm(regnum)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5+1)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5+1, float)
     def ymmregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec5+1`` which returns an YMM register on the Intel architecture.'''
         global architecture
         regnum = op.reg
         return architecture.by_ymm(regnum)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5+2)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5+2, float)
     def zmmregister(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec5+2`` which returns an ZMM register on the Intel architecture.'''
         raise E.UnsupportedCapability(u"{:s}.zmmregister({:#x}, ...) : ZMM registers (`%zmmX`) are not implemented for the Intel platform.".format('.'.join([__name__, 'operand_types']), insn.ea))
@@ -2400,7 +2400,7 @@ class operand_types:
         regnum = op.reg
         return architecture.by_zmm(regnum)
 
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_mem, builtins.type)
     def memory(insn, op):
         '''Operand type decoder for returning a memory address including a segment on the Intel architecture.'''
         global architecture
@@ -2460,8 +2460,8 @@ class operand_types:
         scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
         return intelops.SegmentOffsetBaseIndexScale(sel, offset_, None, index_, scale_)
 
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
-    @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_displ, builtins.type)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase, builtins.type)
     def phrase(insn, op):
         '''Operand type decoder for returning a phrase or displacement on the Intel architecture.'''
         global architecture
@@ -2547,7 +2547,7 @@ class operand_types:
         scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
         return intelops.SegmentOffsetBaseIndexScale(sel, offset_, base_, index_, scale_)
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase, builtins.type)
     def phrase(insn, op):
         '''Operand type decoder for returning a memory phrase on either the AArch32 or AArch64 architectures.'''
         global architecture
@@ -2558,14 +2558,14 @@ class operand_types:
         Rn, Rm = architecture.by_index(op.reg), architecture.by_index(op.specflag1)
         return armops.registerphrase(Rn, Rm)
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ, builtins.type)
     def phrase(insn, op):
         '''Operand type decoder for returning a memory displacement on either the AArch32 or AArch64 architectures.'''
         global architecture
         Rn = architecture.by_index(op.reg)
         return armops.immediatephrase(Rn, idaapi.as_signed(op.addr))
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem, builtins.type)
     def memory(insn, op):
         '''Operand type decoder for returning a memory reference on either the AArch32 or AArch64 architectures.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
@@ -2584,7 +2584,7 @@ class operand_types:
 
         return armops.memory(addr, res - maxval if sf else res)
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0, int)
     def flex(insn, op):
         '''Operand type decoder for returning a flexible operand (shift-op) on either the AArch32 or AArch64 architectures.'''
         global architecture
@@ -2635,7 +2635,7 @@ class operand_types:
 
         raise E.UnsupportedCapability(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4, float)
     def extensionlist(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec4`` which returns a floating-point register list on either the AArch32 or AArch64 architectures.'''
 
@@ -2647,7 +2647,7 @@ class operand_types:
 
         raise E.UnsupportedCapability(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join([__name__, 'operand_types']), insn.ea, op.type, op.type))
 
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5, builtins.type)
     def text(insn, op):
         '''Operand type decoder for ``idaapi.o_idpspec5`` which returns arbitrary text on either the AArch32 or AArch64 architectures.'''
 
@@ -2666,7 +2666,7 @@ class operand_types:
         cc = op.value & 0x0f
         return architecture.by_condition(cc)
 
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ, builtins.type)
     def phrase(insn, op):
         '''Operand type decoder for memory phrases on MIPS architecturs.'''
         global architecture
@@ -2674,13 +2674,13 @@ class operand_types:
         rt, imm = architecture.by_index(op.reg), op.addr
         return mipsops.phrase(rt, imm)
 
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec0)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec0, int)
     def code(insn, op):
         '''Operand type decoder for trap codes on MIPS architectures.'''
         res = op.value
         return mipsops.trap(int(res))
 
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1, float)
     def float(insn, op):
         '''Operand type decoder for floating-point registers on MIPS architectures.'''
         index = op.reg
@@ -3218,18 +3218,18 @@ class Intel(interface.architecture_t):
 
         fpstack = self.__register__.fpstack
         # single precision
-        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float)) for _ in range(8) ]
+        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float, ptype=float)) for _ in range(8) ]
         # double precision
-        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(8) ]
+        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double, ptype=float)) for _ in range(8) ]
         # umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
-        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte)) for _ in range(8) ]
+        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte, ptype=float)) for _ in range(8) ]
 
         # not sure if the mmx registers trash the other 16 bits of an fp register
         [ setitem("mm{:d}".format(_), self.child(fpstack, "mm{:d}".format(_), _*80, 64, dtype=idaapi.dt_qword)) for _ in range(8) ]
 
         # sse1/sse2 simd registers
-        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16)) for _ in range(16) ]
-        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 256, dtype=idaapi.dt_byte32)) for _ in range(16) ]
+        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16, ptype=float)) for _ in range(16) ]
+        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 256, dtype=idaapi.dt_byte32, ptype=float)) for _ in range(16) ]
 
         # control registers (32-bit and 64-bit)
         [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in range(0, 8) ]
@@ -3291,12 +3291,12 @@ class AArch(interface.architecture_t):
 
         # Sub-registers that compose the V register (floating-point)
         if BITS > 32:
-            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="V{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(32) ]
+            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="V{:d}".format(_), dtype=idaapi.dt_double, ptype=float)) for _ in range(32) ]
         else:
-            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(32) ]
-        [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_), dtype=idaapi.dt_float)) for _ in range(32) ]
-        [ setitem("h{:d}".format(_), self.child(getitem("s{:d}".format(_)), "h{:d}".format(_), 0, 16, idaname="X{:d}".format(_), dtype=getattr(idaapi, 'dt_half', idaapi.dt_word))) for _ in range(32) ]
-        [ setitem("b{:d}".format(_), self.child(getitem("h{:d}".format(_)), "b{:d}".format(_), 0, 8, idaname="X{:d}".format(_))) for _ in range(32) ]
+            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_), dtype=idaapi.dt_double, ptype=float)) for _ in range(32) ]
+        [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_), dtype=idaapi.dt_float, ptype=float)) for _ in range(32) ]
+        [ setitem("h{:d}".format(_), self.child(getitem("s{:d}".format(_)), "h{:d}".format(_), 0, 16, idaname="X{:d}".format(_), dtype=getattr(idaapi, 'dt_half', idaapi.dt_word), ptype=float)) for _ in range(32) ]
+        [ setitem("b{:d}".format(_), self.child(getitem("h{:d}".format(_)), "b{:d}".format(_), 0, 8, idaname="X{:d}".format(_), ptype=float)) for _ in range(32) ]
 
         # General-purpose registers
         [ setitem("x{:d}".format(_), self.new("x{:d}".format(_), BITS, idaname="X{:d}".format(_))) for _ in range(31) ]
@@ -3495,9 +3495,9 @@ class MIPS(interface.architecture_t):
 
         # floating-point registers
         if BITS > 32:
-            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(32) ]
+            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_double, ptype=float)) for _ in range(32) ]
         else:
-            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_float)) for _ in range(32) ]
+            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_float, ptype=float)) for _ in range(32) ]
 
         # FIXME: we should probably include all of the selector versions for the
         #        coprocessor registers too...
