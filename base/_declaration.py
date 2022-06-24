@@ -8,7 +8,6 @@ TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
 
-import function as fn, database as db
 import internal, idaapi
 import string as _string
 
@@ -138,8 +137,7 @@ def unmangle_name(name):
     # Now we can drop everything before the last space, and then return it.
     return joined.rsplit(' ', 1)[-1]
 
-def unmangle_arguments(ea):
-    info = fn.type(ea)
+def unmangle_arguments(ea, info):
     if not info.present():
         raise ValueError(info)
 
