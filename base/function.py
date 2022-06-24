@@ -3412,7 +3412,14 @@ class type(object):
         @classmethod
         def registers(cls, func):
             '''Return the registers for each of the parameters belonging to the function `func`.'''
-            return [reg for reg, ti, name in frame.args.registers(func)]
+            result = []
+            for _, _, loc in cls.iterate(func):
+                if isinstance(loc, builtins.tuple) and any(isinstance(item, interface.register_t) for item in loc):
+                    reg, offset = loc
+                    item = loc if all(isinstance(item, interface.register_t) for item in loc) else loc if offset else reg
+                    result.append(item)
+                continue
+            return result
         regs = utils.alias(registers, 'type.arguments')
 
         @utils.multicase()
