@@ -1875,7 +1875,7 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('newprc', interface.typemap.__newprc__, 0)
 
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
 
     ## monitor when ida enters its various states so we can pre-build the tag cache
     if idaapi.__version__ >= 7.0:
@@ -1891,9 +1891,9 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('auto_empty', on_ready, -100)
 
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_init, -50)
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_init, -50)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
         ui.hook.idp.add('auto_empty', on_ready, 0)
 
     ui.hook.idb.add('closebase', on_close, 10000)
@@ -1906,7 +1906,7 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
 
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
 
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
@@ -1922,8 +1922,8 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idb.add('area_cmt_changed', globals.changed, 0)
 
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
         ui.hook.idb.add('area_cmt_changed', globals.old_changed, 0)
 
     # hook the changing of a comment
@@ -1976,7 +1976,7 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('newprc', instruction.__newprc__, 0)
 
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
 
     ## ensure the database.config namespace is initialized as it's
     ## necessary and used by the processor detection.
@@ -1987,7 +1987,7 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('init', database.config.__init_info_structure__, -100)
 
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
+        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
 
     ## keep track of individual tags like colors and type info
     if idaapi.__version__ >= 7.2:
@@ -2025,10 +2025,10 @@ def make_ida_not_suck_cocks(nw_code):
 
 def make_ida_suck_cocks(nw_code):
     '''Unhook all of IDA's API.'''
-    idaapi.__notification__.close()
+    hasattr(idaapi, '__notification__') and idaapi.__notification__.close()
     ui.hook.__stop_ida__()
 
 def ida_is_busy_sucking_cocks(*args, **kwargs):
     make_ida_not_suck_cocks(idaapi.NW_INITIDA)
-    idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
+    hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
     return -1
