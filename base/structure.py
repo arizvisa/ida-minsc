@@ -1212,7 +1212,7 @@ class members_t(object):
     def by(self, offset):
         '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
-    @utils.multicase(offset=interface.location_t)
+    @utils.multicase(location=interface.location_t)
     def by(self, location):
         '''Return the member at the specified `location`.'''
         offset, size = location
