@@ -26,9 +26,27 @@ sys.path.remove(root)
 loader = imp.load_source('__loader__', os.path.join(root, 'plugins', 'minsc.py'))
 sys.meta_path.extend(loader.finders())
 
-# now we can just load it into the globals() namespace. we don't need
-# to delete it, because it gets popped out of existence during load.
-loader.load(globals(), preserve={'_orig_stdout', '_orig_stderr'})
+# then we need to patch the version into "idaapi" so that we can
+# access it when figuring out which logic we need to use.
+loader.patch_version(idaapi)
+
+# IDA 6.95 obnoxiously replaces the displayhook with their own
+# version which makes it so that we can't hook it with ours.
+if idaapi.__version__ >= 6.95 and hasattr(ida_idaapi, '_IDAPython_displayhook') and hasattr(ida_idaapi._IDAPython_displayhook, 'orig_displayhook'):
+    sys.displayhook = ida_idaapi._IDAPython_displayhook.orig_displayhook
+    del(ida_idaapi._IDAPython_displayhook)
+
+# replace sys.displayhook with our own so that IDAPython can't
+# tamper with our __repr__ implementations.
+sys.displayhook = loader.DisplayHook(sys.stdout.write, sys.displayhook).displayhook
+
+# now we can just load it into the globals() namespace, but we still
+# need to preserve it as we'll need one more function after transition.
+loader.load(globals(), preserve={'loader', '_orig_stdout', '_orig_stderr'})
+
+# now we can start everything up and delete the loader afterwards.
+loader.startup()
+del(loader)
 
 # try and execute our user's idapythonrc.py
 try:
