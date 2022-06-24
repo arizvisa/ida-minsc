@@ -2097,7 +2097,10 @@ class frame(object):
                 # its properties to turn it into a register_t and grab its name.
                 result = []
                 for regarg, ti in items:
-                    reg = instruction.architecture.by_indexsize(regarg.reg, ti.get_size())
+                    try:
+                        reg = instruction.architecture.by_indexsize(regarg.reg, ti.get_size())
+                    except KeyError:
+                        reg = instruction.architecture.by_index(regarg.reg)
                     result.append((reg, ti, utils.string.of(regarg.name)))
                 return result
 
@@ -2136,10 +2139,12 @@ class frame(object):
                 atype = loc.atype()
 
                 # If there was only one register (with an offset), then we can
-                # just grab it and convert it to a register_t.
+                # just grab it and convert it to a register_t. If the register
+                # size doesn't fit, then we just fall back to the register index.
                 if atype == idaapi.ALOC_REG1:
                     ridx, roff = loc.reg1(), loc.regoff()
-                    reg = instruction.architecture.by_indexsize(ridx, ti.get_size())
+                    try: reg = instruction.architecture.by_indexsize(ridx, ti.get_size())
+                    except KeyError: reg = instruction.architecture.by_index(ridx)
 
                 # FIXME: This is untested, but the idea is that if there's two
                 #        of them (without an offset), then not only do we need
@@ -2147,8 +2152,13 @@ class frame(object):
                 #        cover the complete size of the type that they represent.
                 elif atype == idaapi.ALOC_REG2:
                     ridx, ridx2 = loc.reg1(), loc.reg2()
-                    reg1 = instruction.architecture.by_indexsize(ridx, ti.get_size() // 2)
-                    reg2 = instruction.architecture.by_indexsize(ridx2, ti.get_size() // 2)
+
+                    try: reg1 = instruction.architecture.by_indexsize(ridx, ti.get_size() // 2)
+                    except KeyError: reg1 = instruction.architecture.by_index(ridx)
+
+                    try: reg2 = instruction.architecture.by_indexsize(ridx2, ti.get_size() // 2)
+                    except KeyError: reg2 = instruction.architecture.by_index(ridx2)
+
                     reg = (reg1, reg2)
 
                 # FIXME: This is untested, but the final register type requires
@@ -2157,7 +2167,8 @@ class frame(object):
                 elif atype == idaapi.ALOC_RREL:
                     rrel = loc.get_rrel()
                     ridx, roff = rrel.reg, rrel.off
-                    reg = instruction.architecture.by_indexsize(ridx, ti.get_size())
+                    try: reg = instruction.architecture.by_indexsize(ridx, ti.get_size())
+                    except KeyError: reg = instruction.architecture.by_index(ridx)
 
                 # We should never hit this case because any other argument type
                 # should not contain any kind of register information.
@@ -3755,19 +3766,27 @@ class type(object):
                 # when using scattered (ALOC_DIST) argument location types.
                 elif ltype == idaapi.ALOC_REG1:
                     ridx1, regoff = (linfo & 0x0000ffff) >> 0, (linfo & 0xffff0000) >> 16
-                    reg = instruction.architecture.by_indexsize(ridx1, ti.get_size())
+                    try: reg = instruction.architecture.by_indexsize(ridx1, ti.get_size())
+                    except KeyError: reg = instruction.architecture.by_index(ridx1)
                     return reg, regoff
 
                 # A pair of registers gets returned as a tuple.
                 elif ltype == idaapi.ALOC_REG2:
                     ridx1, ridx2 = (linfo & 0x0000ffff) >> 0, (linfo & 0xffff0000) >> 16
-                    reg1, reg2 = (instruction.architecture.by_indexsize(ridx, ti.get_size() // 2) for ridx in [ridx1, ridx2])
+                    try: reg1 = instruction.architecture.by_indexsize(ridx1, ti.get_size() // 2)
+                    except KeyError: reg1 = instruction.architecture.by_index(ridx1)
+
+                    try: reg2 = instruction.architecture.by_indexsize(ridx2, ti.get_size() // 2)
+                    except KeyError: reg2 = instruction.architecture.by_index(ridx2)
+
                     return reg1, reg2
 
                 # Seems to be a value relative to a register (reg+off).
                 elif ltype in {idaapi.ALOC_RREL}:
                     ridx, roff = linfo
-                    return instruction.architecture.by_indexsize(ridx, ti.get_size())
+                    try: reg = instruction.architecture.by_indexsize(ridx, ti.get_size())
+                    except KeyError: reg = instruction.architecture.by_index(ridx)
+                    return reg, roff
 
                 # Scattered shit should really just be a list of things, and we
                 # can just recurse into it in order to extract our results.
