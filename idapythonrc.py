@@ -256,12 +256,19 @@ del(subdir)
 # temporarily load the root namespace
 __root__ = imp.load_source('__root__', os.path.join(root, '__root__.py'))
 
+# save certain things within the current namespace
+__original__ = {symbol : value for symbol, value in globals().items() if symbol in {'_orig_stdout', '_orig_stderr'}}
+
 # empty out IDAPython's namespace so that we can replace it
 [globals().pop(symbol) for symbol in globals().copy() if not symbol.startswith('__')]
 
-# re-populate with a default namespace and remove our variable that contained it
+# re-populate with a default namespace while including any symbols that needed
+# preservation, and then remove both variables that contained them
 globals().update({symbol : value for symbol, value in __root__.__dict__.items() if not symbol.startswith('__')})
 del(__root__)
+
+globals().update({symbol : value for symbol, value in __original__.items()})
+del(__original__)
 
 # try and execute our user's idapythonrc.py
 try:
