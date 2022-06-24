@@ -1,6 +1,6 @@
 import sys, os
 import imp, fnmatch, ctypes, types
-import idaapi
+import idaapi, logging
 
 # Point this at the repository directory
 root = idaapi.get_user_idadir()
@@ -226,3 +226,39 @@ def load(namespace, preserve=()):
     # that needed to be preserved.
     namespace.update({symbol : value for symbol, value in module.__dict__.items() if not symbol.startswith('__')})
     namespace.update({symbol : value for symbol, value in preserved.items()})
+
+# Just a ctypes wrapper so that we can access the internal IDA api.
+library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
+
+# The following code is responsible for seeding Python's loader by
+# yielding each of the objects that need to be added to its meta_path.
+def finders():
+    '''Yield each finder that will be used by the plugin to locate its modules.'''
+
+    # IDA's native lower-level api
+    if sys.platform in {'darwin'}:
+        yield internal_object('ida', library(idaapi.idadir("libida{:s}.dylib".format('' if idaapi.BADADDR < 0x100000000 else '64'))))
+
+    elif sys.platform in {'linux', 'linux2'}:
+        yield internal_object('ida', library(idaapi.idadir("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64'))))
+
+    elif sys.platform in {'win32'}:
+        if os.path.exists(idaapi.idadir('ida.wll')):
+            yield internal_object('ida', library(idaapi.idadir('ida.wll')))
+        else:
+            yield internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64'))))
+
+    else:
+        logging.warning("{:s} : Unable to load IDA's native api via ctypes. Ignoring...".format(__name__))
+
+    # private (internal) api
+    yield internal_submodule('internal', os.path.join(root, 'base'), include='_*.py')
+
+    # public api
+    yield internal_path(os.path.join(root, 'base'), exclude='_*.py')
+    yield internal_path(os.path.join(root, 'misc'))
+
+    # custom and application api
+    for subdir in ['custom', 'app']:
+        yield internal_submodule(subdir, os.path.join(root, subdir))
+    return
