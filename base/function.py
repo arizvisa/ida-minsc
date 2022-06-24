@@ -1886,21 +1886,11 @@ class frame(object):
             '''Yield the `(offset, name, size)` of each argument belonging to the function `func`.'''
             _, ea = interface.addressOfRuntimeOrStatic(func)
 
-            # first we'll need to check if there's a tinfo_t for the address that
-            # we're looking at so that we can give it priority over the frame.
+            # first we'll need to check if there's a tinfo_t for the address to
+            # give it priority over the frame. then we can grab its details.
             if database.type.has_typeinfo(ea):
                 tinfo = type(ea)
-
-                # if the tinfo_t that we grabbed is a function pointer (import),
-                # then make sure we dereference it so we can get its details.
-                ti = tinfo.get_pointed_object() if tinfo.is_ptr() else tinfo
-                if not ti.has_details():
-                    raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to extract the type information for the arguments belonging to function ({:#x}) due to a missing prototype.".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-                # grab the details containing the function's actual parameters.
-                ftd = idaapi.func_type_data_t()
-                if not ti.get_func_details(ftd):
-                    raise E.DisassemblerError(u"{:s}({:#x}) : Unable to extract the argument details of function ({:#x}) from its type information ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ea, ti._print()))
+                _, ftd = interface.tinfo.function_details(ea, tinfo)
 
                 # iterate through the parameters and collect only arguments that
                 # are allocated on the stack so that we can use their information
@@ -2104,20 +2094,9 @@ class frame(object):
                     result.append((reg, ti, utils.string.of(regarg.name)))
                 return result
 
-            # Otherwise, we need to extract them from the details for the tinfo_t
-            # for the function. If it's a pointer (like an import), then we make
-            # sure to dereference it before checking the type's details. If there
-            # are no details for us, then this is a critical error and we really
-            # can't do shit about it.
+            # Grab the type at the given address, and then the function details.
             tinfo = type(ea)
-            ti = tinfo.get_pointed_object() if tinfo.is_ptr() else tinfo
-            if not ti.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}.registers({:#x}) : Unable to extract the type information for the arguments belonging to function ({:#x}) due to a missing prototype.".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-            # If we couldn't grab the details, then just fail...super hard.
-            ftd = idaapi.func_type_data_t()
-            if not ti.get_func_details(ftd):
-                raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to extract the argument details of function ({:#x}) from its type information ({!s}).".format('.'.join([__name__, cls.__name__]), ea, ea, ti._print()))
+            _, ftd = interface.tinfo.function_details(ea, ti)
 
             # Now we just need to iterate through our parameters while grabbing
             # any one of them that's located within a register. We also preserve
@@ -2999,39 +2978,22 @@ class type(object):
         """
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         try:
-            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            _, ea = interface.addressOfRuntimeOrStatic(func)
 
         # If we couldn't resolve the function, then consider our parameter
         # as the calling convention that we're going to apply to the current address.
         except E.FunctionNotFoundError:
             return cls.convention(ui.current.address(), func)
 
-        # Grab the type information from the address that we resolved.
+        # Grab the type information from the address that we resolved. We avoid
+        # doing any "guessing" here and only work with an explicitly applied type.
         ti = idaapi.tinfo_t()
         if not get_tinfo(ti, ea):
             raise E.MissingTypeOrAttribute(u"{:s}.convention({:#x}) : Specified function {:#x} does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
-        # If this is a runtime address (a function pointer), then we need to navigate
-        # to the type information that it points to.
-        if rt and ti.is_funcptr():
-            pi = idaapi.ptr_type_data_t()
-            if not ti.get_ptr_details(pi):
-                raise E.DisassemblerError(u"{:s}.convention({:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x})".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
-            tinfo = pi.obj_type
-
-        # Otherwise, it should be a function and we can just use its idaapi.tinfo_t as-is.
-        elif not rt and ti.is_func():
-            tinfo = ti
-
-        # Otherwise, this is not a function prototype and we can't use it.
-        else:
-            raise E.InvalidTypeOrValueError(u"{:s}.convention({:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
-
-        # Now we need to get the function details from the type and then we can extract the
-        # convention and the spoiled count from it that we'll return.
-        ftd = idaapi.func_type_data_t()
-        if not (tinfo.has_details() and tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT)):
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({:#x}) : Unable to extract the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(tinfo), ea))
+        # Now we can just grab the function details for this type, use it to extract
+        # the convention and the spoiled count, and then return what we found.
+        _, ftd = interface.tinfo.function_details(ea, ti)
         result, spoiled_count = ftd.cc & idaapi.CM_CC_MASK, ftd.cc & ~idaapi.CM_CC_MASK
         return result
     @utils.multicase(convention=six.string_types)
@@ -3065,67 +3027,30 @@ class type(object):
     @classmethod
     def convention(cls, func, convention):
         '''Set the calling convention used by the prototype for the function `func` to the specified `convention`.'''
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-        set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
 
-        # Grab the type information from the resolved address so that we can modify it.
+        # Grab the type information from the resolved address.
         ti = idaapi.tinfo_t()
         if not get_tinfo(ti, ea):
             raise E.MissingTypeOrAttribute(u"{:s}.convention({:#x}, {:#x}) : The specified function ({:#x}) does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), ea, convention, ea))
 
-        # If this is a runtime address (a function pointer), then we need to get what
-        # it actually points to so that we can actually get its function details.
-        if rt and ti.is_funcptr():
-            pi = idaapi.ptr_type_data_t()
-            if not ti.get_ptr_details(pi):
-                raise E.DisassemblerError(u"{:s}.convention({:#x}, {:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, convention, "{!s}".format(ti), ea))
-            tinfo = pi.obj_type
+        # Now we just need to create the strpath.update_function_details
+        # coroutine. Our first result will contain the function details
+        # for us to tinker with.
+        updater = interface.tinfo.update_function_details(ea, ti)
+        _, ftd = builtins.next(updater)
 
-        # Otherwise, it should be a function and we can just use its idaapi.tinfo_t as-is.
-        elif not rt and ti.is_func():
-            tinfo = ti
-
-        # Otherwise, this is not a function prototype and we can't use it.
-        else:
-            raise E.InvalidTypeOrValueError(u"{:s}.convention({:#x}, {:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, convention, "{!s}".format(ti), ea))
-
-        # Now we need to get the function details from the type and then we can modify its
-        # convention and preserve its spoiled count.
-        ftd = idaapi.func_type_data_t()
-        if not (tinfo.has_details() and tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT)):
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({:#x}, {:#x}) : Unable to extract the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, convention, "{!s}".format(tinfo), ea))
-
-        # Update the calling convention whilst preserving the spoiled count. If it has extra
-        # bits that were set, then we need to warn the user about it, and then we can recreate
-        # our function using it.
+        # Update the calling convention whilst preserving the spoiled count.
+        # If it has extra bits that were set, then we need to warn the user
+        # about it, and then we can send it back to the updater.
         if convention & ~idaapi.CM_CC_MASK:
             logging.warning(u"{:s}.convention({:#x}, {:#x}) : The convention that was provided ({:#x}) contains extra bits ({:#x}) that will be masked ({:#x}) out.".format('.'.join([__name__, cls.__name__]), ea, convention, convention, convention & ~idaapi.CM_CC_MASK, idaapi.CM_CC_MASK))
         result, ftd.cc = ftd.cc, (ftd.cc & ~idaapi.CM_CC_MASK) | (convention & idaapi.CM_CC_MASK)
 
-        # Now we can use the function prototype that we snagged earlier, and re-create it using
-        # the function details that we just modified.
-        if not tinfo.create_func(ftd):
-            raise E.DisassemblerError(u"{:s}.convention({:#x}, {:#x}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, convention, "{!s}".format(tinfo), ea))
-
-        # Next we need to do is to figure out if the user asked us to modify a runtime function
-        # which makes this function pointer and requires another step to fix it up.
-        if rt:
-            pi.obj_type = tinfo
-            if not ti.create_ptr(pi):
-                raise E.DisassemblerError(u"{:s}.convention({:#x}, {:#x}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, convention, "{!s}".format(tinfo), ea))
-            newinfo = ti
-
-        # If it isn't a runtime function and is just a regular one, then we're fine and can just
-        # apply the tinfo that we've currently been fucking around with.
-        else:
-            newinfo = tinfo
-
-        # Now we have a proper tinfo_t that has been modified which we can apply to the given
-        # address. After we apply it, then we can return the previous calling convention making
-        # sure that we mask out the spoiled_count bits.
-        if not set_tinfo(ea, newinfo):
-            raise E.DisassemblerError(u"{:s}.convention({:#x}, {:#x}) : Unable to apply the new type information ({!r}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, convention, "{!s}".format(newinfo), ea))
+        # Now we can send the updater our modified ftd, close it, and then
+        # return the value that was set prevously.
+        updater.send(ftd), updater.close()
         return result & idaapi.CM_CC_MASK
     cc = utils.alias(convention, 'type')
 
@@ -3154,7 +3079,7 @@ class type(object):
         def __new__(cls, func):
             '''Return the result type for the function `func` as an ``idaapi.tinfo_t``.'''
             try:
-                rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+                _, ea = internal.interface.addressOfRuntimeOrStatic(func)
 
             # If we couldn't resolve the function, then consider our parameter
             # as some type information that we're going to apply to the current one.
@@ -3166,33 +3091,8 @@ class type(object):
             else:
                 ti = type(ea)
 
-            # If our type is a function pointer, then we need to dereference it
-            # in order to get the type that we want to extract the result from.
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not ti.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}.result({:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
-
-            # Otherwise, it should be a function and we can just use its idaapi.tinfo_t as-is.
-            elif not rt and ti.is_func():
-                tinfo = ti
-
-            # Otherwise, this is not a function prototype and we can't use it.
-            else:
-                raise E.InvalidTypeOrValueError(u"{:s}.result({:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
-
-            # Now we should have a function prototype where we can grab the
-            # return type type out of its details. If there are no details,
-            # then we fall back to the method off of the idaapi.tinfo_t.
-            if not tinfo.has_details():
-                logging.warning(u"{:s}.result({:#x}) : Fetching the return type directly from the type information ({!r}) due to the inability to get the details for the function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(tinfo), ea))
-                return tinfo.get_rettype()
-
             # Now we can grab our function details and then return the type.
-            ftd = idaapi.func_type_data_t()
-            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
-                raise E.DisassemblerError(u"{:s}.result({:#x}) : Unable to get the details from the type information ({!r}) for the specified function.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(tinfo)))
+            _, ftd = interface.tinfo.function_details(ea, ti)
             return ftd.rettype
         @utils.multicase(info=six.string_types)
         @utils.string.decorate_arguments('info')
@@ -3207,63 +3107,42 @@ class type(object):
         @utils.multicase(info=idaapi.tinfo_t)
         def __new__(cls, func, info):
             '''Modify the result type for the function `func` to the type information provided as an ``idaapi.tinfo_t`` in `info`.'''
-            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            _, ea = interface.addressOfRuntimeOrStatic(func)
             get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-            set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
 
-            # Grab the type information from the resolved address so that we can modify it.
+            # Grab the type information from the function that we'll update with.
             ti = idaapi.tinfo_t()
             if not get_tinfo(ti, ea):
                 raise E.MissingTypeOrAttribute(u"{:s}.result({:#x}, {!r}) : Specified function {:#x} does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ea))
 
-            # If this is a runtime address (a function pointer), then we need to get what
-            # it actually points to so that we can actually get to the function details.
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not ti.get_ptr_details(pi):
-                    raise E.MissingTypeOrAttribute(u"{:s}.result({:#x}, {!r}) : Unable able to get the pointer target from the type ({!r}) at the specified address ({:#x})".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
+            # Now we can create an updater, and grab the details out of it.
+            updater = interface.tinfo.update_function_details(ea, ti)
+            _, ftd = builtins.next(updater)
 
-            # Otherwise, it's a regular function and our idaapi.tinfo_t is okay.
-            elif not rt and ti.is_func():
-                tinfo = ti
-
-            # Anything else is not a function prototype and we can't use it.
-            else:
-                raise E.InvalidTypeOrValueError(u"{:s}.result({:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), ea))
-
-            # Similar to the calling convention, we need to get to the function details so
-            # that we can modify the return type and grab its old one.
-            ftd = idaapi.func_type_data_t()
-            if not (tinfo.has_details() and tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT)):
-                raise E.MissingTypeOrAttribute(u"{:s}.result({:#x}, {!r}) : Unable to extract the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(tinfo), ea))
-
-            # Now we should be able to assign the new return type that the user gave us
-            # while preserving the previous value within the function details. After we
-            # assign the new type, we can use the prototype to recreate it.
+            # From this, we'll trade the return type with the one the user gave us,
+            # and then send it back to the updater to write it to the address.
             result, ftd.rettype = ftd.rettype, info
-            if not tinfo.create_func(ftd):
-                raise E.DisassemblerError(u"{:s}.result({:#x}, {!r}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(tinfo), ea))
+            updater.send(ftd), updater.close()
 
-            # Next thing to handle is whether the user asked us to modify a runtime function
-            # or not. If so, this requires us to make our type a function pointer in order
-            # to fix everything up before we re-apply it.
-            if rt:
-                pi.obj_type = tinfo
-                if not ti.create_ptr(pi):
-                    raise E.DisassemblerError(u"{:s}.result({:#x}, {!r}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), ea))
-                newinfo = ti
-
-            # If it wasn't a runtime function, then we're fine and can just apply the
-            # tinfo that we started out using.
-            else:
-                newinfo = tinfo
-
-            # Finally we have a proper idaapi.tinfo_t that we can apply. After we apply it,
-            # all we need to do is return the previous one to the caller and we're good.
-            if not set_tinfo(ea, newinfo):
-                raise E.DisassemblerError(u"{:s}.result({:#x}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(newinfo), ea))
+            # That was it and we only need to return the previous value.
             return result
+
+        @utils.multicase()
+        @classmethod
+        def location(cls):
+            '''Return the location of the result belonging to the current function.'''
+            return cls.location(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def location(cls, func):
+            '''Return the location of the result belonging to the function `func`.'''
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            ti = type(ea)
+
+            # Grab the functions details, rip the location out of them, return it.
+            _, ftd = interface.tinfo.function_details(ea, ti)
+            location = ftd.retloc
+            return ftd.retloc
 
     class argument(object):
         """
@@ -3294,38 +3173,12 @@ class type(object):
         @utils.multicase(index=six.integer_types)
         def __new__(cls, func, index):
             '''Return the type information for the parameter at the specified `index` of the function `func`.'''
-            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
-            # If our type is a function pointer, then we need to dereference it
-            # in order to get the type that we want to extract the argument from.
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not ti.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
-
-            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
-            elif not rt and ti.is_func():
-                tinfo = ti
-
-            # Anything else is a type error that we need to raise to the user.
-            else:
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {:d}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(ti), ea))
-
-            # Now we can check to see if the type has details that we can grab the
-            # argument type out of. If there are no details, then we raise an
-            # exception informing the user.
-            if not tinfo.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}, {:d}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(tinfo), ea))
-
-            # Now we can grab our function details and process them according to
-            # what the user is asking us to do.
-            ftd = idaapi.func_type_data_t()
-            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
-                raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(tinfo), ea))
-
-            # Check that the index is within the boundaries for our available arguments.
+            # Use the address and tinfo to grab the details containing our arguments,
+            # and then check that the index is within its boundaries.
+            _, ftd = interface.tinfo.function_details(ea, ti)
             if not (0 <= index < ftd.size()):
                 raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, index, ftd.size(), ea))
 
@@ -3335,71 +3188,25 @@ class type(object):
         @utils.multicase(index=six.integer_types, info=idaapi.tinfo_t)
         def __new__(cls, func, index, info):
             '''Modify the type information for the parameter at the specified `index` of the function `func` to `info`.'''
-            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
-
-            # First we need to figure out if our type is a function. If it is, then
-            # we need to dereference it in order to get the information that we'll
-            # need to modify.
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not ti.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}({:#x}, {:d}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
 
-            # If it's a regular function, then we can use the idaapi.tinfo_t we received.
-            elif not rt and ti.is_func():
-                tinfo = ti
+            # We're going to update the type information as the specified address.
+            # So we'll use interface.tinfo.update_function_details to create an
+            # updater...
+            updater = interface.tinfo.update_function_details(ea, ti)
 
-            # Anything else is not a function prototype and thus we can't use it.
-            else:
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {:d}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(ti), ea))
-
-            # Next we need to ensure that the type information has details that
-            # we can modify. If they aren't there, then we need to bail.
-            if not tinfo.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}, {:d}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(tinfo), ea))
-
-            # Last thing we need to grab is our function details so that we can
-            # modify them according to what the user gave us.
-            ftd = idaapi.func_type_data_t()
-            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
-                raise E.DisassemblerError(u"{:s}({:#x}, {:d}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(tinfo), ea))
-
-            # Check that the index is within the boundaries for our available
-            # arguments. If it is, then we just need to make a backup of the old
-            # information and assign the new type information in its place.
+            # ...and then we grab the details out of it to check the user's index.
+            _, ftd = builtins.next(updater)
             if not (0 <= index < ftd.size()):
                 raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {:d}, {!r}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), index, ftd.size(), ea))
 
+            # Now we can just trade their type with the argument at the given index.
             argument = ftd[index]
             result, argument.type = argument.type, info
 
-            # Now, we just need to update our function type information with this
-            # new argument type. We do this by taking tinfo and recreating it.
-            if not tinfo.create_func(ftd):
-                raise E.DisassemblerError(u"{:s}({:#x}, {:d}, {!r}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(tinfo), ea))
-
-            # The last thing to do is to apply our type information back to the
-            # function, but we first need to check if we were modifying a runtime
-            # function or a static one. If it's a runtime one, then we were asked
-            # to modify a pointer and we need to recreate it before we apply.
-            if rt:
-                pi.obj_type = tinfo
-                if not ti.create_ptr(pi):
-                    raise E.DisassemblerError(u"{:s}({:#x}, {:d}, {!r}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(tinfo), ea))
-                newinfo = ti
-
-            # Otherwise, the type information that we used is good enough and we
-            # just need to apply it.
-            else:
-                newinfo = tinfo
-
-            # Finally we can apply our proper idaapi.tinfo_t to the address. Since
-            # it's been applied, all we have to do is return the previous one.
-            if not set_tinfo(ea, newinfo):
-                raise E.DisassemblerError(u"{:s}({:#x}, {:d}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), "{!s}".format(newinfo), ea))
+            # Then we can send it back to our updater, and return the previous value.
+            updater.send(ftd), updater.close()
             return result
         @utils.multicase(index=six.integer_types, info=six.string_types)
         @utils.string.decorate_arguments('info')
@@ -3424,38 +3231,12 @@ class type(object):
         @classmethod
         def name(cls, func, index):
             '''Return the name of the parameter at the specified `index` in the function `func`.'''
-            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
-            # If our type is a function pointer, then we need to dereference it
-            # in order to get the type that we want to extract the argument from.
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not tinfo.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
-
-            # Otherwise we check to see if it's a function so that we can use it as-is.
-            elif not rt and ti.is_func():
-                tinfo = ti
-
-            # Anything else is a type error that we need to raise to the user.
-            else:
-                raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}, {:d}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, "{!s}".format(ti), ea))
-
-            # Otherwise it should be a regular function and we can grab the
-            # types out of its details. If there are no details, then we raise
-            # an exception informing the user.
-            if not tinfo.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}, {:d}) : The type information ({!r}) for the function at {:#x} does not contain any details.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, "{!s}".format(tinfo), ea))
-
-            # Now we can grab our function details and process them according to
-            # what the user is asking us to do.
-            ftd = idaapi.func_type_data_t()
-            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
-                raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, "{!s}".format(tinfo), ea))
-
-            # Check that the index is within the boundaries for our available arguments.
+            # Use the address and type to get the function details, and then check that
+            # the user's index is within their boundaries to access the argument name.
+            _, ftd = interface.tinfo.function_details(ea, ti)
             if not (0 <= index < ftd.size()):
                 raise E.InvalidTypeOrValueError(u"{:s}.name({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
 
@@ -3467,72 +3248,25 @@ class type(object):
         @utils.string.decorate_arguments('string', 'suffix')
         def name(cls, func, index, string, *suffix):
             '''Modify the name of the parameter at the specified `index` of the function `func` to `string`.'''
-            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
-            name = interface.tuplename(*itertools.chain([string], suffix))
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            ti, name = type(ea), interface.tuplename(*itertools.chain([string], suffix))
 
-            # First we need to figure out if our type is a function. If it is, then
-            # we need to dereference it in order to get the information that we'll
-            # need to modify.
-            ti = type(ea)
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not ti.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}, {!s}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
-
-            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
-            elif not rt and ti.is_func():
-                tinfo = ti
-
-            # Anything else is a type error that we need to raise to the user.
-            else:
-                raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}, {:d}, {!s}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(ti), ea))
-
-            # Next we need to ensure that the type information has details that
-            # we can modify. If they aren't there, then we need to bail.
-            if not tinfo.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}, {:d}, {!s}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(tinfo), ea))
-
-            # Last thing we need to grab is our function details so that we can
-            # modify them according to what the user gave us.
-            ftd = idaapi.func_type_data_t()
-            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
-                raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}, {!s}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(tinfo), ea))
-
-            # Check that the index is within the boundaries for our available
-            # arguments. If it is, then we just need to make a backup of the old
-            # information and assign the new type information in its place.
+            # Now we can just use the address and type to create an updater for
+            # our function details. Grab the func_type_data_t from it and check
+            # that the user's argument index is within its bounds.
+            updater = interface.tinfo.update_function_details(ea, ti)
+            _, ftd = builtins.next(updater)
             if not (0 <= index < ftd.size()):
                 raise E.InvalidTypeOrValueError(u"{:s}.name({:#x}, {:d}, {!s}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), index, ftd.size(), ea))
 
+            # Only thing left to do is to trade the name the user gave us with
+            # whatever was stored at the parameter index they specified.
             argument = ftd[index]
             result, argument.name = argument.name, utils.string.to(name)
 
-            # Now, we just need to update our function type information with this
-            # new argument type. We do this by taking tinfo and recreating it.
-            if not tinfo.create_func(ftd):
-                raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}, {!s}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(tinfo), ea))
-
-            # The last thing to do is to apply our type information back to the
-            # function, but we first need to check if we were modifying a runtime
-            # function or a static one. If it's a runtime one, then we were asked
-            # to modify a pointer and we need to recreate it before we apply.
-            if rt:
-                pi.obj_type = tinfo
-                if not ti.create_ptr(pi):
-                    raise E.DisassemblerError(u"{:s}({:#x}, {:d}, {!s}) : Unable to modify the pointer target in the type information ({!r}) for the specified address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(tinfo), ea))
-                newinfo = ti
-
-            # Otherwise, the type information that we used is good enough and we
-            # just need to apply it.
-            else:
-                newinfo = tinfo
-
-            # Finally we can apply our proper idaapi.tinfo_t to the address. Since
-            # it's been applied, all we have to do is return the previous one.
-            if not set_tinfo(ea, newinfo):
-                raise E.DisassemblerError(u"{:s}.name({:#x}, {:d}, {!s}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), "{!s}".format(newinfo), ea))
+            # Now we can send the whole thing back to the updater, close it,
+            # and then return the previous result that was assigned.
+            updater.send(ftd), updater.close()
             return result
 
         @utils.multicase(index=six.integer_types)
@@ -3603,38 +3337,12 @@ class type(object):
         @classmethod
         def types(cls, func):
             '''Return the type information for each of the parameters belonging to the function `func`.'''
-            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
-            # If our type is a function pointer, then we need to dereference it
-            # in order to get the type that we want to extract the argument from.
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not ti.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}.types({:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
-
-            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
-            elif not rt and ti.is_func():
-                tinfo = ti
-
-            # Anything else is a type error that we need to raise to the user.
-            else:
-                raise E.InvalidTypeOrValueError(u"{:s}.types({:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
-
-            # Now we can check to see if the type has details that we can grab the
-            # argument type out of. If there are no details, then we raise an
-            # exception informing the user.
-            if not tinfo.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}.types({:#x}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
-
-            # Now we can grab our function details and process them according to
-            # what the user is asking us to do.
-            ftd = idaapi.func_type_data_t()
-            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
-                raise E.DisassemblerError(u"{:s}.types({:#x}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
-
-            # Then we just have to return each element as a list.
+            # Use the address and type to snag the details requested by the
+            # caller, iterate through it, and then return each type as a list.
+            _, ftd = interface.tinfo.function_details(ea, ti)
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [item.type for item in iterable]
         type = utils.alias(types, 'type.arguments')
@@ -3648,40 +3356,14 @@ class type(object):
         @classmethod
         def names(cls, func):
             '''Return the names for each of the parameters belonging to the function `func`.'''
-            rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
-            # If our type is a function pointer, then we need to dereference it
-            # in order to get the type that we want to extract the argument from.
-            if rt and ti.is_funcptr():
-                pi = idaapi.ptr_type_data_t()
-                if not ti.get_ptr_details(pi):
-                    raise E.DisassemblerError(u"{:s}.names({:#x}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
-                tinfo = pi.obj_type
-
-            # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
-            elif not rt and ti.is_func():
-                tinfo = ti
-
-            # Anything else is a type error that we need to raise to the user.
-            else:
-                raise E.InvalidTypeOrValueError(u"{:s}.names({:#x}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(ti), ea))
-
-            # Now we can check to see if the type has details that we can grab the
-            # argument type out of. If there are no details, then we raise an
-            # exception informing the user.
-            if not tinfo.has_details():
-                raise E.MissingTypeOrAttribute(u"{:s}.names({:#x}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
-
-            # Now we can grab our function details and process them according to
-            # what the user is asking us to do.
-            ftd = idaapi.func_type_data_t()
-            if not tinfo.get_func_details(ftd, idaapi.GTD_NO_LAYOUT):
-                raise E.DisassemblerError(u"{:s}.names({:#x}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, "{!s}".format(tinfo), ea))
-
-            # Then we just have to return each name as a list.
+            # Similar to the types, we use the address and type to snag the
+            # details, iterate through it, and then return each name as a list.
+            _, ftd = interface.tinfo.function_details(ea, ti)
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
-            return [item.name for item in iterable]
+            return [utils.string.to(item.name) for item in iterable]
         name = utils.alias(names, 'type.arguments')
 
         @utils.multicase()
