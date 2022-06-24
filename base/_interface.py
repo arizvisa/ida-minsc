@@ -3359,9 +3359,10 @@ class architecture_t(object):
 
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
 
         namespace = {key : value for key, value in register_t.__dict__.items()}
-        namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits})
+        namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits, '__ptype__':ptype})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', {item for item in []})
         namespace['architecture'] = self
@@ -3384,8 +3385,10 @@ class architecture_t(object):
 
         dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
+        ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
+
         namespace = {key : value for key, value in register_t.__dict__.items() }
-        namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits})
+        namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits, '__ptype__':ptype})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', {item for item in []})
         namespace['architecture'] = self
