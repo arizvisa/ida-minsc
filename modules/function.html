@@ -3155,6 +3155,26 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 </dd></dl>
 
 <dl class="function">
+<dt id="function.frame.args.iterate">
+<code class="descclassname">frame.args.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(member,</span> <span class="pre">type,</span> <span class="pre">name)</span></code> associated with the arguments for the current function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">frame.args.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(member,</span> <span class="pre">type,</span> <span class="pre">name)</span></code> associated with the arguments for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function containing the argument information to yield</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.frame.args.location">
 <code class="descclassname">frame.args.</code><code class="descname">location</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.location" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the list of address locations for each of the parameters that are passed to the function call at the current address.</p>
@@ -3198,13 +3218,15 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 <dl class="function">
 <dt id="function.frame.args.registers">
 <code class="descclassname">frame.args.</code><code class="descname">registers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.registers" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the register information associated with the arguments for the current function.</p>
+<dd><p>Return the register information associated with the arguments of the current function.</p>
+<p>Aliases: <a class="reference internal" href="#function.frame.args.registers" title="function.frame.args.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.regs</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">frame.args.</code><code class="descname">registers</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns the register information associated with the arguments for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<dd><p>Return the register information associated with the arguments of the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.frame.args.registers" title="function.frame.args.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.regs</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -3877,81 +3899,6 @@ the following globals:</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="function.type.result">
-<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.result" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the result type for the current function as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Modify the result type for the current function to the type information provided as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> provided in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the result</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the result to return</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Modify the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the type information provided as a string in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the address or function using the result to modify</li>
-<li><strong>info</strong> (<em>str</em>) – the type information to apply to the result of the function</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
-<dd><p>Modify the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the type information provided as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the address or function using the result to modify</li>
-<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the result</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="function.type.static">
 <code class="descclassname">type.</code><code class="descname">static</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.static" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return a boolean describing whether the current function is defined as a static function.</p>
@@ -4029,10 +3976,9 @@ the following globals:</p>
 
 <div class="section" id="function-type-argument">
 <span id="ns-function-type-argument"></span><h4>3.1.3.2.6.1. function.type.argument<a class="headerlink" href="#function-type-argument" title="Permalink to this headline">¶</a></h4>
-<p>This namespace allows one to interaction the with individual
-arguments within a function prototype. This allows one to
-rename or modify the type information for a particular argument
-within a function’s definition.</p>
+<p>This namespace allows one to interact with individual arguments
+within a function prototype. This allows one to rename or modify
+the type information for a particular argument within its definition.</p>
 <p>This namespace is aliased as <code class="xref py py-obj docutils literal notranslate"><span class="pre">function.type.arg</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">function.type.parameter</span></code>.</p>
 <p>Some simple ways of fetching or modifying the type of the first parameter
 in a function:</p>
@@ -4235,7 +4181,7 @@ in a function:</p>
 </div>
 <div class="section" id="function-type-arguments">
 <span id="ns-function-type-arguments"></span><h4>3.1.3.2.6.2. function.type.arguments<a class="headerlink" href="#function-type-arguments" title="Permalink to this headline">¶</a></h4>
-<p>This namespace allows one to interaction the with the arguments
+<p>This namespace allows one to interact the with the arguments
 belonging to a function prototype as a whole. This can allow
 one to count the number of arguments, or fetch all their names
 and types in their entirety.</p>
@@ -4379,6 +4325,112 @@ and types in their entirety.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the prototype with the argument types to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="function-type-result">
+<span id="ns-function-type-result"></span><h4>3.1.3.2.6.3. function.type.result<a class="headerlink" href="#function-type-result" title="Permalink to this headline">¶</a></h4>
+<p>This namespace allows one to interact with the result as defined
+within a function prototype. This allows one to fetch or modify
+the type information that is returned by a function.</p>
+<p>Some ways to utilize this namespace can be:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">location</span><span class="p">()</span> <span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="function.type.result">
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.result" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the result type for the current function as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the result type for the current function to the type information provided as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> provided in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the result</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the result to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the type information provided as a string in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function using the result to modify</li>
+<li><strong>info</strong> (<em>str</em>) – the type information to apply to the result of the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">result</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Modify the result type for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the type information provided as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> in <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.result" title="function.type.result"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.result</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function using the result to modify</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the result</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.type.result.location">
+<code class="descclassname">type.result.</code><code class="descname">location</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.result.location" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the location of the result belonging to the current function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.result.</code><code class="descname">location</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the location of the result belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function using the result to return the location of</td>
 </tr>
 </tbody>
 </table>
@@ -4600,6 +4652,7 @@ the following globals:</p>
 <li><a class="reference internal" href="#function-type">3.1.3.2.6. function.type</a><ul>
 <li><a class="reference internal" href="#function-type-argument">3.1.3.2.6.1. function.type.argument</a></li>
 <li><a class="reference internal" href="#function-type-arguments">3.1.3.2.6.2. function.type.arguments</a></li>
+<li><a class="reference internal" href="#function-type-result">3.1.3.2.6.3. function.type.result</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#function-xref">3.1.3.2.7. function.xref</a></li>
