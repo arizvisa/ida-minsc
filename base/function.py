@@ -3139,10 +3139,17 @@ class type(object):
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
-            # Grab the functions details, rip the location out of them, return it.
+            # Grab the function details, rip the result type and location out of them.
             _, ftd = interface.tinfo.function_details(ea, ti)
-            location = ftd.retloc
-            return ftd.retloc
+            tinfo, location = ftd.rettype, ftd.retloc
+            locinfo = interface.tinfo.location_raw(location)
+
+            # Get the location out of it, and then figure out how to return it.
+            result = interface.tinfo.location(tinfo, instruction.architecture, *locinfo)
+            if builtins.isinstance(result, builtins.tuple) and any(isinstance(item, interface.register_t) for item in result):
+                reg, offset = result
+                return result if offset else reg
+            return result
 
     class argument(object):
         """
