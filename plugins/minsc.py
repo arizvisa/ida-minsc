@@ -2,6 +2,9 @@ import sys, os
 import imp, fnmatch, ctypes, types
 import idaapi
 
+# Point this at the repository directory
+root = idaapi.get_user_idadir()
+
 # The following classes contain the pretty much all of the loader logic used by the
 # plugin. This is being defined here so that this file can also be used as a module.
 class internal_api(object):
@@ -207,3 +210,19 @@ class plugin_module(object):
 
         # idaapi.require
         pass
+
+# The following logic is responsible for replacing a namespace with
+# the contents namespace that represents the entirety of the plugin.
+def load(namespace, preserve=()):
+    module = imp.load_source('__root__', os.path.join(root, '__root__.py'))
+
+    # save certain things within the namespace
+    preserved = {symbol : value for symbol, value in namespace.items() if symbol in preserve}
+
+    # empty out the entire namespace so that we can replace it
+    [namespace.pop(symbol) for symbol in namespace.copy() if not symbol.startswith('__')]
+
+    # re-populate with the root namespace while restoring any symbols
+    # that needed to be preserved.
+    namespace.update({symbol : value for symbol, value in module.__dict__.items() if not symbol.startswith('__')})
+    namespace.update({symbol : value for symbol, value in preserved.items()})
