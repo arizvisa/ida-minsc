@@ -13,29 +13,6 @@ that needs to occur.
 ### ida-python specific modules
 import idaapi, ida
 
-### detect which version of IDA is being used
-
-## needed because IDA 6.95 is fucking stupid and sets the result of idaapi.get_kernel_version() to a string
-def __version__():
-    # api doesn't exist, go back to a crazy version.
-    if not hasattr(idaapi, 'get_kernel_version'):
-        return 6, 0, 6.0
-
-    import math
-    res = str(idaapi.get_kernel_version())      # force it to a str because IDA 7.0 "fixed" it
-    major, minor = map(int, res.split('.', 2))
-    minor = int("{:<02d}".format(minor))
-    if minor > 0:
-        count = 1 + math.floor(math.log10(minor))
-        return major, minor, float(major) + minor * pow(10, -count)
-    return major, minor, float(major)
-
-## inject the version info into idaapi
-idaapi.__version_major__, idaapi.__version_minor__, idaapi.__version__ = __version__()
-
-## now we can delete the function because we're done with it
-del __version__
-
 ### Pre-populate the root namespace with a bunch of things that IDA requires
 
 ## IDA 6.9 requires the _idaapi module exists in the global namespace
@@ -45,11 +22,6 @@ if idaapi.__version__ <= 6.9:
 ## IDA 6.95 requires these couple modules to exist in the global namespace
 if idaapi.__version__ >= 6.95:
     import ida_idaapi, ida_kernwin, ida_diskio
-
-    ## Restore the displayhook that IDAPython obnoxiously replaces
-    if hasattr(ida_idaapi, '_IDAPython_displayhook'):
-        __import__('sys').displayhook = ida_idaapi._IDAPython_displayhook.orig_displayhook
-        del(ida_idaapi._IDAPython_displayhook)
 
 ## IDA 7.4 requires that this module exists in the global namespace
 if idaapi.__version__ >= 7.4:
@@ -104,39 +76,3 @@ ref_t, opref_t = (getattr(__import__('internal').interface, item) for item in ['
 
 # other miscellaneous modules to expose to the user
 import ui, tools, custom
-
-### Replace sys.displayhook with our own so that IDAPython can't tamper with
-### our __repr__ implementations.
-__import__('sys').displayhook = ui.DisplayHook().displayhook
-
-### Construct a priority notification handler, and inject into IDA because it
-### needs to exist for everything to initialize/deinitialize properly.
-
-__notification__ = __import__('internal').interface.prioritynotification()
-idaapi.__notification__ = __notification__
-
-### Now we can install our hooks that initialize/uninitialize MINSC
-try:
-    idaapi.__notification__.add(idaapi.NW_INITIDA, __import__('hooks').make_ida_not_suck_cocks, -1000)
-
-# If installing that hook failed, then check if we're running in batch mode. If
-# we are, then just immediately register things.
-except Exception:
-    TIMEOUT = 5
-    if idaapi.cvar.batch:
-        __import__('hooks').ida_is_busy_sucking_cocks()
-
-    # Otherwise warn the user about this and register our hook with a timer.
-    else:
-        __import__('logging').warning("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
-        idaapi.register_timer(TIMEOUT, __import__('hooks').ida_is_busy_sucking_cocks)
-    del(TIMEOUT)
-
-# If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
-else:
-    try:
-        idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, +1000)
-
-    # Installing the termination hook failed, but it's not really too important...
-    except Exception:
-        __import__('logging').warning("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
