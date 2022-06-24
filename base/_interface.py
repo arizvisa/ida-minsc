@@ -2580,6 +2580,10 @@ class tinfo(object):
         elif loctype in {idaapi.ALOC_DIST}:
             return [ cls.location(item) for item in locinfo ]
 
+        # Return None if there wasn't a location type.
+        elif loctype in {idaapi.ALOC_NONE}:
+            return
+
         # FIXME: We're not supporting this because I've never used this fucker.
         elif loctype in {idaapi.ALOC_CUSTOM}:
             pass
