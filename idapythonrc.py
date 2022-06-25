@@ -46,43 +46,15 @@ loader.load(globals(), preserve={'loader', '_orig_stdout', '_orig_stderr'})
 
 # now we can start everything up and delete the loader afterwards.
 loader.startup()
-del(loader)
 
 # try and execute our user's idapythonrc.py
-try:
-    import os
-    path, filename = None, '.idapythonrc.py'
+loader.dotfile(globals())
 
-    try:
-        # execute user's .pythonrc and .idapythonrc in one go
-        if os.path.expanduser("~"):
-            path = os.path.expanduser("~")
-            exec(open(os.path.join(path, filename)).read())
-
-    except ImportError:
-        # otherwise try to figure it out without tainting the namespace
-        if __import__('os').getenv('HOME', default=None) is not None:
-            path = os.getenv('HOME')
-            exec(open(os.path.join(path, filename)).read())
-        elif __import__('os').getenv('USERPROFILE', default=None) is not None:
-            path = os.getenv('USERPROFILE')
-            exec(open(os.path.join(path, filename)).read())
-        else:
-            raise OSError("unable to determine the user's home directory.")
-        pass
-
-except IOError:
-    __import__('logging').warning("No {:s} file found in the user's home directory ({!s}).".format(filename, path))
-
-except Exception:
-    __import__('logging').warning("Unexpected exception raised while trying to execute `{!s}`.".format(os.path.join(path or '~', filename)), exc_info=True)
-
-finally:
-    del(filename)
-    del(path)
-    del(os)
+# that should've been evertyhing
+del(loader)
 
 ## stupid fucking idapython hax
+
 # prevent idapython from trying to write its banner to the message window since we called it up above.
 print_banner = lambda: None
 
