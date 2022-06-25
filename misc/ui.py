@@ -1475,7 +1475,7 @@ class hook(object):
     def __stop_ida__(ns):
         for api in ['idp', 'idb', 'ui']:
 
-            # grab the invidual class that was used to hook things
+            # grab the individual class that was used to hook things
             instance = getattr(ns, api)
 
             # and then unhook it completely, because IDA on linux
@@ -1483,12 +1483,6 @@ class hook(object):
             # the language extension is unloaded.
             instance.close()
         return
-
-    # pre-instantiate the namespaces so that users can interact with them from
-    # their dotfiles or just by importing the module.
-    idp = internal.interface.priorityhook(idaapi.IDP_Hooks, __import__('hooks').supermethods.IDP_Hooks.mapping)
-    idb = internal.interface.priorityhook(idaapi.IDB_Hooks, __import__('hooks').supermethods.IDB_Hooks.mapping)
-    ui = internal.interface.priorityhook(idaapi.UI_Hooks, __import__('hooks').supermethods.UI_Hooks.mapping)
 
     # if there's a __notification__ attribute attached to IDA, then
     # assign it to our namespace so it can be used.
