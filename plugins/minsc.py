@@ -1,8 +1,23 @@
+"""
+IDA-Minsc plugin -- https://arizvisa.github.io/ida-minsc
+
+This file contains the entirety of the logic that is used to load the
+plugin. The plugin is (mostly) a library that aims to simplify IDAPython.
+However, it utilizes hooks and keyboard shortcuts in a variety of ways in
+order to keep track of the changes that the user may make within their
+database. Essentially the goal of this plugin is to make absolutely
+_everything_ that's useful in the database serializeable and queryable
+so that it can be exchanged with things outside of the database.
+
+If you wish to change the directory that the plugin is loaded from, specify the
+location of the plugin's git repository in the variable that is marked below.
+"""
+
 import sys, os, logging
 import six, imp, fnmatch, ctypes, types
 import idaapi
 
-# Point this at the repository directory
+# :: Point this variable at the directory containing the repository of the plugin ::
 root = idaapi.get_user_idadir()
 
 # The following classes contain the pretty much all of the loader logic used by the
@@ -466,3 +481,212 @@ def startup():
         except Exception:
             logging.warning("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
     return
+
+# Now we can define our plugin_t that literally does nothing if we've already been
+# loaded via the idapythonrc.py file and control the entire default namespace.
+
+class MINSC(idaapi.plugin_t):
+    wanted_name = 'About Minsc'
+    comment = 'Makes IDAPython Not Suck Completely.'
+    wanted_hotkey = ''
+
+    flags = idaapi.PLUGIN_FIX
+    state = None
+
+    help = 'You should totally check out the `dill` Python module so you can save your game.'
+
+    def get_loader(self):
+        '''Return the loader containing all the components needed for loading and initializing the plugin'''
+        import imp
+
+        # We explicitly create our own version of the loader from the current
+        # file. The functionality we need is actually within our current module,
+        # but IDA was responsible for loading it. Most importantly, though, is
+        # that the loader is intended to be completely thrown away after usage.
+        try:
+            filename = __file__ if os.path.exists(__file__) else os.path.join(root, 'plugins', 'minsc.py')
+            module = imp.load_source("{:s}-loader".format(self.wanted_name), filename)
+
+        except IOError:
+            logging.critical("{:s} : A critical error occurred while trying to read the plugin loader from the file: {:s}".format(self.wanted_name, filename), exc_info=True)
+
+        except ImportError:
+            logging.critical("{:s} : A critical error occurred while initializing the plugin loader in \"{:s}\"".format(self.wanted_name, filename), exc_info=True)
+
+        except Exception:
+            logging.critical("{:s} : A critical error occurred while initializing the plugin loader".format(self.wanted_name, filename), exc_info=True)
+
+        return module
+
+    def init(self):
+        version = getattr(idaapi, '__version__', None)
+
+        # Check our version.. but not really. We're only checking it to see
+        # whether the plugin has been loaded yet. If our version if a float,
+        # then our module finders have already been loaded and we just need
+        # to persist ourselves.
+        if isinstance(version, float):
+            self.state = 'persistent'
+            return idaapi.PLUGIN_KEEP
+
+        # Now the version hasn't been assigned yet, then the user didn't
+        # install this globally. This means that we don't control the primary
+        # namespace. So we'll need to load ourselves still and then afterwards
+        # we can uninstall ourselves whenever our plugin is asked to terminate.
+        loader = self.get_loader()
+        if not loader:
+            raise SystemError("{:s} : Unable to get the loader required by the plugin.".format(self.wanted_name))
+
+        # Seed the metapath, then patch the version into the idaapi module.
+        sys.meta_path.extend(loader.finders())
+        _, _, version = loader.patch_version(idaapi)
+
+        # Check if IDAPython (6.95) has replaced the display hook with their
+        # own version. We're going to undo exactly what they did, because
+        # we're going to replace it with our own anyways.
+        ida_idaapi = __import__('ida_idaapi') if version >= 6.95 else idaapi
+        if hasattr(ida_idaapi, '_IDAPython_displayhook') and hasattr(ida_idaapi._IDAPython_displayhook, 'orig_displayhook'):
+            orig_displayhook = ida_idaapi._IDAPython_displayhook.orig_displayhook
+            del(ida_idaapi._IDAPython_displayhook.orig_displayhook)
+
+            sys.displayhook = loader.DisplayHook(sys.stdout.write, orig_displayhook).displayhook
+
+        # If it's the builtin displayhook then we can use it as-is.
+        elif getattr(sys.displayhook, '__module__', '') == 'sys':
+            sys.displayhook = loader.DisplayHook(sys.stdout.write, sys.displayhook).displayhook
+
+        # Anything else means that some plugin or somebody else did something
+        # crazy, and we have no idea how to recover from this.
+        else:
+            logging.warning("{:s} : Skipping installation of the display hook at \"{:s}\" due to a lack of awareness about the current one ({!r}).".format(self.wanted_name, '.'.join(['sys', 'displayhook']), sys.displayhook))
+
+        # Now we'll try and tamper with the user's namespace. We'll search through
+        # Python's module list, and if we find it we'll just swap it out for root.
+        if '__main__' in sys.modules:
+            ns = sys.modules['__main__']
+            loader.load(ns.__dict__, preserve={'print_banner', '_orig_stdout', '_orig_stderr'})
+
+        else:
+            logging.warning("{:s} : Skipping the reset of the primary namespace as \"{:s}\" was not found in Python's module list.".format(self.wanted_name, '__main__'))
+
+        # We don't bother tampering with the user's namespace, since technically
+        # we don't have access to it.. However, we'll still try to install the
+        # necessary hooks or other features depending what we found available.
+        ok = True
+        try:
+            import internal, hooks
+
+        except (ImportError, Exception):
+            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\".".format(self.wanted_name, 'internal', 'hooks'), exc_info=True)
+            ok = False
+
+        try:
+            ok and internal.interface
+
+        except AttributeError:
+            logging.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was not properly loaded.".format(self.wanted_name, '.'.join(['internal', 'interface'])))
+
+        # Check to see if our notification instance was assigned into idaapi. If
+        # it wasn't then try to construct one and assign it for usage.
+        try:
+            if ok and not hasattr(idaapi, '__notification__'):
+                idaapi.__notification__ = notification = internal.interface.prioritynotification()
+
+        except Exception:
+            logging.warning("{:s} : An error occurred while trying to instantiate the notifications interface. Notifications will be left as disabled.".format(self.wanted_name))
+
+        # Check to see if all is well, and if it is then we can proceed to install
+        # the necessary hooks to kick everything off.
+        if ok:
+            logging.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(self.wanted_name))
+            hooks.make_ida_not_suck_cocks(idaapi.NW_INITIDA)
+            self.state = 'local'
+
+        else:
+            logging.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(self.wanted_name))
+            self.state = 'disabled'
+
+        return idaapi.PLUGIN_KEEP
+
+    def term(self):
+        if self.state is None:
+            logging.warning("{:s} : Ignoring the host application request to terminate as the plugin has not yet been initialized.".format(self.wanted_name))
+            return
+
+        # Figure out how we were started so that we can slowly tear things down.
+        if self.state in {'disabled', 'persistent'}:
+            logging.debug("{:s} : Host application requested termination of {:s} plugin.".format(self.wanted_name, self.state))
+            return
+
+        # We were run locally, so we're only allowed to interact with the current
+        # database. This means that we now will need to shut everything down.
+        try:
+            import internal, hooks
+
+        except ImportError:
+            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\" during plugin termination.".format(self.wanted_name, 'internal', 'hooks'), exc_info=True)
+            return
+
+        # Now we can just remove our hooks and all should be well.
+        try:
+            logging.debug("{:s} : Detaching from the host application as requested.".format(self.wanted_name))
+            hooks.make_ida_suck_cocks(idaapi.NW_TERMIDA)
+
+        except Exception:
+            logging.critical("{:s} : An error occurred while trying to detach from the host application during plugin termination. Application may become unstable.".format(self.wanted_name), exc_info=True)
+        return
+
+    def run(self, args):
+        import ui
+
+        # Shove some help down the user's throat.
+        print("Python>{:<{:d}s} # Use `help({:s})` for usage".format('ui.keyboard.list()', 40, 'ui.keyboard'))
+        try:
+            ui.keyboard.list()
+        except Exception as E:
+            print(E)
+        print('')
+
+        # Have some more...
+        hooks = [name for name in dir(ui.hook) if not name.startswith('__')]
+        print('The following hook types are locked and loaded:' if hooks else 'Currently no hooks have been initialized.')
+        for name in hooks:
+            item = getattr(ui.hook, name)
+            fullname = '.'.join(['ui.hook', name])
+            print("Python>{:<{:d}s} # Use `help({:s})` for usage and `{:s}.list()` to see availability".format(fullname, 40, fullname, fullname))
+            print(item)
+            print('')
+
+        # Dead leaves on the dirty ground...when I know you're not around. Shiny
+        # tops and soda pops, when I hear you make a sound.
+
+        noise = '''Welcome to the IDA-minsc plugin. My arrow keys are broken.
+
+        This plugin is (mostly) a library that aims to simplify IDAPython. However,
+        it utilizes hooks and keyboard shortcuts in a variety of ways in order to
+        keep track of the changes that the user may make within their database.
+
+        Essentially the goal of this plugin is to make absolutely _everything_
+        that a user may notate in their database serializeable (into a python type)
+        and queryable so that things can be exchanged with other Python interpreters.
+
+        Use "." to jump to the command-line and Shift+F2 if you need multi-line.
+        Don't forget `dir()` to look around, and `help(thing)` to inquire.
+        '''
+
+        # If you can hear a piano fall, you can hear me coming down the hall. If
+        # I can just hear your pretty voice, I don't think I need to see at all.
+
+        home = os.path.expanduser('~')
+        dotfile = "On startup, the {:s} file will be executed within the primary namespace.".format(os.path.join(home, '.idapythonrc.py'))
+
+        # Every breath that is in your lungs is a tiny little gift to me.
+
+        import database
+        path = os.path.join(database.config.path() or '$IDB_DIRECTORY', 'idapythonrc.py')
+        rcfile = "Upon {:s} database, the {:s} file will be loaded.".format('opening up the current' if database.config.path() else 'opening up a', os.path.abspath(path))
+        ui.message('\n'.join([noise, '\n'.join([dotfile, rcfile])]))
+        return
+
+def PLUGIN_ENTRY():
+    return MINSC()
