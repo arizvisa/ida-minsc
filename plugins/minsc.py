@@ -413,6 +413,69 @@ class DisplayHook(object):
             traceback.print_exc()
             self.orig_displayhook(item)
 
+# Locate the user's dotfile and execute it within the specified namespace.
+def dotfile(namespace, filename=u'.idapythonrc.py'):
+    '''Execute the user's dotfile within the specified namespace.'''
+    path = None
+
+    # A closure that just consumes paths until it finds one that
+    # it can read and execute it within the specified namespace.
+    def read_and_execute(filename, namespace):
+        path = (yield)
+        while True:
+            fp = os.path.join(path, filename)
+            try:
+                with open(fp, 'r') as infile:
+                    content = infile.read()
+            except IOError:
+                logging.debug("{:s} : Error reading the dotfile at `{!s}`.".format(__name__, fp), exc_info=True)
+            else:
+                break
+            path = (yield)
+
+        exec(content, namespace)
+
+    # Another closure that just tries to determine the user's home
+    # directory from the environment variables it receives.
+    def find_home(*variables):
+        iterable = (var for var in variables if os.getenv(var, default=None) is not None)
+        path = next(iterable, None)
+        if path is None:
+            raise OSError("Unable to determine the user's home directory from the environment.")
+        return path, os.getenv(path)
+
+    # Create our coroutine, initialize it, and then feed it some paths.
+    tribulations = read_and_execute(filename, namespace); next(tribulations)
+
+    try:
+        path = os.path.expanduser('~')
+        tribulations.send(path)
+
+        var, path = find_home('HOME', 'USERPROFILE')
+        tribulations.send(path)
+
+    # If we stopped, then it was read and executed successfully.
+    except StopIteration:
+        logging.debug("Successfully read and executed the dotfile at `{!s}`.".format(os.path.join(path, filename)))
+
+    # If we received an OSError, then this likely happened while we
+    # were trying to find the home directory. Pass it to the user.
+    except OSError as E:
+        print(E)
+
+    # Any other exception is because of an issue in the user's script,
+    # so we'll do our best to log the backtrace for them to debug.
+    except Exception:
+        logging.warning("Unexpected exception raised while trying to execute the dotfile at `{!s}`.".format(os.path.join(path, filename)), exc_info=True)
+
+    # If we didn't get an exception, then literally we couldn't find
+    # any file that we were supposed to execute. Log it and move on.
+    else:
+        logging.warning("Unable to locate a {:s} dotfile in the user's {:s} directory ({!s}).".format(filename, var, path))
+    finally:
+        tribulations.close()
+    return
+
 # The following logic is actually responsible for starting up the whole
 # plugin. This is done with by trying with a notification, falling back
 # to a timer, and then straight-up executing things if all else fails.
