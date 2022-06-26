@@ -4274,14 +4274,15 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the `[type, length]` of the array at the address specified by `ea`.'''
+            ea = interface.address.head(ea)
             F, ti, cb = type.flags(ea), idaapi.opinfo_t(), idaapi.get_item_size(ea)
 
             # get the opinfo at the current address to verify if there's a structure or not
             ok = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
             tid = ti.tid if ok else idaapi.BADADDR
 
-            # convert it to a pythonic type
-            res = interface.typemap.dissolve(F, tid, cb)
+            # convert it to a pythonic type using the address we were given.
+            res = interface.typemap.dissolve(F, tid, cb, offset=ea)
 
             # if it's a list, then validate the result and return it
             if isinstance(res, list):
@@ -4328,9 +4329,8 @@ class type(object):
         @classmethod
         def size(cls, ea):
             '''Return the size of a member in the array at the address specified by `ea`.'''
-            FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-
-            ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
+            ea, FF_STRUCT = interface.address.head(ea), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+            F, T = type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
             return _structure.size(type.structure.id(ea)) if T == FF_STRUCT else idaapi.get_full_data_elsize(ea, F)
 
         @utils.multicase()
@@ -4342,8 +4342,8 @@ class type(object):
         @classmethod
         def length(cls, ea):
             '''Return the number of members in the array at the address specified by `ea`.'''
-            ea, F = interface.address.within(ea), type.flags(ea)
-            sz, ele = idaapi.get_item_size(ea), idaapi.get_full_data_elsize(ea, F)
+            ea = interface.address.head(ea)
+            sz, ele = idaapi.get_item_size(ea), idaapi.get_full_data_elsize(ea, type.flags(ea))
             return sz // ele
 
     class structure(object):
@@ -4366,8 +4366,9 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the structure type at address `ea`.'''
+            ea = interface.address.head(ea)
             res = cls.id(ea)
-            return _structure.by(res)
+            return _structure.by(res, offset=ea)
 
         @utils.multicase()
         @classmethod
@@ -4378,9 +4379,7 @@ class type(object):
         @classmethod
         def id(cls, ea):
             '''Return the identifier of the structure at address `ea`.'''
-            FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-
-            ea = interface.address.within(ea)
+            ea, FF_STRUCT = interface.address.head(ea), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
             res = type.flags(ea, idaapi.DT_TYPE)
             if res != FF_STRUCT:
