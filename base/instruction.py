@@ -1265,16 +1265,16 @@ def op_structurepath(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
     F, insn, op = database.type.flags(ea), at(ea), operand(ea, opnum)
 
-    # If it's a memory address, then this is the wrong API and we should be using
-    # the op_structure function. Log something, and then chain to the correct one.
-    if op.type in {idaapi.o_mem}:
-        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a memory address referenced.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
-        return op_structure(ea, opnum)
-
     # If it's a stack variable, then this is also the wrong API and we should be
     # using the op_structure function. Log it and continue onto the right one.
-    elif idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
+    if idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
         logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a stack variable operand.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
+        return op_structure(ea, opnum)
+
+    # If it's a memory address, then this is the wrong API and we should be using
+    # the op_structure function. Log something, and then chain to the correct one.
+    elif not idaapi.is_stroff(F, opnum) and op.type in {idaapi.o_mem}:
+        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a memory address referenced.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
         return op_structure(ea, opnum)
 
     # If it wasn't a stack variable, then check that the operand is actually a
@@ -1322,7 +1322,7 @@ def op_structurepath(ea, opnum):
     # Now we have the correct resolved path with each offset in it being correct. We
     # need to translate it by our carried value and then we can determine the correct
     # offset for each member of the path that we'll return.
-    calculator = interface.strpath.calculate(carry - target)
+    calculator = interface.strpath.calculate(value + (carry - target))
     result, position = [], builtins.next(calculator)
     for sptr, mptr, offset in path:
         st = structure.__instance__(sptr.id, offset=position)
@@ -1340,7 +1340,7 @@ def op_structurepath(ea, opnum):
     results = tuple(result)
     if carry:
         return results + (carry,)
-    return results
+    return results if len(results) > 1 else results[0]
 
 ## current address and opnum with variable-length path
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, idaapi.struc_t, six.string_types))
