@@ -1672,7 +1672,7 @@ class members_t(object):
                 tid = idaapi.BADADDR
 
             # now we can dissolve it, and than append things to our results.
-            type = interface.typemap.dissolve(mptr.flag, tid, msize)
+            type = interface.typemap.dissolve(mptr.flag, tid, msize, offset=moffset)
             result.append((mptr.id, name, type, moffset, msize))
 
         # Figure out whether we're just going to remove one element, or
@@ -1776,11 +1776,11 @@ class members_t(object):
         # Define a closure that grabs the type information for a particular
         # member, and converts it to a pythonic-type. This way it's easier
         # for us to determine both the member's type and its size.
-        def dissolve(mptr):
+        def dissolve(mptr, offset):
             opinfo = idaapi.opinfo_t()
             res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
             tid = res.tid if res else idaapi.BADADDR
-            return interface.typemap.dissolve(mptr.flag, tid, idaapi.get_member_size(mptr))
+            return interface.typemap.dissolve(mptr.flag, tid, idaapi.get_member_size(mptr), offset=offset)
 
         # Start out by finding all of the members at our current offset.
         items = []
@@ -1831,7 +1831,8 @@ class members_t(object):
         # we need to continue recursing into something and what exactly
         # we're recursing into.
         mptr, = filtered
-        mtype, moffset = dissolve(mptr), 0 if is_union(owner.ptr) else mptr.soff
+        moffset = 0 if is_union(owner.ptr) else mptr.soff
+        mtype = dissolve(mptr, self.offset + moffset)
 
         # If our member type is an array, then we need to do some things
         # to try and figure out which index we're actually going to be
@@ -2585,7 +2586,7 @@ class member_t(object):
     @property
     def type(self):
         '''Return the type of the member in its pythonic form.'''
-        res = interface.typemap.dissolve(self.flag, self.typeid, self.size)
+        res = interface.typemap.dissolve(self.flag, self.typeid, self.size, offset=self.offset)
         if isinstance(res, structure_t):
             res = __instance__(res.id, offset=self.offset)
         elif isinstance(res, tuple):
