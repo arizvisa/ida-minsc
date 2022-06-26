@@ -951,11 +951,41 @@ def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
     F, insn, op = database.type.flags(ea), at(ea), operand(ea, opnum)
 
-    # First check if our operand is pointing to memory by checking the operand
-    # type. If it is, then the operand is not a structure offset and thus we'll
-    # need to figure the field being referenced by calculating the offset into
-    # the referenced structure ourselves.
-    if op.type in {idaapi.o_mem}:
+    # Start out by checking if the operand is a stack variable, because
+    # we'll need to handle it differently if so.
+    if idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
+        fn = function.by(insn.ea)
+
+        # Now we can ask IDA what's up with it.
+        res = idaapi.get_stkvar(insn, op, op.addr)
+        if not res:
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, value))
+        mptr, actval = res
+
+        # First we grab our frame, and then find the starting member by its id.
+        frame = function.frame(fn)
+        member = frame.members.by_identifier(mptr.id)
+
+        # Use the real offset of the member so that we can figure out which
+        # members of the structure are actually part of the path.
+        path, delta = member.parent.members.__walk_to_realoffset__(actval)
+
+        # If we got a list as a result, then we encountered an array which
+        # requires us to return a list and include the offset.
+        if isinstance(path, builtins.list):
+            return path + [delta]
+
+        # Otherwise it's just a regular path, and we need to determine whether
+        # to include the offset in the result or not.
+        results = tuple(path)
+        if delta > 0:
+            return results + (delta,)
+        return tuple(results) if len(results) > 1 else results[0]
+
+    # Otherwise, we check if our operand is not a structure offset, but pointing
+    # to memory by checking the operand type. If it is then we'll need to figure
+    # the field being referenced by calculating the offset into structure ourselves.
+    elif not idaapi.is_stroff(F, opnum) and op.type in {idaapi.o_mem}:
         address = database.address.head(op.addr)
         t, count = database.type.array(address)
         offset = op.addr - address
@@ -985,39 +1015,6 @@ def op_structure(ea, opnum):
             return results + (delta,)
         return tuple(results) if len(results) > 1 else results[0]
 
-    # Start out by checking if the operand is a stack variable, because
-    # we'll need to handle it differently if so.
-    elif idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
-        fn = function.by(insn.ea)
-
-        # Now we can ask IDA what's up with it.
-        res = idaapi.get_stkvar(insn, op, op.addr)
-        if not res:
-            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, value))
-        mptr, actval = res
-
-        # First we grab our frame, and then find the starting member by its id.
-        frame = function.frame(fn)
-        member = frame.members.by_identifier(mptr.id)
-
-        # Use the real offset of the member so that we can figure out which
-        # members of the structure are actually part of the path.
-        path, delta = member.parent.members.__walk_to_realoffset__(actval)
-
-        # If we got a list as a result, then we encountered an array which
-        # requires us to return a list and include the offset.
-        if isinstance(path, builtins.list):
-            return path + [delta]
-
-        # Otherwise it's just a regular path, and we need to determine whether
-        # to include the offset in the result or not.
-        results = tuple(path)
-        if delta > 0:
-            return results + (delta,)
-        return tuple(results) if len(results) > 1 else results[0]
-
-    # Otherwise, we have no idea what to do here since we need to know the opinfo_t
-    # in order to determine what structure is there.
     elif not idaapi.is_stroff(F, opnum):
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
 
