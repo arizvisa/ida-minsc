@@ -1330,9 +1330,14 @@ def op_structurepath(ea, opnum):
         result.append(item)
         position = calculator.send((sptr, mptr, offset))
 
+    # If we did not figure out any path, then this is likely a sizeof(structure)
+    # operand. So, we return the structure and whatever value was carried.
+    if not result:
+        return structure.__instance__(sptr.id), carry
+
     # Just like the op_structure implementation, we need to figure out if
     # there's an array being referenced to convert our result to a list.
-    if any(isinstance(member.type, builtins.list) for member in result if isinstance(member, structure.member_t)):
+    elif any(isinstance(member.type, builtins.list) for member in result if isinstance(member, structure.member_t)):
         return result + [carry]
 
     # Otherwise it's just a path with the carried offset, so we check the
