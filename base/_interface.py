@@ -192,8 +192,8 @@ class typemap(object):
         return cls.__newprc__(pnum)
 
     @classmethod
-    def dissolve(cls, flag, typeid, size):
-        '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
+    def dissolve(cls, flag, typeid, size, offset=None):
+        '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type at the optional `offset`.'''
         structure = sys.modules.get('structure', __import__('structure'))
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
@@ -206,7 +206,7 @@ class typemap(object):
         # flag but still assign the structure type-id to a union member.
         if (dsize == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
-            t = structure.by_identifier(typeid)
+            t = structure.by_identifier(typeid) if offset is None else structure.by_identifier(typeid, offset=offset)
             sz = t.size
             return t if sz == size else [t, size // sz]
 
