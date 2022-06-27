@@ -3788,6 +3788,24 @@ class address(object):
         return interface.address.inside(ea) - config.baseaddress()
     getoffset = utils.alias(offset, 'address')
 
+    @utils.multicase()
+    @classmethod
+    def fileoffset(cls):
+        '''Return the file offset in the input file for the current address.'''
+        return cls.fileoffset(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def fileoffset(cls, ea):
+        '''Return the file offset in the input file for the address `ea`.'''
+        return idaapi.get_fileregion_offset(ea)
+
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def by_fileoffset(cls, offset):
+        '''Return the address in the database for the specified file `offset` of the input file.'''
+        return idaapi.get_fileregion_ea(offset)
+    byfileoffset = utils.alias(by_fileoffset, 'address')
+
 a = addr = address  # XXX: ns alias
 
 # address translations
