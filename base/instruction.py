@@ -497,6 +497,37 @@ def op_state(ea, opnum):
     # then fallback to "r" as the operand still exists and it must be doing something.
     return interface.reftype_t.of_action(res or 'r')
 
+# we needed an adjective, but "read" is a verb and a noun. this should be thought of in its noun form.
+@utils.multicase(opnum=six.integer_types)
+def op_read(opnum):
+    '''Return whether the operand `opnum` belonging to the current instruction is only being read from.'''
+    return op_read(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_read(reference):
+    '''Return whether the operand pointed to by `reference` is only being read from.'''
+    address, opnum, _ = reference
+    return op_read(address, opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_read(ea, opnum):
+    '''Return whether the operand `opnum` belonging to the instruction at the address `ea` is only being read from.'''
+    return 'r' in op_state(ea, opnum)
+op_used = utils.alias(op_read)          # XXX: read/modified or used/modified?
+
+@utils.multicase(opnum=six.integer_types)
+def op_modified(opnum):
+    '''Return whether the operand `opnum` belonging to the current instruction is being modified (written to).'''
+    return op_modified(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_modified(reference):
+    '''Return whether the operand pointed to by `reference` is being modified (written to).'''
+    address, opnum, _ = reference
+    return op_modified(address, opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_modified(ea, opnum):
+    '''Return whether the operand `opnum` belonging to the instruction at the address `ea` is being modified (written to).'''
+    return 'w' in op_state(ea, opnum)
+op_written = op_write = utils.alias(op_modified)        # XXX: these aliases are needed because our opposite is `op_read`
+
 @utils.multicase(opnum=six.integer_types)
 def op_size(opnum):
     '''Returns the size for the operand `opnum` belonging to the current instruction.'''
