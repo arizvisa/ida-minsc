@@ -286,6 +286,36 @@ class structure_t(object):
         # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
         res = {}
         [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
+
+        # Now we need to add implicit tags which are related to the structure.
+        sptr = self.ptr
+
+        # If we're a frame or we're unlisted, then we don't add the implicit 
+        # "__name__" tag. This way the user can select for "__name__" and use
+        # it to distinguish local types and ghost types (which always have a name).
+        excluded = ['SF_FRAME', 'SF_NOLIST']
+        name = utils.string.of(idaapi.get_struc_name(sptr.id))
+        if name and not any([sptr.props & getattr(idaapi, attribute) for attribute in excluded if hasattr(idaapi, attribute)]):
+            res.setdefault('__name__', name)
+
+        # Now we need to do the '__typeinfo__' tag. This is going to be a little
+        # bit different than how we usually determine it, because we're going to
+        # use it to determine whether the user created this type themselves or it
+        # was created automatically. So, if it was copied from the type library
+        # (SF_TYPLIB), from the local types (SF_GHOST), or the user chose not to
+        # list it (SF_NOLIST), then we don't assign '__typeinfo__'.
+        excluded = ['SF_FRAME', 'SF_GHOST', 'SF_TYPLIB', 'SF_NOLIST']
+        if any([sptr.props & getattr(idaapi, attribute) for attribute in excluded if hasattr(idaapi, attribute)]):
+            pass
+
+        # SF_NOLIST is justified because if the user didn't want the structure to
+        # be listed, then we're just doing as we're told. Everything else should
+        # be justifiable because if the user did anything with the type, then
+        # the other flags should've been cleared.
+        else:
+            ti = self.typeinfo
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
+            res.setdefault('__typeinfo__', ti_s)
         return res
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key')
