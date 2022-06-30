@@ -142,10 +142,11 @@ def select(**boolean):
         for st in __iterate__():
             content = st.tag()
 
-            # All structures have type information, which we shouldn't
-            # be indexing anyways. So we remove it...just in case.
-            content.pop('__typeinfo__', None)
-            if content: yield st, content
+            # If we have any content, then the structure and its content
+            # can be yielded to the user.
+            if content:
+                yield st, content
+            continue
         return
 
     # Collect the tags we're supposed to look for in the typical lame way.
