@@ -1414,7 +1414,7 @@ class members_t(object):
                 res = interface.typemap.dissolve(flags, tid, size)
 
                 # Adjust the offset so it points directly into the member.
-                realoffset = offset - (0 if unionQ() else mptr.soff)
+                realoffset = offset - (0 if unionQ else mptr.soff)
 
                 # First we need to check to see if it's an array, because this
                 # might actually be an array of structures which we'll need to
@@ -1474,7 +1474,7 @@ class members_t(object):
             # this "algorithm" is totally busted and we want to figure out
             # where it's busted.
             iterable = ((mptr, idaapi.get_member_fullname(mptr.id)) for mptr in selected)
-            messages = (u"[{:d}] {:s} {:#x}{:+#x}".format(1 + i, fullname, mptr.soff, mptr.eoff) for i, (mptr, fullname) in enumerate(iterable))
+            messages = (u"[{:d}] {:s} {:#x}{:+#x}".format(1 + i, fullname, 0 if unionQ else mptr.soff, mptr.eoff) for i, (mptr, fullname) in enumerate(iterable))
             [ logging.info(msg) for msg in messages ]
 
             # Grab the first element from our sorted list, as that's the one
