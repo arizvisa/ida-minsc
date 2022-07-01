@@ -291,7 +291,7 @@ class structure_t(object):
         # Now we need to add implicit tags which are related to the structure.
         sptr = self.ptr
 
-        # If we're a frame or we're unlisted, then we don't add the implicit 
+        # If we're a frame or we're unlisted, then we don't add the implicit
         # "__name__" tag. This way the user can select for "__name__" and use
         # it to distinguish local types and ghost types (which always have a name).
         excluded = ['SF_FRAME', 'SF_NOLIST']
@@ -2814,9 +2814,23 @@ class member_t(object):
         tid = self.typeid
         tid = None if tid is None else __instance__(tid) if has(tid) else tid
         flag, size = mptr.flag, idaapi.get_member_size(mptr)
+        ty = mptr.flag, tid, size
 
-        t, ti = (mptr.flag, tid, size), self.typeinfo
-        typeinfo = t, ti.serialize()
+        # if the user applied some type information to the member, then we make sure
+        # to serialize it (print_tinfo) so we can parse it back into the member.
+        ti = self.typeinfo
+        if '__typeinfo__' in self.tag():
+            res = idaapi.PRTYPE_1LINE | idaapi.PRTYPE_SEMI | idaapi.PRTYPE_NOARRS | idaapi.PRTYPE_RESTORE
+            tname = idaapi.print_tinfo('', 0, 0, res, ti, '', '')
+            tinfo = idaapi.print_tinfo('', 0, 0, res | idaapi.PRTYPE_DEF, ti, tname, '')
+
+            # use a list so we can differentiate older version from newer
+            typeinfo = ty, [tname, tinfo]
+
+        # otherwise, we serialize the type into the older version. this shouldn't
+        # get applied because there's a chance the type doesn't exist.
+        else:
+            typeinfo = ty, ti.serialize()
 
         # grab its comments
         cmtt = idaapi.get_member_cmt(mptr.id, True)
@@ -2865,20 +2879,10 @@ class member_t(object):
         count = sptr.memqty
 
         # extract the type information of the member so that we can
-        # construct the opinfo_t and deserialize the tinfo_t for it.
-        t, ti_ = typeinfo
+        # construct the opinfo_t and later apply the tinfo_t.
+        t, ti = typeinfo
         flag, mytype, nbytes = t
 
-        ti = idaapi.tinfo_t()
-        if ti.deserialize(None, *ti_):
-            logging.debug(u"{:s}({:#x}, index={:d}): Successfully deserialized type information for member \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), ti))
-
-        else:
-            ti, _ = None, logging.warning(u"{:s}({:#x}, index={:d}): Skipping application of corrupted type information ({!r}) for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, ti_, utils.string.escape(fullname, '"')))
-
-        # create an opinfo_t for the member's type, if there isn't one then we
-        # validate the flags so that we can warn the user if they don't correspond.
-        # FIXME: explicitly handle .strtype (strings), .ec (enums), .cd (custom), etc.
         opinfo = idaapi.opinfo_t()
         if mytype is None:
             if flag & idaapi.DT_TYPE == FF_STRUCT:
@@ -2930,3 +2934,34 @@ class member_t(object):
         # update both of the member's comments prior to fixing its type.
         idaapi.set_member_cmt(mptr, utils.string.to(cmtt), True)
         idaapi.set_member_cmt(mptr, utils.string.to(cmtf), False)
+
+        # if we're using the new tinfo version (a list), then try our hardest
+        # to parse it. if we succeed, then we likely can apply it later.
+        if isinstance(ti, builtins.list) and len(ti) == 2:
+            tname, tinfo = ti
+            typeinfo = internal.declaration.parse(tname) if tname else None
+            typeinfo = typeinfo if typeinfo else internal.declaration.parse(tinfo)
+            None if typeinfo is None else logging.info(u"{:s}({:#x}, index={:d}): Successfully parsed type information for member \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), typeinfo))
+
+        # otherwise it's the old version (a tuple), and it shouldn't need to
+        # exist... but, if we can actually deserialize it then later we can
+        # likely apply it...unless it has an ordinal.
+        else:
+            typeinfo = idaapi.tinfo_t()
+            if typeinfo.deserialize(None, *ti):
+                logging.info(u"{:s}({:#x}, index={:d}): Successfully deserialized type information for member \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), typeinfo))
+            else:
+                logging.info(u"{:s}({:#x}, index={:d}): Skipping application of corrupted type information ({!r}) for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, ti, utils.string.escape(fullname, '"')))
+                typeinfo = None
+
+        # if tinfo was defined and it doesn't use an ordinal, then we can apply it.
+        if typeinfo and not any([typeinfo.get_ordinal(), typeinfo.is_array() and typeinfo.get_array_element().get_ordinal()]):
+            self.typeinfo = typeinfo
+            logging.info(u"{:s}({:#x}, index={:d}): Applied the type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
+
+        # otherwise, we had type information and so we need to guess what it is.
+        elif typeinfo:
+            ti = idaapi.tinfo_t()
+            ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
+            if ok: self.typeinfo = ti
+        return
