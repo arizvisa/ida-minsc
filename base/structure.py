@@ -794,15 +794,34 @@ class structure_t(object):
 
     ## Serialization
     def __getstate__(self):
-        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), [True, False])
+        sptr = self.ptr
+
+        # grab the index
+        idx = idaapi.get_struc_idx(sptr.id)
+
+        # then its name
+        name = utils.string.of(idaapi.get_struc_name(sptr.id) or '')
 
         # decode the comments that we found in the structure
-        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
+        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), [True, False])
+        comments = tuple(utils.string.of(cmt) for cmt in [cmtt, cmtf])
 
-        # FIXME: perhaps we should preserve the get_struc_idx result too
-        return (self.name, tuple(res), self.members)
+        # pack our state into a tuple.
+        state = idx, sptr.props, name, comments
+
+        # FIXME: is there anything other attributes that we might need?
+        return state, self.members
     def __setstate__(self, state):
-        name, (cmtt, cmtf), members = state
+
+        # Restore the index (discarded), properties, name, and comments.
+        if len(state) == 2:
+            state, members = state
+            idx, props, name, (cmtt, cmtf) = state
+
+        # For backwards compatibility...
+        else:
+            name, (cmtt, cmtf), members = state
+            idx, props = -1, 0
 
         # try and find the structure in the database by its name
         res = utils.string.to(name)
@@ -813,14 +832,26 @@ class structure_t(object):
             cls = self.__class__
             logging.info(u"{:s}({:#x}) : Creating structure \"{:s}\" with {:d} fields and the comment \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(name, '"'), len(members), utils.string.escape(cmtf or cmtt or '', '"')))
             res = utils.string.to(name)
-            identifier = idaapi.add_struc(idaapi.BADADDR, res)
+            identifier = idaapi.add_struc(idaapi.BADADDR, res, True if props & idaapi.SF_UNION else False)
 
         # now we can apply the comments to it
         idaapi.set_struc_cmt(identifier, utils.string.to(cmtt), True)
         idaapi.set_struc_cmt(identifier, utils.string.to(cmtf), False)
 
+        # set its individual properties (ignoring SF_FRAME and SF_GHOST of course)
+        sptr = idaapi.get_struc(identifier)
+        idaapi.set_struc_listed(sptr, False if props & idaapi.SF_NOLIST else True)
+        idaapi.set_struc_hidden(sptr, True if props & idaapi.SF_HIDDEN else False)
+        idaapi.set_struc_align(sptr, (props & idaapi.SF_ALIGN) >> 7)
+
+        # we don't really bother with changing the index, because we
+        # want to be able to preserve the order when they're added.
+        if False and 0 <= idx < idaapi.get_struc_qty():
+            if idaapi.get_struc_by_idx(idx) == idaapi.BADADDR:
+                idaapi.set_struc_idx(sptr, idx)
+
         # and set its attributes properly
-        self.__ptr__, self.__name__ = idaapi.get_struc(identifier), name
+        self.__ptr__, self.__name__ = idaapi.get_struc(sptr.id), name
         self.__members__ = members
         return
 
@@ -2099,10 +2130,19 @@ class members_t(object):
 
     ## Serialization
     def __getstate__(self):
-        items = [self[idx] for idx in range(len(self))]
-        return (self.owner.name, self.baseoffset, items)
+        sptr, items = self.owner.ptr, [self[idx] for idx in range(len(self))]
+        parent = sptr.props, utils.string.of(idaapi.get_struc_name(sptr.id))
+        return (parent, self.baseoffset, items)
     def __setstate__(self, state):
-        ownername, baseoffset, _ = state
+        owner, baseoffset, _ = state
+
+        # figure out our parent here.
+        if isinstance(owner, tuple) and len(owner) == 2:
+            sprops, ownername = owner
+
+        # backwards compatibility
+        elif isinstance(owner, six.string_types):
+            sprops, ownername = 0, owner
 
         # grab the structure containing our members so we can instantiate it
         res = utils.string.to(ownername)
@@ -2110,7 +2150,7 @@ class members_t(object):
         if identifier == idaapi.BADADDR:
             cls = self.__class__
             logging.info(u"{:s}({:#x}) : Creating `members_t` for `structure_t` \"{:s}\" with no members.".format('.'.join([__name__, cls.__name__]), identifier, utils.string.escape(ownername, '"')))
-            identifier = idaapi.add_struc(idaapi.BADADDR, res)
+            identifier = idaapi.add_struc(idaapi.BADADDR, res, True if sprops & idaapi.SF_UNION else False)
 
         # assign the properties for our new member using the instance we figured out
         self.baseoffset = baseoffset
@@ -2767,25 +2807,47 @@ class member_t(object):
 
     ## Serialization
     def __getstate__(self):
-        id = self.typeid
-        tid = None if id is None else __instance__(id) if has(id) else id
-        t, ti = (self.flag, tid, self.size), self.typeinfo
+        parentbase = self.__parent__.members.baseoffset
+        mptr, fullname, sptr = idaapi.get_member_by_id(self.ptr.id)
 
         # grab its typeinfo and serialize it
+        tid = self.typeid
+        tid = None if tid is None else __instance__(tid) if has(tid) else tid
+        flag, size = mptr.flag, idaapi.get_member_size(mptr)
+
+        t, ti = (mptr.flag, tid, size), self.typeinfo
         typeinfo = t, ti.serialize()
 
         # grab its comments
-        cmtt = idaapi.get_member_cmt(self.id, True)
-        cmtf = idaapi.get_member_cmt(self.id, False)
-        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
+        cmtt = idaapi.get_member_cmt(mptr.id, True)
+        cmtf = idaapi.get_member_cmt(mptr.id, False)
+        comments = tuple(utils.string.of(cmt) for cmt in [cmtt, cmtf])
 
-        # now we can return the member at the specific start offset (or index if we're a union)
-        soff = self.ptr.soff
-        return self.__parent__.name, self.__index__, self.name, tuple(res), soff, typeinfo
+        # grab its parent name along with its name, and then we can
+        # pack the information about its parent into a tuple.
+        pname, name = fullname.split('.', 1)
+        parent = pname, sptr.props, parentbase
+
+        # pack up our state
+        state = mptr.props, mptr.soff, typeinfo, name, comments
+
+        # combine parent state with our location (index) and state
+        return parent, self.__index__, state
     def __setstate__(self, state):
-        parentname, index, name, (cmtt, cmtf), soff, typeinfo = state
-        cls, fullname = self.__class__, '.'.join([parentname, name])
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+
+        # Restore all the attributes we need to deserialize.
+        if len(state) == 3:
+            parent, index, state = state
+            parentname, parentprops, parentbase = parent
+            props, soff, typeinfo, name, (cmtt, cmtf) = state
+
+        # In order to remain backwards compatible...
+        else:
+            parentname, index, name, (cmtt, cmtf), soff, typeinfo = state
+            parentprops = props = 0
+            parentbase = 0
+        cls, fullname = self.__class__, '.'.join([parentname, name])
 
         # get the structure owning the member by the name we stored
         # creating it if necessary.
@@ -2793,12 +2855,14 @@ class member_t(object):
         identifier = idaapi.get_struc_id(res)
         if identifier == idaapi.BADADDR:
             logging.info(u"{:s}({:#x}, index={:d}) : Creating structure ({:s}) for member named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, index, parentname, utils.string.escape(name, '"'), cmtt or cmtf or ''))
-            identifier = idaapi.add_struc(idaapi.BADADDR, res)
+            identifier = idaapi.add_struc(idaapi.BADADDR, res, True if parentprops & idaapi.SF_UNION else False)
 
         if identifier == idaapi.BADADDR:
             raise E.DisassemblerError(u"{:s}({:#x}, {:s}) : Unable to get structure ({:s}) for member named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, index, parentname, utils.string.escape(name, '"'), cmtt or cmtf or ''))
 
-        parent = __instance__(identifier, offset=0)
+        # now we can get our structure and run with it
+        sptr = idaapi.get_struc(identifier)
+        count = sptr.memqty
 
         # extract the type information of the member so that we can
         # construct the opinfo_t and deserialize the tinfo_t for it.
@@ -2807,18 +2871,18 @@ class member_t(object):
 
         ti = idaapi.tinfo_t()
         if ti.deserialize(None, *ti_):
-            logging.info(u"{:s}({:#x}, index={:d}): Successfully deserialized type information for member \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), identifier, index, utils.string.escape(fullname, '"'), ti))
+            logging.debug(u"{:s}({:#x}, index={:d}): Successfully deserialized type information for member \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), ti))
 
         else:
-            ti, _ = None, logging.warning(u"{:s}({:#x}, index={:d}): Skipping application of corrupted type information ({!r}) for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, index, ti_, utils.string.escape(fullname, '"')))
+            ti, _ = None, logging.warning(u"{:s}({:#x}, index={:d}): Skipping application of corrupted type information ({!r}) for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, ti_, utils.string.escape(fullname, '"')))
 
         # create an opinfo_t for the member's type, if there isn't one then we
         # validate the flags so that we can warn the user if they don't correspond.
         # FIXME: explicitly handle .strtype (strings), .ec (enums), .cd (custom), etc.
         opinfo = idaapi.opinfo_t()
         if mytype is None:
-            if flag & idaapi.DT_TYPE in {FF_STRUCT}:
-                logging.warning(u"{:s}({:#x}, index={:d}): Unexpected DT_TYPE was found in flags ({:#x}) for the untyped member \"{:s}\" of structure ({:s}).".format('.'.join([__name__, cls.__name__]), identifier, index, flag, utils.string.escape(name, '"'), parentname))
+            if flag & idaapi.DT_TYPE == FF_STRUCT:
+                logging.warning(u"{:s}({:#x}, index={:d}): Unexpected DT_TYPE was found in flags ({:#x}) for the untyped member \"{:s}\" of structure ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, index, flag, utils.string.escape(name, '"'), parentname))
 
         # if we have an integer or a structure_t, then assign it as the identifier for the opinfo.
         else:
@@ -2827,42 +2891,42 @@ class member_t(object):
         # add the member to the database, and then check whether there was a naming
         # issue of some sort so that we can warn the user or resolve it.
         res = utils.string.to(name)
-        mem = idaapi.add_struc_member(parent.ptr, res, soff, flag, opinfo, nbytes)
+        mem = idaapi.add_struc_member(sptr, res, 0 if sptr.props & idaapi.SF_UNION else soff, flag, opinfo, nbytes)
 
         # FIXME: handle these naming errors properly
         # duplicate name
         if mem == idaapi.STRUC_ERROR_MEMBER_NAME:
-            if idaapi.get_member_by_name(parent.ptr, res).soff != soff:
+            if idaapi.get_member_by_name(sptr, res).soff != soff:
                 newname = u"{:s}_{:x}".format(res, soff)
-                logging.warning(u"{:s}({:#x}, index={:d}): Duplicate name found for member \"{:s}\" of structure ({:s}), renaming it to \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, index, utils.string.escape(name, '"'), parentname, utils.string.escape(newname, '"')))
-                idaapi.set_member_name(parent.ptr, soff, utils.string.to(newname))
+                logging.warning(u"{:s}({:#x}, index={:d}): Duplicate name found for member \"{:s}\" of structure ({:s}), renaming it to \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(name, '"'), parentname, utils.string.escape(newname, '"')))
+                idaapi.set_member_name(sptr, soff, utils.string.to(newname))
             else:
-                logging.info(u"{:s}({:#x}, index={:d}): Ignoring field at index {:d} of structure ({:s}) with the same name (\"{:s}\") and position ({:#x}).".format('.'.join([__name__, cls.__name__]), identifier, index, index, parentname, utils.string.escape(name, '"'), soff))
+                logging.info(u"{:s}({:#x}, index={:d}): Ignoring field at index {:d} of structure ({:s}) with the same name (\"{:s}\") and position ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index, index, parentname, utils.string.escape(name, '"'), soff))
 
         # duplicate field (same offset)
         elif mem == idaapi.STRUC_ERROR_MEMBER_OFFSET:
-            logging.info(u"{:s}({:#x}, index={:d}): Already existing field found at offset {:+#x} of structure ({:s}), overwriting it with \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, index, soff, parentname, utils.string.escape(name, '"')))
-            idaapi.set_member_type(parent.ptr, soff, flag, opinfo, nbytes)
-            idaapi.set_member_name(parent.ptr, soff, res)
+            mptr = idaapi.get_member(sptr, soff)
+            if (utils.string.of(idaapi.get_member_name(mptr.id)), mptr.flag, idaapi.get_member_size(mptr)) != (res, flag, nbytes):
+                logging.warning(u"{:s}({:#x}, index={:d}): Already existing field found at offset {:+#x} of structure ({:s}), overwriting it with \"{:s}\" of size ({:#x}) and flags ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index, soff, parentname, utils.string.escape(name, '"'), nbytes, flag))
+                idaapi.set_member_type(sptr, soff, flag, opinfo, nbytes)
+                idaapi.set_member_name(sptr, soff, res)
 
         # unknown
         elif mem != idaapi.STRUC_ERROR_MEMBER_OK:
             errors = {getattr(idaapi, name): name for name in dir(idaapi) if name.startswith('STRUC_ERROR_')}
-            logging.warning(u"{:s}({:#x}, index={:d}): Error {:s} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, index, "{:s}({:#x})".format(errors[mem], mem) if mem in errors else "code ({:#x})".format(mem), utils.string.escape(fullname, '"')))
+            logging.warning(u"{:s}({:#x}, index={:d}): Error {:s} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, "{:s}({:#x})".format(errors[mem], mem) if mem in errors else "code ({:#x})".format(mem), utils.string.escape(fullname, '"')))
 
-        # now that we know our parent exists, assign both that and our
-        # index that we deserialized.
+        # check the index and count, as we've already added it properly (STRUC_ERROR_MEMBER_OK)
+        elif index != count:
+            logging.warning(u"{:s}({:#x}, index={:d}): The member that was created (\"{:s}\") was expected at index {:d} but was created at index {:d}.".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), index, count))
+            index = count
+
+        # now that we know our parent exists and th member has been added
+        # we can use the soff to grab the the member's mptr.
+        mptr = idaapi.get_member(sptr, soff)
+        parent = __instance__(sptr.id, offset=parentbase)
         self.__parent__, self.__index__ = parent, index
 
         # update both of the member's comments prior to fixing its type.
-        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtt), True)
-        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtf), False)
-
-        # try and assign the typeinfo that we previously deserialized
-        try:
-            if ti:
-                self.typeinfo = ti
-
-        except Exception:
-            logging.warning(u"{:s}({:#x}, index={:d}): Unable to apply type information ({!s}) to member \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, index, ti, utils.string.escape(fullname, '"')), exc_info=True)
-        return
+        idaapi.set_member_cmt(mptr, utils.string.to(cmtt), True)
+        idaapi.set_member_cmt(mptr, utils.string.to(cmtf), False)
