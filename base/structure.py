@@ -1894,7 +1894,7 @@ class members_t(object):
         # we're recursing into.
         mptr, = filtered
         moffset = 0 if is_union(owner.ptr) else mptr.soff
-        mtype = dissolve(mptr, self.offset + moffset)
+        mtype = dissolve(mptr, self.baseoffset + moffset)
 
         # If our member type is an array, then we need to do some things
         # to try and figure out which index we're actually going to be
