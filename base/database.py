@@ -3799,7 +3799,7 @@ class address(object):
         '''Return the file offset in the input file for the address `ea`.'''
         return idaapi.get_fileregion_offset(ea)
 
-    @utils.multicase(ea=six.integer_types)
+    @utils.multicase(offset=six.integer_types)
     @classmethod
     def by_fileoffset(cls, offset):
         '''Return the address in the database for the specified file `offset` of the input file.'''
