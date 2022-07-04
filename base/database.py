@@ -2582,6 +2582,22 @@ class address(object):
     def __new__(cls, ea):
         '''Return the address of the item containing the address `ea`.'''
         return cls.head(ea)
+    @utils.multicase(start=six.integer_types, end=six.integer_types)
+    def __new__(cls, start, end):
+        '''Return a list containing each of the addresses from `start` to `end`.'''
+        return [ea for ea in cls.iterate(start, end)]
+    @utils.multicase(start=six.integer_types, end=six.integer_types, step=callable)
+    def __new__(cls, start, end, step):
+        '''Return a list containing each of the addresses from `start` to `end` using the callable `step` to determine the next address.'''
+        return [ea for ea in cls.iterate(start, end, step)]
+    @utils.multicase(bounds=tuple)
+    def __new__(cls, bounds):
+        '''Return a list containing each of the addresses within `bounds`.'''
+        return [ea for ea in cls.iterate(bounds)]
+    @utils.multicase(bounds=tuple, step=callable)
+    def __new__(cls, bounds, step):
+        '''Return a list containing each of the addresses within `bounds` using the callable `step` to determine the next address.'''
+        return [ea for ea in cls.iterate(bounds, step)]
 
     @utils.multicase()
     @classmethod
