@@ -313,9 +313,12 @@ def get(name):
     '''Get (or create) a netnode with the given `name`, and return its identifier.'''
     if isinstance(name, six.integer_types):
         node = utils.get(name)
-        return netnode.index(node)
-    res = internal.utils.string.to(name)
-    node = netnode.get(res, len(res))
+        node = name
+    elif isinstance(name, six.string_types):
+        res = internal.utils.string.to(name)
+        node = netnode.get(res, len(res))
+    else:
+        node = name
     return netnode.index(node)
 
 def remove(nodeidx):
@@ -380,7 +383,8 @@ class value(object):
             return netnode.valstr(node)
         elif issubclass(type, six.integer_types):
             return netnode.long_value(node)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's value.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's value.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
     def set(cls, nodeidx, value):
@@ -394,7 +398,8 @@ class value(object):
             return netnode.set(node, value)
         elif isinstance(value, six.integer_types):
             return netnode.set_long(node, value)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}) : An unsupported type ({!r}) was specified for the netnode's value.".format('.'.join([__name__, cls.__name__]), nodeidx, value, value.__class__))
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}) : An unsupported type ({!r}) was specified for the netnode's value.".format('.'.join([__name__, cls.__name__]), description, value, value.__class__))
 
     @classmethod
     def remove(cls, nodeidx):
@@ -406,7 +411,8 @@ class value(object):
     def repr(cls, nodeidx):
         '''Display the value for the netnode identified by `nodeidx`.'''
         if not cls.has(nodeidx):
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any value.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}) : The specified node ({:s}) does not have any value.".format('.'.join([__name__, cls.__name__]), description, description))
         res, string, value = cls.get(nodeidx), cls.get(nodeidx, type=bytes), cls.get(nodeidx, type=int)
         return "{!r} {!r} {:#x}".format(res, string, value)
 
@@ -464,7 +470,8 @@ class blob(object):
     def repr(cls, nodeidx, tag):
         '''Display the blob stored in `tag` for the netnode identified by `nodeidx`.'''
         if cls.size(nodeidx, tag) == 0:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}, {!r}) : The tag {!r} for the specified node ({:x}) does not have a blob.".format('.'.join([__name__, cls.__name__]), nodeidx, tag, tag, nodeidx))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}, {!r}) : The tag {!r} for the specified node ({:s}) does not have a blob.".format('.'.join([__name__, cls.__name__]), description, tag, tag, description))
         res = cls.get(nodeidx, tag)
         return "{!r}".format(res)
 
@@ -561,7 +568,8 @@ class alt(object):
         for index, value in cls.fitems(nodeidx, tag=tag):
             res.append("{0:x} : {1:#x} ({1:d})".format(index, value))
         if not res:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any altvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}) : The specified node ({:s}) does not have any altvals.".format('.'.join([__name__, cls.__name__]), description, description))
         return '\n'.join(res)
 
 ### node supval : sparse array[integer] = str * 1024
@@ -592,7 +600,8 @@ class sup(object):
             return netnode.supstr(node, index, tag or netnode.suptag)
         elif issubclass(type, six.string_types):
             return netnode.supstr(node, index, tag or netnode.suptag)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, index, type, type))
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, index, type, type))
 
     @classmethod
     def set(cls, nodeidx, index, value, tag=None):
@@ -626,7 +635,8 @@ class sup(object):
         elif issubclass(type, six.string_types):
             value, transform = netnode.supstr, internal.utils.fidentity
         else:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
         node = utils.get(nodeidx)
         for nsup, supval in utils.fsup(node, value, tag=tag or netnode.suptag):
             yield nsup, transform(supval)
@@ -652,7 +662,8 @@ class sup(object):
         elif issubclass(type, six.string_types):
             value, transform = netnode.supstr, internal.utils.fidentity
         else:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
         node = utils.get(nodeidx)
         for nsup, supval in utils.rsup(node, value, tag=tag or netnode.suptag):
             yield nsup, transform(supval)
@@ -666,7 +677,8 @@ class sup(object):
             value = cls.get(nodeidx, item, tag=tag)
             res.append("[{:d}] {:x} : {!r}".format(index, item, value))
         if not res:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any supvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}) : The specified node ({:s}) does not have any supvals.".format('.'.join([__name__, cls.__name__]), description, description))
         return '\n'.join(res)
 
 ### node hashval : sparse dictionary[str * 510] = str * 1024
@@ -699,7 +711,8 @@ class hash(object):
             return netnode.hashstr(node, key, tag or netnode.hashtag)
         elif issubclass(type, six.integer_types):
             return netnode.hashval_long(node, key, tag or netnode.hashtag)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, type, type))
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, key, type, type))
 
     @classmethod
     def set(cls, nodeidx, key, value, tag=None):
@@ -714,7 +727,8 @@ class hash(object):
             return netnode.hashset_buf(node, key, value, tag or netnode.hashtag)
         elif isinstance(value, six.integer_types):
             return netnode.hashset_idx(node, key, value, tag or netnode.hashtag)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}, {!r}) : An unsupported type ({!r}) was specified for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, value, type(value)))
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}, {!r}) : An unsupported type ({!r}) was specified for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, key, value, type(value)))
 
     @classmethod
     def remove(cls, nodeidx, key, tag=None):
@@ -744,7 +758,8 @@ class hash(object):
         elif issubclass(type, six.integer_types):
             value, transform = netnode.hashval_long, internal.utils.fidentity
         else:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
         node = utils.get(nodeidx)
         for idx, hashval in utils.fhash(node, value, tag=tag or netnode.hashtag):
             yield idx, transform(hashval)
@@ -772,7 +787,8 @@ class hash(object):
         elif issubclass(type, six.integer_types):
             value, transform = netnode.hashval_long, internal.utils.fidentity
         else:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
         node = utils.get(nodeidx)
         for idx, hashval in utils.rhash(node, value, tag=tag or netnode.hashtag):
             yield idx, transform(hashval)
@@ -792,7 +808,8 @@ class hash(object):
             value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=tag)), l2, cls.get(nodeidx, key, None, tag=tag), cls.get(nodeidx, key, bytes, tag=tag), cls.get(nodeidx, key, int, tag=tag), cls.get(nodeidx, key, int, tag=tag))
             res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, key, l1, value))
         if not res:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, six.integer_types) else "{!r}".format(nodeidx)
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, description))
         return '\n'.join(res)
 
 # FIXME: implement a file-allocation-table based filesystem using the netnode wrappers defined above
