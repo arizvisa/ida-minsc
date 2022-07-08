@@ -1523,6 +1523,115 @@ def name(ea, none, **flags):
     return name(ea, none or '', **flags)
 
 @utils.multicase()
+def mangled():
+    '''Return the mangled name at the current address.'''
+    return mangled(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def mangled(ea):
+    '''Return the mangled name at the address specified by `ea`.'''
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.is_code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
+
+    result = name(ea)
+    mangled_name_type_t = Fmangled_type(utils.string.to(result))
+    if mangled_name_type_t == MANGLED_UNKNOWN:
+        logging.warning(u"{:s}.mangled({:#x}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, ea, mangled_name_type_t, 'regular'))
+    return result
+@utils.multicase(string=six.string_types)
+@utils.string.decorate_arguments('string','suffix')
+def mangled(string, *suffix):
+    '''Rename the current address to the mangled version of `string` and return its previous mangled value.'''
+    return mangled(ui.current.address(), string, *suffix)
+@utils.multicase(none=None.__class__)
+def mangled(none):
+    '''Remove the mangled name at the current address and return its previous mangled value.'''
+    return mangled(ui.current.address(), none)
+@utils.multicase(ea=six.integer_types, string=six.string_types)
+@utils.string.decorate_arguments('string', 'suffix')
+def mangled(ea, string, *suffix):
+    '''Rename the address specified by `ea` to the mangled version of `string` and return its previous mangled value.'''
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.is_code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
+
+    mangled_name_type_t = Fmangled_type(utils.string.to(string))
+    if mangled_name_type_t == MANGLED_UNKNOWN:
+        raise NotImplementedError(u"{:s}.mangled({:#x}, {:s}) : Unable to mangle the specified name (\"{:s}\") before applying it to the address ({:#x}).".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), ea))
+    if suffix:
+        raise NotImplementedError(u"{:s}.mangled({:#x}, {:s}) : Unable to attach the suffix (\"{:s}\") to the unmangled name (\"{:s}\") before applying it to the address ({:#x}).".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), interface.tuplename(*suffix), internal.declaration.demangle(string), ea))
+    # FIXME: mangle the string that we were given according to the schema for
+    #        the default compiler type with the suffix appended to its name.
+    logging.warning(u"{:s}.mangled({:#x}, {:s}) : The specified name (\"{:s}\") is already mangled ({:d}) and will be assigned to the given address ({:#x}) as \"{:s}\".".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), mangled_name_type_t, ea, internal.declaration.demangle(string)))
+    return name(ea, string, *suffix)
+@utils.multicase(ea=six.integer_types, none=None.__class__)
+def mangled(ea, none):
+    '''Remove the name at the address specified by `ea` and return its previous mangled value.'''
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.is_code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
+    GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
+
+    flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
+    string, _ = name(ea), name(ea, none, flags=flags)
+    mangled_name_type_t = Fmangled_type(utils.string.to(string))
+    if mangled_name_type_t == MANGLED_UNKNOWN:
+        logging.warning(u"{:s}.mangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_t, 'regular'))
+    return string
+mangle = utils.alias(mangled)
+
+@utils.multicase()
+def unmangled():
+    '''Return the name at the current address in its unmangled form.'''
+    return unmangled(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def unmangled(ea):
+    '''Return the name at the address specified by `ea` in its unmangled form.'''
+    GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
+
+    flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
+    result = name(ea, flags=flags)
+    return result if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
+@utils.multicase(string=six.string_types)
+@utils.string.decorate_arguments('string','suffix')
+def unmangled(string, *suffix):
+    '''Rename the current address using the mangled version of `string` and return its previous unmangled value.'''
+    return unmangled(ui.current.address(), string, *suffix)
+@utils.multicase(none=None.__class__)
+def unmangled(none):
+    '''Remove the name at the current address and return its previous unmangled value.'''
+    return unmangled(ui.current.address(), none)
+@utils.multicase(ea=six.integer_types, string=six.string_types)
+@utils.string.decorate_arguments('string', 'suffix')
+def unmangled(ea, string, *suffix):
+    '''Rename the address specified by `ea` using the mangled version of `string` and return its previous unmangled value.'''
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.is_code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
+    GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
+
+    mangled_name_type_t = Fmangled_type(utils.string.to(string))
+    if mangled_name_type_t != MANGLED_UNKNOWN:
+        logging.warning(u"{:s}.unmangled({:#x}, {:s}) : The specified name (\"{:s}\") is already mangled ({:d}) and will be assigned to the given address ({:#x}) as \"{:s}\".".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), mangled_name_type_t, ea, internal.declaration.demangle(string)))
+    if suffix:
+        raise NotImplementedError(u"{:s}.unmangled({:#x}, {:s}) : Unable to attach the suffix (\"{:s}\") to the unmangled name (\"{:s}\") before applying it to the address ({:#x}).".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), interface.tuplename(*suffix), internal.declaration.demangle(string), ea))
+    # FIXME: correct the string, doing whatever it takes to keep it the same
+    #        when it gets mangled(?) and append the given suffix to its name.
+    flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
+    result = name(ea, string, *suffix, flags=flags)
+    return result if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
+@utils.multicase(ea=six.integer_types, none=None.__class__)
+def unmangled(ea, none):
+    '''Remove the name at the address specified by `ea` and return its previous unmangled value.'''
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.is_code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
+    GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
+
+    flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
+    string, result = name(ea), name(ea, none, flags=flags)
+    mangled_name_type_t = Fmangled_type(utils.string.to(string))
+    if mangled_name_type_t == MANGLED_UNKNOWN:
+        logging.warning(u"{:s}.unmangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_t, 'regular'))
+    return result if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
+unmangle = demangle = demangled = utils.alias(unmangled)
+
+@utils.multicase()
 def color():
     '''Return the color (RGB) for the item at the current address.'''
     return color(ui.current.address())
