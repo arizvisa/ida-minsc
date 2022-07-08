@@ -876,6 +876,16 @@ class names(object):
     This namespace is used for listing all of the names (symbols) within the
     database. By default the `(address, name)` is yielded in its mangled form.
 
+    When listing names that are matched, the following legend can be used to
+    identify certain characteristics about the address of the returned name:
+
+        `I` - The symbol is residing in an import segment
+        `C` - The address of the symbol is marked as code
+        `D` - The address of the symbol is marked as data
+        `^` - The address of the symbol is is initialized
+        `+` - The symbol has an implicit tag applied to it (named or typed)
+        `*` - The symbol has an explicit tag applied to it
+
     The available types that one can filter the symbols with are as follows:
 
         `address` - Match according to the address of the symbol
@@ -884,6 +894,10 @@ class names(object):
         `like` - Filter the symbol names according to a glob
         `regex` - Filter the symbol names according to a regular-expression
         `index` - Match the symbol according to its index
+        `function` - Filter the symbol names for any that are referring to a function
+        `imports` - Filter the symbol names for any that are imports
+        `typed` - Filter the symbol names for any that have type information applied to them
+        `tagged` - Filter the symbol names for any that use the specified tag(s)
         `predicate` - Filter the symbols by passing their address to a callable
 
     Some examples of using these keywords are as follows::
@@ -901,6 +915,10 @@ class names(object):
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('unmangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.combinator('demangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
+    __matcher__.mapping('function', function.within, idaapi.get_nlist_ea)
+    __matcher__.mapping('imports', utils.fpartial(operator.eq, idaapi.SEG_XTRN), idaapi.get_nlist_ea, idaapi.segtype)
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, bool) else operator.contains(keys, parameter) if isinstance(parameter, six.string_types) else keys&parameter, idaapi.get_nlist_ea, lambda ea: function.tag(ea) if function.within(ea) else tag(ea), operator.methodcaller('keys'), builtins.set)
+    __matcher__.mapping('typed', operator.truth, idaapi.get_nlist_ea, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.predicate('predicate', idaapi.get_nlist_ea)
     __matcher__.predicate('pred', idaapi.get_nlist_ea)
     __matcher__.attribute('index')
@@ -953,16 +971,20 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the names in the database that match the keyword specified by `type`.'''
-        listable = []
+        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN))
+        MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
         # Set some reasonable defaults
         maxindex = 1
-        maxaddr = 0
+        maxaddr = maxname = 0
 
         # Perform the first pass through our listable grabbing our field lengths
+        listable = []
         for index in cls.__iterate__(**type):
             maxindex = max(index, maxindex)
             maxaddr = max(idaapi.get_nlist_ea(index), maxaddr)
+            maxname = max(len(idaapi.get_nlist_name(index)), maxname)
 
             listable.append(index)
 
@@ -971,22 +993,23 @@ class names(object):
 
         # List all the fields of each name that was found
         for index in listable:
-            ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
-            ui.navigation.set(ea)
+            ea, name = ui.navigation.set(idaapi.get_nlist_ea(index)), utils.string.of(idaapi.get_nlist_name(index))
+            tags = function.tag(ea) if function.within(ea) else tag(ea)
 
-            # If there isn't any type information or it's included in the name, then
-            # we can render it as-is.
-            if name.startswith('?') or not t(ea):
-                demangled = internal.declaration.demangle(name)
-                six.print_(u"[{:>{:d}d}] {:#0{:d}x} {:s}{:s}".format(index, math.trunc(cindex), ea, math.trunc(caddr), utils.string.of(demangled), " ({:s})".format(name) if demangled != name else ''))
+            # Any flags that could be useful
+            ftype = 'I' if idaapi.segtype(ea) == idaapi.SEG_XTRN else '-' if t.is_unknown(ea) else 'C' if t.is_code(ea) else 'D' if t.is_data(ea) else '-'
+            finitialized = '^' if t.is_initialized(ea) else '-'
+            tags.pop('__name__', None)
+            ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
+            flags = itertools.chain(finitialized, ftype, ftagged)
 
-            # Otherwise, prefix the name with the type information that we were able
-            # to extract from the specified address.
-            else:
-                description = t(ea)
-                demangled = internal.declaration.demangle(name)
-                six.print_(u"[{:>{:d}d}] {:#0{:d}x} {!s} {:s}{:s}".format(index, math.trunc(cindex), ea, math.trunc(caddr), description, utils.string.of(demangled), " ({:s})".format(name) if demangled != name else ''))
-            continue
+            # Figure out which name we need to use, the mangled one or the real one.
+            mangled_name_type_t = Fmangled_type(utils.string.to(name))
+            realname = name if mangled_name_type_t == MANGLED_UNKNOWN else (idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP) or name)
+
+            # Now we can just try to demangle the name and display both mangled and unmangled forms.
+            description = utils.string.of(idaapi.demangle_name(utils.string.to(name), MNG_LONG_FORM) or realname)
+            six.print_(u"{:<{:d}s} {:#0{:d}x} : {:s} : {:>{:d}s} : {:s}".format("[{:d}]".format(index), 2 + math.trunc(cindex), ea, math.trunc(caddr), ''.join(flags), '' if realname == name else "({:s})".format(name), 2 + maxname, description))
         return
 
     @utils.multicase(string=six.string_types)
@@ -1000,12 +1023,15 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def search(cls, **type):
         '''Search through all of the names within the database and return the first result matching the keyword specified by `type`.'''
-        query_s = utils.string.kwargs(type)
+        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.is_code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
+        MNG_LONG_FORM = getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
+        query_s = utils.string.kwargs(type)
         listable = [item for item in cls.__iterate__(**type)]
         if len(listable) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)
-            messages = ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in listable)
+            messages = ((u"[{:d}] {:#x} {:s}".format(idx, ea, name if Fmangled_type(utils.string.to(name)) == MANGLED_UNKNOWN else "({:s}) {:s}".format(name, utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM)))) for idx, ea, name in map(utils.fmap(utils.fidentity, f1, f2), listable)))
             [ logging.info(msg) for msg in messages ]
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
 
