@@ -2429,6 +2429,15 @@ class imports(object):
     with, and `hint` is the import ordinal hint which is used to speed
     up the linking process.
 
+    When listing the imports that are matched, the following legend can be
+    used to identify certain characteristics about them:
+
+        `T` - The import has a type that was explicitly applied
+        `t` - The import has a type that was guessted
+        `H` - The import contains an ordinal number as a hint
+        `+` - The import has an implicit tag applied to it (named or typed)
+        `*` - The import has an explicit tag applied to it
+
     The different types that one can match imports with are the following:
 
         `address` or `ea` - Match according to the import's address
@@ -2439,6 +2448,8 @@ class imports(object):
         `regex` - Filter the symbol names of all the imports according to a regular-expression
         `ordinal` - Match according to the import's hint (ordinal)
         `index` - Match according index of the import
+        `typed` - Filter all of the imports based on whether they have a type applied to them
+        `tagged` - Filter the imports for any that use the specified tag(s)
         `predicate` Filter the imports by passing the above (default) tuple to a callable
 
     Some examples of using these keywords are as follows::
@@ -2484,6 +2495,8 @@ class imports(object):
     __matcher__.combinator('module', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), operator.itemgetter(0))
     __matcher__.mapping('ordinal', utils.fcompose(operator.itemgetter(1), operator.itemgetter(-1)))
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __format__.__func__)
+    __matcher__.mapping('typed', operator.truth, operator.itemgetter(0), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, bool) else operator.contains(keys, parameter) if isinstance(parameter, six.string_types) else keys&parameter, tag, operator.methodcaller('keys'), builtins.set)
     __matcher__.predicate('predicate', lambda item: item)
     __matcher__.predicate('pred', lambda item: item)
     __matcher__.mapping('index', operator.itemgetter(0))
@@ -2611,13 +2624,16 @@ class imports(object):
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def list(cls, **type):
         '''List all of the imports in the database that match the keyword specified by `type`.'''
-        listable = []
+        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN))
+        MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
         # Set some reasonable defaults
         maxaddr = maxmodule = cordinal = maxname = 0
         has_ordinal = False
 
         # Perform the first pass through our listable grabbing our field lengths
+        listable = []
         for ea, (module, name, ordinal) in cls.iterate(**type):
             maxaddr = max(ea, maxaddr)
             maxname = max(len(name or ''), maxname)
@@ -2636,27 +2652,40 @@ class imports(object):
         caddr = utils.string.digits(maxaddr, 16)
 
         # List all the fields of every import that was matched
-        prefix = '__imp_'
+        prefix, get_tinfo = '__imp_', (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         for ea, (module, name, ordinal) in listable:
             ui.navigation.set(ea)
-            moduleordinal = "{:s}{:s}".format(module or '', "<{:d}>".format(ordinal) if has_ordinal else '')
+            moduleordinal = "{:s}<{:d}>".format(module or '', ordinal) if ordinal else (module or '')
 
             address_s = "{:<#0{:d}x}".format(ea, 2 + math.trunc(caddr))
-            module_s = "{:>{:d}s}".format(moduleordinal if module else '', maxmodule + (cordinal if has_ordinal else 0))
+            module_s = "{:>{:d}s}".format(moduleordinal if module else '', maxmodule + (2 + cordinal if has_ordinal else 0))
 
-            # Clean up the demangled name by culling out the scope and any other declarations
+            # Clean up the the name and then figure out what the actual name would be. We first
+            # strip out the import prefix, then figure out the type before we render just the name.
             name = name[len(prefix):] if name.startswith(prefix) else name
-            demangled = internal.declaration.demangle(name)
-            scope = internal.declaration.extract.scope(name)
-            without_scope = demangled[len("{:s}: ".format(scope)):] if scope else demangled
+            mangled_name_type_t = Fmangled_type(utils.string.to(name))
+            realname = name if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP))
 
-            # If the name isn't demangled, then we can just output it as-is.
-            if demangled == name:
-                six.print_(u"{:s} : {:s} : {:s}".format(address_s, module_s, name))
+            # Some flags that are probably useful.
+            ftyped = 'T' if get_tinfo(idaapi.tinfo_t(), ea) else 't' if t.has_typeinfo(ea) else '-'
+            fordinaled = 'H' if ordinal > 0 else '-'
 
-            # Otherwise we need to output the name that we tampered with.
+            tags = tag(ea)
+            tags.pop('__name__', None)
+            ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
+
+            flags = itertools.chain(ftyped, fordinaled, ftagged)
+
+            # If there's any type information for the address, then we can just render it.
+            ti = idaapi.tinfo_t()
+            if get_tinfo(ti, ea):
+                description = idaapi.print_tinfo('', 0, 0, idaapi.PRTYPE_DEF, ti, utils.string.to(realname), '')
+                six.print_(u"{:s} : {:s} : {:s} : {:s}".format(address_s, ''.join(flags), module_s, utils.string.of(description)))
+
+            # Otherwise we'll use the realname to demangle it to something displayable.
             else:
-                six.print_(u"{:s} : {:s} : {:s}".format(address_s, module_s, without_scope))
+                description = idaapi.demangle_name(utils.string.to(name), MNG_LONG_FORM) or realname
+                six.print_(u"{:s} : {:s} : {:s} : {:s}".format(address_s, ''.join(flags), module_s, utils.string.of(description)))
             continue
         return
 
@@ -2675,7 +2704,7 @@ class imports(object):
 
         listable = [item for item in cls.iterate(**type)]
         if len(listable) > 1:
-            messages = (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in listable)
+            messages = (u"{:x} {:s}{:s} {:s}".format(ea, module, "<{:d}>".format(ordinal) if ordinal else '', name) for ea, (module, name, ordinal) in listable)
             [ logging.info(msg) for msg in messages ]
             f = utils.fcompose(operator.itemgetter(1), cls.__formatl__)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
