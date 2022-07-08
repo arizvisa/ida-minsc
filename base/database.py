@@ -1710,6 +1710,21 @@ class entries(object):
 
     This namespace is also aliased as ``database.exports``.
 
+    When listing entry points that are matched, the following legend can be
+    used to identify certain characteristics about them:
+
+        `F` - The entry point is referencing a function
+        `C` - The entry point is referencing code
+        `A` - The entry point is referencing data (address)
+        `D` - The entry point is referencing a decompiled function
+        `T` - The address of the entry point has a type applied to it
+        `t` - The address of the entry point has a guessable type
+        `C` - The address of the entry point is marked as code
+        `D` - The address of the entry point is marked as data
+        `^` - The address of the entry point is marked as unknown
+        `+` - The entry point has an implicit tag applied to it (named or typed)
+        `*` - The entry point has an explicit tag applied to it
+
     The different types that one can match entrypoints with are the following:
 
         `address` or `ea` - Match according to the entrypoint's address
@@ -1721,6 +1736,9 @@ class entries(object):
         `gt` - Filter the entrypoints for any after the specified address (exclusive)
         `less` or `le` - Filter the entrypoints for any before the specified address (inclusive)
         `lt` - Filter the entrypoints for any before the specified address (exclusive)
+        `function` - Filter the entrypoints for any that are referencing a function
+        `typed` - Filter the entrypoints for any that have type information applied to them
+        `tagged` - Filter the entrypoints for any that use the specified tag(s)
         `predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
 
     Some examples of using these keywords are as follows::
@@ -1732,8 +1750,8 @@ class entries(object):
     """
 
     __matcher__ = utils.matcher()
-    __matcher__.mapping('address', utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.mapping('ea', utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('address', operator.eq, idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.boolean('ea', operator.eq, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('greater', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('ge', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('gt', operator.lt, idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -1743,7 +1761,10 @@ class entries(object):
     __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
-    __matcher__.predicate('predicate', idaapi.get_entry_ordinal)
+    __matcher__.mapping('function', function.within, idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, bool) else operator.contains(keys, parameter) if isinstance(parameter, six.string_types) else keys&parameter, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if function.within(ea) else tag(ea), operator.methodcaller('keys'), builtins.set)
+    __matcher__.predicate('predicate', idaapi.get_entry_ordinal),
     __matcher__.predicate('pred', idaapi.get_entry_ordinal)
     __matcher__.boolean('index', operator.eq)
 
@@ -1850,12 +1871,16 @@ class entries(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the entry points in the database that match the keyword specified by `type`.'''
-        listable = []
+        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE, MANGLED_UNKNOWN))
+        MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
+        MNG_NOSCTYP, MNG_NOCALLC = getattr(idaapi, 'MNG_NOSCTYP', 0x400), getattr(idaapi, 'MNG_NOCALLC', 0x100)
 
         # Set some reasonable defaults
         maxindex = maxaddr = maxordinal = 0
 
         # First pass through our listable grabbing the maximum lengths of our fields
+        listable = []
         for index in cls.__iterate__(**type):
             maxindex = max(index, maxindex)
 
@@ -1866,17 +1891,38 @@ class entries(object):
             listable.append(index)
 
         # Collect the maximum sizes for everything from the first pass
-        cindex = utils.string.digits(maxindex, 10)
-        caddr, cordinal = (utils.string.digits(item, 16) for item in [maxaddr, maxordinal])
+        cindex, cordinal = (utils.string.digits(maxindex, 10) for item in [maxindex, maxordinal])
+        caddr = utils.string.digits(maxaddr, 16)
 
         # List all the fields from everything that matched
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         for index in listable:
             ordinal = cls.__entryordinal__(index)
             ea = idaapi.get_entry(ordinal)
-            realname = cls.__entryname__(index)
-            scope, unmangled = internal.declaration.extract.scope(realname), internal.declaration.demangle(realname) if internal.declaration.mangledQ(realname) else realname
-            without_scope = unmangled[len("{:s}: ".format(scope)):] if scope else unmangled
-            six.print_(u"{:<{:d}s} {:<#{:d}x} : {:s}{:s}".format("[{:d}]".format(index), 2 + math.trunc(cindex), ea, 2 + math.trunc(caddr), "{:<{:d}s} ".format('()' if ea == ordinal else "({:#x})".format(ordinal), 2 + 2 + math.trunc(cindex)), without_scope))
+            tags = function.tag(ea) if function.within(ea) else tag(ea)
+            realname = cls.__entryname__(index) or name(ea)
+
+            # Some flags that could be useful.
+            fclass = 'A' if t.is_data(ea) or t.is_unknown(ea) else 'D' if function.within(ea) and function.type.is_decompiled(ea) else 'F' if function.within(ea) else 'C' if t.is_code(ea) else '-'
+            finitialized = '-' if not t.is_initialized(ea) else 'C' if t.is_code(ea) else 'D' if t.is_data(ea) else '^'
+            ftyped = 'T' if get_tinfo(idaapi.tinfo_t(), ea) else 't' if t.has_typeinfo(ea) else '-'
+            tags.pop('__name__', None)
+            ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
+            flags = itertools.chain(fclass, finitialized, ftyped, ftagged)
+
+            # If we're within a function, then display the type information if available
+            # while being aware of name mangling. If there's no type information, then
+            # use the unmangled name for displaying the export.
+            if function.within(ea):
+                ti, mangled_name_type_t = idaapi.tinfo_t(), Fmangled_type(utils.string.to(realname))
+                dname = realname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_NODEFINIT|MNG_NOPTRTYP))
+                demangled = utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_LONG_FORM|MNG_NOSCTYP|MNG_NOCALLC)) or realname
+                description = idaapi.print_tinfo('', 0, 0, idaapi.PRTYPE_DEF, ti, utils.string.to(dname), '') if get_tinfo(ti, ea) else demangled
+
+            # Otherwise, we always try to display the type regardless of what's available.
+            else:
+                description = tags.get('__typeinfo__', realname)
+            six.print_(u"{:<{:d}s} {:s} {:<#{:d}x} : {:s} : {:s}".format("[{:d}]".format(index), 2 + math.trunc(cindex), "{:>{:d}s}".format('' if ea == ordinal else "(#{:d})".format(ordinal), 2 + 1 + math.trunc(cindex)), ea, 2 + math.trunc(caddr), ''.join(flags), description))
         return
 
     @utils.multicase(string=six.string_types)
@@ -1894,7 +1940,7 @@ class entries(object):
 
         listable = [item for item in cls.__iterate__(**type)]
         if len(listable) > 1:
-            messages = ((u"[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in listable)
+            messages = ((u"[{:d}] ({:s}) {:#x} : {:s} {:s}".format(idx, '' if ordinal == ea else "#{:d}".format(ordinal), ea, '[FUNC]' if function.within(ea) else '[ADDR]', name or unmangled(ea))) for idx, ordinal, name, ea in map(utils.fmap(utils.fidentity, cls.__entryordinal__, cls.__entryname__, cls.__address__), listable))
             [ logging.info(msg) for msg in messages ]
             f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f(listable[0])))
