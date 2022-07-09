@@ -3446,8 +3446,6 @@ class switch_t(object):
 
 def xiterate(ea, start, next):
     '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
-    getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
-
     addr = start(ea)
     while addr != idaapi.BADADDR:
         yield addr
@@ -3459,7 +3457,7 @@ def addressOfRuntimeOrStatic(func):
 
     This returns a tuple of the format `(runtimeQ, address)` where
     `runtimeQ` is a boolean returning true if the symbol is linked
-    during runtime.
+    during runtime and `address` is the address of the entrypoint.
     """
     import function
     try:
@@ -3477,29 +3475,28 @@ def addressOfRuntimeOrStatic(func):
         if not database.type.is_data(func): six.reraise(*exc_info)
 
         # ensure that we're an import, otherwise throw original exception
-        try:
-            database.imports.at(func)
-        except internal.exceptions.MissingTypeOrAttribute:
+        if idaapi.segtype(func) != idaapi.SEG_XTRN:
             six.reraise(*exc_info)
 
         # yep, we're an import
         return True, func
 
-    # check if we're _not_ actually within a function (mis-defined external)
+    # check if we're _not_ within a function. this is because in elf IDBs, IDA will
+    # create a func_t over each import in the database. since we're trying to identify
+    # code and trust FF_CODE for it, imports being considered functions with code in
+    # them just completely fucks up everything...hence we need to explicitly check for it.
     ea = range.start(fn)
     if not function.within(ea):
         import database
 
-        # ensure that we're an import, otherwise this is definitely not misdefined
-        try:
-            database.imports.at(ea)
-        except internal.exceptions.MissingTypeOrAttribute:
+        # if we're in a SEG_XTRN, then we're an import and this is a runtime-func.
+        if idaapi.segtype(ea) != idaapi.SEG_XTRN:
             raise internal.exceptions.FunctionNotFoundError(u"addressOfRuntimeOrStatic({:#x}) : Unable to locate function by address.".format(ea))
 
-        # ok, we found a mis-defined import
+        # ok, we found a mis-defined import (thx ida)
         return True, ea
 
-    # nope, we're just a function
+    # nope, we're just a function with real executable code inside
     return False, ea
 
 ## internal enumerations that idapython missed
