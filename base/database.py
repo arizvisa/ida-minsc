@@ -483,12 +483,34 @@ class functions(object):
     database. By default a list is returned containing the address of
     each function.
 
+    When listing functions that are matched, the following legend can be
+    used to identify certain characteristics about them:
+
+        `+` - The function has an implicit tag (named or typed)
+        `*` - The function has been explicitly tagged
+        `J` - The function is a wrapper or a thunk
+        `L` - The function was pattern matched as a library
+        `S` - The function is declared statically
+        `^` - The function does not contain a frame
+        `?` - The function has its stack points calculated incorrectly and may be incorrect
+        `T` - The function has a prototype that was applied to it manually or via decompilation
+        `t` - The function has a prototype that was guessed
+        `D` - The function has been previously decompiled
+
     The different types that one can match functions with are the following:
 
         `address` or `ea` - Match according to the function's address
         `name` - Match according to the exact name
         `like` - Filter the function names according to a glob
         `regex` - Filter the function names according to a regular-expression
+        `typed` - Filter the functions for any that have type information applied to them
+        `decompiled` - Filter the functions for any that have been decompiled
+        `frame` - Filter the functions for any that contain a frame
+        `problems` - Filter the functions for any that contain problems with their stack
+        `library` - Filter the functions that any which were detected as a library function
+        `wrapper` - Filter the functions that are flagged as wrappers (thunks)
+        `exceptions` Filter the functions for any that either handles an exception or sets up a handler
+        `tagged` - Filter the functions for any that use the specified tag(s)
         `predicate` - Filter the functions by passing their ``idaapi.func_t`` to a callable
 
     Some examples of how to use these keywords are as follows::
@@ -503,9 +525,21 @@ class functions(object):
     __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), function.by, function.name)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
+    __matcher__.boolean('address', function.contains), __matcher__.boolean('ea', function.contains)
+    __matcher__.mapping('typed', operator.truth, function.top, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
+    __matcher__.mapping('decompiled', operator.truth, function.type.is_decompiled)
+    __matcher__.mapping('frame', operator.truth, function.type.has_frame)
+    __matcher__.mapping('library', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_LIB))
+    __matcher__.mapping('wrapper', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, bool) else operator.contains(keys, parameter) if isinstance(parameter, six.string_types) else keys&parameter, function.top, function.tag, operator.methodcaller('keys'), builtins.set)
     __matcher__.predicate('predicate', function.by)
     __matcher__.predicate('pred', function.by)
-    __matcher__.boolean('address', function.contains), __matcher__.boolean('ea', function.contains)
+
+    if any(hasattr(idaapi, item) for item in ['is_problem_present', 'QueueIsPresent']):
+        __matcher__.mapping('problems', operator.truth, function.top, utils.frpartial(function.type.has_problem, getattr(idaapi, 'PR_BADSTACK', 0xb)))
+
+    if all(hasattr(idaapi, Fname) for Fname in ['tryblks_t', 'get_tryblks']):
+        __matcher__.mapping('exceptions', operator.truth, function.by, lambda fn: idaapi.get_tryblks(idaapi.tryblks_t(), fn), utils.fpartial(operator.ne, 0))
 
     # chunk matching
     #__matcher__.boolean('greater', operator.le, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max))
@@ -568,15 +602,15 @@ class functions(object):
         '''List all of the functions in the database that match the keyword specified by `type`.'''
         listable = []
 
-        # Some utility functions for grabbing frame information
-        flvars = lambda f: _structure.fragment(f.frame, 0, f.frsize) if f.frsize else []
-        favars = lambda f: function.frame.args(f) if f.frsize else []
+        # Some utility functions for grabbing counts of function attributes
+        Fcount_lvars = utils.fcompose(function.frame.lvars, utils.count)
+        Fcount_avars = utils.fcompose(function.frame.args.iterate, utils.count)
 
         # Set some reasonable defaults here
         maxentry = config.bounds()[0]
-        maxaddr = minaddr = 0
+        maxaddr = minaddr = maxchunks = 0
         maxname = maxunmangled = chunks = marks = blocks = exits = 0
-        lvars = avars = 0
+        lvars = avars = refs = 0
 
         # First pass through the list to grab the maximum lengths of the different fields
         for ea in cls.iterate(**type):
@@ -587,16 +621,16 @@ class functions(object):
             maxname = max(len(unmangled), maxname)
             maxunmangled = max(len(unmangled), maxunmangled) if not internal.declaration.mangledQ(realname) else maxunmangled
 
-            res = [item for item in function.chunks(func)]
-            maxaddr, minaddr = max(max(map(operator.itemgetter(-1), res)), maxaddr), max(max(map(operator.itemgetter(0), res)), minaddr)
-            chunks = max(len(res), chunks)
+            bounds, items = function.bounds(func), [item for item in function.chunks(func)]
+            maxaddr, minaddr = max(max(bounds), maxaddr), max(min(bounds), minaddr)
+            maxchunks = max(len(items), maxchunks)
 
-            # Prior to IDA 7.0, interacting with marks forces the mark window to appear...so we'll ignore them
-            marks = max(len([] if idaapi.__version__ < 7.0 else builtins.list(function.marks(func))), marks)
+            # Figure out the maximum values for each of these attributes
             blocks = max(len(builtins.list(function.blocks(func, silent=True))), blocks)
             exits = max(len(builtins.list(function.bottom(func))), exits)
-            lvars = max(len(builtins.list(flvars(func))) if func.frsize else lvars, lvars)
-            avars = max(len(builtins.list(favars(func))) if func.frsize else avars, avars)
+            refs = max(len(xref.up(ea)), refs)
+            lvars = max(Fcount_lvars(func) if idaapi.get_frame(ea) else 0, lvars)
+            avars = max(Fcount_avars(func), avars)
 
             listable.append(ea)
 
@@ -605,29 +639,52 @@ class functions(object):
         try: cmaxoffset = utils.string.digits(offset(maxentry), 16)
         except E.OutOfBoundsError: cmaxoffset = 0
         cmaxentry, cmaxaddr, cminaddr = (utils.string.digits(item, 16) for item in [maxentry, maxaddr, minaddr])
-        cchunks = utils.string.digits(chunks, 10) if chunks else 1
-        cblocks = utils.string.digits(blocks, 10) if blocks else 1
-        cexits = utils.string.digits(exits, 10) if exits else 1
-        cavars = utils.string.digits(avars, 10) if avars else 1
-        clvars = utils.string.digits(lvars, 10) if lvars else 1
-        cmarks = utils.string.digits(marks, 10) if marks else 1
+        cchunks, cblocks, cexits, cavars, clvars, crefs = (utils.string.digits(item, 10) for item in [maxchunks, blocks, exits, avars, lvars, refs])
 
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
-            func, _ = function.by(ea), ui.navigation.procedure(ea)
+            func, decompiledQ = function.by(ui.navigation.procedure(ea)), interface.node.aflags(ui.navigation.procedure(ea), getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000))
+            tags = function.tag(ea)
+
+            # any flags that might be useful
+            ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
+            ftyped = 'D' if function.type.is_decompiled(ea) else '-' if not function.type.has_typeinfo(func) else 'T' if interface.node.aflags(ea, idaapi.AFL_USERTI) else 't'
+            fframe = '?' if function.type.has_problem(ea, getattr(idaapi, 'PR_BADSTACK', 0xb)) else '-' if idaapi.get_frame(ea) else '^'
+            fgeneral = 'J' if func.flags & idaapi.FUNC_THUNK else 'L' if func.flags & idaapi.FUNC_LIB else 'S' if func.flags & idaapi.FUNC_STATICDEF else 'F'
+            flags = itertools.chain(fgeneral, fframe, ftyped, ftagged)
+
+            # naming information
             unmangled, realname = function.name(func), name(ea)
-            res = [item for item in function.chunks(func)]
-            six.print_(u"{:<{:d}s} {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x}{:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
+
+            # chunks and boundaries
+            chunks = [item for item in function.chunks(func)]
+            bounds = function.bounds(func)
+
+            # try/except handlers
+            if all(hasattr(idaapi, Fname) for Fname in ['tryblks_t', 'get_tryblks']):
+                tb = idaapi.tryblks_t()
+                blkcount = idaapi.get_tryblks(tb, func)
+                trycount = sum(tb[i].is_cpp() for i in builtins.range(blkcount))
+                iterable = (tb[i].cpp() if tb[i].is_cpp() else tb[i].seh() for i in builtins.range(tb.size()))
+                ehcount = sum(item.size() for item in iterable)
+
+            else:
+                tb = None
+                blkcount = trycount = ehcount = 0
+
+            # now we can output everything that was found
+            six.print_(u"{:<{:d}s} {:+#0{:d}x} : {:#0{:d}x}..{:#0{:d}x} : {:<{:d}s} {:s} : {:<{:d}s} : refs:{:<{:d}d} args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
                 "[{:d}]".format(index), 2 + math.trunc(cindex),
                 offset(ea), 3 + math.trunc(cmaxoffset),
-                min(map(operator.itemgetter(0), res)), 2 + math.trunc(cminaddr), max(map(operator.itemgetter(-1), res)), 2 + math.trunc(cmaxaddr),
-                math.trunc(cchunks) * ' ', len(res),
+                bounds[0], 2 + math.trunc(cminaddr), bounds[1], 2 + math.trunc(cmaxaddr),
+                "({:d})".format(len(chunks)), 2 + cchunks, ''.join(flags),
                 unmangled, math.trunc(maxname if internal.declaration.mangledQ(realname) else maxunmangled),
-                len(builtins.list(favars(func))) if func.frsize else 0, 1 + math.trunc(cavars),
-                len(builtins.list(flvars(func))), 1 + math.trunc(clvars),
-                len(builtins.list(function.blocks(func, silent=True))), 1 + math.trunc(cblocks),
-                len(builtins.list(function.bottom(func))), 1 + math.trunc(cexits),
-                '' if idaapi.__version__ < 7.0 else " marks:{:<{:d}d}".format(len(builtins.list(function.marks(func))), 1 + math.trunc(cmarks))
+                len(xref.up(ea)), crefs,
+                Fcount_avars(func), cavars,
+                Fcount_lvars(func) if idaapi.get_frame(ea) else 0, clvars,
+                len(builtins.list(function.blocks(func, silent=True))), cblocks,
+                len(builtins.list(function.bottom(func))), cexits,
+                " exceptions:{:d}+{:d}/{:d}".format(blkcount - trycount, trycount, ehcount) if tb else ''
             ))
         return
 
