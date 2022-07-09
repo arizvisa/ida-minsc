@@ -1324,20 +1324,16 @@ class members_t(object):
 
     def by_offset(self, offset):
         '''Return the member at the specified `offset` from the base offset of the structure.'''
-        owner = self.owner
-
-        # Start out by getting our bounds, and translating them to our relative
-        # offset.
-        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), owner.realbounds)
-
-        # Make sure that the requested offset is within the boundaries of our
-        # structure, and bail if it isn't.
-        if not (minimum <= offset < maximum):
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, offset))
+        cls, owner = self.__class__, self.owner
 
         # Chain to the realoffset implementation.. This is just a wrapper.
-        return self.by_realoffset(offset - self.baseoffset)
+        try:
+            result = self.by_realoffset(offset - self.baseoffset)
+
+        # Pivot any expected exceptions so that we can output the parameter the user gave us.
+        except (E.MemberNotFoundError, E.OutOfBoundsError):
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to locate a member at the specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, offset))
+        return result
     byoffset = utils.alias(by_offset, 'members_t')
 
     def index(self, member):
