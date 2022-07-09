@@ -2117,8 +2117,12 @@ class frame(object):
                 # result if we have a frame...otherwise, we return the location.
                 if isinstance(loc, interface.location_t):
                     translated = operator.add(loc, frame.regs.size())
-                    item = fr.members.by(translated) if fr else translated
-                    yield item, ti, name
+                    try:
+                        item = fr.members.by(translated) if fr else translated
+                    except (E.MemberNotFoundError, E.OutOfBoundsError):
+                        item = translated
+                    finally:
+                        yield item, ti, name
 
                 # If it's a tuple, then we check if it contains any registers
                 # so that way we can process them if necessary. If its a register
