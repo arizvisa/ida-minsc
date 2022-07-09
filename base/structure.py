@@ -1274,14 +1274,17 @@ class members_t(object):
     def by(self, offset):
         '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
-    @utils.multicase(location=interface.location_t)
+    @utils.multicase(location=tuple)
     def by(self, location):
         '''Return the member at the specified `location`.'''
         offset, size = location
+        if isinstance(offset, interface.symbol_t):
+            offset, = (int(item) for item in offset)
         member = self.by_offset(offset)
         if (offset, size) != (member.offset, member.size):
             cls = self.__class__
-            logging.warning(u"{:s}({:#x}).members.by({!s}) : The member at offset ({:#x}) and size ({:d}) that is exactly the same as the location offset ({:#x}) and size ({:d}).".format('.'.join([__name__, cls.__name__]), self.owner.ptr.id, location, member.offset, member.size, offset, size))
+            message = "is a different size ({:d}) than requested".format(size) if member.offset == offset else "is not at the exact offset ({:#x}) as requested".format(offset)
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by({!s}) : The member ({:s}) at the given location ({:#x}<->{:#x}) {:s}.".format('.'.join([__name__, cls.__name__]), self.owner.ptr.id, location, member.name, member.left, member.right, message))
         return member
 
     @utils.string.decorate_arguments('name')
