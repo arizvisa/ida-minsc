@@ -2793,12 +2793,12 @@ class type(object):
     @classmethod
     def has_name(cls):
         '''Return if the current function has a user-defined name.'''
-        return cls.has_name(ui.current.function())
+        return cls.has_name(ui.current.address())
     @utils.multicase()
     @classmethod
     def has_name(cls, func):
         '''Return if the function `func` has a user-defined name.'''
-        ea = address(func)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
         return database.type.has_customname(ea)
     nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
 
@@ -2947,13 +2947,12 @@ class type(object):
     @classmethod
     def has_prototype(cls):
         '''Return a boolean describing whether the current function has a prototype associated with it.'''
-        return cls.has_prototype(ui.current.function())
+        return cls.has_prototype(ui.current.address())
     @utils.multicase()
     @classmethod
     def has_prototype(cls, func):
         '''Return a boolean describing whether the function `func` has a prototype associated with it.'''
-        fn = by(func)
-        ea = interface.range.start(fn)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
         return database.type.has_typeinfo(ea)
     prototypeQ = has_typeinfo = typeinfoQ = utils.alias(has_prototype, 'type')
 
