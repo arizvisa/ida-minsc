@@ -2037,63 +2037,117 @@ class frame(object):
         def iterate(cls, func):
             '''Yield the `(member, type, name)` associated with the arguments for the function `func`.'''
             rt, ea = interface.addressOfRuntimeOrStatic(func)
+            fn, has_tinfo = None if rt else by(ea), type.has_typeinfo(ea)
 
-            # If we're not working with a runtime function (import) and the func_t.regargqty is larger
-            # than zero, then we're supposed to extract the arguments directly from the func_t.
-            if not rt and by(ea).regargqty:
-                fn, items = by(ea), []
+            # We need our frame to be correct, so we confirm it by checking the problem queue.
+            Fproblem = builtins.next((getattr(idaapi, candidate) for candidate in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, candidate)), utils.fconstant(False))
+            PR_BADSTACK = getattr(idaapi, 'PR_BADSTACK', 0xb)
 
-                # If regargqty is set, but regargs is None...then we need to call read_regargs on our
-                # fn to get IDA to actually read it...The funny thing is, on earlier versions of IDA
-                # it seems that read_regargs won't always allocate an iterator...so this means that
-                # we manually make it a list and then this way we can iterate through the fucker.
-                idaapi.read_regargs(fn) if fn.regargs is None else None
-                if isinstance(fn.regargs, idaapi.regarg_t):
-                    regargs = [fn.regargs]
-                else:
-                    regargs = [fn.regargs[index] for index in builtins.range(fn.regargqty)]
+            # Build a lookup table that we'll use to deserialize the correct type for each size.
+            bits, tilookup = database.config.bits(), {
+                8: idaapi.BT_INT8, 16: idaapi.BT_INT16, 32: idaapi.BT_INT32,
+                64: idaapi.BT_INT64, 128: idaapi.BT_INT128, 80: idaapi.BTF_TBYTE,
+            }
 
-                # Iterate through all of our arguments and grab the register, the type information, and
-                # argument name out of the register argument.
-                for index, regarg in enumerate(regargs):
-                    ti = idaapi.tinfo_t()
+            # Then build an array_type_data_t for absolutely everything else.
+            at, byte = idaapi.array_type_data_t(), idaapi.tinfo_t()
+            byte.create_simple_type(idaapi.BTF_BYTE)
+            at.base, at.nelems, at.elem_type = 0, 0, byte
 
-                    # Deserialize the type information that we received from the register argument.
-                    if ti.deserialize(None, regarg.type, None):
-                        items.append((regarg, ti))
+            # If we have no type information, then we can only process arguments if we're within
+            # a function. If we're not not part of a functon, then we log a warning and bail.
+            if not has_tinfo:
+                if not fn:
+                    logging.warning(u"{:s}.iterate({:#x}) : Unable to iterate through the arguments for the given function ({:#x}) due to missing type information.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
-                    # If we failed, then log a warning and try to append a void* as a placeholder.
-                    elif ti.deserialize(None, bytes(bytearray([idaapi.BT_PTR, idaapi.BT_VOID])), None):
-                        logging.warning(u"{:s}.registers({:#x}) : Using the type {!r} as a placeholder due to being unable to decode the type information ({!s}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, ti._print(), regarg.type, index))
-                        items.append((regarg, ti))
+                # If our function's regargqty is larger than zero, then we're supposed to extract the
+                # regargs directly out of the func_t.
+                elif fn.regargqty:
+                    items = []
 
-                    # If we couldn't even create a void*, then this is a critical failure and we
-                    # really need to get the argument size correct. So, we just look it up.
+                    # If regargqty is set, but regargs is None...then we need to call read_regargs on our
+                    # fn to get IDA to actually read it...The funny thing is, on earlier versions of IDA
+                    # it seems that read_regargs won't always allocate an iterator...so this means that
+                    # we manually make it a list and then this way we can iterate through the fucker.
+                    idaapi.read_regargs(fn) if fn.regargs is None else None
+                    if isinstance(fn.regargs, idaapi.regarg_t):
+                        regargs = [fn.regargs]
                     else:
-                        bits, lookup = database.config.bits(), {
-                            8: idaapi.BT_INT8,
-                            16: idaapi.BT_INT16,
-                            32: idaapi.BT_INT32,
-                            64: idaapi.BT_INT64,
-                            128: idaapi.BT_INT128,
-                        }
-                        if not operator.contains(lookup, bits) or not ti.deserialize(None, bytes(bytearray([lookup[bits]])), None):
-                            raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to create a type that fits within the number of bits for the database ({:d}).".format('.'.join([__name__, cls.__name__]), ea, bits))
-                        logging.critical(u"{:s}.registers({:#x}) : Falling back to the type {!r} as a placeholder due to being unable to cast the type information ({!r}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, ti._print(), regarg.type, index))
-                        items.append((regarg, ti))
-                    continue
+                        regargs = [fn.regargs[index] for index in builtins.range(fn.regargqty)]
 
-                # Now that we have the regarg and its tinfo_t, we just need to extract
-                # its properties to turn it into a register_t and grab its name.
-                for regarg, ti in items:
-                    try:
-                        reg = instruction.architecture.by_indexsize(regarg.reg, ti.get_size())
-                    except KeyError:
-                        reg = instruction.architecture.by_index(regarg.reg)
-                    yield reg, ti, utils.string.of(regarg.name)
+                    # Iterate through all of our arguments and grab the register, the type information, and
+                    # argument name out of the register argument.
+                    for index, regarg in enumerate(regargs):
+                        ti = idaapi.tinfo_t()
+
+                        # Deserialize the type information that we received from the register argument.
+                        if ti.deserialize(None, regarg.type, None):
+                            items.append((regarg, ti))
+
+                        # If we failed, then log a warning and try to append a void* as a placeholder.
+                        elif ti.deserialize(None, bytes(bytearray([idaapi.BT_PTR, idaapi.BT_VOID])), None):
+                            logging.warning(u"{:s}.iterate({:#x}) : Using the type {!r} as a placeholder due to being unable to decode the type information ({!s}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, ti._print(), regarg.type, index))
+                            items.append((regarg, ti))
+
+                        # If we couldn't even create a void*, then this is a critical failure and we
+                        # really need to get the argument size correct. So, we just look it up.
+                        else:
+                            if not operator.contains(tilookup, bits) or not ti.deserialize(None, bytes(bytearray([tilookup[bits]])), None):
+                                raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to create a type that fits within the number of bits for the database ({:d}).".format('.'.join([__name__, cls.__name__]), ea, bits))
+                            logging.critical(u"{:s}.iterate({:#x}) : Falling back to the type {!r} as a placeholder due to being unable to cast the type information ({!r}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, ti._print(), regarg.type, index))
+                            items.append((regarg, ti))
+                        continue
+
+                    # Now that we have the regarg and its tinfo_t, we just need to extract
+                    # its properties to turn it into a register_t and grab its name.
+                    for regarg, ti in items:
+                        try:
+                            reg = instruction.architecture.by_indexsize(regarg.reg, ti.get_size())
+                        except KeyError:
+                            reg = instruction.architecture.by_index(regarg.reg)
+                        yield reg, ti, utils.string.of(regarg.name)
+
+                    # We processed the registers, so we can fallthrough to the next one.
+
+                # If we have a frame, then we do our best to figure out the parameters from it.
+                if fn and idaapi.get_frame(ea):
+                    fr, asize, rsize = frame(ea), cls.size(ea), bits // 8 + fn.frregs
+
+                    # Before we start checking the frame, though, we need to make sure that IDA
+                    # didn't have any problems calculating the stackpoints. If so, then we need
+                    # to access the member differently using an "inexact" methodology.
+                    Flocation = operator.attrgetter('offset') if Fproblem(PR_BADSTACK, ea) else utils.fidentity
+
+                    # Now we can grab the fragment of the structure containing the parameters. If
+                    # there's no content, then skip it and move onto the next member.
+                    for offset, size, content in structure.fragment(fr.id, fr.size - asize, asize):
+                        if not content:
+                            continue
+
+                        # Now we can calculate our location and create a default type for it.
+                        aoffset = offset - fr.size + asize
+                        location, aname = interface.location_t(aoffset + rsize, size), interface.tuplename('arg', aoffset)
+
+                        ti, at.nelems = idaapi.tinfo_t(), size
+                        if not ti.create_array(at):
+                            raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to create an array of the required number of bytes ({:d}).".format('.'.join([__name__, cls.__name__]), ea, size))
+
+                        # Use the location to try and find the member that it points to.
+                        try:
+                            item = fr.members.by(Flocation(location))
+                        except (E.MemberNotFoundError, E.OutOfBoundsError):
+                            if not operator.contains(tilookup, 8 * size) or not ti.deserialize(None, bytes(bytearray([tilookup[8 * size]])), None):
+                                raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to create a type of the required number of bytes ({:d}).".format('.'.join([__name__, cls.__name__]), ea, size))
+                            item, ti, name = location, ti, aname
+                        else:
+                            item, ti, name = (item, item.typeinfo, item.name) if item.offset == location.offset else (location, ti, aname)
+                        yield item, ti, name
+
+                    # That was all the arguments we found in the frame...which means, we're done.
                 return
 
-            # Grab the type at the given address, and then the function details.
+            # If we got here, then we have type information that we can grab out
+            # of the given address. Once we have it, rip the details out o it.
             tinfo = type(ea)
             _, ftd = interface.tinfo.function_details(ea, tinfo)
 
@@ -2107,22 +2161,25 @@ class frame(object):
 
             # Last thing that we need to do is to extract each location and
             # figure out whether we return it as a register or an actual member.
-            fr = None if rt else frame() if idaapi.get_frame(ea) else None
+            fr = None if rt else frame(ea) if idaapi.get_frame(ea) else None
             for index, name, ti, location in items:
                 atype, ainfo = location
                 loc = interface.tinfo.location(ti, instruction.architecture, atype, ainfo)
 
-                # If it's a location, then we can just add the register size
-                # to find where the member is located at. This becomes our
-                # result if we have a frame...otherwise, we return the location.
+                # If it's a location, then we can just add the register size to
+                # find where the member is located at. This becomes our result
+                # if we have a frame. Otherwise we return the location.
                 if isinstance(loc, interface.location_t):
-                    translated = operator.add(loc, frame.regs.size())
+                    translated = operator.add(loc, bits // 8 + (fn.frregs if fn else 0))
+                    aname = name or interface.tuplename('arg', translated.offset - bits // 8)
                     try:
                         item = fr.members.by(translated) if fr else translated
                     except (E.MemberNotFoundError, E.OutOfBoundsError):
-                        item = translated
+                        item, name = translated, aname
+                    else:
+                        name = item.name if fr else aname
                     finally:
-                        yield item, ti, name
+                        yield item, ti, name or aname
 
                 # If it's a tuple, then we check if it contains any registers
                 # so that way we can process them if necessary. If its a register
