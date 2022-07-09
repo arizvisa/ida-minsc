@@ -1528,6 +1528,22 @@ def removing_func_tail(pfn, tail):
     bounds = interface.range.bounds(tail)
     referrers = [fn for fn in function.chunk.owners(bounds.left)]
 
+    # Before we do anything, we need to make sure we can iterate through the
+    # boundaries in the database that we're supposed to act upon.
+    try:
+        iterable = database.address.iterate(bounds)
+
+    # If the address is out of bounds, then IDA removed this tail completely from
+    # the database and we need to manually delete the tail's contents. Since we
+    # can't trust anything, we use the entire contents index filtered by bounds.
+    except E.OutOfBoundsError:
+        iterable = (ea for ea, _ in internal.comment.contents.iterate() if bounds.contains(ea))
+
+        results = remove_contents(pfn, iterable)
+        for tag, items in results.items():
+            logging.debug(u"{:s}.removing_func_tail({:#x}, {!s}) : Removed {:d} instances of tag ({:s}) that were associated with a removed tail.".format(__name__, interface.range.start(pfn), bounds, len(items), utils.string.repr(tag)))
+        return
+
     # If the number of referrers is larger than 1, then the tail was just removed
     # from the pfn function. We verify that the pfn is still in the list of
     # referrers and warn the user if it isn't.
@@ -1537,7 +1553,7 @@ def removing_func_tail(pfn, tail):
 
         # So there's no promotion from a contents tag to a global tag, but
         # there is a removal from the cache for pfn.
-        for ea in database.address.iterate(bounds):
+        for ea in iterable:
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 logging.debug(u"{:s}.removing_func_tail({:#x}, {!s}) : Decreasing reference for tag ({:s}) at {:#x} in cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
@@ -1550,7 +1566,7 @@ def removing_func_tail(pfn, tail):
 
     # If there's just one referrer, then the referrer should be pfn and we should
     # be promoting the relevant addresses in the cache from contents to globals.
-    for ea in database.address.iterate(bounds):
+    for ea in iterable:
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
@@ -1649,6 +1665,40 @@ def add_func(pfn):
         continue
     return
 
+def remove_contents(fn, iterable):
+    '''This is just a utility that manually removes the contents from a function using an iterator of addresses.'''
+    func, results = interface.range.start(fn), {}
+
+    # Iterate through each address we were given and decode the contents tags directly
+    # using IDAPython, since none of these addresses are accessible via our api.
+    for index, ea in enumerate(iterable):
+        items = idaapi.get_cmt(ea, True), idaapi.get_cmt(ea, False)
+        repeatable, nonrepeatable = (internal.comment.decode(item) for item in items)
+
+        logging.debug(u"{:s}.remove_contents({:#x}) : Removing both repeatable references ({:d}) and non-repeatable references ({:d}) from {:s} ({:#x}).".format(__name__, func, len(repeatable), len(nonrepeatable), 'contents', ea))
+
+        # After decoding it, we can now decrease their refcount and remove them.
+        [ internal.comment.contents.dec(ea, k, target=func) for k in repeatable ]
+        [ internal.comment.contents.dec(ea, k, target=func) for k in nonrepeatable ]
+
+        # Update our results with the keys at whatever address we just removed.
+        [ results.setdefault(k, []).append(ea) for k in itertools.chain(repeatable, nonrepeatable) ]
+
+        # Now we need to do a couple of the implicit tags which means we need to
+        # check the name, type information, and color.
+        if idaapi.get_item_color(ea) == idaapi.COLOR_DEFAULT:
+            internal.comment.contents.dec(ea, '__color__', target=func)
+        if database.extra.__get_prefix__(ea) is not None:
+            internal.comment.contents.dec(ea, '__extra_prefix__', target=func)
+        if database.extra.__get_suffix__(ea) is not None:
+            internal.comment.contents.dec(ea, '__extra_suffix__', target=func)
+
+        get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
+        if get_flags(ea) & idaapi.FF_NAME:
+            internal.comment.contents.dec(ea, '__name__', target=func)
+        continue
+    return results
+
 def del_func(pfn):
     """This is called when a function is removed/deleted.
 
@@ -1659,8 +1709,54 @@ def del_func(pfn):
     reference count cache for the function.
     """
 
+    try:
+        rt, fn = interface.addressOfRuntimeOrStatic(pfn)
+
+    # If IDA told us a function was there, but it actually isn't, then this
+    # function was completely removed out from underneath us.
+    except E.FunctionNotFoundError:
+        exc_info = sys.exc_info()
+
+        # We sanity check what we're being told by checking if it's outside
+        # the bounds of the db. If it isn't, then reraise the exception.
+        bounds = interface.range.bounds(pfn)
+        if any(map(database.within, bounds)):
+            six.reraise(*exc_info)
+
+        # Okay, so our function bounds are not within the database whatsoever but
+        # we know which function it's in and we know it's boundaries. So at the
+        # very least we can manually remove its contents from our storage.
+        fn, _ = bounds
+        iterable = (ea for ea in internal.comment.contents.address(fn, target=fn) if bounds.contains(ea))
+
+        results = remove_contents(pfn, iterable)
+        for tag, items in results.items():
+            logging.debug(u"{:s}.del_func({:#x}) : Removed {:d} instances of tag ({:s}) that were associated with a removed function.".format(__name__, interface.range.start(pfn), len(items), utils.string.repr(tag)))
+
+        # Now we need to remove the global tags associated with this function.
+        items = idaapi.get_func_cmt(pfn, True), idaapi.get_func_cmt(pfn, False)
+        repeatable, nonrepeatable = (internal.comment.decode(item) for item in items)
+
+        logging.debug(u"{:s}.del_func({:#x}) : Removing both repeatable references ({:d}) and non-repeatable references ({:d}) from {:s} ({:#x}).".format(__name__, interface.range.start(pfn), len(repeatable), len(nonrepeatable), 'globals', fn))
+
+        # After decoding them, we can try to decrease our reference count.
+        [ internal.comment.globals.dec(fn, k, target=fn) for k in repeatable ]
+        [ internal.comment.globals.dec(fn, k, target=fn) for k in nonrepeatable ]
+
+        # We also need to handle any implicit tags as well to be properly done.
+        if pfn.color == idaapi.COLOR_DEFAULT:
+            internal.comment.globals.dec(fn, '__color__')
+
+        get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
+        if get_flags(fn) & idaapi.FF_NAME:
+            internal.comment.globals.dec(fn, '__name__')
+
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        if get_tinfo(idaapi.tinfo_t(), fn):
+            internal.comment.globals.dec(fn, '__typeinfo__')
+        return
+
     # convert all contents into globals
-    rt, fn = interface.addressOfRuntimeOrStatic(pfn)
     for ea in internal.comment.contents.address(fn, target=fn):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=fn)
