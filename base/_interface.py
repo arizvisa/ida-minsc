@@ -3020,6 +3020,39 @@ class register_t(symbol_t):
         '''Return true if the `other` register may overlap with the current one and thus might be affected when one is modified.'''
         return self.supersetQ(other) or self.subsetQ(other)
 
+    def __int__(self):
+        '''Return the integer value of the current register.'''
+        rv, rname = idaapi.regval_t(), self.name
+        if not idaapi.get_reg_val(rname, rv):
+            raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the integer value from the associated register name ({:s}).".format(self, rname))
+        mask = pow(2, self.bits) - 1
+        if rv.rvtype == idaapi.RVT_INT:
+            return rv.ival & mask
+        elif rv.rvtype == idaapi.RVT_FLOAT:
+            logging.warning(u"{!s} : Converting a non-integer register type ({:d}) to an integer using {:d} bytes.".format(self, rv.rvtype, self.size))
+            bytes = rv.fval.bytes
+        else:
+            logging.warning(u"{!s} : Converting a non-integer register type ({:d}) to an integer using {:d} bytes.".format(self, rv.rvtype, self.size))
+            bytes = rv.bytes()
+        return functools.reduce(lambda agg, item: agg * 0x100 + item, bytearray(bytes), 0)
+
+    def __float__(self):
+        '''Return the floating-point value of the current register.'''
+        rv, rname = idaapi.regval_t(), self.name
+        if not idaapi.get_reg_val(rname, rv):
+            raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the floating-point value from the associated register name ({:s}).".format(self, rname))
+        if rv.rvtype == idaapi.RVT_FLOAT:
+            return rv.fval._get_float()
+        raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to concretize an unknown register value type ({:d}) to a floating-point number.".format(self, rv.rvtype))
+
+    @property
+    def bytes(self):
+        '''Return the bytes that make up the value of the current register.'''
+        rv, rname = idaapi.regval_t(), self.name
+        if not idaapi.get_reg_val(rname, rv):
+            raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the bytes for the associated register name ({:s}).".format(self, rname))
+        return rv.bytes()
+
 class regmatch(object):
     """
     This namespace is used to assist with doing register matching
@@ -3791,8 +3824,13 @@ class location_t(integerish):
         offset, size = self
         if isinstance(offset, six.integer_types):
             return offset
+
+        elif isinstance(offset, symbol_t):
+            symbol, = offset.symbols
+            return int(offset)
+
         cls = self.__class__
-        raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to convert the offset type of the location ({!s}) to an integer.".format(self, offset.__class__))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to convert the location offset ({!s}) to an integer.".format(self, offset))
 
     def __same__(self, other):
         thisoffset, thissize = self
@@ -3824,3 +3862,27 @@ class location_t(integerish):
 
         # otherwise, we need to form ourselves into an array of bytes.
         return [(int, 1), size]
+
+    @property
+    def bounds(self):
+        '''Return the boundaries of the current location as a ``bounds_t``.'''
+        offset, size = self
+        if isinstance(offset, six.integer_types):
+            return bounds_t(offset, offset + size)
+
+        # If the offset is a symbol, then we can try for an integer if possible.
+        elif isinstance(offset, symbol_t):
+            symbol, = offset.symbols
+            offset = int(offset)
+            return bounds_t(offset, offset + size)
+
+        raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to convert the location offset ({!s}) to an integer.".format(self, offset))
+
+    def range(self):
+        '''Return the current location casted to a native ``idaapi.range_t`` type.'''
+        return self.bounds.range()
+
+    def contains(self, offset):
+        '''Return if the given `offset` is contained by the current location.'''
+        return self.bounds.contains(offset)
+    __contains__ = contains
