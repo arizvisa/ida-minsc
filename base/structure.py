@@ -1024,7 +1024,9 @@ def size(id):
 def is_union(id):
     '''Return whether the structure identified by `id` is a union or not.'''
     sptr = idaapi.get_struc(id)
-    return is_union(sptr)
+    if sptr:
+        return is_union(sptr)
+    raise E.StructureNotFoundError(u"{:s}.is_union({:#x}) : Unable to find the requested structure ({:#x}).".format(__name__, id, id))
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def is_union(structure):
     '''Return whether the provided `structure` is defined as a union.'''
