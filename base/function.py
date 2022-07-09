@@ -153,18 +153,17 @@ def name():
 def name(func):
     '''Return the name of the function `func`.'''
     get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
+    MNG_LONG_FORM = getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
     # check to see if it's a runtime-linked function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     if rt:
         name = get_name(ea)
-
-        # decode the string from IDA's UTF-8
-        # XXX: how does demangling work with unicode? this would be implementation specific, no?
-        res = utils.string.of(name)
-
-        # demangle it if necessary
-        return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
+        mangled_name_type_t = Fmangled_type(name)
+        return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM))
+        #return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
         #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
 
     # otherwise it's a regular function, so try and get its name in a couple of ways
@@ -172,12 +171,11 @@ def name(func):
     if not name: name = get_name(ea)
     if not name: name = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
 
-    # decode the string from IDA's UTF-8
-    # XXX: how does demangling work with unicode? this would be implementation specific, no?
-    res = utils.string.of(name)
-
-    # demangle it if we need to
-    return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
+    # decode the string from IDA's UTF-8 and demangle it if we need to
+    # XXX: how does demangling work with utf-8? this would be implementation specific, no?
+    mangled_name_type_t = Fmangled_type(name)
+    return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM))
+    #return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
 @utils.multicase(none=None.__class__)
@@ -2346,6 +2344,10 @@ def tag(func, key):
 @utils.multicase()
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
+    MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
+
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
@@ -2390,7 +2392,8 @@ def tag(func):
             ti, fname = type(fn), database.name(interface.range.start(fn))
 
             # Demangle the name if necessary, and render it to a string.
-            realname = internal.declaration.unmangle_name(fname)
+            mangled_name_type_t = Fmangled_type(utils.string.to(fname)) if fname else MANGLED_UNKNOWN
+            realname = fname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(fname), MNG_NODEFINIT|MNG_NOPTRTYP))
             fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
 
             # And then return it to the user
@@ -2399,7 +2402,8 @@ def tag(func):
     # If an exception was raised, then the name from the type information might
     # be mangled and so we need to rip the type from the demangled name.
     except E.InvalidTypeOrValueError:
-        demangled = internal.declaration.demangle(fname)
+        mangled_name_type_t = Fmangled_type(utils.string.to(fname)) if fname else MANGLED_UNKNOWN
+        demangled = fname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(fname), MNG_LONG_FORM))
 
         # If the demangled name is different from the actual name, then we need
         # to extract its result type and prepend it to the demangled name.
