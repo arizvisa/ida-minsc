@@ -2861,6 +2861,20 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def is_decompiled(cls):
+        '''Return if the current function has been decompiled.'''
+        return cls.is_decompiled(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def is_decompiled(cls, func):
+        '''Return if the function `func` has been decompiled.'''
+        AFL_HR_DETERMINED = getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        return interface.node.aflags(ea, AFL_HR_DETERMINED)
+    decompiledQ = utils.alias(is_decompiled, 'type')
+
+    @utils.multicase()
+    @classmethod
     def has_frame(cls):
         '''Return if the current function has a frame allocated to it.'''
         return cls.has_frame(ui.current.function())
