@@ -4758,6 +4758,23 @@ class types(object):
     can be used to create, query, or fetch the types that have been
     defined.
 
+    When listing the types that are matched, the following legend can be
+    used to identify certain characteristics about them:
+
+        `L` - The type originated from a type library
+        `I` - The type originated from an inherited type library
+        `T` - The type is a type definition and references another type
+        `P` - The contents of the type is a pointer
+        `F` - The contents of the type is a floating-point value (float, double, long double)
+        `E` - The contents of the type is an enumeration
+        `I` - The contents of the type is an integral
+        `A` - The type represents an array
+        `F` - The type represents a function
+        `S` - The type represents a structure
+        `V` - The type represents a virtual function table
+        `C` - The type represents a structure containing a virtual function table
+        `U` - The type represents a union
+
     The available types that one can filter the local types with are as follows:
 
         `ordinal` - Match according to the ordinal of the local type.
@@ -4765,11 +4782,20 @@ class types(object):
         `like` - Filter the names of the local types according to a glob.
         `definition` - Filter the local types by applying a glob to their definition.
         `regex` - Filter the local types by applying a regular-expression to their definition.
+        `typeref` or `typedef` - Filter the local types for any that are an alias declared with typedef.
         `size` - Filter the local types according to their size.
         `greater` or `ge` - Filter the local types for the ones that are larger or equal to a certain size.
         `gt` - Filter the local types for the ones that are larger than a certain size.
         `less` or `le` - Filter the local types for the ones that are less or equal to a certain size.
         `lt` - Filter the local types for the ones that are less than a certain size.
+        `integer` - Filter the local types for any that are integers.
+        `pointer` - Filter the local types for any that are pointers.
+        `function` - Filter the local types for any that are functions.
+        `float` - Filter the local types for any that are floating-point.
+        `array` - Filter the local types for any that describe an array.
+        `structure` - Filter the local types for any that describe a structure.
+        `union` - Filter the local types for any that describe a union.
+        `enumeration` - Filter the local types for any that describe an enumeration.
         `predicate` - Filter the types by passing their ordinal and ``idaapi.tinfo_t`` to a callable.
 
     Some examples of using these keywords are as follows::
@@ -4808,6 +4834,18 @@ class types(object):
     __matcher__.boolean('ordinal', operator.eq, operator.itemgetter(0)), __matcher__.boolean('index', operator.eq, operator.itemgetter(0))
     __matcher__.combinator('definition', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
+    __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref'))
+    __matcher__.mapping('typedef', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref'))
+
+    __matcher__.mapping('integer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_integral'))
+    __matcher__.mapping('pointer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_ptr'))
+    __matcher__.mapping('function', operator.truth, operator.itemgetter(2), operator.methodcaller('is_func'))
+    __matcher__.mapping('float', operator.truth, operator.itemgetter(2), operator.methodcaller('is_floating'))
+    __matcher__.mapping('array', operator.truth, operator.itemgetter(2), operator.methodcaller('is_array'))
+    __matcher__.mapping('structure', operator.truth, operator.itemgetter(2), operator.methodcaller('is_struct'))
+    __matcher__.mapping('union', operator.truth, operator.itemgetter(2), operator.methodcaller('is_union'))
+    __matcher__.mapping('enumeration', operator.truth, operator.itemgetter(2), operator.methodcaller('is_enum'))
+
     __matcher__.boolean('size', operator.eq, operator.itemgetter(2), operator.methodcaller('get_size'))
     __matcher__.boolean('greater', operator.le, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('ge', operator.le, operator.itemgetter(2), operator.methodcaller('get_size'))
     __matcher__.boolean('gt', operator.lt, operator.itemgetter(2), operator.methodcaller('get_size')),
@@ -4943,12 +4981,13 @@ class types(object):
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
     def list(cls, library, **type):
         '''List all of the types in the specified type `library` that match the keyword specified by `type`.'''
-        listable = []
+        ti = idaapi.tinfo_t()
 
         # Set some reasonable defaults for the list of types
         maxordinal = maxname = maxsize = 0
 
         # Perform the first pass through our listable grabbing all the lengths.
+        listable = []
         for ordinal, name, ti in cls.iterate(library, **type):
             maxordinal = max(ordinal, maxordinal)
             maxname = max(len(name or ''), maxname)
@@ -4959,9 +4998,45 @@ class types(object):
         cordinal = 2 + utils.string.digits(maxordinal, 10)
         csize = 2 + utils.string.digits(maxsize, 16)
 
+        # Lookup table for figuring out some useful flags
+        items = [
+            ('T', 'is_typeref'),
+        ]
+        rlookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(ti, name)]
+
+        items = [
+            ('P', 'is_ptr'),
+            ('F', 'is_floating'),
+            ('E', 'is_enum'),
+            ('I', 'is_integral'),
+        ]
+        ilookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(ti, name)]
+
+        items = [
+            ('A', 'is_array'),
+            ('F', 'is_func'),
+            ('V', 'is_vftable'),
+            ('C', 'has_vftable'),
+            ('S', 'is_struct'),
+            ('U', 'is_union'),
+        ]
+        glookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(ti, name)]
+
         # Now we can list each type information located within the type library.
         for ordinal, name, ti in listable:
-            six.print_(u"{:<{:d}s} {:>+#{:d}x} {:<{:d}s}".format("[{:d}]".format(ordinal), cordinal, ti.get_size() if ti.present() else 0, csize, name, maxname))
+
+            # Apparently we can't use builtins.next because python is garbage.
+            flibrary = '?' if not ti.present() else '-' if not ti.get_til() else 'I' if ti.is_from_subtil() else 'L'
+            items = [q for q, F in rlookup if F(ti)]
+            frtype = items[0] if items else '-'
+            items = [q for q, F in ilookup if F(ti)]
+            fitype = items[0] if items else '-'
+            items = [q for q, F in glookup if F(ti)]
+            fgtype = items[0] if items else '-'
+            flags = itertools.chain(flibrary, frtype, fitype, fgtype)
+
+            # That was it, now we can just display it.
+            six.print_(u"{:<{:d}s} {:>+#{:d}x} : {:s} : {:<{:d}s}".format("[{:d}]".format(ordinal), cordinal, ti.get_size() if ti.present() else 0, 1 + csize, ''.join(flags), name, maxname))
         return
 
     @utils.multicase(ordinal=six.integer_types)
