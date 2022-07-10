@@ -2827,6 +2827,40 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def has_problem(cls):
+        '''Return if the current function has a problem associated with it.'''
+        return cls.has_problem(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def has_problem(cls, func):
+        '''Return if the function `func` has a problem associated with it.'''
+        PR_END = getattr(idaapi, 'PR_END', 17)
+        iterable = (getattr(idaapi, attribute) for attribute in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, attribute))
+        Fproblem = builtins.next(iterable, utils.fconstant(False))
+
+        # Really only PR_BADSTACK is relevant, but we generalize all the problems
+        # and by default only ignore ones related to decisions or FLAIR.
+        ignored = {getattr(idaapi, name, default) for name, default in [('PR_FINAL', 13), ('PR_COLLISION', 14), ('PR_DECIMP', 15)]}
+        problems = {problem for problem in builtins.range(1, PR_END)} - ignored
+
+        # Figure out the function's address, and check if any of the problems apply.
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        return any(Fproblem(problem, ea) for problem in problems)
+    @utils.multicase(problem=six.integer_types)
+    @classmethod
+    def has_problem(cls, func, problem):
+        '''Return if the function `func` has the specified `problem` associated with it.'''
+        PR_END = getattr(idaapi, 'PR_END', 17)
+        iterable = (getattr(idaapi, attribute) for attribute in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, attribute))
+        Fproblem = builtins.next(iterable, utils.fconstant(False))
+
+        # Now we can just ask if the specified problem exists for the function.
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        return Fproblem(problem, ea)
+    problemQ = utils.alias(has_problem, 'type')
+
+    @utils.multicase()
+    @classmethod
     def has_frame(cls):
         '''Return if the current function has a frame allocated to it.'''
         return cls.has_frame(ui.current.function())
