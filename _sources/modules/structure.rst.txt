@@ -146,7 +146,7 @@ functions and aliases. For more information on this, please see
    
    :param structure: the :py:obj:`structure_t` to remove the comment from
    :type structure: structure_t
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*repeatable: whether the removed comment should be the repeatable one
    
@@ -168,7 +168,7 @@ functions and aliases. For more information on this, please see
    
    :param id: the identifier of the structure
    :type id: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*repeatable: whether the removed comment should be the repeatable one
    
@@ -623,7 +623,7 @@ member_t
       
       :param key: a string representing the tag name
       :type key: str
-      :param none: the value :py:obj:`None`
+      :param none: the python value :py:obj:`None`
       :type none: None
       
 *********
@@ -724,8 +724,8 @@ members_t
       
       Return the member at the specified ``location``.
       
-      :param location: a :py:obj:`location_t` to use when locating the member
-      :type location: interface.location_t
+      :param location: a tuple containing the offset and exact size to use when locating the member
+      :type location: tuple
       
    .. py:method:: by_fullname(self, fullname)
       
@@ -989,7 +989,7 @@ structure_t
       
       :param key: a string representing the tag name
       :type key: str
-      :param none: the value :py:obj:`None`
+      :param none: the python value :py:obj:`None`
       :type none: None
       
    .. py:method:: up(self)

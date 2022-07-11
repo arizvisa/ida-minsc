@@ -95,7 +95,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -125,7 +125,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -211,7 +211,7 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be removed</li>
 </ul>
 </td>
@@ -251,7 +251,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be removed</li>
 </ul>
 </td>
@@ -351,6 +351,101 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 </dd></dl>
 
 <dl class="function">
+<dt id="database.mangled">
+<code class="descclassname">database.</code><code class="descname">mangled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.mangled" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the mangled name at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#database.mangled" title="database.mangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.mangle</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">mangled</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the mangled name at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.mangled" title="database.mangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.mangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing a name</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">mangled</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<dd><p>Rename the current address to the mangled version of <code class="docutils literal notranslate"><span class="pre">string</span></code> and return its previous mangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.mangled" title="database.mangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.mangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
+<li><strong>*suffix</strong> – any other strings to append to the name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">mangled</code><span class="sig-paren">(</span><em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the mangled name at the current address and return its previous mangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.mangled" title="database.mangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.mangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">mangled</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<dd><p>Rename the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> to the mangled version of <code class="docutils literal notranslate"><span class="pre">string</span></code> and return its previous mangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.mangled" title="database.mangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.mangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
+<li><strong>*suffix</strong> – any other strings to append to the name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">mangled</code><span class="sig-paren">(</span><em>ea</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the name at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> and return its previous mangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.mangled" title="database.mangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.mangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing a name</li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.mark">
 <code class="descclassname">database.</code><code class="descname">mark</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.mark" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the mark at the current address.</p>
@@ -364,7 +459,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -408,7 +503,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an existing mark within the database</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -495,7 +590,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when setting the name</li>
 </ul>
 </td>
@@ -537,7 +632,7 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when removing the name</li>
 </ul>
 </td>
@@ -767,7 +862,7 @@ If <code class="docutils literal notranslate"><span class="pre">Or</span></code>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>key</strong> (<em>str</em>) – a string representing the tag name to remove</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -786,7 +881,7 @@ If <code class="docutils literal notranslate"><span class="pre">Or</span></code>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>key</strong> (<em>str</em>) – a string representing the tag name to remove</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -804,6 +899,101 @@ If <code class="docutils literal notranslate"><span class="pre">Or</span></code>
 <dt id="database.top">
 <code class="descclassname">database.</code><code class="descname">top</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.top" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the very lowest address within the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.unmangled">
+<code class="descclassname">database.</code><code class="descname">unmangled</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.unmangled" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the name at the current address in its unmangled form.</p>
+<p>Aliases: <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.unmangle</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangled</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangle</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">unmangled</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the name at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> in its unmangled form.</p>
+<p>Aliases: <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.unmangle</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangled</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing a name</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">unmangled</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<dd><p>Rename the current address using the mangled version of <code class="docutils literal notranslate"><span class="pre">string</span></code> and return its previous unmangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.unmangle</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangled</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
+<li><strong>*suffix</strong> – any other strings to append to the name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">unmangled</code><span class="sig-paren">(</span><em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the name at the current address and return its previous unmangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.unmangle</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangled</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">unmangled</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<dd><p>Rename the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> using the mangled version of <code class="docutils literal notranslate"><span class="pre">string</span></code> and return its previous unmangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.unmangle</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangled</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
+<li><strong>*suffix</strong> – any other strings to append to the name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">unmangled</code><span class="sig-paren">(</span><em>ea</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the name at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> and return its previous unmangled value.</p>
+<p>Aliases: <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.unmangle</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangled</span></code></a>, <a class="reference internal" href="#database.unmangled" title="database.unmangled"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.demangle</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing a name</li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="function">
@@ -918,7 +1108,76 @@ determining the next valid address. These are:</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database to its item address for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address of an item in the database to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">address</code><span class="sig-paren">(</span><em>start</em>, <em>end</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a list containing each of the addresses from <code class="docutils literal notranslate"><span class="pre">start</span></code> to <code class="docutils literal notranslate"><span class="pre">end</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the address to start at</li>
+<li><strong>end</strong> (<em>int</em><em> or </em><em>long</em>) – the address to stop at</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">address</code><span class="sig-paren">(</span><em>start</em>, <em>end</em>, <em>step</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a list containing each of the addresses from <code class="docutils literal notranslate"><span class="pre">start</span></code> to <code class="docutils literal notranslate"><span class="pre">end</span></code> using the callable <code class="docutils literal notranslate"><span class="pre">step</span></code> to determine the next address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the address to start at</li>
+<li><strong>end</strong> (<em>int</em><em> or </em><em>long</em>) – the address to stop at</li>
+<li><strong>step</strong> (<em>callable</em>) – a callable that seeks to the next address such as <a class="reference internal" href="#database.address.next" title="database.address.next"><code class="xref py py-obj docutils literal notranslate"><span class="pre">address.next</span></code></a></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">address</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a list containing each of the addresses within <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the address boundaries to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">address</code><span class="sig-paren">(</span><em>bounds</em>, <em>step</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a list containing each of the addresses within <code class="docutils literal notranslate"><span class="pre">bounds</span></code> using the callable <code class="docutils literal notranslate"><span class="pre">step</span></code> to determine the next address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bounds</strong> (<em>tuple</em>) – the address boundaries to return</li>
+<li><strong>step</strong> (<em>callable</em>) – a callable that seeks to the next address such as <a class="reference internal" href="#database.address.next" title="database.address.next"><code class="xref py py-obj docutils literal notranslate"><span class="pre">address.next</span></code></a></li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -997,6 +1256,21 @@ determining the next valid address. These are:</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="database.address.by_fileoffset">
+<code class="descclassname">address.</code><code class="descname">by_fileoffset</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#database.address.by_fileoffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the address in the database for the specified file <code class="docutils literal notranslate"><span class="pre">offset</span></code> of the input file.</p>
+<p>Aliases: <a class="reference internal" href="#database.address.by_fileoffset" title="database.address.by_fileoffset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.byfileoffset</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the file offset to convert into a database address</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.address.by_offset">
 <code class="descclassname">address.</code><code class="descname">by_offset</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#database.address.by_offset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> translated to an address in the database.</p>
@@ -1006,6 +1280,26 @@ determining the next valid address. These are:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>offset</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.address.fileoffset">
+<code class="descclassname">address.</code><code class="descname">fileoffset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address.fileoffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the file offset in the input file for the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">address.</code><code class="descname">fileoffset</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the file offset in the input file for the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database to translate to the file offset</td>
 </tr>
 </tbody>
 </table>
@@ -2387,7 +2681,7 @@ determining the next valid address. These are:</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database to translate to an offset from the beginning of the database.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database to translate to an offset from the beginning of the database</td>
 </tr>
 </tbody>
 </table>
@@ -3994,6 +4288,21 @@ sizes for the database.</p>
 exports that are defined within the database By default the address
 of each entrypoint will be yielded.</p>
 <p>This namespace is also aliased as <code class="xref py py-obj docutils literal notranslate"><span class="pre">database.exports</span></code>.</p>
+<p>When listing entry points that are matched, the following legend can be
+used to identify certain characteristics about them:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">F</span></code> - The entry point is referencing a function</li>
+<li><code class="docutils literal notranslate"><span class="pre">C</span></code> - The entry point is referencing code</li>
+<li><code class="docutils literal notranslate"><span class="pre">A</span></code> - The entry point is referencing data (address)</li>
+<li><code class="docutils literal notranslate"><span class="pre">D</span></code> - The entry point is referencing a decompiled function</li>
+<li><code class="docutils literal notranslate"><span class="pre">T</span></code> - The address of the entry point has a type applied to it</li>
+<li><code class="docutils literal notranslate"><span class="pre">t</span></code> - The address of the entry point has a guessable type</li>
+<li><code class="docutils literal notranslate"><span class="pre">C</span></code> - The address of the entry point is marked as code</li>
+<li><code class="docutils literal notranslate"><span class="pre">D</span></code> - The address of the entry point is marked as data</li>
+<li><code class="docutils literal notranslate"><span class="pre">^</span></code> - The address of the entry point is marked as unknown</li>
+<li><code class="docutils literal notranslate"><span class="pre">+</span></code> - The entry point has an implicit tag applied to it (named or typed)</li>
+<li><code class="docutils literal notranslate"><span class="pre">\*</span></code> - The entry point has an explicit tag applied to it</li>
+</ul>
 <p>The different types that one can match entrypoints with are the following:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">address</span></code> or <code class="docutils literal notranslate"><span class="pre">ea</span></code> - Match according to the entrypoint’s address</li>
@@ -4005,6 +4314,9 @@ of each entrypoint will be yielded.</p>
 <li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the entrypoints for any after the specified address (exclusive)</li>
 <li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Filter the entrypoints for any before the specified address (inclusive)</li>
 <li><code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the entrypoints for any before the specified address (exclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">function</span></code> - Filter the entrypoints for any that are referencing a function</li>
+<li><code class="docutils literal notranslate"><span class="pre">typed</span></code> - Filter the entrypoints for any that have type information applied to them</li>
+<li><code class="docutils literal notranslate"><span class="pre">tagged</span></code> - Filter the entrypoints for any that use the specified tag(s)</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the entrypoints by passing its index (ordinal) to a callable</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>
@@ -4417,7 +4729,7 @@ multilined or paragraph comment.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -4465,7 +4777,7 @@ multilined or paragraph comment.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address containing the prefix comment to remove</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -4535,7 +4847,7 @@ multilined or paragraph comment.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -4583,7 +4895,7 @@ multilined or paragraph comment.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address containing the suffix comment to remove</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -4597,12 +4909,34 @@ multilined or paragraph comment.</p>
 <p>This namespace is used for listing all the functions inside the
 database. By default a list is returned containing the address of
 each function.</p>
+<p>When listing functions that are matched, the following legend can be
+used to identify certain characteristics about them:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">+</span></code> - The function has an implicit tag (named or typed)</li>
+<li><code class="docutils literal notranslate"><span class="pre">\*</span></code> - The function has been explicitly tagged</li>
+<li><code class="docutils literal notranslate"><span class="pre">J</span></code> - The function is a wrapper or a thunk</li>
+<li><code class="docutils literal notranslate"><span class="pre">L</span></code> - The function was pattern matched as a library</li>
+<li><code class="docutils literal notranslate"><span class="pre">S</span></code> - The function is declared statically</li>
+<li><code class="docutils literal notranslate"><span class="pre">^</span></code> - The function does not contain a frame</li>
+<li><code class="docutils literal notranslate"><span class="pre">?</span></code> - The function has its stack points calculated incorrectly and may be incorrect</li>
+<li><code class="docutils literal notranslate"><span class="pre">T</span></code> - The function has a prototype that was applied to it manually or via decompilation</li>
+<li><code class="docutils literal notranslate"><span class="pre">t</span></code> - The function has a prototype that was guessed</li>
+<li><code class="docutils literal notranslate"><span class="pre">D</span></code> - The function has been previously decompiled</li>
+</ul>
 <p>The different types that one can match functions with are the following:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">address</span></code> or <code class="docutils literal notranslate"><span class="pre">ea</span></code> - Match according to the function’s address</li>
 <li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match according to the exact name</li>
 <li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the function names according to a glob</li>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the function names according to a regular-expression</li>
+<li><code class="docutils literal notranslate"><span class="pre">typed</span></code> - Filter the functions for any that have type information applied to them</li>
+<li><code class="docutils literal notranslate"><span class="pre">decompiled</span></code> - Filter the functions for any that have been decompiled</li>
+<li><code class="docutils literal notranslate"><span class="pre">frame</span></code> - Filter the functions for any that contain a frame</li>
+<li><code class="docutils literal notranslate"><span class="pre">problems</span></code> - Filter the functions for any that contain problems with their stack</li>
+<li><code class="docutils literal notranslate"><span class="pre">library</span></code> - Filter the functions that any which were detected as a library function</li>
+<li><code class="docutils literal notranslate"><span class="pre">wrapper</span></code> - Filter the functions that are flagged as wrappers (thunks)</li>
+<li><code class="docutils literal notranslate"><span class="pre">exceptions</span></code> Filter the functions for any that either handles an exception or sets up a handler</li>
+<li><code class="docutils literal notranslate"><span class="pre">tagged</span></code> - Filter the functions for any that use the specified tag(s)</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the functions by passing their <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.func_t</span></code> to a callable</li>
 </ul>
 <p>Some examples of how to use these keywords are as follows:</p>
@@ -5666,6 +6000,15 @@ symbols with the binary.</p>
 import is imported from. The <code class="docutils literal notranslate"><span class="pre">name</span></code> is the symbol name to link
 with, and <code class="docutils literal notranslate"><span class="pre">hint</span></code> is the import ordinal hint which is used to speed
 up the linking process.</p>
+<p>When listing the imports that are matched, the following legend can be
+used to identify certain characteristics about them:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">T</span></code> - The import has a type that was explicitly applied</li>
+<li><code class="docutils literal notranslate"><span class="pre">t</span></code> - The import has a type that was guessted</li>
+<li><code class="docutils literal notranslate"><span class="pre">H</span></code> - The import contains an ordinal number as a hint</li>
+<li><code class="docutils literal notranslate"><span class="pre">+</span></code> - The import has an implicit tag applied to it (named or typed)</li>
+<li><code class="docutils literal notranslate"><span class="pre">\*</span></code> - The import has an explicit tag applied to it</li>
+</ul>
 <p>The different types that one can match imports with are the following:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">address</span></code> or <code class="docutils literal notranslate"><span class="pre">ea</span></code> - Match according to the import’s address</li>
@@ -5676,6 +6019,8 @@ up the linking process.</p>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the symbol names of all the imports according to a regular-expression</li>
 <li><code class="docutils literal notranslate"><span class="pre">ordinal</span></code> - Match according to the import’s hint (ordinal)</li>
 <li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match according index of the import</li>
+<li><code class="docutils literal notranslate"><span class="pre">typed</span></code> - Filter all of the imports based on whether they have a type applied to them</li>
+<li><code class="docutils literal notranslate"><span class="pre">tagged</span></code> - Filter the imports for any that use the specified tag(s)</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> Filter the imports by passing the above (default) tuple to a callable</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>
@@ -6009,6 +6354,16 @@ navigation to a mark.</p>
 <span id="ns-database-names"></span><h3>3.1.1.2.9. database.names<a class="headerlink" href="#database-names" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is used for listing all of the names (symbols) within the
 database. By default the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">name)</span></code> is yielded in its mangled form.</p>
+<p>When listing names that are matched, the following legend can be used to
+identify certain characteristics about the address of the returned name:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">I</span></code> - The symbol is residing in an import segment</li>
+<li><code class="docutils literal notranslate"><span class="pre">C</span></code> - The address of the symbol is marked as code</li>
+<li><code class="docutils literal notranslate"><span class="pre">D</span></code> - The address of the symbol is marked as data</li>
+<li><code class="docutils literal notranslate"><span class="pre">^</span></code> - The address of the symbol is is initialized</li>
+<li><code class="docutils literal notranslate"><span class="pre">+</span></code> - The symbol has an implicit tag applied to it (named or typed)</li>
+<li><code class="docutils literal notranslate"><span class="pre">\*</span></code> - The symbol has an explicit tag applied to it</li>
+</ul>
 <p>The available types that one can filter the symbols with are as follows:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">address</span></code> - Match according to the address of the symbol</li>
@@ -6017,6 +6372,10 @@ database. By default the <code class="docutils literal notranslate"><span class=
 <li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the symbol names according to a glob</li>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the symbol names according to a regular-expression</li>
 <li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match the symbol according to its index</li>
+<li><code class="docutils literal notranslate"><span class="pre">function</span></code> - Filter the symbol names for any that are referring to a function</li>
+<li><code class="docutils literal notranslate"><span class="pre">imports</span></code> - Filter the symbol names for any that are imports</li>
+<li><code class="docutils literal notranslate"><span class="pre">typed</span></code> - Filter the symbol names for any that have type information applied to them</li>
+<li><code class="docutils literal notranslate"><span class="pre">tagged</span></code> - Filter the symbol names for any that use the specified tag(s)</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the symbols by passing their address to a callable</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>
@@ -7404,7 +7763,7 @@ specified address.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -7452,7 +7811,7 @@ specified address.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> – an address within the database</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -8336,6 +8695,23 @@ will return the <code class="xref py py-obj docutils literal notranslate"><span 
 defined within the database. The functions within this namespace
 can be used to create, query, or fetch the types that have been
 defined.</p>
+<p>When listing the types that are matched, the following legend can be
+used to identify certain characteristics about them:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">L</span></code> - The type originated from a type library</li>
+<li><code class="docutils literal notranslate"><span class="pre">I</span></code> - The type originated from an inherited type library</li>
+<li><code class="docutils literal notranslate"><span class="pre">T</span></code> - The type is a type definition and references another type</li>
+<li><code class="docutils literal notranslate"><span class="pre">P</span></code> - The contents of the type is a pointer</li>
+<li><code class="docutils literal notranslate"><span class="pre">F</span></code> - The contents of the type is a floating-point value (float, double, long double)</li>
+<li><code class="docutils literal notranslate"><span class="pre">E</span></code> - The contents of the type is an enumeration</li>
+<li><code class="docutils literal notranslate"><span class="pre">I</span></code> - The contents of the type is an integral</li>
+<li><code class="docutils literal notranslate"><span class="pre">A</span></code> - The type represents an array</li>
+<li><code class="docutils literal notranslate"><span class="pre">F</span></code> - The type represents a function</li>
+<li><code class="docutils literal notranslate"><span class="pre">S</span></code> - The type represents a structure</li>
+<li><code class="docutils literal notranslate"><span class="pre">V</span></code> - The type represents a virtual function table</li>
+<li><code class="docutils literal notranslate"><span class="pre">C</span></code> - The type represents a structure containing a virtual function table</li>
+<li><code class="docutils literal notranslate"><span class="pre">U</span></code> - The type represents a union</li>
+</ul>
 <p>The available types that one can filter the local types with are as follows:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">ordinal</span></code> - Match according to the ordinal of the local type.</li>
@@ -8343,11 +8719,20 @@ defined.</p>
 <li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the names of the local types according to a glob.</li>
 <li><code class="docutils literal notranslate"><span class="pre">definition</span></code> - Filter the local types by applying a glob to their definition.</li>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the local types by applying a regular-expression to their definition.</li>
+<li><code class="docutils literal notranslate"><span class="pre">typeref</span></code> or <code class="docutils literal notranslate"><span class="pre">typedef</span></code> - Filter the local types for any that are an alias declared with typedef.</li>
 <li><code class="docutils literal notranslate"><span class="pre">size</span></code> - Filter the local types according to their size.</li>
 <li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">ge</span></code> - Filter the local types for the ones that are larger or equal to a certain size.</li>
 <li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the local types for the ones that are larger than a certain size.</li>
 <li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Filter the local types for the ones that are less or equal to a certain size.</li>
 <li><code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the local types for the ones that are less than a certain size.</li>
+<li><code class="docutils literal notranslate"><span class="pre">integer</span></code> - Filter the local types for any that are integers.</li>
+<li><code class="docutils literal notranslate"><span class="pre">pointer</span></code> - Filter the local types for any that are pointers.</li>
+<li><code class="docutils literal notranslate"><span class="pre">function</span></code> - Filter the local types for any that are functions.</li>
+<li><code class="docutils literal notranslate"><span class="pre">float</span></code> - Filter the local types for any that are floating-point.</li>
+<li><code class="docutils literal notranslate"><span class="pre">array</span></code> - Filter the local types for any that describe an array.</li>
+<li><code class="docutils literal notranslate"><span class="pre">structure</span></code> - Filter the local types for any that describe a structure.</li>
+<li><code class="docutils literal notranslate"><span class="pre">union</span></code> - Filter the local types for any that describe a union.</li>
+<li><code class="docutils literal notranslate"><span class="pre">enumeration</span></code> - Filter the local types for any that describe an enumeration.</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the types by passing their ordinal and <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to a callable.</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>

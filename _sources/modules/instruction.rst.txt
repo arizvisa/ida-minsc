@@ -368,6 +368,35 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
+.. py:function:: op_modified(opnum)
+   
+   Return whether the operand ``opnum`` belonging to the current instruction is being modified (written to).
+   
+   Aliases: :py:func:`instruction.op_write<op_modified>`, :py:func:`instruction.op_written<op_modified>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_modified(reference)
+   
+   Return whether the operand pointed to by ``reference`` is being modified (written to).
+   
+   Aliases: :py:func:`instruction.op_write<op_modified>`, :py:func:`instruction.op_written<op_modified>`
+   
+   :param reference: the :py:obj:`opref_t` of the instruction and operand
+   :type reference: interface.opref_t
+   
+.. py:function:: op_modified(ea, opnum)
+   
+   Return whether the operand ``opnum`` belonging to the instruction at the address ``ea`` is being modified (written to).
+   
+   Aliases: :py:func:`instruction.op_write<op_modified>`, :py:func:`instruction.op_written<op_modified>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
 .. py:function:: op_number(opnum)
    
    Set the type for operand ``opnum`` at the current instruction to a number and return it.
@@ -420,6 +449,35 @@ functions and aliases. For more information on this, please see
    Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to octal and return it.
    
    Aliases: :py:func:`instruction.op_oct<op_octal>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
+.. py:function:: op_read(opnum)
+   
+   Return whether the operand ``opnum`` belonging to the current instruction is only being read from.
+   
+   Aliases: :py:func:`instruction.op_used<op_read>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_read(reference)
+   
+   Return whether the operand pointed to by ``reference`` is only being read from.
+   
+   Aliases: :py:func:`instruction.op_used<op_read>`
+   
+   :param reference:
+   :type reference: interface.opref_t
+   
+.. py:function:: op_read(ea, opnum)
+   
+   Return whether the operand ``opnum`` belonging to the instruction at the address ``ea`` is only being read from.
+   
+   Aliases: :py:func:`instruction.op_used<op_read>`
    
    :param ea: the address of an instruction
    :type ea: int or long

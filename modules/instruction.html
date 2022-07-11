@@ -648,6 +648,55 @@ functions and aliases. For more information on this, please see
 </dd></dl>
 
 <dl class="function">
+<dt id="instruction.op_modified">
+<code class="descclassname">instruction.</code><code class="descname">op_modified</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_modified" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the current instruction is being modified (written to).</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_modified" title="instruction.op_modified"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_write</span></code></a>, <a class="reference internal" href="#instruction.op_modified" title="instruction.op_modified"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_written</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_modified</code><span class="sig-paren">(</span><em>reference</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the operand pointed to by <code class="docutils literal notranslate"><span class="pre">reference</span></code> is being modified (written to).</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_modified" title="instruction.op_modified"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_write</span></code></a>, <a class="reference internal" href="#instruction.op_modified" title="instruction.op_modified"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_written</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>reference</strong> (<em>interface.opref_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">opref_t</span></code> of the instruction and operand</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_modified</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is being modified (written to).</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_modified" title="instruction.op_modified"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_write</span></code></a>, <a class="reference internal" href="#instruction.op_modified" title="instruction.op_modified"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_written</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="instruction.op_number">
 <code class="descclassname">instruction.</code><code class="descname">op_number</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_number" title="Permalink to this definition">¶</a></dt>
 <dd><p>Set the type for operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current instruction to a number and return it.</p>
@@ -731,6 +780,55 @@ functions and aliases. For more information on this, please see
 <code class="descclassname">instruction.</code><code class="descname">op_octal</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the type for operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> to octal and return it.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_octal" title="instruction.op_octal"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_oct</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.op_read">
+<code class="descclassname">instruction.</code><code class="descname">op_read</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_read" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the current instruction is only being read from.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_read" title="instruction.op_read"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_used</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_read</code><span class="sig-paren">(</span><em>reference</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the operand pointed to by <code class="docutils literal notranslate"><span class="pre">reference</span></code> is only being read from.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_read" title="instruction.op_read"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_used</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>reference</strong> (<em>interface.opref_t</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_read</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is only being read from.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_read" title="instruction.op_read"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_used</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

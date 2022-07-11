@@ -39,7 +39,7 @@ functions and aliases. For more information on this, please see
    
    Remove the color from the item at the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: color(ea)
@@ -55,7 +55,7 @@ functions and aliases. For more information on this, please see
    
    :param ea: an address in the database
    :type ea: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: color(ea, rgb)
@@ -95,7 +95,7 @@ functions and aliases. For more information on this, please see
    
    Remove the comment at the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
@@ -119,7 +119,7 @@ functions and aliases. For more information on this, please see
    
    :param ea: an address in the database
    :type ea: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
@@ -171,6 +171,63 @@ functions and aliases. For more information on this, please see
    :param ea: an address within the database
    :type ea: int or long
    
+.. py:function:: mangled()
+   
+   Return the mangled name at the current address.
+   
+   Aliases: :py:func:`database.mangle<mangled>`
+   
+.. py:function:: mangled(ea)
+   
+   Return the mangled name at the address specified by ``ea``.
+   
+   Aliases: :py:func:`database.mangle<mangled>`
+   
+   :param ea: an address in the database containing a name
+   :type ea: int or long
+   
+.. py:function:: mangled(string, \*suffix)
+   
+   Rename the current address to the mangled version of ``string`` and return its previous mangled value.
+   
+   Aliases: :py:func:`database.mangle<mangled>`
+   
+   :param string: a string to use as the name
+   :type string: str
+   :param \*suffix: any other strings to append to the name
+   
+.. py:function:: mangled(none)
+   
+   Remove the mangled name at the current address and return its previous mangled value.
+   
+   Aliases: :py:func:`database.mangle<mangled>`
+   
+   :param none: the python value :py:obj:`None`
+   :type none: None
+   
+.. py:function:: mangled(ea, string, \*suffix)
+   
+   Rename the address specified by ``ea`` to the mangled version of ``string`` and return its previous mangled value.
+   
+   Aliases: :py:func:`database.mangle<mangled>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param string: a string to use as the name
+   :type string: str
+   :param \*suffix: any other strings to append to the name
+   
+.. py:function:: mangled(ea, none)
+   
+   Remove the name at the address specified by ``ea`` and return its previous mangled value.
+   
+   Aliases: :py:func:`database.mangle<mangled>`
+   
+   :param ea: an address in the database containing a name
+   :type ea: int or long
+   :param none: the python value :py:obj:`None`
+   :type none: None
+   
 .. py:function:: mark()
    
    Return the mark at the current address.
@@ -179,7 +236,7 @@ functions and aliases. For more information on this, please see
    
    Remove the mark at the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: mark(ea)
@@ -202,7 +259,7 @@ functions and aliases. For more information on this, please see
    
    :param ea: the address of an existing mark within the database
    :type ea: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: mark(ea, description)
@@ -243,7 +300,7 @@ functions and aliases. For more information on this, please see
    
    Removes the name at the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
@@ -268,7 +325,7 @@ functions and aliases. For more information on this, please see
    
    :param ea: an address in the database
    :type ea: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when removing the name
    
@@ -386,7 +443,7 @@ functions and aliases. For more information on this, please see
    
    :param key: a string representing the tag name to remove
    :type key: str
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: tag(ea, key, none)
@@ -397,7 +454,7 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param key: a string representing the tag name to remove
    :type key: str
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: tags()
@@ -407,6 +464,63 @@ functions and aliases. For more information on this, please see
 .. py:function:: top()
    
    Return the very lowest address within the database.
+   
+.. py:function:: unmangled()
+   
+   Return the name at the current address in its unmangled form.
+   
+   Aliases: :py:func:`database.unmangle<unmangled>`, :py:func:`database.demangled<unmangled>`, :py:func:`database.demangle<unmangled>`
+   
+.. py:function:: unmangled(ea)
+   
+   Return the name at the address specified by ``ea`` in its unmangled form.
+   
+   Aliases: :py:func:`database.unmangle<unmangled>`, :py:func:`database.demangled<unmangled>`, :py:func:`database.demangle<unmangled>`
+   
+   :param ea: an address in the database containing a name
+   :type ea: int or long
+   
+.. py:function:: unmangled(string, \*suffix)
+   
+   Rename the current address using the mangled version of ``string`` and return its previous unmangled value.
+   
+   Aliases: :py:func:`database.unmangle<unmangled>`, :py:func:`database.demangled<unmangled>`, :py:func:`database.demangle<unmangled>`
+   
+   :param string: a string to use as the name
+   :type string: str
+   :param \*suffix: any other strings to append to the name
+   
+.. py:function:: unmangled(none)
+   
+   Remove the name at the current address and return its previous unmangled value.
+   
+   Aliases: :py:func:`database.unmangle<unmangled>`, :py:func:`database.demangled<unmangled>`, :py:func:`database.demangle<unmangled>`
+   
+   :param none: the python value :py:obj:`None`
+   :type none: None
+   
+.. py:function:: unmangled(ea, string, \*suffix)
+   
+   Rename the address specified by ``ea`` using the mangled version of ``string`` and return its previous unmangled value.
+   
+   Aliases: :py:func:`database.unmangle<unmangled>`, :py:func:`database.demangled<unmangled>`, :py:func:`database.demangle<unmangled>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param string: a string to use as the name
+   :type string: str
+   :param \*suffix: any other strings to append to the name
+   
+.. py:function:: unmangled(ea, none)
+   
+   Remove the name at the address specified by ``ea`` and return its previous unmangled value.
+   
+   Aliases: :py:func:`database.unmangle<unmangled>`, :py:func:`database.demangled<unmangled>`, :py:func:`database.demangle<unmangled>`
+   
+   :param ea: an address in the database containing a name
+   :type ea: int or long
+   :param none: the python value :py:obj:`None`
+   :type none: None
    
 .. py:function:: within()
    
@@ -498,8 +612,44 @@ Some examples of using this namespace can be::
    
    Return the address of the item containing the address ``ea``.
    
-   :param ea: an address in the database to its item address for
+   :param ea: an address of an item in the database to return
    :type ea: int or long
+   
+.. py:function:: address(start, end)
+   
+   Return a list containing each of the addresses from ``start`` to ``end``.
+   
+   :param start: the address to start at
+   :type start: int or long
+   :param end: the address to stop at
+   :type end: int or long
+   
+.. py:function:: address(start, end, step)
+   
+   Return a list containing each of the addresses from ``start`` to ``end`` using the callable ``step`` to determine the next address.
+   
+   :param start: the address to start at
+   :type start: int or long
+   :param end: the address to stop at
+   :type end: int or long
+   :param step: a callable that seeks to the next address such as :py:obj:`address.next`
+   :type step: callable
+   
+.. py:function:: address(bounds)
+   
+   Return a list containing each of the addresses within ``bounds``.
+   
+   :param bounds: the address boundaries to return
+   :type bounds: tuple
+   
+.. py:function:: address(bounds, step)
+   
+   Return a list containing each of the addresses within ``bounds`` using the callable ``step`` to determine the next address.
+   
+   :param bounds: the address boundaries to return
+   :type bounds: tuple
+   :param step: a callable that seeks to the next address such as :py:obj:`address.next`
+   :type step: callable
    
 .. py:function:: address\.blocks()
    
@@ -539,6 +689,15 @@ Some examples of using this namespace can be::
    :param ea: the address within the database to return an :py:obj:`interface.bounds_t` from
    :type ea: int or long
    
+.. py:function:: address\.by_fileoffset(offset)
+   
+   Return the address in the database for the specified file ``offset`` of the input file.
+   
+   Aliases: :py:func:`database.address.byfileoffset<address\.by_fileoffset>`
+   
+   :param offset: the file offset to convert into a database address
+   :type offset: int or long
+   
 .. py:function:: address\.by_offset(offset)
    
    Return the specified ``offset`` translated to an address in the database.
@@ -546,6 +705,17 @@ Some examples of using this namespace can be::
    Aliases: :py:func:`database.address.byoffset<address\.by_offset>`, :py:func:`database.by_offset<address\.by_offset>`, :py:func:`database.byoffset<address\.by_offset>`
    
    :param offset:
+   
+.. py:function:: address\.fileoffset()
+   
+   Return the file offset in the input file for the current address.
+   
+.. py:function:: address\.fileoffset(ea)
+   
+   Return the file offset in the input file for the address ``ea``.
+   
+   :param ea: an address within the database to translate to the file offset
+   :type ea: int or long
    
 .. py:function:: address\.head()
    
@@ -1287,7 +1457,7 @@ Some examples of using this namespace can be::
    
    Aliases: :py:func:`database.get_offset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`
    
-   :param ea: an address within the database to translate to an offset from the beginning of the database.
+   :param ea: an address within the database to translate to an offset from the beginning of the database
    :type ea: int or long
    
 .. py:function:: address\.prev(\*\*count)
@@ -2196,6 +2366,21 @@ of each entrypoint will be yielded.
 
 This namespace is also aliased as :py:obj:`database.exports`.
 
+When listing entry points that are matched, the following legend can be
+used to identify certain characteristics about them:
+
+- ``F`` - The entry point is referencing a function
+- ``C`` - The entry point is referencing code
+- ``A`` - The entry point is referencing data (address)
+- ``D`` - The entry point is referencing a decompiled function
+- ``T`` - The address of the entry point has a type applied to it
+- ``t`` - The address of the entry point has a guessable type
+- ``C`` - The address of the entry point is marked as code
+- ``D`` - The address of the entry point is marked as data
+- ``^`` - The address of the entry point is marked as unknown
+- ``+`` - The entry point has an implicit tag applied to it (named or typed)
+- ``\*`` - The entry point has an explicit tag applied to it
+
 The different types that one can match entrypoints with are the following:
 
 - ``address`` or ``ea`` - Match according to the entrypoint's address
@@ -2207,6 +2392,9 @@ The different types that one can match entrypoints with are the following:
 - ``gt`` - Filter the entrypoints for any after the specified address (exclusive)
 - ``less`` or ``le`` - Filter the entrypoints for any before the specified address (inclusive)
 - ``lt`` - Filter the entrypoints for any before the specified address (exclusive)
+- ``function`` - Filter the entrypoints for any that are referencing a function
+- ``typed`` - Filter the entrypoints for any that have type information applied to them
+- ``tagged`` - Filter the entrypoints for any that use the specified tag(s)
 - ``predicate`` - Filter the entrypoints by passing its index (ordinal) to a callable
 
 Some examples of using these keywords are as follows::
@@ -2444,7 +2632,7 @@ To add extra comments, one can do this like::
    
    Delete the prefixed comment at the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: extra\.prefix(ea)
@@ -2469,7 +2657,7 @@ To add extra comments, one can do this like::
    
    :param ea: the address containing the prefix comment to remove
    :type ea: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: extra\.preinsert(ea, count)
@@ -2507,7 +2695,7 @@ To add extra comments, one can do this like::
    
    Delete the suffixed comment at the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: extra\.suffix(ea)
@@ -2532,7 +2720,7 @@ To add extra comments, one can do this like::
    
    :param ea: the address containing the suffix comment to remove
    :type ea: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. _ns-database-functions:
@@ -2545,12 +2733,34 @@ This namespace is used for listing all the functions inside the
 database. By default a list is returned containing the address of
 each function.
 
+When listing functions that are matched, the following legend can be
+used to identify certain characteristics about them:
+
+- ``+`` - The function has an implicit tag (named or typed)
+- ``\*`` - The function has been explicitly tagged
+- ``J`` - The function is a wrapper or a thunk
+- ``L`` - The function was pattern matched as a library
+- ``S`` - The function is declared statically
+- ``^`` - The function does not contain a frame
+- ``?`` - The function has its stack points calculated incorrectly and may be incorrect
+- ``T`` - The function has a prototype that was applied to it manually or via decompilation
+- ``t`` - The function has a prototype that was guessed
+- ``D`` - The function has been previously decompiled
+
 The different types that one can match functions with are the following:
 
 - ``address`` or ``ea`` - Match according to the function's address
 - ``name`` - Match according to the exact name
 - ``like`` - Filter the function names according to a glob
 - ``regex`` - Filter the function names according to a regular-expression
+- ``typed`` - Filter the functions for any that have type information applied to them
+- ``decompiled`` - Filter the functions for any that have been decompiled
+- ``frame`` - Filter the functions for any that contain a frame
+- ``problems`` - Filter the functions for any that contain problems with their stack
+- ``library`` - Filter the functions that any which were detected as a library function
+- ``wrapper`` - Filter the functions that are flagged as wrappers (thunks)
+- ``exceptions`` Filter the functions for any that either handles an exception or sets up a handler
+- ``tagged`` - Filter the functions for any that use the specified tag(s)
 - ``predicate`` - Filter the functions by passing their :py:obj:`idaapi.func_t` to a callable
 
 Some examples of how to use these keywords are as follows::
@@ -3156,6 +3366,15 @@ import is imported from. The ``name`` is the symbol name to link
 with, and ``hint`` is the import ordinal hint which is used to speed
 up the linking process.
 
+When listing the imports that are matched, the following legend can be
+used to identify certain characteristics about them:
+
+- ``T`` - The import has a type that was explicitly applied
+- ``t`` - The import has a type that was guessted
+- ``H`` - The import contains an ordinal number as a hint
+- ``+`` - The import has an implicit tag applied to it (named or typed)
+- ``\*`` - The import has an explicit tag applied to it
+
 The different types that one can match imports with are the following:
 
 - ``address`` or ``ea`` - Match according to the import's address
@@ -3166,6 +3385,8 @@ The different types that one can match imports with are the following:
 - ``regex`` - Filter the symbol names of all the imports according to a regular-expression
 - ``ordinal`` - Match according to the import's hint (ordinal)
 - ``index`` - Match according index of the import
+- ``typed`` - Filter all of the imports based on whether they have a type applied to them
+- ``tagged`` - Filter the imports for any that use the specified tag(s)
 - ``predicate`` Filter the imports by passing the above (default) tuple to a callable
 
 Some examples of using these keywords are as follows::
@@ -3365,6 +3586,16 @@ database.names
 This namespace is used for listing all of the names (symbols) within the
 database. By default the ``(address, name)`` is yielded in its mangled form.
 
+When listing names that are matched, the following legend can be used to
+identify certain characteristics about the address of the returned name:
+
+- ``I`` - The symbol is residing in an import segment
+- ``C`` - The address of the symbol is marked as code
+- ``D`` - The address of the symbol is marked as data
+- ``^`` - The address of the symbol is is initialized
+- ``+`` - The symbol has an implicit tag applied to it (named or typed)
+- ``\*`` - The symbol has an explicit tag applied to it
+
 The available types that one can filter the symbols with are as follows:
 
 - ``address`` - Match according to the address of the symbol
@@ -3373,6 +3604,10 @@ The available types that one can filter the symbols with are as follows:
 - ``like`` - Filter the symbol names according to a glob
 - ``regex`` - Filter the symbol names according to a regular-expression
 - ``index`` - Match the symbol according to its index
+- ``function`` - Filter the symbol names for any that are referring to a function
+- ``imports`` - Filter the symbol names for any that are imports
+- ``typed`` - Filter the symbol names for any that have type information applied to them
+- ``tagged`` - Filter the symbol names for any that use the specified tag(s)
 - ``predicate`` - Filter the symbols by passing their address to a callable
 
 Some examples of using these keywords are as follows::
@@ -4217,7 +4452,7 @@ Some examples of using this namespace can be::
    
    Remove the type information from the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: type(info)
@@ -4241,7 +4476,7 @@ Some examples of using this namespace can be::
    Remove the type information from the address ``ea``.
    
    :param ea: an address within the database
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: type(ea, string)
@@ -4828,6 +5063,23 @@ defined within the database. The functions within this namespace
 can be used to create, query, or fetch the types that have been
 defined.
 
+When listing the types that are matched, the following legend can be
+used to identify certain characteristics about them:
+
+- ``L`` - The type originated from a type library
+- ``I`` - The type originated from an inherited type library
+- ``T`` - The type is a type definition and references another type
+- ``P`` - The contents of the type is a pointer
+- ``F`` - The contents of the type is a floating-point value (float, double, long double)
+- ``E`` - The contents of the type is an enumeration
+- ``I`` - The contents of the type is an integral
+- ``A`` - The type represents an array
+- ``F`` - The type represents a function
+- ``S`` - The type represents a structure
+- ``V`` - The type represents a virtual function table
+- ``C`` - The type represents a structure containing a virtual function table
+- ``U`` - The type represents a union
+
 The available types that one can filter the local types with are as follows:
 
 - ``ordinal`` - Match according to the ordinal of the local type.
@@ -4835,11 +5087,20 @@ The available types that one can filter the local types with are as follows:
 - ``like`` - Filter the names of the local types according to a glob.
 - ``definition`` - Filter the local types by applying a glob to their definition.
 - ``regex`` - Filter the local types by applying a regular-expression to their definition.
+- ``typeref`` or ``typedef`` - Filter the local types for any that are an alias declared with typedef.
 - ``size`` - Filter the local types according to their size.
 - ``greater`` or ``ge`` - Filter the local types for the ones that are larger or equal to a certain size.
 - ``gt`` - Filter the local types for the ones that are larger than a certain size.
 - ``less`` or ``le`` - Filter the local types for the ones that are less or equal to a certain size.
 - ``lt`` - Filter the local types for the ones that are less than a certain size.
+- ``integer`` - Filter the local types for any that are integers.
+- ``pointer`` - Filter the local types for any that are pointers.
+- ``function`` - Filter the local types for any that are functions.
+- ``float`` - Filter the local types for any that are floating-point.
+- ``array`` - Filter the local types for any that describe an array.
+- ``structure`` - Filter the local types for any that describe a structure.
+- ``union`` - Filter the local types for any that describe a union.
+- ``enumeration`` - Filter the local types for any that describe an enumeration.
 - ``predicate`` - Filter the types by passing their ordinal and :py:obj:`idaapi.tinfo_t` to a callable.
 
 Some examples of using these keywords are as follows::

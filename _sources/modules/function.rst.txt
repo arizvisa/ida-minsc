@@ -136,7 +136,7 @@ functions and aliases. For more information on this, please see
    Remove the color for the function ``func``.
    
    :param func: the function to remove the color from
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: color(func, rgb)
@@ -151,7 +151,7 @@ functions and aliases. For more information on this, please see
    
    Remove the color from the current function.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: comment(\*\*repeatable)
@@ -181,7 +181,7 @@ functions and aliases. For more information on this, please see
    
    Remove the comment for the current function.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
@@ -203,7 +203,7 @@ functions and aliases. For more information on this, please see
    If the bool ``repeatable`` is specified, then remove the repeatable comment.
    
    :param func: the function to remove the comment from
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
@@ -231,7 +231,7 @@ functions and aliases. For more information on this, please see
    
    Remove the custom-name from the current function.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*flags: any extra flags to use when removing the name
    
@@ -249,7 +249,7 @@ functions and aliases. For more information on this, please see
    Remove the custom-name from the function ``func``.
    
    :param func: the function to remove the name for
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*flags: any extra flags to use when removing the name
    
@@ -425,7 +425,7 @@ functions and aliases. For more information on this, please see
    
    :param key: a string representing the tag name to remove
    :type key: str
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: tag(func, key, none)
@@ -435,7 +435,7 @@ functions and aliases. For more information on this, please see
    :param func: the function to remove the tag from
    :param key: a string representing the tag name to remove
    :type key: str
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: tags()
@@ -685,7 +685,7 @@ Some examples of this functionality can be::
    
    Removes the color of the basic block at the current address.
    
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: block\.color(ea)
@@ -715,7 +715,7 @@ Some examples of this functionality can be::
    
    :param ea: the address of the basic block to remove the color from
    :type ea: int or long
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: block\.color(bounds, none)
@@ -724,7 +724,7 @@ Some examples of this functionality can be::
    
    :param bounds: the boundaries of the basic block to remove the color from
    :type bounds: tuple
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: block\.color(bb, none)
@@ -733,7 +733,7 @@ Some examples of this functionality can be::
    
    :param bb: the basic block to remove the color from
    :type bb: idaapi.BasicBlock
-   :param none: the value :py:obj:`None`
+   :param none: the python value :py:obj:`None`
    :type none: None
    
 .. py:function:: block\.color(ea, rgb, \*\*frame)
@@ -1908,7 +1908,7 @@ Some simple ways of getting information about a function::
    
    Remove the type information for the current function.
    
-   :param none: the value :py:obj:`None` which will remove the type information from the function
+   :param none: the python value :py:obj:`None` which will remove the type information from the function
    :type none: None
    
 .. py:function:: type(func)
@@ -1939,7 +1939,7 @@ Some simple ways of getting information about a function::
    Remove the type information for the function ``func``.
    
    :param func: the address or function to remove the type information from
-   :param none: the value :py:obj:`None` which will remove the type information from the function
+   :param none: the python value :py:obj:`None` which will remove the type information from the function
    :type none: None
    
 .. py:function:: type\.convention()
@@ -2048,6 +2048,30 @@ Some simple ways of getting information about a function::
    
    :param func: the function to use when checking for a name
    
+.. py:function:: type\.has_problem()
+   
+   Return if the current function has a problem associated with it.
+   
+   Aliases: :py:func:`function.type.problemQ<type\.has_problem>`
+   
+.. py:function:: type\.has_problem(func)
+   
+   Return if the function ``func`` has a problem associated with it.
+   
+   Aliases: :py:func:`function.type.problemQ<type\.has_problem>`
+   
+   :param func: the function to check for problems
+   
+.. py:function:: type\.has_problem(func, problem)
+   
+   Return if the function ``func`` has the specified ``problem`` associated with it.
+   
+   Aliases: :py:func:`function.type.problemQ<type\.has_problem>`
+   
+   :param func: the function to check for problems
+   :param problem: the :py:obj:`idaapi.PR_` problem type representing the queue to search for problems in
+   :type problem: int or long
+   
 .. py:function:: type\.has_prototype()
    
    Return a boolean describing whether the current function has a prototype associated with it.
@@ -2092,6 +2116,20 @@ Some simple ways of getting information about a function::
    
    :param func: the function to modify the hidden attribute
    :param boolean: a boolean value representing whether the function is hidden or not
+   
+.. py:function:: type\.is_decompiled()
+   
+   Return if the current function has been decompiled.
+   
+   Aliases: :py:func:`function.type.decompiledQ<type\.is_decompiled>`
+   
+.. py:function:: type\.is_decompiled(func)
+   
+   Return if the function ``func`` has been decompiled.
+   
+   Aliases: :py:func:`function.type.decompiledQ<type\.is_decompiled>`
+   
+   :param func: the function to check if it is decompiled
    
 .. py:function:: type\.is_far()
    
