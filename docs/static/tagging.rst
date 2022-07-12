@@ -3,10 +3,10 @@
 Tagging and the querying of the tag cache
 =========================================
 
-This project provides an interesting interface based on some research
-[:ref:`1<tagging-references>`] that was done by one of the authors at the
-Ekoparty conference in 2011. The author is grateful to TippingPoint/3com/HP
-for providing him the resources and time in which to do this research.
+This project provides a unique interface that is based on some research
+[:ref:`1<tagging-references>`] that was done by the authors at the Ekoparty
+conference in 2011. The authors are grateful to TippingPoint/3com/HP for
+providing them the resources and time in which to do this research.
 
 Typically when recalling addresses in an IDA database, users will use one of the
 already existing facilities for navigation. This includes things such as names or
@@ -24,21 +24,34 @@ to programatically categorize information that a user might have inferred
 during their reversing endeavor in the hopes to improve the way that a user
 navigates the database and shares information with other users.
 
-This system allows for a user to store a primitive python object within a comment,
-which can then be decoded back into its original type, thus allowing a user to
-store and retrieve a python object associated with an address. This is described
-in detail later at :ref:`tagging-encoding`. These values can then later be queried
-in order to reference the addresses of the types that the user has marked. This
-is also described in detail at :ref:`tagging-querying`.
+------------------------------------
+What is tagging and why is it useful
+------------------------------------
 
-Using such a mechanism, facilitates a user to be able to quickly tag
-a number of related functions or addresses, and perform some sort of
-processing against them. The work required to perform tasks such as
-tagging all the handlers related to some CGI binary, tagging various
-instructions according to some attribute in order to later color them,
-tagging an instruction address with a breakpoint command to later feed
-to a debugger, or even simply tagging the results of a hit-tracer for later
-review is greatly simplified.
+Tagging basically allows for a user to store a primitive python object within a
+comment, which can then be decoded back into its original pythonic type thus
+allowing a user to store and retrieve a python object associated with an address.
+This is described in detail later at :ref:`tagging-encoding`, but these values
+can then be queried later in order to assist referencing the address of some
+locations that the user has marked. This is also described in detail at
+:ref:`tagging-querying`.
+
+The existence of such a mechanism should enable a user to be able to quickly tag
+and group related artifacts within the database in order to serialize or perform
+some kind of collective processing against them. The visibility of these tags
+also allows a user to quickly edit or modify special cases that their initial
+query did not annotate correctly. Since the contents of these tags are native
+Python types, these may also be serialized or translated in order to migrate
+them between databases or into another Python interpreter.
+
+This should greatly reduce the amount of work that is required in order to perform
+a variety of tasks such as labelling all of the handlers within a CGI binary,
+highlighting the basic blocks of a path through a control-flow-graph or later using
+them to generate breakpoints that should be consumed by a debugger, enumerating
+the 3rd parameter of some logging function in order to annotate a list of functions
+with their correct name, or tagging arbitrary instructions or their operands
+using a particular attribute. Thus later the user can either color them or annotate
+them in a different way for improved visibility.
 
 .. _tagging-references:
 .. rubric:: References
@@ -51,21 +64,24 @@ review is greatly simplified.
 Building the tag-cache
 ----------------------
 
-When creating an IDA database, this plugin will hook IDA in order to determine
+When creating an IDA database, the plugin will hook IDA in order to determine
 when the auto-analysis queue is empty. When this happens, this plugin will
-proceed to build the tag cache. When building the tag cache, the plugin will
-output the number of functions completed relative to the total number of
-defined functions. This will be in the form of a progress bar that looks like
-the following.
+proceed to build the tag cache and its index. When building the tag cache,
+the plugin will output the number of functions completed relative to the total
+number of defined functions so that the user may see how much work is left
+for the progress to complete. This process may be interrupted by the user, bu
+it is recommended by the author that the user lets this process complete if
+they wish to query the tags in any way. The current progress of this process
+will be in the form of a progress bar which looks like the following.
 
 .. image:: _images/tagging-progress.png
    :alt: image of progress bar
    :align: center
 
-Once producing the tag cache, the database is ready to be queried. If the
-user wants to rebuild the tag cache, or to build a cache for a database that
-has previously been built. Please see :ref:`tagging-modules-tagfix` for
-more information.
+Once the tag cache and its index has been generated, the database is ready to
+be modified and queried. If the user wants to rebuild the tag cache, or to
+build a cache for a database that has been previously analyzed. Please see
+:ref:`tagging-modules-tagfix` for more information.
 
 .. _tagging-types:
 
@@ -73,29 +89,42 @@ more information.
 Tag types
 ---------
 
-Comments are hence split up into two parts that compose a dictionary, these are
-the "key" and the "value". Each location or object that can be tagged, will
-include a specially formatted comment that isolates these components so that
-they can later be queried. These tags are then cached in a netnode so that they
-be easily queried (see :ref:`tagging-querying`) to then later revisit or extract
-information to process.
+Tags split up comments into the two parts that compose a dictionary, these are
+the "key" which is always referenced as a string and the "value" which can be
+any one of the basic Python types. These tags will be displayed as a comment
+alongside their target so that the user may review them or change them as needed.
+These comments are specially formatted in a way that is easy for the user to
+edit as a multi-line comment. The key of each created tag is also cached and
+indexed in order to allow the user to quickly query it (see :ref:`tagging-querying`).
+This allows the user to later revisit or extract reversing artifacts that they
+wish to further process or display later.
 
-In essence, these tags are grouped into two different types. One of which
-is the "global" tag. A "global" tag is used to store attributes about a
-particular global such as a function, or an address outside of a function.
-These tags can then be used to search the database for something of reference
-which is a significant improvement to the way that marks work, and works around
-the limitation that a database has on its limited number of marks.
+In essence, tags are used to reference information that is associated with an
+address. Thus, these tags are grouped into two different types. One of which
+is the "global" tag. A "global" tag is used to store attributes about an address
+such as a function, or an address that is **outside** of a function. These tags
+can be used to perform a global search of the database for something of reference
+which is a significant improvement to the way that marks work. This has the added
+effect of working around the limitation of a database in which it has a limited
+number of marks.
 
 The other type of tag is known as a "contents" tag. A "contents" tag is used to
-store attributes about an address that is inside a function and is commonly
+store attributes about an address that is **inside** a function and is commonly
 associated with the instructions that belong to a function. This allows one to
 store attributes describing the semantics of what is being reversed at a given
 address within a function.
 
-When querying a tag, it is important to distinguish between which tag the user
-wishes to search through. This is described in detail at :ref:`tagging-querying`.
-Some examples of querying are described at :ref:`tagging-examples-querying`.
+There are other places that tags may be applied in order to select certain parts
+of the database that the user may wish to query. As such, there is also support
+for tagging structures (that are explicitly defined or part of a function frame)
+or their individual members. This can be useful if the user wishes to remember
+specific structures or fields for scripting later.
+
+When querying a tag, it is important to distinguish between whether the user
+wishes to query a "global" tag or a "contents" tag when searching. The difference
+in methodology or searching between these is described in detail at :ref:`tagging-querying`.
+Some examples of querying the different types are also described at :ref:`tagging-examples-querying`
+and :ref:`tagging-examples-querying-structures` with regards to structures.
 
 .. _tagging-format:
 
@@ -103,27 +132,32 @@ Some examples of querying are described at :ref:`tagging-examples-querying`.
 Tag formats
 -----------
 
-In order to facilitate support tags and still allow for a user to quickly
-comprehend the intention of a tag. Tags are actually encoded within comments
-at the address that is "tagged". This is done by encoding the tag using a
-specific newline-delimited format.
+In order to facilitate support for tags and still allow for a user to quickly
+review the intention of a particular tag. Tags are actually encoded within
+comments at the address that is "tagged". This is done by encoding the tag using a
+specific newline-delimited format that is reminiscent of a Python dictionary.
 
-This format represents the attributes commonly associated with a dictionary. If
-a user chooses to not use this special format, then when utilizing the tag api
-the entire comment is treated as an "empty" tag using an empty string as its key.
-Please see :ref:`tagging-examples` for an example of this.
+If the user chooses to not use this format or is using a database that does not
+follow this format, the comments within the database will then be treated as an
+"empty" tag. If the user wishes to still query these tags, the user will need to
+use the empty string as their key. Please see :ref:`tagging-examples` for an
+example of this of how to use this.
 
 Due to a limitation of IDA with regards to the size of comments and this abuse
-of using comments to store tag values, tags have a limited size. If the user
-wishes to store a long tag at an address it is necessary for them to break it
-down into smaller components that do not exceed the maximum number of characters
-that IDA allots for each comment or to use another storage mechanism entirely.
-It is recommended by the author to only store light information and if a large
-value needs to be stored, that a user should really just use another storage
-mechanism. Long (and hidden) tags may be supported in the future, however.
+of using comments to display the values of a tag to the user, tags have a limited
+size. If the user wishes to store a long tag at an address it is necessary for them
+to break it down into smaller components that do not exceed the maximum number of
+characters that IDA allows when displaying each comment. There is also the other
+option of using another storage mechanism entirely as tags are intended for
+allowing the user to visibly see contextual information alongside the things that
+they are reversing. Hence, it is recommended by the author to only store light
+information that is easy to read and quick to edit. If a larger value needs to
+be stored, then the user should really just use another storage mechanism.
+Tags of a large length may eventually be supported in the future, but will likely
+remain hidden due to the constraints of IDA's ability to display them.
 
-The format for a tag to an address within the database can look like the
-following:
+The format for a tag associated with an address within the database should look
+like the following:
 
 .. code-block:: tasm
 
@@ -133,7 +167,7 @@ following:
                             ; [references] set([0x58b012, 0x581061, 0x501212])
                             ; [floating-value] float(0.500000)
 
-When applying a tag to a function, this can look like the following:
+Similarly, when applying a tag to a function the same format should be followed.
 
 .. code-block:: tasm
 
@@ -147,9 +181,9 @@ When applying a tag to a function, this can look like the following:
     ...
 
 If a user chooses to not explicitly use the tagging API and wishes to use IDA's
-regular commenting interface instead, they will simply need to specify the key
-name with brackets ("[" and "]") with the value for the key immediately following.
-This should look similar to:
+regular comment interface instead, they will simply need to specify the name of
+the tag with brackets ("[" and "]") immediately followed by the value that they
+wish to associate with the tag. This should look fairly similar to the following:
 
 .. code-block:: none
 
@@ -160,12 +194,11 @@ This should look similar to:
     [float] float(2.71828182846)
     [linked] 0x51b2080
 
-IDA supports two different types of comments within the database. A comment can
-be either a "repeatable" comment, or a "non-repeatable" comment. By default when
-tagging, this type of comment is automatically chosen based on whether the address
-belongs to a function, or a global. When fetching a tag, however, both types
-of comments are combined whilst giving priority to the automatically chosen
-comment type.
+IDA supports two different types of comments within the database. These are a
+"repeatable" or a non-repeatable" comment. By default when tagging, the type of
+comment is automatically chosen based on whether the address belongs to a
+function, or a global. When fetching a tag, however, both types of comments are
+combined whilst giving priority to the automatically chosen comment type.
 
 When tagging an address belonging to a function's contents, the default comment
 type of "non-repeatable" will be chosen. When tagging to a global, or an actual
@@ -204,10 +237,10 @@ similar to the way integers are encoded.
 Custom python objects, iterators, or callables are unfortunately not supported
 as tags. If the user really wishes to store these types, however, it is possible
 for one to serialize a type, and then store it as a string inside a tag. As
-previousy mentioned, however, this is not recommended and it is suggested by
+previously mentioned, however, this is not recommended and it is suggested by
 the author that a user uses an alternative storage mechanism.
 
-If a user wishes to go against these recommendations, however, once can
+If a user wishes to go against these recommendations, however, one can
 store an arbitrary type by using either :py:func:`pickle` or :py:func:`marshal`
 to serialize their object, applying some compression to the resulting data,
 followed by encoding into a character set using "base64", encoding to hex,
@@ -220,49 +253,57 @@ Querying tags
 -------------
 
 When initially creating a database, this project will hook IDA in order to
-identify a good time to pre-build the tag cache. Once IDA has finished its
+identify the correct time to pre-build the tag index. Once IDA has finished its
 analysis, the tag cache will begin to be built. This consists of iterating
-through the different places that can be tagged and reference counting whats
-available. By default all comments that do not fit the correct format
-(see :ref:`tagging-format`) will be internally treated as the "empty" tag.
+through the different places that can be tagged and distinguishing what IDA
+has done. This way when the location is later modified or queried, the plugin
+will be able to distinguish a user annotation from an annotation caused by
+IDA's initial analysis. By default all comments that do not fit the correct 
+format (see :ref:`tagging-format`) will be treated as the "empty" tag.
 
-Once the creation of this cache has been completed, this project will keep
+Once the creation of this index has been completed, the plugin will keep
 track of any comments and tags that are created by the user and automatically
-update the cache. This will then allow a user to quickly query the tags that
-they have marked up in a database. If this cache gets corrupted in some way,
-one can repair the cache by using the module :py:mod:`tagfix`. Please see
-:ref:`tagging-modules-tagfix` for more information.
+update the index as needed. This will then allow a user to quickly query the
+tags that they have marked up in a database. If the index gets corrupted in some
+way, one may repair it by using the module :py:mod:`tagfix`. If this situation
+happens to the user, please refer to :ref:`tagging-modules-tagfix` for more
+information or contact the author for assistance.
 
-When querying a tag, as mentioned before, the tag's type is of significant
-importance. This is due to there being two different ways of querying them
-based on the type.
+When querying a tag associated with an address, as mentioned before, the tag's
+type is of significant importance. This is due to there being two different
+ways of querying them based on the type due to the address being either associated
+with a function or a global address that is not associated with a function.
 
 Within the :py:mod:`database` namespace are the functions :py:func:`database.select`,
 and :py:func:`database.selectcontents`. The :py:func:`database.select` function is
 used for querying all of the global tags as well as any tags made explicitly to a
-function.
-
-The :py:func:`database.selectcontents` function, however, is used to return the
-functions that contain the desired tags within the function's contents. Once the
-functions in the database have been identified, the user can then use
+function. The :py:func:`database.selectcontents` function, however, is used to
+return the functions that contain the desired tags within the function's contents.
+Once the functions in the database have been identified, the user can then use
 :py:func:`function.select` function to query the contents of a function for
 specific tags.
 
-When calling either :py:func:`database.select`, or :py:func:`function.select`,
-an iterator is returned. This iterator yields a tuple containing the address the
-tag was found at, as well as a dictionary containing the values of the tags that
-were queried. This then allows a user to act on the tags such as emitting them
-to the console, or storing them in another data structure. See
-:ref:`tagging-examples-querying-globals`
-for such an example.
+Similarly, if the user wishes to query any structures or members they may have
+defined within their database, the :py:mod:`structure` namespace includes the
+:py:func:`structure.select` function and :py:func:`structure.members_t.select`
+method. These can be used to select a specific structure for serialization
+or a member that they would like to extract information from to use outside
+of their database.
 
-When calling :py:func:`database.selectcontents`, however, an iterator that returns
-the function and the tag membership is returned. Each iteration of this iterator
-will yield the address of the function, followed by a :py:class:`set` of the
-contents tags that were found in the function. This tuple can then be immediately
-passed to :py:func:`function.select` in order to iterate through all the contents
-tags matched within the database. See :ref:`tagging-examples-querying-content`
-for how a user can use this.
+When calling either :py:func:`database.select`, :py:func:`function.select`,
+:py:func:`structure.select`, or :py:meth:`structure.members_t.select` an iterator
+is returned. This iterator yields a tuple containing the address, structure, or
+member that the chosen tag was found at, as well as a dictionary containing the
+values of the tags that were queried. This then allows a user to act on the tags
+such as emitting them to the console, or storing them within a serializeable data
+structure. See :ref:`tagging-examples-querying-globals` for such an example.
+
+When calling :py:func:`database.selectcontents`, however, its iterator will return
+a tuple composed of the function address and the discovered tags as a :py:class:`set`.
+This allows the user to identify the functions that which contain a particular set of
+tags and can be directly passed to :py:func:`function.select` in order to iterate
+through all of the contents tags that were matched. Please review the example at
+:ref:`tagging-examples-querying-content` for how a user may use this.
 
 Each of these functions takes a variable number of parameters as well as boolean
 types that specify whether to require specific tags in order to return a result,
@@ -309,9 +350,9 @@ look like for :py:func:`function.tag`::
     >
     > oldvalue = function.tag('marks', [0x51b0102, 0x51b0208, 0x51b021f])
 
-The next variartion occurs when only the tag name is provided. This variation
+The next variation occurs when only the tag name is provided. This variation
 will return the value of the tag at a given address and is thus used for
-reading a particular tag from the databasee. This looks like the following for
+reading a particular tag from the database. This looks like the following for
 :py:func:`database.tag`::
 
     > value = database.tag(ea, 'mytagname')
@@ -349,6 +390,64 @@ like::
          res[ea] = function.tag(ea)
    > print "All the tags in the world: %r"% res
 
+-----------------------------------
+"Explicit" and "Implicit" Tag Names
+-----------------------------------
+
+When using tag names within a database, any tag name can be used. Tags that are
+wrapped with double-underscores ("__") may also have additional useful side
+effects and are referred to as "implicit" tags. In most cases, these "implicit"
+tags are **only** indexed after IDA has finished processing the database. Thus
+these can be queried in order to identify changes to the database that have been
+made by the user or through further analysis by IDA Pro. Some of the implicit
+tags that are currently available are as follows:
+
++------------------+-----------------------------------------------------------+
+| ``__color__``    | The RGB color of an item at a particular address          |
++------------------+-----------------------------------------------------------+
+| ``__name__``     | The name associated with an address, structure/frame, or  |
+|                  | member. It also has the additional effect of only being   |
+|                  | indexed if the location has been explicitly named after   |
+|                  | the database has been processed by IDA                    |
++------------------+-----------------------------------------------------------+
+| ``__typeinfo__`` | The type information that was applied to an address,      |
+|                  | structure, or member. It has the added effect of only     |
+|                  | being indexed if it was explicitly created or applied to  |
+|                  | an address, structure, or member through type propagation |
++------------------+-----------------------------------------------------------+
+
+Although any string may be used as a tag name, it's recommended by the author
+that the user standardize upon a consistent naming scheme in order to simplify
+the exchange of artifacts with other users. Some examples of tag names that one
+may use as inspiration for other names are as follows.
+
++------------------+-----------------------------------------------------------+
+| ``synopsis``     | The potential semantics of a fully-reversed function      |
++------------------+-----------------------------------------------------------+
+| ``note``         | Any general notes about an address that the user may wish |
+|                  | to inform others or that may need to be referenced later  |
++------------------+-----------------------------------------------------------+
+| ``marks``        | A set of addresses containing marks used by the function  |
++------------------+-----------------------------------------------------------+
+| ``mark``         | A string containing the description of a mark that the    |
+|                  | user may have assigned to the address                     |
++------------------+-----------------------------------------------------------+
+| ``object``       | The name of a structure or address(es) containing the     |
+|                  | vtable that is used to reference a particular method.     |
++------------------+-----------------------------------------------------------+
+| ``object.size``  | The size of an object that might be stored at a pointer   |
++------------------+-----------------------------------------------------------+
+| ``input``        | A dictionary mapping register parameters for a function   |
++------------------+-----------------------------------------------------------+
+| ``return``       | A list containing the registers that may compose a result |
+|                  | that is returned by the called function                   |
++------------------+-----------------------------------------------------------+
+| ``break``        | The contents of a conditional breakpoint or code that the |
+|                  | user may wish to execute at a given address               |
++------------------+-----------------------------------------------------------+
+| ``string``       | The address of a string that is referenced as a parameter |
++------------------+-----------------------------------------------------------+
+
 .. _tagging-modules:
 
 -----------
@@ -356,11 +455,11 @@ Tag modules
 -----------
 
 There are a few modules that are provided within this project that allows one
-to interact with all of the tags defined in a database. This can be used to
+to interact with all of the tags defined in a database. These can be used to
 perform various tasks such as exporting all the tags within a database to
-serialize for later importing, translating tags within the database in order
-to match up to another database, etc. These modules are available via the
-:py:mod:`tools` namespace.
+later import into a difference database, translating tags within the database
+in order to match them up to another database, etc. These modules are available
+via the :py:mod:`tools` namespace.
 
 .. _tagging-modules-tags:
 
@@ -396,9 +495,13 @@ As described in the previous sections, tags have 2 different types and thus have
 with a given function or a global address, whereas "Contents" tags are associated
 with an address belonging to a function.
 
+There are also 2 different types for tagging structures and their members. These
+are similar to both "Global" and "Contents" tags in functionality, but are different
+in that they can only be applied to structures, frames, and their members.
+
 (In the following examples, format strings are used. Although format-specifiers
-are a lot more flexible and poweful, they might not be familiar to the average
-user. Apologies in advance.)
+are a lot more flexible and powerful, they might not be familiar to the average
+user and thus these are chosen for simplicity. Apologies in advance.)
 
 .. _tagging-examples-querying-globals:
 
@@ -499,13 +602,95 @@ within the :py:mod:`tools` namespace::
     > res = tools.tags.list()
     > print repr(res)
 
+.. _tagging-examples-querying-structures:
+
+Examples -- Querying "Structure" tags
+*************************************
+
+Create a temporary structure for this example and add some members to it::
+
+    > st = structure.new('example')
+    > f1 = st.add('my_dword_field', (int, 4))
+    > f2 = st.add('my_ptr', type)
+    > f3 = st.add('my_byte', (int, 1))
+
+Set some attributes of the individual fields::
+
+    > f2.tag('a pointer', 'this is a pointer that i need to track')
+    > f3.typeinfo = 'bool'
+
+Add a tag to the structure to query it later::
+
+    > st.tag('selected', 1)
+
+Select the previously tagged structure::
+
+    > for st, res in struc.select('selected'):
+          print('Found', st, 'with', res)
+    >
+
+Select the members of the structure containing user-defined type information::
+
+    > for m, t in st.select('__typeinfo__'):
+          print('Found member', m, 'with explicit type information', t)
+    >
+
+Select all of the members of within the database that are tagged with "a pointer"::
+
+    > for st in structure.iterate():
+          for m, t in st.select('a pointer'):
+              print('Found a pointer', m, 'with note', t['a pointer'])
+          continue
+    >
+
+Create a couple of structures to represent a path::
+
+    > st1 = structure.new('struc_1')
+    > m1 = st1.add(('field', st1.size))
+    > st2 = structure.new('struc_2')
+    > m2 = st2.add('field_0', st1)
+    > st3 = structure.new('struc_3')
+    > m3 = st3.add(('field', st3.size), st2)
+
+Tag the members the order that you wish to traverse them::
+
+    > m1.tag('order', 0)
+    > m2.tag('order', 1)
+    > m3.tag('order', 2)
+
+Select all of the structures that you have created and store them in a list::
+
+    > myitems = [st for st, tags in structure.select('__typeinfo__')]
+
+Select the tagged members from the structures and store them into a dictionary::
+
+    > myresults = {}
+    > for st in myitems:
+          for m, tags in st.select('order'):
+              index = tags['order']
+              myresults[index] = m
+          continue
+    >
+
+Iterate through the sorted dictionary and display each member::
+
+    > for index in sorted(myresults):
+          m = myresults[index]
+          print(hex(m.offset), m)
+    >
+
+Collect each of these entries into a structure path that may be explicitly applied to an operand::
+
+    > path = [ myresults[index] for index in sorted(myresults) ]
+    > instruction.op_structure(ea, opnum, *path)
+
 .. _tagging-examples:
 
-------------------------------------
-Examples -- Application or Retrieval
-------------------------------------
+---------------------------------------------------
+Examples -- Application of Tags and Retrieving them
+---------------------------------------------------
 
-The other aspect of the tagging api is the application and retrieval of tags at
+The other aspect of the tagging API is the application and retrieval of tags at
 a particular address. As was explained bit in :ref:`tagging-usage`, this
 functionality is performed by either :py:func:`database.tag` or :py:func:`function.tag`.
 
@@ -568,37 +753,3 @@ To prefix all tags with the current username using the cache::
              continue
          continue
    >
-
--------------------
-Suggested tag names
--------------------
-
-When using tag names within a database, any tag name can be used. Tags that
-are wrapped with double-underscores ("__") may also have additional useful
-side effects. Although any tag names can be used, it's recommended by the
-author to choose consistent names to simplify exchanging knowledge with
-other users. Some recommended names are:
-
-+---------------+--------------------------------------------------------+
-| ``synopsis``  | The potential semantics of a reversed function         |
-+---------------+--------------------------------------------------------+
-| ``__color__`` | The RGB color of an item at a particular address       |
-+---------------+--------------------------------------------------------+
-| ``__name__``  | The name associated with an address                    |
-+---------------+--------------------------------------------------------+
-| ``note``      | Any general notes about an address determined by the   |
-|               | user                                                   |
-+---------------+--------------------------------------------------------+
-| ``marks``     | A set containing any marks contained within a function |
-+---------------+--------------------------------------------------------+
-| ``mark``      | A string containing the description for a mark at an   |
-|               | address                                                |
-+---------------+--------------------------------------------------------+
-| ``object``    | The name or address(es) of a related vtable applied to |
-|               | a function that is used to call a method.              |
-+---------------+--------------------------------------------------------+
-| ``input``     | A dictionary mapping register arguments to a function  |
-+---------------+--------------------------------------------------------+
-| ``return``    | A list containing the registers that a result is       |
-|               | composed of                                            |
-+---------------+--------------------------------------------------------+
