@@ -63,47 +63,68 @@ the <code class="docutils literal notranslate"><span class="pre">plugins/minsc.p
 its contents in order to assign the path that you have cloned the repository
 into. After it has been modified, when starting up IDA you should then notice
 that the “About Minsc” menu item is listed under your currently installed plugins.</p>
-<p>If using an <strong>older</strong> version of IDA Pro, one may need to use the previous
-installation methodology at section <a class="reference internal" href="#install-older"><span class="std std-ref">1.6</span></a> to ensure that
-IDA-Minsc is loaded immediately after IDA has been started. To install it in
-this manner, the idea is that the “<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code>” file from the IDA-Minsc
-repository is executed by IDAPython when the user starts up IDA. This is done
-by cloning the IDA-Minsc repository <strong>directly</strong> into the IDA user directory.
-This way when IDA starts, IDA-Minsc will then empty out the default namespace
-and replace it with its own.</p>
+<p>However, if you are using an “older” version of IDA Pro, you may need to use
+the previous installation methodology (at section <a class="reference internal" href="#install-older"><span class="std std-ref">1.6</span></a>).
+This ensures that IDA-Minsc is loaded immediately after IDA has been started.
+To install it in this manner, the idea is that the “<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code>” file
+from the IDA-Minsc repository is executed by IDAPython when the user starts up
+IDA. This is done by cloning the IDA-Minsc repository directly into the IDA
+user directory.  This way when IDA starts, IDA-Minsc will then empty out the
+default namespace and replace it with its own.</p>
+<p>In summary, you will be performing the following steps.</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li>Ensure that Git is installed, IDA Pro works and you can use IDAPython.</li>
+<li>Using Git, clone the repository at <a class="reference external" href="https://github.com/arizvisa/ida-minsc">https://github.com/arizvisa/ida-minsc</a>
+in a directory of your choosing.</li>
+<li>Install the Python requirements using the Python package manager (<code class="docutils literal notranslate"><span class="pre">pip</span></code>)
+with the <code class="docutils literal notranslate"><span class="pre">&quot;requirements.txt&quot;</span></code> file in the plugin directory.</li>
+<li>Edit the <code class="docutils literal notranslate"><span class="pre">&quot;plugins/minsc.py&quot;</span></code> file in the plugin directory so that
+it points at whatever directory you cloned the repository into.</li>
+<li>Deploy your modified <code class="docutils literal notranslate"><span class="pre">&quot;plugins/minsc.py&quot;</span></code> file into the “plugins”
+sub-directory of your IDA user directory.</li>
+<li>Run IDA Pro and ensure that the plugin is listed and works.</li>
+</ol>
+</div></blockquote>
+<p>That’s it!</p>
 <div class="section" id="software-requirements">
 <h2>1.1. Software Requirements<a class="headerlink" href="#software-requirements" title="Permalink to this headline">¶</a></h2>
 <p>This plugin requires IDA Pro disassembler [<a class="reference internal" href="#software-references"><span class="std std-ref">1</span></a>] to be
-installed along with the IDAPython plugin. To update the IDA-Minsc plugin, the
-Git [<a class="reference internal" href="#software-references"><span class="std std-ref">2</span></a>] software is also required. This makes you
-responsible for updating with regards to any newer features and avoids using
-the many auto-updating systems that are pervasive throughout software. You may
+installed along with its IDAPython plugin. To download the IDA-Minsc plugin, the
+Git [<a class="reference internal" href="#software-references"><span class="std std-ref">2</span></a>] software is also required. This puts the
+responsibility for updating the software in your hands and forces you to update it
+yourself. This is preferred by the author instead of running arbitrary scripts
+over the internet, mostly because the author is vehemently opposed to the many
+auto-updating systems that are pervasive throughout all of our software. You may
 download Git at [<a class="reference internal" href="#software-references"><span class="std std-ref">3</span></a>] and then run it in order to get
-it installed. This should put “<code class="docutils literal notranslate"><span class="pre">git</span></code>” within your <code class="docutils literal notranslate"><span class="pre">PATH</span></code> and allow you to
-run it from the command line. This is necessary as it will be used for cloning
-the repository [<a class="reference internal" href="#software-references"><span class="std std-ref">4</span></a>] containing the actual plugin.</p>
+it installed. This should put “<code class="docutils literal notranslate"><span class="pre">git</span></code>” within your <code class="docutils literal notranslate"><span class="pre">PATH</span></code> and allow you to run
+it from the command line. This is necessary as it will be used for cloning the
+repository [<a class="reference internal" href="#software-references"><span class="std std-ref">4</span></a>] that contains the actual plugin.</p>
 <p>Currently, IDA versions 6.8 up to 7.7.220125 [<a class="reference internal" href="#software-references"><span class="std std-ref">5</span></a>] are
-supported along with <code class="docutils literal notranslate"><span class="pre">both</span></code> versions of the Python interpreter [<a class="reference internal" href="#software-references"><span class="std std-ref">6</span></a>].
-This includes the Python 3.x series and the older Python 2.x series. The installation
+supported by the plugin along with both versions of the Python interpreter
+[<a class="reference internal" href="#software-references"><span class="std std-ref">6</span></a>]. This means that both the <strong>Python 3.x</strong> series
+<strong>and</strong> the older <strong>Python 2.x</strong> series should be usable. However, the installation
 steps described within this document assume that you have Python 3.9 installed
 [<a class="reference internal" href="#software-references"><span class="std std-ref">7</span></a>] and that it is also accessible via the command
 line. If this is not the case, you may need to follow additional steps in order
-to install Python and get it working within your instance of IDA Pro.</p>
-<p>If you have installed IDA and realized that another plugin in which you are
-interested in requires a different version of Python, please review the
-<a class="reference internal" href="#downgrading-the-idapython-version-to-python-2-x-for-other-plugins">Downgrading the IDAPython version to Python 2.x for other plugins</a> section
-for your platform in order to switch between them. To be clear, none of this
-is required for the IDA-Minsc plugin and is instead only described in order
-to support older versions of other plugins that you may need.</p>
+to install Python and get it working within your instance of IDA Pro. If your
+situation is different, please contact the author at [<a class="reference internal" href="#software-references"><span class="std std-ref">8</span></a>],
+so that the documentation can be updated.</p>
+<p>If you have already installed IDA and realized that another plugin that you are
+interested in using requires you to use Python 2.x for it to work, please review
+the <a class="reference internal" href="#downgrading-the-idapython-version-to-python-2-x-for-other-plugins">Downgrading the IDAPython version to Python 2.x for other plugins</a> section
+for your platform which describes how to switch between them. To be clear, none
+of this is required for the IDA-Minsc plugin and is instead only described in order
+to support older versions of other plugins that you may use in your endeavors.</p>
 <div class="section" id="cloning-the-repository">
 <h3>1.1.1. Cloning the repository<a class="headerlink" href="#cloning-the-repository" title="Permalink to this headline">¶</a></h3>
 <p>To install the plugin, the contents of the repository will need to be cloned with
-Git into a directory of your choosing. After you have downloaded Git [<a class="reference internal" href="#software-references"><span class="std std-ref">3</span></a>]
-and installed it, you should then be able to clone the repository containing the
-plugin [<a class="reference internal" href="#software-references"><span class="std std-ref">4</span></a>] into your desired installation directory.
-If you’re using the command line to clone the plugin repository, you will first
-need to navigate to your desired installation directory and then you can run the
-following if “<code class="docutils literal notranslate"><span class="pre">git</span></code>” is within your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
+Git into a directory of your choosing. After you have downloaded the Git software
+and installed it [<a class="reference internal" href="#software-references"><span class="std std-ref">3</span></a>], you should then be able to clone
+the repository containing the plugin [<a class="reference internal" href="#software-references"><span class="std std-ref">4</span></a>] into your
+desired installation directory. If you’re using the command line to clone the plugin
+repository, you will first need to navigate to your desired installation directory
+and then you can run the following if “<code class="docutils literal notranslate"><span class="pre">git</span></code>” is within your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">cd</span> /path/to/installation/directory/
 $ git clone https://github.com/arizvisa/ida-minsc
 </pre></div>
@@ -115,21 +136,21 @@ Afterwards, you can proceed with installing any of the required Python dependenc
 <span id="install-dependencies"></span><h3>1.1.2. Required Python dependencies<a class="headerlink" href="#required-python-dependencies" title="Permalink to this headline">¶</a></h3>
 <p>This project depends on a small number of Python modules that you will need to
 install into Python’s “<code class="docutils literal notranslate"><span class="pre">site-packages</span></code>” directory. These modules are mostly
-used to provide a reasonable graph implementation. But there are other modules
-which are used for compatibility with both Python3 and Python2.</p>
+used to provide a reasonable graph implementation, but there are other modules
+which are used for retaining compatibility with both Python3 and Python2.</p>
 <p>To install these required modules you can use the “<code class="docutils literal notranslate"><span class="pre">pip</span></code>” tool which comes
 with Python to install them. In the root of the repository, there’s a file
-“<code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>” that you can use. This file contains the required
-dependencies and can be installed by executing the following while in the
-directory that you cloned the repository into.</p>
+“<code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>” that you can use to accomplish this. This file contains
+the required dependencies and can be installed by executing the following while
+in the directory that you cloned the repository into.</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>$ pip install -r requirements.txt
 </pre></div>
 </div>
 <p>This should install all of the required Python dependencies, and then you can
 proceed with installing the actual plugin. There are two ways to install the
 plugin. The new way which requires you to modify a file and manually deploy
-it within the plugin directory, and then the old way which is only necessary
-if you’re using an older version of IDA Pro.</p>
+it within the plugin directory, and then the old way (section <a class="reference internal" href="#install-older"><span class="std std-ref">1.6</span></a>)
+which is only necessary if you’re using an older version of IDA Pro.</p>
 <p class="rubric" id="software-references">References</p>
 <ol class="arabic simple">
 <li><a class="reference external" href="https://hex-rays.com/ida-pro/ida-disassembler/">Hex Rays: IDA Disassembler — https://hex-rays.com/ida-pro/ida-disassembler/</a></li>
@@ -139,6 +160,7 @@ if you’re using an older version of IDA Pro.</p>
 <li><a class="reference external" href="https://hex-rays.com/blog/ida-7-7-released/">Hex Rays: IDA 7.7 released — https://hex-rays.com/blog/ida-7-7-released/</a></li>
 <li><a class="reference external" href="https://www.python.org/">Python: Welcome to Python.org — https://www.python.org/</a></li>
 <li><a class="reference external" href="https://www.python.org/downloads/release/python-3913">Python: Downloading Python 3.9.13 — https://wiki.python.org/moin/BeginnersGuide/Download</a></li>
+<li><a class="reference external" href="https://github.com/arizvisa/ida-minsc/issues/new?title=My+instance+of+IDAPython+appears+broken...">IDA-Minsc: Python issues — https://github.com/arizvisa/ida-minsc/issues</a></li>
 </ol>
 </div>
 </div>
@@ -147,18 +169,19 @@ if you’re using an older version of IDA Pro.</p>
 <p>Once the repository has been cloned into a directory of your choice, you will
 need to modify the “<code class="docutils literal notranslate"><span class="pre">./plugins/minsc.py</span></code>” file from the repository to point it
 to whichever directory you cloned the repository into. After it’s been properly
-modified, you can then deploy it into the IDA user directory.</p>
-<p>Near the very top of this file, you should see the following text which is referencing
-a variable which tells the plugin where its repository is actually located. By default
-it uses the current IDA user directory for the prior installation method, but it
-can actually be changed to reference any directory that you prefer.</p>
+modified, you can then deploy it into the IDA user directory [<a class="reference internal" href="#install-references"><span class="std std-ref">1</span></a>].</p>
+<p>Near the very top of “<code class="docutils literal notranslate"><span class="pre">./plugins/minsc.py</span></code>” file, you should see the following code
+which is a variable that tells the plugin where its repository is actually located.
+By default it uses the current IDA user directory for the prior installation method
+that is described in section <a class="reference internal" href="#install-older"><span class="std std-ref">1.6</span></a>, but it can actually be changed
+to reference any directory that you prefer.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># :: Point this variable at the directory containing the repository of the plugin ::</span>
 <span class="n">root</span> <span class="o">=</span> <span class="n">idaapi</span><span class="o">.</span><span class="n">get_user_idadir</span><span class="p">()</span>
 </pre></div>
 </div>
-<p>It is this variable that you will need to modify to point it at the directory
-that you cloned the repository into. As this is Python, you will need to keep in
-mind that the directory will need to be specified as a string and will require any
+<p>It is this variable that you will need to modify to point at the directory that
+you cloned the repository into. As this is Python, you will need to keep in mind
+that the directory will need to be specified as a string and will require any
 escaping as is necessary for whatever path you specify.</p>
 <p>As an example, if you have cloned the repository into “<code class="docutils literal notranslate"><span class="pre">C:\Users\Guest\IDA-Minsc</span></code>”,
 you would modify the variable in the file as so:</p>
@@ -170,30 +193,28 @@ you would modify the variable in the file as so:</p>
 <span class="n">root</span> <span class="o">=</span> <span class="s1">&#39;C:</span><span class="se">\\</span><span class="s1">Users</span><span class="se">\\</span><span class="s1">Guest</span><span class="se">\\</span><span class="s1">ida-minsc&#39;</span>
 </pre></div>
 </div>
-<p>After the file has been modified, you can then deploy this file into your IDA user
-directory under the sub-directory labeled “<code class="docutils literal notranslate"><span class="pre">plugins</span></code>”. On the Windows platform,
-IDA Pro’s user directory is typically found at “<code class="docutils literal notranslate"><span class="pre">%APPDATA%/Roaming/Hex-Rays/IDA</span> <span class="pre">Pro</span></code>”
-whereas on Linux or MacOS the path to this directory can be found under
-“<code class="docutils literal notranslate"><span class="pre">$HOME/.idapro</span></code>” [<a class="reference internal" href="#install-references"><span class="std std-ref">1</span></a>]. If you’re not sure of the path that
-IDA’s user directory is located at, you can simply execute the following at the IDAPython
-prompt to print out the correct path.</p>
+<p>After the file has been modified, it is then ready to be depoyed into your IDA
+user directory under the sub-directory labeled “<code class="docutils literal notranslate"><span class="pre">plugins</span></code>”. On the Windows platform,
+the IDA Pro user directory is typically found at “<code class="docutils literal notranslate"><span class="pre">%APPDATA%/Roaming/Hex-Rays/IDA</span> <span class="pre">Pro</span></code>”
+whereas on Linux or MacOS the path to this directory can be found under “<code class="docutils literal notranslate"><span class="pre">$HOME/.idapro</span></code>”.
+If you’re not sure of the path that IDA’s user directory is located at, you can simply
+execute the following at the IDAPython prompt to print out its location.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span><span class="n">idaapi</span><span class="o">.</span><span class="n">get_user_idadir</span><span class="p">())</span>
 </pre></div>
 </div>
-<p>After you have modified the file and identified your IDA user directory that you
-will be deploying the modified file into, you can then copy the “<code class="docutils literal notranslate"><span class="pre">./plugins/minsc.py</span></code>” file
-to it. To ensure this directory exists, you can execute the following at the IDAPython
-prompt to first create the directory (which could raise an exception if it already
-exists), and then print out the location that you will need to copy the “<code class="docutils literal notranslate"><span class="pre">./plugins/minsc.py</span></code>”
-file into.</p>
+<p>Once knowing the location of the IDA user directory and identifying your “<code class="docutils literal notranslate"><span class="pre">plugins</span></code>”
+directory, you can then copy the modified “<code class="docutils literal notranslate"><span class="pre">./plugins/minsc.py</span></code>” file into it. To ensure
+this directory exists, you can execute the following at the IDAPython prompt which first
+creates the directory (which could raise an exception if it already exists), and then
+output the exact location that you will need to copy the “<code class="docutils literal notranslate"><span class="pre">./plugins/minsc.py</span></code>” file into.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">plugins</span> <span class="o">=</span> <span class="n">idaapi</span><span class="o">.</span><span class="n">get_user_idadir</span><span class="p">()</span> <span class="o">+</span> <span class="s1">&#39;/plugins&#39;</span>
 <span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">os</span>
 <span class="o">&gt;</span> <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">plugins</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span><span class="n">plugins</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Once the modified “<code class="docutils literal notranslate"><span class="pre">plugins/minsc.py</span></code>” file has been copied to this location, the
-plugin should be installed. Whenever you startup IDA, the “About Minsc” menu item
+<p>Once your modified “<code class="docutils literal notranslate"><span class="pre">plugins/minsc.py</span></code>” file has been copied to this location, the
+plugin should be installed and whenever you startup IDA, the “About Minsc” menu item
 will be visible in the plugins list. The plugins list can be found within the menu
 system of IDA under “Edit” 🠞 “Plugins”.</p>
 <div class="section" id="sanity-checking-the-installation">
@@ -210,7 +231,7 @@ has been installed. To do this, ensure that the IDAPython prompt is selected as
 <p>This should return a number (typically <code class="docutils literal notranslate"><span class="pre">0</span></code> due to there being no database loaded).
 If this is successful, then you should now have access to the modules that compose
 IDA-Minsc. If you have problems with this process, please feel free to open up an
-issue under GitHub’s issue tracker for the project.</p>
+issue under GitHub’s issue tracker for the project [<a class="reference internal" href="#install-references"><span class="std std-ref">2</span></a>].</p>
 <p class="rubric" id="install-references">References</p>
 <ol class="arabic simple">
 <li><a class="reference external" href="https://www.hex-rays.com/products/ida/support/idadoc/1375.shtml">IDA Help: Environment variables (%IDAUSR%) — https://www.hex-rays.com/products/ida/support/idadoc/1375.shtml</a></li>
@@ -249,15 +270,15 @@ this are as follows:</p>
 <span class="o">&gt;</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">globals</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">sys</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s1">&#39;__module__&#39;</span><span class="p">)]</span>
 </pre></div>
 </div>
-<p>Another aspect that the user may find useful as they get more accustomed to
-using the features provided by the plugin is the ability to query the tags
-that they have assigned within their database. For the sake of brevity,
-this can be used to query the various parts of your database such as global
-addresses (via <a class="reference internal" href="modules/database.html#database.select" title="database.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.select()</span></code></a>), function contents (via <a class="reference internal" href="modules/function.html#function.select" title="function.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.select()</span></code></a>),
-types (via <a class="reference internal" href="modules/structure.html#structure.select" title="structure.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.select()</span></code></a>), or their members (via <a class="reference internal" href="modules/structure.html#structure.members_t.select" title="structure.members_t.select"><code class="xref py py-meth docutils literal notranslate"><span class="pre">structure.members_t.select()</span></code></a>).
-Tagging is described in detail at section <a class="reference internal" href="tagging.html#tagging-intro"><span class="std std-ref">2.2</span></a>, but one of
-the most common things that you may want to query will be within the contents of
-your functions. Thus, another utility you may find useful would be the following:</p>
+<p>Another aspect that the user may find useful as they get more accustomed to using the
+features provided by the plugin is the ability to query the tags that they have
+assigned within their database. For the sake of brevity, this can be used to query
+the various parts of your database such as global addresses (via <a class="reference internal" href="modules/database.html#database.select" title="database.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.select()</span></code></a>),
+function contents (via <a class="reference internal" href="modules/function.html#function.select" title="function.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.select()</span></code></a>), types (via <a class="reference internal" href="modules/structure.html#structure.select" title="structure.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.select()</span></code></a>),
+or their members (via <a class="reference internal" href="modules/structure.html#structure.members_t.select" title="structure.members_t.select"><code class="xref py py-meth docutils literal notranslate"><span class="pre">structure.members_t.select()</span></code></a>). Tagging is described in
+detail at section <a class="reference internal" href="tagging.html#tagging-intro"><span class="std std-ref">2.2</span></a>, but one of the most common things that
+you may want to query will be within the contents of your functions. Thus, another
+utility you may find useful would be the following:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">selectall</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="o">&gt;</span>     <span class="k">for</span> <span class="n">fn</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="o">&gt;</span>         <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="o">*</span><span class="n">tags</span><span class="p">):</span>
@@ -267,8 +288,8 @@ your functions. Thus, another utility you may find useful would be the following
 </pre></div>
 </div>
 <p>It is recommended by the author that you include some of these example utility
-functions, or import modules that can be used for serialization or deserialization of
-Python objects (such as <a class="reference external" href="https://docs.python.org/3/library/pickle.html">pickle</a>
+functions, or import modules that can be used for serialization or deserialization
+of Python objects (such as <a class="reference external" href="https://docs.python.org/3/library/pickle.html">pickle</a>
 or <a class="reference external" href="https://pypi.org/project/dill/">dill</a>) within your default namespace.
 Customization of your default namespace is described in the next section.</p>
 <div class="section" id="customizing-the-default-namespace">
@@ -281,13 +302,14 @@ path, “<code class="docutils literal notranslate"><span class="pre">$USERPROFI
 is executed followed by the loading process for the plugin which will try to locate
 the “<code class="docutils literal notranslate"><span class="pre">.idapythonrc.py</span></code>” file within your home (or user profile) directory.
 Once this is located, it will then evaluated at startup. Similarly, when a
-specific database is opened up, the plugin will also look for a file alongside
-the database with the name, “<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code>”, and execute it when the database
-has been loaded.</p>
+you open up a database with IDA, the plugin will also look for a file in the same
+directory as the database with the name “<code class="docutils literal notranslate"><span class="pre">idapythonrc.py</span></code>”. If it is found, the
+plugin will execute the script when the database has been loaded.</p>
 <p>As mentioned, these files can allow you to define functions that you may find useful
-or to add aliases for the more common ones that you may use. If you wish to attach custom
-hooks or key bindings using the <a class="reference internal" href="modules/misc-ui.html#module-ui" title="ui"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ui</span></code></a> module, this would be the place to add them.
-By default the following functions are available in the default namespace:</p>
+or to add aliases for the more common ones that you may use. If you wish to attach
+custom hooks or key bindings using the <a class="reference internal" href="modules/misc-ui.html#module-ui" title="ui"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ui</span></code></a> module (section <a class="reference internal" href="tutorials.html#tutorials-userinterface"><span class="std std-ref">4.5</span></a>),
+this would be the place to add them. By default the following functions are available
+from IDAPython when you start up IDA Pro.</p>
 <table border="1" class="docutils">
 <colgroup>
 <col width="20%" />
@@ -325,10 +347,12 @@ to the specified offset from the lowest address in the database</td>
 </table>
 <p>There are also a number of combinators that are exposed to the user via the
 default namespace if the user is familiar with that style of programming.
-Please see <a class="reference internal" href="combinators.html"><span class="doc">Functional combinators</span></a> for more information on how these can be used.</p>
+Please see the section on <a class="reference internal" href="combinators.html"><span class="doc">Functional combinators</span></a> for more information on how
+these may be used.</p>
 <p>Some of the base types that can be used for checking their types with <code class="xref py py-func docutils literal notranslate"><span class="pre">isinstance()</span></code>
 are also included in the default namespace. For more information on these types, it
-is recommended to use an instance of the type with the <code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code> function.</p>
+is recommended to use the <code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code> function on an instance of the type when
+you discover one.</p>
 <table border="1" class="docutils">
 <colgroup>
 <col width="29%" />
@@ -344,15 +368,15 @@ is recommended to use an instance of the type with the <code class="xref py py-f
 <tbody valign="top">
 <tr class="row-even"><td><code class="xref py py-class docutils literal notranslate"><span class="pre">register_t</span></code></td>
 <td>–</td>
-<td>The base type that registers are inherited from</td>
+<td>The base type that registers are inherited from and
+that can be resolved if you are using the debugger</td>
 </tr>
 <tr class="row-odd"><td><code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></td>
 <td>–</td>
-<td>A type that is used to represent objects that are
-composed of some number of symbols. This can be used
-to enumerate through all the registers returned from
-an operand such as <a class="reference internal" href="modules/instruction.html#instruction.op" title="instruction.op"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op()</span></code></a>, or any
-object that may contain an unresolvable symbol.</td>
+<td>A type that is used to represent objects that may be
+composed of other symbols and whose individual
+coponents may be enumerated. An example of this can
+be found via the <a class="reference internal" href="modules/instruction.html#instruction.op" title="instruction.op"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op()</span></code></a> function.</td>
 </tr>
 <tr class="row-even"><td><code class="xref py py-class docutils literal notranslate"><span class="pre">bounds_t</span></code></td>
 <td>–</td>
@@ -364,22 +388,22 @@ object that may contain an unresolvable symbol.</td>
 </tr>
 <tr class="row-even"><td><code class="xref py py-class docutils literal notranslate"><span class="pre">ref_t</span></code></td>
 <td>–</td>
-<td>A tuple describing a reference to a memory address
-that is read from, written to, or executed.</td>
+<td>A tuple describing a memory address reference that
+is read from (r), written to (w), or executed (x)</td>
 </tr>
 <tr class="row-odd"><td rowspan="2"><code class="xref py py-class docutils literal notranslate"><span class="pre">opref_t</span></code></td>
 <td rowspan="2">–</td>
-<td rowspan="2">A tuple describing a reference for an instruction
-operand that is either reading from, writing to, or
-executing the contained address.</td>
+<td rowspan="2">A tuple describing an instruction operand reference
+that is either reading from (r), writing to (w), or
+executing (x) the described address</td>
 </tr>
 <tr class="row-even"></tr>
 </tbody>
 </table>
 <p>In order to shorten the typing required to access the more commonly used parts of the
-API, most of the available modules are aliased as shorter and thus easier to remember
-names. Thus to access these parts of the API, one can use these aliases instead of the
-full module name to get access to them.</p>
+plugin API, most of the available modules are aliased as shorter and thus easier to
+remember names. Thus to access these parts of the API, you can use these aliases instead
+of the full module name to get access to them.</p>
 <table border="1" class="docutils">
 <colgroup>
 <col width="47%" />
@@ -425,11 +449,13 @@ full module name to get access to them.</p>
 </table>
 <p>It is recommended by the author that the user use <code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code> to explore these modules
 when trying to identify certain aspects of functionality that the user may want to use when
-querying their database or scripting different parts of IDA. The names of these modules
-and the functions within try to group functionality within the context that they’re used
-and attempt to use names that can be referenced in proper english. The namining of these
-functions are of course debatable, and if you believe something should be named differently
-or another alias should be included, please contact the author.</p>
+querying their database or scripting different parts of IDA Pro. The author has attempted
+to name these modules and the functions within using actual words based on English and has
+also tried to group related functionality within their specific context. Thus, the only thing
+you should need to remember when using an API is whether you want to use an address or not.
+The names of the functions within the module are of course debatable, and as such if you
+believe something should be named differently or another alias should be included, please
+report an issue.</p>
 </div>
 </div>
 <div class="section" id="help-with-scripting-or-reporting-issues">
@@ -495,7 +521,7 @@ about getting it added to this list.</p>
 </ol>
 </div>
 <div class="section" id="previous-installation-method-for-the-plugin">
-<h2>1.6. Previous installation method for the plugin<a class="headerlink" href="#previous-installation-method-for-the-plugin" title="Permalink to this headline">¶</a></h2>
+<span id="install-older"></span><h2>1.6. Previous installation method for the plugin<a class="headerlink" href="#previous-installation-method-for-the-plugin" title="Permalink to this headline">¶</a></h2>
 <p>The following section describes other ways that the plugin may be
 installed or how to customize which version of the Python
 interpreter that the IDAPython plugin will use in order for
@@ -556,7 +582,7 @@ the choice of choosing a Python version is left completely up to the user. To
 temporary switch the interpreter that IDAPython uses, IDA provides a couple of
 avenues that a user can take [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">3</span></a>].</p>
 <div class="section" id="earlier-versions-of-idapython">
-<span id="install-older"></span><h4>1.6.2.1. Earlier versions of IDAPython<a class="headerlink" href="#earlier-versions-of-idapython" title="Permalink to this headline">¶</a></h4>
+<h4>1.6.2.1. Earlier versions of IDAPython<a class="headerlink" href="#earlier-versions-of-idapython" title="Permalink to this headline">¶</a></h4>
 <p>When installing IDA Pro, all of the available plugins that are currently installed
 can be found under the “<code class="docutils literal notranslate"><span class="pre">plugins</span></code>” subdirectory [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">4</span></a>].
 On Windows, this directory is commonly found at a path that is similar to
