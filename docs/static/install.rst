@@ -4,29 +4,29 @@
 Installation of IDA-Minsc
 =========================
 
-To install IDA-Minsc on the various platforms that a user has installed
-IDA in, it simply requires the user to clone the repository into a directory
-of their choosing. After the repository has been cloned, the user will then
-need to copy the ``plugins/minsc.py`` file into their IDA user directory and
-then modify its contents in order to set the path that you have cloned the
-repository in. After it has been modified, when starting up IDA the user
-should then notice that the "About Minsc" menu item is listed under their
-currently installed plugins.
+To install IDA-Minsc on whichever platform that you may have installed IDA
+in, it simply requires you to clone the repository into a directory of your
+choosing. After the repository has been cloned, you will then need to copy
+the ``plugins/minsc.py`` file into their IDA user directory and then modify
+its contents in order to assign the path that you have cloned the repository
+into. After it has been modified, when starting up IDA you should then notice
+that the "About Minsc" menu item is listed under your currently installed plugins.
 
-If using an older version of IDA, one may use the previous methodology to
-ensure that IDA-Minsc is running at all times when IDA has been started.
-To install it in this manner, the idea is that IDA-Minsc's "``idapythonrc.py``"
-file is executed by IDAPython when the user starts up IDA. This is done by
-cloning the IDA-Minsc repository directly into the IDA user directory. Then
-when IDA starts, IDA-Minsc will then empty out the default namespace and
-replace it with its own.
+If using an **older** version of IDA Pro, one may need to use the previous
+installation methodology at section :ref:`1.6<install-older>` to ensure that
+IDA-Minsc is loaded immediately after IDA has been started. To install it in
+this manner, the idea is that the "``idapythonrc.py``" file from the IDA-Minsc
+repository is executed by IDAPython when the user starts up IDA. This is done
+by cloning the IDA-Minsc repository **directly** into the IDA user directory.
+This way when IDA starts, IDA-Minsc will then empty out the default namespace
+and replace it with its own.
 
 ---------------------
 Software Requirements
 ---------------------
 
 This plugin requires IDA Pro disassembler [:ref:`1<software-references>`] to be
-installed along with the IDAPython plugin. To update the IDA-minsc plugin, the
+installed along with the IDAPython plugin. To update the IDA-Minsc plugin, the
 Git [:ref:`2<software-references>`] software is also required. This makes you
 responsible for updating with regards to any newer features and avoids using
 the many auto-updating systems that are pervasive throughout software. You may
@@ -38,17 +38,17 @@ the repository [:ref:`4<software-references>`] containing the actual plugin.
 Currently, IDA versions 6.8 up to 7.7.220125 [:ref:`5<software-references>`] are
 supported along with ``both`` versions of the Python interpreter [:ref:`6<software-references>`].
 This includes the Python 3.x series and the older Python 2.x series. The installation
-steps described within this document assume that you have Python 3.9 installed [:ref:`7<software-references>`]
-and that it is also accessible via the command line. If this is not the case,
-you may need to follow additional steps in order to install Python and get it
-working within your instance of IDA Pro.
+steps described within this document assume that you have Python 3.9 installed
+[:ref:`7<software-references>`] and that it is also accessible via the command
+line. If this is not the case, you may need to follow additional steps in order
+to install Python and get it working within your instance of IDA Pro.
 
 If you have installed IDA and realized that another plugin in which you are
 interested in requires a different version of Python, please review the
 `Downgrading the IDAPython version to Python 2.x for other plugins`_ section
 for your platform in order to switch between them. To be clear, none of this
-is required for this plugin and is instead only provided in order to support
-older versions of other plugins that may be available.
+is required for the IDA-Minsc plugin and is instead only described in order
+to support older versions of other plugins that you may need.
 
 Cloning the repository
 ----------------------
@@ -208,45 +208,73 @@ allows you to use a function such as :py:func:`help` for identifying what
 parameters are best or :py:func:`dir` to list all the functions that you
 have created during a reversing session. The aim of this is to allow you
 to automate simple things, or to do more advanced things such as pickling
-your entire sesssion to disk so that you can resume it later between
+your entire session to disk so that you can resume it later between
 distinctly separate instances of IDA.
 
 To get access to help, it is recommended by the author to use either the
-:py:func:`help` function, or to use ``?`` shortcut at the IDAPython command
-line instead of having to use external documentation (``?database.functions``).
-Some examples of using this are as follows::
+Python :py:func:`help` function, or to use the ``?`` shortcut that is
+provided the IDAPython command line ("``?database.functions``"). This
+avoids the need of having to use any external documentation when hacking
+together a script that is needed to import or export information from the
+database. Some examples of using the :py:func:`help` function are as follows::
 
     > help(database)
     > help(function)
 
-Similarly, to list what functions are currently available within your
+Similarly, to list the functions that you have defined within your
 current namespace, you can use the :py:func:`dir` function to list
-what you've already defined or you can access :py:func:`globals` in
-various ways to filter what you've already defined. Some examples of
-how to do this are::
+both the functions and variables. Likewise, you can access the contents
+of the namespace using the :py:func:`globals` function in various ways
+to filter things that you've already defined. Some basic examples of doing
+this are as follows::
 
     > dir()
     > [name for name, item in globals().items() if not isinstance(item, type(sys))]
     > [name for name, item in globals().items() if not isinstance(item, type(sys)) and not hasattr(v, '__module__')]
 
+Another aspect that the user may find useful as they get more accustomed to
+using the features provided by the plugin is the ability to query the tags
+that they have assigned within their database. For the sake of brevity,
+this can be used to query the various parts of your database such as global
+addresses (via :py:func:`database.select`), function contents (via :py:func:`function.select`),
+types (via :py:func:`structure.select`), or their members (via :py:meth:`structure.members_t.select`).
+Tagging is described in detail at section :ref:`2.2<tagging-intro>`, but one of
+the most common things that you may want to query will be within the contents of
+your functions. Thus, another utility you may find useful would be the following::
+
+    > def selectall(*args, **kwargs):
+    >     for fn, tags in database.selectcontents(*args, **kwargs):
+    >         for ea, results in func.select(fn, *tags):
+    >             yield ea, results
+    >         continue
+    >     return
+
+It is recommended by the author that you include some of these example utility
+functions, or import modules that can be used for serialization or deserialization of
+Python objects (such as `pickle <https://docs.python.org/3/library/pickle.html>`_
+or `dill <https://pypi.org/project/dill/>`_) within your default namespace.
+Customization of your default namespace is described in the next section.
+
 Customizing the default namespace
 ---------------------------------
 
 If you wish to import your own modules, or define custom functionality using
-the tools available within IDA-Minsc, you can simply add them to a file in
-your home directory named "``$HOME/.idapythonrc.py``".
+the tooling that is provided by IDA-Minsc, you can simply add them to a file in
+your home directory using the "``$HOME/.idapythonrc.py``" path or the equivalent
+path, "``$USERPROFILE/.idapythonrc.py``", used by the Windows platform.
 
-By default when IDA-Minsc starts up, the typical Python interpreter logic
-is executed followed by the plugin loading process which will try to locate
-the "``.idapythonrc.py``" file within your home directory (or profile) and
-then evaluate it at startup. Similarly, when a database is opened up, the
-plugin will also look for a file alongside the database with the name,
-"``idapythonrc.py``", and execute it when the database is loaded.
+By default when IDA-Minsc starts up, the standard Python interpreter logic
+is executed followed by the loading process for the plugin which will try to locate
+the "``.idapythonrc.py``" file within your home (or user profile) directory.
+Once this is located, it will then evaluated at startup. Similarly, when a
+specific database is opened up, the plugin will also look for a file alongside
+the database with the name, "``idapythonrc.py``", and execute it when the database
+has been loaded.
 
 As mentioned, these files can allow you to define functions that you may find useful
-or add aliases for the more common ones that you may use. If you wish to attach custom
+or to add aliases for the more common ones that you may use. If you wish to attach custom
 hooks or key bindings using the :py:mod:`ui` module, this would be the place to add them.
-By default the following functions are avaialble in the default namespace:
+By default the following functions are available in the default namespace:
 
 +-----------------+----+-----------------------------------------------------------------+
 | alias name      |    | description of alias                                            |
@@ -296,8 +324,9 @@ is recommended to use an instance of the type with the :py:func:`help` function.
 +------------------------+----+------------------------------------------------------+
 
 In order to shorten the typing required to access the more commonly used parts of the
-api, there are a number of modules that are aliased. Thus to access these parts of the
-api, one can use their default aliases which are as follows.
+API, most of the available modules are aliased as shorter and thus easier to remember
+names. Thus to access these parts of the API, one can use these aliases instead of the
+full module name to get access to them.
 
 +-----------------------+----+----------------------+
 | module name           |    | alias name           |
@@ -319,16 +348,20 @@ api, one can use their default aliases which are as follows.
 
 It is recommended by the author that the user use :py:func:`help` to explore these modules
 when trying to identify certain aspects of functionality that the user may want to use when
-querying their database or scripting different parts of IDA.
+querying their database or scripting different parts of IDA. The names of these modules
+and the functions within try to group functionality within the context that they're used
+and attempt to use names that can be referenced in proper english. The namining of these
+functions are of course debatable, and if you believe something should be named differently
+or another alias should be included, please contact the author.
 
 ---------------------------------------
 Help with scripting or reporting issues
 ---------------------------------------
 
 There is a wiki that is hosted at the plugin's repository page [:ref:`1<usage-references>`]
-which may contain more information that might be worth reading. If you have any
-questions about scripting parts of your reverse-engineering session [:ref:`2<usage-references>`]
-or issues that may need to be reported [:ref:`3<usage-references>`], please do not hestitate
+which may contain more information that might be worth reading. If you have any questions
+about scripting parts of your reverse-engineering session [:ref:`2<usage-references>`] or
+issues that may need to be reported [:ref:`3<usage-references>`], please do not hesitate
 to ask.
 
 .. _usage-references:
@@ -343,43 +376,44 @@ to ask.
 Compatibility with other plugins
 --------------------------------
 
-This plugin "aims" to be friendly with a number of other plugins. Some
-plugins that the author has found useful and may be worth checking
-out if you're trying to script yourself out of a job are as follows.
+This plugin "aims" to be friendly with a number of other plugins that a user may
+use to script themself out of a job. Some plugins that the author has found useful
+or interesting and may be worth checking out are listed below.
 
     1. :ref:`IPyIDA<competitors>`: https://github.com/eset/ipyida 
 
        This plugin provides an IPython (Jupyter) interface for editing IDAPython scripts. IPython/Jupyter is
        a "notebook interface" as popularized by Stephen Wolfram's Mathematica which combines some aspects of
-       Knuth's ideas of "Literate Programming" into an elegant interface for writing code.
+       Knuth's ideas from "Literate Programming" into an elegant interface for writing code.
 
     2. :ref:`PyKd<competitors>`: https://githomelab.ru/pykd/pykd 
 
-       This is not an IDA plugin, but it exposes the WinDbg API via Python which can be used to interact with
-       it via all of the typical APIs. The author of IDA-minsc used to maintain a different project, PyDbgEng,
-       but decided against maintaining it once the author of PyKd released their PyKd plugin.
+       This is not an IDA plugin, but is rather a combination of Windbg extension and Python module. It exposes
+       the WinDbg API via Python and allows one to interact with all of the various aspects of WinDbg using
+       its general API. The author of IDA-Minsc used to maintain a different project, PyDbgEng, but decided
+       against it once the author of PyKd released this particular project.
 
     3. :ref:`BinSync<competitors>`: https://github.com/angr/binsync 
 
-       A collaboration environment that also aims to serialize and deserialization information out of all
-       of the disassemblers and decompilers. What makes it unique is that it also includes support for
-       the different debuggers allowing one to exchange exchange information between both static and runtime
-       reverse-engineering tools.
+       A collaboration environment that also aims to serialize and deserialize information out of all
+       of the disassemblers and decompilers so that reverse-engineering artifacts can be shared with
+       other users. What makes it unique is that it also includes support for the different debuggers
+       allowing one to exchange information between both static and runtime reverse-engineering tools.
 
     4. :ref:`Sark<competitors>`: https://sark.readthedocs.io/
 
        A well-documented object-oriented wrapper around the IDAPython API with the aim of simplifying
        some of the more tedious parts of IDAPython. This plugin also includes wrappers to ease the
-       writing and distribution of user-written plugins that are written using this library.
+       writing and distribution of user-written plugins that utilize this library.
 
     5. :ref:`Bip<competitors>`: https://synacktiv.github.io/bip/build/html/index.html 
 
        Another well-documented object-oriented wrapper around the IDAPython API. This plugin seems to provide
        more interaction with the lower-level parts of IDAPython and includes support for Hex-Rays.
 
-If you find any other plugins that may be useful with IDA-Minsc or "competes" with any
-of its capabilities, feel free to contact the author [:ref:`4<usage-references>`] about
-getting it added to this list.
+If you find any other plugins that may be useful to combine with IDA-Minsc or a plugin
+that may "compete" with any of its capabilities, feel free to contact the author [:ref:`4<usage-references>`]
+about getting it added to this list.
 
 .. _competitors:
 .. rubric:: References
@@ -403,13 +437,13 @@ Installing the plugin "directly" into the IDA user directory
 ------------------------------------------------------------
 
 To install the plugin in this manner, the contents of the repository must be
-cloned or extracted into IDA's user directory. The repository is located at the
-referenced github url [:ref:`1<install-clone-references>`]. On the Windows
-platform, IDA Pro's user directory can be typically found at the "``%APPDATA%/Roaming/Hex-Rays/IDA Pro``"
-directory whereas on Linux or MacOS the path to this directory can be found at
-"``$HOME/.idapro``" [:ref:`2<install-clone-references>`]. If the user is not
-sure of the path that IDA's user directory is located at, they can simply
-execute the following at the IDAPython prompt to output the correct path:
+cloned or extracted into the IDA user directory. The repository to be cloned
+can be located at the referenced URL  on GitHub [:ref:`1<install-clone-references>`].
+On the Windows platform, IDA Pro's user directory can be typically found at the
+"``%APPDATA%/Roaming/Hex-Rays/IDA Pro``" directory whereas on Linux or MacOS the
+path to this directory can be found at "``$HOME/.idapro``" [:ref:`2<install-clone-references>`].
+If the user is not sure where the path of the IDA user directory is located at,
+they can simply execute the following at the IDAPython prompt to output the correct path:
 
 .. code-block:: python
 
@@ -420,10 +454,10 @@ When cloning, the directory containing the plugin's repository should replace th
 contents of the IDA user directory. If there are any existing files that the user
 currently has in their IDA user directory, the user can simply move these files
 into the repository's directory after cloning. This is done so that IDAPython
-will execute the "``idapythonrc.py``" file that is in the root of the IDA-minsc
+will execute the "``idapythonrc.py``" file that is in the root of the IDA-Minsc
 repository upon startup. The following can be typed at the command line in order
 to clone the repository of the plugin [:ref:`1<install-clone-references>`] directly
-into IDA's user directory:
+into the IDA user directory:
 
 .. code-block:: sh
 
@@ -431,8 +465,8 @@ into IDA's user directory:
 
 Once this has been correctly done and the Python dependencies are installed,
 then when IDA starts up, the "``idapythonrc.py``" file in the repository should be
-executed and IDAPython's namespace replaced with the namespace belonging to the
-plugin.
+executed resulting in the IDAPython namespace being replaced with the namespace
+belonging to the plugin.
 
 After the repository has been cloned, you will then need to install any of the
 :ref:`Required Python dependencies<install-dependencies>` and then you can proceed
@@ -461,10 +495,12 @@ that particular version without doing a complete re-install.
 
 If you have chosen Python 3.x, then some desired third-party plugins might not work
 with your setup, or some modules might not be available until you switch your Python
-interpreter. This however does not affect any part of the IDA-minsc plugin, and
+interpreter. This however does not affect any part of the IDA-Minsc plugin, and
 the choice of choosing a Python version is left completely up to the user. To
 temporary switch the interpreter that IDAPython uses, IDA provides a couple of
 avenues that a user can take [:ref:`3<downgrading-references>`]. 
+
+.. _install-older:
 
 Earlier versions of IDAPython
 *****************************
@@ -563,7 +599,7 @@ will contain the necessary Python components.
 | MacOS      | /Applications/IDA Pro/ida.app/Contents/MacOS/python |
 +------------+-----------------------------------------------------+
 
-Within this directory contains the Python code for the IDAPython api. Due to the
+Within this directory contains the Python code for the IDAPython API. Due to the
 variations between both Python 2.x and Python 3.x, IDAPython splits its implementation
 and necessary files under the "``python/2``" directory for Python 2.x, and the
 "``python/3``" directory for Python 3.x. These subdirectories will contain the
@@ -621,7 +657,7 @@ code by typing it into the input box::
 
 Examining the major version of the named tuple that has been returned shows that
 the Python 3.x version of the IDAPython plugin is currently being used. At this
-point, the user may continue to use the IDA-minsc plugin with whatever other
+point, the user may continue to use the IDA-Minsc plugin with whatever other
 plugins or modules that are now available.
 
 .. _downgrading-references:
