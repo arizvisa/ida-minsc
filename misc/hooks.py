@@ -1740,8 +1740,8 @@ def del_func(pfn):
         logging.debug(u"{:s}.del_func({:#x}) : Removing both repeatable references ({:d}) and non-repeatable references ({:d}) from {:s} ({:#x}).".format(__name__, interface.range.start(pfn), len(repeatable), len(nonrepeatable), 'globals', fn))
 
         # After decoding them, we can try to decrease our reference count.
-        [ internal.comment.globals.dec(fn, k, target=fn) for k in repeatable ]
-        [ internal.comment.globals.dec(fn, k, target=fn) for k in nonrepeatable ]
+        [ internal.comment.globals.dec(fn, k) for k in repeatable ]
+        [ internal.comment.globals.dec(fn, k) for k in nonrepeatable ]
 
         # We also need to handle any implicit tags as well to be properly done.
         if pfn.color == idaapi.COLOR_DEFAULT:
