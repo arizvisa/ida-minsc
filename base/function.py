@@ -542,15 +542,38 @@ class chunk(object):
     @utils.multicase()
     @classmethod
     def owner(cls):
-        '''Return the first owner of the function chunk containing the current address.'''
+        '''Return the primary owner of the function chunk containing the current address.'''
         return cls.owner(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def owner(cls, ea):
-        '''Return the first owner of the function chunk containing the address specified by `ea`.'''
+        '''Return the primary owner of the function chunk containing the address specified by `ea`.'''
         if within(ea):
             return next(item for item in cls.owners(ea))
         raise E.FunctionNotFoundError(u"{:s}.owner({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def owner(cls, bounds):
+        '''Return the primary owner of the function chunk specified by `bounds`.'''
+        ea, _ = bounds
+        return cls.owner(ea)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def owner(cls, ea, func):
+        '''Set the primary owner of the chunk at `ea` to the function `func`.'''
+        ea, fn = interface.address.within(ea), by(func)
+        result, ok = cls.owner(ea), idaapi.set_tail_owner(fn, ea)
+        if not ok:
+            fullname = '.'.join([getattr(idaapi.set_tail_owner, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.set_tail_owner, attribute)])
+            raise E.DisassemblerError(u"{:s}.owner({#x}, {!r}) : Unable to modify the owner of the chunk at {:#x} to the given function ({:#x}) with `{:s}`.".format('.'.join([__name__, cls.__name__]), ea, func, ea, interface.range.start(fn), fullname))
+        return result
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def owner(cls, bounds, func):
+        '''Set the primary owner of the chunk specified by `bounds` to the function `func`.'''
+        ea, _ = bounds
+        return cls.owner(ea, func)
+
     @utils.multicase()
     @classmethod
     def owners(cls):
@@ -888,19 +911,7 @@ class chunk(object):
         '''Remove the chunk specified by `bounds` from the function `func`.'''
         ea, _ = bounds
         return cls.remove(func, ea)
-
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def assign(cls, ea):
-        '''Assign the chunk at `ea` to the current function.'''
-        return cls.assign_chunk(ui.current.function(), ea)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def assign(cls, func, ea):
-        '''Assign the chunk at `ea` to the function `func`.'''
-        fn, ea = by(func), interface.address.within(ea)
-        return idaapi.set_tail_owner(fn, ea)
-add_chunk, remove_chunk, assign_chunk = utils.alias(chunk.add, 'chunk'), utils.alias(chunk.remove, 'chunk'), utils.alias(chunk.assign, 'chunk')
+add_chunk, remove_chunk = utils.alias(chunk.add, 'chunk'), utils.alias(chunk.remove, 'chunk')
 
 @utils.multicase()
 def within():
