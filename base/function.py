@@ -356,19 +356,32 @@ def marks(func):
 ## functions
 @utils.multicase()
 def new():
-    '''Make a function at the current address.'''
+    '''Create a new function at the current address.'''
     return new(ui.current.address())
-@utils.multicase(start=six.integer_types)
-def new(start, **end):
-    """Make a function at the address `start` and return its entrypoint.
-
-    If the address `end` is specified, then stop processing the function at its address.
-    """
+@utils.multicase(ea=six.integer_types)
+def new(ea):
+    '''Create a new function at the address specified by `ea`.'''
     start = interface.address.inside(start)
-    end = end.get('end', idaapi.BADADDR)
-    ok = idaapi.add_func(start, end)
+    if not idaapi.add_func(start, idaapi.BADADDR):
+        fullname = '.'.join([getattr(idaapi.add_func, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.add_func, attribute)])
+        raise E.DisassemblerError(u"{:s}.new({:#x}) : Unable create a new function at the given address ({:#x}) with `{:s}`.".format(__name__, ea, start, fullname))
     ui.state.wait()
-    return address(start) if ok else None
+    return interface.range.bounds(by_address(start))
+@utils.multicase(start=six.integer_types, end=six.integer_types)
+def new(start, end):
+    '''Create a new function from the address `start` until `end`.'''
+    bounds = ea, stop = interface.bounds_t(*interface.address.within(start, end))
+    if not idaapi.add_func(ea, stop):
+        fullname = '.'.join([getattr(idaapi.add_func, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.add_func, attribute)])
+        raise E.DisassemblerError(u"{:s}.new({:#x}, {:#x}) : Unable create a new function for the given boundaries ({:s}) with `{:s}`.".format(__name__, start, end, bounds, fullname))
+    ui.state.wait()
+    return interface.range.bounds(by_address(ea))
+@utils.multicase(bounds=tuple)
+def new(bounds):
+    '''Create a new function using the specified `bounds`.'''
+    start, end = bounds
+    return new(start, end)
+
 make = add = utils.alias(new)
 
 @utils.multicase()
