@@ -6504,53 +6504,61 @@ class set(object):
     def alignment(cls, ea, **alignment):
         """Set the data at address `ea` as aligned.
 
-        If `alignment` is specified, then use it as the default alignment.
+        If `alignment` is specified, then use it as the number of bytes to align the data to.
         If `size` is specified, then align that number of bytes.
         """
         if not type.is_unknown(ea):
             logging.warning("{:s}.set.alignment({:#x}{:s}) : Refusing to align the specified address ({:#x}) as it has already been defined.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(alignment)) if alignment else '', ea))  # XXX: define a custom warning
             return 0
 
-        # grab the size out of the kwarg
-        if 'size' in alignment:
-            size = alignment['size']
+        # alignment can only be determined if there's an actual size, so
+        # we'll need some way to calculate the size if we weren't given one.
+        def calculate_size(ea):
 
-        # otherwise, figure it out by counting repetitions
-        # if the address is actually initialized
-        elif type.is_initialized(ea):
-            size, by = 0, read(ea, 1)
-            while read(ea + size, 1) == by:
-                size += 1
-            pass
+            # if the address is initialized, then we'll figure it out by
+            # looking for bytes that repeat.
+            if type.is_initialized(ea):
+                size, by = 0, read(ea, 1)
+                while read(ea + size, 1) == by:
+                    size += 1
+                return size
 
-        # if it's uninitialized, then use the nextlabel as the
-        # boundary to determine the size
-        else:
-            size = address.nextlabel(ea) - ea
+            # if it's uninitialized, then use the next label as the boundary
+            # for calculating the size that we need.
+            return address.nextlabel(ea) - ea
 
-        # if idaapi.create_align doesn't exist, then just hand this
-        # off to idaapi.create_data with the determined size.
+        # first of all, we need to check if idaapi.create_align exists,
+        # because if it doesn't then we need to calculate things ourselves.
         if not hasattr(idaapi, 'create_align'):
+
+            # grab the size out of the kwarg or calculate it if one wasn't given.
+            size = alignment['size'] if operator.contains(alignment, 'size') else calculate_size(ea)
+
+            # now we can just hand our size off to create_data because
+            # this is the very best that we can do.
             return cls.data(ea, size, type=idaapi.FF_ALIGN)
 
-        # grab the aligment out of the kwarg
-        if any(k in alignment for k in ['align', 'alignment']):
-            align = builtins.next((alignment[k] for k in ['align', 'alignment'] if k in alignment))
-            e = utils.string.digits(align, 2)
+        # otherwise we can actually use the create_align which can infer the
+        # size and align it on our behalf. we'll start by trying to grab the
+        # alignment and converting from a multiple to an actual exponent.
+        align = builtins.next((alignment[k] for k in ['align', 'alignment'] if k in alignment), 0)
+        e = math.trunc(math.floor(math.log(align, 2))) if align else 0
 
-        # or we again...just figure it out via brute force
+        # if we were given an alignment, then we'll need to convert it from
+        # its multiple that the user wants to an actual exponent for the api.
+        # next we'll need to grab the size if the user gave us one.
+        if operator.contains(alignment, 'size'):
+            size = alignment['size']
+
+        # if they didn't give us one, then we need at least one of them to
+        # figure out the other. we do this by calculating the size ourselves.
         else:
-            e, target = 13, ea + size
-            while e > 0:
-                if target & (pow(2, e) - 1) == 0:
-                    break
-                e -= 1
+            size = alignment.get('size', 0 if align else calculate_size(ea))
 
-        # we should be good to go
-        ok = idaapi.create_align(ea, size, e)
-
-        # return the new size, or a failure
-        return idaapi.get_item_size(ea) if ok else 0
+        # now we should be good to go and can return the new size or 0 on failure.
+        if not idaapi.create_align(ea, size, e):
+            return 0
+        return idaapi.get_item_size(ea)
     align = aligned = utils.alias(alignment, 'set')
 
     @utils.multicase()
