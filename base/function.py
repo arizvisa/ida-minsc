@@ -361,7 +361,7 @@ def new():
 @utils.multicase(ea=six.integer_types)
 def new(ea):
     '''Create a new function at the address specified by `ea`.'''
-    start = interface.address.inside(start)
+    start = interface.address.inside(ea)
     if not idaapi.add_func(start, idaapi.BADADDR):
         fullname = '.'.join([getattr(idaapi.add_func, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.add_func, attribute)])
         raise E.DisassemblerError(u"{:s}.new({:#x}) : Unable create a new function at the given address ({:#x}) with `{:s}`.".format(__name__, ea, start, fullname))
