@@ -6570,7 +6570,43 @@ class set(object):
     @classmethod
     def string(cls, **strtype):
         '''Set the data at the current address to a string with the specified `strtype`.'''
-        return cls.string(ui.current.address(), **strtype)
+        address, selection = ui.current.address(), ui.current.selection()
+        if 'length' in strtype or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.string(address, **strtype)
+        return cls.string(selection, **strtype)
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def string(cls, bounds, **strtype):
+        '''Set the data within the provided `bounds` to a string with the specified `strtype`.'''
+        widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
+        lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
+
+        # Before we do anything, we're going to need to figure out what the string
+        # type so that we can calculate what the actual string length will be.
+        if any(item in strtype for item in ['strtype', 'type']):
+            res = builtins.next(strtype[item] for item in ['strtype', 'type'] if item in strtype)
+            width_t, length_t = res if isinstance(res, (builtins.list, builtins.tuple)) else (res, 0)
+
+        # If we didn't get one, then we need to use the default one from the database.
+        else:
+            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+            width, layout = ((inf >> shift) & mask for shift, mask in [(0, idaapi.STRWIDTH_MASK), (idaapi.STRLYT_SHIFT, idaapi.STRLYT_MASK)])
+            match_width = (item for item, value in widthtype.items() if value == width)
+            match_layout = (item for item, value in lengthtype.items() if value == layout)
+            width_t, length_t = builtins.next(match_width, 1), builtins.next(match_layout, 0)
+
+        # Now we have the character width and the length prefix size. So to start out, we
+        # take the difference between our bounds and subtract the layout length from it.
+        distance = operator.sub(*reversed(bounds))
+        if length_t > distance:
+            logging.warning("{:s}.string({!s}{:s}) : Attempting to apply a string with a prefix length ({:d}) that is larger than the given boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', length_t, bounds))
+        leftover = distance - length_t if distance > length_t else 0
+
+        # Next we can just take our total number of leftover bytes and divide it by the
+        # character width to get the real string length that we'll use. We round it up
+        # to ensure that the bounds the user gave us covers everything they selected.
+        ea, _ = bounds
+        return cls.string(ea, math.trunc(math.ceil(leftover / width_t)), **strtype)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def string(cls, ea, **strtype):
