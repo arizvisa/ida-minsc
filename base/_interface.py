@@ -2970,6 +2970,14 @@ class register_t(symbol_t):
         '''Return the pythonic type of the register.'''
         return self.__ptype__, self.__size__ // 8
 
+    def __format__(self, spec):
+        '''Return the architecture's register prefix concatenated to the register's name.'''
+        if spec != 's':
+            cls = self.__class__
+            raise TypeError("unsupported format string ({!s}) passed to {:s}".format(spec, '.'.join([cls.__name__, '__format__'])))
+        prefix = self.architecture.prefix if hasattr(self, 'architecture') else ''
+        return prefix + self.name
+
     def __str__(self):
         '''Return the architecture's register prefix concatenated to the register's name.'''
         prefix = self.architecture.prefix if hasattr(self, 'architecture') else ''
@@ -3792,6 +3800,16 @@ class bounds_t(integerish):
         left, right = self
         return left <= ea < right if left < right else right <= ea < left
     __contains__ = contains
+
+    def __format__(self, spec):
+        '''Return the current boundary as a string containing only the components that are inclusive to the range.'''
+        if spec != 's':
+            cls = self.__class__
+            raise TypeError("unsupported format string ({!s}) passed to {:s}".format(spec, '.'.join([cls.__name__, '__format__'])))
+        left, right = self
+        if left < right:
+            return "{:#x}..{:#x}".format(left, right - 1)
+        return "{:#x}".format(left)
 
     def __str__(self):
         cls = self.__class__
