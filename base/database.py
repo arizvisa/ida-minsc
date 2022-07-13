@@ -6550,6 +6550,11 @@ class set(object):
         if operator.contains(alignment, 'size'):
             size = alignment['size']
 
+        # if our size is unset and we're using an older version of IDA, then
+        # we actually need to figure the size out ourselves regardless.
+        elif idaapi.__version__ < 7.6:
+            size = alignment.get('size', calculate_size(ea))
+
         # if they didn't give us one, then we need at least one of them to
         # figure out the other. we do this by calculating the size ourselves.
         else:
