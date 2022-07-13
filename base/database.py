@@ -6587,15 +6587,22 @@ class set(object):
         widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
         lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
 
-        # First grab the type that the user gave us from either the old or new parameter.
-        res = builtins.next((strtype[item] for item in ['strtype', 'type'] if item in strtype), (1, 0))
+        # First try grab the type that the user gave us from the parameters. If it wasn't a tuple,
+        # then convert it into one with a null-terminator, as the user might've just given us the
+        # character width.
+        if any(item in strtype for item in ['strtype', 'type']):
+            res = builtins.next(strtype[item] for item in ['strtype', 'type'] if item in strtype)
+            width_t, length_t = res if isinstance(res, (builtins.list, builtins.tuple)) else (res, 0)
 
-        # If it's not tuple, then convert it to one that uses a null-terminator.
-        if not isinstance(res, (builtins.list, builtins.tuple)):
-            res = (res, 0)
+        # Otherwise, we need to unpack the default one from the database into the width and layout.
+        else:
+            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+            width, layout = ((inf >> shift) & mask for shift, mask in [(0, idaapi.STRWIDTH_MASK), (idaapi.STRLYT_SHIFT, idaapi.STRLYT_MASK)])
+            match_width = (item for item, value in widthtype.items() if value == width)
+            match_layout = (item for item, value in lengthtype.items() if value == layout)
+            width_t, length_t = builtins.next(match_width, 1), builtins.next(match_layout, 0)
 
-        # Now we can extract the width and the length size so we can validate them.
-        width_t, length_t = res
+        # Now we can just validate the width and the length size.
         if not operator.contains(widthtype, width_t):
             raise E.InvalidTypeOrValueError("{:s}.string({:#x}, {:d}{:s}) : The requested character width ({:d}) is unsupported.".format('.'.join([__name__, cls.__name__]), ea, length, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', width_t))
         if not operator.contains(lengthtype, length_t):
