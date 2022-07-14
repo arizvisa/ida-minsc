@@ -553,12 +553,21 @@ class notepad(appwindow):
 
     @classmethod
     def open(cls, *args):
-        '''Open or show the notepad window and return its ``QtWidgets.QPlainTextEdit`` widget.'''
+        '''Open or show the notepad window and return its UI widget that can be used to modify it.'''
         widget = super(notepad, cls).open(*args)
+        if isinstance(widget, PyQt5.QtWidgets.QPlainTextEdit):
+            return widget
+
+        elif hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            if not widget:
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.open({!s}) : Unable to open or interact with the notepad window when not running the Qt user-interface.".format('.'.join([__name__, cls.__name__]), ', '.join(map(internal.utils.string.repr, args))))
+            return widget
+
+        # We're running the PyQt UI, so we need to descend until we get to the text widget.
         children = (item for item in widget.children() if isinstance(item, PyQt5.QtWidgets.QPlainTextEdit))
         result = builtins.next(children, None)
         if result is None:
-            raise internal.exceptions.ItemNotFoundError(u"{:s}.open({!s}) : Unable to locate the QtWidgets.QPlainTextEdit widget.".format('.'.join([__name__, cls.__name__]), ', '.join(map(internal.utils.repr, args))))
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.open({!s}) : Unable to locate the QtWidgets.QPlainTextEdit widget.".format('.'.join([__name__, cls.__name__]), ', '.join(map(internal.utils.string.repr, args))))
         return result
 
     @classmethod
