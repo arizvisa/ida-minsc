@@ -311,6 +311,10 @@ class current(object):
         global window
         # FIXME: cast this to a QWindow somehow?
         return window.main()
+    @classmethod
+    def viewer(cls):
+        '''Return the current viewer that is being used.'''
+        return idaapi.get_current_viewer()
 
 class state(object):
     """
@@ -895,10 +899,7 @@ class window(object):
     """
     This namespace is for selecting a specific or particular window.
     """
-    @classmethod
-    def viewer(cls):
-        '''Return the current viewer.'''
-        return idaapi.get_current_viewer()
+    viewer = internal.utils.alias(current.viewer, 'current')
     @classmethod
     def main(cls):
         '''Return the active main window.'''
