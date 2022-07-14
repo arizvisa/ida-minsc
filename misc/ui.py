@@ -405,7 +405,7 @@ class appwindow(object):
         '''Open or show the window belonging to the namespace.'''
         global widget
         res = cls.__open__(*args) if args else cls.__open__(*getattr(cls, '__open_defaults__', ()))
-        return widget.form(res)
+        return widget.of(res)
 
     @classmethod
     def close(cls):
@@ -924,8 +924,12 @@ class widget(object):
         q = application()
         return q.widgetAt(x, y)
     @classmethod
-    def form(cls, twidget):
-        '''Return an IDA plugin form as a UI widget.'''
+    def of(cls, form):
+        '''Return the UI widget for the IDA `form` that is provided.'''
+        raise internal.exceptions.MissingMethodError
+    @classmethod
+    def form(cls, widget):
+        '''Return the IDA form for the UI `widget` that is provided.'''
         raise internal.exceptions.MissingMethodError
 
 class clipboard(object):
@@ -1360,11 +1364,27 @@ try:
         """
         This namespace is for selecting a specific or particular widget.
         """
+        __cache__ = {}
         @classmethod
-        def form(cls, twidget):
-            '''Return an IDA plugin form as a UI widget.'''
+        def of(cls, form):
+            '''Return the PyQt widget for the IDA `form` that is provided.'''
             ns = idaapi.PluginForm
-            return ns.FormToPyQtWidget(twidget)
+            iterable = (getattr(ns, attribute) for attribute in ['TWidgetToPyQtWidget', 'FormToPyQtWidget'] if hasattr(ns, attribute))
+            F = next(iterable, None)
+            if F is None:
+                raise internal.exceptions.UnsupportedVersion(u"{:s}.of({!s}) : Unable to return the PyQT widget from a plugin form due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), form))
+            result = F(form)
+            cls.__cache__[result] = form
+            return result
+        @classmethod
+        def form(cls, widget):
+            '''Return the IDA form for the PyQt `widget` that is provided.'''
+            ns = idaapi.PluginForm
+            if hasattr(ns, 'QtWidgetToTWidget'):
+                return ns.QtWidgetToTWidget(widget)
+            elif widget in cls.__cache__:
+                return cls.__cache__[widget]
+            raise internal.exceptions.UnsupportedVersion(u"{:s}.of({!s}) : Unable to return the plugin form from a PyQT widget due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), widget))
 
 except ImportError:
     logging.info(u"{:s}:Unable to locate `PyQt5.Qt` module.".format(__name__))
@@ -1403,11 +1423,25 @@ try:
         """
         This namespace is for selecting a specific or particular widget.
         """
+        __cache__ = {}
         @classmethod
-        def form(cls, twidget):
-            '''Return an IDA plugin form as a UI widget.'''
+        def of(cls, form):
+            '''Return the PySide widget for the IDA `form` that is provided.'''
             ns = idaapi.PluginForm
-            return ns.FormToPySideWidget(twidget)
+            iterable = (getattr(ns, attribute) for attribute in ['TWidgetToPySideWidget', 'FormToPySideWidget'] if hasattr(ns, attribute))
+            F = next(iterable, None)
+            if F is None:
+                raise internal.exceptions.UnsupportedVersion(u"{:s}.of({!s}) : Unable to return the PySide widget from a plugin form due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), form))
+            result = F(form)
+            cls.__cache__[result] = form
+            return result
+
+        @classmethod
+        def form(cls, widget):
+            '''Return the IDA form for the PySide `widget` that is provided.'''
+            if widget in cls.__cache__:
+                return cls.__cache__[widget]
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.of({!s}) : Unable to return the plugin form from a PySide widget due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), widget))
 
 except ImportError:
     logging.info(u"{:s}:Unable to locate `PySide` module.".format(__name__))
