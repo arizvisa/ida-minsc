@@ -941,6 +941,10 @@ class widget(object):
     def form(cls, widget):
         '''Return the IDA form for the UI `widget` that is provided.'''
         raise internal.exceptions.MissingMethodError
+    @classmethod
+    def isinstance(cls, object):
+        '''Return whether the given `object` is of the correct type for the UI.'''
+        raise internal.exceptions.MissingMethodError
 
 class clipboard(object):
     """
@@ -1238,7 +1242,7 @@ class keyboard(object):
 ## these can overwrite any of the classes defined above
 try:
     import PyQt5.Qt
-    from PyQt5.Qt import QObject
+    from PyQt5.Qt import QObject, QWidget
 
     def application():
         '''Return the current instance of the IDA Application.'''
@@ -1395,6 +1399,10 @@ try:
             elif widget in cls.__cache__:
                 return cls.__cache__[widget]
             raise internal.exceptions.UnsupportedVersion(u"{:s}.of({!s}) : Unable to return the plugin form from a PyQT widget due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), widget))
+        @classmethod
+        def isinstance(cls, widget):
+            '''Return whether the given `object` is a PyQt widget.'''
+            return isinstance(widget, QWidget)
 
 except ImportError:
     logging.info(u"{:s}:Unable to locate `PyQt5.Qt` module.".format(__name__))
@@ -1452,6 +1460,11 @@ try:
             if widget in cls.__cache__:
                 return cls.__cache__[widget]
             raise internal.exceptions.UnsupportedCapability(u"{:s}.of({!s}) : Unable to return the plugin form from a PySide widget due to it being unsupported by the current version of IDA.".format('.'.join([__name__, cls.__name__]), widget))
+
+        @classmethod
+        def isinstance(cls, object):
+            '''Return whether the given `object` is a PySide widget.'''
+            return isinstance(object, PySide.QtCore.QObject)
 
 except ImportError:
     logging.info(u"{:s}:Unable to locate `PySide` module.".format(__name__))
