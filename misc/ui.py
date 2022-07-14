@@ -297,7 +297,10 @@ class current(object):
     opnum = internal.utils.alias(operand, 'current')
     @classmethod
     def widget(cls):
-        '''Return the current widget that the mouse is hovering over.'''
+        '''Return the current widget that is being used.'''
+        if hasattr(idaapi, 'get_current_widget'):
+            return idaapi.get_current_widget()
+
         # XXX: there's probably a better way to do this rather than looking
         #      at the mouse cursor position
         x, y = mouse.position()
