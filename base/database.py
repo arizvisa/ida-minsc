@@ -7754,7 +7754,41 @@ class get(object):
     @classmethod
     def string(cls, **length):
         '''Return the array at the current address as a string.'''
-        return cls.string(ui.current.address(), **length)
+        address, selection = ui.current.address(), ui.current.selection()
+        if 'length' in length or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.string(address, **length)
+        return cls.string(selection, **length)
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def string(cls, bounds, **length):
+        '''Return the array described by the specified `bounds` as a string.'''
+        widthtype = {idaapi.STRWIDTH_1B: 1, idaapi.STRWIDTH_2B: 2, idaapi.STRWIDTH_4B: 4}
+
+        # Similar to the get.string function, we're need to figure out the string
+        # type to calculate what the string length means for the given bounds.
+        if any(item in length for item in ['strtype', 'type']):
+            res = builtins.next(length[item] for item in ['strtype', 'type'] if item in length)
+            width_t, length_t = res if isinstance(res, (builtins.list, builtins.tuple)) else (res, 0)
+
+        # If we didn't get one, then we actually figure it out by applying the
+        # default string character width from the database. We're explicitly
+        # ignoring the prefix here so the user has to explicitly specify it.
+        else:
+            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+            width_t, length_t = widthtype.get(inf & idaapi.STRWIDTH_MASK, 1), 0
+
+        # Now we have the character width and the size of the length prefix size. So we
+        # take the difference between our bounds and subtract the layout length from it.
+        distance = operator.sub(*reversed(bounds))
+        if length_t > distance:
+            logging.warning("{:s}.string({!s}{:s}) : Attempting to apply a string with a prefix length ({:d}) that is larger than the given boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, u", {!s}".format(utils.string.kwargs(length)) if length else '', length_t, bounds))
+        leftover = distance - length_t if distance > length_t else 0
+
+        # That was it, we can now just use the leftover bytes to calculate our length,
+        # assigned it into our kwargs, and chain to the real get.string functionality.
+        ea, _ = bounds
+        length.setdefault('length', math.trunc(math.ceil(leftover / width_t)))
+        return cls.string(ea, **length)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def string(cls, ea, **length):
@@ -7779,11 +7813,13 @@ class get(object):
             strtype = idaapi.get_str_type(address.head(ea))
             get_str_type_code = idaapi.get_str_type_code
 
+        # Define some lookup tables that we'll use to figure out the lengths.
+        widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
+        lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
+
         # If a strtype was provided in the parameters, then convert it into a proper
         # string typecode so that the logic which follows will still work.
         if any(item in length for item in ['strtype', 'type']):
-            widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
-            lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
 
             # Extract the strtype that the user gave us whilst ensuring that we remove
             # the items out of the parameters since we later pass them to `get.array`.
@@ -7799,36 +7835,41 @@ class get(object):
             # which get passed to `get.array` so that each element is of the correct width.
             length['type'] = int, width_t
 
+        # If we weren't given a strtype, then we still need to figure out what the default
+        # is that was set in the database. This way we can actually fall back to something.
+        else:
+            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+            strwidth_t = inf & idaapi.STRWIDTH_MASK
+            default_width = builtins.next((item for item, value in widthtype.items() if value == strwidth_t), 1)
+
         # If no string was found, then try to treat it as a plain old array
         # XXX: idaapi.get_str_type() seems to return 0xffffffff on failure instead of idaapi.BADADDR
         if strtype in {idaapi.BADADDR, 0xffffffff}:
             res = cls.array(ea, **length)
 
-            # It ended up not being an array type, and was probably a structure. So,
-            # we can only complain to the user about it and let them sort it out.
-            if not isinstance(res, _array.array):
-                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The data at address {:#x} cannot be read as an integer array and thus is unable to be converted to a string.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
-
             # Warn the user what we're doing before we start figuring out
             # the element size of the string.
-            logging.warning(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type code for address {:#x}. Reading it as an integer array and converting it to a string instead.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
+            if isinstance(res, _array.array):
+                logging.warning(u"{:s}.string({:#x}{:s}) : Unable to guess the string type for address {:#x}. Reading it as an array of {:d}-byte sized integers and converting it to a string instead.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.itemsize))
 
-            # We can't figure out the shift.. So, since that's a dead end we
-            # have to assume that the terminator is a null byte.
+            # If we were unable to retrieve an _array.array, then it's likely because the address
+            # is defined as a structure or a weird size. To fix it, we will set the type to the
+            # default character width, warn the user that we're ignoring IDA, and try it again.
+            else:
+                logging.warning(u"{:s}.string({:#x}{:s}) : The data at address {:#x} is using a non-integral type and will be treated as an array of {:d}-byte sized characters.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, default_width))
+                length['type'] = int, default_width
+                res = cls.array(ea, **length)
+
+            # This really should be an assertion error or really a "unit-test" for cls.array,
+            # because we _absolutely_ should have gotten an _array.array from cls.array.
+            if not isinstance(res, _array.array):
+                raise E.DisassemblerError(u"{:s}.string({:#x}{:s}) : There was a failure while trying to read the data at address {:#x} as an array of integers ({!s}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.__class__))
+
+            # We can't figure out the shift.. So, since that's a dead end we have to assume that
+            # the terminator is a null byte. Since we're already guessing, use the widthtype
+            # that corresponds to our array itemsize whilst falling back to the default.
             sentinels, sl = '\0', idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT
-
-            # However, we can still figure out the character width from the itemsize.
-            sizelookup = {
-                1: idaapi.STRWIDTH_1B,
-                2: idaapi.STRWIDTH_2B,
-                4: idaapi.STRWIDTH_4B,
-            }
-
-            # But we still need to make sure that the itemsize is something we support.
-            if not operator.contains(sizelookup, res.itemsize):
-                raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported character width ({:d}) found for string in the array at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', res.itemsize, ea))
-
-            sw = sizelookup[res.itemsize]
+            sw = widthtype[res.itemsize if res.itemsize in widthtype else default_width]
 
         # Otherwise we can extract the string's characteristics directly from the strtype code.
         else:
