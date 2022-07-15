@@ -999,14 +999,20 @@ class widget(object):
     @classmethod
     def of(cls, form):
         '''Return the UI widget for the IDA `form` that is provided.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            return form
         raise internal.exceptions.MissingMethodError
     @classmethod
     def form(cls, widget):
         '''Return the IDA form for the UI `widget` that is provided.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            return widget
         raise internal.exceptions.MissingMethodError
     @classmethod
     def isinstance(cls, object):
         '''Return whether the given `object` is of the correct type for the UI.'''
+        if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+            return True
         raise internal.exceptions.MissingMethodError
 
 class clipboard(object):
@@ -1437,6 +1443,9 @@ try:
                 self.object.setValue(options['value'])
             return res
 
+    if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+        raise StopIteration
+
     class widget(widget):
         """
         This namespace is for interacting with any of the widgets
@@ -1467,6 +1476,9 @@ try:
         def isinstance(cls, widget):
             '''Return whether the given `object` is a PyQt widget.'''
             return isinstance(widget, QWidget)
+
+except StopIteration:
+    pass
 
 except ImportError:
     logging.info(u"{:s}:Unable to locate `PyQt5.Qt` module.".format(__name__))
@@ -1501,6 +1513,9 @@ try:
             '''Return the current keyboard input context.'''
             return q.inputContext()
 
+    if hasattr(idaapi, 'is_idaq') and not idaapi.is_idaq():
+        raise StopIteration
+
     class widget(widget):
         """
         This namespace is for interacting with any of the widgets
@@ -1530,6 +1545,9 @@ try:
         def isinstance(cls, object):
             '''Return whether the given `object` is a PySide widget.'''
             return isinstance(object, PySide.QtCore.QObject)
+
+except StopIteration:
+    pass
 
 except ImportError:
     logging.info(u"{:s}:Unable to locate `PySide` module.".format(__name__))
