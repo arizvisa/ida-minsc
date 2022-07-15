@@ -920,12 +920,23 @@ class windows(object):
 
 class widget(object):
     """
-    This namespace is for selecting a specific or particular widget.
+    This namespace is for interacting with any of the widgets
+    associated with the native user-interface.
     """
-    def __new__(self, xy):
+    @internal.utils.multicase()
+    def __new__(cls):
+        '''Return the widget that is currently being used.'''
+        return cls.of(current.widget())
+    @internal.utils.multicase(xy=tuple)
+    def __new__(cls, xy):
         '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
         res = x, y = xy
         return cls.at(res)
+    @internal.utils.multicase(title=six.string_types)
+    def __new__(cls, title):
+        '''Return the widget that is using the specified `title`.'''
+        return cls.by(title)
+
     @classmethod
     def at(cls, xy):
         '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
@@ -933,6 +944,58 @@ class widget(object):
         global application
         q = application()
         return q.widgetAt(x, y)
+
+    @classmethod
+    def open(cls, widget, flags, **target):
+        '''Open the `widget` using the specified ``idaapi.WOPN_`` flags.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        ok = idaapi.display_widget(twidget, flags)
+        # FIXME: rather than returning whether it succeeded or not, we should
+        #        return what the widget was attached to in order to locate it.
+        return ok
+    @classmethod
+    def close(cls, widget, flags):
+        '''Close the `widget` using the specified ``idaapi.WCLS_`` flags.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        ok = idaapi.close_widget(twidget, flags)
+        # FIXME: rather than returning whether it succeeded or not, we should
+        #        return what the widget was attached to before we closed it.
+        return ok
+
+    @classmethod
+    def show(cls, widget):
+        '''Display the specified `widget` without putting it in focus.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        res, ok = idaapi.get_current_widget(), idaapi.activate_widget(twidget, False)
+        return cls.of(res) if ok else None
+    @classmethod
+    def focus(cls, widget):
+        '''Activate the specified `widget` and put it in focus.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        res, ok = idaapi.get_current_widget(), idaapi.activate_widget(twidget, True)
+        return cls.of(res) if ok else None
+
+    @classmethod
+    def type(cls, widget):
+        '''Return the ``idaapi.twidget_type_t`` for the given `widget`.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        return idaapi.get_widget_type(twidget)
+    @classmethod
+    def title(cls, widget):
+        '''Return the window title for the given `widget`.'''
+        twidget = cls.form(widget) if cls.isinstance(widget) else widget
+        return idaapi.get_widget_title(twidget)
+
+    @internal.utils.multicase(title=six.string_types)
+    @classmethod
+    @internal.utils.string.decorate_arguments('title')
+    def by(cls, title):
+        '''Return the widget associated with the given window `title`.'''
+        res = idaapi.find_widget(internal.utils.string.to(title))
+        if res is None:
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.by({!r}) : Unable to locate a widget with the specified title ({!r}).".format('.'.join([__name__, cls.__name__]), title, title))
+        return cls.of(res)
+
     @classmethod
     def of(cls, form):
         '''Return the UI widget for the IDA `form` that is provided.'''
@@ -1376,7 +1439,8 @@ try:
 
     class widget(widget):
         """
-        This namespace is for selecting a specific or particular widget.
+        This namespace is for interacting with any of the widgets
+        associated with the native PyQT5 user-interface.
         """
         __cache__ = {}
         @classmethod
@@ -1439,7 +1503,8 @@ try:
 
     class widget(widget):
         """
-        This namespace is for selecting a specific or particular widget.
+        This namespace is for interacting with any of the widgets
+        associated with the native PySide user-interface.
         """
         __cache__ = {}
         @classmethod
