@@ -3270,7 +3270,17 @@ class Intel(interface.architecture_t):
 
         ##fpctrl, fpstat, fptags
         ##mxcsr
-        ## 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
+        setitem('rflags', self.new('rflags', 64))
+        setitem('eflags', self.child(self.by_name('rflags'), 'eflags', 0, 32, idaname='efl'))
+        setitem('cf', self.child(self.by_name('eflags'), 'cf',  0, 1, idaname='cf'))
+        setitem('pf', self.child(self.by_name('eflags'), 'pf',  2, 1, idaname='pf'))
+        setitem('af', self.child(self.by_name('eflags'), 'af',  4, 1, idaname='af'))
+        setitem('zf', self.child(self.by_name('eflags'), 'zf',  6, 1, idaname='zf'))
+        setitem('sf', self.child(self.by_name('eflags'), 'sf',  7, 1, idaname='sf'))
+        setitem('tf', self.child(self.by_name('eflags'), 'tf',  8, 1, idaname='tf'))
+        setitem('if', self.child(self.by_name('eflags'), 'if',  9, 1, idaname='if'))
+        setitem('df', self.child(self.by_name('eflags'), 'df', 10, 1, idaname='df'))
+        setitem('of', self.child(self.by_name('eflags'), 'of', 11, 1, idaname='of'))
 
     def by_float(self, index):
         '''Return the desired floating-point stack register by the specified `index`.'''
