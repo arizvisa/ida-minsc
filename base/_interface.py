@@ -3707,6 +3707,8 @@ class architecture_t(object):
             return register if register.bits == bits else self.promote(parent(register), bits=bits)
         except StopIteration: pass
         cls = self.__class__
+        if bits is None:
+            raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to promote the specified register to a size larger than {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register))
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to promote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
     def demote(self, register, bits=None):
@@ -3719,6 +3721,8 @@ class architecture_t(object):
             return register if register.bits == bits else self.demote(firstchild(register), bits=bits)
         except StopIteration: pass
         cls = self.__class__
+        if bits is None:
+            raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to demote the specified register to a size smaller than {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register))
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
 class bounds_t(integerish):
