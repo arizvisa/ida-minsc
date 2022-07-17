@@ -32,9 +32,29 @@ import database as _database, segment as _segment
 # another item menu to toolbar
 # find the QAction associated with a command (or keypress)
 
-def application():
-    '''Return the current instance of the IDA Application.'''
-    raise internal.exceptions.MissingMethodError
+class application(object):
+    """
+    This namespace is for getting information about the application user-interface.
+    """
+    def __new__(cls):
+        '''Return the current instance of the application.'''
+        raise internal.exceptions.MissingMethodError
+
+    @classmethod
+    def window(cls):
+        '''Return the current window for the application.'''
+        raise internal.exceptions.MissingMethodError
+
+    @classmethod
+    def windows(cls):
+        '''Return all of the top-level windows for the application.'''
+        raise internal.exceptions.MissingMethodError
+
+    @classmethod
+    def beep(cls):
+        '''Beep using the application interface.'''
+        return idaapi.beep()
+beep = internal.utils.alias(application.beep, 'application')
 
 class ask(object):
     """
@@ -308,9 +328,7 @@ class current(object):
     @classmethod
     def window(cls):
         '''Return the current window that is being used.'''
-        global window
-        # FIXME: cast this to a QWindow somehow?
-        return window.main()
+        return application.window()
     @classmethod
     def viewer(cls):
         '''Return the current viewer that is being used.'''
@@ -335,20 +353,7 @@ class state(object):
     def wait(cls):
         '''Wait until IDA's autoanalysis queues are empty.'''
         return idaapi.autoWait() if idaapi.__version__ < 7.0 else idaapi.auto_wait()
-
-    @classmethod
-    def beep(cls):
-        '''Beep using IDA's interface.'''
-        return idaapi.beep()
-
-    @classmethod
-    def refresh(cls):
-        '''Refresh all of IDA's windows.'''
-        global disassembly
-        ok = idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
-        return ok and disassembly.refresh()
-
-wait, beep, refresh = internal.utils.alias(state.wait, 'state'), internal.utils.alias(state.beep, 'state'), internal.utils.alias(state.refresh, 'state')
+wait = internal.utils.alias(state.wait, 'state')
 
 class message(object):
     """
@@ -897,26 +902,35 @@ class menu(object):
 ### Qt wrappers and namespaces
 class window(object):
     """
-    This namespace is for selecting a specific or particular window.
+    This namespace is for interacting with a specific window.
     """
-    viewer = internal.utils.alias(current.viewer, 'current')
-    @classmethod
-    def main(cls):
-        '''Return the active main window.'''
-        global application
-        q = application()
-        widgets = q.topLevelWidgets()
-        return next(widget for widget in widgets if isinstance(widget, PyQt5.QtWidgets.QMainWindow))
+    def __new__(cls):
+        '''Return the currently active window.'''
+        # FIXME: should probably traverse the application windows to figure out the
+        #        exact one that is in use so that we can cast it to a QWindow.
+        return application.window()
+
+    @internal.utils.multicase(xy=tuple)
+    def at(cls, xy):
+        '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
+        x, y = xy
+        return application.window(x, y)
 
 class windows(object):
     """
-    Interact with any or all of the top-level windows for the application.
+    This namespace is for interacting with any or all of the windows for the application.
     """
     def __new__(cls):
         '''Return all of the top-level windows.'''
-        global application
-        q = application()
-        return q.topLevelWindows()
+        return application.windows()
+
+    @classmethod
+    def refresh(cls):
+        '''Refresh all of lists and choosers within the application.'''
+        global disassembly
+        ok = idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
+        return ok and disassembly.refresh()
+refresh = internal.utils.alias(windows.refresh, 'windows')
 
 class widget(object):
     """
@@ -1313,10 +1327,35 @@ try:
     import PyQt5.Qt
     from PyQt5.Qt import QObject, QWidget
 
-    def application():
-        '''Return the current instance of the IDA Application.'''
-        q = PyQt5.Qt.qApp
-        return q.instance()
+    class application(application):
+        """
+        This namespace is for getting information about the application user-interface
+        that is based on PyQt.
+        """
+        def __new__(cls):
+            '''Return the current instance of the PyQt Application.'''
+            q = PyQt5.Qt.qApp
+            return q.instance()
+
+        @internal.utils.multicase()
+        @classmethod
+        def window(cls):
+            '''Return the active main window for the PyQt application.'''
+            q = cls()
+            widgets = q.topLevelWidgets()
+            return next(widget for widget in widgets if isinstance(widget, PyQt5.QtWidgets.QMainWindow))
+        @internal.utils.multicase(x=six.integer_types, y=six.integer_types)
+        @classmethod
+        def window(cls, x, y):
+            '''Return the window at the specified `x` and `y` coordinate.'''
+            q = cls()
+            return q.topLevelAt(x, y)
+
+        @classmethod
+        def windows(cls):
+            '''Return all of the available windows for the application.'''
+            q = cls()
+            return q.topLevelWindows()
 
     class mouse(mouse):
         """
@@ -1375,12 +1414,12 @@ try:
         # methods
         def open(self, width=0.8, height=0.1):
             '''Open a progress bar with the specified `width` and `height` relative to the dimensions of IDA's window.'''
-            cls = self.__class__
+            cls, app = self.__class__, application()
 
             # XXX: spin for a second until main is defined because IDA seems to be racy with this api
             ts, main = time.time(), getattr(self, '__appwindow__', None)
             while time.time() - ts < self.timeout and main is None:
-                _, main = application().processEvents(), window.main()
+                _, main = app.processEvents(), application.window()
 
             if main is None:
                 logging.warning(u"{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join([__name__, cls.__name__]), width, height))
@@ -1410,13 +1449,13 @@ try:
             self.object.move(x, y)
 
             # now everything should look good.
-            self.object.show(), application().processEvents()
+            self.object.show(), app.processEvents()
 
         def close(self):
             '''Close the current progress bar.'''
-            event = self.__evrunning
+            event, app = self.__evrunning, application()
             self.object.canceled.disconnect(event.set)
-            self.object.close(), application().processEvents()
+            self.object.close(), app.processEvents()
 
         def update(self, **options):
             '''Update the current state of the progress bar.'''
@@ -1488,10 +1527,37 @@ try:
     import PySide
     import PySide.QtCore, PySide.QtGui
 
-    def application():
-        '''Return the current instance of the IDA Application.'''
-        res = PySide.QtCore.QCoreApplication
-        return res.instance()
+    class application(application):
+        """
+        This namespace is for getting information about the application user-interface
+        that is based on PySide.
+        """
+        def __new__(cls):
+            '''Return the current PySide instance of the application.'''
+            res = PySide.QtCore.QCoreApplication
+            return res.instance()
+
+        @internal.utils.multicase()
+        @classmethod
+        def window(cls):
+            '''Return the active main window for the PySide application.'''
+
+            # Apparently PySide.QtCore.QCoreApplication is actually considered
+            # the main window for the application. Go figure...
+            return cls()
+        @internal.utils.multicase(x=six.integer_types, y=six.integer_types)
+        @classmethod
+        def window(cls, x, y):
+            '''Return the window at the specified `x` and `y` coordinate.'''
+            q = cls()
+            return q.topLevelAt(x, y)
+
+        @classmethod
+        def windows(cls):
+            '''Return all of the available windows for the application.'''
+            app = cls()
+            items = app.topLevelWidgets()
+            return [item for item in items if top.isWindow()]
 
     class mouse(mouse):
         """
@@ -1718,7 +1784,7 @@ class Progress(object):
         # XXX: spin for a bit looking for the application window as IDA seems to be racy with this for some reason
         ts, main = time.time(), getattr(cls, '__appwindow__', None)
         while time.time() - ts < cls.timeout and main is None:
-            main = window.main()
+            main = application.window()
 
         # If no main window was found, then fall back to the console-only progress bar
         if main is None:
