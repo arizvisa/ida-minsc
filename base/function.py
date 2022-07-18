@@ -2441,9 +2441,16 @@ def tag(func):
     res = {}
     [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
 
+    # Collect all of the naming information for the function.
+    fname, mangled = name(ea), utils.string.of(idaapi.get_func_name(ea))
+    if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
+        realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP))
+    else:
+        realname = fname
+
     # Add any of the implicit tags for the given function into our results.
-    fname = name(fn)
-    if fname and database.type.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', fname)
+    fname = fname
+    if fname and database.type.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', realname)
     fcolor = color(fn)
     if fcolor is not None: res.setdefault('__color__', fcolor)
 
@@ -2452,26 +2459,18 @@ def tag(func):
     # is so that we can use the name to emit a proper function prototype.
     try:
         if type.has_prototype(fn):
-            ti, fname = type(fn), database.name(interface.range.start(fn))
+            ti = type(fn)
 
-            # Demangle the name if necessary, and render it to a string.
-            mangled_name_type_t = Fmangled_type(utils.string.to(fname)) if fname else MANGLED_UNKNOWN
-            realname = fname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(fname), MNG_NODEFINIT|MNG_NOPTRTYP))
+            # Use the realname to render the type into a string so that we
+            # can return it to the user in its proper format.
             fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
-
-            # And then return it to the user
             res.setdefault('__typeinfo__', fprototype)
 
-    # If an exception was raised, then the name from the type information might
-    # be mangled and so we need to rip the type from the demangled name.
+    # If an exception was raised, then we're using an older version of IDA and we
+    # need to rip the type information from the unmangled name.
     except E.InvalidTypeOrValueError:
-        mangled_name_type_t = Fmangled_type(utils.string.to(fname)) if fname else MANGLED_UNKNOWN
-        demangled = fname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(fname), MNG_LONG_FORM))
-
-        # If the demangled name is different from the actual name, then we need
-        # to extract its result type and prepend it to the demangled name.
-        if demangled != fname:
-            res.setdefault('__typeinfo__', ' '.join([internal.declaration.extract.result(prototype(ea)), demangled]))
+        if fname != realname:
+            res.setdefault('__typeinfo__', fname)
 
     # Finally we can hand our result back to the caller.
     return res
