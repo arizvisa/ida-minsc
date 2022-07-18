@@ -2092,6 +2092,10 @@ def tag():
 @utils.multicase(ea=six.integer_types)
 def tag(ea):
     '''Return all of the tags defined at address `ea`.'''
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
+    MNG_NODEFINIT, MNG_NOPTRTYP = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7)
+
     ea = interface.address.inside(ea)
 
     # Check if we're within a function and determine whether it's a
@@ -2133,9 +2137,16 @@ def tag(ea):
     [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
     rt and res.update(d3)
 
-    # Add any of the implicit tags for the specified address to our results.
+    # First thing we need to figure out is whether the name exists and if
+    # it's actually special in that we need to demangle it for the real name.
     aname = name(ea)
-    if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', aname)
+    if aname and Fmangled_type(utils.string.to(aname)) != MANGLED_UNKNOWN:
+        realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP))
+    else:
+        realname = aname
+
+    # Add any of the implicit tags for the specified address to our results.
+    if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', realname)
     eprefix = extra.__get_prefix__(ea)
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
     esuffix = extra.__get_suffix__(ea)
@@ -2151,7 +2162,6 @@ def tag(ea):
 
             # Demangle just the name if it's mangled in some way, and use it to render
             # the typeinfo to return.
-            realname = internal.declaration.unmangle_name(aname)
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
 
             # Add it to our dictionary that we return to the user.
