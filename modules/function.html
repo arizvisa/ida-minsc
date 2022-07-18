@@ -272,7 +272,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to remove the color from</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -306,7 +306,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -372,7 +372,7 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be removed</li>
 </ul>
 </td>
@@ -412,7 +412,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to remove the comment from</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**repeatable</strong> – a boolean specifying that the repeatable comment should be removed</li>
 </ul>
 </td>
@@ -470,7 +470,7 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**flags</strong> – any extra flags to use when removing the name</li>
 </ul>
 </td>
@@ -508,7 +508,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to remove the name for</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**flags</strong> – any extra flags to use when removing the name</li>
 </ul>
 </td>
@@ -542,15 +542,29 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <dl class="function">
 <dt id="function.new">
 <code class="descclassname">function.</code><code class="descname">new</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.new" title="Permalink to this definition">¶</a></dt>
-<dd><p>Make a function at the current address.</p>
+<dd><p>Create a new function at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.make</span></code></a>, <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.add</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">new</code><span class="sig-paren">(</span><em>start</em>, <em>**end</em><span class="sig-paren">)</span></dt>
-<dd><p>Make a function at the address <code class="docutils literal notranslate"><span class="pre">start</span></code> and return its entrypoint.</p>
-<p>If the address <code class="docutils literal notranslate"><span class="pre">end</span></code> is specified, then stop processing the function at its address.</p>
+<code class="descclassname">function.</code><code class="descname">new</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Create a new function at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.make</span></code></a>, <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.add</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address of the function to create</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">new</code><span class="sig-paren">(</span><em>start</em>, <em>end</em><span class="sig-paren">)</span></dt>
+<dd><p>Create a new function from the address <code class="docutils literal notranslate"><span class="pre">start</span></code> until <code class="docutils literal notranslate"><span class="pre">end</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.make</span></code></a>, <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.add</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -558,9 +572,24 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address of the function to create</li>
-<li><strong>**end</strong> – if <code class="docutils literal notranslate"><span class="pre">end</span></code> is specified as an address, then use it to determine the end of the created function</li>
+<li><strong>end</strong> (<em>int</em><em> or </em><em>long</em>) – the end address of the function to create</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">new</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Create a new function using the specified <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.make</span></code></a>, <a class="reference internal" href="#function.new" title="function.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.add</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the function to create</td>
 </tr>
 </tbody>
 </table>
@@ -627,18 +656,32 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <dl class="function">
 <dt id="function.remove">
 <code class="descclassname">function.</code><code class="descname">remove</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.remove" title="Permalink to this definition">¶</a></dt>
-<dd><p>Remove the definition of the current function from the database.</p>
+<dd><p>Remove the current function from the database.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">function.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Remove the definition of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> from the database.</p>
+<dd><p>Remove the function <code class="docutils literal notranslate"><span class="pre">func</span></code> from the database.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to remove</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the function specified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code> from the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – </td>
 </tr>
 </tbody>
 </table>
@@ -856,7 +899,7 @@ If <code class="docutils literal notranslate"><span class="pre">Or</span></code>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>key</strong> (<em>str</em>) – a string representing the tag name to remove</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -875,7 +918,7 @@ If <code class="docutils literal notranslate"><span class="pre">Or</span></code>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to remove the tag from</li>
 <li><strong>key</strong> (<em>str</em>) – a string representing the tag name to remove</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -1300,7 +1343,7 @@ namespace.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
 </tr>
 </tbody>
 </table>
@@ -1358,7 +1401,7 @@ namespace.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to remove the color from</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -1376,7 +1419,7 @@ namespace.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to remove the color from</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -1394,7 +1437,7 @@ namespace.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the basic block to remove the color from</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -2198,7 +2241,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to start from</li>
-<li><strong>exits</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em><em> or </em><em>set</em>) – the addresses of basic blocks to stop at</li>
+<li><strong>exits</strong> (<em>intlong</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em><em> or </em><em>set</em>) – the addresses of basic blocks to stop at</li>
 </ul>
 </td>
 </tr>
@@ -2218,7 +2261,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to return the graph from</li>
 <li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to start from</li>
-<li><strong>exits</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em><em> or </em><em>set</em>) – the addresses of basic blocks to stop at</li>
+<li><strong>exits</strong> (<em>intlong</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em><em> or </em><em>set</em>) – the addresses of basic blocks to stop at</li>
 </ul>
 </td>
 </tr>
@@ -2313,18 +2356,14 @@ the chunk containing the requested address.</p>
 
 <dl class="function">
 <dt id="function.chunk.add">
-<code class="descclassname">chunk.</code><code class="descname">add</code><span class="sig-paren">(</span><em>start</em>, <em>end</em><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.add" title="Permalink to this definition">¶</a></dt>
-<dd><p>Add the chunk starting at the address <code class="docutils literal notranslate"><span class="pre">start</span></code> and terminating at <code class="docutils literal notranslate"><span class="pre">end</span></code> to the current function.</p>
+<code class="descclassname">chunk.</code><code class="descname">add</code><span class="sig-paren">(</span><em>start</em><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add the chunk starting at the address <code class="docutils literal notranslate"><span class="pre">start</span></code> to the current function.</p>
 <p>Aliases: <a class="reference internal" href="#function.chunk.add" title="function.chunk.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.add_chunk</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address of the chunk to add</li>
-<li><strong>end</strong> (<em>int</em><em> or </em><em>long</em>) – the ending address of the chunk</li>
-</ul>
-</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address of the chunk to add</td>
 </tr>
 </tbody>
 </table>
@@ -2347,8 +2386,27 @@ the chunk containing the requested address.</p>
 
 <dl class="function">
 <dt>
+<code class="descclassname">chunk.</code><code class="descname">add</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Add the chunk starting at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunk.add" title="function.chunk.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.add_chunk</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to add the chunk to</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address of the chunk to add to the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">chunk.</code><code class="descname">add</code><span class="sig-paren">(</span><em>func</em>, <em>start</em>, <em>end</em><span class="sig-paren">)</span></dt>
-<dd><p>Add the chunk starting at the address <code class="docutils literal notranslate"><span class="pre">start</span></code> and terminating at <code class="docutils literal notranslate"><span class="pre">end</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<dd><p>Add the chunk from the address <code class="docutils literal notranslate"><span class="pre">start</span></code> until <code class="docutils literal notranslate"><span class="pre">end</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#function.chunk.add" title="function.chunk.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.add_chunk</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -2415,40 +2473,6 @@ the chunk containing the requested address.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk</li>
 <li><strong>offset</strong> (<em>int</em><em> or </em><em>long</em>) – the offset to add to the chunk address</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="function.chunk.assign">
-<code class="descclassname">chunk.</code><code class="descname">assign</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.assign" title="Permalink to this definition">¶</a></dt>
-<dd><p>Assign the chunk at <code class="docutils literal notranslate"><span class="pre">ea</span></code> to the current function.</p>
-<p>Aliases: <a class="reference internal" href="#function.chunk.assign" title="function.chunk.assign"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.assign_chunk</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to assign</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">chunk.</code><code class="descname">assign</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Assign the chunk at <code class="docutils literal notranslate"><span class="pre">ea</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.chunk.assign" title="function.chunk.assign"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.assign_chunk</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the function to assign the chunk to</li>
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to add to the function</li>
 </ul>
 </td>
 </tr>
@@ -2593,18 +2617,68 @@ the chunk containing the requested address.</p>
 <dl class="function">
 <dt id="function.chunk.owner">
 <code class="descclassname">chunk.</code><code class="descname">owner</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.owner" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the first owner of the function chunk containing the current address.</p>
+<dd><p>Return the primary owner of the function chunk containing the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">chunk.</code><code class="descname">owner</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the first owner of the function chunk containing the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the primary owner of the function chunk containing the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return the function for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to return the owner of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">owner</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the primary owner of the function chunk specified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the chunk to return the owner of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">owner</code><span class="sig-paren">(</span><em>ea</em>, <em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the primary owner of the chunk at <code class="docutils literal notranslate"><span class="pre">ea</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to change the owner of</li>
+<li><strong>func</strong> – the desired function that should own the chunk</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">owner</code><span class="sig-paren">(</span><em>bounds</em>, <em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the primary owner of the chunk specified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the chunk to change the owner of</li>
+<li><strong>func</strong> – the desired function that should own the chunk</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2732,6 +2806,21 @@ the chunk containing the requested address.</p>
 
 <dl class="function">
 <dt>
+<code class="descclassname">chunk.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the chunk specified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code> from its function.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunk.remove" title="function.chunk.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.remove_chunk</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – a tuple describing the boundaries of the chunk to remove</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">chunk.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Remove the chunk at <code class="docutils literal notranslate"><span class="pre">ea</span></code> from the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#function.chunk.remove" title="function.chunk.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.remove_chunk</span></code></a></p>
@@ -2742,6 +2831,25 @@ the chunk containing the requested address.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the chunk</li>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the chunk to remove from the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>func</em>, <em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the chunk specified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code> from the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.chunk.remove" title="function.chunk.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.remove_chunk</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the chunk</li>
+<li><strong>bounds</strong> (<em>tuple</em>) – a tuple describing the boundaries of the chunk to remove</li>
 </ul>
 </td>
 </tr>
@@ -3410,7 +3518,7 @@ the following globals:</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information from the function</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information from the function</td>
 </tr>
 </tbody>
 </table>
@@ -3424,7 +3532,7 @@ the following globals:</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>idaapi.func_t</em>) – the address or function to return the type information from</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> (<em>intlong</em><em> or </em><em>idaapi.func_t</em>) – the address or function to return the type information from</td>
 </tr>
 </tbody>
 </table>
@@ -3476,7 +3584,7 @@ the following globals:</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the address or function to remove the type information from</li>
-<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information from the function</li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> which will remove the type information from the function</li>
 </ul>
 </td>
 </tr>
@@ -3594,7 +3702,7 @@ the following globals:</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function with the flags that are to be modified</li>
 <li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – a bitmask used to specify the explicit flags to set</li>
-<li><strong>integer</strong> (<em>bool</em><em> or </em><em>int</em><em> or </em><em>long</em>) – the flags to set on the function</li>
+<li><strong>integer</strong> (<em>bool</em><em> or </em><em>intlong</em>) – the flags to set on the function</li>
 </ul>
 </td>
 </tr>
@@ -4775,7 +4883,7 @@ the following globals:</p>
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2010-2022, Ali Rizvi-Santiago.
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
       Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>

@@ -573,209 +573,8 @@ being equivalent to “leaf” or “virtual-wrapper” depending on whether
 no functions are called, or only indirect calls are made.</li>
 </ol>
 </div>
-<div class="section" id="using-the-user-interface-ui-module-to-map-hotkeys-to-a-function">
-<span id="tutorials-userinterface"></span><h2>4.5. Using the user-interface (ui) module to map hotkeys to a function<a class="headerlink" href="#using-the-user-interface-ui-module-to-map-hotkeys-to-a-function" title="Permalink to this headline">¶</a></h2>
-<p>This plugin wraps a number of the capabilities that are exposed by
-IDAPython. One of these capabilities are to be able to interact with
-IDA’s user-interface. This is exposed by the plugin via the <a class="reference internal" href="modules/misc-ui.html#module-ui" title="ui"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ui</span></code></a>
-module. This tutorial introduces some of the user-interface wrappers
-that are available and can be used to develop quick tools that the user
-needs as they’re reversing a target.</p>
-<ol class="arabic simple">
-<li>When doing iterative changes to the different content within a
-database, it is common to perform actions such as apply a structure,
-convert a list of data items into an array, convert a range of bytes
-into a string, and so forth. As an example, when reversing C++ targets
-where runtime-type-information is available (RTTI), information about
-a class such as its size, number of virtual methods, etc. are available,
-but not packed into a structure by IDA. Most of this is done relative
-to whatever object the user is currently working with. The current
-object the user is working with can be identifed with the
-<code class="xref py py-class docutils literal notranslate"><span class="pre">ui.current</span></code> namespace. This can be combined with other
-functionality within the plugin in order to automate a large aspect
-of the reverser’s chores.</li>
-</ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>&gt; help(ui.current)
-Help on class current in module ui:
-
-class current(__builtin__.object)
- |  This namespace contains tools for fetching information about the
- |  current selection state. This can be used to get the state of
- |  thigns that are currently selected such as the address, function,
- |  segment, clipboard, widget, or even the current window in use.
- |
- |  Class methods defined here:
- |
- |  address(cls) from __builtin__.type
- |      Return the current address.
- |
- |  color(cls) from __builtin__.type
- |      Return the color of the current item.
- |
- |  function(cls) from __builtin__.type
- |      Return the current function.
- |
- |  opnum(cls) from __builtin__.type
- |      Return the currently selected operand number.
- |
- |  segment(cls) from __builtin__.type
- |      Return the current segment.
- |
- |  selected = selection(*arguments, **keywords) from __builtin__.type
- |      Alias for `ui.current.selection`.
- |
- |  selection(cls) from __builtin__.type
- |      Return the current address range of whatever is selected
- |
- |  status(cls) from __builtin__.type
- |      Return the IDA status.
- |
- |  symbol(cls) from __builtin__.type
- |      Return the current highlighted symbol name.
- |
- |  widget(cls) from __builtin__.type
- |      Return the current widget that the mouse is hovering over.
- |
- |  window(cls) from __builtin__.type
- |      Return the current window that is being used.
-</pre></div>
-</div>
-<ol class="arabic simple" start="2">
-<li>When an RTTI entry is identified by IDA, it looks like the following
-unstructured data. With a cross-reference existing at address 0x723324.
-This data isn’t presently of use to a reverser, and it would be much
-easier to use if it was structured. Normally the reverser would need
-to navigate to the “Structures” view, create the structure, and then
-use ‘Alt+Q’ to apply the structure to the address at 0x723308.</li>
-</ol>
-<div class="highlight-objdump-nasm notranslate"><div class="highlight"><pre><span></span><span class="x">.rdata:00723308 BC 34 72 00           off_723308      dd offset str.CNxPrefDigSigDlg</span>
-<span class="x">.rdata:0072330C 68                                    db  68h ; h</span>
-<span class="x">.rdata:0072330D 01                                    db    1</span>
-<span class="x">.rdata:0072330E 00                                    db    0</span>
-<span class="x">.rdata:0072330F 00                                    db    0</span>
-<span class="x">.rdata:00723310 FF                                    db 0FFh ; ÿ</span>
-<span class="x">.rdata:00723311 FF                                    db 0FFh ; ÿ</span>
-<span class="x">.rdata:00723312 00                                    db    0</span>
-<span class="x">.rdata:00723313 00                                    db    0</span>
-<span class="x">.rdata:00723314 00                                    db    0</span>
-<span class="x">.rdata:00723315 00                                    db    0</span>
-<span class="x">.rdata:00723316 00                                    db    0</span>
-<span class="x">.rdata:00723317 00                                    db    0</span>
-<span class="x">.rdata:00723318 E0 55 42 00                           dd offset sub_4255E0</span>
-<span class="x">.rdata:0072331C 00                                    db    0</span>
-<span class="x">.rdata:0072331D 00                                    db    0</span>
-<span class="x">.rdata:0072331E 00                                    db    0</span>
-<span class="x">.rdata:0072331F 00                                    db    0</span>
-<span class="x">.rdata:00723320 00                                    db    0</span>
-<span class="x">.rdata:00723321 00                                    db    0</span>
-<span class="x">.rdata:00723322 00                                    db    0</span>
-<span class="x">.rdata:00723323 00                                    db    0</span>
-<span class="x">.rdata:00723324 C8 7C 7A 00                           dd offset const CNxPrefDigSigDlg::`RTTI Complete Object Locator&#39;</span>
-</pre></div>
-</div>
-<ol class="arabic simple" start="3">
-<li>To deal with this, we will first create the structure at the IDAPython
-command prompt based on what we know. Depending on the C++ implementation,
-this structure can be named <cite>CRuntimeClass</cite>, begins with a pointer to
-a string, contains a pointer to the constructor, and ends with a reference
-to the object locator. We will use <a class="reference internal" href="modules/structure.html#structure.new" title="structure.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">struc.new</span></code></a> to
-create it and add some members.</li>
-</ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">struc</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;CRuntimeClass&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;p_name_0&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;v_size_4&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;v_8&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;pf_constructor_c&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;p_parentClass_10&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;p_14&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;p_18&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">st</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;p_runtimeTypeInformation_1c&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-</pre></div>
-</div>
-<ol class="arabic simple" start="4">
-<li>Now that we have a structure stored in the <cite>st</cite> variable, we can use
-<a class="reference internal" href="modules/database.html#database.set.structure" title="database.set.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">db.set.structure</span></code></a> to apply it to
-an address. After applying the structure, we can then name it with
-<a class="reference internal" href="modules/database.html#database.name" title="database.name"><code class="xref py py-func docutils literal notranslate"><span class="pre">db.name</span></code></a>, or even tag it using the
-<a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">db.tag</span></code></a> function in order to search for it
-later. As <a class="reference internal" href="modules/database.html#database.set.structure" title="database.set.structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">db.set.structure</span></code></a>
-returns the structure that was created, we will use this combined
-with <a class="reference internal" href="modules/database.html#database.get.string" title="database.get.string"><code class="xref py py-func docutils literal notranslate"><span class="pre">db.get.string</span></code></a> to create the
-new name for the address.</li>
-</ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">make_rtti</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
-      <span class="n">res</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">structure</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">st</span><span class="p">)</span>
-      <span class="n">name_address</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;p_name_0&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">value</span>
-      <span class="n">name</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">string</span><span class="p">(</span><span class="n">name_address</span><span class="p">)</span>
-      <span class="c1"># database.name(ea, &#39;gv&#39;, &#39;rtti&#39;, name, db.offset(ea))</span>
-      <span class="n">database</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;rtti&#39;</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">name</span><span class="p">)</span>
-      <span class="k">return</span> <span class="n">res</span>
-</pre></div>
-</div>
-<ol class="arabic simple" start="5">
-<li>Now we can use this function, whilst passing the target address as a
-parameter, to automatically apply the structure to the given address.
-One issue with this, however, is that typically when dealing with a
-<cite>CRuntimeClass</cite>, the cross-reference that navigates you to the class
-will point to the <cite>p_runtimeTypeInformation_1c</cite> field which will
-require you to seek by -0x1c bytes in order to apply the structure.
-We can remedy this by assuming IDA will label the string, and use
-the <a class="reference internal" href="modules/database.html#database.address.prevlabel" title="database.address.prevlabel"><code class="xref py py-func docutils literal notranslate"><span class="pre">db.a.prevlabel</span></code></a> function
-to get an address pointing to the previously defined label.</li>
-</ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">make_rtti_from_reference</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
-      <span class="n">name_address</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">a</span><span class="o">.</span><span class="n">prevlabel</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-      <span class="k">return</span> <span class="n">make_rtti</span><span class="p">(</span><span class="n">name_address</span><span class="p">)</span>
-</pre></div>
-</div>
-<ol class="arabic simple" start="6">
-<li>Now that we have a way to apply the structure to the address
-identified by the previously labeled name, we can simply iterate
-through all the cross-references pointing to the “RTTI Object Locator”,
-and apply this function to it. However, what if we’re unsure that
-every single cross-reference has this particular format? If that’s
-turns out to be the case, then it might be better to do this on
-command instead of programmatically. We’ll first define a function
-that uses the current address via either the <a class="reference internal" href="modules/misc-ui.html#ui.current.address" title="ui.current.address"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.current.address()</span></code></a>
-function, or the <a class="reference internal" href="modules/database.html#database.here" title="database.here"><code class="xref py py-func docutils literal notranslate"><span class="pre">h</span></code></a> function.</li>
-</ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">apply_rtti_here</span><span class="p">():</span>
-      <span class="n">ea</span> <span class="o">=</span> <span class="n">h</span><span class="p">()</span>
-      <span class="n">res</span> <span class="o">=</span> <span class="n">make_rtti_from_reference</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-      <span class="n">constructor</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;pf_constructor_c&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">value</span>
-      <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;rtti.constructor&#39;</span><span class="p">,</span> <span class="n">constructor</span><span class="p">)</span>
-</pre></div>
-</div>
-<ol class="arabic simple" start="7">
-<li>Now we have a function that when executed, will use the current address,
-and apply our structure to that given address. One issue with this is
-the need to type the function into IDAPython in order to execute it. In
-order to work around this, we can use the <a class="reference internal" href="modules/misc-ui.html#ui.keyboard.map" title="ui.keyboard.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.keyboard.map()</span></code></a>
-function to map it to a hotkey. We will use the ‘Ctrl+P’ hotkey.</li>
-</ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">ui</span><span class="o">.</span><span class="n">keyboard</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="s1">&#39;Ctrl-P&#39;</span><span class="p">,</span> <span class="n">apply_rtti_here</span><span class="p">)</span>
-<span class="o">&lt;</span><span class="n">capsule</span> <span class="nb">object</span> <span class="s2">&quot;$valid$&quot;</span> <span class="n">at</span> <span class="mh">0x7fe7812b51e0</span><span class="o">&gt;</span>
-</pre></div>
-</div>
-<ol class="arabic simple" start="7">
-<li>At this point, we can simply navigate to a cross-reference pointing in
-front of a label that we want to convert to a structure, and then hit
-the ‘Ctrl+P’ hotkey to execute our function. This allows us to automate
-some aspect of our reversing in order to annotate the database belonging
-to the target. When we’re done, we can simply use the <a class="reference internal" href="modules/misc-ui.html#ui.keyboard.unmap" title="ui.keyboard.unmap"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.keyboard.unmap()</span></code></a>
-function to unmap our hotkey to restore IDA’s original functionality.</li>
-</ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">ui</span><span class="o">.</span><span class="n">keyboard</span><span class="o">.</span><span class="n">unmap</span><span class="p">(</span><span class="s1">&#39;Ctrl-P&#39;</span><span class="p">)</span>
-</pre></div>
-</div>
-<ol class="arabic simple" start="8">
-<li>This plugin includes a number of ways to interact with IDA’s user-interface.
-Please review the help for the <a class="reference internal" href="modules/misc-ui.html#module-ui" title="ui"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ui</span></code></a> module for some of its other
-capabilities.</li>
-</ol>
-</div>
 <div class="section" id="conclusion">
-<span id="tutorials-conclusion"></span><h2>4.6. Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
+<span id="tutorials-conclusion"></span><h2>4.5. Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
 <p>There are a variety of different features available in this plugin that
 can allow users to automate different aspects of their reverse-engineering
 project. It is recommended by the author to explore the different modules
@@ -813,8 +612,7 @@ examples help demonstrate the flexibility that is provided by this plugin.</p>
 <li><a class="reference internal" href="#setting-breakpoints-windbg-on-all-labels-in-a-function">4.2. Setting breakpoints (WinDbg) on all labels in a function</a></li>
 <li><a class="reference internal" href="#tagging-all-dynamic-calls-in-the-database">4.3. Tagging all dynamic calls in the database</a></li>
 <li><a class="reference internal" href="#marking-all-functions-that-are-leaves">4.4. Marking all functions that are “leaves”</a></li>
-<li><a class="reference internal" href="#using-the-user-interface-ui-module-to-map-hotkeys-to-a-function">4.5. Using the user-interface (ui) module to map hotkeys to a function</a></li>
-<li><a class="reference internal" href="#conclusion">4.6. Conclusion</a></li>
+<li><a class="reference internal" href="#conclusion">4.5. Conclusion</a></li>
 </ul>
 </li>
 </ul>
@@ -865,7 +663,7 @@ examples help demonstrate the flexibility that is provided by this plugin.</p>
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2010-2022, Ali Rizvi-Santiago.
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
       Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>

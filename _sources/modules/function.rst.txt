@@ -137,7 +137,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the color from
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(func, rgb)
    
@@ -152,7 +152,7 @@ functions and aliases. For more information on this, please see
    Remove the color from the current function.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: comment(\*\*repeatable)
    
@@ -182,7 +182,7 @@ functions and aliases. For more information on this, please see
    Remove the comment for the current function.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
 .. py:function:: comment(func, string, \*\*repeatable)
@@ -204,7 +204,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the comment from
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
 .. py:function:: marks()
@@ -232,7 +232,7 @@ functions and aliases. For more information on this, please see
    Remove the custom-name from the current function.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(string, \*suffix, \*\*flags)
@@ -250,7 +250,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the name for
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(func, string, \*suffix, \*\*flags)
@@ -268,21 +268,38 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: new()
    
-   Make a function at the current address.
+   Create a new function at the current address.
    
    Aliases: :py:func:`function.make<new>`, :py:func:`function.add<new>`
    
-.. py:function:: new(start, \*\*end)
+.. py:function:: new(ea)
    
-   Make a function at the address ``start`` and return its entrypoint.
+   Create a new function at the address specified by ``ea``.
    
-   If the address ``end`` is specified, then stop processing the function at its address.
+   Aliases: :py:func:`function.make<new>`, :py:func:`function.add<new>`
+   
+   :param ea: the starting address of the function to create
+   :type ea: int or long
+   
+.. py:function:: new(start, end)
+   
+   Create a new function from the address ``start`` until ``end``.
    
    Aliases: :py:func:`function.make<new>`, :py:func:`function.add<new>`
    
    :param start: the starting address of the function to create
    :type start: int or long
-   :param \*\*end: if ``end`` is specified as an address, then use it to determine the end of the created function
+   :param end: the end address of the function to create
+   :type end: int or long
+   
+.. py:function:: new(bounds)
+   
+   Create a new function using the specified ``bounds``.
+   
+   Aliases: :py:func:`function.make<new>`, :py:func:`function.add<new>`
+   
+   :param bounds: the boundaries of the function to create
+   :type bounds: tuple
    
 .. py:function:: offset()
    
@@ -314,13 +331,20 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: remove()
    
-   Remove the definition of the current function from the database.
+   Remove the current function from the database.
    
 .. py:function:: remove(func)
    
-   Remove the definition of the function ``func`` from the database.
+   Remove the function ``func`` from the database.
    
    :param func: the function to remove
+   
+.. py:function:: remove(bounds)
+   
+   Remove the function specified by ``bounds`` from the database.
+   
+   :param bounds:
+   :type bounds: tuple
    
 .. py:function:: select(\*\*boolean)
    
@@ -426,7 +450,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tag(func, key, none)
    
@@ -436,7 +460,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tags()
    
@@ -686,7 +710,7 @@ Some examples of this functionality can be::
    Removes the color of the basic block at the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(ea)
    
@@ -716,7 +740,7 @@ Some examples of this functionality can be::
    :param ea: the address of the basic block to remove the color from
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(bounds, none)
    
@@ -725,7 +749,7 @@ Some examples of this functionality can be::
    :param bounds: the boundaries of the basic block to remove the color from
    :type bounds: tuple
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(bb, none)
    
@@ -734,7 +758,7 @@ Some examples of this functionality can be::
    :param bb: the basic block to remove the color from
    :type bb: idaapi.BasicBlock
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(ea, rgb, \*\*frame)
    
@@ -1164,7 +1188,7 @@ Some examples of this namespace's usage::
    :param start: the address of the basic block to start from
    :type start: int or long
    :param exits: the addresses of basic blocks to stop at
-   :type exits: int or long or list or tuple or set
+   :type exits: intlong or list or tuple or set
    
 .. py:function:: blocks\.subgraph(func, start, exits)
    
@@ -1176,7 +1200,7 @@ Some examples of this namespace's usage::
    :param start: the address of the basic block to start from
    :type start: int or long
    :param exits: the addresses of basic blocks to stop at
-   :type exits: int or long or list or tuple or set
+   :type exits: intlong or list or tuple or set
    
 .. py:function:: blocks\.walk()
    
@@ -1231,16 +1255,14 @@ The functions in this namespace can be used as::
    :param ea: the address containing the chunk to return
    :type ea: int or long
    
-.. py:function:: chunk\.add(start, end)
+.. py:function:: chunk\.add(start)
    
-   Add the chunk starting at the address ``start`` and terminating at ``end`` to the current function.
+   Add the chunk starting at the address ``start`` to the current function.
    
    Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
    :param start: the starting address of the chunk to add
    :type start: int or long
-   :param end: the ending address of the chunk
-   :type end: int or long
    
 .. py:function:: chunk\.add(bounds)
    
@@ -1251,9 +1273,19 @@ The functions in this namespace can be used as::
    :param bounds: the boundaries of the chunk to add
    :type bounds: tuple
    
+.. py:function:: chunk\.add(func, ea)
+   
+   Add the chunk starting at address ``ea`` to the function ``func``.
+   
+   Aliases: :py:func:`function.add_chunk<chunk\.add>`
+   
+   :param func: the function to add the chunk to
+   :param ea: the starting address of the chunk to add to the function
+   :type ea: int or long
+   
 .. py:function:: chunk\.add(func, start, end)
    
-   Add the chunk starting at the address ``start`` and terminating at ``end`` to the function ``func``.
+   Add the chunk from the address ``start`` until ``end`` to the function ``func``.
    
    Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
@@ -1292,25 +1324,6 @@ The functions in this namespace can be used as::
    :type ea: int or long
    :param offset: the offset to add to the chunk address
    :type offset: int or long
-   
-.. py:function:: chunk\.assign(ea)
-   
-   Assign the chunk at ``ea`` to the current function.
-   
-   Aliases: :py:func:`function.assign_chunk<chunk\.assign>`
-   
-   :param ea: the address of the chunk to assign
-   :type ea: int or long
-   
-.. py:function:: chunk\.assign(func, ea)
-   
-   Assign the chunk at ``ea`` to the function ``func``.
-   
-   Aliases: :py:func:`function.assign_chunk<chunk\.assign>`
-   
-   :param func: the function to assign the chunk to
-   :param ea: the address of the chunk to add to the function
-   :type ea: int or long
    
 .. py:function:: chunk\.at()
    
@@ -1383,14 +1396,37 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.owner()
    
-   Return the first owner of the function chunk containing the current address.
+   Return the primary owner of the function chunk containing the current address.
    
 .. py:function:: chunk\.owner(ea)
    
-   Return the first owner of the function chunk containing the address specified by ``ea``.
+   Return the primary owner of the function chunk containing the address specified by ``ea``.
    
-   :param ea: the address of the chunk to return the function for
+   :param ea: the address of the chunk to return the owner of
    :type ea: int or long
+   
+.. py:function:: chunk\.owner(bounds)
+   
+   Return the primary owner of the function chunk specified by ``bounds``.
+   
+   :param bounds: the boundaries of the chunk to return the owner of
+   :type bounds: tuple
+   
+.. py:function:: chunk\.owner(ea, func)
+   
+   Set the primary owner of the chunk at ``ea`` to the function ``func``.
+   
+   :param ea: the address of the chunk to change the owner of
+   :type ea: int or long
+   :param func: the desired function that should own the chunk
+   
+.. py:function:: chunk\.owner(bounds, func)
+   
+   Set the primary owner of the chunk specified by ``bounds`` to the function ``func``.
+   
+   :param bounds: the boundaries of the chunk to change the owner of
+   :type bounds: tuple
+   :param func: the desired function that should own the chunk
    
 .. py:function:: chunk\.owners()
    
@@ -1458,6 +1494,15 @@ The functions in this namespace can be used as::
    :param ea: the address of the chunk to remove
    :type ea: int or long
    
+.. py:function:: chunk\.remove(bounds)
+   
+   Remove the chunk specified by ``bounds`` from its function.
+   
+   Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
+   
+   :param bounds: a tuple describing the boundaries of the chunk to remove
+   :type bounds: tuple
+   
 .. py:function:: chunk\.remove(func, ea)
    
    Remove the chunk at ``ea`` from the function ``func``.
@@ -1467,6 +1512,16 @@ The functions in this namespace can be used as::
    :param func: the function containing the chunk
    :param ea: the address of the chunk to remove from the function
    :type ea: int or long
+   
+.. py:function:: chunk\.remove(func, bounds)
+   
+   Remove the chunk specified by ``bounds`` from the function ``func``.
+   
+   Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
+   
+   :param func: the function containing the chunk
+   :param bounds: a tuple describing the boundaries of the chunk to remove
+   :type bounds: tuple
    
 .. py:function:: chunk\.top()
    
@@ -1909,14 +1964,14 @@ Some simple ways of getting information about a function::
    Remove the type information for the current function.
    
    :param none: the python value :py:obj:`None` which will remove the type information from the function
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type(func)
    
    Return the type information for the function ``func`` as an :py:obj:`idaapi.tinfo_t`.
    
    :param func: the address or function to return the type information from
-   :type func: int or long or idaapi.func_t
+   :type func: intlong or idaapi.func_t
    
 .. py:function:: type(func, info)
    
@@ -1940,7 +1995,7 @@ Some simple ways of getting information about a function::
    
    :param func: the address or function to remove the type information from
    :param none: the python value :py:obj:`None` which will remove the type information from the function
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type\.convention()
    
@@ -2004,7 +2059,7 @@ Some simple ways of getting information about a function::
    :param mask: a bitmask used to specify the explicit flags to set
    :type mask: int or long
    :param integer: the flags to set on the function
-   :type integer: bool or int or long
+   :type integer: bool or intlong
    
 .. py:function:: type\.has_frame()
    

@@ -19,18 +19,6 @@ user to interact with the different windows that are currently
 in use. This can allow for one to automatically show or hide a
 window that they wish to expose to the user.
 
--------------
-Function list
--------------
-
-The functions that are available in this module use multicased
-functions and aliases. For more information on this, please see
-:ref:`multicase-aliases` and :ref:`multicase-functions`.
-
-.. py:function:: application()
-   
-   Return the current instance of the IDA Application.
-   
 --------------
 Namespace list
 --------------
@@ -42,6 +30,32 @@ information on namespaces. For more information on multicase
 functions or aliases, please see :ref:`multicase-functions` or
 :ref:`multicase-aliases`.
 
+.. _ns-ui-application:
+
+**************
+ui.application
+**************
+
+This namespace is for getting information about the application user-interface.
+
+.. py:function:: application()
+   
+   Return the current instance of the application.
+   
+.. py:function:: application\.beep()
+   
+   Beep using the application interface.
+   
+   Aliases: :py:func:`ui.beep<application\.beep>`
+   
+.. py:function:: application\.window()
+   
+   Return the current window for the application.
+   
+.. py:function:: application\.windows()
+   
+   Return all of the top-level windows for the application.
+   
 .. _ns-ui-appwindow:
 
 ************
@@ -258,9 +272,13 @@ segment, clipboard, widget, or even the current window in use.
    
    Return the current highlighted symbol name or register.
    
+.. py:function:: current\.viewer()
+   
+   Return the current viewer that is being used.
+   
 .. py:function:: current\.widget()
    
-   Return the current widget that the mouse is hovering over.
+   Return the current widget that is being used.
    
 .. py:function:: current\.window()
    
@@ -639,7 +657,7 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
    
 .. py:function:: notepad\.open(\*args)
    
-   Open or show the notepad window and return its :py:obj:`QtWidgets.QPlainTextEdit` widget.
+   Open or show the notepad window and return its UI widget that can be used to modify it.
    
    :param \*args:
    
@@ -740,21 +758,9 @@ state of IDA's interface. These are things such as waiting for
 IDA's analysis queue, or determining whether the function is
 being viewed in graph view or not.
 
-.. py:function:: state\.beep()
-   
-   Beep using IDA's interface.
-   
-   Aliases: :py:func:`ui.beep<state\.beep>`
-   
 .. py:function:: state\.graphview()
    
    Returns true if the current function is being viewed in graph view mode.
-   
-.. py:function:: state\.refresh()
-   
-   Refresh all of IDA's windows.
-   
-   Aliases: :py:func:`ui.refresh<state\.refresh>`
    
 .. py:function:: state\.wait()
    
@@ -868,13 +874,24 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 ui.widget
 *********
 
-This namespace is for selecting a specific or particular widget.
+This namespace is for interacting with any of the widgets
+associated with the native user-interface.
 
+.. py:function:: widget()
+   
+   Return the widget that is currently being used.
+   
 .. py:function:: widget(xy)
    
    Return the widget at the specified (``x``, ``y``) coordinate within the ``xy`` tuple.
    
    :param xy: a tuple composed of the X and Y coordinates of a widget
+   
+.. py:function:: widget(title)
+   
+   Return the widget that is using the specified ``title``.
+   
+   :param title: a string containing the widget title
    
 .. py:function:: widget\.at(xy)
    
@@ -882,11 +899,68 @@ This namespace is for selecting a specific or particular widget.
    
    :param xy: a tuple composed of the X and Y coordinates of a widget
    
-.. py:function:: widget\.form(twidget)
+.. py:function:: widget\.by(title)
    
-   Return an IDA plugin form as a UI widget.
+   Return the widget associated with the given window ``title``.
    
-   :param twidget: the IDA plugin form to convert to a Qt widget
+   :param title: the title of the desired widget to return
+   
+.. py:function:: widget\.close(widget, flags)
+   
+   Close the ``widget`` using the specified :py:obj:`idaapi.WCLS_` flags.
+   
+   :param widget: the widget to close
+   :param flags: the specified flags to use when closing the widget
+   
+.. py:function:: widget\.focus(widget)
+   
+   Activate the specified ``widget`` and put it in focus.
+   
+   :param widget: the widget to put into focus
+   
+.. py:function:: widget\.form(widget)
+   
+   Return the IDA form for the UI ``widget`` that is provided.
+   
+   :param widget: the user-interface widget to convert to an IDA plugin form
+   
+.. py:function:: widget\.isinstance(object)
+   
+   Return whether the given ``object`` is of the correct type for the UI.
+   
+   :param object: the object to check the instance of
+   
+.. py:function:: widget\.of(form)
+   
+   Return the UI widget for the IDA ``form`` that is provided.
+   
+   :param form: the IDA plugin form to convert to a user-interface widget
+   
+.. py:function:: widget\.open(widget, flags, \*\*target)
+   
+   Open the ``widget`` using the specified :py:obj:`idaapi.WOPN_` flags.
+   
+   :param widget: the widget to open
+   :param flags: the specified flags to use when opening the widget
+   :param \*\*target:
+   
+.. py:function:: widget\.show(widget)
+   
+   Display the specified ``widget`` without putting it in focus.
+   
+   :param widget: the widget to show
+   
+.. py:function:: widget\.title(widget)
+   
+   Return the window title for the given ``widget``.
+   
+   :param widget: the widget to return the title from
+   
+.. py:function:: widget\.type(widget)
+   
+   Return the :py:obj:`idaapi.twidget_type_t` for the given ``widget``.
+   
+   :param widget: the widget to return the type of
    
 .. _ns-ui-window:
 
@@ -894,15 +968,18 @@ This namespace is for selecting a specific or particular widget.
 ui.window
 *********
 
-This namespace is for selecting a specific or particular window.
+This namespace is for interacting with a specific window.
 
-.. py:function:: window\.main()
+.. py:function:: window()
    
-   Return the active main window.
+   Return the currently active window.
    
-.. py:function:: window\.viewer()
+.. py:function:: window\.at(cls, xy)
    
-   Return the current viewer.
+   Return the widget at the specified (``x``, ``y``) coordinate within the ``xy`` tuple.
+   
+   :param cls:
+   :param xy: a tuple composed of the X and Y coordinates of a window
    
 .. _ns-ui-windows:
 
@@ -910,11 +987,17 @@ This namespace is for selecting a specific or particular window.
 ui.windows
 **********
 
-Interact with any or all of the top-level windows for the application.
+This namespace is for interacting with any or all of the windows for the application.
 
 .. py:function:: windows()
    
    Return all of the top-level windows.
+   
+.. py:function:: windows\.refresh()
+   
+   Refresh all of lists and choosers within the application.
+   
+   Aliases: :py:func:`ui.refresh<windows\.refresh>`
    
 ----------
 Class list

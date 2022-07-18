@@ -70,28 +70,45 @@ of other things.</p>
 user to interact with the different windows that are currently
 in use. This can allow for one to automatically show or hide a
 window that they wish to expose to the user.</p>
-<div class="section" id="function-list">
-<h2>3.2.1.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
-<p>The functions that are available in this module use multicased
-functions and aliases. For more information on this, please see
-<a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
-<dl class="function">
-<dt id="ui.application">
-<code class="descclassname">ui.</code><code class="descname">application</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.application" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the current instance of the IDA Application.</p>
-</dd></dl>
-
-</div>
 <div class="section" id="namespace-list">
-<h2>3.2.1.2. Namespace list<a class="headerlink" href="#namespace-list" title="Permalink to this headline">¶</a></h2>
+<h2>3.2.1.1. Namespace list<a class="headerlink" href="#namespace-list" title="Permalink to this headline">¶</a></h2>
 <p>These are the namespaces available within this module. Namespaces
 group similar functions that can be used typically for the same
 concept. Please see <a class="reference internal" href="../multicase.html#multicase-namespaces"><span class="std std-ref">Classes as namespaces</span></a> for more
 information on namespaces. For more information on multicase
 functions or aliases, please see <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a> or
 <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
+<div class="section" id="ui-application">
+<span id="ns-ui-application"></span><h3>3.2.1.1.1. ui.application<a class="headerlink" href="#ui-application" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for getting information about the application user-interface.</p>
+<dl class="function">
+<dt id="ui.application">
+<code class="descclassname">ui.</code><code class="descname">application</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.application" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current instance of the application.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.application.beep">
+<code class="descclassname">application.</code><code class="descname">beep</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.application.beep" title="Permalink to this definition">¶</a></dt>
+<dd><p>Beep using the application interface.</p>
+<p>Aliases: <a class="reference internal" href="#ui.application.beep" title="ui.application.beep"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.beep</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.application.window">
+<code class="descclassname">application.</code><code class="descname">window</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.application.window" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current window for the application.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.application.windows">
+<code class="descclassname">application.</code><code class="descname">windows</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.application.windows" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return all of the top-level windows for the application.</p>
+</dd></dl>
+
+</div>
 <div class="section" id="ui-appwindow">
-<span id="ns-ui-appwindow"></span><h3>3.2.1.2.1. ui.appwindow<a class="headerlink" href="#ui-appwindow" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-appwindow"></span><h3>3.2.1.1.2. ui.appwindow<a class="headerlink" href="#ui-appwindow" title="Permalink to this headline">¶</a></h3>
 <p>Base namespace used for interacting with the windows provided by IDA.</p>
 <dl class="function">
 <dt id="ui.appwindow.close">
@@ -115,7 +132,7 @@ functions or aliases, please see <a class="reference internal" href="../multicas
 
 </div>
 <div class="section" id="ui-ask">
-<span id="ns-ui-ask"></span><h3>3.2.1.2.2. ui.ask<a class="headerlink" href="#ui-ask" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-ask"></span><h3>3.2.1.1.3. ui.ask<a class="headerlink" href="#ui-ask" title="Permalink to this headline">¶</a></h3>
 <p>This namespace contains utilities for asking the user for some
 particular type of information. These will typically require a
 user-interface of some sort and will block while waiting for the
@@ -359,17 +376,17 @@ the value <code class="xref py py-obj docutils literal notranslate"><span class=
 
 </div>
 <div class="section" id="ui-breakpoints">
-<span id="ns-ui-breakpoints"></span><h3>3.2.1.2.3. ui.breakpoints<a class="headerlink" href="#ui-breakpoints" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-breakpoints"></span><h3>3.2.1.1.4. ui.breakpoints<a class="headerlink" href="#ui-breakpoints" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Breakpoints window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-calls">
-<span id="ns-ui-calls"></span><h3>3.2.1.2.4. ui.calls<a class="headerlink" href="#ui-calls" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-calls"></span><h3>3.2.1.1.5. ui.calls<a class="headerlink" href="#ui-calls" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the (Function) Calls window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-clipboard">
-<span id="ns-ui-clipboard"></span><h3>3.2.1.2.5. ui.clipboard<a class="headerlink" href="#ui-clipboard" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-clipboard"></span><h3>3.2.1.1.6. ui.clipboard<a class="headerlink" href="#ui-clipboard" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the current clipboard state.</p>
 <dl class="function">
 <dt id="ui.clipboard">
@@ -379,7 +396,7 @@ the value <code class="xref py py-obj docutils literal notranslate"><span class=
 
 </div>
 <div class="section" id="ui-current">
-<span id="ns-ui-current"></span><h3>3.2.1.2.6. ui.current<a class="headerlink" href="#ui-current" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-current"></span><h3>3.2.1.1.7. ui.current<a class="headerlink" href="#ui-current" title="Permalink to this headline">¶</a></h3>
 <p>This namespace contains tools for fetching information about the
 current selection state. This can be used to get the state of
 thigns that are currently selected such as the address, function,
@@ -435,9 +452,15 @@ segment, clipboard, widget, or even the current window in use.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="ui.current.viewer">
+<code class="descclassname">current.</code><code class="descname">viewer</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.viewer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current viewer that is being used.</p>
+</dd></dl>
+
+<dl class="function">
 <dt id="ui.current.widget">
 <code class="descclassname">current.</code><code class="descname">widget</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.widget" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the current widget that the mouse is hovering over.</p>
+<dd><p>Return the current widget that is being used.</p>
 </dd></dl>
 
 <dl class="function">
@@ -448,7 +471,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-disassembly">
-<span id="ns-ui-disassembly"></span><h3>3.2.1.2.7. ui.disassembly<a class="headerlink" href="#ui-disassembly" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-disassembly"></span><h3>3.2.1.1.8. ui.disassembly<a class="headerlink" href="#ui-disassembly" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Disassembly window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -459,37 +482,37 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-dump">
-<span id="ns-ui-dump"></span><h3>3.2.1.2.8. ui.dump<a class="headerlink" href="#ui-dump" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-dump"></span><h3>3.2.1.1.9. ui.dump<a class="headerlink" href="#ui-dump" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the (Hex) Dump window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-enumerations">
-<span id="ns-ui-enumerations"></span><h3>3.2.1.2.9. ui.enumerations<a class="headerlink" href="#ui-enumerations" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-enumerations"></span><h3>3.2.1.1.10. ui.enumerations<a class="headerlink" href="#ui-enumerations" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Enumerations window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-exports">
-<span id="ns-ui-exports"></span><h3>3.2.1.2.10. ui.exports<a class="headerlink" href="#ui-exports" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-exports"></span><h3>3.2.1.1.11. ui.exports<a class="headerlink" href="#ui-exports" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Exports window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-frame">
-<span id="ns-ui-frame"></span><h3>3.2.1.2.11. ui.frame<a class="headerlink" href="#ui-frame" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-frame"></span><h3>3.2.1.1.12. ui.frame<a class="headerlink" href="#ui-frame" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the (Function) Frame window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-functions">
-<span id="ns-ui-functions"></span><h3>3.2.1.2.12. ui.functions<a class="headerlink" href="#ui-functions" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-functions"></span><h3>3.2.1.1.13. ui.functions<a class="headerlink" href="#ui-functions" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Functions window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-imports">
-<span id="ns-ui-imports"></span><h3>3.2.1.2.13. ui.imports<a class="headerlink" href="#ui-imports" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-imports"></span><h3>3.2.1.1.14. ui.imports<a class="headerlink" href="#ui-imports" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Imports window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-keyboard">
-<span id="ns-ui-keyboard"></span><h3>3.2.1.2.14. ui.keyboard<a class="headerlink" href="#ui-keyboard" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-keyboard"></span><h3>3.2.1.1.15. ui.keyboard<a class="headerlink" href="#ui-keyboard" title="Permalink to this headline">¶</a></h3>
 <p>Base namespace for interacting with the keyboard input.</p>
 <dl class="function">
 <dt id="ui.keyboard.input">
@@ -546,12 +569,12 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-libraries">
-<span id="ns-ui-libraries"></span><h3>3.2.1.2.15. ui.libraries<a class="headerlink" href="#ui-libraries" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-libraries"></span><h3>3.2.1.1.16. ui.libraries<a class="headerlink" href="#ui-libraries" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the (Type) Libraries window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-menu">
-<span id="ns-ui-menu"></span><h3>3.2.1.2.16. ui.menu<a class="headerlink" href="#ui-menu" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-menu"></span><h3>3.2.1.1.17. ui.menu<a class="headerlink" href="#ui-menu" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for registering items in IDA’s menu system.</p>
 <dl class="function">
 <dt id="ui.menu.add">
@@ -601,7 +624,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-message">
-<span id="ns-ui-message"></span><h3>3.2.1.2.17. ui.message<a class="headerlink" href="#ui-message" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-message"></span><h3>3.2.1.1.18. ui.message<a class="headerlink" href="#ui-message" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for displaying a modal dialog box with the different
 icons that are available from IDA’s user interface. The functions within
 will block IDA from being interacted with while their dialog is displayed.</p>
@@ -669,12 +692,12 @@ will block IDA from being interacted with while their dialog is displayed.</p>
 
 </div>
 <div class="section" id="ui-modules">
-<span id="ns-ui-modules"></span><h3>3.2.1.2.18. ui.modules<a class="headerlink" href="#ui-modules" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-modules"></span><h3>3.2.1.1.19. ui.modules<a class="headerlink" href="#ui-modules" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Modules window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-mouse">
-<span id="ns-ui-mouse"></span><h3>3.2.1.2.19. ui.mouse<a class="headerlink" href="#ui-mouse" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-mouse"></span><h3>3.2.1.1.20. ui.mouse<a class="headerlink" href="#ui-mouse" title="Permalink to this headline">¶</a></h3>
 <p>Base namespace for interacting with the mouse input.</p>
 <dl class="function">
 <dt id="ui.mouse.buttons">
@@ -690,7 +713,7 @@ will block IDA from being interacted with while their dialog is displayed.</p>
 
 </div>
 <div class="section" id="ui-names">
-<span id="ns-ui-names"></span><h3>3.2.1.2.20. ui.names<a class="headerlink" href="#ui-names" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-names"></span><h3>3.2.1.1.21. ui.names<a class="headerlink" href="#ui-names" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Names window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -783,7 +806,7 @@ will block IDA from being interacted with while their dialog is displayed.</p>
 
 </div>
 <div class="section" id="ui-navigation">
-<span id="ns-ui-navigation"></span><h3>3.2.1.2.21. ui.navigation<a class="headerlink" href="#ui-navigation" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-navigation"></span><h3>3.2.1.1.22. ui.navigation<a class="headerlink" href="#ui-navigation" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for updating the state of the colored navigation band.</p>
 <dl class="function">
 <dt id="ui.navigation.analyze">
@@ -950,7 +973,7 @@ will block IDA from being interacted with while their dialog is displayed.</p>
 
 </div>
 <div class="section" id="ui-notepad">
-<span id="ns-ui-notepad"></span><h3>3.2.1.2.22. ui.notepad<a class="headerlink" href="#ui-notepad" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-notepad"></span><h3>3.2.1.1.23. ui.notepad<a class="headerlink" href="#ui-notepad" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Notepad window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -1008,7 +1031,7 @@ will block IDA from being interacted with while their dialog is displayed.</p>
 <dl class="function">
 <dt id="ui.notepad.open">
 <code class="descclassname">notepad.</code><code class="descname">open</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.notepad.open" title="Permalink to this definition">¶</a></dt>
-<dd><p>Open or show the notepad window and return its <code class="xref py py-obj docutils literal notranslate"><span class="pre">QtWidgets.QPlainTextEdit</span></code> widget.</p>
+<dd><p>Open or show the notepad window and return its UI widget that can be used to modify it.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1055,64 +1078,50 @@ will block IDA from being interacted with while their dialog is displayed.</p>
 
 </div>
 <div class="section" id="ui-problems">
-<span id="ns-ui-problems"></span><h3>3.2.1.2.23. ui.problems<a class="headerlink" href="#ui-problems" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-problems"></span><h3>3.2.1.1.24. ui.problems<a class="headerlink" href="#ui-problems" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Problems window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-references">
-<span id="ns-ui-references"></span><h3>3.2.1.2.24. ui.references<a class="headerlink" href="#ui-references" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-references"></span><h3>3.2.1.1.25. ui.references<a class="headerlink" href="#ui-references" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Cross-References window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-segmentregisters">
-<span id="ns-ui-segmentregisters"></span><h3>3.2.1.2.25. ui.segmentregisters<a class="headerlink" href="#ui-segmentregisters" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-segmentregisters"></span><h3>3.2.1.1.26. ui.segmentregisters<a class="headerlink" href="#ui-segmentregisters" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Segments window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-segments">
-<span id="ns-ui-segments"></span><h3>3.2.1.2.26. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-segments"></span><h3>3.2.1.1.27. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Segments window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-selectors">
-<span id="ns-ui-selectors"></span><h3>3.2.1.2.27. ui.selectors<a class="headerlink" href="#ui-selectors" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-selectors"></span><h3>3.2.1.1.28. ui.selectors<a class="headerlink" href="#ui-selectors" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Selectors window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-signatures">
-<span id="ns-ui-signatures"></span><h3>3.2.1.2.28. ui.signatures<a class="headerlink" href="#ui-signatures" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-signatures"></span><h3>3.2.1.1.29. ui.signatures<a class="headerlink" href="#ui-signatures" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Signatures window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-stack">
-<span id="ns-ui-stack"></span><h3>3.2.1.2.29. ui.stack<a class="headerlink" href="#ui-stack" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-stack"></span><h3>3.2.1.1.30. ui.stack<a class="headerlink" href="#ui-stack" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the (Call) Stack window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-state">
-<span id="ns-ui-state"></span><h3>3.2.1.2.30. ui.state<a class="headerlink" href="#ui-state" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-state"></span><h3>3.2.1.1.31. ui.state<a class="headerlink" href="#ui-state" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for fetching or interacting with the current
 state of IDA’s interface. These are things such as waiting for
 IDA’s analysis queue, or determining whether the function is
 being viewed in graph view or not.</p>
 <dl class="function">
-<dt id="ui.state.beep">
-<code class="descclassname">state.</code><code class="descname">beep</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.beep" title="Permalink to this definition">¶</a></dt>
-<dd><p>Beep using IDA’s interface.</p>
-<p>Aliases: <a class="reference internal" href="#ui.state.beep" title="ui.state.beep"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.beep</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
 <dt id="ui.state.graphview">
 <code class="descclassname">state.</code><code class="descname">graphview</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.graphview" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the current function is being viewed in graph view mode.</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="ui.state.refresh">
-<code class="descclassname">state.</code><code class="descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.refresh" title="Permalink to this definition">¶</a></dt>
-<dd><p>Refresh all of IDA’s windows.</p>
-<p>Aliases: <a class="reference internal" href="#ui.state.refresh" title="ui.state.refresh"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.refresh</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -1124,7 +1133,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-strings">
-<span id="ns-ui-strings"></span><h3>3.2.1.2.31. ui.strings<a class="headerlink" href="#ui-strings" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-strings"></span><h3>3.2.1.1.32. ui.strings<a class="headerlink" href="#ui-strings" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Strings window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -1175,17 +1184,17 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-structures">
-<span id="ns-ui-structures"></span><h3>3.2.1.2.32. ui.structures<a class="headerlink" href="#ui-structures" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-structures"></span><h3>3.2.1.1.33. ui.structures<a class="headerlink" href="#ui-structures" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Structures window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-threads">
-<span id="ns-ui-threads"></span><h3>3.2.1.2.33. ui.threads<a class="headerlink" href="#ui-threads" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-threads"></span><h3>3.2.1.1.34. ui.threads<a class="headerlink" href="#ui-threads" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Threads window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-timer">
-<span id="ns-ui-timer"></span><h3>3.2.1.2.34. ui.timer<a class="headerlink" href="#ui-timer" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-timer"></span><h3>3.2.1.1.35. ui.timer<a class="headerlink" href="#ui-timer" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for registering a python callable to a timer in IDA.</p>
 <dl class="function">
 <dt id="ui.timer.register">
@@ -1228,27 +1237,48 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-tracing">
-<span id="ns-ui-tracing"></span><h3>3.2.1.2.35. ui.tracing<a class="headerlink" href="#ui-tracing" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-tracing"></span><h3>3.2.1.1.36. ui.tracing<a class="headerlink" href="#ui-tracing" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Tracing window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-types">
-<span id="ns-ui-types"></span><h3>3.2.1.2.36. ui.types<a class="headerlink" href="#ui-types" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-types"></span><h3>3.2.1.1.37. ui.types<a class="headerlink" href="#ui-types" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Types window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-widget">
-<span id="ns-ui-widget"></span><h3>3.2.1.2.37. ui.widget<a class="headerlink" href="#ui-widget" title="Permalink to this headline">¶</a></h3>
-<p>This namespace is for selecting a specific or particular widget.</p>
+<span id="ns-ui-widget"></span><h3>3.2.1.1.38. ui.widget<a class="headerlink" href="#ui-widget" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for interacting with any of the widgets
+associated with the native user-interface.</p>
 <dl class="function">
 <dt id="ui.widget">
-<code class="descclassname">ui.</code><code class="descname">widget</code><span class="sig-paren">(</span><em>xy</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">ui.</code><code class="descname">widget</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the widget that is currently being used.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ui.</code><code class="descname">widget</code><span class="sig-paren">(</span><em>xy</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the widget at the specified (<code class="docutils literal notranslate"><span class="pre">x</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>) coordinate within the <code class="docutils literal notranslate"><span class="pre">xy</span></code> tuple.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>xy</strong> – a tuple composed of the X and Y coordinates of a widget</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ui.</code><code class="descname">widget</code><span class="sig-paren">(</span><em>title</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the widget that is using the specified <code class="docutils literal notranslate"><span class="pre">title</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>title</strong> – a string containing the widget title</td>
 </tr>
 </tbody>
 </table>
@@ -1269,14 +1299,149 @@ being viewed in graph view or not.</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="ui.widget.form">
-<code class="descclassname">widget.</code><code class="descname">form</code><span class="sig-paren">(</span><em>twidget</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.form" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return an IDA plugin form as a UI widget.</p>
+<dt id="ui.widget.by">
+<code class="descclassname">widget.</code><code class="descname">by</code><span class="sig-paren">(</span><em>title</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the widget associated with the given window <code class="docutils literal notranslate"><span class="pre">title</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>twidget</strong> – the IDA plugin form to convert to a Qt widget</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>title</strong> – the title of the desired widget to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.close">
+<code class="descclassname">widget.</code><code class="descname">close</code><span class="sig-paren">(</span><em>widget</em>, <em>flags</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Close the <code class="docutils literal notranslate"><span class="pre">widget</span></code> using the specified <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.WCLS_</span></code> flags.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>widget</strong> – the widget to close</li>
+<li><strong>flags</strong> – the specified flags to use when closing the widget</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.focus">
+<code class="descclassname">widget.</code><code class="descname">focus</code><span class="sig-paren">(</span><em>widget</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.focus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Activate the specified <code class="docutils literal notranslate"><span class="pre">widget</span></code> and put it in focus.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>widget</strong> – the widget to put into focus</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.form">
+<code class="descclassname">widget.</code><code class="descname">form</code><span class="sig-paren">(</span><em>widget</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.form" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the IDA form for the UI <code class="docutils literal notranslate"><span class="pre">widget</span></code> that is provided.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>widget</strong> – the user-interface widget to convert to an IDA plugin form</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.isinstance">
+<code class="descclassname">widget.</code><code class="descname">isinstance</code><span class="sig-paren">(</span><em>object</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.isinstance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the given <code class="docutils literal notranslate"><span class="pre">object</span></code> is of the correct type for the UI.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>object</strong> – the object to check the instance of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.of">
+<code class="descclassname">widget.</code><code class="descname">of</code><span class="sig-paren">(</span><em>form</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.of" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the UI widget for the IDA <code class="docutils literal notranslate"><span class="pre">form</span></code> that is provided.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>form</strong> – the IDA plugin form to convert to a user-interface widget</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.open">
+<code class="descclassname">widget.</code><code class="descname">open</code><span class="sig-paren">(</span><em>widget</em>, <em>flags</em>, <em>**target</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.open" title="Permalink to this definition">¶</a></dt>
+<dd><p>Open the <code class="docutils literal notranslate"><span class="pre">widget</span></code> using the specified <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.WOPN_</span></code> flags.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>widget</strong> – the widget to open</li>
+<li><strong>flags</strong> – the specified flags to use when opening the widget</li>
+<li><strong>**target</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.show">
+<code class="descclassname">widget.</code><code class="descname">show</code><span class="sig-paren">(</span><em>widget</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.show" title="Permalink to this definition">¶</a></dt>
+<dd><p>Display the specified <code class="docutils literal notranslate"><span class="pre">widget</span></code> without putting it in focus.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>widget</strong> – the widget to show</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.title">
+<code class="descclassname">widget.</code><code class="descname">title</code><span class="sig-paren">(</span><em>widget</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.title" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the window title for the given <code class="docutils literal notranslate"><span class="pre">widget</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>widget</strong> – the widget to return the title from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.type">
+<code class="descclassname">widget.</code><code class="descname">type</code><span class="sig-paren">(</span><em>widget</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.type" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.twidget_type_t</span></code> for the given <code class="docutils literal notranslate"><span class="pre">widget</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>widget</strong> – the widget to return the type of</td>
 </tr>
 </tbody>
 </table>
@@ -1284,34 +1449,53 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-window">
-<span id="ns-ui-window"></span><h3>3.2.1.2.38. ui.window<a class="headerlink" href="#ui-window" title="Permalink to this headline">¶</a></h3>
-<p>This namespace is for selecting a specific or particular window.</p>
+<span id="ns-ui-window"></span><h3>3.2.1.1.39. ui.window<a class="headerlink" href="#ui-window" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for interacting with a specific window.</p>
 <dl class="function">
-<dt id="ui.window.main">
-<code class="descclassname">window.</code><code class="descname">main</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.window.main" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the active main window.</p>
+<dt id="ui.window">
+<code class="descclassname">ui.</code><code class="descname">window</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.window" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the currently active window.</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="ui.window.viewer">
-<code class="descclassname">window.</code><code class="descname">viewer</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.window.viewer" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the current viewer.</p>
+<dt id="ui.window.at">
+<code class="descclassname">window.</code><code class="descname">at</code><span class="sig-paren">(</span><em>cls</em>, <em>xy</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.window.at" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the widget at the specified (<code class="docutils literal notranslate"><span class="pre">x</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span></code>) coordinate within the <code class="docutils literal notranslate"><span class="pre">xy</span></code> tuple.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>cls</strong> – </li>
+<li><strong>xy</strong> – a tuple composed of the X and Y coordinates of a window</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 </div>
 <div class="section" id="ui-windows">
-<span id="ns-ui-windows"></span><h3>3.2.1.2.39. ui.windows<a class="headerlink" href="#ui-windows" title="Permalink to this headline">¶</a></h3>
-<p>Interact with any or all of the top-level windows for the application.</p>
+<span id="ns-ui-windows"></span><h3>3.2.1.1.40. ui.windows<a class="headerlink" href="#ui-windows" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for interacting with any or all of the windows for the application.</p>
 <dl class="function">
 <dt id="ui.windows">
 <code class="descclassname">ui.</code><code class="descname">windows</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.windows" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return all of the top-level windows.</p>
 </dd></dl>
 
+<dl class="function">
+<dt id="ui.windows.refresh">
+<code class="descclassname">windows.</code><code class="descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.windows.refresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Refresh all of lists and choosers within the application.</p>
+<p>Aliases: <a class="reference internal" href="#ui.windows.refresh" title="ui.windows.refresh"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.refresh</span></code></a></p>
+</dd></dl>
+
 </div>
 </div>
 <div class="section" id="class-list">
-<h2>3.2.1.3. Class list<a class="headerlink" href="#class-list" title="Permalink to this headline">¶</a></h2>
+<h2>3.2.1.2. Class list<a class="headerlink" href="#class-list" title="Permalink to this headline">¶</a></h2>
 <p>Classes provide the definition necessary to instantiate an object.
 In most cases, a class is returned when calling one of the prior
 listed functions and thus have no need to be manually instantiated.
@@ -1319,7 +1503,7 @@ Classes may also have aliases defined for them. Please refer to the
 documentation for the class to see what is available. For more
 information on aliases, please see <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
 <div class="section" id="consoleprogress">
-<h3>3.2.1.3.1. ConsoleProgress<a class="headerlink" href="#consoleprogress" title="Permalink to this headline">¶</a></h3>
+<h3>3.2.1.2.1. ConsoleProgress<a class="headerlink" href="#consoleprogress" title="Permalink to this headline">¶</a></h3>
 <dl class="class">
 <dt id="ui.ConsoleProgress">
 <em class="property">class </em><code class="descclassname">ui.</code><code class="descname">ConsoleProgress</code><a class="headerlink" href="#ui.ConsoleProgress" title="Permalink to this definition">¶</a></dt>
@@ -1374,7 +1558,7 @@ information on aliases, please see <a class="reference internal" href="../multic
 
 </div>
 <div class="section" id="inputbox">
-<h3>3.2.1.3.2. InputBox<a class="headerlink" href="#inputbox" title="Permalink to this headline">¶</a></h3>
+<h3>3.2.1.2.2. InputBox<a class="headerlink" href="#inputbox" title="Permalink to this headline">¶</a></h3>
 <dl class="class">
 <dt id="ui.InputBox">
 <em class="property">class </em><code class="descclassname">ui.</code><code class="descname">InputBox</code><a class="headerlink" href="#ui.InputBox" title="Permalink to this definition">¶</a></dt>
@@ -1431,7 +1615,7 @@ to interact with the user.</p>
 
 </div>
 <div class="section" id="progress">
-<h3>3.2.1.3.3. Progress<a class="headerlink" href="#progress" title="Permalink to this headline">¶</a></h3>
+<h3>3.2.1.2.3. Progress<a class="headerlink" href="#progress" title="Permalink to this headline">¶</a></h3>
 <dl class="class">
 <dt id="ui.Progress">
 <em class="property">class </em><code class="descclassname">ui.</code><code class="descname">Progress</code><a class="headerlink" href="#ui.Progress" title="Permalink to this definition">¶</a></dt>
@@ -1460,7 +1644,7 @@ based on what is presently available.</p>
 
 </div>
 <div class="section" id="uiprogress">
-<h3>3.2.1.3.4. UIProgress<a class="headerlink" href="#uiprogress" title="Permalink to this headline">¶</a></h3>
+<h3>3.2.1.2.4. UIProgress<a class="headerlink" href="#uiprogress" title="Permalink to this headline">¶</a></h3>
 <dl class="class">
 <dt id="ui.UIProgress">
 <em class="property">class </em><code class="descclassname">ui.</code><code class="descname">UIProgress</code><a class="headerlink" href="#ui.UIProgress" title="Permalink to this definition">¶</a></dt>
@@ -1560,54 +1744,54 @@ based on what is presently available.</p>
   <h3 class="sidebar"><a href="../index.html">Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">3.2.1. ui – User Interface module</a><ul>
-<li><a class="reference internal" href="#function-list">3.2.1.1. Function list</a></li>
-<li><a class="reference internal" href="#namespace-list">3.2.1.2. Namespace list</a><ul>
-<li><a class="reference internal" href="#ui-appwindow">3.2.1.2.1. ui.appwindow</a></li>
-<li><a class="reference internal" href="#ui-ask">3.2.1.2.2. ui.ask</a></li>
-<li><a class="reference internal" href="#ui-breakpoints">3.2.1.2.3. ui.breakpoints</a></li>
-<li><a class="reference internal" href="#ui-calls">3.2.1.2.4. ui.calls</a></li>
-<li><a class="reference internal" href="#ui-clipboard">3.2.1.2.5. ui.clipboard</a></li>
-<li><a class="reference internal" href="#ui-current">3.2.1.2.6. ui.current</a></li>
-<li><a class="reference internal" href="#ui-disassembly">3.2.1.2.7. ui.disassembly</a></li>
-<li><a class="reference internal" href="#ui-dump">3.2.1.2.8. ui.dump</a></li>
-<li><a class="reference internal" href="#ui-enumerations">3.2.1.2.9. ui.enumerations</a></li>
-<li><a class="reference internal" href="#ui-exports">3.2.1.2.10. ui.exports</a></li>
-<li><a class="reference internal" href="#ui-frame">3.2.1.2.11. ui.frame</a></li>
-<li><a class="reference internal" href="#ui-functions">3.2.1.2.12. ui.functions</a></li>
-<li><a class="reference internal" href="#ui-imports">3.2.1.2.13. ui.imports</a></li>
-<li><a class="reference internal" href="#ui-keyboard">3.2.1.2.14. ui.keyboard</a></li>
-<li><a class="reference internal" href="#ui-libraries">3.2.1.2.15. ui.libraries</a></li>
-<li><a class="reference internal" href="#ui-menu">3.2.1.2.16. ui.menu</a></li>
-<li><a class="reference internal" href="#ui-message">3.2.1.2.17. ui.message</a></li>
-<li><a class="reference internal" href="#ui-modules">3.2.1.2.18. ui.modules</a></li>
-<li><a class="reference internal" href="#ui-mouse">3.2.1.2.19. ui.mouse</a></li>
-<li><a class="reference internal" href="#ui-names">3.2.1.2.20. ui.names</a></li>
-<li><a class="reference internal" href="#ui-navigation">3.2.1.2.21. ui.navigation</a></li>
-<li><a class="reference internal" href="#ui-notepad">3.2.1.2.22. ui.notepad</a></li>
-<li><a class="reference internal" href="#ui-problems">3.2.1.2.23. ui.problems</a></li>
-<li><a class="reference internal" href="#ui-references">3.2.1.2.24. ui.references</a></li>
-<li><a class="reference internal" href="#ui-segmentregisters">3.2.1.2.25. ui.segmentregisters</a></li>
-<li><a class="reference internal" href="#ui-segments">3.2.1.2.26. ui.segments</a></li>
-<li><a class="reference internal" href="#ui-selectors">3.2.1.2.27. ui.selectors</a></li>
-<li><a class="reference internal" href="#ui-signatures">3.2.1.2.28. ui.signatures</a></li>
-<li><a class="reference internal" href="#ui-stack">3.2.1.2.29. ui.stack</a></li>
-<li><a class="reference internal" href="#ui-state">3.2.1.2.30. ui.state</a></li>
-<li><a class="reference internal" href="#ui-strings">3.2.1.2.31. ui.strings</a></li>
-<li><a class="reference internal" href="#ui-structures">3.2.1.2.32. ui.structures</a></li>
-<li><a class="reference internal" href="#ui-threads">3.2.1.2.33. ui.threads</a></li>
-<li><a class="reference internal" href="#ui-timer">3.2.1.2.34. ui.timer</a></li>
-<li><a class="reference internal" href="#ui-tracing">3.2.1.2.35. ui.tracing</a></li>
-<li><a class="reference internal" href="#ui-types">3.2.1.2.36. ui.types</a></li>
-<li><a class="reference internal" href="#ui-widget">3.2.1.2.37. ui.widget</a></li>
-<li><a class="reference internal" href="#ui-window">3.2.1.2.38. ui.window</a></li>
-<li><a class="reference internal" href="#ui-windows">3.2.1.2.39. ui.windows</a></li>
+<li><a class="reference internal" href="#namespace-list">3.2.1.1. Namespace list</a><ul>
+<li><a class="reference internal" href="#ui-application">3.2.1.1.1. ui.application</a></li>
+<li><a class="reference internal" href="#ui-appwindow">3.2.1.1.2. ui.appwindow</a></li>
+<li><a class="reference internal" href="#ui-ask">3.2.1.1.3. ui.ask</a></li>
+<li><a class="reference internal" href="#ui-breakpoints">3.2.1.1.4. ui.breakpoints</a></li>
+<li><a class="reference internal" href="#ui-calls">3.2.1.1.5. ui.calls</a></li>
+<li><a class="reference internal" href="#ui-clipboard">3.2.1.1.6. ui.clipboard</a></li>
+<li><a class="reference internal" href="#ui-current">3.2.1.1.7. ui.current</a></li>
+<li><a class="reference internal" href="#ui-disassembly">3.2.1.1.8. ui.disassembly</a></li>
+<li><a class="reference internal" href="#ui-dump">3.2.1.1.9. ui.dump</a></li>
+<li><a class="reference internal" href="#ui-enumerations">3.2.1.1.10. ui.enumerations</a></li>
+<li><a class="reference internal" href="#ui-exports">3.2.1.1.11. ui.exports</a></li>
+<li><a class="reference internal" href="#ui-frame">3.2.1.1.12. ui.frame</a></li>
+<li><a class="reference internal" href="#ui-functions">3.2.1.1.13. ui.functions</a></li>
+<li><a class="reference internal" href="#ui-imports">3.2.1.1.14. ui.imports</a></li>
+<li><a class="reference internal" href="#ui-keyboard">3.2.1.1.15. ui.keyboard</a></li>
+<li><a class="reference internal" href="#ui-libraries">3.2.1.1.16. ui.libraries</a></li>
+<li><a class="reference internal" href="#ui-menu">3.2.1.1.17. ui.menu</a></li>
+<li><a class="reference internal" href="#ui-message">3.2.1.1.18. ui.message</a></li>
+<li><a class="reference internal" href="#ui-modules">3.2.1.1.19. ui.modules</a></li>
+<li><a class="reference internal" href="#ui-mouse">3.2.1.1.20. ui.mouse</a></li>
+<li><a class="reference internal" href="#ui-names">3.2.1.1.21. ui.names</a></li>
+<li><a class="reference internal" href="#ui-navigation">3.2.1.1.22. ui.navigation</a></li>
+<li><a class="reference internal" href="#ui-notepad">3.2.1.1.23. ui.notepad</a></li>
+<li><a class="reference internal" href="#ui-problems">3.2.1.1.24. ui.problems</a></li>
+<li><a class="reference internal" href="#ui-references">3.2.1.1.25. ui.references</a></li>
+<li><a class="reference internal" href="#ui-segmentregisters">3.2.1.1.26. ui.segmentregisters</a></li>
+<li><a class="reference internal" href="#ui-segments">3.2.1.1.27. ui.segments</a></li>
+<li><a class="reference internal" href="#ui-selectors">3.2.1.1.28. ui.selectors</a></li>
+<li><a class="reference internal" href="#ui-signatures">3.2.1.1.29. ui.signatures</a></li>
+<li><a class="reference internal" href="#ui-stack">3.2.1.1.30. ui.stack</a></li>
+<li><a class="reference internal" href="#ui-state">3.2.1.1.31. ui.state</a></li>
+<li><a class="reference internal" href="#ui-strings">3.2.1.1.32. ui.strings</a></li>
+<li><a class="reference internal" href="#ui-structures">3.2.1.1.33. ui.structures</a></li>
+<li><a class="reference internal" href="#ui-threads">3.2.1.1.34. ui.threads</a></li>
+<li><a class="reference internal" href="#ui-timer">3.2.1.1.35. ui.timer</a></li>
+<li><a class="reference internal" href="#ui-tracing">3.2.1.1.36. ui.tracing</a></li>
+<li><a class="reference internal" href="#ui-types">3.2.1.1.37. ui.types</a></li>
+<li><a class="reference internal" href="#ui-widget">3.2.1.1.38. ui.widget</a></li>
+<li><a class="reference internal" href="#ui-window">3.2.1.1.39. ui.window</a></li>
+<li><a class="reference internal" href="#ui-windows">3.2.1.1.40. ui.windows</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#class-list">3.2.1.3. Class list</a><ul>
-<li><a class="reference internal" href="#consoleprogress">3.2.1.3.1. ConsoleProgress</a></li>
-<li><a class="reference internal" href="#inputbox">3.2.1.3.2. InputBox</a></li>
-<li><a class="reference internal" href="#progress">3.2.1.3.3. Progress</a></li>
-<li><a class="reference internal" href="#uiprogress">3.2.1.3.4. UIProgress</a></li>
+<li><a class="reference internal" href="#class-list">3.2.1.2. Class list</a><ul>
+<li><a class="reference internal" href="#consoleprogress">3.2.1.2.1. ConsoleProgress</a></li>
+<li><a class="reference internal" href="#inputbox">3.2.1.2.2. InputBox</a></li>
+<li><a class="reference internal" href="#progress">3.2.1.2.3. Progress</a></li>
+<li><a class="reference internal" href="#uiprogress">3.2.1.2.4. UIProgress</a></li>
 </ul>
 </li>
 </ul>
@@ -1664,7 +1848,7 @@ based on what is presently available.</p>
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2010-2022, Ali Rizvi-Santiago.
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
       Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>

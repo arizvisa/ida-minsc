@@ -40,7 +40,7 @@ functions and aliases. For more information on this, please see
    Remove the color from the item at the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(ea)
    
@@ -56,7 +56,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(ea, rgb)
    
@@ -96,7 +96,7 @@ functions and aliases. For more information on this, please see
    Remove the comment at the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
 .. py:function:: comment(ea, string, \*\*repeatable)
@@ -120,7 +120,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: a boolean specifying that the repeatable comment should be removed
    
 .. py:function:: disassemble(\*\*options)
@@ -203,7 +203,7 @@ functions and aliases. For more information on this, please see
    Aliases: :py:func:`database.mangle<mangled>`
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: mangled(ea, string, \*suffix)
    
@@ -226,7 +226,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database containing a name
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: mark()
    
@@ -237,7 +237,7 @@ functions and aliases. For more information on this, please see
    Remove the mark at the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: mark(ea)
    
@@ -260,7 +260,7 @@ functions and aliases. For more information on this, please see
    :param ea: the address of an existing mark within the database
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: mark(ea, description)
    
@@ -301,7 +301,7 @@ functions and aliases. For more information on this, please see
    Removes the name at the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(ea, string, \*suffix, \*\*flags)
@@ -326,7 +326,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when removing the name
    
 .. py:function:: read()
@@ -444,7 +444,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tag(ea, key, none)
    
@@ -455,7 +455,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tags()
    
@@ -497,7 +497,7 @@ functions and aliases. For more information on this, please see
    Aliases: :py:func:`database.unmangle<unmangled>`, :py:func:`database.demangled<unmangled>`, :py:func:`database.demangle<unmangled>`
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: unmangled(ea, string, \*suffix)
    
@@ -520,7 +520,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database containing a name
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: within()
    
@@ -2633,7 +2633,7 @@ To add extra comments, one can do this like::
    Delete the prefixed comment at the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: extra\.prefix(ea)
    
@@ -2658,7 +2658,7 @@ To add extra comments, one can do this like::
    :param ea: the address containing the prefix comment to remove
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: extra\.preinsert(ea, count)
    
@@ -2696,7 +2696,7 @@ To add extra comments, one can do this like::
    Delete the suffixed comment at the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: extra\.suffix(ea)
    
@@ -2721,7 +2721,7 @@ To add extra comments, one can do this like::
    :param ea: the address containing the suffix comment to remove
    :type ea: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. _ns-database-functions:
 
@@ -2908,6 +2908,14 @@ following examples can be used::
    
    Return the array at the current address as a string.
    
+   :param \*\*length: an integer specifying the :py:obj:`length` to use for the string or a :py:obj:`strtype` describing the type of the string
+   
+.. py:function:: get\.string(bounds, \*\*length)
+   
+   Return the array described by the specified ``bounds`` as a string.
+   
+   :param bounds: the boundaries of the string to return
+   :type bounds: tuple
    :param \*\*length: an integer specifying the :py:obj:`length` to use for the string or a :py:obj:`strtype` describing the type of the string
    
 .. py:function:: get\.string(ea, \*\*length)
@@ -3989,7 +3997,7 @@ This can be used as in the following examples::
    
    Set the data at address ``ea`` as aligned.
    
-   If ``alignment`` is specified, then use it as the default alignment.
+   If ``alignment`` is specified, then use it as the number of bytes to align the data to.
    If ``size`` is specified, then align that number of bytes.
    
    Aliases: :py:func:`database.set.align<set\.alignment>`, :py:func:`database.set.aligned<set\.alignment>`
@@ -4077,6 +4085,14 @@ This can be used as in the following examples::
    
    Set the data at the current address to a string with the specified ``strtype``.
    
+   :param \*\*strtype: if ``strtype`` is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix
+   
+.. py:function:: set\.string(bounds, \*\*strtype)
+   
+   Set the data within the provided ``bounds`` to a string with the specified ``strtype``.
+   
+   :param bounds: the boundaries of the string to return
+   :type bounds: tuple
    :param \*\*strtype: if ``strtype`` is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix
    
 .. py:function:: set\.string(ea, \*\*strtype)
@@ -4453,7 +4469,7 @@ Some examples of using this namespace can be::
    Remove the type information from the current address.
    
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type(info)
    
@@ -4477,7 +4493,7 @@ Some examples of using this namespace can be::
    
    :param ea: an address within the database
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type(ea, string)
    

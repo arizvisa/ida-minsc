@@ -147,7 +147,7 @@ functions and aliases. For more information on this, please see
    :param structure: the :py:obj:`structure_t` to remove the comment from
    :type structure: structure_t
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the removed comment should be the repeatable one
    
 .. py:function:: comment(id, cmt, \*\*repeatable)
@@ -169,7 +169,7 @@ functions and aliases. For more information on this, please see
    :param id: the identifier of the structure
    :type id: int or long
    :param none: the python value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the removed comment should be the repeatable one
    
 .. py:function:: fragment(structure, offset, \*\*base)
@@ -624,7 +624,7 @@ member_t
       :param key: a string representing the tag name
       :type key: str
       :param none: the python value :py:obj:`None`
-      :type none: None
+      :type none: None.__class__
       
 *********
 members_t
@@ -990,7 +990,7 @@ structure_t
       :param key: a string representing the tag name
       :type key: str
       :param none: the python value :py:obj:`None`
-      :type none: None
+      :type none: None.__class__
       
    .. py:method:: up(self)
       
