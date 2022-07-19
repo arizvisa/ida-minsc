@@ -4147,7 +4147,7 @@ class type(object):
         if get_tinfo(ti, ea):
             return ti
 
-        # Otherwise we'll and guess the typeinfo for the same address.
+        # Otherwise we'll go ahead and guess the typeinfo for the same address.
         res = idaapi.guess_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
 
         # If we failed, then we'll try and hack around it using idaapi.print_type.
@@ -4160,7 +4160,7 @@ class type(object):
             if info_s is None:
                 return None
 
-            # Parse the typeinfo string that IDA gave us and return it.
+            # Parse the type information string that IDA gave us and return it.
             ti = internal.declaration.parse(info_s)
             if ti is None:
                 raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the returned type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s)))
@@ -4171,19 +4171,20 @@ class type(object):
         '''Remove the type information from the current address.'''
         return cls(ui.current.address(), None)
     @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
-    def __new__(cls, info):
+    def __new__(cls, info, **guessed):
         '''Apply the type information in `info` to the current address.'''
-        return cls(ui.current.address(), info)
+        return cls(ui.current.address(), info, **guessed)
     @utils.multicase(ea=six.integer_types, info=idaapi.tinfo_t)
-    def __new__(cls, ea, info):
+    def __new__(cls, ea, info, **guessed):
         '''Apply the ``idaapi.tinfo_t`` in `info` to the address `ea`.'''
+        TINFO_GUESSED, TINFO_DEFINITE = getattr(idaapi, 'TINFO_GUESSED', 0), getattr(idaapi, 'TINFO_DEFINITE', 1)
         info_s = "{!s}".format(info)
 
-        # Check if we're pointing at an export or directly at a function. If we
-        # are, then we need to use function.type.
+        # Check if we're pointing directly at a function, because if we are,
+        # then we need to use function.type instead.
         try:
             rt, ea = interface.addressOfRuntimeOrStatic(ea)
-            if rt or function.address(ea) == ea:
+            if not rt:
                 return function.type(ea, info)
 
         except E.FunctionNotFoundError:
@@ -4191,57 +4192,51 @@ class type(object):
 
         # All we need to do is to use idaapi to apply our parsed tinfo_t to the
         # address we were given.
-        ok = idaapi.apply_tinfo(ea, info, idaapi.TINFO_DEFINITE)
+        result, ok = cls(ea), idaapi.apply_tinfo(ea, info, TINFO_DEFINITE)
         if not ok:
             raise E.DisassemblerError(u"{:s}.info({:#x}, {!s}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
 
-        # Return the typeinfo that was applied to the specified address.
-        return cls(ea)
+        # TINFO_GUESSED doesn't appear to work, so instead we'll force the option
+        # here by clearing the aflag if the user wants to mark this as guessed.
+        if guessed.get('guessed', False):
+            interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
+        return result
     @utils.multicase(none=None.__class__)
     def __new__(cls, ea, none):
         '''Remove the type information from the address `ea`.'''
-        ti = idaapi.tinfo_t()
+        del_tinfo = idaapi.del_tinfo2 if idaapi.__version__ < 7.0 else idaapi.del_tinfo
 
         # Grab the previous typeinfo if there was something there, and coerce
         # it to None if we got an error of some sort.
         try:
-            result = cls(ea)
+            ti = cls(ea)
 
         except E.DisassemblerError:
-            result = None
+            ti = None
 
-        # Clear the tinfo_t we created, and apply it to the given address. We
-        # discard the result because IDA will _always_ give us an error despite
-        # successfully clearing the typeinfo.
-        ti.clear()
-        _ = idaapi.apply_tinfo(ea, ti, idaapi.TINFO_DEFINITE)
-
+        result, _ = ti, del_tinfo(ea)
         return result
-
     @utils.multicase(ea=six.integer_types, string=six.string_types)
     @utils.string.decorate_arguments('string')
-    def __new__(cls, ea, string):
+    def __new__(cls, ea, string, **guessed):
         '''Parse the type information in `string` into an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
 
-        # Check if we're pointing at an export or directly at a function. If we
-        # are, then we need to use function.type.
+        # Check if we're pointing directly at a function, because if we are,
+        # then we need to use function.type instead.
         try:
             rt, ea = interface.addressOfRuntimeOrStatic(ea)
-            if rt or function.address(ea) == ea:
+            if not rt:
                 return function.type(ea, string)
 
         except E.FunctionNotFoundError:
             pass
 
-        # Now we can just ask IDA to parse this into a tinfo_t for
-        # us. If we received None, then raise an exception due to
-        # there being a parsing error of some sort.
+        # Now we can just ask IDA to parse this into a tinfo_t for us and then recurse
+        # into ourselves. If we received None, then that's pretty much a parsing error.
         ti = internal.declaration.parse(string)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(string)))
-
-        # Recurse into ourselves now that we have the actual typeinfo.
-        return cls(ea, ti)
+        return cls(ea, ti, **guessed)
 
     @utils.multicase()
     @classmethod
