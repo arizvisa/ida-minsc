@@ -3037,9 +3037,9 @@ class type(object):
         return cls.is_library(ui.current.function())
     @utils.multicase()
     @classmethod
-    def library(cls, boolean):
-        '''Modify the attributes of the current function to set it as a library function depending on the value of `boolean`.'''
-        return cls.library(ui.current.function(), boolean)
+    def library(cls, func):
+        '''Return a boolean describing whether the function `func` is considered a library function.'''
+        return cls.is_library(func)
     @utils.multicase()
     @classmethod
     def library(cls, func, boolean):
@@ -3065,9 +3065,9 @@ class type(object):
         return cls.is_thunk(ui.current.function())
     @utils.multicase()
     @classmethod
-    def thunk(cls, boolean):
-        '''Modify the attributes of the current function to set it as a code thunk depending on the value of `boolean`.'''
-        return cls.thunk(ui.current.function(), boolean)
+    def thunk(cls, func):
+        '''Return a boolean describing whether the function `func` was determined to be a code thunk.'''
+        return cls.is_thunk(func)
     @utils.multicase()
     @classmethod
     def thunk(cls, func, boolean):
@@ -3106,9 +3106,9 @@ class type(object):
         return cls.is_static(ui.current.function())
     @utils.multicase()
     @classmethod
-    def static(cls, boolean):
-        '''Modify the attributes of the current function to set it as a static function depending on the value of `boolean`.'''
-        return cls.static(ui.current.function(), boolean)
+    def static(cls, func):
+        '''Return a boolean describing whether the function `func` is defined as a static function.'''
+        return cls.is_static(func)
     @utils.multicase()
     @classmethod
     def static(cls, func, boolean):
@@ -3135,9 +3135,9 @@ class type(object):
         return cls.is_hidden(ui.current.function())
     @utils.multicase()
     @classmethod
-    def hidden(cls, boolean):
-        '''Modify the attributes of the current function to set it as a hidden function depending on the value of `boolean`.'''
-        return cls.hidden(ui.current.function(), boolean)
+    def hidden(cls, func):
+        '''Return a boolean describing whether the function `func` is hidden.'''
+        return cls.is_hidden(func)
     @utils.multicase()
     @classmethod
     def hidden(cls, func, boolean):
