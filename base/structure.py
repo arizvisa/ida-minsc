@@ -2672,12 +2672,33 @@ class member_t(object):
     @type.setter
     def type(self, type):
         '''Set the type of the member to the provided `type`.'''
+        cls, set_member_tinfo = self.__class__, idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
+
+        # if we were given a tinfo_t or a string to use, then we pretty much use
+        # it with the typeinfo api, but allow it the ability to destroy other members.
+        if isinstance(type, (six.string_types, idaapi.tinfo_t)):
+            info = type if isinstance(type, idaapi.tinfo_t) else internal.declaration.parse(type)
+            res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), info, idaapi.SET_MEMTI_MAY_DESTROY)
+            if res in {idaapi.SMT_OK, idaapi.SMT_KEEP}:
+                return
+
+            elif res == idaapi.SMT_FAILED:
+                raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the type information ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(info)), utils.string.escape("{!s}".format(info), '"'), utils.string.repr(self.name)))
+
+            errtable = {
+                idaapi.SMT_BADARG: 'invalid parameters', idaapi.SMT_NOCOMPAT: 'incompatible type', idaapi.SMT_WORSE: 'worse type',
+                idaapi.SMT_SIZE: 'invalid type for member size', idaapi.SMT_ARRAY: 'setting function argument as an array is illegal',
+                idaapi.SMT_OVERLAP: 'the specified type would result in member overlap', idaapi.SMT_KEEP: 'the specified type is not ideal',
+            }
+            message = errtable.get(res, "unknown error {:#x}".format(res))
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(info)), utils.string.escape("{!s}".format(info), '"'), utils.string.repr(self.name), message))
+
+        # decompose the pythonic type into the actual information to apply.
         flag, typeid, nbytes = interface.typemap.resolve(type)
 
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         if not idaapi.set_member_type(self.parent.ptr, self.offset - self.parent.members.baseoffset, flag, opinfo, nbytes):
-            cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, type, utils.string.repr(self.name)))
 
         # verify that our type has been applied before we update its refinfo,
@@ -2689,7 +2710,6 @@ class member_t(object):
         if expected == resulting:
             interface.typemap.update_refinfo(self.id, flag)
         else:
-            cls = self.__class__
             logging.warning(u"{:s}({:#x}).type({!s}) : Applying the given flags and size ({:#x}, {:d}) resulted in different flags and size being assigned ({:#x}, {:d}).".format('.'.join([__name__, cls.__name__]), self.id, type, *itertools.chain(expected, resulting)))
 
         # smoke-test that we actually updated the type identifier and log it if it
@@ -2697,7 +2717,6 @@ class member_t(object):
         # that opinfo.tid should be BADADDR which isn't actually the truth when
         # you're working with a refinfo. hence we try to be quiet about it.
         if expected_tid != (resulting_tid or idaapi.BADADDR):
-            cls = self.__class__
             logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, type, expected_tid, resulting_tid))
 
         # return the stuff that actually applied.
@@ -2748,7 +2767,7 @@ class member_t(object):
             ti = info
 
         # Now we can pass our tinfo_t along with the member information to IDA.
-        res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
+        res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, idaapi.SET_MEMTI_COMPATIBLE)
         if res == idaapi.SMT_OK:
             return
 
