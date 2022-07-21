@@ -1814,7 +1814,8 @@ class entries(object):
         `name` - Match according to the exact name
         `like` - Filter the entrypoint names according to a glob
         `regex` - Filter the entrypoint names according to a regular-expression
-        `index` - Match according to the entrypoint's index (ordinal)
+        `index` - Match according to the entrypoint's index
+        `ordinal` - Match according to the entrypoint's ordinal
         `greater` or `ge` - Filter the entrypoints for any after the specified address (inclusive)
         `gt` - Filter the entrypoints for any after the specified address (exclusive)
         `less` or `le` - Filter the entrypoints for any before the specified address (inclusive)
@@ -1849,6 +1850,7 @@ class entries(object):
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, bool) else operator.contains(keys, parameter) if isinstance(parameter, six.string_types) else keys&parameter, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if function.within(ea) else tag(ea), operator.methodcaller('keys'), builtins.set)
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal),
     __matcher__.predicate('pred', idaapi.get_entry_ordinal)
+    __matcher__.boolean('ordinal', operator.eq, idaapi.get_entry_ordinal)
     __matcher__.boolean('index', operator.eq)
 
     def __new__(cls):
