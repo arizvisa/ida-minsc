@@ -3796,14 +3796,53 @@ class bounds_t(integerish):
 
     def range(self):
         '''Return the current boundary casted to a native ``idaapi.range_t`` type.'''
-        left, right = self
+        left, right = sorted(self)
         return idaapi.range_t(left, right)
 
     def contains(self, ea):
         '''Return if the address `ea` is contained by the current boundary.'''
-        left, right = self
-        return left <= ea < right if left < right else right <= ea < left
+        left, right = sorted(self)
+        if isinstance(ea, six.integer_types):
+            return left <= ea < right
+
+        # compare against another boundary
+        elif isinstance(ea, tuple):
+            other_left, other_right = ea
+            return all([left <= other_left, right >= other_right])
+
+        # anything else is an invalid type
+        raise internal.exceptions.InvalidTypeOrValueError(u"{!s}.contains({!s}) : Unable to check containment with the provided type ({!s}).".format(self, ea, ea.__class__))
     __contains__ = contains
+
+    def overlaps(self, bounds):
+        '''Return if the boundary `bounds` overlaps with the current boundary.'''
+        left, right = sorted(self)
+        if isinstance(bounds, six.integer_types):
+            return left <= bounds < right
+
+        other_left, other_right = sorted(bounds)
+        return all([left <= other_right, right >= other_left])
+
+    def union(self, other):
+        '''Return a union of the current boundary with `other`.'''
+        if not isinstance(other, tuple):
+            return super(bounds_t, self).__or__(other)
+        (left, right), (other_left, other_right) = map(sorted, [self, other])
+        return self.__class__(min(left, other_left), max(right, other_right))
+    __or__ = union
+
+    def intersection(self, other):
+        '''Return an intersection of the current boundary with `other`.'''
+        if not isinstance(other, tuple):
+            return super(bounds_t, self).__and__(other)
+
+        # if they don't overlap, then we can't intersect and so we bail.
+        if not self.overlaps(other):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{!s}.intersection({!s}) : Unable to intersect with a non-overlapping boundary ({!s}).".format(self, other, other))
+
+        (left, right), (other_left, other_right) = map(sorted, [self, other])
+        return self.__class__(max(left, other_left), min(right, other_right))
+    __and__ = intersection
 
     def __format__(self, spec):
         '''Return the current boundary as a string containing only the components that are inclusive to the range.'''
