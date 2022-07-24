@@ -4756,6 +4756,92 @@ class type(object):
         return len(datarefs) > len(coderefs)
     isglobalref = globalrefQ = utils.alias(is_globalref, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def is_exception(cls, **flags):
+        '''Return if the current address or selection is guarded by an exception or part of an exception handler.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.is_exception(address, **flags)
+        return cls.is_exception(address, **flags)
+    @utils.multicase(ea=(six.integer_types, builtins.tuple))
+    @classmethod
+    def is_exception(cls, ea, **flags):
+        """Return if the address or boundaries in `ea` is guarded by an exception or part of an exception handler.
+
+        If `seh` or `cpp` is specified, then include or exclude that exception type.
+        If `guarded` or `try` is true, then return if the address is guarded by an exception.
+        If `handler` or `catch` is true, then return if the address is part of an exception handler.
+        If `fallthrough` is true, then return if the address is part of the fall-through case for a handler.
+        If `filter` or `finally` is true, then return if the address is part of an SEH filter or SEH finalizer (respectively).
+        """
+        tryflags = flags.pop('flags', 0) if flags else idaapi.TBEA_ANY
+
+        # pre-assign some keyword args that we will map into actual flags.
+        default = {
+            'guard': idaapi.TBEA_TRY | idaapi.TBEA_SEHTRY, 'guarded': idaapi.TBEA_TRY | idaapi.TBEA_SEHTRY, 'try': idaapi.TBEA_TRY | idaapi.TBEA_SEHTRY,
+            'handler': idaapi.TBEA_CATCH | idaapi.TBEA_SEHFILT, 'catch': idaapi.TBEA_CATCH | idaapi.TBEA_SEHFILT,
+            'fall': idaapi.TBEA_FALLTHRU, 'fallthrough': idaapi.TBEA_FALLTHRU, 'fallthru': idaapi.TBEA_FALLTHRU,
+        }
+
+        # first comes the c++ keywords which are pretty minimalistic.
+        try_kwargs = {
+            'guard': idaapi.TBEA_TRY, 'guarded': idaapi.TBEA_TRY, 'try': idaapi.TBEA_TRY,
+            'handler': idaapi.TBEA_CATCH, 'catch': idaapi.TBEA_CATCH,
+        }
+
+        # now do the same for seh keywords. we do these separately so we can
+        # choose to either combine both try/seh or not.
+        seh_kwargs = {
+            'guard': idaapi.TBEA_SEHTRY, 'guarded': idaapi.TBEA_SEHTRY, 'try': idaapi.TBEA_SEHTRY,
+            'filter': idaapi.TBEA_SEHFILT,
+            'handler': idaapi.TBEA_CATCH, 'catch': idaapi.TBEA_CATCH,
+            'finalizer': idaapi.TBEA_SEHLPAD, 'finally': idaapi.TBEA_SEHLPAD, 'final': idaapi.TBEA_SEHLPAD,
+        }
+
+        # and now a union...for the user that wants it all. we default with seh because
+        # usually that's the thing people know first when they have no idea what they want.
+        indecisive = {k : v for k, v in default.items()}
+        [ indecisive.setdefault(k, v) for k, v in itertools.chain(*map(operator.methodcaller('items'), [seh_kwargs, try_kwargs])) ]
+
+        # god i hope that ida doesn't add any more exception types or i might need to
+        # wield science and turn this crap into a decision tree...
+        try_choices = {flags.pop(key, False) for key in {'c++', 'cpp'} if operator.contains(flags, key)}
+        seh_choices = {flags.pop(key, False) for key in {'seh', 'eh'} if operator.contains(flags, key)}
+
+        explicit = try_explicit, seh_explicit = ((any(choices) if choices else None) for choices in [try_choices, seh_choices])
+        kwargs = indecisive if all(explicit) else default if all(choices is None for choices in explicit) else [try_kwargs, seh_kwargs][0 if try_explicit else 1]
+
+        # now we iterate through the kwargs and figure out what flags they wanted.
+        tryflags, userflags = tryflags, {kw : value for kw, value in flags.items()}
+        for key in flags:
+            if not any(operator.contains(args, key) for args in [kwargs, default]):
+                continue
+
+            choice, value = userflags.pop(key), kwargs.get(key, default.get(key, 0))
+            Fchoice = functools.partial(operator.or_, value) if choice else functools.partial(operator.and_, ~value)
+            tryflags = idaapi.BADADDR & Fchoice(tryflags)
+
+        # figure out if there were any flags that we couldn't interpret and warn the user about it.
+        if userflags:
+            leftover = sorted(userflags)
+            logging.warning(u"{:s}.is_exception({:s}{:s}) : Ignored {:d} unknown parameter{:s} that {:s} passed as flags ({:s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ea) if isinstance(ea, six.integer_types) else ea, ", {:s}".format(utils.string.kwargs(flags)) if flags else '', len(leftover), '' if len(leftover) == 1 else 's', 'was' if len(leftover) == 1 else 'were', ', '.join(leftover)))
+
+        # now we can get to the actual api.
+        return cls.is_exception(ea, tryflags)
+    @utils.multicase(ea=six.integer_types, flags=six.integer_types)
+    @classmethod
+    def is_exception(cls, ea, flags):
+        '''Return if the address in `ea` is referenced by an exception matching the specified `flags` (``idaapi.TBEA_*``).'''
+        is_ea_tryblks = idaapi.is_ea_tryblks if hasattr(idaapi, 'is_ea_tryblks') else utils.fconstant(False)
+        return True if is_ea_tryblks(ea, flags) else False
+    @utils.multicase(bounds=builtins.tuple, flags=six.integer_types)
+    @classmethod
+    def is_exception(cls, bounds, flags):
+        '''Return if the given `bounds` is referenced by an exception matching the specified `flags` (``idaapi.TBEA_*``).'''
+        return any(cls.is_exception(ea, flags) for ea in address.iterate(bounds))
+    has_exception = isexception = hasexception = exceptionQ = utils.alias(is_exception, 'type')
+
 t = type    # XXX: ns alias
 
 class types(object):
