@@ -453,24 +453,25 @@ class chunks(object):
     @utils.multicase()
     @classmethod
     def at(cls):
-        '''Return a tuple containing the bounds of the current function chunk.'''
+        '''Return an ``idaapi.range_t`` describing the bounds of the current function chunk.'''
         return cls.at(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea):
-        '''Return a tuple containing the bounds of the function chunk at the address `ea`.'''
+        '''Return an ``idaapi.range_t`` describing the bounds of the function chunk at the address `ea`.'''
         fn = by_address(ea)
         return cls.at(fn, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, func, ea):
-        '''Return a tuple containing the bounds of the function chunk belonging to `func` at the address `ea`.'''
+        '''Return an ``idaapi.range_t`` describing the bounds of the function chunk belonging to `func` at the address `ea`.'''
         fn = by(func)
         for left, right in cls(fn):
             if left <= ea < right:
-                return interface.bounds_t(left, right)
+                area = interface.bounds_t(left, right)
+                return area.range()
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate the chunk for the given address ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
     @utils.multicase()
     @classmethod
@@ -546,11 +547,12 @@ class chunk(object):
     @utils.multicase()
     def __new__(cls):
         '''Return a tuple containing the bounds of the function chunk at the current address.'''
-        return chunks.at(ui.current.address())
+        return cls(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
         '''Return a tuple containing the bounds of the function chunk at the address `ea`.'''
-        return chunks.at(ea)
+        area = cls.at(ea, ea)
+        return interface.range.bounds(area)
 
     @utils.multicase()
     @classmethod
@@ -755,18 +757,18 @@ class chunk(object):
     @utils.multicase()
     @classmethod
     def at(cls):
-        '''Return a tuple containing the bounds of the current function chunk.'''
+        '''Return an ``idaapi.range_t`` describing the bounds of the current function chunk.'''
         return cls.at(ui.current.function(), ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea):
-        '''Return a tuple containing the bounds of the function chunk at the address `ea`.'''
+        '''Return an ``idaapi.range_t`` describing the bounds of the function chunk at the address `ea`.'''
         fn = by_address(ea)
         return cls.at(fn, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, func, ea):
-        '''Return a tuple containing the bounds of the function chunk belonging to `func` at the address `ea`.'''
+        '''Return an ``idaapi.range_t`` describing the bounds of the function chunk belonging to `func` at the address `ea`.'''
         return chunks.at(func, ea)
 
     @utils.multicase()
