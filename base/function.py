@@ -1046,43 +1046,47 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
-    def walk(cls):
-        '''Yield each ``idaapi.BasicBlock`` starting at the current address and terminating when there's no clear path to continue.'''
-        for item in cls.walk(ui.current.function(), ui.current.address()):
-            yield item
-        return
+    def walk(cls, **flags):
+        '''Traverse each of the successor blocks starting from the beginning of the current function.'''
+        fn = ui.current.function()
+        return cls.traverse(fn, interface.range.start(fn), operator.methodcaller('succs'), **flags)
     @utils.multicase()
     @classmethod
-    def walk(cls, ea):
-        '''Yield each ``idaapi.BasicBlock`` starting at the address `ea` and terminating when there's no clear path to continue.'''
-        fn = by(ea)
-        for item in cls.walk(fn, ea if isinstance(ea, six.integer_types) else interface.range.start(fn)):
-            yield item
-        return
+    def walk(cls, func, **flags):
+        '''Traverse each of the successor blocks starting from the beginning of the function `func`.'''
+        fn = by(func)
+        return cls.traverse(fn, interface.range.start(fn), operator.methodcaller('succs'), **flags)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def walk(cls, func, ea):
-        '''Yield each ``idaapi.BasicBlock`` in the function `func` starting at the address `ea` and terminating when there's no clear path to continue.'''
-        fn = by(func)
-        bb = cls.at(fn, ea)
-        for item in cls.walk(bb):
-            yield item
-        return
+    def walk(cls, func, ea, **flags):
+        '''Traverse each of the successor blocks of the block identified by `ea` belonging to the function `func`.'''
+        return cls.traverse(func, ea, operator.methodcaller('succs'), **flags)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def walk(cls, bb):
-        '''Yield each ``idaapi.BasicBlock`` starting at the specified `bb` and terminating when there's no clear path to continue.'''
-        item, visited = bb, {item for item in []}
-        yield item
-        visited |= {item.id}
-
-        # Now continue following the successors until there are no singles left.
-        items = [bb for bb in item.succs()]
-        while len(items) == 1 and not operator.contains(visited, items[0].id):
-            item = items[0]
-            yield item
-            visited, items = visited | {item.id}, [bb for bb in item.succs()]
-        return
+        '''Traverse each of the successor blocks from the ``idaapi.BasicBlock`` identified by `bb`.'''
+        return cls.traverse(bb, operator.methodcaller('succs'))
+    @utils.multicase()
+    @classmethod
+    def moonwalk(cls, **flags):
+        '''Traverse each of the predecessor blocks for the current function starting with the block at the current address.'''
+        ea = ui.current.address()
+        return cls.traverse(ea, ea, operator.methodcaller('preds'), **flags)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def moonwalk(cls, ea, **flags):
+        '''Traverse each of the predecessor blocks for a function starting with the block at the address `ea`.'''
+        return cls.traverse(ea, ea, operator.methodcaller('preds'), **flags)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def moonwalk(cls, func, ea, **flags):
+        '''Traverse each of the predecessor blocks from the block at address `ea` belonging to the function `func`.'''
+        return cls.traverse(func, ea, operator.methodcaller('preds'), **flags)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def moonwalk(cls, bb):
+        '''Traverse each of the predecessor blocks from the ``idaapi.BasicBlock`` identified by `bb`.'''
+        return cls.traverse(bb, operator.methodcaller('preds'))
 
     @utils.multicase()
     @classmethod
