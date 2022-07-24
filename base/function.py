@@ -1086,6 +1086,79 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
+    def traverse(cls, **flags):
+        '''Traverse each of the successor blocks starting from the beginning of the current function.'''
+        fn = ui.current.function()
+        return cls.traverse(fn, interface.range.start(fn), operator.methodcaller('succs'), **flags)
+    @utils.multicase(predicate=callable)
+    @classmethod
+    def traverse(cls, predicate, **flags):
+        '''Traverse the blocks from the beginning of the current function until the callable `predicate` returns no more elements.'''
+        fn = ui.current.function()
+        return cls.traverse(fn, interface.range.start(fn), predicate, **flags)
+    @utils.multicase(predicate=callable)
+    @classmethod
+    def traverse(cls, func, predicate, **flags):
+        '''Traverse the blocks from the beginning of function `func` until the callable `predicate` returns no more elements.'''
+        fn = by(func)
+        ea = interface.range.start(fn)
+        return cls.traverse(fn, ea, predicate, **flags)
+    @utils.multicase(ea=six.integer_types, predicate=callable)
+    @classmethod
+    def traverse(cls, func, ea, predicate, **flags):
+        '''Traverse the blocks of function `func` from the block given by `ea` until the callable `predicate` returns no more elements.'''
+        fn = by(func)
+        bb = cls.at(fn, ea, **flags)
+        return cls.traverse(bb, predicate)
+    @utils.multicase(bb=idaapi.BasicBlock, predicate=callable)
+    @classmethod
+    def traverse(cls, bb, predicate):
+        '''Traverse the blocks of function `func` from the ``idaapi.BasicBlock`` given by `bb` until the callable `predicate` returns no more elements.'''
+        visited = {item for item in []}
+
+        # define a closure containing the core of our functionality.
+        def Fchoose(item, items, bb=bb, visited=visited):
+            if item is None:
+                filtered = [bounds for bounds in items if bounds not in visited]
+                if len(filtered) != len(items):
+                    removed = [bounds for bounds in items if bounds in visited]
+                    logging.warning(u"{:s}.traverse({!s}) : Discarded {:d} already visited block{:s} ({:s}) leaving only {:d} ({:s}) to choose a default from.".format('.'.join([__name__, cls.__name__]), bb, len(removed), '' if len(removed) == 1 else 's', ', '.join(map("{:s}".format, removed)), len(filtered), ', '.join(map("{:s}".format, filtered))))
+                iterable = (choice for choice in filtered[:1])
+            elif isinstance(item, six.integer_types):
+                iterable = (choice for choice in choices if choice.contains(item))
+            elif item in items:
+                iterable = (choice for choice in [item])
+            else:
+                iterable = (choice for choice in [])
+
+            # grab our result and error out if its an integer and didn't match a block.
+            result = builtins.next(iterable, None)
+            if result is None and isinstance(item, six.integer_types):
+                message = 'any of the available blocks' if len(items) > 1 else 'the only available block'
+                raise E.ItemNotFoundError(u"{:s}.traverse({!s}) : The specified address ({:#x}) is not within {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), bb, item, message, ', '.join(map("{:s}".format, items))))
+
+            # otherwise, it was something else, and we couldn't match it.
+            elif result is None:
+                item_descr = interface.bounds_t(*item) if isinstance(item, tuple) else "{!s}".format(item)
+                message = 'is not one of the available choices' if len(items) > 1 else 'does not match the only available block'
+                raise E.ItemNotFoundError(u"{:s}.traverse({!s}) : The specified block ({:s}) {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), bb, item_descr, message, ', '.join(map("{:s}".format, items))))
+            return result
+
+        # start out with the basic-block we were given, and use it for each decision.
+        available = {interface.range.bounds(bb) : bb}
+        choices = [item for item in available]
+
+        # continue while we still have choices to choose from.
+        while len(choices):
+            selected = (yield choices if len(choices) > 1 else choices[0])
+            choice = Fchoose(selected, choices)
+            items, _ = predicate(available[choice]), visited.add(choice)
+            available = {interface.range.bounds(item) : item for item in items}
+            choices = [item for item in available]
+        return
+
+    @utils.multicase()
+    @classmethod
     def at(cls, **flags):
         '''Return the ``idaapi.BasicBlock`` at the current address in the current function.'''
         return cls.at(ui.current.function(), ui.current.address(), **flags)
