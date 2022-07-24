@@ -2952,13 +2952,13 @@ class address(object):
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
         left, right = bounds
-        return cls.iterate(left, cls.tail(cls.prev(right)))
+        return cls.iterate(left, cls.tail(right))
     @utils.multicase(bounds=tuple, step=callable)
     @classmethod
     def iterate(cls, bounds, step):
         '''Iterate through all of the addresses defined within `bounds` using the callable `step` to determine the next address.'''
         left, right = bounds
-        return cls.iterate(left, cls.tail(cls.prev(right)), step)
+        return cls.iterate(left, cls.tail(right), step)
 
     @utils.multicase()
     @classmethod
