@@ -326,7 +326,7 @@ def bottom():
 def bottom(func):
     '''Return the exit-points of the function `func`.'''
     fn = by(func)
-    fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
+    fc = blocks.flowchart(fn, idaapi.FC_PREDS)
     exit_types = (
         interface.fc_block_type_t.fcb_ret,
         interface.fc_block_type_t.fcb_cndret,
@@ -964,26 +964,29 @@ class blocks(object):
 
     """
     @utils.multicase()
-    def __new__(cls, **silent):
+    def __new__(cls, **external):
         '''Return the bounds of each basic block for the current function.'''
-        return cls(ui.current.function(), **silent)
+        return cls(ui.current.function(), **external)
     @utils.multicase()
-    def __new__(cls, func, **silent):
+    def __new__(cls, func, **external):
         '''Returns the bounds of each basic block for the function `func`.'''
-        for bb in cls.iterate(func, **silent):
+        for bb in cls.iterate(func, **external):
             yield interface.range.bounds(bb)
         return
     @utils.multicase(bounds=tuple)
-    def __new__(cls, bounds, **silent):
+    def __new__(cls, bounds, **external):
         '''Return each basic block contained within the specified `bounds`.'''
         left, right = bounds
-        return cls(left, right, **silent)
+        return cls(left, right, **external)
     @utils.multicase()
-    def __new__(cls, left, right, **silent):
-        '''Returns each basic block contained within the addresses `left` and `right`.'''
+    def __new__(cls, left, right, **external):
+        """Returns each basic block contained within the addresses `left` and `right`.
+
+        If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
+        """
         fn = by_address(left)
         (left, _), (_, right) = block(left), block(database.address.prev(right))
-        for bb in cls.iterate(fn, **silent):
+        for bb in cls.iterate(fn, **external):
             if (interface.range.start(bb) >= left and interface.range.end(bb) <= right):
                 yield interface.range.bounds(bb)
             continue
@@ -991,20 +994,29 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
-    def iterate(cls, **silent):
+    def iterate(cls, **external):
         '''Return each ``idaapi.BasicBlock`` for the current function.'''
-        return cls.iterate(ui.current.function(), **silent)
+        return cls.iterate(ui.current.function(), **external)
     @utils.multicase()
     @classmethod
-    def iterate(cls, func, **silent):
-        '''Returns each ``idaapi.BasicBlock`` for the function `func`.'''
+    def iterate(cls, func, **external):
+        """Returns each ``idaapi.BasicBlock`` for the function `func`.
+
+        If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
+        """
+        fc_flags = external.pop('flags', idaapi.FC_PREDS) | (0 if external.get('external', False) else idaapi.FC_NOEXT)
+        return cls.iterate(func, fc_flags, **external)
+    @utils.multicase(flags=six.integer_types)
+    @classmethod
+    def iterate(cls, func, flags, **silent):
+        '''Returns each ``idaapi.BasicBlock`` from the flowchart built with the specified `flags` (``idaapi.FC_*``) for the function `func`.'''
         fn = by(func)
         boundaries = [bounds for bounds in chunks(fn)]
 
         # iterate through all the basic-blocks in the flow chart and yield
         # each of them back to the caller. we need to ensure that the bounds
         # are actually contained by the function, so we collect this too.
-        for bb in idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS):
+        for bb in cls.flowchart(fn, flags):
             bounds = interface.range.bounds(bb)
             ea, _ = bounds
 
@@ -1021,8 +1033,8 @@ class blocks(object):
             # otherwise warn the user about it just in case they're processing
             # them and are always expecting an address within the function.
             else:
-                f, api = interface.range.start(fn), idaapi.FlowChart
-                logging.warning(u"{:s}.iterate({:#x}) : The block ({!s}) being returned at {!s} by `{:s}` is outside the boundaries of the requested function ({:#x}).".format('.'.join([__name__, cls.__name__]), f, bb, bounds, '.'.join([api.__module__, api.__name__]), f))
+                f, api, Flogging = interface.range.start(fn), idaapi.FlowChart, logging.warning if flags & idaapi.FC_NOEXT else logging.info
+                Flogging(u"{:s}.iterate({:#x}, {:#x}{:s}) : The current block {!s} ({:s}) being returned by `{:s}` is outside the boundaries of the requested function ({:#x}).".format('.'.join([__name__, cls.__name__]), f, flags, ", {:s}".format(utils.string.kwargs(silent)) if silent else '', bb, bounds, '.'.join([api.__module__, api.__name__]), f))
                 yield bb
             continue
         return
@@ -1082,8 +1094,8 @@ class blocks(object):
     @classmethod
     def at(cls, func, ea):
         '''Return the ``idaapi.BasicBlock`` in function `func` at address `ea`.'''
-        fn = by(func)
-        for bb in cls.iterate(fn, silent=True):
+        fn, flags = by(func), idaapi.FC_PREDS | idaapi.FC_NOEXT
+        for bb in cls.iterate(fn, flags):
             if interface.range.within(ea, bb):
                 return bb
             continue
@@ -1092,8 +1104,8 @@ class blocks(object):
     @classmethod
     def at(cls, func, bb):
         '''Return the ``idaapi.BasicBlock`` in function `func` identifed by `bb`.'''
-        fn = by(func)
-        iterable = (item for item in cls.iterate(fn, silent=True) if item.id == bb.id)
+        fn, flags = by(func), idaapi.FC_PREDS | idaapi.FC_NOEXT
+        iterable = (item for item in cls.iterate(fn, flags) if item.id == bb.id)
         result = builtins.next(iterable, None)
         if result is None:
             raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate `idaapi.BasicBlock` with the specified id ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.bounds(bb), bb.id, interface.range.start(fn)))
@@ -1123,12 +1135,12 @@ class blocks(object):
         return cls.digraph(ui.current.function())
     @utils.multicase()
     @classmethod
-    def digraph(cls, func):
+    def digraph(cls, func, **flags):
         """Return a ``networkx.DiGraph`` of the function `func`.
 
         Requires the ``networkx`` module in order to build the graph.
         """
-        fn = by(func)
+        fn, fcflags = by(func), flags.get('flags', idaapi.FC_PREDS | idaapi.FC_NOEXT | getattr(idaapi, 'FC_CALL_ENDS', 0))
         ea = interface.range.start(fn)
 
         # assign some default values and create some tools to use when creating the graph
@@ -1161,7 +1173,7 @@ class blocks(object):
         fVisibleTags = lambda items: {tag for tag in items if not tag.startswith('__')}
 
         # create a node for each block in the flowchart
-        nodes_iterable, edges_iterable = itertools.tee(cls.iterate(fn), 2)
+        nodes_iterable, edges_iterable = itertools.tee(cls.iterate(fn, fcflags), 2)
         for B in nodes_iterable:
             bounds = block(B)
 
