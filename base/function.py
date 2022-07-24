@@ -1101,15 +1101,20 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
-    def flowchart(cls):
+    def flowchart(cls, **flags):
         '''Return an ``idaapi.FlowChart`` object for the current function.'''
-        return cls.flowchart(ui.current.function())
+        return cls.flowchart(ui.current.function(), **flags)
     @utils.multicase()
     @classmethod
-    def flowchart(cls, func):
+    def flowchart(cls, func, **flags):
         '''Return an ``idaapi.FlowChart`` object for the function `func`.'''
+        return cls.flowchart(func, flags.get('flags', idaapi.FC_PREDS))
+    @utils.multicase(flags=six.integer_types)
+    @classmethod
+    def flowchart(cls, func, flags):
+        '''Return an ``idaapi.FlowChart`` object built with the specified `flags` for the function `func`.'''
         fn = by(func)
-        return idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
+        return idaapi.FlowChart(f=fn, flags=flags)
 
     @utils.multicase()
     @classmethod
