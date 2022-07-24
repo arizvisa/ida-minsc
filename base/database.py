@@ -4775,6 +4775,10 @@ class type(object):
         If `fallthrough` is true, then return if the address is part of the fall-through case for a handler.
         If `filter` or `finally` is true, then return if the address is part of an SEH filter or SEH finalizer (respectively).
         """
+        if not hasattr(idaapi, 'TBEA_ANY'):
+            logging.fatal(u"{:s}.is_exception({:s}{:s}) : Support for interacting with exceptions is not available in your version ({:.1f}) of the IDA Pro disassembler (requires {:.1f}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ea) if isinstance(ea, six.integer_types) else ea, u", {:s}".format(utils.string.kwargs(flags)) if flags else '', idaapi.__version__, 7.7))
+            return cls.is_exception(ea, 0)
+
         tryflags = flags.pop('flags', 0) if flags else idaapi.TBEA_ANY
 
         # pre-assign some keyword args that we will map into actual flags.
