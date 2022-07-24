@@ -1379,8 +1379,8 @@ class range(object):
     @classmethod
     def bounds(cls, area):
         '''Return the boundaries of the specified `area` as a ``bounds_t``.'''
-        res = cls.unpack(area)
-        return bounds_t(*res)
+        left, right = cls.unpack(area)
+        return bounds_t(left, right - 1)
 
     @classmethod
     def within(cls, ea, area):
@@ -3797,7 +3797,7 @@ class bounds_t(integerish):
     def range(self):
         '''Return the current boundary casted to a native ``idaapi.range_t`` type.'''
         left, right = sorted(self)
-        return idaapi.range_t(left, right)
+        return idaapi.range_t(left, right + 1)
 
     def contains(self, ea):
         '''Return if the address `ea` is contained by the current boundary.'''
@@ -3851,7 +3851,7 @@ class bounds_t(integerish):
             raise TypeError("unsupported format string ({!s}) passed to {:s}".format(spec, '.'.join([cls.__name__, '__format__'])))
         left, right = self
         if left < right:
-            return "{:#x}..{:#x}".format(left, right - 1)
+            return "{:#x}..{:#x}".format(left, right)
         return "{:#x}".format(left)
 
     def __str__(self):
