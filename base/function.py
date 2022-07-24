@@ -958,7 +958,7 @@ class blocks(object):
 
     Some examples of this namespace's usage::
 
-        > for bb in function.blocks(): ...
+        > for bb in function.blocks(split=True): ...
         > chart = function.blocks.flowchart(ea)
         > G = function.blocks.graph()
 
@@ -983,6 +983,7 @@ class blocks(object):
         """Returns each basic block contained within the addresses `left` and `right`.
 
         If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
+        If `split` is true, then divide blocks by all branches including call instructions.
         """
         fn = by_address(left)
         (left, _), (_, right) = block(left), block(database.address.prev(right))
@@ -1003,8 +1004,12 @@ class blocks(object):
         """Returns each ``idaapi.BasicBlock`` for the function `func`.
 
         If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
+        If `split` is true, then divide blocks by all branches including call instructions.
         """
-        fc_flags = external.pop('flags', idaapi.FC_PREDS) | (0 if external.get('external', False) else idaapi.FC_NOEXT)
+        FC_NOEXT, FC_CALL_ENDS = getattr(idaapi, 'FC_NOEXT', 2), getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+        fc_flags = external.pop('flags', idaapi.FC_PREDS)
+        fc_flags |= (0 if external.get('external', False) else FC_NOEXT)
+        fc_flags |= (FC_CALL_ENDS if any(external.get(item, False) for item in ['call', 'calls', 'split']) else 0)
         return cls.iterate(func, fc_flags, **external)
     @utils.multicase(flags=six.integer_types)
     @classmethod
@@ -1081,20 +1086,27 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
-    def at(cls):
+    def at(cls, **flags):
         '''Return the ``idaapi.BasicBlock`` at the current address in the current function.'''
-        return cls.at(ui.current.function(), ui.current.address())
+        return cls.at(ui.current.function(), ui.current.address(), **flags)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def at(cls, ea):
+    def at(cls, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` of address `ea` in the current function.'''
         fn = by_address(ea)
-        return cls.at(fn, ea)
+        return cls.at(fn, ea, **flags)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def at(cls, func, ea):
+    def at(cls, func, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` in function `func` at address `ea`.'''
-        fn, flags = by(func), idaapi.FC_PREDS | idaapi.FC_NOEXT
+        FC_NOEXT, FC_CALL_ENDS = getattr(idaapi, 'FC_NOEXT', 2), getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+        fc_flags = flags.get('flags', idaapi.FC_PREDS | FC_NOEXT) | (FC_CALL_ENDS if any(flags.get(item, False) for item in ['call', 'calls', 'split']) else 0)
+        return cls.at(func, ea, fc_flags)
+    @utils.multicase(ea=six.integer_types, flags=six.integer_types)
+    @classmethod
+    def at(cls, func, ea, flags):
+        '''Return the ``idaapi.BasicBlock`` with the specified `flags` (``idaapi.FC_*``) for function `func` at address `ea`.'''
+        fn = by(func)
         for bb in cls.iterate(fn, flags):
             if interface.range.within(ea, bb):
                 return bb
@@ -1104,7 +1116,19 @@ class blocks(object):
     @classmethod
     def at(cls, func, bb):
         '''Return the ``idaapi.BasicBlock`` in function `func` identifed by `bb`.'''
-        fn, flags = by(func), idaapi.FC_PREDS | idaapi.FC_NOEXT
+        fn = by(func)
+
+        # now we need to extract the flags from the fc if possible.
+        path = map(operator.attrgetter, ['_fc', '_q', 'flags'])
+        try:
+            flags = functools.reduce(lambda agg, item: item(agg), path, bb)
+
+        # warn the user about not being able to figure it out.
+        except AttributeError:
+            flags = idaapi.FC_PREDS | idaapi.FC_NOEXT
+            logging.warning(u"{:s}.at({:#x}, {!s}) : Unable to determine the original flags for the `idaapi.BasicBlock` ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.bounds(bb), interface.range.start(fn)))
+
+        # regenerate the flowchart and find the block in the list of identifiers
         iterable = (item for item in cls.iterate(fn, flags) if item.id == bb.id)
         result = builtins.next(iterable, None)
         if result is None:
@@ -1350,20 +1374,20 @@ class block(object):
     """
     @utils.multicase()
     @classmethod
-    def at(cls):
+    def at(cls, **flags):
         '''Return the ``idaapi.BasicBlock`` of the current address in the current function.'''
-        return cls.at(ui.current.function(), ui.current.address())
+        return cls.at(ui.current.function(), ui.current.address(), **flags)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def at(cls, ea):
+    def at(cls, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` of address `ea` in the current function.'''
         fn = by_address(ea)
-        return cls.at(fn, ea)
+        return cls.at(fn, ea, **flags)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def at(cls, func, ea):
+    def at(cls, func, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` of address `ea` in the function `func`.'''
-        return blocks.at(func, ea)
+        return blocks.at(func, ea, **flags)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def at(cls, bb):
@@ -1371,10 +1395,10 @@ class block(object):
         return bb
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
-    def at(cls, bounds):
+    def at(cls, bounds, **flags):
         '''Return the ``idaapi.BasicBlock`` identified by `bounds`.'''
         left, _ = bounds
-        return cls.at(left)
+        return cls.at(left, **flags)
 
     @utils.multicase()
     @classmethod
@@ -1403,27 +1427,32 @@ class block(object):
         return cls.at(bounds).id
 
     @utils.multicase()
-    def __new__(cls):
+    def __new__(cls, **flags):
         '''Returns the boundaries of the current basic block.'''
-        return cls(ui.current.function(), ui.current.address())
+        return cls(ui.current.function(), ui.current.address(), **flags)
     @utils.multicase(ea=six.integer_types)
-    def __new__(cls, ea):
+    def __new__(cls, ea, **flags):
         '''Returns the boundaries of the basic block at address `ea`.'''
-        return cls(by_address(ea), ea)
+        return cls(by_address(ea), ea, **flags)
     @utils.multicase(ea=six.integer_types)
-    def __new__(cls, func, ea):
+    def __new__(cls, func, ea, **flags):
         '''Returns the boundaries of the basic block at address `ea` in function `func`.'''
-        res = blocks.at(func, ea)
+        res = blocks.at(func, ea, **flags)
+        return interface.range.bounds(res)
+    @utils.multicase(ea=six.integer_types, flags=six.integer_types)
+    def __new__(cls, func, ea, flags):
+        '''Returns the boundaries of the basic block with the specified `flags` (``idaapi.FC_*``) at address `ea` in function `func`.'''
+        res = blocks.at(func, ea, flags)
         return interface.range.bounds(res)
     @utils.multicase(bb=idaapi.BasicBlock)
     def __new__(cls, bb):
         '''Returns the boundaries of the basic block `bb`.'''
         return interface.range.bounds(bb)
     @utils.multicase(bounds=builtins.tuple)
-    def __new__(cls, bounds):
+    def __new__(cls, bounds, **flags):
         '''Return the boundaries of the basic block identified by `bounds`.'''
         left, _ = bounds
-        return cls(left)
+        return cls(left, **flags)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -1734,8 +1763,7 @@ class block(object):
     @classmethod
     def iterate(cls, bounds):
         '''Yield all the addresses in the basic block identified by `bounds`.'''
-        bb = cls.at(bounds)
-        return cls.iterate(bb)
+        return database.address.iterate(bounds)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def iterate(cls, bb):
@@ -1752,14 +1780,23 @@ class block(object):
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
-        bb = cls.at(ea)
+        bb = cls.at(ea, **modifiers)
         return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bounds=builtins.tuple, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block identified by `bounds` that uses `reg` or any one of the registers in `regs`.'''
-        bb = cls.at(bounds)
-        return cls.register(bb, reg, *regs, **modifiers)
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use( (reg,) + regs )
+
+        for ea in database.address.iterate(bounds):
+            for opnum in iterops(ea):
+                if uses_register(ea, opnum):
+                    items = ea, opnum, instruction.op_state(ea, opnum)
+                    yield interface.opref_t(*items)
+                continue
+            continue
+        return
     @utils.multicase(bb=idaapi.BasicBlock, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
@@ -1818,8 +1855,8 @@ class block(object):
     @classmethod
     def disassemble(cls, bounds, **options):
         '''Returns the disassembly of the basic block identified by `bounds`.'''
-        bb = cls.at(bounds)
-        return cls.disassemble(bb)
+        bb = cls.at(bounds, **options)
+        return cls.disassemble(bb, **options)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def disassemble(cls, bb, **options):
