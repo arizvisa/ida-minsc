@@ -1137,6 +1137,18 @@ class contents(tagging):
         return {item for item in res.keys()}
 
     @classmethod
+    def counts(cls, address, **target):
+        """Yield each tag name and its count for the contents of the function `target`.
+
+        If `target` is undefined or ``None`` then use `address` to locate the function.
+        """
+        key = target.get('target', None)
+        items = cls._read(key, address) or {}
+        for tag, count in items.get(cls.__tags__, {}).items():
+            yield tag, count
+        return
+
+    @classmethod
     def address(cls, address, **target):
         """Return all the addresses (``sorted``) with tags in the contents for the function `target`.
 
