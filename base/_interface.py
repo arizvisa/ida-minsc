@@ -3803,7 +3803,7 @@ class bounds_t(integerish):
         '''Return if the address `ea` is contained by the current boundary.'''
         left, right = sorted(self)
         if isinstance(ea, six.integer_types):
-            return left <= ea < right
+            return left <= ea <= right
 
         # compare against another boundary
         elif isinstance(ea, tuple):
@@ -3818,7 +3818,7 @@ class bounds_t(integerish):
         '''Return if the boundary `bounds` overlaps with the current boundary.'''
         left, right = sorted(self)
         if isinstance(bounds, six.integer_types):
-            return left <= bounds < right
+            return left <= bounds <= right
 
         other_left, other_right = sorted(bounds)
         return all([left <= other_right, right >= other_left])
