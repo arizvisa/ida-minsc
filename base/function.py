@@ -2594,9 +2594,14 @@ def tag(func):
         if type.has_prototype(fn):
             ti = type(fn)
 
-            # Use the realname to render the type into a string so that we
+            # Filter the name we're going to render with so that it can be parsed properly.
+            valid = {item for item in string.digits} | {':'}
+            filtered = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in realname)
+            validname = ''.join(filtered)
+
+            # Use the validname to render the type into a string so that we
             # can return it to the user in its proper format.
-            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
+            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
             res.setdefault('__typeinfo__', fprototype)
 
     # If an exception was raised, then we're using an older version of IDA and we
