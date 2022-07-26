@@ -2162,9 +2162,14 @@ def tag(ea):
         if type.has_typeinfo(ea):
             ti = type(ea)
 
+            # Filter the name we're going to render with so that it can be parsed properly.
+            valid = {item for item in string.digits} | {':'}
+            filtered = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in realname)
+            validname = ''.join(filtered)
+
             # Demangle just the name if it's mangled in some way, and use it to render
             # the typeinfo to return.
-            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
 
             # Add it to our dictionary that we return to the user.
             res.setdefault('__typeinfo__', ti_s)
