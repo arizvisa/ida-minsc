@@ -3561,6 +3561,11 @@ class type(object):
         def name(cls, index):
             '''Return the name of the parameter at the specified `index` in the current function.'''
             return cls.name(ui.current.address(), index)
+        @utils.multicase(index=six.integer_types, none=None.__class__)
+        @classmethod
+        def name(cls, index, none):
+            '''Remove the name from the parameter at the specified `index` in the current function.'''
+            return cls.name(ui.current.address(), index, none)
         @utils.multicase(index=six.integer_types, string=six.string_types)
         @classmethod
         def name(cls, index, string, *suffix):
@@ -3581,7 +3586,12 @@ class type(object):
 
             # Now we can grab the argument using the index we were given and return its name.
             result = ftd[index]
-            return utils.string.of(result.name)
+            return utils.string.of(result.name) or None
+        @utils.multicase(index=six.integer_types, none=None.__class__)
+        @classmethod
+        def name(cls, func, index, none):
+            '''Remove the name from the parameter at the specified `index` in the function `func`.'''
+            return cls.name(func, index, '')
         @utils.multicase(index=six.integer_types, string=six.string_types)
         @classmethod
         @utils.string.decorate_arguments('string', 'suffix')
@@ -3606,7 +3616,7 @@ class type(object):
             # Now we can send the whole thing back to the updater, close it,
             # and then return the previous result that was assigned.
             updater.send(ftd), updater.close()
-            return result
+            return result or None
 
         @utils.multicase(index=six.integer_types)
         @classmethod
