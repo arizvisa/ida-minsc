@@ -349,7 +349,8 @@ class DisplayHook(object):
     def format_ctypes(self, num_printer, storage, item):
         cls, size = item.__class__, ctypes.sizeof(item)
         if isinstance(item, ctypes._SimpleCData):
-            storage.append("{:s}({:#0{:d}x})".format(cls.__name__, item.value, 2 + 2 * size))
+            contents = "{:#0{:d}x}".format(item.value, 2 + 2 * size) if isinstance(item.value, six.integer_types) else "{!s}".format(item.value)
+            storage.append("{:s}({:s})".format(cls.__name__, contents))
 
         # if it's anything else (or an unknown), then use the default formatter.
         else:
