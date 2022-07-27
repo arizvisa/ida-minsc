@@ -4183,7 +4183,11 @@ class type(object):
         return cls(ui.current.address(), info, **guessed)
     @utils.multicase(ea=six.integer_types, info=idaapi.tinfo_t)
     def __new__(cls, ea, info, **guessed):
-        '''Apply the ``idaapi.tinfo_t`` in `info` to the address `ea`.'''
+        """Apply the ``idaapi.tinfo_t`` in `info` to the address `ea`.
+
+        If `guess` is true, then apply the type information as a guess.
+        If `force` is true, then apply the type as-is regardless of its location.
+        """
         TINFO_GUESSED, TINFO_DEFINITE = getattr(idaapi, 'TINFO_GUESSED', 0), getattr(idaapi, 'TINFO_DEFINITE', 1)
         info_s = "{!s}".format(info)
 
@@ -4197,15 +4201,34 @@ class type(object):
         except E.FunctionNotFoundError:
             pass
 
-        # All we need to do is to use idaapi to apply our parsed tinfo_t to the
-        # address we were given.
+        # If we didn't exception, then that means we're pointing at a runtime
+        # address. If we are then we need to ensure that our type is a pointer.
+        else:
+            ti = idaapi.tinfo_t()
+            if any([info.is_ptr(), info.is_func()]) or builtins.next((guessed[kwd] for kwd in ['force', 'forced'] if kwd in guessed), False):
+                ti, ok = info, True
+
+            # If it's not a pointer then we need to promote it.
+            else:
+                logging.warning(u"{:s}.info({:#x}, {!s}) : Promoting the given type ({!s}) to a pointer before applying it to the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
+                pi = idaapi.ptr_type_data_t()
+                pi.obj_type = info
+                ok = ti.create_ptr(pi)
+
+            # If we couldn't promote it to a pointer, then we need to bail so we
+            # don't damage anything that the user might not have intended to do.
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.info({:#x}, {!s}) : Unable to promote type ({!s}) to a pointer for the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
+            info = ti
+
+        # All we need to do is to use idaapi to apply our tinfo_t to the address.
         result, ok = cls(ea), idaapi.apply_tinfo(ea, info, TINFO_DEFINITE)
         if not ok:
             raise E.DisassemblerError(u"{:s}.info({:#x}, {!s}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
 
         # TINFO_GUESSED doesn't appear to work, so instead we'll force the option
         # here by clearing the aflag if the user wants to mark this as guessed.
-        if guessed.get('guessed', False):
+        if builtins.next((guessed[kwd] for kwd in ['guess', 'guessed'] if kwd in guessed), False):
             interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
         return result
     @utils.multicase(none=None.__class__)
