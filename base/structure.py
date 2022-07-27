@@ -2976,13 +2976,48 @@ class member_t(object):
                 typeinfo = None
 
         # if tinfo was defined and it doesn't use an ordinal, then we can apply it.
+        # FIXME: we are likely going to need to traverse this to determine if it's using an ordinal or not
         if typeinfo and not any([typeinfo.get_ordinal(), typeinfo.is_array() and typeinfo.get_array_element().get_ordinal()]):
-            self.typeinfo = typeinfo
-            logging.info(u"{:s}({:#x}, index={:d}): Applied the type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
+            try:
+                self.typeinfo = typeinfo
 
-        # otherwise, we had type information and so we need to guess what it is.
+            # if the type is not ideal, then we can pretty much ignore this because
+            # the type is already there and IDA thinks that it's okay.
+            except E.DisassemblerError as exc:
+                if 'type is not ideal' in "{!s}".format(exc):
+                    logging.info(u"{:s}({:#x}, index={:d}): The disassembler refused to apply the type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
+                    logging.debug(u"{!s}".format(exc))
+
+                # otherwise, we need to warn the user about what happened.
+                else:
+                    logging.warning(u"{:s}({:#x}, index={:d}): The disassembler was unable to apply the type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
+                    logging.warning(u"{!s}".format(exc))
+
+            # we're good, it was applied.
+            else:
+                logging.info(u"{:s}({:#x}, index={:d}): Applied the type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
+
+        # otherwise, we had type information that was an ordinal which might not
+        # exist in our database...so we ask IDA to make a guess at what it is.
         elif typeinfo:
             ti = idaapi.tinfo_t()
             ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
-            if ok: self.typeinfo = ti
+            try:
+                if ok:
+                    self.typeinfo = ti
+
+            # if the type was not ideal, then this can be ignored because IDA
+            # really knows best, and if it says we're wrong..then we're wrong.
+            except E.DisassemblerError as exc:
+                if 'type is not ideal' in "{!s}".format(exc):
+                    logging.info(u"{:s}({:#x}, index={:d}): The disassembler refused to apply the guessed type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
+                    logging.debug(u"{!s}".format(exc))
+
+                else:
+                    logging.warning(u"{:s}({:#x}, index={:d}): The disassembler was unable to apply the guesed type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
+                    logging.warning(u"{!s}".format(exc))
+
+            # if we applied it, then we're good.
+            else:
+                ok and logging.info(u"{:s}({:#x}, index={:d}): Applied the type information \"{!s}\" to the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, typeinfo, utils.string.escape(fullname, '"')))
         return
