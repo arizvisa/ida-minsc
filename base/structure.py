@@ -2760,11 +2760,12 @@ class member_t(object):
             ti = internal.declaration.parse(info)
             if ti is None:
                 cls = self.__class__
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info))
+                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info)))
+            info_description = info
 
         # If it's a tinfo_t, then we can just use it as-is.
         elif isinstance(info, idaapi.tinfo_t):
-            ti = info
+            ti, info_description = info, "{!s}".format(info)
 
         # Now we can pass our tinfo_t along with the member information to IDA.
         res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, idaapi.SET_MEMTI_COMPATIBLE)
@@ -2774,7 +2775,7 @@ class member_t(object):
         # We failed, so just raise an exception for the user to handle.
         elif res == idaapi.SMT_FAILED:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info_description), utils.string.repr(self.name)))
 
         # If we received an alternative return code, then build a relevant
         # message that we can raise with our exception.
@@ -2797,7 +2798,7 @@ class member_t(object):
 
         # Finally we can raise our exception so that the user knows whats up.
         cls = self.__class__
-        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name), message))
+        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info_description), utils.string.repr(self.name), message))
 
     ### Private methods
     def __str__(self):
