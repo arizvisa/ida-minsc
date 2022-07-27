@@ -8060,6 +8060,12 @@ class get(object):
             (int, -4) : ctypes.c_int32,  (int, 4) : ctypes.c_uint32,
             (int, -8) : ctypes.c_int64,  (int, 8) : ctypes.c_uint64,
             (float, 4) : ctypes.c_float, (float, 8) : ctypes.c_double,
+
+            # pointer types, would be cool if we could have variable-sized pointers..but we don't.
+            (builtins.type, -1) : ctypes.c_int8,    (builtins.type, 1) : ctypes.c_uint8,
+            (builtins.type, -2) : ctypes.c_int16,   (builtins.type, 2) : ctypes.c_uint16,
+            (builtins.type, -4) : ctypes.c_int32,   (builtins.type, 4) : ctypes.c_uint32,
+            (builtins.type, -8) : ctypes.c_int64,   (builtins.type, 8) : ctypes.c_uint64,
         }
 
         res = {}
