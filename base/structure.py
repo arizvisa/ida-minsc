@@ -1226,15 +1226,17 @@ class members_t(object):
         for item in listable: yield item
     @utils.multicase(string=six.string_types)
     @utils.string.decorate_arguments('string')
-    def iterate(self, string):
+    def iterate(self, string, *suffix):
         '''Iterate through all of the members in the structure with a name that matches the glob in `string`.'''
-        return self.iterate(like=string)
+        res = string if isinstance(string, tuple) else (string,)
+        return self.iterate(like=interface.tuplename(*(res + suffix)))
 
     @utils.multicase(string=six.string_types)
     @utils.string.decorate_arguments('string')
-    def list(self, string):
+    def list(self, string, *suffix):
         '''List any members that match the glob in `string`.'''
-        return self.list(like=string)
+        res = string if isinstance(string, tuple) else (string,)
+        return self.list(like=interface.tuplename(*(res + suffix)))
     @utils.multicase()
     @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
     def list(self, **type):
@@ -1274,9 +1276,9 @@ class members_t(object):
         return res
     @utils.multicase(name=six.string_types)
     @utils.string.decorate_arguments('name')
-    def by(self, name):
+    def by(self, name, *suffix):
         '''Return the member with the specified `name`.'''
-        return self.by_name(name)
+        return self.by_name(name, *suffix)
     @utils.multicase(offset=six.integer_types)
     def by(self, offset):
         '''Return the member at the specified `offset`.'''
@@ -1295,9 +1297,10 @@ class members_t(object):
         return member
 
     @utils.string.decorate_arguments('name')
-    def by_name(self, name):
+    def by_name(self, name, *suffix):
         '''Return the member with the specified `name`.'''
-        res = utils.string.to(name)
+        string = name if isinstance(name, tuple) else (name,)
+        res = utils.string.to(interface.tuplename(*(string + suffix)))
         owner = self.owner
 
         # grab the member_t of the structure by its name
@@ -1312,9 +1315,10 @@ class members_t(object):
     byname = utils.alias(by_name, 'members_t')
 
     @utils.string.decorate_arguments('fullname')
-    def by_fullname(self, fullname):
+    def by_fullname(self, fullname, *suffix):
         '''Return the member with the specified `fullname`.'''
-        res = utils.string.to(fullname)
+        string = fullname if isinstance(fullname, tuple) else (fullname,)
+        res = utils.string.to(interface.tuplename(*(string + suffix)))
         owner = self.owner
 
         # grab the member_t of the structure by its fullname
