@@ -540,6 +540,211 @@ the combinators provided by this plugin.
    being equivalent to "leaf" or "virtual-wrapper" depending on whether
    no functions are called, or only indirect calls are made.
 
+.. _tutorials_userinterface:
+
+-----------------------------------------------------------------
+Using the user-interface (ui) module to map hotkeys to a function
+-----------------------------------------------------------------
+
+This plugin wraps a number of the capabilities that are exposed by
+IDAPython. One of these capabilities are to be able to interact with
+IDA's user-interface. This is exposed by the plugin via the :py:mod:`ui`
+module. This tutorial introduces some of the user-interface wrappers
+that are available and can be used to develop quick tools that the user
+needs as they're reversing a target.
+
+1. When doing iterative changes to the different content within a
+   database, it is common to perform actions such as apply a structure,
+   convert a list of data items into an array, convert a range of bytes
+   into a string, and so forth. As an example, when reversing C++ targets
+   where runtime-type-information is available (RTTI), information about
+   a class such as its size, number of virtual methods, etc. are available,
+   but not packed into a structure by IDA. Most of this is done relative
+   to whatever object the user is currently working with. The current
+   object the user is working with can be identifed with the
+   :py:class:`ui.current` namespace. This can be combined with other
+   functionality within the plugin in order to automate a large aspect
+   of the reverser's chores.
+
+.. code-block:: python
+
+   > help(ui.current)
+   Help on class current in module ui:
+
+   class current(__builtin__.object)
+    |  This namespace contains tools for fetching information about the
+    |  current selection state. This can be used to get the state of
+    |  thigns that are currently selected such as the address, function,
+    |  segment, clipboard, widget, or even the current window in use.
+    |
+    |  Class methods defined here:
+    |
+    |  address(cls) from __builtin__.type
+    |      Return the current address.
+    |
+    |  color(cls) from __builtin__.type
+    |      Return the color of the current item.
+    |
+    |  function(cls) from __builtin__.type
+    |      Return the current function.
+    |
+    |  opnum(cls) from __builtin__.type
+    |      Return the currently selected operand number.
+    |
+    |  segment(cls) from __builtin__.type
+    |      Return the current segment.
+    |
+    |  selected = selection(*arguments, **keywords) from __builtin__.type
+    |      Alias for `ui.current.selection`.
+    |
+    |  selection(cls) from __builtin__.type
+    |      Return the current address range of whatever is selected
+    |
+    |  status(cls) from __builtin__.type
+    |      Return the IDA status.
+    |
+    |  symbol(cls) from __builtin__.type
+    |      Return the current highlighted symbol name.
+    |
+    |  widget(cls) from __builtin__.type
+    |      Return the current widget that the mouse is hovering over.
+    |
+    |  window(cls) from __builtin__.type
+    |      Return the current window that is being used.
+
+
+2. When an RTTI entry is identified by IDA, it looks like the following
+   unstructured data. With a cross-reference existing at address 0x723324.
+   This data isn't presently of use to a reverser, and it would be much
+   easier to use if it was structured. Normally the reverser would need
+   to navigate to the "Structures" view, create the structure, and then
+   use 'Alt+Q' to apply the structure to the address at 0x723308.
+
+.. code-block:: objdump-nasm
+
+    .rdata:00723308 BC 34 72 00           off_723308      dd offset str.CNxPrefDigSigDlg
+    .rdata:0072330C 68                                    db  68h ; h
+    .rdata:0072330D 01                                    db    1
+    .rdata:0072330E 00                                    db    0
+    .rdata:0072330F 00                                    db    0
+    .rdata:00723310 FF                                    db 0FFh ; ÿ
+    .rdata:00723311 FF                                    db 0FFh ; ÿ
+    .rdata:00723312 00                                    db    0
+    .rdata:00723313 00                                    db    0
+    .rdata:00723314 00                                    db    0
+    .rdata:00723315 00                                    db    0
+    .rdata:00723316 00                                    db    0
+    .rdata:00723317 00                                    db    0
+    .rdata:00723318 E0 55 42 00                           dd offset sub_4255E0
+    .rdata:0072331C 00                                    db    0
+    .rdata:0072331D 00                                    db    0
+    .rdata:0072331E 00                                    db    0
+    .rdata:0072331F 00                                    db    0
+    .rdata:00723320 00                                    db    0
+    .rdata:00723321 00                                    db    0
+    .rdata:00723322 00                                    db    0
+    .rdata:00723323 00                                    db    0
+    .rdata:00723324 C8 7C 7A 00                           dd offset const CNxPrefDigSigDlg::`RTTI Complete Object Locator'
+
+3. To deal with this, we will first create the structure at the IDAPython
+   command prompt based on what we know. Depending on the C++ implementation,
+   this structure can be named `CRuntimeClass`, begins with a pointer to
+   a string, contains a pointer to the constructor, and ends with a reference
+   to the object locator. We will use :py:func:`struc.new<structure.new>` to
+   create it and add some members.
+
+.. code-block:: python
+
+   > st = struc.new('CRuntimeClass')
+   > st.members.add('p_name_0', int)
+   > st.members.add('v_size_4', int)
+   > st.members.add('v_8', int)
+   > st.members.add('pf_constructor_c', int)
+   > st.members.add('p_parentClass_10', int)
+   > st.members.add('p_14', int)
+   > st.members.add('p_18', int)
+   > st.members.add('p_runtimeTypeInformation_1c', int)
+
+4. Now that we have a structure stored in the `st` variable, we can use
+   :py:func:`db.set.structure<database.set.structure>` to apply it to
+   an address. After applying the structure, we can then name it with
+   :py:func:`db.name<database.name>`, or even tag it using the
+   :py:func:`db.tag<database.tag>` function in order to search for it
+   later. As :py:func:`db.set.structure<database.set.structure>`
+   returns the structure that was created, we will use this combined
+   with :py:func:`db.get.string<database.get.string>` to create the
+   new name for the address.
+
+.. code-block:: python
+
+   > def make_rtti(ea):
+         res = db.set.structure(ea, st)
+         name_address = res['p_name_0'].value
+         name = db.get.string(name_address)
+         # database.name(ea, 'gv', 'rtti', name, db.offset(ea))
+         database.name(ea, 'rtti' + '_' + name)
+         return res
+
+5. Now we can use this function, whilst passing the target address as a
+   parameter, to automatically apply the structure to the given address.
+   One issue with this, however, is that typically when dealing with a
+   `CRuntimeClass`, the cross-reference that navigates you to the class
+   will point to the `p_runtimeTypeInformation_1c` field which will
+   require you to seek by -0x1c bytes in order to apply the structure.
+   We can remedy this by assuming IDA will label the string, and use
+   the :py:func:`db.a.prevlabel<database.address.prevlabel>` function
+   to get an address pointing to the previously defined label.
+
+.. code-block:: python
+
+   > def make_rtti_from_reference(ea):
+         name_address = db.a.prevlabel(ea)
+         return make_rtti(name_address)
+
+6. Now that we have a way to apply the structure to the address
+   identified by the previously labeled name, we can simply iterate
+   through all the cross-references pointing to the "RTTI Object Locator",
+   and apply this function to it. However, what if we're unsure that
+   every single cross-reference has this particular format? If that's
+   turns out to be the case, then it might be better to do this on
+   command instead of programmatically. We'll first define a function
+   that uses the current address via either the :py:func:`ui.current.address`
+   function, or the :py:func:`h<database.here>` function.
+
+.. code-block:: python
+
+   > def apply_rtti_here():
+         ea = h()
+         res = make_rtti_from_reference(ea)
+         constructor = res['pf_constructor_c'].value
+         db.tag(ea, 'rtti.constructor', constructor)
+
+7. Now we have a function that when executed, will use the current address,
+   and apply our structure to that given address. One issue with this is
+   the need to type the function into IDAPython in order to execute it. In
+   order to work around this, we can use the :py:func:`ui.keyboard.map`
+   function to map it to a hotkey. We will use the 'Ctrl+P' hotkey.
+
+.. code-block:: python
+
+   > ui.keyboard.map('Ctrl-P', apply_rtti_here)
+   <capsule object "$valid$" at 0x7fe7812b51e0>
+
+7. At this point, we can simply navigate to a cross-reference pointing in
+   front of a label that we want to convert to a structure, and then hit
+   the 'Ctrl+P' hotkey to execute our function. This allows us to automate
+   some aspect of our reversing in order to annotate the database belonging
+   to the target. When we're done, we can simply use the :py:func:`ui.keyboard.unmap`
+   function to unmap our hotkey to restore IDA's original functionality.
+
+.. code-block:: python
+
+   > ui.keyboard.unmap('Ctrl-P')
+
+8. This plugin includes a number of ways to interact with IDA's user-interface.
+   Please review the help for the :py:mod:`ui` module for some of its other
+   capabilities.
+
 .. _tutorials_conclusion:
 
 ----------

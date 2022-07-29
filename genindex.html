@@ -665,9 +665,11 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="combinators.html#fapply">fapply() (built-in function)</a>
 </li>
-      <li><a href="combinators.html#fbox">fbox() (built-in function)</a>
+      <li><a href="combinators.html#fcar">fcar() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fcatch">fcatch() (built-in function)</a>
+</li>
+      <li><a href="combinators.html#fcdr">fcdr() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fcomplement">fcomplement() (built-in function)</a>
 </li>
@@ -675,9 +677,13 @@
 </li>
       <li><a href="combinators.html#fcondition">fcondition() (built-in function)</a>
 </li>
+      <li><a href="combinators.html#fconstant">fconstant() (built-in function)</a>
+</li>
       <li><a href="combinators.html#fcurry">fcurry() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fdefault">fdefault() (built-in function)</a>
+</li>
+      <li><a href="combinators.html#fdelitem">fdelitem() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fdiscard">fdiscard() (built-in function)</a>
 </li>
@@ -697,6 +703,8 @@
 </li>
       <li><a href="combinators.html#fhasitem">fhasitem() (built-in function)</a>
 </li>
+      <li><a href="combinators.html#fidentity">fidentity() (built-in function)</a>
+</li>
       <li><a href="modules/structure.html#structure.structure_t.field">field() (structure.structure_t method)</a>
 </li>
       <li><a href="combinators.html#finstance">finstance() (built-in function)</a>
@@ -709,15 +717,15 @@
 </li>
       <li><a href="modules/enumeration.html#enumeration.flags">flags() (in module enumeration)</a>, <a href="modules/enumeration.html#enumeration.flags">[1]</a>
 </li>
-      <li><a href="combinators.html#fmap">fmap() (built-in function)</a>
-</li>
-      <li><a href="combinators.html#fmemo">fmemo() (built-in function)</a>
+      <li><a href="combinators.html#flazy">flazy() (built-in function)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="combinators.html#fpartial">fpartial() (built-in function)</a>
+      <li><a href="combinators.html#fmap">fmap() (built-in function)</a>
 </li>
-      <li><a href="combinators.html#fpassthru">fpassthru() (built-in function)</a>
+      <li><a href="combinators.html#fpack">fpack() (built-in function)</a>
+</li>
+      <li><a href="combinators.html#fpartial">fpartial() (built-in function)</a>
 </li>
       <li><a href="modules/structure.html#structure.fragment">fragment() (in module structure)</a>, <a href="modules/structure.html#structure.fragment">[1]</a>, <a href="modules/structure.html#structure.fragment">[2]</a>
 </li>
@@ -747,13 +755,15 @@
 </li>
       <li><a href="modules/function.html#function.frame.regs.size">frame.regs.size() (in module function)</a>, <a href="modules/function.html#function.frame.regs.size">[1]</a>
 </li>
-      <li><a href="combinators.html#freversed">freversed() (built-in function)</a>
+      <li><a href="combinators.html#freverse">freverse() (built-in function)</a>
 </li>
       <li><a href="combinators.html#frpartial">frpartial() (built-in function)</a>
 </li>
-      <li><a href="modules/structure.html#structure.member_t.fullname">fullname (structure.member_t attribute)</a>
+      <li><a href="combinators.html#fsetattr">fsetattr() (built-in function)</a>
 </li>
-      <li><a href="combinators.html#funbox">funbox() (built-in function)</a>
+      <li><a href="combinators.html#fsetitem">fsetitem() (built-in function)</a>
+</li>
+      <li><a href="modules/structure.html#structure.member_t.fullname">fullname (structure.member_t attribute)</a>
 </li>
       <li><a href="modules/function.html#module-function">function (module)</a>
 </li>
@@ -764,6 +774,8 @@
       <li><a href="modules/database.html#database.functions.list">functions.list() (in module database)</a>, <a href="modules/database.html#database.functions.list">[1]</a>
 </li>
       <li><a href="modules/database.html#database.functions.search">functions.search() (in module database)</a>, <a href="modules/database.html#database.functions.search">[1]</a>
+</li>
+      <li><a href="combinators.html#funpack">funpack() (built-in function)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -925,6 +937,8 @@
 </li>
       <li><a href="modules/structure.html#structure.is_union">is_union() (in module structure)</a>, <a href="modules/structure.html#structure.is_union">[1]</a>
 </li>
+      <li><a href="combinators.html#islice">islice() (built-in function)</a>, <a href="combinators.html#islice">[1]</a>
+</li>
       <li><a href="combinators.html#itake">itake() (built-in function)</a>
 </li>
       <li><a href="modules/enumeration.html#enumeration.iterate">iterate() (in module enumeration)</a>
@@ -969,6 +983,8 @@
 </li>
       <li><a href="modules/structure.html#structure.member_t.left">left (structure.member_t attribute)</a>
 </li>
+      <li><a href="combinators.html#lfilter">lfilter() (built-in function)</a>
+</li>
       <li><a href="modules/enumeration.html#enumeration.list">list() (in module enumeration)</a>, <a href="modules/enumeration.html#enumeration.list">[1]</a>
 
       <ul>
@@ -985,11 +1001,17 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="combinators.html#liter">liter() (built-in function)</a>
 </li>
+      <li><a href="combinators.html#lmap">lmap() (built-in function)</a>
+</li>
       <li><a href="modules/segment.html#segment.load">load() (in module segment)</a>
 </li>
       <li><a href="modules/custom-tags.html#tags.locationToAddress">locationToAddress() (in module tags)</a>
 </li>
+      <li><a href="combinators.html#lslice">lslice() (built-in function)</a>, <a href="combinators.html#lslice">[1]</a>
+</li>
       <li><a href="modules/custom-tags.html#tags.lvarNameQ">lvarNameQ() (in module tags)</a>
+</li>
+      <li><a href="combinators.html#lzip">lzip() (built-in function)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -2071,7 +2093,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
+        &#169; Copyright 2010-2022, Ali Rizvi-Santiago.
       Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>
