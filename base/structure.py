@@ -86,9 +86,10 @@ def __iterate__():
 
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
-def iterate(string):
+def iterate(string, *suffix):
     '''Iterate through all of the structures in the database with a glob that matches `string`.'''
-    return iterate(like=string)
+    res = string if isinstance(string, tuple) else (string,)
+    return iterate(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def iterate(**type):
@@ -101,9 +102,10 @@ def iterate(**type):
 
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
-def list(string):
+def list(string, *suffix):
     '''List any structures that match the glob in `string`.'''
-    return list(like=string)
+    res = string if isinstance(string, tuple) else (string,)
+    return list(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
@@ -190,18 +192,20 @@ def new(string, *suffix, **offset):
     return __instance__(id, **offset)
 
 @utils.multicase(string=six.string_types)
-def search(string):
+def search(string, *suffix):
     '''Search through all the structure names matching the glob `string`.'''
-    return by(like=string)
+    res = string if isinstance(string, tuple) else (string,)
+    return by(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
 def search(**type):
     '''Search through all of the structures and return the first result matching the keyword specified by `type`.'''
     return by(**type)
 
 @utils.string.decorate_arguments('name')
-def by_name(name, **options):
+def by_name(name, *suffix, **options):
     '''Return a structure by its name.'''
-    res = utils.string.to(name)
+    string = name if isinstance(name, tuple) else (name,)
+    res = utils.string.to(interface.tuplename(*(string + suffix)))
 
     # try and find the structure id according to its name
     id = idaapi.get_struc_id(res)
@@ -862,9 +866,10 @@ def has(id):
     return True if interface.node.is_identifier(id) and idaapi.get_struc(id) else False
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
-def has(name):
+def has(name, *suffix):
     '''Return if a structure with the specified `name` exists within the database.'''
-    res = utils.string.to(name)
+    string = name if isinstance(name, tuple) else (name,)
+    res = utils.string.to(interface.tuplename(*(string + suffix)))
     return has(idaapi.get_struc_id(res))
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def has(structure):
@@ -873,9 +878,9 @@ def has(structure):
 
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
-def by(name, **options):
+def by(name, *suffix, **options):
     '''Return the structure with the given `name`.'''
-    return by_name(name, **options)
+    return by_name(name, *suffix, **options)
 @utils.multicase(id=six.integer_types)
 def by(id, **options):
     '''Return the structure with the specified `id` or index.'''
@@ -1155,9 +1160,9 @@ def remove(structure):
     return True
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
-def remove(name):
+def remove(name, *suffix):
     '''Remove the structure with the specified `name`.'''
-    res = by_name(name)
+    res = by_name(name, *suffix)
     return remove(res)
 @utils.multicase(id=six.integer_types)
 def remove(id):
