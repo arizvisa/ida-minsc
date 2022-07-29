@@ -1586,6 +1586,7 @@ class block(object):
         '''Return the top address of the basic block identified by `bounds`.'''
         left, _ = cls(bounds)
         return left
+    address = addr = utils.alias(top, 'block')
 
     @utils.multicase()
     @classmethod
