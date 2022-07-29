@@ -5549,6 +5549,46 @@ class types(object):
         '''Return the number of types that are available in the specified type `library`.'''
         return idaapi.get_ordinal_qty(library)
 
+    @utils.multicase(string=six.string_types)
+    @classmethod
+    def declare(cls, string, **flags):
+        '''Parse the given `string` into an ``idaapi.tinfo_t`` using the current type library and return it.'''
+        til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
+        return cls.parse(string, til, **flags)
+    @utils.multicase(string=six.string_types, library=idaapi.til_t)
+    @classmethod
+    def declare(cls, string, library, **flags):
+        """Parse the given `string` into an ``idaapi.tinfo_t`` using the specified type `library` and return it.
+
+        If the integer `flags` is provided, then use the specified flags (``idaapi.PT_*``) when parsing the `string`.
+        """
+        ti, flag = idaapi.tinfo_t(), flags.get('flags', idaapi.PT_SIL | idaapi.PT_TYP)
+
+        # Firstly we need to ';'-terminate the type the user provided in order
+        # for IDA's parser to understand it.
+        terminated = string if string.endswith(';') else "{:s};".format(string)
+
+        # Ask IDA to parse this into a tinfo_t for us. We default to the silent flag
+        # so that we're responsible for handling it if there's a parsing error of
+        # some sort. If it succeeds, then we can return our typeinfo otherwise we'll
+        # return None to avoid returning a completely invalid type.
+        if idaapi.__version__ < 6.9:
+            ok, name = idaapi.parse_decl2(library, terminated, None, ti, flag), None
+        elif idaapi.__version__ < 7.0:
+            ok, name = idaapi.parse_decl2(library, terminated, ti, flag), None
+        else:
+            name = idaapi.parse_decl(ti, library, terminated, flag)
+            ok = name is not None
+
+        # If we couldn't parse the type we were given, then simply bail.
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}{:s}) : Unable to parse the provided string into a valid type.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(flags)) if flags else ''))
+
+        # If we were given the idaapi.PT_VAR flag, then we return the parsed name too.
+        logging.info(u"{:s}.declare({!r}, {:s}{:s}) : Successfully parsed the given string into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', " ({:s})".format(name) if name else ''))
+        return (name, ti) if flag & idaapi.PT_VAR else ti
+    parse = decl = utils.alias(declare, 'types')
+
 ## information about a given address
 size = utils.alias(type.size, 'type')
 is_code = utils.alias(type.is_code, 'type')
