@@ -1683,20 +1683,22 @@ class members_t(object):
     @utils.multicase()
     def remove(self, offset):
         '''Remove the member at `offset` from the structure.'''
-        owner, items = self.owner, [mptr for mptr in self.__members_at__(offset - self.baseoffset)]
+        cls, owner, items = self.__class__, self.owner, [mptr for mptr in self.__members_at__(offset - self.baseoffset)] if offset >= self.baseoffset else []
 
         # If there are no items at the requested offset, then we bail.
         if not items:
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find a member at the specified offset ({:#x}) of the structure ({:s}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, offset, self.owner.bounds))
 
         # If more than one item was found, then we also need to bail.
-        if len(items) > 1:
+        elif len(items) > 1:
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.remove({:+#x}) : Refusing to remove more than {:d} member{:s} ({:d}) at offset {:#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, 1, '' if len(items) == 1 else 's', len(items), offset))
 
         # Now we know exactly what we can remove.
-        mptr = items[0]
-        result, = self.remove(self.baseoffset + mptr.soff, mptr.eoff - mptr.soff)
+        mptr, = items
+        results = self.remove(self.baseoffset + mptr.soff, mptr.eoff - mptr.soff)
+        if not results:
+            raise E.DisassemblerError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to remove the member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, self.baseoffset + mptr.soff))
+        result, = results
         return result
     @utils.multicase()
     def remove(self, offset, size):
@@ -1712,18 +1714,31 @@ class members_t(object):
         if is_union(sptr):
             raise E.InvalidParameterError(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Refusing to remove members from the specified union by the specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, offset))
 
-        # First we'll need to figure out the index of the member that
-        # we will start removing things at. This way we can start
-        # collecting the members that'll be removed.
-        index = idaapi.get_prev_member_idx(sptr, soffset) + 1
-        if sptr.memqty < index:
-            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to find the member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, offset))
+        # We need to calculate range that we're actually going to be removing, so
+        # that we can clamp it to the boundaries of the structure. If the range
+        # doesn't overlap, then we simply abort here with a warning.
+        (left, right), (sleft, sright) = sorted([soffset, soffset + size]), (0, idaapi.get_struc_size(sptr))
+        if not all([left <= sright - 1, right - 1  >= sleft]):
+            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : The specified range ({:#x}..{:#x}) is outside the range of the structure ({:#x}..{:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, *map(functools.partial(operator.add, self.baseoffset), [left, right - 1, sleft, sright - 1])))
+            return []
+
+        # Now that we know the range overlaps, we just need to clamp our values
+        # to the overlapping part and recalculate the size.
+        else:
+            soffset, ssize = max(left, sleft), min(right, sright) - max(left, sleft)
+
+        # First we'll need to figure out the index of the member that we will
+        # start removing things at so we can collect the members to remove.
+        previndex, nextindex = idaapi.get_prev_member_idx(sptr, soffset), idaapi.get_next_member_idx(sptr, soffset)
+        index = previndex if nextindex < 0 else nextindex - 1
+        if not (0 <= index < sptr.memqty):
+            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to determine the index of the member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, soffset + self.baseoffset))
             return []
 
         # Next we need to collect each member that will be removed so
         # that we can return them back to the caller after removal.
         items = []
-        while index < sptr.memqty and sptr.members[index].soff < soffset + size:
+        while index < sptr.memqty and sptr.members[index].soff < soffset + ssize:
             mptr = sptr.members[index]
             items.append(mptr)
             index += 1
@@ -1745,14 +1760,14 @@ class members_t(object):
                 tid = idaapi.BADADDR
 
             # now we can dissolve it, and than append things to our results.
-            type = interface.typemap.dissolve(mptr.flag, tid, msize, offset=moffset)
-            result.append((mptr.id, name, type, moffset, msize))
+            type, location = interface.typemap.dissolve(mptr.flag, tid, msize, offset=moffset), interface.location_t(moffset, msize)
+            result.append((mptr.id, name, type, location))
 
         # Figure out whether we're just going to remove one element, or
         # multiple elements so that we can call the correct api and figure
         # out how to compare the number of successfully removed members.
         if len(items) > 1:
-            count = idaapi.del_struc_members(sptr, soffset, soffset + size)
+            count = idaapi.del_struc_members(sptr, soffset, soffset + ssize)
         elif len(items):
             count = 1 if idaapi.del_struc_member(sptr, soffset) else 0
         else:
@@ -1762,18 +1777,21 @@ class members_t(object):
         # the user know that it didn't happen.
         if result and not count:
             start, stop = result[0], result[-1]
-            logging.fatal(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove the requested elements ({:+#x}<>{:+#x}) from the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, start[3], stop[3] + stop[4]))
+            bounds = interface.bounds_t(start[3].bounds.left, stop[3].bounds.right)
+            logging.fatal(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove the requested elements ({:s}) from the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, bounds))
             return []
 
         # If our count matches what was expected, then we're good and can
         # just return our results to the user.
         if len(result) == count:
-            return [(name, type, moffset) for _, name, type, moffset, msize in result]
+            items = [(name, type, location) for _, name, type, location in result]
+            return items[::-1] if size < 0 else items
 
         # Otherwise, we only removed some of the elements and we need to
         # figure out what happened so we can let the user know.
-        removed, expected = {id for id in []}, {id : (name, type, moffset) for id, name, type, moffset, msize in result}
-        for id, name, _, moffset, msize in result:
+        removed, expected = {id for id in []}, {id : (name, type, location) for id, name, type, location in result}
+        for id, name, _, location in result:
+            moffset, _ = location
             if idaapi.get_member(sptr, moffset - self.baseoffset):
                 logging.debug(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove member {:s} at offset {:+#x} with the specified id ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, name, moffset, id))
                 continue
@@ -1782,8 +1800,10 @@ class members_t(object):
         # We have the list of identities that were removed. So let's proceed
         # with our warnings and return whatever we successfully removed.
         start, stop = result[0], result[-1]
-        logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove {:d} members out of an expected {:d} members within the specified range ({:+#x}<>{:+#x}) of the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, len(expected) - len(removed), len(expected), start[3], stop[3] + stop[4]))
-        return [(name, type, moffset) for id, name, type, moffset, _ in result if id in removed]
+        bounds = interface.bounds_t(start[3].bounds.left, stop[3].bounds.right)
+        logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove {:d} members out of an expected {:d} members within the specified range ({:s}) of the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, len(expected) - len(removed), len(expected), bounds))
+        items = [(name, type, location) for id, name, type, location in result if id in removed]
+        return items[::-1] if size < 0 else items
 
     ### Properties
     @property
