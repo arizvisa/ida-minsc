@@ -1377,6 +1377,16 @@ class range(object):
         return cls.start(area), cls.end(area)
 
     @classmethod
+    def pack(cls, start, stop):
+        '''Pack the address at `start` up to `stop` (exclusive) into a `range_t`.'''
+        res = idaapi.range_t()
+        if idaapi.__version__ < 7.0:
+            res.startEA, res.endEA = start, stop
+        else:
+            res.start_ea, res.end_ea = start, stop
+        return res
+
+    @classmethod
     def bounds(cls, area):
         '''Return the boundaries of the specified `area` as a ``bounds_t``.'''
         left, right = cls.unpack(area)
