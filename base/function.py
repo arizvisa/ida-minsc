@@ -976,19 +976,19 @@ class blocks(object):
     @utils.multicase(bounds=tuple)
     def __new__(cls, bounds, **external):
         '''Return each basic block contained within the specified `bounds`.'''
-        left, right = bounds
+        (left, _), (_, right) = map(interface.range.unpack, map(cls.at, bounds))
         return cls(left, right, **external)
     @utils.multicase()
     def __new__(cls, left, right, **external):
-        """Returns each basic block contained within the addresses `left` and `right`.
+        """Returns each basic block contained between the addresses `left` and `right`.
 
         If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
         If `split` is false, then do not allow a call instruction to split a block.
         """
         fn = by_address(left)
-        (left, _), (_, right) = block(left), block(database.address.prev(right))
+        (left, _), (_, right) = map(interface.range.unpack, map(cls.at, [left, right]))
         for bb in cls.iterate(fn, **external):
-            if (interface.range.start(bb) >= left and interface.range.end(bb) <= right):
+            if interface.range.start(bb) >= left and interface.range.end(bb) < right:
                 yield interface.range.bounds(bb)
             continue
         return
@@ -1022,6 +1022,7 @@ class blocks(object):
         # each of them back to the caller. we need to ensure that the bounds
         # are actually contained by the function, so we collect this too.
         for bb in cls.flowchart(fn, flags):
+            left, right = interface.range.unpack(bb)
             bounds = interface.range.bounds(bb)
             ea, _ = bounds
 
@@ -1048,7 +1049,7 @@ class blocks(object):
 
             # unpack the boundaries of the basic block to verify it's in one
             # of them, so that way we can yield it to the user if so.
-            elif any(left <= ea < right for left, right in boundaries):
+            elif any(start <= ea <= stop for start, stop in boundaries) and left != right:
                 yield bb
 
             # otherwise warn the user about it just in case they're processing
