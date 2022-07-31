@@ -1733,32 +1733,28 @@ def op_string(ea, opnum, strtype):
     res = opinfo(ea, opnum, info, flags=F)
     return True if res.strtype == strtype else False
 
-## flags
+# XXX: these functions are pretty much deprecated in favor of interface.address.refinfo.
 @utils.multicase()
 def ops_refinfo():
     '''Returns the ``idaapi.refinfo_t`` for the instruction at the current address.'''
-    OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
-    return op_refinfo(ui.current.address(), OPND_ALL)
+    return interface.address.refinfo(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_refinfo(ea):
     '''Returns the ``idaapi.refinfo_t`` for the instruction at the address `ea`.'''
-    OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
-    return op_refinfo(ea, OPND_ALL)
+    return interface.address.refinfo(ea)
 @utils.multicase(opnum=six.integer_types)
 def op_refinfo(opnum):
     '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
-    return op_refinfo(ui.current.address(), opnum)
+    return interface.address.refinfo(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
 def op_refinfo(reference):
     '''Return the ``idaapi.refinfo_t`` for the operand pointed to by `reference`.'''
     address, opnum, _ = reference
-    return op_refinfo(address, opnum)
+    return interface.address.refinfo(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_refinfo(ea, opnum):
     '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
-    ri = idaapi.refinfo_t()
-    ok = idaapi.get_refinfo(ea, opnum, ri) if idaapi.__version__ < 7.0 else idaapi.get_refinfo(ri, ea, opnum)
-    return ri if ok else None
+    return interface.address.refinfo(ea, opnum)
 
 @utils.multicase(opnum=six.integer_types)
 def op_reference(opnum):
