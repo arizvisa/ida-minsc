@@ -3715,11 +3715,44 @@ class type(object):
         @utils.multicase()
         def __new__(cls):
             '''Return the type information for each of the parameters belonging to the current function.'''
-            return cls.types(ui.current.address())
+            return cls(ui.current.address())
         @utils.multicase()
         def __new__(cls, func):
             '''Return the type information for each of the parameters belonging to the function `func`.'''
-            return cls.types(func)
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            ti = type(ea)
+
+            # Use the address and type to snag the details requested by the
+            # caller, iterate through it, and then return each type as a list.
+            _, ftd = interface.tinfo.function_details(ea, ti)
+            iterable = (ftd[index] for index in builtins.range(ftd.size()))
+            return [item.type for item in iterable]
+        @utils.multicase(types=(builtins.list, builtins.tuple))
+        def __new__(cls, func, types):
+            '''Overwrite the type information for the parameters belonging to the function `func` with the provided list of `types`.'''
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            updater = interface.tinfo.update_function_details(ea, type(ea))
+
+            # Grab the type and parameters so we can capture all of the ones that will be replaced.
+            ti, ftd = builtins.next(updater)
+
+            # Iterate through all of the parameters capturing all of the state that we'll return.
+            results = []
+            for idx in builtins.range(ftd.size()):
+                farg = ftd[idx]
+                aname, atype, aloc, acmt = farg.name, farg.type, farg.argloc, farg.cmt
+                results.append((aname, atype, aloc, acmt))
+
+            # Now we should able to resize our details, and then update them with our input.
+            ftd.resize(len(types))
+            for index, item in enumerate(types):
+                aname, ainfo = item if isinstance(item, builtins.tuple) else ('', item)
+                ftd[index].name, ftd[index].type = utils.string.to(aname), internal.declaration.parse(ainfo) if isinstance(ainfo, six.string_types) else ainfo
+            updater.send(ftd), updater.close()
+
+            # The very last thing we need to do is to return our results. Even though we collected
+            # all their information for safety, we return just the types for simplicity.
+            return [item for _, item, _, _ in results]
 
         @utils.multicase()
         @classmethod
@@ -3737,19 +3770,17 @@ class type(object):
         @classmethod
         def types(cls):
             '''Return the type information for each of the parameters belonging to the current function.'''
-            return cls.types(ui.current.address())
+            return cls(ui.current.address())
         @utils.multicase()
         @classmethod
         def types(cls, func):
             '''Return the type information for each of the parameters belonging to the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
-
-            # Use the address and type to snag the details requested by the
-            # caller, iterate through it, and then return each type as a list.
-            _, ftd = interface.tinfo.function_details(ea, ti)
-            iterable = (ftd[index] for index in builtins.range(ftd.size()))
-            return [item.type for item in iterable]
+            return cls(func)
+        @utils.multicase(types=(builtins.list, builtins.tuple))
+        @classmethod
+        def types(cls, func, types):
+            '''Overwrite the type information for the parameters belonging to the function `func` with the provided list of `types`.'''
+            return cls(func, types)
         type = utils.alias(types, 'type.arguments')
 
         @utils.multicase()
