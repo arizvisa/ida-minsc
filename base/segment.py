@@ -220,7 +220,7 @@ def iterate(segment):
 def iterate(segment):
     '''Iterate through all of the addresses within the ``idaapi.segment_t`` represented by `segment`.'''
     left, right = interface.range.unpack(segment)
-    for ea in database.address.iterate(left, database.address.prev(right)):
+    for ea in database.address.iterate(left, right):
         yield ea
     return
 
