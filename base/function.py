@@ -3813,6 +3813,38 @@ class type(object):
                 continue
             return result
 
+        @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
+        @classmethod
+        def add(cls, info):
+            '''Add the provided type information in `info` as another parameter to the current function.'''
+            return cls.add(ui.current.address(), info, '')
+        @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
+        @classmethod
+        def add(cls, func, info):
+            '''Add the provided type information in `info` as another parameter to the function `func`.'''
+            return cls.add(func, info, '')
+        @utils.multicase(info=(six.string_types, idaapi.tinfo_t), name=six.string_types)
+        @classmethod
+        @utils.string.decorate_arguments('name', 'suffix')
+        def add(cls, func, info, name, *suffix):
+            '''Add the provided type information in `info` with the given `name` as another parameter to the function `func`.'''
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            updater = interface.tinfo.update_function_details(ea, type(ea))
+
+            # Grab the type and the details, and then resize it to add space for another parameter.
+            ti, ftd = builtins.next(updater)
+            index, _ = ftd.size(), ftd.resize(ti.get_nargs() + 1)
+
+            # Convert all our parameters and update the index we allocated space for.
+            res = name if isinstance(name, tuple) else (name,)
+            aname, ainfo = interface.tuplename(*(res + suffix)), internal.declaration.parse(info) if isinstance(info, six.string_types) else info
+            ftd[index].name, ftd[index].type = utils.string.to(aname), ainfo
+
+            # We should be good to go and we just need to return the index.
+            updater.send(ftd), updater.close()
+            return index
+        append = utils.alias(add, 'type.arguments')
+
     args = parameters = arguments
 
 t = type # XXX: ns alias
