@@ -958,7 +958,7 @@ class blocks(object):
 
     Some examples of this namespace's usage::
 
-        > for bb in function.blocks(split=True): ...
+        > for bb in function.blocks(calls=False): ...
         > chart = function.blocks.flowchart(ea)
         > G = function.blocks.graph()
 
@@ -983,7 +983,7 @@ class blocks(object):
         """Returns each basic block contained within the addresses `left` and `right`.
 
         If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
-        If `split` is true, then divide blocks by all branches including call instructions.
+        If `split` is false, then do not allow a call instruction to split a block.
         """
         fn = by_address(left)
         (left, _), (_, right) = block(left), block(database.address.prev(right))
@@ -1004,18 +1004,18 @@ class blocks(object):
         """Returns each ``idaapi.BasicBlock`` for the function `func`.
 
         If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
-        If `split` is true, then divide blocks by all branches including call instructions.
+        If `split` is false, then do not allow a call instruction to split a block.
         """
         FC_NOEXT, FC_CALL_ENDS = getattr(idaapi, 'FC_NOEXT', 2), getattr(idaapi, 'FC_CALL_ENDS', 0x20)
         fc_flags = external.pop('flags', idaapi.FC_PREDS)
         fc_flags |= (0 if external.get('external', False) else FC_NOEXT)
-        fc_flags |= (FC_CALL_ENDS if any(external.get(item, False) for item in ['call', 'calls', 'split']) else 0)
+        fc_flags |= 0 if any(not external[item] for item in ['call', 'calls', 'split'] if item in external) else FC_CALL_ENDS
         return cls.iterate(func, fc_flags, **external)
     @utils.multicase(flags=six.integer_types)
     @classmethod
     def iterate(cls, func, flags, **silent):
         '''Returns each ``idaapi.BasicBlock`` from the flowchart built with the specified `flags` (``idaapi.FC_*``) for the function `func`.'''
-        fn = by(func)
+        fn, FC_CALL_ENDS, has_calls = by(func), getattr(idaapi, 'FC_CALL_ENDS', 0x20), hasattr(idaapi, 'FC_CALL_ENDS')
         boundaries = [bounds for bounds in chunks(fn)]
 
         # iterate through all the basic-blocks in the flow chart and yield
@@ -1025,9 +1025,25 @@ class blocks(object):
             bounds = interface.range.bounds(bb)
             ea, _ = bounds
 
+            # if we're unable to split up calls, then we need to traverse this
+            # block so that we can figure out where we need to split.
+            if not has_calls and flags & FC_CALL_ENDS:
+                start, stop, locations = left, right, [ea for ea in block.iterate(bb) if instruction.type.is_call(ea)]
+                for item in locations:
+                    left, right = start, database.address.next(item)
+                    yield idaapi.BasicBlock(bb.id, interface.range.pack(left, right), bb._fc)
+                    start = right
+
+                # if the addresses are diffrent, then we have one more block to yield.
+                if start < stop:
+                    yield idaapi.BasicBlock(bb.id, interface.range.pack(start, stop), bb._fc)
+
+                # if they're the same and we didn't have to chop it up, then this is external.
+                elif start == stop and not locations:
+                    yield idaapi.BasicBlock(bb.id, interface.range.pack(start, stop), bb._fc)
+
             # if we've been asked to be silent, then just yield what we got.
-            ea = ui.navigation.set(ea)
-            if silent.get('silent', False):
+            elif silent.get('silent', False):
                 yield bb
 
             # unpack the boundaries of the basic block to verify it's in one
@@ -1177,7 +1193,8 @@ class blocks(object):
     def at(cls, func, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` in function `func` at address `ea`.'''
         FC_NOEXT, FC_CALL_ENDS = getattr(idaapi, 'FC_NOEXT', 2), getattr(idaapi, 'FC_CALL_ENDS', 0x20)
-        fc_flags = flags.get('flags', idaapi.FC_PREDS | FC_NOEXT) | (FC_CALL_ENDS if any(flags.get(item, False) for item in ['call', 'calls', 'split']) else 0)
+        fc_flags = flags.get('flags', idaapi.FC_PREDS | FC_NOEXT)
+        fc_flags |= 0 if any(not flags[item] for item in ['call', 'calls', 'split'] if item in flags) else FC_CALL_ENDS
         return cls.at(func, ea, fc_flags)
     @utils.multicase(ea=six.integer_types, flags=six.integer_types)
     @classmethod
@@ -1241,7 +1258,7 @@ class blocks(object):
 
         Requires the ``networkx`` module in order to build the graph.
         """
-        fn, fcflags = by(func), flags.get('flags', idaapi.FC_PREDS | idaapi.FC_NOEXT | getattr(idaapi, 'FC_CALL_ENDS', 0))
+        fn, fcflags = by(func), flags.get('flags', idaapi.FC_PREDS | idaapi.FC_NOEXT | getattr(idaapi, 'FC_CALL_ENDS', 0x20))
         ea = interface.range.start(fn)
 
         # assign some default values and create some tools to use when creating the graph
