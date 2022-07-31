@@ -1921,8 +1921,8 @@ class block(object):
     @classmethod
     def read(cls, ea):
         '''Return all the bytes contained in the basic block at address `ea`.'''
-        l, r = cls(ea)
-        return database.read(l, r - l)
+        bb = cls.at(ea)
+        return cls.read(bb)
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def read(cls, bounds):
@@ -1933,8 +1933,8 @@ class block(object):
     @classmethod
     def read(cls, bb):
         '''Return all the bytes contained in the basic block `bb`.'''
-        l, r = cls(bb)
-        return database.read(l, r - l)
+        bounds = interface.range.bounds(bb)
+        return database.read(bounds)
 
     @utils.multicase()
     @classmethod
