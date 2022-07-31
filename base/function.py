@@ -2604,7 +2604,7 @@ def tag(func):
     if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
         realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP))
     else:
-        realname = fname
+        realname = fname or ''
 
     # Add any of the implicit tags for the given function into our results.
     fname = fname
