@@ -909,8 +909,8 @@ def read(ea, size):
 def read(bounds):
     '''Return the bytes within the specified `bounds`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
-    start, end = bounds
-    return get_bytes(start, end - start) or b''
+    bounds = ea, _ = interface.bounds_t(*bounds)
+    return get_bytes(ea, bounds.size) or b''
 
 @utils.multicase(data=bytes)
 def write(data, **persist):
