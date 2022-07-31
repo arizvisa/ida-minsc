@@ -980,7 +980,7 @@ def op_structure(reference):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
-    F, insn, op = database.type.flags(ea), at(ea), operand(ea, opnum)
+    F, insn, op, ri = database.type.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
 
     # Start out by checking if the operand is a stack variable, because
     # we'll need to handle it differently if so.
@@ -1014,18 +1014,19 @@ def op_structure(ea, opnum):
         return tuple(results) if len(results) > 1 else results[0]
 
     # Otherwise, we check if our operand is not a structure offset, but pointing
-    # to memory by checking the operand type. If it is then we'll need to figure
-    # the field being referenced by calculating the offset into structure ourselves.
-    elif not idaapi.is_stroff(F, opnum) and op.type in {idaapi.o_mem}:
-        address = database.address.head(op.addr)
+    # to memory by having a reference. If it is then we'll need to figure the field
+    # being referenced by calculating the offset into structure ourselves.
+    elif not idaapi.is_stroff(F, opnum) and ri:
+        value = op_reference(ea, opnum)
+        address = database.address.head(value)
         t, count = database.type.array(address)
-        offset = op.addr - address
+        offset = value - address
 
         # Verify that the type as the given address is a structure
         if not isinstance(t, structure.structure_t):
             raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not pointing to a structure.".format(__name__, ea, opnum, opnum))
 
-        # FIXME: check if the operand contains any member references, because
+        # FIXME: check if the operand contains any member xrefs, because
         #        if it doesn't then we don't actually need a path.
 
         # Figure out the index and the real offset into the structure,
@@ -1046,8 +1047,9 @@ def op_structure(ea, opnum):
             return results + (delta,)
         return tuple(results) if len(results) > 1 else results[0]
 
+    # If it doesn't have a reference, then there's absolutely nothing we can do.
     elif not idaapi.is_stroff(F, opnum):
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Unable to identify the structure referenced by operand {:d} with flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
 
     # First we'll get the operand value and then collect all of the IDs in
     # our path along with the delta that was applied. This way we can calculate
@@ -1294,7 +1296,7 @@ def op_structurepath(reference):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structurepath(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
-    F, insn, op = database.type.flags(ea), at(ea), operand(ea, opnum)
+    F, insn, op, ri = database.type.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
 
     # If it's a stack variable, then this is also the wrong API and we should be
     # using the op_structure function. Log it and continue onto the right one.
@@ -1304,14 +1306,14 @@ def op_structurepath(ea, opnum):
 
     # If it's a memory address, then this is the wrong API and we should be using
     # the op_structure function. Log something, and then chain to the correct one.
-    elif not idaapi.is_stroff(F, opnum) and op.type in {idaapi.o_mem}:
-        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a memory address referenced.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
+    elif not idaapi.is_stroff(F, opnum) and ri:
+        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a reference.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
         return op_structure(ea, opnum)
 
     # If it wasn't a stack variable, then check that the operand is actually a
     # structure offset. If it isn't, then bail because we have no idea what to do.
     elif not idaapi.is_stroff(F, opnum):
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Unable to identify the structure referenced by operand {:d} with flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
 
     # Start out by collecting the operand value, the delta and the tids from the
     # chosen operand and grab its sptr so that we can figure out what path was applied.
