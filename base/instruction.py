@@ -1761,6 +1761,62 @@ def op_refinfo(ea, opnum):
     return ri if ok else None
 
 @utils.multicase(opnum=six.integer_types)
+def op_reference(opnum):
+    '''Return the address being referenced by the operand `opnum` belonging to the instruction at the current address.'''
+    return op_ref(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_reference(reference):
+    '''Return the address being referenced by the operand pointed to by `reference`.'''
+    address, opnum, _ = reference
+    return op_ref(address, opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_reference(ea, opnum):
+    '''Return the address being referenced by the operand `opnum` belonging to the instruction at the address `ea`.'''
+    insn, ops = at(ea), operands(ea)
+    if len(ops) < opnum:
+        raise E.InvalidTypeOrValueError(u"{:s}.op_ref({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+
+    # Grab the operand and its reference if it it actually has one. We'll use this
+    # to figure out exactly what address is being referenced by the operand.
+    op, ri = ops[opnum], interface.address.refinfo(ea, opnum)
+    if ri:
+        target, base, value = idaapi.ea_pointer(), idaapi.ea_pointer(), op.value if op.type in {idaapi.o_imm} else op.addr
+
+        # Try and calculate the reference for the operand value. If we couldn't, then we simply treat the value as-is.
+        if not idaapi.calc_reference_data(target.cast(), base.cast(), ea, ri, value):
+            logging.debug(u"{:s}.op_ref({:#x}, {:d}) : The disassembler could not calculate the target for the reference ({:d}) at address {:#x}.".format(__name__, ea, opnum, ri.flags & idaapi.REFINFO_TYPE, ea))
+            return value
+        return target.value()
+
+        # If we actually wanted to, we could use the reference information to figure
+        # out the actual offset to the data that is being referenced.
+        base, target = (item.value() for item in [base, target])
+        if base:
+            base, offset = base, target - base
+            return base + offset
+
+        # If we weren't given the base address, then we're supposed to figure it out ourselves.
+        seg = idaapi.getseg(ea)
+        if seg is None:
+            raise E.SegmentNotFoundError(u"{:s}.op_ref({:#x}, {:d}) : Unable to locate segment containing the specified instruction address ({:#x}).".format(__name__, ea, ea))
+
+        imagebase, segbase = idaapi.get_imagebase(), idaapi.get_segm_base(seg)
+        base, offset = imagebase, seg.start_ea - imagebase
+        return base + offset
+
+    # Otherwise, we need to use the default reference type. Unless the user changed
+    # the default reference type, this should always result in returning the immediate.
+    ri = idaapi.refinfo_t()
+    ri.set_type(idaapi.get_default_reftype(ea))
+    if op.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far}:
+        raise E.DisassemblerError(u"{:s}.op_ref({:#x}, {:d}) : Unable to get the reference information from the operand type ({:d}) at the specified operand ({:d}) belonging to the address {:#x}.".format(__name__, ea, opnum, op.type, opnum, ea))
+
+    # If the target base can't be calculated, then we need to use the imagebase.
+    res = idaapi.calc_target(ea, op.addr, ri)
+    return op.addr if res == idaapi.BADADDR else res
+op_ref = utils.alias(op_reference)
+
+@utils.multicase(opnum=six.integer_types)
 def op_refs(opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the current instruction.'''
     return op_refs(ui.current.address(), opnum)
@@ -2128,7 +2184,6 @@ def op_refs(ea, opnum):
             iterable = (item for item in [ref])
         res.extend(iterable)
     return res
-op_ref = utils.alias(op_refs)
 
 ## types of instructions
 class type(object):
