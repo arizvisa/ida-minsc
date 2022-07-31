@@ -1008,7 +1008,7 @@ class blocks(object):
         """
         FC_NOEXT, FC_CALL_ENDS = getattr(idaapi, 'FC_NOEXT', 2), getattr(idaapi, 'FC_CALL_ENDS', 0x20)
         fc_flags = external.pop('flags', idaapi.FC_PREDS)
-        fc_flags |= (0 if external.get('external', False) else FC_NOEXT)
+        fc_flags |= 0 if any(external.get(item, False) for item in ['external', 'externals']) else FC_NOEXT
         fc_flags |= 0 if any(not external[item] for item in ['call', 'calls', 'split'] if item in external) else FC_CALL_ENDS
         return cls.iterate(func, fc_flags, **external)
     @utils.multicase(flags=six.integer_types)
