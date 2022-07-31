@@ -85,7 +85,7 @@ def __iterate__():
     return
 
 @utils.multicase(string=six.string_types)
-@utils.string.decorate_arguments('string')
+@utils.string.decorate_arguments('string', 'suffix')
 def iterate(string, *suffix):
     '''Iterate through all of the structures in the database with a glob that matches `string`.'''
     res = string if isinstance(string, tuple) else (string,)
@@ -101,7 +101,7 @@ def iterate(**type):
     for item in listable: yield item
 
 @utils.multicase(string=six.string_types)
-@utils.string.decorate_arguments('string')
+@utils.string.decorate_arguments('string', 'suffix')
 def list(string, *suffix):
     '''List any structures that match the glob in `string`.'''
     res = string if isinstance(string, tuple) else (string,)
@@ -192,6 +192,7 @@ def new(string, *suffix, **offset):
     return __instance__(id, **offset)
 
 @utils.multicase(string=six.string_types)
+@utils.string.decorate_arguments('string', 'suffix')
 def search(string, *suffix):
     '''Search through all the structure names matching the glob `string`.'''
     res = string if isinstance(string, tuple) else (string,)
@@ -201,7 +202,7 @@ def search(**type):
     '''Search through all of the structures and return the first result matching the keyword specified by `type`.'''
     return by(**type)
 
-@utils.string.decorate_arguments('name')
+@utils.string.decorate_arguments('name', 'suffix')
 def by_name(name, *suffix, **options):
     '''Return a structure by its name.'''
     string = name if isinstance(name, tuple) else (name,)
@@ -865,7 +866,7 @@ def has(id):
     '''Return whether a structure with the specified `id` exists within the database.'''
     return True if interface.node.is_identifier(id) and idaapi.get_struc(id) else False
 @utils.multicase(name=six.string_types)
-@utils.string.decorate_arguments('name')
+@utils.string.decorate_arguments('name', 'suffix')
 def has(name, *suffix):
     '''Return if a structure with the specified `name` exists within the database.'''
     string = name if isinstance(name, tuple) else (name,)
@@ -877,7 +878,7 @@ def has(structure):
     return has(structure.id)
 
 @utils.multicase(name=six.string_types)
-@utils.string.decorate_arguments('name')
+@utils.string.decorate_arguments('name', 'suffix')
 def by(name, *suffix, **options):
     '''Return the structure with the given `name`.'''
     return by_name(name, *suffix, **options)
@@ -1159,7 +1160,7 @@ def remove(structure):
         raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to remove structure {:#x}.".format(__name__, structure, structure.id))
     return True
 @utils.multicase(name=six.string_types)
-@utils.string.decorate_arguments('name')
+@utils.string.decorate_arguments('name', 'suffix')
 def remove(name, *suffix):
     '''Remove the structure with the specified `name`.'''
     res = by_name(name, *suffix)
@@ -1225,14 +1226,14 @@ class members_t(object):
             listable = [item for item in self.__members_matcher.match(key, value, listable)]
         for item in listable: yield item
     @utils.multicase(string=six.string_types)
-    @utils.string.decorate_arguments('string')
+    @utils.string.decorate_arguments('string', 'suffix')
     def iterate(self, string, *suffix):
         '''Iterate through all of the members in the structure with a name that matches the glob in `string`.'''
         res = string if isinstance(string, tuple) else (string,)
         return self.iterate(like=interface.tuplename(*(res + suffix)))
 
     @utils.multicase(string=six.string_types)
-    @utils.string.decorate_arguments('string')
+    @utils.string.decorate_arguments('string', 'suffix')
     def list(self, string, *suffix):
         '''List any members that match the glob in `string`.'''
         res = string if isinstance(string, tuple) else (string,)
@@ -1275,7 +1276,7 @@ class members_t(object):
             raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, searchstring))
         return res
     @utils.multicase(name=six.string_types)
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'suffix')
     def by(self, name, *suffix):
         '''Return the member with the specified `name`.'''
         return self.by_name(name, *suffix)
@@ -1296,7 +1297,7 @@ class members_t(object):
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.by({!s}) : The member ({:s}) at the given location ({:#x}<->{:#x}) {:s}.".format('.'.join([__name__, cls.__name__]), self.owner.ptr.id, location, member.name, member.left, member.right, message))
         return member
 
-    @utils.string.decorate_arguments('name')
+    @utils.string.decorate_arguments('name', 'suffix')
     def by_name(self, name, *suffix):
         '''Return the member with the specified `name`.'''
         string = name if isinstance(name, tuple) else (name,)
@@ -1314,7 +1315,7 @@ class members_t(object):
         return self[index]
     byname = utils.alias(by_name, 'members_t')
 
-    @utils.string.decorate_arguments('fullname')
+    @utils.string.decorate_arguments('fullname', 'suffix')
     def by_fullname(self, fullname, *suffix):
         '''Return the member with the specified `fullname`.'''
         string = fullname if isinstance(fullname, tuple) else (fullname,)
