@@ -3517,6 +3517,8 @@ class type(object):
             > print( function.argument.name(1) )
             > oldtype = function.argument(0, 'void*')
             > oldname = function.argument.name(1)
+            > location = function.argument.location(2)
+            > index = function.argument.remove(3)
 
         """
 
@@ -3663,6 +3665,41 @@ class type(object):
                     return reg
                 return location
             return location
+
+        @utils.multicase(index=six.integer_types)
+        @classmethod
+        def remove(cls, index):
+            '''Remove the parameter at the specified `index` from the current function.'''
+            return cls.remove(ui.current.address(), index)
+        @utils.multicase(index=six.integer_types)
+        @classmethod
+        def remove(cls, func, index):
+            '''Remove the parameter at the specified `index` from the function `func`.'''
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            updater = interface.tinfo.update_function_details(ea, type(ea))
+
+            # Grab the type and the details and verify the index is valid before
+            # collecting into a list that we'll use for modifying things.
+            ti, ftd = builtins.next(updater)
+            if not (0 <= index < ftd.size()):
+                raise E.InvalidTypeOrValueError(u"{:s}.remove({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
+            items = [ftd[idx] for idx in builtins.range(ftd.size())]
+
+            # Now we can safely modify out list, and pop out the funcarg_t from it.
+            farg = items.pop(index)
+            name, result, location, comment = utils.string.of(farg.name), farg.type, farg.argloc, farg.cmt
+
+            # Instead of recreating the func_type_data_t, we'll reassign the
+            # references back in, and then resize it afterwards.
+            for idx, item in enumerate(items):
+                ftd[idx] = item
+            ftd.resize(len(items))
+
+            # At this point we shouldn't have any references to anything that we
+            # modified, and can send it back to update the prototype correctly.
+            updater.send(ftd), updater.close()
+            return result
+        pop = utils.alias(remove, 'type.argument')
 
     arg = parameter = argument  # XXX: ns alias
 
