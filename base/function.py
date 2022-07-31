@@ -428,11 +428,12 @@ class chunks(object):
         if not fci.main():
             raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `idaapi.func_tail_iterator_t`.".format(__name__, interface.range.start(fn)))
 
+        results = []
         while True:
             ch = fci.chunk()
-            yield interface.range.bounds(ch)
+            results.append(interface.range.bounds(ch))
             if not fci.next(): break
-        return
+        return results
 
     @utils.multicase()
     @classmethod
