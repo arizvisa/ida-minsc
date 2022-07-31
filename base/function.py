@@ -970,14 +970,13 @@ class blocks(object):
     @utils.multicase()
     def __new__(cls, func, **external):
         '''Returns the bounds of each basic block for the function `func`.'''
-        for bb in cls.iterate(func, **external):
-            yield interface.range.bounds(bb)
-        return
+        iterable = cls.iterate(func, **external)
+        return [ interface.range.bounds(bb) for bb in iterable ]
     @utils.multicase(bounds=tuple)
     def __new__(cls, bounds, **external):
         '''Return each basic block contained within the specified `bounds`.'''
         (left, _), (_, right) = map(interface.range.unpack, map(cls.at, bounds))
-        return cls(left, right, **external)
+        return cls(left, right + 1, **external)
     @utils.multicase()
     def __new__(cls, left, right, **external):
         """Returns each basic block contained between the addresses `left` and `right`.
@@ -986,12 +985,18 @@ class blocks(object):
         If `split` is false, then do not allow a call instruction to split a block.
         """
         fn = by_address(left)
+
+        # Define a closure that filters the basic-blocks within the given range.
+        def filtered(left, right, iterable=cls.iterate(fn, **external)):
+            for bb in cls.iterate(fn, **external):
+                if interface.range.start(bb) >= left and interface.range.end(bb) < right:
+                    yield interface.range.bounds(bb)
+                continue
+            return
+
+        # Take the range we were given, and return it as a list.
         (left, _), (_, right) = map(interface.range.unpack, map(cls.at, [left, right]))
-        for bb in cls.iterate(fn, **external):
-            if interface.range.start(bb) >= left and interface.range.end(bb) < right:
-                yield interface.range.bounds(bb)
-            continue
-        return
+        return [ bounds for bounds in filtered(left, right) ]
 
     @utils.multicase()
     @classmethod
