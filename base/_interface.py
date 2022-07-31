@@ -1390,7 +1390,7 @@ class range(object):
     def bounds(cls, area):
         '''Return the boundaries of the specified `area` as a ``bounds_t``.'''
         left, right = cls.unpack(area)
-        return bounds_t(left, right - 1)
+        return bounds_t(left, right) if left == right else bounds_t(left, right)
 
     @classmethod
     def within(cls, ea, area):
@@ -3807,7 +3807,7 @@ class bounds_t(integerish):
     def range(self):
         '''Return the current boundary casted to a native ``idaapi.range_t`` type.'''
         left, right = sorted(self)
-        return idaapi.range_t(left, right + 1)
+        return idaapi.range_t(left, right)
 
     def contains(self, ea):
         '''Return if the address `ea` is contained by the current boundary.'''
