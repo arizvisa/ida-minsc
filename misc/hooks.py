@@ -897,7 +897,7 @@ def __process_functions(percentage=0.10):
 
             # Iterate through each address in the function, only updating the
             # references for tags that are not in our set of implicit ones.
-            for ea in database.address.iterate(ui.navigation.analyze(l), database.address.prev(r)):
+            for ea in database.address.iterate(ui.navigation.analyze(l), r):
                 available = {k for k in database.tag(ea)}
                 for k in available - implicit:
                     if ea in globals: internal.comment.globals.dec(ea, k)
@@ -1655,7 +1655,7 @@ def add_func(pfn):
     # convert all globals into contents whilst making sure that we don't
     # add any of the implicit tags that are handled by other events.
     for l, r in function.chunks(ea):
-        for ea in database.address.iterate(l, database.address.prev(r)):
+        for ea in database.address.iterate(l, r):
             available = {item for item in database.tag(ea)}
             for k in available - implicit:
                 internal.comment.globals.dec(ea, k)
@@ -1783,7 +1783,7 @@ def set_func_start(pfn, new_start):
     # if new_start has removed addresses from function, then we need to transform
     # all contents tags into globals tags
     if interface.range.start(pfn) > new_start:
-        for ea in database.address.iterate(new_start, database.address.prev(interface.range.start(pfn))):
+        for ea in database.address.iterate(new_start, interface.range.start(pfn)):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
@@ -1794,7 +1794,7 @@ def set_func_start(pfn, new_start):
     # if new_start has added addresses to function, then we need to transform all
     # its global tags into contents tags
     elif interface.range.start(pfn) < new_start:
-        for ea in database.address.iterate(interface.range.start(pfn), database.address.prev(new_start)):
+        for ea in database.address.iterate(interface.range.start(pfn), new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -1814,7 +1814,7 @@ def set_func_end(pfn, new_end):
     # if new_end has added addresses to function, then we need to transform
     # all globals tags into contents tags
     if new_end > interface.range.end(pfn):
-        for ea in database.address.iterate(interface.range.end(pfn), database.address.prev(new_end)):
+        for ea in database.address.iterate(interface.range.end(pfn), new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -1825,7 +1825,7 @@ def set_func_end(pfn, new_end):
     # if new_end has removed addresses from function, then we need to transform
     # all contents tags into globals tags
     elif new_end < interface.range.end(pfn):
-        for ea in database.address.iterate(new_end, database.address.prev(interface.range.end(pfn))):
+        for ea in database.address.iterate(new_end, interface.range.end(pfn)):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
