@@ -2145,7 +2145,7 @@ def tag(ea):
     if aname and Fmangled_type(utils.string.to(aname)) != MANGLED_UNKNOWN:
         realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP))
     else:
-        realname = aname
+        realname = aname or ''
 
     # Add any of the implicit tags for the specified address to our results.
     if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', realname)
