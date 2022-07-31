@@ -2938,15 +2938,17 @@ class address(object):
     @classmethod
     def iterate(cls, start, end, step):
         '''Iterate from address `start` to `end` using the callable `step` to determine the next address.'''
-        start, end = interface.address.inside(start, end)
         left, right = config.bounds()
 
-        if start == end: return
-        op = operator.le if start < end else operator.ge
+        # we need to always ensure that the maximum address is always excluded. no
+        # good reason for this, but i'm pretty sure that this is how this had always
+        # worked as the positions we get should be thought of like a cursor.
+        op = operator.lt if start <= end else operator.ge
+        ea, stop = interface.address.within(start, end) if start <= end else reversed(sorted(interface.address.inside(end, start - 1)))
 
-        ea = start
+        # loop continuosly until we terminate or we run out of bounds.
         try:
-            while ea not in {idaapi.BADADDR, None} and op(ea, end):
+            while ea not in {idaapi.BADADDR, None} and op(ea, stop):
                 yield ea
                 ea = step(ea)
         except E.OutOfBoundsError:
@@ -2957,13 +2959,13 @@ class address(object):
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
         left, right = bounds
-        return cls.iterate(left, cls.tail(right))
+        return cls.iterate(left, right, cls.prev if left > right else cls.next)
     @utils.multicase(bounds=tuple, step=callable)
     @classmethod
     def iterate(cls, bounds, step):
         '''Iterate through all of the addresses defined within `bounds` using the callable `step` to determine the next address.'''
         left, right = bounds
-        return cls.iterate(left, cls.tail(right), step)
+        return cls.iterate(left, right, step)
 
     @utils.multicase()
     @classmethod
