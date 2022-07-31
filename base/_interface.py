@@ -1334,6 +1334,20 @@ class address(object):
             return cls.__within2__(*args)
         return cls.__within1__(*args)
 
+    @internal.utils.multicase(ea=six.integer_types)
+    @classmethod
+    def refinfo(cls, ea):
+        '''This returns the ``idaapi.refinfo_t`` for the address given in `ea`.'''
+        OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
+        return cls.refinfo(ea, OPND_ALL)
+    @internal.utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+    @classmethod
+    def refinfo(cls, ea, opnum):
+        '''This returns the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the address given in `ea`.'''
+        ri = idaapi.refinfo_t()
+        ok = idaapi.get_refinfo(ea, opnum, ri) if idaapi.__version__ < 7.0 else idaapi.get_refinfo(ri, ea, opnum)
+        return ri if ok else None
+
 class range(object):
     """
     This namespace provides tools that assist with interacting with IDA 6.x's
@@ -3383,7 +3397,7 @@ class switch_t(object):
 
         # last thing to do is to adjust each element from our items to
         # correspond to what's described by its refinfo_t.
-        ri = instruction.ops_refinfo(ea)
+        ri = address.refinfo(ea)
 
         # the refinfo_t's flags determine whether we need to subtract or
         # add the value from the refinfo_t.base.
