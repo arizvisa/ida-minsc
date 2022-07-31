@@ -6764,7 +6764,7 @@ class set(object):
 
         # Now we have the character width and the length prefix size. So to start out, we
         # take the difference between our bounds and subtract the layout length from it.
-        distance = operator.sub(*reversed(bounds))
+        distance = operator.sub(*reversed(sorted(bounds)))
         if length_t > distance:
             logging.warning("{:s}.string({!s}{:s}) : Attempting to apply a string with a prefix length ({:d}) that is larger than the given boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', length_t, bounds))
         leftover = distance - length_t if distance > length_t else 0
@@ -7326,14 +7326,15 @@ class set(object):
         '''Set the data at the provided `bounds` to an array of the given `type`.'''
         if isinstance(type, builtins.list):
             raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Unable to set the provided boundary ({!r}) to the specified type ({!s}) due to it resulting in another array.".format('.'.join([__name__, cls.__name__]), bounds, type, bounds, type))
+        start, stop = sorted(bounds)
 
         # Calculate the size of the type that we were given.
         _, _, nbytes = interface.typemap.resolve(type)
-        start, stop = bounds
+        length = operator.sub(*reversed(sorted(bounds)))
 
         # Now we can use it to calculate the length and apply it.
-        length = (stop - start) / nbytes
-        return cls.array(start, type, math.trunc(math.ceil(length)))
+        res = math.ceil(length / nbytes)
+        return cls.array(start, type, math.trunc(res))
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
@@ -7946,7 +7947,7 @@ class get(object):
 
         # Now we have the character width and the size of the length prefix size. So we
         # take the difference between our bounds and subtract the layout length from it.
-        distance = operator.sub(*reversed(bounds))
+        distance = operator.sub(*reversed(sorted(bounds)))
         if length_t > distance:
             logging.warning("{:s}.string({!s}{:s}) : Attempting to apply a string with a prefix length ({:d}) that is larger than the given boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, u", {!s}".format(utils.string.kwargs(length)) if length else '', length_t, bounds))
         leftover = distance - length_t if distance > length_t else 0
