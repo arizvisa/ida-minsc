@@ -3793,13 +3793,39 @@ class type(object):
         def names(cls, func):
             '''Return the names for each of the parameters belonging to the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
+            ti, ftd = interface.tinfo.function_details(ea, type(ea))
 
-            # Similar to the types, we use the address and type to snag the
-            # details, iterate through it, and then return each name as a list.
-            _, ftd = interface.tinfo.function_details(ea, ti)
+            # Iterate through the function details and return each name as a list.
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [utils.string.to(item.name) for item in iterable]
+        @utils.multicase(names=(builtins.list, builtins.tuple))
+        @classmethod
+        def names(cls, func, names):
+            '''Overwrite the names for the parameters belonging to the function `func` with the provided list of `names`.'''
+            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+
+            # Grab the type and parameters so we can capture all of the ones that will be replaced.
+            updater = interface.tinfo.update_function_details(ea, type(ea))
+            ti, ftd = builtins.next(updater)
+
+            # Force all of the names we were given into string that we can actually apply. Afterwards
+            # we check to see if we were given any extra that we need to warn the user about.
+            strings = [item for item in map("{!s}".format, names)]
+            if strings[ftd.size():]:
+                discarded = ["\"{:s}\"".format(utils.string.escape(item, '"')) for item in strings[ftd.size():]]
+                logging.warning(u"{:s}.names({:#x}, {!r}) : Discarding {:d} additional name{:s} ({:s}) that {:s} given for the specified function which has only {:d} parameter{:s}.".format('.'.join([__name__, cls.__name__]), ea, names, len(discarded), '' if len(discarded) == 1 else 's', ', '.join(discarded), 'was' if len(discarded) == 1 else 'were', ftd.size(), '' if ftd.size() == 1 else 's'))
+
+            # Now we'll go through all of the available parameters, and update the names. If
+            # we weren't given one, then we just assign an empty name to the funcarg_t.
+            results = []
+            for index in builtins.range(ftd.size()):
+                farg, item = ftd[index], strings[index] if index < len(strings) else ''
+                results.append(utils.string.of(farg.name))
+                ftd[index].name = utils.string.to(item)
+
+            # That was it, just need to update everything and return our results.
+            updater.send(ftd), updater.close()
+            return results
         name = utils.alias(names, 'type.arguments')
 
         @utils.multicase()
