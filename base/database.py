@@ -7354,7 +7354,7 @@ class set(object):
         flags, typeid, nbytes = interface.typemap.resolve(realtype)
         if not idaapi.create_data(ea, flags, nbytes, typeid):
             raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join([__name__, cls.__name__]), ea, type, length))
-        interface.typemap.update_refinfo(ea, flags)
+        interface.address.update_refinfo(ea, flags)
 
         # return the array that we just created.
         return get.array(ea, length=reallength)
@@ -7802,7 +7802,7 @@ class get(object):
             # If the array has a refinfo_t at its address or the signed flag is
             # set, then we need to lowercase the typecode to get signed or
             # relative values from the array.
-            if _instruction.ops_refinfo(ea) or F & idaapi.FF_SIGN:
+            if interface.address.refinfo(ea) or F & idaapi.FF_SIGN:
 
                 # FIXME: If the user has set the signed flag, then we need to return
                 #        the negative values that are displayed instead of just
