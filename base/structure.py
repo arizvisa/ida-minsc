@@ -440,7 +440,7 @@ class structure_t(object):
                 # searching through the operands.
                 for ea in references:
                     for opnum in range(instruction.ops_count(ea)):
-                        if instruction.op_refinfo(ea, opnum):
+                        if interface.address.refinfo(ea, opnum):
                             state = instruction.op_state(ea, opnum)
                             results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
                             continue
@@ -1666,7 +1666,7 @@ class members_t(object):
 
         # We can now log our small success and update the member's refinfo if it
         # was actually necessary.
-        cls, refcount = self.__class__, interface.typemap.update_refinfo(mptr.id, flag)
+        cls, refcount = self.__class__, interface.address.update_refinfo(mptr.id, flag)
         logging.debug(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success{:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes, " ({:d} references)".format(refcount) if refcount > 0 else ''))
 
         # If we successfully grabbed the member, then we need to figure out its
@@ -2738,7 +2738,7 @@ class member_t(object):
         resulting, resulting_tid = (self.flag, self.size), self.typeid
 
         if expected == resulting:
-            interface.typemap.update_refinfo(self.id, flag)
+            interface.address.update_refinfo(self.id, flag)
         else:
             logging.warning(u"{:s}({:#x}).type({!s}) : Applying the given flags and size ({:#x}, {:d}) resulted in different flags and size being assigned ({:#x}, {:d}).".format('.'.join([__name__, cls.__name__]), self.id, type, *itertools.chain(expected, resulting)))
 
