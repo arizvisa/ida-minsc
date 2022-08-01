@@ -3208,7 +3208,7 @@ class type(object):
     @classmethod
     def library(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a library function depending on the value of `boolean`.'''
-        return cls.flags(func, idaapi.FUNC_LIB, boolean) == idaapi.FUNC_LIB
+        return cls.flags(func, idaapi.FUNC_LIB, -1 if boolean else 0) == idaapi.FUNC_LIB
 
     @utils.multicase()
     @classmethod
@@ -3236,7 +3236,7 @@ class type(object):
     @classmethod
     def thunk(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a code thunk depending on the value of `boolean`.'''
-        return cls.flags(func, idaapi.FUNC_THUNK, boolean) == idaapi.FUNC_THUNK
+        return cls.flags(func, idaapi.FUNC_THUNK, -1 if boolean else 0) == idaapi.FUNC_THUNK
 
     @utils.multicase()
     @classmethod
@@ -3278,7 +3278,7 @@ class type(object):
     def static(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a static function depending on the value of `boolean`.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
-        return cls.flags(func, FUNC_STATICDEF, boolean) == FUNC_STATICDEF
+        return cls.flags(func, FUNC_STATICDEF, -1 if boolean else 0) == FUNC_STATICDEF
 
     @utils.multicase()
     @classmethod
@@ -3306,7 +3306,7 @@ class type(object):
     @classmethod
     def hidden(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a hidden function depending on the value of `boolean`.'''
-        return cls.flags(func, idaapi.FUNC_HIDDEN, boolean) == idaapi.FUNC_HIDDEN
+        return cls.flags(func, idaapi.FUNC_HIDDEN, -1 if boolean else 0) == idaapi.FUNC_HIDDEN
 
     @utils.multicase()
     @classmethod
