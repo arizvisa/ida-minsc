@@ -484,6 +484,29 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
+.. py:function:: op_reference(opnum)
+   
+   Return the address being referenced by the operand ``opnum`` belonging to the instruction at the current address.
+   
+   :param opnum:
+   :type opnum: int or long
+   
+.. py:function:: op_reference(reference)
+   
+   Return the address being referenced by the operand pointed to by ``reference``.
+   
+   :param reference:
+   :type reference: interface.opref_t
+   
+.. py:function:: op_reference(ea, opnum)
+   
+   Return the address being referenced by the operand ``opnum`` belonging to the instruction at the address ``ea``.
+   
+   :param ea:
+   :type ea: int or long
+   :param opnum:
+   :type opnum: int or long
+   
 .. py:function:: op_refinfo(opnum)
    
    Return the :py:obj:`idaapi.refinfo_t` for the operand ``opnum`` belonging to the instruction at the current address.

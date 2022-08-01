@@ -844,6 +844,52 @@ functions and aliases. For more information on this, please see
 </dd></dl>
 
 <dl class="function">
+<dt id="instruction.op_reference">
+<code class="descclassname">instruction.</code><code class="descname">op_reference</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_reference" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the address being referenced by the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_reference</code><span class="sig-paren">(</span><em>reference</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address being referenced by the operand pointed to by <code class="docutils literal notranslate"><span class="pre">reference</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>reference</strong> (<em>interface.opref_t</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_reference</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address being referenced by the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="instruction.op_refinfo">
 <code class="descclassname">instruction.</code><code class="descname">op_refinfo</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_refinfo" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.refinfo_t</span></code> for the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at the current address.</p>

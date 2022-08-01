@@ -47,12 +47,13 @@ The functions that are available in this module use multicased
 functions and aliases. For more information on this, please see
 :ref:`multicase-aliases` and :ref:`multicase-functions`.
 
-.. py:function:: by(name, \*\*options)
+.. py:function:: by(name, \*suffix, \*\*options)
    
    Return the structure with the given ``name``.
    
    :param name: the name of the structure to return
    :type name: str
+   :param \*suffix: any other numbers or strings that should be appended to the name
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
    
 .. py:function:: by(id, \*\*options)
@@ -103,13 +104,14 @@ functions and aliases. For more information on this, please see
    :param index: the index of the structure to return
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
    
-.. py:function:: by_name(name, \*\*options)
+.. py:function:: by_name(name, \*suffix, \*\*options)
    
    Return a structure by its name.
    
    Aliases: :py:func:`structure.byname<by_name>`
    
    :param name: the name of the structure to return
+   :param \*suffix: any other numbers or strings that should be appended to the name
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
    
 .. py:function:: comment(id, \*\*repeatable)
@@ -213,12 +215,13 @@ functions and aliases. For more information on this, please see
    :param id: the identifier or the index of the structure to check
    :type id: int or long
    
-.. py:function:: has(name)
+.. py:function:: has(name, \*suffix)
    
    Return if a structure with the specified ``name`` exists within the database.
    
    :param name: the name of the structure to check
    :type name: str
+   :param \*suffix: any other numbers or strings that should be appended to the name
    
 .. py:function:: has(structure)
    
@@ -295,12 +298,13 @@ functions and aliases. For more information on this, please see
    :param structure: the :py:obj:`idaapi.struc_t` or :py:obj:`structure_t` to check
    :type structure: idaapi.struc_t or structure_t
    
-.. py:function:: iterate(string)
+.. py:function:: iterate(string, \*suffix)
    
    Iterate through all of the structures in the database with a glob that matches ``string``.
    
    :param string: the glob to filter the structure names with
    :type string: str
+   :param \*suffix: any other numbers or strings that should be appended to the name
    
 .. py:function:: iterate(\*\*type)
    
@@ -308,12 +312,13 @@ functions and aliases. For more information on this, please see
    
    :param \*\*type: any keyword that can be used to filter structures with
    
-.. py:function:: list(string)
+.. py:function:: list(string, \*suffix)
    
    List any structures that match the glob in ``string``.
    
    :param string: the glob to filter the structure names with
    :type string: str
+   :param \*suffix: any other numbers or strings that should be appended to the name
    
 .. py:function:: list(\*\*type)
    
@@ -356,7 +361,7 @@ functions and aliases. For more information on this, please see
    :param id: the identifier of the structure to return the name for
    :param string: the name to rename the structure to
    :type string: str
-   :param \*suffix: any other names to append to the base name
+   :param \*suffix: any other numbers or strings to append to the base name
    
 .. py:function:: name(structure, string, \*suffix)
    
@@ -366,7 +371,7 @@ functions and aliases. For more information on this, please see
    :type structure: structure_t
    :param string: the name to rename the structure to
    :type string: str
-   :param \*suffix: any other names to append to the base name
+   :param \*suffix: any other numbers or strings to append to the base name
    
 .. py:function:: new(string, \*suffix, \*\*offset)
    
@@ -376,7 +381,7 @@ functions and aliases. For more information on this, please see
    
    :param string: a string to use as the name
    :type string: str or tuple
-   :param \*suffix: any other strings to append to the name
+   :param \*suffix: any other numbers or strings to append to the name
    :param \*\*offset: the base offset of the structure that is being created
    
 .. py:function:: remove(structure)
@@ -388,7 +393,7 @@ functions and aliases. For more information on this, please see
    :param structure: the :py:obj:`structure_t` to remove from the database
    :type structure: structure_t
    
-.. py:function:: remove(name)
+.. py:function:: remove(name, \*suffix)
    
    Remove the structure with the specified ``name``.
    
@@ -396,6 +401,7 @@ functions and aliases. For more information on this, please see
    
    :param name: the name of the structure to remove from the database
    :type name: str
+   :param \*suffix: any other numbers or strings that should be appended to the name
    
 .. py:function:: remove(id)
    
@@ -414,12 +420,13 @@ functions and aliases. For more information on this, please see
    
    :param \*\*type: any keyword that can be used to match the structure with
    
-.. py:function:: search(string)
+.. py:function:: search(string, \*suffix)
    
    Search through all the structure names matching the glob ``string``.
    
    :param string: the glob to match the structure name with
    :type string: str
+   :param \*suffix: any other numbers or strings that should be appended to the name
    
 .. py:function:: search(\*\*type)
    
@@ -706,12 +713,13 @@ members_t
       
       :param \*\*type: any keyword that can be used to match the structure member with
       
-   .. py:method:: by(self, name)
+   .. py:method:: by(self, name, \*suffix)
       
       Return the member with the specified ``name``.
       
       :param name: the name of the member to return
       :type name: str
+      :param \*suffix: any other numbers or strings that should be appended to the name
       
    .. py:method:: by(self, offset)
       
@@ -727,13 +735,14 @@ members_t
       :param location: a tuple containing the offset and exact size to use when locating the member
       :type location: tuple
       
-   .. py:method:: by_fullname(self, fullname)
+   .. py:method:: by_fullname(self, fullname, \*suffix)
       
       Return the member with the specified ``fullname``.
       
       Aliases: :py:func:`structure.members_t.byfullname<by_fullname>`
       
       :param fullname: the full name of the member to return
+      :param \*suffix: any other numbers or strings that should be appended to the name
       
    .. py:method:: by_identifier(self, id)
       
@@ -743,13 +752,14 @@ members_t
       
       :param id: the identifier of the member to return
       
-   .. py:method:: by_name(self, name)
+   .. py:method:: by_name(self, name, \*suffix)
       
       Return the member with the specified ``name``.
       
       Aliases: :py:func:`structure.members_t.byname<by_name>`
       
       :param name: the name of the member to return
+      :param \*suffix: any other numbers or strings that should be appended to the name
       
    .. py:method:: by_offset(self, offset)
       
@@ -779,19 +789,21 @@ members_t
       
       :param \*\*type: any keyword that can be used to filter the structure members with
       
-   .. py:method:: iterate(self, string)
+   .. py:method:: iterate(self, string, \*suffix)
       
       Iterate through all of the members in the structure with a name that matches the glob in ``string``.
       
       :param string: the glob to filter the structure member names with
       :type string: str
+      :param \*suffix: any other numbers or strings that should be appended to the name
       
-   .. py:method:: list(self, string)
+   .. py:method:: list(self, string, \*suffix)
       
       List any members that match the glob in ``string``.
       
       :param string: the glob to filter the structure member names with
       :type string: str
+      :param \*suffix: any other numbers or strings that should be appended to the name
       
    .. py:method:: list(self, \*\*type)
       

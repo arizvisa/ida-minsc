@@ -383,7 +383,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
-<li><strong>*suffix</strong> – any other strings to append to the name</li>
+<li><strong>*suffix</strong> – any other integers or strings to append to the name</li>
 </ul>
 </td>
 </tr>
@@ -418,7 +418,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
-<li><strong>*suffix</strong> – any other strings to append to the name</li>
+<li><strong>*suffix</strong> – any other integers or strings to append to the name</li>
 </ul>
 </td>
 </tr>
@@ -572,7 +572,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
-<li><strong>*suffix</strong> – any other strings to append to the name</li>
+<li><strong>*suffix</strong> – any other integers or strings to append to the name</li>
 <li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when setting the name</li>
 </ul>
 </td>
@@ -613,7 +613,7 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
-<li><strong>*suffix</strong> – any other strings to append to the name</li>
+<li><strong>*suffix</strong> – any other integers or strings to append to the name</li>
 <li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when setting the name</li>
 </ul>
 </td>
@@ -4309,7 +4309,8 @@ used to identify certain characteristics about them:</p>
 <li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match according to the exact name</li>
 <li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the entrypoint names according to a glob</li>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the entrypoint names according to a regular-expression</li>
-<li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match according to the entrypoint’s index (ordinal)</li>
+<li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match according to the entrypoint’s index</li>
+<li><code class="docutils literal notranslate"><span class="pre">ordinal</span></code> - Match according to the entrypoint’s ordinal</li>
 <li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">ge</span></code> - Filter the entrypoints for any after the specified address (inclusive)</li>
 <li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the entrypoints for any after the specified address (exclusive)</li>
 <li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Filter the entrypoints for any before the specified address (inclusive)</li>
@@ -7807,13 +7808,17 @@ specified address.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em>, <em>**guessed</em><span class="sig-paren">)</span></dt>
 <dd><p>Apply the type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to apply to the address</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to apply to the address</li>
+<li><strong>**guessed</strong> – if <code class="docutils literal notranslate"><span class="pre">guessed</span></code> is specified, the mark it as guessed by the disassembler of the user</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -7821,8 +7826,10 @@ specified address.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em>, <em>**guessed</em><span class="sig-paren">)</span></dt>
 <dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">guess</span></code> is true, then apply the type information as a guess.
+If <code class="docutils literal notranslate"><span class="pre">force</span></code> is true, then apply the type as-is regardless of its location.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -7830,6 +7837,7 @@ specified address.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
 <li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to apply to the address</li>
+<li><strong>**guessed</strong> – if <code class="docutils literal notranslate"><span class="pre">guessed</span></code> is specified, the mark it as guessed by the disassembler of the user</li>
 </ul>
 </td>
 </tr>
@@ -7857,7 +7865,7 @@ specified address.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em>, <em>**guessed</em><span class="sig-paren">)</span></dt>
 <dd><p>Parse the type information in <code class="docutils literal notranslate"><span class="pre">string</span></code> into an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -7866,6 +7874,7 @@ specified address.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
 <li><strong>string</strong> (<em>str</em>) – a string describing the type information to apply to the address</li>
+<li><strong>**guessed</strong> – if <code class="docutils literal notranslate"><span class="pre">guessed</span></code> is specified, the mark it as guessed by the disassembler of the user</li>
 </ul>
 </td>
 </tr>
@@ -8247,6 +8256,83 @@ specified address.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
 <li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to check</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.type.is_exception">
+<code class="descclassname">type.</code><code class="descname">is_exception</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_exception" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return if the current address or selection is guarded by an exception or part of an exception handler.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.hasexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.has_exception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.exceptionQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – any of the <code class="docutils literal notranslate"><span class="pre">idaapi.TBEA_\*</span></code> flags that are used to match the block type.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_exception</code><span class="sig-paren">(</span><em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Return if the address or boundaries in <code class="docutils literal notranslate"><span class="pre">ea</span></code> is guarded by an exception or part of an exception handler.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">seh</span></code> or <code class="docutils literal notranslate"><span class="pre">cpp</span></code> is specified, then include or exclude that exception type.
+If <code class="docutils literal notranslate"><span class="pre">guarded</span></code> or <code class="docutils literal notranslate"><span class="pre">try</span></code> is true, then return if the address is guarded by an exception.
+If <code class="docutils literal notranslate"><span class="pre">handler</span></code> or <code class="docutils literal notranslate"><span class="pre">catch</span></code> is true, then return if the address is part of an exception handler.
+If <code class="docutils literal notranslate"><span class="pre">fallthrough</span></code> is true, then return if the address is part of the fall-through case for a handler.
+If <code class="docutils literal notranslate"><span class="pre">filter</span></code> or <code class="docutils literal notranslate"><span class="pre">finally</span></code> is true, then return if the address is part of an SEH filter or SEH finalizer (respectively).</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.hasexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.has_exception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.exceptionQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>tuple</em>) – an address within the database</li>
+<li><strong>**flags</strong> – any of the <code class="docutils literal notranslate"><span class="pre">idaapi.TBEA_\*</span></code> flags that are used to match the block type.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_exception</code><span class="sig-paren">(</span><em>ea</em>, <em>flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Return if the address in <code class="docutils literal notranslate"><span class="pre">ea</span></code> is referenced by an exception matching the specified <code class="docutils literal notranslate"><span class="pre">flags</span></code> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.TBEA_*</span></code>).</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.hasexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.has_exception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.exceptionQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address within the database</li>
+<li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – any of the <code class="docutils literal notranslate"><span class="pre">idaapi.TBEA_\*</span></code> flags that are used to match the block type.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_exception</code><span class="sig-paren">(</span><em>bounds</em>, <em>flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Return if the given <code class="docutils literal notranslate"><span class="pre">bounds</span></code> is referenced by an exception matching the specified <code class="docutils literal notranslate"><span class="pre">flags</span></code> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.TBEA_*</span></code>).</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.hasexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.has_exception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isexception</span></code></a>, <a class="reference internal" href="#database.type.is_exception" title="database.type.is_exception"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.exceptionQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the range to check</li>
+<li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – any of the <code class="docutils literal notranslate"><span class="pre">idaapi.TBEA_\*</span></code> flags that are used to match the block type.</li>
 </ul>
 </td>
 </tr>
@@ -8980,6 +9066,46 @@ used to identify certain characteristics about them:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> of the library to return the number of types from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.types.declare">
+<code class="descclassname">types.</code><code class="descname">declare</code><span class="sig-paren">(</span><em>string</em>, <em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#database.types.declare" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse the given <code class="docutils literal notranslate"><span class="pre">string</span></code> into an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> using the current type library and return it.</p>
+<p>Aliases: <a class="reference internal" href="#database.types.declare" title="database.types.declare"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.types.decl</span></code></a>, <a class="reference internal" href="#database.types.declare" title="database.types.declare"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.types.parse</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the type as a string to parse</li>
+<li><strong>**flags</strong> – any of the <code class="docutils literal notranslate"><span class="pre">idaapi.PT_\*</span></code> flags to use when parsing the type</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">types.</code><code class="descname">declare</code><span class="sig-paren">(</span><em>string</em>, <em>library</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Parse the given <code class="docutils literal notranslate"><span class="pre">string</span></code> into an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> using the specified type <code class="docutils literal notranslate"><span class="pre">library</span></code> and return it.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">flags</span></code> is provided, then use the specified flags (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.PT_*</span></code>) when parsing the <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.types.declare" title="database.types.declare"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.types.decl</span></code></a>, <a class="reference internal" href="#database.types.declare" title="database.types.declare"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.types.parse</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the type as a string to parse</li>
+<li><strong>library</strong> (<em>idaapi.til_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.til_t</span></code> describing the target type library</li>
+<li><strong>**flags</strong> – any of the <code class="docutils literal notranslate"><span class="pre">idaapi.PT_\*</span></code> flags to use when parsing the type</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>

@@ -98,7 +98,7 @@ functions and aliases. For more information on this, please see
 <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
 <dl class="function">
 <dt id="structure.by">
-<code class="descclassname">structure.</code><code class="descname">by</code><span class="sig-paren">(</span><em>name</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.by" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">structure.</code><code class="descname">by</code><span class="sig-paren">(</span><em>name</em>, <em>*suffix</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.by" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the structure with the given <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -106,6 +106,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>name</strong> (<em>str</em>) – the name of the structure to return</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
 <li><strong>**options</strong> – if <code class="docutils literal notranslate"><span class="pre">offset</span></code> is specified, then use it as the base offset of the structure</li>
 </ul>
 </td>
@@ -222,7 +223,7 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt id="structure.by_name">
-<code class="descclassname">structure.</code><code class="descname">by_name</code><span class="sig-paren">(</span><em>name</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.by_name" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">structure.</code><code class="descname">by_name</code><span class="sig-paren">(</span><em>name</em>, <em>*suffix</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.by_name" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return a structure by its name.</p>
 <p>Aliases: <a class="reference internal" href="#structure.by_name" title="structure.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.byname</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -231,6 +232,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>name</strong> – the name of the structure to return</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
 <li><strong>**options</strong> – if <code class="docutils literal notranslate"><span class="pre">offset</span></code> is specified, then use it as the base offset of the structure</li>
 </ul>
 </td>
@@ -429,13 +431,17 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">structure.</code><code class="descname">has</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">structure.</code><code class="descname">has</code><span class="sig-paren">(</span><em>name</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
 <dd><p>Return if a structure with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> exists within the database.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the structure to check</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the structure to check</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -581,13 +587,17 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt id="structure.iterate">
-<code class="descclassname">structure.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.iterate" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">structure.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.iterate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Iterate through all of the structures in the database with a glob that matches <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to filter the structure names with</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to filter the structure names with</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -609,13 +619,17 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt id="structure.list">
-<code class="descclassname">structure.</code><code class="descname">list</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.list" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">structure.</code><code class="descname">list</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.list" title="Permalink to this definition">¶</a></dt>
 <dd><p>List any structures that match the glob in <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to filter the structure names with</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to filter the structure names with</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -710,7 +724,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>id</strong> – the identifier of the structure to return the name for</li>
 <li><strong>string</strong> (<em>str</em>) – the name to rename the structure to</li>
-<li><strong>*suffix</strong> – any other names to append to the base name</li>
+<li><strong>*suffix</strong> – any other numbers or strings to append to the base name</li>
 </ul>
 </td>
 </tr>
@@ -729,7 +743,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>structure</strong> (<a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to rename</li>
 <li><strong>string</strong> (<em>str</em>) – the name to rename the structure to</li>
-<li><strong>*suffix</strong> – any other names to append to the base name</li>
+<li><strong>*suffix</strong> – any other numbers or strings to append to the base name</li>
 </ul>
 </td>
 </tr>
@@ -748,7 +762,7 @@ functions and aliases. For more information on this, please see
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>string</strong> (<em>str</em><em> or </em><em>tuple</em>) – a string to use as the name</li>
-<li><strong>*suffix</strong> – any other strings to append to the name</li>
+<li><strong>*suffix</strong> – any other numbers or strings to append to the name</li>
 <li><strong>**offset</strong> – the base offset of the structure that is being created</li>
 </ul>
 </td>
@@ -774,14 +788,18 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">structure.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">structure.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>name</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
 <dd><p>Remove the structure with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#structure.remove" title="structure.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.delete</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the structure to remove from the database</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the structure to remove from the database</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -819,13 +837,17 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt id="structure.search">
-<code class="descclassname">structure.</code><code class="descname">search</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.search" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">structure.</code><code class="descname">search</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.search" title="Permalink to this definition">¶</a></dt>
 <dd><p>Search through all the structure names matching the glob <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to match the structure name with</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to match the structure name with</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1481,13 +1503,17 @@ specified. The keywords that are available to filter members are:</p>
 
 <dl class="method">
 <dt>
-<code class="descname">by</code><span class="sig-paren">(</span><em>self</em>, <em>name</em><span class="sig-paren">)</span></dt>
+<code class="descname">by</code><span class="sig-paren">(</span><em>self</em>, <em>name</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the member with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the name of the member to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – the name of the member to return</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1523,14 +1549,18 @@ specified. The keywords that are available to filter members are:</p>
 
 <dl class="method">
 <dt id="structure.members_t.by_fullname">
-<code class="descname">by_fullname</code><span class="sig-paren">(</span><em>self</em>, <em>fullname</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.by_fullname" title="Permalink to this definition">¶</a></dt>
+<code class="descname">by_fullname</code><span class="sig-paren">(</span><em>self</em>, <em>fullname</em>, <em>*suffix</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.by_fullname" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the member with the specified <code class="docutils literal notranslate"><span class="pre">fullname</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#structure.members_t.by_fullname" title="structure.members_t.by_fullname"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.members_t.byfullname</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>fullname</strong> – the full name of the member to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>fullname</strong> – the full name of the member to return</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1553,14 +1583,18 @@ specified. The keywords that are available to filter members are:</p>
 
 <dl class="method">
 <dt id="structure.members_t.by_name">
-<code class="descname">by_name</code><span class="sig-paren">(</span><em>self</em>, <em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.by_name" title="Permalink to this definition">¶</a></dt>
+<code class="descname">by_name</code><span class="sig-paren">(</span><em>self</em>, <em>name</em>, <em>*suffix</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.by_name" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the member with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#structure.by_name" title="structure.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">structure.members_t.byname</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> – the name of the member to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> – the name of the member to return</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1626,13 +1660,17 @@ specified. The keywords that are available to filter members are:</p>
 
 <dl class="method">
 <dt>
-<code class="descname">iterate</code><span class="sig-paren">(</span><em>self</em>, <em>string</em><span class="sig-paren">)</span></dt>
+<code class="descname">iterate</code><span class="sig-paren">(</span><em>self</em>, <em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
 <dd><p>Iterate through all of the members in the structure with a name that matches the glob in <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to filter the structure member names with</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to filter the structure member names with</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1640,13 +1678,17 @@ specified. The keywords that are available to filter members are:</p>
 
 <dl class="method">
 <dt id="structure.members_t.list">
-<code class="descname">list</code><span class="sig-paren">(</span><em>self</em>, <em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.list" title="Permalink to this definition">¶</a></dt>
+<code class="descname">list</code><span class="sig-paren">(</span><em>self</em>, <em>string</em>, <em>*suffix</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.list" title="Permalink to this definition">¶</a></dt>
 <dd><p>List any members that match the glob in <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to filter the structure member names with</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> (<em>str</em>) – the glob to filter the structure member names with</li>
+<li><strong>*suffix</strong> – any other numbers or strings that should be appended to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>

@@ -1009,19 +1009,13 @@ namespace.</p>
 </div>
 <dl class="function">
 <dt id="function.block">
-<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#function.block" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the boundaries of the current basic block.</p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns the boundaries of the basic block at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address containing the basic block to return the boundaries for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – </td>
 </tr>
 </tbody>
 </table>
@@ -1029,7 +1023,25 @@ namespace.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the boundaries of the basic block at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address containing the basic block to return the boundaries for</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns the boundaries of the basic block at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1038,6 +1050,26 @@ namespace.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the basic block</li>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address containing the basic block to return the boundaries for</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the boundaries of the basic block with the specified <code class="docutils literal notranslate"><span class="pre">flags</span></code> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.FC_*</span></code>) at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
 </ul>
 </td>
 </tr>
@@ -1061,13 +1093,17 @@ namespace.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">block</code><span class="sig-paren">(</span><em>bounds</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the boundaries of the basic block identified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to return the basic block for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to return the basic block for</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1165,19 +1201,13 @@ namespace.</p>
 
 <dl class="function">
 <dt id="function.block.at">
-<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block.at" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#function.block.at" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> of the current address in the current function.</p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> of address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in the current function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</td>
 </tr>
 </tbody>
 </table>
@@ -1185,7 +1215,25 @@ namespace.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> of address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> of address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1194,6 +1242,7 @@ namespace.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the basic block</li>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
 </ul>
 </td>
 </tr>
@@ -1217,13 +1266,17 @@ namespace.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">block.</code><code class="descname">at</code><span class="sig-paren">(</span><em>bounds</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> identified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to return</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1966,12 +2019,14 @@ namespace.</p>
 <dt id="function.block.top">
 <code class="descclassname">block.</code><code class="descname">top</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block.top" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the top address of the basic block at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.addr</span></code></a>, <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.address</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">block.</code><code class="descname">top</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the top address of the basic block at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.addr</span></code></a>, <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.address</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1986,6 +2041,7 @@ namespace.</p>
 <dt>
 <code class="descclassname">block.</code><code class="descname">top</code><span class="sig-paren">(</span><em>bb</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the top address of the basic block <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.addr</span></code></a>, <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.address</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2000,6 +2056,7 @@ namespace.</p>
 <dt>
 <code class="descclassname">block.</code><code class="descname">top</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the top address of the basic block identified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.addr</span></code></a>, <a class="reference internal" href="#function.block.top" title="function.block.top"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.block.address</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2024,20 +2081,20 @@ by the <code class="xref py py-obj docutils literal notranslate"><span class="pr
 often, these functions are exported globally as <code class="xref py py-obj docutils literal notranslate"><span class="pre">function.flowchart</span></code>
 and <code class="xref py py-obj docutils literal notranslate"><span class="pre">function.digraph</span></code>.</p>
 <p>Some examples of this namespace’s usage:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">bb</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">blocks</span><span class="p">():</span> <span class="o">...</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">bb</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">blocks</span><span class="p">(</span><span class="n">calls</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span> <span class="o">...</span>
 <span class="o">&gt;</span> <span class="n">chart</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">flowchart</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">G</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">graph</span><span class="p">()</span>
 </pre></div>
 </div>
 <dl class="function">
 <dt id="function.blocks">
-<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>**silent</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>**external</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the bounds of each basic block for the current function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**silent</strong> – a boolean specifying to exclude warnings about blocks that are outside the function</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**external</strong> – a boolean specifying to include external blocks in the blocks that are returned</td>
 </tr>
 </tbody>
 </table>
@@ -2045,7 +2102,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>func</em>, <em>**silent</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>func</em>, <em>**external</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns the bounds of each basic block for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -2053,7 +2110,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to return the basic blocks for</li>
-<li><strong>**silent</strong> – a boolean specifying to exclude warnings about blocks that are outside the function</li>
+<li><strong>**external</strong> – a boolean specifying to include external blocks in the blocks that are returned</li>
 </ul>
 </td>
 </tr>
@@ -2063,7 +2120,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>bounds</em>, <em>**silent</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>bounds</em>, <em>**external</em><span class="sig-paren">)</span></dt>
 <dd><p>Return each basic block contained within the specified <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -2071,7 +2128,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>bounds</strong> (<em>tuple</em>) – the boundaries to use when constraining the returned list of basic blocks</li>
-<li><strong>**silent</strong> – a boolean specifying to exclude warnings about blocks that are outside the function</li>
+<li><strong>**external</strong> – a boolean specifying to include external blocks in the blocks that are returned</li>
 </ul>
 </td>
 </tr>
@@ -2081,8 +2138,10 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>left</em>, <em>right</em>, <em>**silent</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns each basic block contained within the addresses <code class="docutils literal notranslate"><span class="pre">left</span></code> and <code class="docutils literal notranslate"><span class="pre">right</span></code>.</p>
+<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>left</em>, <em>right</em>, <em>**external</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns each basic block contained between the addresses <code class="docutils literal notranslate"><span class="pre">left</span></code> and <code class="docutils literal notranslate"><span class="pre">right</span></code>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">external</span></code> is true, then include all blocks that are a branch target despite being outside the function boundaries.
+If <code class="docutils literal notranslate"><span class="pre">split</span></code> is false, then do not allow a call instruction to split a block.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2090,7 +2149,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>left</strong> – the top address of the basic block</li>
 <li><strong>right</strong> – the bottom address of the basic block</li>
-<li><strong>**silent</strong> – a boolean specifying to exclude warnings about blocks that are outside the function</li>
+<li><strong>**external</strong> – a boolean specifying to include external blocks in the blocks that are returned</li>
 </ul>
 </td>
 </tr>
@@ -2100,19 +2159,13 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt id="function.blocks.at">
-<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.at" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.at" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> at the current address in the current function.</p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> of address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in the current function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</td>
 </tr>
 </tbody>
 </table>
@@ -2120,7 +2173,25 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
-<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> of address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> in function <code class="docutils literal notranslate"><span class="pre">func</span></code> at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -2129,6 +2200,26 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the basic block</li>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">flags</span></code> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.FC_*</span></code>) for function <code class="docutils literal notranslate"><span class="pre">func</span></code> at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the basic block</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to return</li>
+<li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
 </ul>
 </td>
 </tr>
@@ -2145,8 +2236,8 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – </li>
-<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – </li>
+<li><strong>func</strong> – the function containing the basic block</li>
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> containing the boundaries to match</li>
 </ul>
 </td>
 </tr>
@@ -2163,7 +2254,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
-<code class="descclassname">blocks.</code><code class="descname">digraph</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">blocks.</code><code class="descname">digraph</code><span class="sig-paren">(</span><em>func</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Return a <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx.DiGraph</span></code> of the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <p>Requires the <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx</span></code> module in order to build the graph.</p>
 <p>Aliases: <a class="reference internal" href="#function.blocks.digraph" title="function.blocks.digraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.blocks.graph</span></code></a>, <a class="reference internal" href="#function.blocks.digraph" title="function.blocks.digraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.graph</span></code></a>, <a class="reference internal" href="#function.blocks.digraph" title="function.blocks.digraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.digraph</span></code></a></p>
@@ -2171,7 +2262,11 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return a graph for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to return a graph for</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2179,21 +2274,52 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt id="function.blocks.flowchart">
-<code class="descclassname">blocks.</code><code class="descname">flowchart</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.flowchart" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">blocks.</code><code class="descname">flowchart</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.flowchart" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.FlowChart</span></code> object for the current function.</p>
 <p>Aliases: <a class="reference internal" href="#function.blocks.flowchart" title="function.blocks.flowchart"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.flowchart</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">blocks.</code><code class="descname">flowchart</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">blocks.</code><code class="descname">flowchart</code><span class="sig-paren">(</span><em>func</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.FlowChart</span></code> object for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#function.blocks.flowchart" title="function.blocks.flowchart"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.flowchart</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the flowchart for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to return the flowchart for</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">flowchart</code><span class="sig-paren">(</span><em>func</em>, <em>flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.FlowChart</span></code> object built with the specified <code class="docutils literal notranslate"><span class="pre">flags</span></code> for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.blocks.flowchart" title="function.blocks.flowchart"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.flowchart</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to return the flowchart for</li>
+<li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2201,13 +2327,13 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt id="function.blocks.iterate">
-<code class="descclassname">blocks.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>**silent</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.iterate" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">blocks.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>**external</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.iterate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> for the current function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**silent</strong> – a boolean specifying to exclude warnings about blocks that are outside the function</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**external</strong> – a boolean specifying to include external blocks in the blocks that are returned</td>
 </tr>
 </tbody>
 </table>
@@ -2215,17 +2341,103 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
-<code class="descclassname">blocks.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>func</em>, <em>**silent</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">blocks.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>func</em>, <em>**external</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">external</span></code> is true, then include all blocks that are a branch target despite being outside the function boundaries.
+If <code class="docutils literal notranslate"><span class="pre">split</span></code> is false, then do not allow a call instruction to split a block.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the basic blocks to yield</li>
+<li><strong>**external</strong> – a boolean specifying to include external blocks in the blocks that are returned</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>func</em>, <em>flags</em>, <em>**silent</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> from the flowchart built with the specified <code class="docutils literal notranslate"><span class="pre">flags</span></code> (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.FC_*</span></code>) for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the basic blocks to yield</li>
+<li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
 <li><strong>**silent</strong> – a boolean specifying to exclude warnings about blocks that are outside the function</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.blocks.moonwalk">
+<code class="descclassname">blocks.</code><code class="descname">moonwalk</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.moonwalk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Traverse each of the predecessor blocks for the current function starting with the block at the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">moonwalk</code><span class="sig-paren">(</span><em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse each of the predecessor blocks for a function starting with the block at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the block to start at</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">moonwalk</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse each of the predecessor blocks from the block at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the block to traverse the predecessors of</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the block to start at</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">moonwalk</code><span class="sig-paren">(</span><em>bb</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse each of the predecessor blocks from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> identified by <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> to traverse the predecessors of</td>
 </tr>
 </tbody>
 </table>
@@ -2270,20 +2482,14 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 </dd></dl>
 
 <dl class="function">
-<dt id="function.blocks.walk">
-<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.walk" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> starting at the current address and terminating when there’s no clear path to continue.</p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> starting at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and terminating when there’s no clear path to continue.</p>
+<dt id="function.blocks.traverse">
+<code class="descclassname">blocks.</code><code class="descname">traverse</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.traverse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Traverse each of the successor blocks starting from the beginning of the current function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart to traverse</td>
 </tr>
 </tbody>
 </table>
@@ -2291,15 +2497,123 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
-<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> in the function <code class="docutils literal notranslate"><span class="pre">func</span></code> starting at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and terminating when there’s no clear path to continue.</p>
+<code class="descclassname">blocks.</code><code class="descname">traverse</code><span class="sig-paren">(</span><em>predicate</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse the blocks from the beginning of the current function until the callable <code class="docutils literal notranslate"><span class="pre">predicate</span></code> returns no more elements.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – </li>
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>predicate</strong> (<em>callable</em>) – a callable (such as <a class="reference internal" href="#function.block.before" title="function.block.before"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.before</span></code></a> or <a class="reference internal" href="#function.block.after" title="function.block.after"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.after</span></code></a>) returning the blocks to choose from</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart to traverse</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">traverse</code><span class="sig-paren">(</span><em>func</em>, <em>predicate</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse the blocks from the beginning of function <code class="docutils literal notranslate"><span class="pre">func</span></code> until the callable <code class="docutils literal notranslate"><span class="pre">predicate</span></code> returns no more elements.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to traverse</li>
+<li><strong>predicate</strong> (<em>callable</em>) – a callable (such as <a class="reference internal" href="#function.block.before" title="function.block.before"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.before</span></code></a> or <a class="reference internal" href="#function.block.after" title="function.block.after"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.after</span></code></a>) returning the blocks to choose from</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart to traverse</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">traverse</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>predicate</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse the blocks of function <code class="docutils literal notranslate"><span class="pre">func</span></code> from the block given by <code class="docutils literal notranslate"><span class="pre">ea</span></code> until the callable <code class="docutils literal notranslate"><span class="pre">predicate</span></code> returns no more elements.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the block</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the block to start at</li>
+<li><strong>predicate</strong> (<em>callable</em>) – a callable (such as <a class="reference internal" href="#function.block.before" title="function.block.before"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.before</span></code></a> or <a class="reference internal" href="#function.block.after" title="function.block.after"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.after</span></code></a>) returning the blocks to choose from</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">traverse</code><span class="sig-paren">(</span><em>bb</em>, <em>predicate</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse the blocks of function <code class="docutils literal notranslate"><span class="pre">func</span></code> from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> given by <code class="docutils literal notranslate"><span class="pre">bb</span></code> until the callable <code class="docutils literal notranslate"><span class="pre">predicate</span></code> returns no more elements.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> to start at</li>
+<li><strong>predicate</strong> (<em>callable</em>) – a callable (such as <a class="reference internal" href="#function.block.before" title="function.block.before"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.before</span></code></a> or <a class="reference internal" href="#function.block.after" title="function.block.after"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block.after</span></code></a>) returning the blocks to choose from</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.blocks.walk">
+<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>**flags</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.walk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Traverse each of the successor blocks starting from the beginning of the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart to traverse</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>func</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse each of the successor blocks starting from the beginning of the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing to traverse the successors of</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart to traverse</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Traverse each of the successor blocks of the block identified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the block to traverse the successors of</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the block to start at</li>
+<li><strong>**flags</strong> – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart the block comes from</li>
 </ul>
 </td>
 </tr>
@@ -2310,12 +2624,12 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <dl class="function">
 <dt>
 <code class="descclassname">blocks.</code><code class="descname">walk</code><span class="sig-paren">(</span><em>bb</em><span class="sig-paren">)</span></dt>
-<dd><p>Yield each <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> starting at the specified <code class="docutils literal notranslate"><span class="pre">bb</span></code> and terminating when there’s no clear path to continue.</p>
+<dd><p>Traverse each of the successor blocks from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> identified by <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> to traverse the successors of</td>
 </tr>
 </tbody>
 </table>
@@ -2483,13 +2797,13 @@ the chunk containing the requested address.</p>
 <dl class="function">
 <dt id="function.chunk.at">
 <code class="descclassname">chunk.</code><code class="descname">at</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.at" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a tuple containing the bounds of the current function chunk.</p>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.range_t</span></code> describing the bounds of the current function chunk.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">chunk.</code><code class="descname">at</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return a tuple containing the bounds of the function chunk at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.range_t</span></code> describing the bounds of the function chunk at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2503,7 +2817,7 @@ the chunk containing the requested address.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">chunk.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return a tuple containing the bounds of the function chunk belonging to <code class="docutils literal notranslate"><span class="pre">func</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.range_t</span></code> describing the bounds of the function chunk belonging to <code class="docutils literal notranslate"><span class="pre">func</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2929,13 +3243,13 @@ the boundaries of each chunk associated with a function.</p>
 <dl class="function">
 <dt id="function.chunks.at">
 <code class="descclassname">chunks.</code><code class="descname">at</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunks.at" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a tuple containing the bounds of the current function chunk.</p>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.range_t</span></code> describing the bounds of the current function chunk.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">chunks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return a tuple containing the bounds of the function chunk at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.range_t</span></code> describing the bounds of the function chunk at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2949,7 +3263,7 @@ the boundaries of each chunk associated with a function.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">chunks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return a tuple containing the bounds of the function chunk belonging to <code class="docutils literal notranslate"><span class="pre">func</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.range_t</span></code> describing the bounds of the function chunk belonging to <code class="docutils literal notranslate"><span class="pre">func</span></code> at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -3498,13 +3812,17 @@ the following globals:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em>, <em>**guessed</em><span class="sig-paren">)</span></dt>
 <dd><p>Apply the type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to apply</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information to apply</li>
+<li><strong>**guessed</strong> – a boolean describing whether the type is guessed by the disassembler or the user</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -3540,7 +3858,7 @@ the following globals:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em>, <em>info</em>, <em>**guessed</em><span class="sig-paren">)</span></dt>
 <dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -3549,6 +3867,7 @@ the following globals:</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the address or function to apply the type information to</li>
 <li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the type information string to apply to the function</li>
+<li><strong>**guessed</strong> – a boolean describing whether the type is guessed by the disassembler or the user</li>
 </ul>
 </td>
 </tr>
@@ -3558,7 +3877,7 @@ the following globals:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em>, <em>info</em>, <em>**guessed</em><span class="sig-paren">)</span></dt>
 <dd><p>Parse the type information string in <code class="docutils literal notranslate"><span class="pre">info</span></code> into an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -3567,6 +3886,7 @@ the following globals:</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the address or function to apply the type information to</li>
 <li><strong>info</strong> (<em>str</em>) – the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> containing the type information to apply to the function</li>
+<li><strong>**guessed</strong> – a boolean describing whether the type is guessed by the disassembler or the user</li>
 </ul>
 </td>
 </tr>
@@ -3869,13 +4189,13 @@ the following globals:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">type.</code><code class="descname">hidden</code><span class="sig-paren">(</span><em>boolean</em><span class="sig-paren">)</span></dt>
-<dd><p>Modify the attributes of the current function to set it as a hidden function depending on the value of <code class="docutils literal notranslate"><span class="pre">boolean</span></code>.</p>
+<code class="descclassname">type.</code><code class="descname">hidden</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a boolean describing whether the function <code class="docutils literal notranslate"><span class="pre">func</span></code> is hidden.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>boolean</strong> – a boolean value representing whether the function is hidden or not</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the hidden attribute from</td>
 </tr>
 </tbody>
 </table>
@@ -4039,13 +4359,13 @@ the following globals:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">type.</code><code class="descname">library</code><span class="sig-paren">(</span><em>boolean</em><span class="sig-paren">)</span></dt>
-<dd><p>Modify the attributes of the current function to set it as a library function depending on the value of <code class="docutils literal notranslate"><span class="pre">boolean</span></code>.</p>
+<code class="descclassname">type.</code><code class="descname">library</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a boolean describing whether the function <code class="docutils literal notranslate"><span class="pre">func</span></code> is considered a library function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>boolean</strong> – a boolean value representing whether the function should be set as a library function or not</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the desired function to return the library attribute from</td>
 </tr>
 </tbody>
 </table>
@@ -4077,13 +4397,13 @@ the following globals:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">type.</code><code class="descname">static</code><span class="sig-paren">(</span><em>boolean</em><span class="sig-paren">)</span></dt>
-<dd><p>Modify the attributes of the current function to set it as a static function depending on the value of <code class="docutils literal notranslate"><span class="pre">boolean</span></code>.</p>
+<code class="descclassname">type.</code><code class="descname">static</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a boolean describing whether the function <code class="docutils literal notranslate"><span class="pre">func</span></code> is defined as a static function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>boolean</strong> – a boolean value representing whether the function should be set as a static function or not</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the static attribute from</td>
 </tr>
 </tbody>
 </table>
@@ -4115,13 +4435,13 @@ the following globals:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">type.</code><code class="descname">thunk</code><span class="sig-paren">(</span><em>boolean</em><span class="sig-paren">)</span></dt>
-<dd><p>Modify the attributes of the current function to set it as a code thunk depending on the value of <code class="docutils literal notranslate"><span class="pre">boolean</span></code>.</p>
+<code class="descclassname">type.</code><code class="descname">thunk</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a boolean describing whether the function <code class="docutils literal notranslate"><span class="pre">func</span></code> was determined to be a code thunk.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>boolean</strong> – a boolean value representing whether the function should be set as a code thunk or not</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the thunk attribute from</td>
 </tr>
 </tbody>
 </table>
@@ -4157,7 +4477,9 @@ in a function:</p>
 <div>&gt; print( function.argument(0) )
 &gt; print( function.argument.name(1) )
 &gt; oldtype = function.argument(0, ‘void*’)
-&gt; oldname = function.argument.name(1)</div></blockquote>
+&gt; oldname = function.argument.name(1)
+&gt; location = function.argument.location(2)
+&gt; index = function.argument.remove(3)</div></blockquote>
 <dl class="function">
 <dt id="function.type.argument">
 <code class="descclassname">type.</code><code class="descname">argument</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#function.type.argument" title="Permalink to this definition">¶</a></dt>
@@ -4254,7 +4576,7 @@ in a function:</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to return the location of</td>
 </tr>
 </tbody>
 </table>
@@ -4269,7 +4591,7 @@ in a function:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the address or function containing the prototype</li>
+<li><strong>func</strong> – the address or function containing the parameter</li>
 <li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to return the location of</li>
 </ul>
 </td>
@@ -4287,6 +4609,24 @@ in a function:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the argument to return the name of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.argument.</code><code class="descname">name</code><span class="sig-paren">(</span><em>index</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the name from the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> in the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the argument to remove the name from</li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -4320,8 +4660,27 @@ in a function:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the address or function containing the prototype</li>
+<li><strong>func</strong> – the address or function containing the parameter</li>
 <li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the argument to return the name of</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.argument.</code><code class="descname">name</code><span class="sig-paren">(</span><em>func</em>, <em>index</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the name from the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> in the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function containing the parameter</li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the argument to remove the name from</li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -4338,10 +4697,44 @@ in a function:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the address or function containing the prototype</li>
+<li><strong>func</strong> – the address or function containing the parameter</li>
 <li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the argument to rename</li>
 <li><strong>string</strong> (<em>str</em>) – the string to rename the argument to</li>
-<li><strong>*suffix</strong> – </li>
+<li><strong>*suffix</strong> – any other integers or strings to append to the name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.type.argument.remove">
+<code class="descclassname">type.argument.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#function.type.argument.remove" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> from the current function.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.argument.remove" title="function.type.argument.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.argument.pop</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to remove</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.argument.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>func</em>, <em>index</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> from the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.argument.remove" title="function.type.argument.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.argument.pop</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function to containing the parameter</li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to remove</li>
 </ul>
 </td>
 </tr>
@@ -4372,6 +4765,79 @@ and types in their entirety.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the prototype with the types to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">arguments</code><span class="sig-paren">(</span><em>func</em>, <em>types</em><span class="sig-paren">)</span></dt>
+<dd><p>Overwrite the type information for the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code> with the provided list of <code class="docutils literal notranslate"><span class="pre">types</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function containing the prototype to modify</li>
+<li><strong>types</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em>) – a tuple or list of types to use for the parameters</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.type.arguments.add">
+<code class="descclassname">type.arguments.</code><code class="descname">add</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span><a class="headerlink" href="#function.type.arguments.add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add the provided type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> as another parameter to the current function.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.arguments.add" title="function.type.arguments.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.arguments.append</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information of the parameter</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.arguments.</code><code class="descname">add</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Add the provided type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> as another parameter to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.arguments.add" title="function.type.arguments.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.arguments.append</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function to add a parameter to</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information of the parameter</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.arguments.</code><code class="descname">add</code><span class="sig-paren">(</span><em>func</em>, <em>info</em>, <em>name</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<dd><p>Add the provided type information in <code class="docutils literal notranslate"><span class="pre">info</span></code> with the given <code class="docutils literal notranslate"><span class="pre">name</span></code> as another parameter to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.arguments.add" title="function.type.arguments.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.arguments.append</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function to add a parameter to</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the type information of the parameter</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the parameter</li>
+<li><strong>*suffix</strong> – any integers or strings to append to the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -4460,15 +4926,36 @@ and types in their entirety.</p>
 </dd></dl>
 
 <dl class="function">
+<dt>
+<code class="descclassname">type.arguments.</code><code class="descname">names</code><span class="sig-paren">(</span><em>func</em>, <em>names</em><span class="sig-paren">)</span></dt>
+<dd><p>Overwrite the names for the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code> with the provided list of <code class="docutils literal notranslate"><span class="pre">names</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.arguments.names" title="function.type.arguments.names"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.arguments.name</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function containing the prototype to modify</li>
+<li><strong>names</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em>) – a tuple or list of names to apply to the parameters</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.type.arguments.registers">
 <code class="descclassname">type.arguments.</code><code class="descname">registers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.arguments.registers" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the registers for each of the parameters belonging to the current function.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.arguments.registers" title="function.type.arguments.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.arguments.regs</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.arguments.</code><code class="descname">registers</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the registers for each of the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.arguments.registers" title="function.type.arguments.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.arguments.regs</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4496,6 +4983,25 @@ and types in their entirety.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the prototype with the argument types to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.arguments.</code><code class="descname">types</code><span class="sig-paren">(</span><em>func</em>, <em>types</em><span class="sig-paren">)</span></dt>
+<dd><p>Overwrite the type information for the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code> with the provided list of <code class="docutils literal notranslate"><span class="pre">types</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.arguments.types" title="function.type.arguments.types"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.arguments.type</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function containing the prototype to modify</li>
+<li><strong>types</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em>) – a tuple or list of types to use for the parameters</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>

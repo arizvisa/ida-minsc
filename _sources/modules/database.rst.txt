@@ -194,7 +194,7 @@ functions and aliases. For more information on this, please see
    
    :param string: a string to use as the name
    :type string: str
-   :param \*suffix: any other strings to append to the name
+   :param \*suffix: any other integers or strings to append to the name
    
 .. py:function:: mangled(none)
    
@@ -215,7 +215,7 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param string: a string to use as the name
    :type string: str
-   :param \*suffix: any other strings to append to the name
+   :param \*suffix: any other integers or strings to append to the name
    
 .. py:function:: mangled(ea, none)
    
@@ -293,7 +293,7 @@ functions and aliases. For more information on this, please see
    
    :param string: a string to use as the name
    :type string: str
-   :param \*suffix: any other strings to append to the name
+   :param \*suffix: any other integers or strings to append to the name
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(none, \*\*flags)
@@ -316,7 +316,7 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param string: a string to use as the name
    :type string: str
-   :param \*suffix: any other strings to append to the name
+   :param \*suffix: any other integers or strings to append to the name
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(ea, none, \*\*flags)
@@ -2387,7 +2387,8 @@ The different types that one can match entrypoints with are the following:
 - ``name`` - Match according to the exact name
 - ``like`` - Filter the entrypoint names according to a glob
 - ``regex`` - Filter the entrypoint names according to a regular-expression
-- ``index`` - Match according to the entrypoint's index (ordinal)
+- ``index`` - Match according to the entrypoint's index
+- ``ordinal`` - Match according to the entrypoint's ordinal
 - ``greater`` or ``ge`` - Filter the entrypoints for any after the specified address (inclusive)
 - ``gt`` - Filter the entrypoints for any after the specified address (exclusive)
 - ``less`` or ``le`` - Filter the entrypoints for any before the specified address (inclusive)
@@ -4471,21 +4472,26 @@ Some examples of using this namespace can be::
    :param none: the python value :py:obj:`None`
    :type none: None
    
-.. py:function:: type(info)
+.. py:function:: type(info, \*\*guessed)
    
    Apply the type information in ``info`` to the current address.
    
    :param info: the type information to apply to the address
    :type info: str or idaapi.tinfo_t
+   :param \*\*guessed: if ``guessed`` is specified, the mark it as guessed by the disassembler of the user
    
-.. py:function:: type(ea, info)
+.. py:function:: type(ea, info, \*\*guessed)
    
    Apply the :py:obj:`idaapi.tinfo_t` in ``info`` to the address ``ea``.
+   
+   If ``guess`` is true, then apply the type information as a guess.
+   If ``force`` is true, then apply the type as-is regardless of its location.
    
    :param ea: an address within the database
    :type ea: int or long
    :param info: the :py:obj:`idaapi.tinfo_t` to apply to the address
    :type info: idaapi.tinfo_t
+   :param \*\*guessed: if ``guessed`` is specified, the mark it as guessed by the disassembler of the user
    
 .. py:function:: type(ea, none)
    
@@ -4495,7 +4501,7 @@ Some examples of using this namespace can be::
    :param none: the python value :py:obj:`None`
    :type none: None
    
-.. py:function:: type(ea, string)
+.. py:function:: type(ea, string, \*\*guessed)
    
    Parse the type information in ``string`` into an :py:obj:`idaapi.tinfo_t` and apply it to the address ``ea``.
    
@@ -4503,6 +4509,7 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param string: a string describing the type information to apply to the address
    :type string: str
+   :param \*\*guessed: if ``guessed`` is specified, the mark it as guessed by the disassembler of the user
    
 .. py:function:: type\.flags()
    
@@ -4751,6 +4758,52 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param size: the number of bytes to check
    :type size: int or long
+   
+.. py:function:: type\.is_exception(\*\*flags)
+   
+   Return if the current address or selection is guarded by an exception or part of an exception handler.
+   
+   Aliases: :py:func:`database.type.hasexception<type\.is_exception>`, :py:func:`database.type.has_exception<type\.is_exception>`, :py:func:`database.type.isexception<type\.is_exception>`, :py:func:`database.type.exceptionQ<type\.is_exception>`
+   
+   :param \*\*flags: any of the ``idaapi.TBEA_\*`` flags that are used to match the block type.
+   
+.. py:function:: type\.is_exception(ea, \*\*flags)
+   
+   Return if the address or boundaries in ``ea`` is guarded by an exception or part of an exception handler.
+   
+   If ``seh`` or ``cpp`` is specified, then include or exclude that exception type.
+   If ``guarded`` or ``try`` is true, then return if the address is guarded by an exception.
+   If ``handler`` or ``catch`` is true, then return if the address is part of an exception handler.
+   If ``fallthrough`` is true, then return if the address is part of the fall-through case for a handler.
+   If ``filter`` or ``finally`` is true, then return if the address is part of an SEH filter or SEH finalizer (respectively).
+   
+   Aliases: :py:func:`database.type.hasexception<type\.is_exception>`, :py:func:`database.type.has_exception<type\.is_exception>`, :py:func:`database.type.isexception<type\.is_exception>`, :py:func:`database.type.exceptionQ<type\.is_exception>`
+   
+   :param ea: an address within the database
+   :type ea: int or long or tuple
+   :param \*\*flags: any of the ``idaapi.TBEA_\*`` flags that are used to match the block type.
+   
+.. py:function:: type\.is_exception(ea, flags)
+   
+   Return if the address in ``ea`` is referenced by an exception matching the specified ``flags`` (:py:obj:`idaapi.TBEA_\*`).
+   
+   Aliases: :py:func:`database.type.hasexception<type\.is_exception>`, :py:func:`database.type.has_exception<type\.is_exception>`, :py:func:`database.type.isexception<type\.is_exception>`, :py:func:`database.type.exceptionQ<type\.is_exception>`
+   
+   :param ea: an address within the database
+   :type ea: int or long
+   :param flags: any of the ``idaapi.TBEA_\*`` flags that are used to match the block type.
+   :type flags: int or long
+   
+.. py:function:: type\.is_exception(bounds, flags)
+   
+   Return if the given ``bounds`` is referenced by an exception matching the specified ``flags`` (:py:obj:`idaapi.TBEA_\*`).
+   
+   Aliases: :py:func:`database.type.hasexception<type\.is_exception>`, :py:func:`database.type.has_exception<type\.is_exception>`, :py:func:`database.type.isexception<type\.is_exception>`, :py:func:`database.type.exceptionQ<type\.is_exception>`
+   
+   :param bounds: the boundaries of the range to check
+   :type bounds: tuple
+   :param flags: any of the ``idaapi.TBEA_\*`` flags that are used to match the block type.
+   :type flags: int or long
    
 .. py:function:: type\.is_globalref()
    
@@ -5235,6 +5288,30 @@ Some examples of using these keywords are as follows::
    
    :param library: the :py:obj:`idaapi.til_t` of the library to return the number of types from
    :type library: idaapi.til_t
+   
+.. py:function:: types\.declare(string, \*\*flags)
+   
+   Parse the given ``string`` into an :py:obj:`idaapi.tinfo_t` using the current type library and return it.
+   
+   Aliases: :py:func:`database.types.decl<types\.declare>`, :py:func:`database.types.parse<types\.declare>`
+   
+   :param string: the type as a string to parse
+   :type string: str
+   :param \*\*flags: any of the ``idaapi.PT_\*`` flags to use when parsing the type
+   
+.. py:function:: types\.declare(string, library, \*\*flags)
+   
+   Parse the given ``string`` into an :py:obj:`idaapi.tinfo_t` using the specified type ``library`` and return it.
+   
+   If the integer ``flags`` is provided, then use the specified flags (:py:obj:`idaapi.PT_\*`) when parsing the ``string``.
+   
+   Aliases: :py:func:`database.types.decl<types\.declare>`, :py:func:`database.types.parse<types\.declare>`
+   
+   :param string: the type as a string to parse
+   :type string: str
+   :param library: the ``idaapi.til_t`` describing the target type library
+   :type library: idaapi.til_t
+   :param \*\*flags: any of the ``idaapi.PT_\*`` flags to use when parsing the type
    
 .. py:function:: types\.get(ordinal)
    

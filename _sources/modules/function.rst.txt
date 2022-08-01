@@ -524,24 +524,38 @@ Some examples of this functionality can be::
     > print( function.block.read().encode('hex') )
     > print( function.block.disasm(ea) )
 
-.. py:function:: block()
+.. py:function:: block(\*\*flags)
    
    Returns the boundaries of the current basic block.
    
-.. py:function:: block(ea)
+   :param \*\*flags:
+   
+.. py:function:: block(ea, \*\*flags)
    
    Returns the boundaries of the basic block at address ``ea``.
    
    :param ea: the address containing the basic block to return the boundaries for
    :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
    
-.. py:function:: block(func, ea)
+.. py:function:: block(func, ea, \*\*flags)
    
    Returns the boundaries of the basic block at address ``ea`` in function ``func``.
    
    :param func: the function containing the basic block
    :param ea: the address containing the basic block to return the boundaries for
    :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
+   
+.. py:function:: block(func, ea, flags)
+   
+   Returns the boundaries of the basic block with the specified ``flags`` (:py:obj:`idaapi.FC_\*`) at address ``ea`` in function ``func``.
+   
+   :param func:
+   :param ea:
+   :type ea: int or long
+   :param flags:
+   :type flags: int or long
    
 .. py:function:: block(bb)
    
@@ -550,12 +564,13 @@ Some examples of this functionality can be::
    :param bb: the basic block to return the boundaries for
    :type bb: idaapi.BasicBlock
    
-.. py:function:: block(bounds)
+.. py:function:: block(bounds, \*\*flags)
    
    Return the boundaries of the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to return the basic block for
    :type bounds: tuple
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
    
 .. py:function:: block\.address()
    
@@ -610,24 +625,28 @@ Some examples of this functionality can be::
    :param bb: the basic block to return the successors for
    :type bb: idaapi.BasicBlock
    
-.. py:function:: block\.at()
+.. py:function:: block\.at(\*\*flags)
    
    Return the :py:obj:`idaapi.BasicBlock` of the current address in the current function.
    
-.. py:function:: block\.at(ea)
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
+   
+.. py:function:: block\.at(ea, \*\*flags)
    
    Return the :py:obj:`idaapi.BasicBlock` of address ``ea`` in the current function.
    
    :param ea: the address of the basic block to return
    :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
    
-.. py:function:: block\.at(func, ea)
+.. py:function:: block\.at(func, ea, \*\*flags)
    
    Return the :py:obj:`idaapi.BasicBlock` of address ``ea`` in the function ``func``.
    
    :param func: the function containing the basic block
    :param ea: the address of the basic block to return
    :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
    
 .. py:function:: block\.at(bb)
    
@@ -636,12 +655,13 @@ Some examples of this functionality can be::
    :param bb: the basic block to return
    :type bb: idaapi.BasicBlock
    
-.. py:function:: block\.at(bounds)
+.. py:function:: block\.at(bounds, \*\*flags)
    
    Return the :py:obj:`idaapi.BasicBlock` identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to return
    :type bounds: tuple
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
    
 .. py:function:: block\.before()
    
@@ -1036,9 +1056,13 @@ Some examples of this functionality can be::
    
    Return the top address of the basic block at the current address.
    
+   Aliases: :py:func:`function.block.addr<block\.top>`, :py:func:`function.block.address<block\.top>`
+   
 .. py:function:: block\.top(ea)
    
    Return the top address of the basic block at address ``ea``.
+   
+   Aliases: :py:func:`function.block.addr<block\.top>`, :py:func:`function.block.address<block\.top>`
    
    :param ea: the address belonging to the basic block to return the top address for
    :type ea: int or long
@@ -1047,12 +1071,16 @@ Some examples of this functionality can be::
    
    Return the top address of the basic block ``bb``.
    
+   Aliases: :py:func:`function.block.addr<block\.top>`, :py:func:`function.block.address<block\.top>`
+   
    :param bb: the basic block to return the top address for
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block\.top(bounds)
    
    Return the top address of the basic block identified by ``bounds``.
+   
+   Aliases: :py:func:`function.block.addr<block\.top>`, :py:func:`function.block.address<block\.top>`
    
    :param bounds: the boundaries of the basic block to return the top address for
    :type bounds: tuple
@@ -1078,64 +1106,81 @@ and :py:obj:`function.digraph`.
 
 Some examples of this namespace's usage::
 
-    > for bb in function.blocks(): ...
+    > for bb in function.blocks(calls=False): ...
     > chart = function.blocks.flowchart(ea)
     > G = function.blocks.graph()
 
-.. py:function:: blocks(\*\*silent)
+.. py:function:: blocks(\*\*external)
    
    Return the bounds of each basic block for the current function.
    
-   :param \*\*silent: a boolean specifying to exclude warnings about blocks that are outside the function
+   :param \*\*external: a boolean specifying to include external blocks in the blocks that are returned
    
-.. py:function:: blocks(func, \*\*silent)
+.. py:function:: blocks(func, \*\*external)
    
    Returns the bounds of each basic block for the function ``func``.
    
    :param func: the function to return the basic blocks for
-   :param \*\*silent: a boolean specifying to exclude warnings about blocks that are outside the function
+   :param \*\*external: a boolean specifying to include external blocks in the blocks that are returned
    
-.. py:function:: blocks(bounds, \*\*silent)
+.. py:function:: blocks(bounds, \*\*external)
    
    Return each basic block contained within the specified ``bounds``.
    
    :param bounds: the boundaries to use when constraining the returned list of basic blocks
    :type bounds: tuple
-   :param \*\*silent: a boolean specifying to exclude warnings about blocks that are outside the function
+   :param \*\*external: a boolean specifying to include external blocks in the blocks that are returned
    
-.. py:function:: blocks(left, right, \*\*silent)
+.. py:function:: blocks(left, right, \*\*external)
    
-   Returns each basic block contained within the addresses ``left`` and ``right``.
+   Returns each basic block contained between the addresses ``left`` and ``right``.
+   
+   If ``external`` is true, then include all blocks that are a branch target despite being outside the function boundaries.
+   If ``split`` is false, then do not allow a call instruction to split a block.
    
    :param left: the top address of the basic block
    :param right: the bottom address of the basic block
-   :param \*\*silent: a boolean specifying to exclude warnings about blocks that are outside the function
+   :param \*\*external: a boolean specifying to include external blocks in the blocks that are returned
    
-.. py:function:: blocks\.at()
+.. py:function:: blocks\.at(\*\*flags)
    
    Return the :py:obj:`idaapi.BasicBlock` at the current address in the current function.
    
-.. py:function:: blocks\.at(ea)
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
+   
+.. py:function:: blocks\.at(ea, \*\*flags)
    
    Return the :py:obj:`idaapi.BasicBlock` of address ``ea`` in the current function.
    
    :param ea: the address of the basic block to return
    :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
    
-.. py:function:: blocks\.at(func, ea)
+.. py:function:: blocks\.at(func, ea, \*\*flags)
    
    Return the :py:obj:`idaapi.BasicBlock` in function ``func`` at address ``ea``.
    
    :param func: the function containing the basic block
    :param ea: the address of the basic block to return
    :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
+   
+.. py:function:: blocks\.at(func, ea, flags)
+   
+   Return the :py:obj:`idaapi.BasicBlock` with the specified ``flags`` (:py:obj:`idaapi.FC_\*`) for function ``func`` at address ``ea``.
+   
+   :param func: the function containing the basic block
+   :param ea: the address of the basic block to return
+   :type ea: int or long
+   :param flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
+   :type flags: int or long
    
 .. py:function:: blocks\.at(func, bb)
    
    Return the :py:obj:`idaapi.BasicBlock` in function ``func`` identifed by ``bb``.
    
-   :param func:
-   :param bb:
+   :param func: the function containing the basic block
+   :param bb: the ``idaapi.BasicBlock`` containing the boundaries to match
    :type bb: idaapi.BasicBlock
    
 .. py:function:: blocks\.digraph()
@@ -1144,7 +1189,7 @@ Some examples of this namespace's usage::
    
    Aliases: :py:func:`function.blocks.graph<blocks\.digraph>`, :py:func:`function.graph<blocks\.digraph>`, :py:func:`function.digraph<blocks\.digraph>`
    
-.. py:function:: blocks\.digraph(func)
+.. py:function:: blocks\.digraph(func, \*\*flags)
    
    Return a :py:obj:`networkx.DiGraph` of the function ``func``.
    
@@ -1153,33 +1198,89 @@ Some examples of this namespace's usage::
    Aliases: :py:func:`function.blocks.graph<blocks\.digraph>`, :py:func:`function.graph<blocks\.digraph>`, :py:func:`function.digraph<blocks\.digraph>`
    
    :param func: the function to return a graph for
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
    
-.. py:function:: blocks\.flowchart()
+.. py:function:: blocks\.flowchart(\*\*flags)
    
    Return an :py:obj:`idaapi.FlowChart` object for the current function.
    
    Aliases: :py:func:`function.flowchart<blocks\.flowchart>`
    
-.. py:function:: blocks\.flowchart(func)
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
+   
+.. py:function:: blocks\.flowchart(func, \*\*flags)
    
    Return an :py:obj:`idaapi.FlowChart` object for the function ``func``.
    
    Aliases: :py:func:`function.flowchart<blocks\.flowchart>`
    
    :param func: the function to return the flowchart for
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
    
-.. py:function:: blocks\.iterate(\*\*silent)
+.. py:function:: blocks\.flowchart(func, flags)
+   
+   Return an :py:obj:`idaapi.FlowChart` object built with the specified ``flags`` for the function ``func``.
+   
+   Aliases: :py:func:`function.flowchart<blocks\.flowchart>`
+   
+   :param func: the function to return the flowchart for
+   :param flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
+   :type flags: int or long
+   
+.. py:function:: blocks\.iterate(\*\*external)
    
    Return each :py:obj:`idaapi.BasicBlock` for the current function.
    
-   :param \*\*silent: a boolean specifying to exclude warnings about blocks that are outside the function
+   :param \*\*external: a boolean specifying to include external blocks in the blocks that are returned
    
-.. py:function:: blocks\.iterate(func, \*\*silent)
+.. py:function:: blocks\.iterate(func, \*\*external)
    
    Returns each :py:obj:`idaapi.BasicBlock` for the function ``func``.
    
+   If ``external`` is true, then include all blocks that are a branch target despite being outside the function boundaries.
+   If ``split`` is false, then do not allow a call instruction to split a block.
+   
    :param func: the function containing the basic blocks to yield
+   :param \*\*external: a boolean specifying to include external blocks in the blocks that are returned
+   
+.. py:function:: blocks\.iterate(func, flags, \*\*silent)
+   
+   Returns each :py:obj:`idaapi.BasicBlock` from the flowchart built with the specified ``flags`` (:py:obj:`idaapi.FC_\*`) for the function ``func``.
+   
+   :param func: the function containing the basic blocks to yield
+   :param flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
+   :type flags: int or long
    :param \*\*silent: a boolean specifying to exclude warnings about blocks that are outside the function
+   
+.. py:function:: blocks\.moonwalk(\*\*flags)
+   
+   Traverse each of the predecessor blocks for the current function starting with the block at the current address.
+   
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
+   
+.. py:function:: blocks\.moonwalk(ea, \*\*flags)
+   
+   Traverse each of the predecessor blocks for a function starting with the block at the address ``ea``.
+   
+   :param ea: the address of the block to start at
+   :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
+   
+.. py:function:: blocks\.moonwalk(func, ea, \*\*flags)
+   
+   Traverse each of the predecessor blocks from the block at address ``ea`` belonging to the function ``func``.
+   
+   :param func: the function containing the block to traverse the predecessors of
+   :param ea: the address of the block to start at
+   :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
+   
+.. py:function:: blocks\.moonwalk(bb)
+   
+   Traverse each of the predecessor blocks from the :py:obj:`idaapi.BasicBlock` identified by ``bb``.
+   
+   :param bb: the ``idaapi.BasicBlock`` to traverse the predecessors of
+   :type bb: idaapi.BasicBlock
    
 .. py:function:: blocks\.subgraph(start, exits)
    
@@ -1202,29 +1303,76 @@ Some examples of this namespace's usage::
    :param exits: the addresses of basic blocks to stop at
    :type exits: int or long or list or tuple or set
    
-.. py:function:: blocks\.walk()
+.. py:function:: blocks\.traverse(\*\*flags)
    
-   Yield each :py:obj:`idaapi.BasicBlock` starting at the current address and terminating when there's no clear path to continue.
+   Traverse each of the successor blocks starting from the beginning of the current function.
    
-.. py:function:: blocks\.walk(ea)
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart to traverse
    
-   Yield each :py:obj:`idaapi.BasicBlock` starting at the address ``ea`` and terminating when there's no clear path to continue.
+.. py:function:: blocks\.traverse(predicate, \*\*flags)
    
-   :param ea:
+   Traverse the blocks from the beginning of the current function until the callable ``predicate`` returns no more elements.
    
-.. py:function:: blocks\.walk(func, ea)
+   :param predicate: a callable (such as :py:obj:`block.before` or :py:obj:`block.after`) returning the blocks to choose from
+   :type predicate: callable
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart to traverse
    
-   Yield each :py:obj:`idaapi.BasicBlock` in the function ``func`` starting at the address ``ea`` and terminating when there's no clear path to continue.
+.. py:function:: blocks\.traverse(func, predicate, \*\*flags)
    
-   :param func:
-   :param ea:
+   Traverse the blocks from the beginning of function ``func`` until the callable ``predicate`` returns no more elements.
+   
+   :param func: the function to traverse
+   :param predicate: a callable (such as :py:obj:`block.before` or :py:obj:`block.after`) returning the blocks to choose from
+   :type predicate: callable
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart to traverse
+   
+.. py:function:: blocks\.traverse(func, ea, predicate, \*\*flags)
+   
+   Traverse the blocks of function ``func`` from the block given by ``ea`` until the callable ``predicate`` returns no more elements.
+   
+   :param func: the function containing the block
+   :param ea: the address of the block to start at
    :type ea: int or long
+   :param predicate: a callable (such as :py:obj:`block.before` or :py:obj:`block.after`) returning the blocks to choose from
+   :type predicate: callable
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
+   
+.. py:function:: blocks\.traverse(bb, predicate)
+   
+   Traverse the blocks of function ``func`` from the :py:obj:`idaapi.BasicBlock` given by ``bb`` until the callable ``predicate`` returns no more elements.
+   
+   :param bb: the ``idaapi.BasicBlock`` to start at
+   :type bb: idaapi.BasicBlock
+   :param predicate: a callable (such as :py:obj:`block.before` or :py:obj:`block.after`) returning the blocks to choose from
+   :type predicate: callable
+   
+.. py:function:: blocks\.walk(\*\*flags)
+   
+   Traverse each of the successor blocks starting from the beginning of the current function.
+   
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart to traverse
+   
+.. py:function:: blocks\.walk(func, \*\*flags)
+   
+   Traverse each of the successor blocks starting from the beginning of the function ``func``.
+   
+   :param func: the function containing to traverse the successors of
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart to traverse
+   
+.. py:function:: blocks\.walk(func, ea, \*\*flags)
+   
+   Traverse each of the successor blocks of the block identified by ``ea`` belonging to the function ``func``.
+   
+   :param func: the function containing the block to traverse the successors of
+   :param ea: the address of the block to start at
+   :type ea: int or long
+   :param \*\*flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart the block comes from
    
 .. py:function:: blocks\.walk(bb)
    
-   Yield each :py:obj:`idaapi.BasicBlock` starting at the specified ``bb`` and terminating when there's no clear path to continue.
+   Traverse each of the successor blocks from the :py:obj:`idaapi.BasicBlock` identified by ``bb``.
    
-   :param bb:
+   :param bb: the ``idaapi.BasicBlock`` to traverse the successors of
    :type bb: idaapi.BasicBlock
    
 .. _ns-function-chunk:
@@ -1327,18 +1475,18 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.at()
    
-   Return a tuple containing the bounds of the current function chunk.
+   Return an :py:obj:`idaapi.range_t` describing the bounds of the current function chunk.
    
 .. py:function:: chunk\.at(ea)
    
-   Return a tuple containing the bounds of the function chunk at the address ``ea``.
+   Return an :py:obj:`idaapi.range_t` describing the bounds of the function chunk at the address ``ea``.
    
    :param ea: the address of the chunk to return
    :type ea: int or long
    
 .. py:function:: chunk\.at(func, ea)
    
-   Return a tuple containing the bounds of the function chunk belonging to ``func`` at the address ``ea``.
+   Return an :py:obj:`idaapi.range_t` describing the bounds of the function chunk belonging to ``func`` at the address ``ea``.
    
    :param func: the function containing the chunk
    :param ea: the address of the chunk to return
@@ -1570,18 +1718,18 @@ Some of the ways to use this namespace are::
    
 .. py:function:: chunks\.at()
    
-   Return a tuple containing the bounds of the current function chunk.
+   Return an :py:obj:`idaapi.range_t` describing the bounds of the current function chunk.
    
 .. py:function:: chunks\.at(ea)
    
-   Return a tuple containing the bounds of the function chunk at the address ``ea``.
+   Return an :py:obj:`idaapi.range_t` describing the bounds of the function chunk at the address ``ea``.
    
    :param ea: the address belonging to the chunk to return
    :type ea: int or long
    
 .. py:function:: chunks\.at(func, ea)
    
-   Return a tuple containing the bounds of the function chunk belonging to ``func`` at the address ``ea``.
+   Return an :py:obj:`idaapi.range_t` describing the bounds of the function chunk belonging to ``func`` at the address ``ea``.
    
    :param func: the function containing the chunk
    :param ea: the address belonging to the chunk to return
@@ -1952,12 +2100,13 @@ Some simple ways of getting information about a function::
    
    Return the type information for the current function as an :py:obj:`idaapi.tinfo_t`.
    
-.. py:function:: type(info)
+.. py:function:: type(info, \*\*guessed)
    
    Apply the type information in ``info`` to the current function.
    
    :param info: the type information to apply
    :type info: str or idaapi.tinfo_t
+   :param \*\*guessed: a boolean describing whether the type is guessed by the disassembler or the user
    
 .. py:function:: type(none)
    
@@ -1973,21 +2122,23 @@ Some simple ways of getting information about a function::
    :param func: the address or function to return the type information from
    :type func: int or long or idaapi.func_t
    
-.. py:function:: type(func, info)
+.. py:function:: type(func, info, \*\*guessed)
    
    Apply the :py:obj:`idaapi.tinfo_t` in ``info`` to the function ``func``.
    
    :param func: the address or function to apply the type information to
    :param info: the type information string to apply to the function
    :type info: idaapi.tinfo_t
+   :param \*\*guessed: a boolean describing whether the type is guessed by the disassembler or the user
    
-.. py:function:: type(func, info)
+.. py:function:: type(func, info, \*\*guessed)
    
    Parse the type information string in ``info`` into an :py:obj:`idaapi.tinfo_t` and apply it to the function ``func``.
    
    :param func: the address or function to apply the type information to
    :param info: the :py:obj:`idaapi.tinfo_t` containing the type information to apply to the function
    :type info: str
+   :param \*\*guessed: a boolean describing whether the type is guessed by the disassembler or the user
    
 .. py:function:: type(func, none)
    
@@ -2159,11 +2310,11 @@ Some simple ways of getting information about a function::
    
    Return a boolean describing whether the current function is hidden.
    
-.. py:function:: type\.hidden(boolean)
+.. py:function:: type\.hidden(func)
    
-   Modify the attributes of the current function to set it as a hidden function depending on the value of ``boolean``.
+   Return a boolean describing whether the function ``func`` is hidden.
    
-   :param boolean: a boolean value representing whether the function is hidden or not
+   :param func: the function to return the hidden attribute from
    
 .. py:function:: type\.hidden(func, boolean)
    
@@ -2260,11 +2411,11 @@ Some simple ways of getting information about a function::
    
    Return a boolean describing whether the current function is considered a library function.
    
-.. py:function:: type\.library(boolean)
+.. py:function:: type\.library(func)
    
-   Modify the attributes of the current function to set it as a library function depending on the value of ``boolean``.
+   Return a boolean describing whether the function ``func`` is considered a library function.
    
-   :param boolean: a boolean value representing whether the function should be set as a library function or not
+   :param func: the desired function to return the library attribute from
    
 .. py:function:: type\.library(func, boolean)
    
@@ -2277,11 +2428,11 @@ Some simple ways of getting information about a function::
    
    Return a boolean describing whether the current function is defined as a static function.
    
-.. py:function:: type\.static(boolean)
+.. py:function:: type\.static(func)
    
-   Modify the attributes of the current function to set it as a static function depending on the value of ``boolean``.
+   Return a boolean describing whether the function ``func`` is defined as a static function.
    
-   :param boolean: a boolean value representing whether the function should be set as a static function or not
+   :param func: the function to return the static attribute from
    
 .. py:function:: type\.static(func, boolean)
    
@@ -2294,11 +2445,11 @@ Some simple ways of getting information about a function::
    
    Return a boolean describing whether the current function was determined to be a code thunk.
    
-.. py:function:: type\.thunk(boolean)
+.. py:function:: type\.thunk(func)
    
-   Modify the attributes of the current function to set it as a code thunk depending on the value of ``boolean``.
+   Return a boolean describing whether the function ``func`` was determined to be a code thunk.
    
-   :param boolean: a boolean value representing whether the function should be set as a code thunk or not
+   :param func: the function to return the thunk attribute from
    
 .. py:function:: type\.thunk(func, boolean)
    
@@ -2326,6 +2477,8 @@ in a function:
     > print( function.argument.name(1) )
     > oldtype = function.argument(0, 'void*')
     > oldname = function.argument.name(1)
+    > location = function.argument.location(2)
+    > index = function.argument.remove(3)
 
 .. py:function:: type\.argument(index)
    
@@ -2375,14 +2528,14 @@ in a function:
    
    Return the location of the parameter at the specified ``index`` in the current function.
    
-   :param index:
+   :param index: the index of the parameter to return the location of
    :type index: int or long
    
 .. py:function:: type\.argument\.location(func, index)
    
    Return the location of the parameter at the specified ``index`` in the function ``func``.
    
-   :param func: the address or function containing the prototype
+   :param func: the address or function containing the parameter
    :param index: the index of the parameter to return the location of
    :type index: int or long
    
@@ -2392,6 +2545,15 @@ in a function:
    
    :param index: the index of the argument to return the name of
    :type index: int or long
+   
+.. py:function:: type\.argument\.name(index, none)
+   
+   Remove the name from the parameter at the specified ``index`` in the current function.
+   
+   :param index: the index of the argument to remove the name from
+   :type index: int or long
+   :param none: the python value :py:obj:`None`
+   :type none: None
    
 .. py:function:: type\.argument\.name(index, string, \*suffix)
    
@@ -2407,20 +2569,49 @@ in a function:
    
    Return the name of the parameter at the specified ``index`` in the function ``func``.
    
-   :param func: the address or function containing the prototype
+   :param func: the address or function containing the parameter
    :param index: the index of the argument to return the name of
    :type index: int or long
+   
+.. py:function:: type\.argument\.name(func, index, none)
+   
+   Remove the name from the parameter at the specified ``index`` in the function ``func``.
+   
+   :param func: the address or function containing the parameter
+   :param index: the index of the argument to remove the name from
+   :type index: int or long
+   :param none: the python value :py:obj:`None`
+   :type none: None
    
 .. py:function:: type\.argument\.name(func, index, string, \*suffix)
    
    Modify the name of the parameter at the specified ``index`` of the function ``func`` to ``string``.
    
-   :param func: the address or function containing the prototype
+   :param func: the address or function containing the parameter
    :param index: the index of the argument to rename
    :type index: int or long
    :param string: the string to rename the argument to
    :type string: str
-   :param \*suffix:
+   :param \*suffix: any other integers or strings to append to the name
+   
+.. py:function:: type\.argument\.remove(index)
+   
+   Remove the parameter at the specified ``index`` from the current function.
+   
+   Aliases: :py:func:`function.type.argument.pop<type\.argument\.remove>`
+   
+   :param index: the index of the parameter to remove
+   :type index: int or long
+   
+.. py:function:: type\.argument\.remove(func, index)
+   
+   Remove the parameter at the specified ``index`` from the function ``func``.
+   
+   Aliases: :py:func:`function.type.argument.pop<type\.argument\.remove>`
+   
+   :param func: the address or function to containing the parameter
+   :param index: the index of the parameter to remove
+   :type index: int or long
    
 .. _ns-function-type-arguments:
 
@@ -2444,6 +2635,46 @@ This namespace is aliased as :py:obj:`function.type.args` and :py:obj:`function.
    Return the type information for each of the parameters belonging to the function ``func``.
    
    :param func: the address or function containing the prototype with the types to return
+   
+.. py:function:: type\.arguments(func, types)
+   
+   Overwrite the type information for the parameters belonging to the function ``func`` with the provided list of ``types``.
+   
+   :param func: the address or function containing the prototype to modify
+   :param types: a tuple or list of types to use for the parameters
+   :type types: list or tuple
+   
+.. py:function:: type\.arguments\.add(info)
+   
+   Add the provided type information in ``info`` as another parameter to the current function.
+   
+   Aliases: :py:func:`function.type.arguments.append<type\.arguments\.add>`
+   
+   :param info: the type information of the parameter
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: type\.arguments\.add(func, info)
+   
+   Add the provided type information in ``info`` as another parameter to the function ``func``.
+   
+   Aliases: :py:func:`function.type.arguments.append<type\.arguments\.add>`
+   
+   :param func: the address or function to add a parameter to
+   :param info: the type information of the parameter
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: type\.arguments\.add(func, info, name, \*suffix)
+   
+   Add the provided type information in ``info`` with the given ``name`` as another parameter to the function ``func``.
+   
+   Aliases: :py:func:`function.type.arguments.append<type\.arguments\.add>`
+   
+   :param func: the address or function to add a parameter to
+   :param info: the type information of the parameter
+   :type info: str or idaapi.tinfo_t
+   :param name: the name of the parameter
+   :type name: str
+   :param \*suffix: any integers or strings to append to the name
    
 .. py:function:: type\.arguments\.count()
    
@@ -2489,13 +2720,27 @@ This namespace is aliased as :py:obj:`function.type.args` and :py:obj:`function.
    
    :param func: the address or function containing the prototype with the argument names to return
    
+.. py:function:: type\.arguments\.names(func, names)
+   
+   Overwrite the names for the parameters belonging to the function ``func`` with the provided list of ``names``.
+   
+   Aliases: :py:func:`function.type.arguments.name<type\.arguments\.names>`
+   
+   :param func: the address or function containing the prototype to modify
+   :param names: a tuple or list of names to apply to the parameters
+   :type names: list or tuple
+   
 .. py:function:: type\.arguments\.registers()
    
    Return the registers for each of the parameters belonging to the current function.
    
+   Aliases: :py:func:`function.type.arguments.regs<type\.arguments\.registers>`
+   
 .. py:function:: type\.arguments\.registers(func)
    
    Return the registers for each of the parameters belonging to the function ``func``.
+   
+   Aliases: :py:func:`function.type.arguments.regs<type\.arguments\.registers>`
    
    :param func: the address or function containing the prototype with the registers to return
    
@@ -2512,6 +2757,16 @@ This namespace is aliased as :py:obj:`function.type.args` and :py:obj:`function.
    Aliases: :py:func:`function.type.arguments.type<type\.arguments\.types>`
    
    :param func: the address or function containing the prototype with the argument types to return
+   
+.. py:function:: type\.arguments\.types(func, types)
+   
+   Overwrite the type information for the parameters belonging to the function ``func`` with the provided list of ``types``.
+   
+   Aliases: :py:func:`function.type.arguments.type<type\.arguments\.types>`
+   
+   :param func: the address or function containing the prototype to modify
+   :param types: a tuple or list of types to use for the parameters
+   :type types: list or tuple
    
 .. _ns-function-type-result:
 
