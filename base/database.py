@@ -1482,6 +1482,10 @@ def name(ea, **flags):
 
     # return the name at the specified address or not
     return utils.string.of(aname) or None
+@utils.multicase(packed=tuple)
+def name(packed, **flags):
+    '''Renames the current address to the given `packed` name.'''
+    return name(ui.current.address(), *packed, **flags)
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
@@ -1491,6 +1495,10 @@ def name(string, *suffix, **flags):
 def name(none, **flags):
     '''Removes the name at the current address.'''
     return name(ui.current.address(), none or '', **flags)
+@utils.multicase(packed=tuple)
+def name(ea, packed, **flags):
+    '''Renames the address specifed by `ea` to the given `packed` name.'''
+    return name(ea, *packed, **flags)
 @utils.multicase(ea=six.integer_types, string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(ea, string, *suffix, **flags):
