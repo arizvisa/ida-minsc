@@ -5534,9 +5534,6 @@ class types(object):
         """
         errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
 
-        # FIXME: check if last element was recently deleted so that we can reuse its ordinal if so.
-        count = idaapi.get_ordinal_qty(library)
-
         # first we'll try to serialize the type before we make any perma-changes.
         serialized = info.serialize()
         if serialized is None:
@@ -5548,7 +5545,7 @@ class types(object):
         cmt, sclass, fieldcmts = b'', idaapi.sc_unk, fieldcmts or b''
 
         # now we can allocate a slot for the ordinal within the type library.
-        ordinal = idaapi.alloc_type_ordinals(library, count + 1)
+        ordinal = idaapi.alloc_type_ordinals(library, 1)
         if not ordinal:
             raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to allocate an ordinal within the specified type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else ''))
 
