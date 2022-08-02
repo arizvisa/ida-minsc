@@ -185,6 +185,10 @@ def name(none, **flags):
     # in case the user might be hovering over an import table
     # function and wanting to rename that instead.
     return name(ui.current.address(), none or '', **flags)
+@utils.multicase(packed=tuple)
+def name(packed, **flags):
+    '''Set the name of the current function to the given `packed` name.'''
+    return name(ui.current.address(), *packed, **flags)
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
@@ -194,6 +198,10 @@ def name(string, *suffix, **flags):
 def name(func, none, **flags):
     '''Remove the custom-name from the function `func`.'''
     return name(func, none or '', **flags)
+@utils.multicase(packed=tuple)
+def name(func, packed, **flags):
+    '''Set the name of the function `func` to the given `packed` name.'''
+    return name(func, *packed, **flags)
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(func, string, *suffix, **flags):
