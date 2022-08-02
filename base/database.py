@@ -5467,6 +5467,20 @@ class types(object):
             raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to delete the type information with the specified name (\"{:s}\") from the type library.".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
         return res
 
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def add(cls, name, **mangled):
+        '''Add an empty type with the provided `name` to the current type library.'''
+        til = idaapi.get_idati()
+        return cls.add(name, til, **mangled)
+    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def add(cls, name, library, **mangled):
+        '''Add an empty type with the provided `name` to the specified type `library`.'''
+        ti = cls.parse(' '.join(['struct', name]))
+        return cls.add(name, ti, library, **mangled)
     @utils.multicase(name=six.string_types, info=(six.string_types, idaapi.tinfo_t))
     @classmethod
     @utils.string.decorate_arguments('name')
