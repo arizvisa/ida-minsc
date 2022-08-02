@@ -735,30 +735,34 @@ class strings(appwindow):
         return idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
     @classmethod
     def size(cls):
-        '''Return the number of elements in the strings list.'''
+        '''Return the number of items available in the strings list.'''
         return idaapi.get_strlist_qty()
     @classmethod
     def at(cls, index):
-        '''Return the string at the specified `index`.'''
+        '''Return the ``idaapi.string_info_t`` for the specified `index` in the strings list.'''
         si = idaapi.string_info_t()
-
-        # FIXME: this isn't being used correctly
-        ok = idaapi.get_strlist_item(si, index)
-        if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join([__name__, cls.__name__]), index, index, res))
+        if not idaapi.get_strlist_item(si, index):
+            raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` did not return successfully.".format('.'.join([__name__, cls.__name__]), index, index))
         return si
     @classmethod
     def get(cls, index):
-        '''Return the address and the string at the specified `index`.'''
+        '''Return the address and its bytes representing the string at the specified `index`.'''
         si = cls.at(index)
         get_contents = idaapi.get_strlit_contents if hasattr(idaapi, 'get_strlit_contents') else idaapi.get_ascii_contents
-        res = get_contents(si.ea, si.length, si.type)
-        return si.ea, internal.utils.string.of(res)
+        string = get_contents(si.ea, si.length, si.type)
+        return si.ea, internal.utils.string.of(string)
+    @classmethod
+    def __iterate__(cls):
+        '''Iterate through all of the items in the strings list yielding the `(index, address, bytes)`.'''
+        for index in range(cls.size()):
+            ea, item = cls.get(index)
+            yield index, ea, item
+        return
     @classmethod
     def iterate(cls):
-        '''Iterate through all of the address and strings in the strings list.'''
-        for index in range(cls.size()):
-            yield cls.get(index)
+        '''Iterate through all of the addresses and items in the strings list.'''
+        for _, ea, item in cls.__iterate__():
+            yield ea, item
         return
 
 class structures(appwindow):
