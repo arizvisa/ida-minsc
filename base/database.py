@@ -5481,7 +5481,7 @@ class types(object):
         '''Add the type information in `string` to the specified type `library` using the provided `name`.'''
         ti = internal.declaration.parse(string)
         if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({:s}).".format('.'.join([__name__, cls.__name__]), name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(info_s)))
+            raise E.InvalidTypeOrValueError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({:s}).".format('.'.join([__name__, cls.__name__]), name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(string)))
         return cls.add(name, ti, library, **mangled)
     @utils.multicase(name=six.string_types, info=idaapi.tinfo_t, library=idaapi.til_t)
     @classmethod
