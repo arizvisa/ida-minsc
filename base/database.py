@@ -5189,6 +5189,33 @@ class types(object):
         '''Return the type information from the specified `library` that is using the given `name`.'''
         return cls.by_name(name, library)
 
+    @utils.multicase(ordinal=six.integer_types)
+    @classmethod
+    def has(cls, ordinal):
+        '''Return whether the current type library has a type at the given `ordinal`.'''
+        til = idaapi.get_idati()
+        return cls.has(ordinal, til)
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def has(cls, name):
+        '''Return whether the current type library has a type with the specified `name`.'''
+        til = idaapi.get_idati()
+        return cls.has(name, til)
+    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+    @classmethod
+    def has(cls, ordinal, library):
+        '''Return whether the provided type `library` has a type at the given `ordinal`.'''
+        serialized = idaapi.get_numbered_type(library, ordinal)
+        return True if serialized else False
+    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def has(cls, name, library):
+        '''Return whether the provided type `library` has a type with the specified `name`.'''
+        ordinal = idaapi.get_type_ordinal(library, utils.string.to(name))
+        return True if ordinal else False
+
     @utils.multicase(name=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('name')
