@@ -4909,6 +4909,7 @@ class types(object):
         `V` - The type represents a virtual function table
         `C` - The type represents a structure containing a virtual function table
         `U` - The type represents a union
+        `?` - The type is currently not defined
 
     The available types that one can filter the local types with are as follows:
 
@@ -4918,6 +4919,7 @@ class types(object):
         `definition` - Filter the local types by applying a glob to their definition.
         `regex` - Filter the local types by applying a regular-expression to their definition.
         `typeref` or `typedef` - Filter the local types for any that are an alias declared with typedef.
+        `defined` or `present` - Filter the local types for any that are defined.
         `size` - Filter the local types according to their size.
         `greater` or `ge` - Filter the local types for the ones that are larger or equal to a certain size.
         `gt` - Filter the local types for the ones that are larger than a certain size.
@@ -4971,6 +4973,7 @@ class types(object):
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref'))
     __matcher__.mapping('typedef', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref'))
+    __matcher__.mapping('defined', operator.truth, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
 
     __matcher__.mapping('integer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_integral'))
     __matcher__.mapping('pointer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_ptr'))
