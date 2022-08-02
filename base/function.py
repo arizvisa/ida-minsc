@@ -210,9 +210,8 @@ def name(func, string, *suffix, **flags):
     # figure out if address is a runtime or static function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-    # set the default flags that we'll use based on whether the
-    # listed parameter was set.
-    res = 0 if flags.get('listed', idaapi.is_in_nlist(ea)) else idaapi.SN_NOLIST
+    # set the default flags that we'll use based on whether the listed parameter was set.
+    res = idaapi.SN_NOWARN | (0 if flags.get('listed', idaapi.is_in_nlist(ea)) else idaapi.SN_NOLIST)
 
     # if it's a runtime-linked function, then it's not a public name.
     if rt:
