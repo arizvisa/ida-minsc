@@ -7759,9 +7759,23 @@ class get(object):
     @classmethod
     def array(cls, bounds):
         '''Return the values within the provided `bounds` as an array.'''
-        start, stop = bounds
-        length = (stop - start) / type.size(start)
+        start, stop = sorted(bounds)
+        length = (stop - start) / idaapi.get_item_size(start)
         return cls.array(start, length=math.trunc(math.ceil(length)))
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def array(cls, bounds, type):
+        '''Return the values within the provided `bounds` as an array of the pythonic element `type`.'''
+        start, stop = sorted(bounds)
+
+        # figure out the element size from our pythonic type parameter.
+        _, _, size = interface.typemap.resolve(type)
+
+        # the bounds might not divide evenly by the given type, but we want
+        # to lean towards reading too much rather than reading too little.
+        length = (stop - start) / size
+        count = math.trunc(math.ceil(length))
+        return cls.array(start, length=count, type=type)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, **length):
@@ -7770,7 +7784,9 @@ class get(object):
         If the integer `length` is defined, then use it as the number of elements for the array.
         If a pythonic type is passed to `type`, then use it for the element type of the array when decoding.
         """
-        ea = interface.address.within(ea)
+        ea = interface.address.within(ea) if 'length' not in length else ea
+
+        # FIXME: this function is just too fucking large...srsly.
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
 
@@ -7911,7 +7927,8 @@ class get(object):
             tid = type.structure.id(ea) if type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT else idaapi.BADADDR
 
         # Set the array's length if it hasn't been determined yet.
-        length.setdefault('length', type.array.length(ea))
+        if not operator.contains(length, 'length'):
+            length['length'] = type.array.length(ea)
 
         # Now that we have the flags and the type, we can use it to determine
         # how we need to decode the array. Since there's no utilities or
@@ -8166,8 +8183,7 @@ class get(object):
         '''Return a dictionary of ctypes for the ``structure_t`` with the specified `identifier` at the address `ea`.'''
         ea = interface.address.within(ea)
 
-        # FIXME: add support for string types
-        # FIXME: consolidate this conversion into interface or something
+        # FIXME: consolidate this conversion into an interface or something
         st = _structure.by_identifier(identifier, offset=ea)
         typelookup = {
             (int, -1) : ctypes.c_int8,   (int, 1) : ctypes.c_uint8,
@@ -8181,6 +8197,8 @@ class get(object):
             (builtins.type, -2) : ctypes.c_int16,   (builtins.type, 2) : ctypes.c_uint16,
             (builtins.type, -4) : ctypes.c_int32,   (builtins.type, 4) : ctypes.c_uint32,
             (builtins.type, -8) : ctypes.c_int64,   (builtins.type, 8) : ctypes.c_uint64,
+
+            # FIXME: add support for string types
         }
 
         res = {}
