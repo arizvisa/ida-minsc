@@ -2011,6 +2011,117 @@ class block(object):
         left, right = interface.range.unpack(bb)
         return database.address.iterate(left, right)
 
+    # current block
+    @utils.multicase()
+    @classmethod
+    def tag(cls):
+        '''Returns all the tags defined for the current basic block.'''
+        return cls.tag(ui.current.address())
+    @utils.multicase(key=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('key')
+    def tag(cls, key):
+        '''Returns the value of the tag identified by `key` for the current basic block.'''
+        return cls.tag(ui.current.address(), key)
+    @utils.multicase(key=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('key')
+    def tag(cls, key, value):
+        '''Sets the value for the tag `key` to `value` for the current basic block.'''
+        return cls.tag(ui.current.address(), key, value)
+    @utils.multicase(key=six.string_types, none=None.__class__)
+    @classmethod
+    @utils.string.decorate_arguments('key')
+    def tag(cls, key, none):
+        '''Removes the tag identified by `key` for the current basic block.'''
+        return cls.tag(ui.current.address(), key, none)
+
+    # address or bounds of block
+    @utils.multicase(ea=(six.integer_types, tuple))
+    @classmethod
+    def tag(cls, ea):
+        '''Returns all the tags defined for the basic block at `ea`.'''
+        bb = cls.at(ea)
+        return cls.tag(bb)
+    @utils.multicase(ea=(six.integer_types, tuple), key=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('key')
+    def tag(cls, ea, key):
+        '''Returns the value of the tag identified by `key` for the basic block at `ea`.'''
+        bb = cls.at(ea)
+        return cls.tag(bb, key)
+    @utils.multicase(ea=(six.integer_types, tuple), key=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('key', 'value')
+    def tag(cls, ea, key, value):
+        '''Sets the value for the tag `key` to `value` for the basic block at `ea`.'''
+        bb = cls.at(ea)
+        return cls.tag(bb, key, value)
+    @utils.multicase(ea=(six.integer_types, tuple), key=six.string_types, none=None.__class__)
+    @classmethod
+    @utils.string.decorate_arguments('key')
+    def tag(cls, ea, key, none):
+        '''Removes the tag identified by `key` for the basic block at `ea`.'''
+        bb = cls.at(ea)
+        return cls.tag(bb, key, none)
+
+    # actual basic block
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    @utils.string.decorate_arguments('key', 'value')
+    def tag(cls, bb):
+        '''Returns all the tags defined for the ``idaapi.BasicBlock`` given in `bb`.'''
+        ea = interface.range.start(bb)
+
+        # first thing to do is to read the tags for the address. this
+        # gives us "__extra_prefix__", "__extra_suffix__", and "__name__".
+        res = database.tag(ea)
+
+        # next, we're going to remove the one implicit tag that we
+        # need to handle...and that's the "__color__" tag.
+        col, _ = cls.color(bb), res.pop('__color__', None)
+        if col is not None: res.setdefault('__color__', col)
+
+        # that was pretty much it, so we can just return our results.
+        return res
+    @utils.multicase(bb=idaapi.BasicBlock, key=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('key', 'value')
+    def tag(cls, bb, key):
+        '''Returns the value of the tag identified by `key` from the ``idaapi.BasicBlock`` given in `bb`.'''
+        res = cls.tag(bb)
+        if key in res:
+            return res[key]
+        bounds = interface.range.bounds(bb)
+        raise E.MissingTagError(u"{:s}.tag({!s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the basic block ({:s}).".format(__name__, bounds, key, utils.string.escape(key, '"'), bounds))
+    @utils.multicase(bb=idaapi.BasicBlock, key=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('key', 'value')
+    def tag(cls, bb, key, value):
+        '''Sets the value for the tag `key` to `value` in the ``idaapi.BasicBlock`` given by `bb`.'''
+        ea = interface.range.start(bb)
+
+        # the only real implicit tag we need to handle is "__color__", because our
+        # database.tag function does "__extra_prefix__", "__extra_suffix__", and "__name__".
+        if key == '__color__':
+            return cls.color(bb, value)
+
+        # now we can passthrough to database.tag for everything else.
+        return database.tag(ea, key, value)
+    @utils.multicase(bb=idaapi.BasicBlock, key=six.string_types, none=None.__class__)
+    @classmethod
+    @utils.string.decorate_arguments('key')
+    def tag(cls, bb, key, none):
+        '''Removes the tag identified by `key` from the ``idaapi.BasicBlock`` given by `bb`.'''
+        ea = interface.range.start(bb)
+
+        # if the '__color__' tag was specified, then explicitly clear it.
+        if key == '__color__':
+            return cls.color(bb, none)
+
+        # passthrough to database.tag for removing the ones we don't handle.
+        return database.tag(ea, key, none)
+
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
