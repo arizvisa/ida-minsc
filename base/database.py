@@ -22,7 +22,7 @@ import six, builtins
 
 import functools, operator, itertools, types
 import sys, os, logging, string, bisect
-import math, array as _array, fnmatch, re, ctypes
+import math, codecs, array as _array, fnmatch, re, ctypes
 
 import function, segment
 import structure as _structure, instruction as _instruction
@@ -8105,19 +8105,32 @@ class get(object):
             sentinels, sl = '\0', idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT
             sw = widthtype[res.itemsize if res.itemsize in widthtype else default_width]
 
+            # FIXME: We should probably figure out the default codec for the character width here.
+            encoding = idaapi.encoding_from_strtype(idaapi.STRENC_DEFAULT)
+            decoder = None
+
         # Otherwise we can extract the string's characteristics directly from the strtype code.
         else:
-            # Get the string encoding (not actually used)
-            encoding = idaapi.get_str_encoding_idx(strtype)
-
-            # Get the terminal characters that can terminate the string
+            # Get the terminal characters that can terminate the string.
             sentinels = idaapi.get_str_term1(strtype) + idaapi.get_str_term2(strtype)
 
-            # Extract the fields out of the string type code
+            # Extract the fields out of the string type code.
             res = get_str_type_code(strtype)
             sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
 
-        # Figure out the STRLYT field
+            # Get the string encoding and look it up in our available codecs. If we can't find
+            # it, then that's okay because we'll fall-back to one of the UTF-XX encodings.
+            encoding = idaapi.encoding_from_strtype(strtype)
+
+            try:
+                decoder = functools.partial(codecs.lookup(encoding).decode, errors='replace')
+            except LookupError:
+                decoder = None
+            finally:
+                if not decoder:
+                    logging.warning(u"{:s}.string({:#x}{:s}) : Due to the string at {:#x} being encoded with an unknown encoding ({:s}), the encoding will be determined based on the character size ({:d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, encoding, {idaapi.STRWIDTH_1B: 1, idaapi.STRWIDTH_2B: 2, idaapi.STRWIDTH_4B: 4}.get(sw, -1)))
+
+        # Figure out how the STRLYT field shifts and terminates the string.
         if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
             shift, fterminate = 0, operator.methodcaller('rstrip', sentinels)
         elif sl == idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT:
@@ -8129,26 +8142,29 @@ class get(object):
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sl, ea))
 
-        # Figure out the STRWIDTH field
+        # Figure out how the STRWIDTH field affects the string.
         if sw == idaapi.STRWIDTH_1B:
-            fdecode = operator.methodcaller('decode', 'utf-8', 'replace')
+            cb, fdecode = 1, utils.fcompose(decoder, operator.itemgetter(0)) if decoder else operator.methodcaller('decode', 'utf-8', 'replace')
         elif sw == idaapi.STRWIDTH_2B:
-            fdecode = operator.methodcaller('decode', 'utf-16', 'replace')
+            cb, fdecode = 2, utils.fcompose(decoder, operator.itemgetter(0)) if decoder else operator.methodcaller('decode', 'utf-16', 'replace')
         elif sw == idaapi.STRWIDTH_4B:
-            fdecode = operator.methodcaller('decode', 'utf-32', 'replace')
+            cb, fdecode = 4, utils.fcompose(decoder, operator.itemgetter(0)) if decoder else operator.methodcaller('decode', 'utf-32', 'replace')
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sw, ea))
+        type = int, cb
 
-        # Read the pascal length if one was specified in the string type code
-        if shift:
-            res = cls.unsigned(ea, shift)
-            length.setdefault('length', res)
+        # If we don't need to shift our address, then just trust get.array.
+        if not shift:
+            res = cls.array(ea + shift, **length)
 
-        # Now we can read the string, and convert it to some bytes to decode
-        res = cls.array(ea + shift, **length)
+        # Otherwise use our length and the string width to figure out the
+        # boundaries of the array and then we can read it.
+        else:
+            left, right = ea + shift, ea + shift + cb * cls.unsigned(ea, shift)
+            res = cls.array((left, right), type)
+
+        # Convert it to a string and then process it with the callables we determined.
         data = res.tostring() if sys.version_info.major < 3 else res.tobytes()
-
-        # ..and then process it.
         return fterminate(fdecode(data))
     @utils.multicase()
     @classmethod
