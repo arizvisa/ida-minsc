@@ -1307,6 +1307,92 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('And', 'Or')
+    def select(cls, **boolean):
+        '''Query the basic blocks of the current function for any tags specified by `boolean`'''
+        return cls.select(ui.current.function(), **boolean)
+    @utils.multicase(tag=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('tag', 'And', 'Or')
+    def select(cls, tag, *Or, **boolean):
+        '''Query the basic blocks of the current function for the specified `tag` and any others specified as `Or`.'''
+        res = {tag} | {item for item in Or}
+        boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+        return cls.select(ui.current.function(), **boolean)
+    @utils.multicase(tag=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('tag', 'And', 'Or')
+    def select(cls, func, tag, *Or, **boolean):
+        '''Query the basic blocks of the function `func` for the specified `tag` and any others specified as `Or`.'''
+        res = {tag} | {item for item in Or}
+        boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+        return cls.select(func, **boolean)
+    @utils.multicase(tag=(builtins.set, builtins.list))
+    @classmethod
+    @utils.string.decorate_arguments('tag', 'And', 'Or')
+    def select(cls, func, tag, *Or, **boolean):
+        '''Query the basic blocks of the function `func` for the specified `tag` and any others specified as `Or`.'''
+        res = {item for item in tag} | {item for item in Or}
+        boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+        return cls.select(func, **boolean)
+    @utils.multicase()
+    @classmethod
+    @utils.string.decorate_arguments('And', 'Or')
+    def select(cls, func, **boolean):
+        """Query the basic blocks of the function `func` for any tags specified by `boolean`. Yields each basic block found along with the matching tags as a dictionary.
+
+        If `And` contains an iterable then require the returned address contains them.
+        If `Or` contains an iterable then include any other tags that are specified.
+        """
+        target, flags = by(func), getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+
+        # Turn all of our parameters into a dict of sets that we can iterate through.
+        containers = (builtins.tuple, builtins.set, builtins.list)
+        boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
+
+        # Grab the addresses that are actually tagged into a set, and then the basic
+        # blocks in an ordered dictionary so that we can union them for our results.
+        available = {ea for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target))}
+        order, iterable = [], ((item, interface.range.bounds(item)) for item in blocks.iterate(target, flags))
+        results = {bounds.left : [order.append(bounds.left), item].pop(1) for item, bounds in iterable }
+
+        # Now we just need to union both our tagged addresses with the ones which
+        # are basic-blocks to get a list of the selected addresses.
+        selected = {ea for ea in available} & {ea for ea in order}
+        ordered = [ea for ea in order if ea in selected]
+
+        # If nothing specific was queried, then iterate through our ordered
+        # blocks and yield absolutely everything that we found.
+        if not boolean:
+            for ea in ordered:
+                ui.navigation.analyze(ea)
+                address = database.tag(ea)
+                if address: yield interface.range.bounds(results[ea]), address
+            return
+
+        # Collect the tagnames being queried as specified by the user.
+        Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+
+        # Walk through every tagged address and cross-check it against the query.
+        for ea in ordered:
+            ui.navigation.analyze(ea)
+            collected, address = {}, database.tag(ea)
+
+            # Or(|) includes any of the tagnames that were selected.
+            collected.update({key : value for key, value in address.items() if key in Or})
+
+            # And(&) includes tags only if the address includes all of the specified tagnames.
+            if And:
+                if And & six.viewkeys(address) == And:
+                    collected.update({key : value for key, value in address.items() if key in And})
+                else: continue
+
+            # If anything was collected (matched), then yield the block and the matching tags.
+            if collected: yield interface.range.bounds(results[ea]), collected
+        return
+
+    @utils.multicase()
+    @classmethod
     def digraph(cls):
         '''Return a ``networkx.DiGraph`` of the function at the current address.'''
         return cls.digraph(ui.current.function())
