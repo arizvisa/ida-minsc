@@ -3878,9 +3878,9 @@ class bounds_t(integerish):
         if spec != 's':
             cls = self.__class__
             raise TypeError("unsupported format string ({!s}) passed to {:s}".format(spec, '.'.join([cls.__name__, '__format__'])))
-        left, right = self
-        if left < right:
-            return "{:#x}..{:#x}".format(left, right)
+        left, right = sorted(self)
+        if left < right - 1:
+            return "{:#x}..{:#x}".format(left, right - 1)
         return "{:#x}".format(left)
 
     def __str__(self):
