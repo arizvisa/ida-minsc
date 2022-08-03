@@ -303,15 +303,13 @@ class current(object):
         if idaapi.read_selection(view, left, right):
             pl_l, pl_r = left.place(view), right.place(view)
             ea_l, ea_r = pl_l.ea, pl_r.ea
+            l, r = internal.interface.address.inside(ea_l, ea_r)
+            return internal.interface.bounds_t(l, r + 1)
 
-        # Otherwise we need to use the current address and its bounds.
-        else:
-            ea = idaapi.get_screen_ea()
-            ea_l, ea_r = ea, ea
-
-        # Select the inside of the range and expand the right-side to encompass it.
-        l, r = internal.interface.address.inside(ea_l, ea_r)
-        return internal.interface.bounds_t(l, r + 1)
+        # Otherwise we just use the current address for both sides.
+        ea = idaapi.get_screen_ea()
+        ea_l, ea_r = ea, ea
+        return internal.interface.bounds_t(ea_l, ea_r)
     selected = internal.utils.alias(selection, 'current')
     @classmethod
     def operand(cls):
