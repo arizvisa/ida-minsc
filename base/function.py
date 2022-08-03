@@ -1223,9 +1223,37 @@ class blocks(object):
         raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
+    def at(cls, bb):
+        '''Return the ``idaapi.BasicBlock`` matching the boundaries identifed by `bb`.'''
+        bounds = interface.range.bounds(bb)
+
+        # try and grab the idaapi.qflow_chart_t out of bb.
+        fcpath = map(operator.attrgetter, ['_fc', '_q'])
+        try:
+            fc = functools.reduce(lambda agg, item: item(agg), fcpath, bb)
+
+        # if we can't get ahold of the flowchart, then we need to use
+        # BasicBlock's address to find the function it's a part of.
+        except AttributeError:
+            fn = func.by(bounds.left)
+            logging.warning(u"{:s}.at({!s}) : Unable to determine the flowchart from the provided `idaapi.BasicBlock` ({:s}) for function {:#x}.".format('.'.join([__name__, cls.__name__]), bounds, bounds, interface.range.start(fn)))
+            return cls.at(fn, bb)
+
+        # now we can extract the function and its flags to regenerate the flowchart.
+        fn, flags = fc.pfn, fc.flags
+
+        # regenerate the flowchart, and generate an iterator that gives us matching
+        # blocks so that we can return the first one that matches.
+        iterable = (item for item in cls.iterate(fn, flags) if bounds.left == interface.range.start(item) or bounds.contains(interface.range.start(item)))
+        result = builtins.next(iterable, None)
+        if result is None:
+            raise E.ItemNotFoundError(u"{:s}.at({!s}) : Unable to locate the `idaapi.BasicBlock` for the given bounds ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bounds, bounds, interface.range.start(fn)))
+        return result
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
     def at(cls, func, bb):
         '''Return the ``idaapi.BasicBlock`` in function `func` identifed by `bb`.'''
-        fn = by(func)
+        fn, bounds = by(func), interface.range.bounds(bb)
 
         # now we need to extract the flags from the fc if possible.
         path = map(operator.attrgetter, ['_fc', '_q', 'flags'])
@@ -1237,11 +1265,12 @@ class blocks(object):
             flags = idaapi.FC_PREDS | idaapi.FC_NOEXT
             logging.warning(u"{:s}.at({:#x}, {!s}) : Unable to determine the original flags for the `idaapi.BasicBlock` ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.bounds(bb), interface.range.start(fn)))
 
-        # regenerate the flowchart and find the block in the list of identifiers
-        iterable = (item for item in cls.iterate(fn, flags) if item.id == bb.id)
+        # regenerate the flowchart, and generate an iterator that gives
+        # us matching blocks. then we can return the first one and be good.
+        iterable = (item for item in cls.iterate(fn, flags) if bounds.left == interface.range.start(item) or bounds.contains(interface.range.start(item)))
         result = builtins.next(iterable, None)
         if result is None:
-            raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate `idaapi.BasicBlock` with the specified id ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.bounds(bb), bb.id, interface.range.start(fn)))
+            raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate the `idaapi.BasicBlock` for the given bounds ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bounds, bounds, interface.range.start(fn)))
         return result
 
     @utils.multicase()
@@ -1260,6 +1289,21 @@ class blocks(object):
         '''Return an ``idaapi.FlowChart`` object built with the specified `flags` for the function `func`.'''
         fn = by(func)
         return idaapi.FlowChart(f=fn, flags=flags)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def flowchart(cls, bb):
+        '''Return an ``idaapi.FlowChart`` object for the given ``idaapi.BasicBlock``.'''
+        fcpath = map(operator.attrgetter, ['_fc', '_q'])
+
+        # try and grab the idaapi.qflow_chart_t out of bb.
+        try:
+            fc = functools.reduce(lambda agg, item: item(agg), fcpath, bb)
+
+        # if we couldn't get the flowchart, then there's nothing we can do.
+        except AttributeError:
+            bounds = interface.range.bounds(bb)
+            raise E.InvalidTypeOrValueError(u"{:s}.at({!s}) : Unable to determine the flowchart from the provided `idaapi.BasicBlock` ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, bounds))
+        return fc
 
     @utils.multicase()
     @classmethod
