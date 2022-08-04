@@ -4616,23 +4616,44 @@ class type(object):
         @utils.multicase()
         def __new__(cls):
             '''Return the `[type, length]` of the array at the current address.'''
-            return cls(ui.current.address())
+            address, selection = ui.current.address(), ui.current.selection()
+            if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+                return cls(address)
+            return cls(selection)
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the `[type, length]` of the array at the address specified by `ea`.'''
+            return cls(ea, idaapi.get_item_size(ea))
+        @utils.multicase(bounds=tuple)
+        def __new__(cls, bounds):
+            '''Return the `[type, length]` of the specified `bounds` as an array.'''
+            left, right = ea, _ = sorted(bounds)
+            return cls(ea, max(0, right - left))
+        @utils.multicase(ea=six.integer_types)
+        def __new__(cls, ea, size):
+            '''Return the `[type, length]` of the address `ea` if it was an array using the specified `size` (in bytes).'''
             ea = interface.address.head(ea)
-            F, ti, cb = type.flags(ea), idaapi.opinfo_t(), idaapi.get_item_size(ea)
+            F, ti, cb = type.flags(ea), idaapi.opinfo_t(), abs(size)
 
             # get the opinfo at the current address to verify if there's a structure or not
             ok = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
             tid = ti.tid if ok else idaapi.BADADDR
 
             # convert it to a pythonic type using the address we were given.
-            res = interface.typemap.dissolve(F, tid, cb, offset=ea)
+            res = interface.typemap.dissolve(F, tid, cb, offset=min(ea, ea + size))
 
             # if it's a list, then validate the result and return it
             if isinstance(res, list):
                 element, length = res
+
+                # if the address is a string type, then we need to know the prefix size
+                # so that we can add it to our length to work around the difference
+                # between how these sizes are calc'd in structs versus addresses.
+                if isinstance(element, tuple) and len(element) == 3:
+                    _, width, extra = element
+                    return [element, length - extra // width]
+
+                # simply return the element that we resolved.
                 return [element, length]
 
             # this shouldn't ever happen, but if it does then it's a
