@@ -2692,12 +2692,13 @@ class member_t(object):
         if isinstance(res, structure_t):
             res = __instance__(res.id, offset=self.offset)
         elif isinstance(res, tuple):
-            t, sz = res
+            iterable = (item for item in res)
+            t = next(iterable)
             if isinstance(t, structure_t):
                 t = __instance__(t.id, offset=self.offset)
             elif isinstance(t, builtins.list) and isinstance(t[0], structure_t):
                 t[0] = __instance__(t[0].id, offset=self.offset)
-            res = t, sz
+            res = builtins.tuple(itertools.chain([t], iterable))
         return res
     @type.setter
     def type(self, type):
