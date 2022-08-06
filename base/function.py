@@ -3735,13 +3735,13 @@ class type(object):
 
         @utils.multicase()
         @classmethod
-        def location(cls):
-            '''Return the location of the result belonging to the current function.'''
-            return cls.location(ui.current.address())
+        def storage(cls):
+            '''Return the storage location of the result belonging to the current function.'''
+            return cls.storage(ui.current.address())
         @utils.multicase()
         @classmethod
-        def location(cls, func):
-            '''Return the location of the result belonging to the function `func`.'''
+        def storage(cls, func):
+            '''Return the storage location of the result belonging to the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
@@ -3772,7 +3772,7 @@ class type(object):
             > print( function.argument.name(1) )
             > oldtype = function.argument(0, 'void*')
             > oldname = function.argument.name(1)
-            > location = function.argument.location(2)
+            > storage = function.argument.storage(2)
             > index = function.argument.remove(3)
 
         """
@@ -3896,19 +3896,19 @@ class type(object):
 
         @utils.multicase(index=six.integer_types)
         @classmethod
-        def location(cls, index):
-            '''Return the location of the parameter at the specified `index` in the current function.'''
-            return cls.location(ui.current.address(), index)
+        def storage(cls, index):
+            '''Return the storage location of the parameter at the specified `index` in the current function.'''
+            return cls.storage(ui.current.address(), index)
         @utils.multicase(index=six.integer_types)
         @classmethod
-        def location(cls, func, index):
-            '''Return the location of the parameter at the specified `index` in the function `func`.'''
+        def storage(cls, func, index):
+            '''Return the storage location of the parameter at the specified `index` in the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             locations = [item for _, _, item in type.arguments.iterate(func)]
 
             # As always, check our bounds and raise an exception...cleanly.
             if not (0 <= index < len(locations)):
-                raise E.InvalidTypeOrValueError(u"{:s}.location({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, len(locations), ea))
+                raise E.InvalidTypeOrValueError(u"{:s}.storage({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, len(locations), ea))
             location = locations[index]
 
             # Otherwise, this might be a tuple and we return the whole thing
@@ -4086,12 +4086,12 @@ class type(object):
         @utils.multicase()
         @classmethod
         def iterate(cls):
-            '''Yield the `(name, type, location)` of each of the parameters belonging to the current function.'''
+            '''Yield the `(name, type, storage)` of each of the parameters belonging to the current function.'''
             return cls.iterate(ui.current.address())
         @utils.multicase()
         @classmethod
         def iterate(cls, func):
-            '''Yield the `(name, type, location)` of each of the parameters belonging to the function `func`.'''
+            '''Yield the `(name, type, storage)` of each of the parameters belonging to the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             ti = type(ea)
 
@@ -4108,8 +4108,8 @@ class type(object):
             # Now we can iterate through each of these items safely, process them,
             # and then yield each individual item to the caller.
             for index, item in enumerate(items):
-                name, ti, location = item
-                ltype, linfo = location
+                name, ti, storage = item
+                ltype, linfo = storage
                 result = interface.tinfo.location(ti, instruction.architecture, ltype, linfo)
 
                 # Check to see if we got an error. We do this with a hack, by
@@ -4144,13 +4144,13 @@ class type(object):
 
         @utils.multicase()
         @classmethod
-        def locations(cls):
-            '''Return the locations of each of the parameters belonging to the current function.'''
-            return cls.locations(ui.current.address())
+        def storage(cls):
+            '''Return the storage location for each of the parameters belonging to the current function.'''
+            return cls.storage(ui.current.address())
         @utils.multicase()
         @classmethod
-        def locations(cls, func):
-            '''Return the locations of each of the parameters belonging to the function `func`.'''
+        def storage(cls, func):
+            '''Return the storage locations for each of the parameters belonging to the function `func`.'''
             iterable = (location for _, _, location in cls.iterate(func))
             result = []
             for _, _, item in cls.iterate(func):
