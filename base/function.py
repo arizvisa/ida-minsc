@@ -2718,9 +2718,10 @@ class frame(object):
             if fr is None:  # unable to figure out arguments
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
+            results = []
             for off, size, content in structure.fragment(fr.id, 0, fn.frsize):
-                yield off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size
-            return
+                results.append((off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size))
+            return results
 
         @utils.multicase()
         @classmethod
@@ -2760,9 +2761,10 @@ class frame(object):
             if fr is None:  # unable to figure out arguments
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
+            results = []
             for off, size, content in structure.fragment(fr.id, fn.frsize, sum([fn.frregs, database.config.bits() // 8])):
-                yield off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size
-            return
+                results.append((off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size))
+            return results
 
         @utils.multicase()
         @classmethod
