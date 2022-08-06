@@ -2330,7 +2330,7 @@ class frame(object):
         fn, ea = by(func), interface.address.inside(ea)
         return idaapi.get_spd(fn, ea)
 
-    class args(object):
+    class arguments(object):
         """
         This namespace is for returning information about the arguments
         within a function's frame. By default, this namespace will yield
@@ -2338,10 +2338,10 @@ class frame(object):
 
         Some ways of using this are::
 
-            > print( function.frame.args(f) )
-            > print( function.frame.args.registers(f) )
-            > print( function.frame.args.size(f) )
-            > print( function.frame.args.location(ea) )
+            > print( function.frame.arguments(f) )
+            > print( function.frame.arguments.registers(f) )
+            > print( function.frame.arguments.size(f) )
+            > print( function.frame.arguments.location(ea) )
 
         """
 
@@ -2395,7 +2395,7 @@ class frame(object):
 
             # now we need to check if our address actually includes a frame. if it
             # doesn't, then we need to explicitly process our locations here.
-            fr = idaapi.get_frame(ea)
+            fr, results = idaapi.get_frame(ea), []
             if fr is None:
                 items = [offset for offset in locations]
 
@@ -2404,13 +2404,13 @@ class frame(object):
                 # between our $pc and any actual args allocated on the stack.
                 delta = min(locations) if locations else 0
                 if delta:
-                    yield 0, None, delta
+                    results.append((0, None, delta))
 
                 # now we can iterate through all our locations and yield each one.
                 for offset in sorted(locations):
                     _, name, ti = locations[offset]
-                    yield offset, name or None, ti.get_size()
-                return
+                    result.append((offset, name or None, ti.get_size()))
+                return results
 
             # to proceed, we need to know the function to get its frame sizes.
             else:
@@ -2433,24 +2433,24 @@ class frame(object):
 
                     # if our member size matches our tinfo size, then we can yield it.
                     if tsize == size:
-                        yield stkoff, name, tsize
+                        result.append((stkoff, name, tsize))
 
                     # if the tinfo size is smaller then the member's, then we're
                     # going to need to pad it up to the expected member size.
                     elif tsize < size:
-                        yield stkoff, name, tsize
-                        yield stkoff + tsize, None, size - tsize
+                        result.append((stkoff, name, tsize))
+                        result.append((stkoff + tsize, None, size - tsize))
 
                     # otherwise, the member size is smaller than the tinfo size.
                     # if this is the case, then we need to use the member size
                     # but log a warning that we're ignoring the size of the tinfo.
                     else:
                         logging.warning(u"{:s}({:#x}) : Ignoring the type size for parameter {:s}(index {:d}) for function ({:#x}) due to the frame member at offset ({:+#x}) being smaller ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(tname, '"')) if tname else '', index, ea, stkoff, size))
-                        yield stkoff, name, size
+                        results.append((stkoff, name, size))
 
                 # otherwise we'll just yield the information from the member.
                 else:
-                    yield stkoff, content.get('__name__', None), size
+                    results.append((stkoff, content.get('__name__', None), size))
 
                 # update our current offset and proceed to the next member.
                 current = stkoff + size
@@ -2462,12 +2462,12 @@ class frame(object):
                 # if our current position is not pointing at the expected stkoff,
                 # then we need to yield some padding that will put us there.
                 if current < stkoff:
-                    yield current, None, stkoff - current
+                    results.append((current, None, stkoff - current))
 
                 # now we can yield the next member and adjust our current position.
-                yield stkoff, name or None, ti.get_size()
+                results.append((stkoff, name or None, ti.get_size()))
                 current = stkoff + ti.get_size()
-            return
+            return results
 
         @utils.multicase()
         @classmethod
@@ -2692,7 +2692,7 @@ class frame(object):
             max = structure.size(get_frameid(fn))
             total = frame.lvars.size(fn) + frame.regs.size(fn)
             return max - total
-    arguments = arg = args    # XXX: ns alias
+    args = arg = arguments  # XXX: ns alias
 
     class lvars(object):
         """
