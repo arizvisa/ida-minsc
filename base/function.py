@@ -4231,6 +4231,7 @@ t = type # XXX: ns alias
 convention = cc = utils.alias(type.convention, 'type')
 result = type.result # XXX: ns alias
 arguments = args = type.arguments   # XXX: ns alias
+argument = arg = type.argument  # XXX: ns alias
 
 class xref(object):
     """
