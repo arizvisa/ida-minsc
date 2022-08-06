@@ -2783,10 +2783,6 @@ get_vars_size = utils.alias(frame.lvars.size, 'frame.lvars')
 get_regs_size = utils.alias(frame.regs.size, 'frame.regs')
 get_spdelta = spdelta = utils.alias(frame.delta, 'frame')
 
-# FIXME: this should really be its own namespace or its own function so that
-#        way we can yield register and stack locations for each argument.
-arguments = args = frame.args
-
 ## instruction iteration/searching
 ## tagging
 @utils.multicase()
@@ -4199,6 +4195,7 @@ class type(object):
 t = type # XXX: ns alias
 convention = cc = utils.alias(type.convention, 'type')
 result = type.result # XXX: ns alias
+arguments = args = type.arguments   # XXX: ns alias
 
 class xref(object):
     """
