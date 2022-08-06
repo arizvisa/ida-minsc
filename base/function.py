@@ -3952,6 +3952,18 @@ class type(object):
             return result
         pop = utils.alias(remove, 'type.argument')
 
+        @utils.multicase(index=six.integer_types)
+        @classmethod
+        def location(cls, index):
+            '''Return the address of the parameter at `index` that is passed to the function referenced at the current address.'''
+            return cls.location(ui.current.address(), index)
+        @utils.multicase(ea=six.integer_types, index=six.integer_types)
+        @classmethod
+        def location(cls, ea, index):
+            '''Return the address of the parameter at `index` that is passed to the function referenced at the address `ea`.'''
+            items = type.arguments.locations(ea)
+            return items[index]
+
     arg = parameter = argument  # XXX: ns alias
 
     class arguments(object):
@@ -4189,6 +4201,29 @@ class type(object):
             updater.send(ftd), updater.close()
             return index
         append = utils.alias(add, 'type.arguments')
+
+        @utils.multicase()
+        @classmethod
+        def locations(cls):
+            '''Return the address of each of the parameters being passed to the function referenced at the current address.'''
+            return cls.locations(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def locations(cls, ea):
+            '''Return the address of each of the parameters being passed to the function referenced at address `ea`.'''
+            if not database.xref.code_down(ea):
+                raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.is_call(ea) else 'is not a call instruction with'))
+            items = idaapi.get_arg_addrs(ea)
+            return [] if items is None else [ea for ea in items]
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def locations(cls, func, ea):
+            '''Return the address of each of the parameters for the function `func` that are being passed to the function referenced at address `ea`.'''
+            refs = {ref for ref in cls.up(func)}
+            if ea not in refs:
+                logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, cls.__name__]), func, ea, address(func), ea))
+            return cls.locations(ea)
+        location = utils.alias(locations, 'type.arguments')
 
     args = parameters = arguments
 
