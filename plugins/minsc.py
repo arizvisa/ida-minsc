@@ -14,7 +14,7 @@ location of the plugin's git repository in the variable that is marked below.
 """
 
 import sys, os, logging
-import six, imp, fnmatch, ctypes, types
+import builtins, six, imp, fnmatch, ctypes, types
 import idaapi
 
 # :: Point this variable at the directory containing the repository of the plugin ::
@@ -390,6 +390,7 @@ class DisplayHook(object):
         return "{:#x}".format(x)
 
     def displayhook(self, item):
+        builtins._ = item
         if item is None or not hasattr(item, '__class__') or item.__class__ is bool:
             self.orig_displayhook(item)
             return
