@@ -49,16 +49,15 @@ h, top, go, goof = database.h, func.top, database.go, database.go_offset
 
 ## other useful things that we can grab from other modules
 
+# stuff for printing (of course)
+p = __import__('six').print_
+pp, pf = pprint, pformat = [getattr(__import__('pprint'), _) for _ in ['pprint', 'pformat']]
+
 # snag the custom exceptions that we use while excluding any modules
 exceptions = __import__('internal').exceptions
-locals().update({name : item for name, item in exceptions.__dict__.items() if not isinstance(item, exceptions.__class__)})
-del(exceptions)
 
 # snag the fake utilities module to share some things with the user...
 utils = __import__('internal').utils
-
-# import all its combinators by copying them directly into locals()
-locals().update({name : item for name, item in utils.__dict__.items() if name in utils.__all__})
 
 # construct some pattern matching types
 AnyRegister = utils.PatternAnyType(__import__('internal').interface.register_t)
@@ -66,9 +65,6 @@ AnyInteger = utils.PatternAnyType(__import__('six').integer_types)
 AnyString = utils.PatternAnyType(__import__('six').string_types)
 AnyBytes = utils.PatternAnyType(bytes)
 Any = utils.PatternAny()
-
-# ...and that's it for the utils
-del(utils)
 
 # some types that the user might want to compare with
 architecture_t, register_t, symbol_t, bounds_t, location_t = (getattr(__import__('internal').interface, item) for item in ['architecture_t', 'register_t', 'symbol_t', 'bounds_t', 'location_t'])
