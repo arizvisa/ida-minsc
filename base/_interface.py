@@ -32,17 +32,16 @@ class typemap(object):
     a tuple of the format `(type, size)`. If `size` is not specified,
     then the size will be assumed to be the default word size for the
     current database. The `type` field is then any one of the python
-    types such as ``int``, ``chr``, ``str``, ``float``, ``type``, or
+    types such as ``int``, ``str``, ``chr``, ``float``, ``type``, or
     ``None``.
 
     These types have the following meanings:
 
         ``int`` or ``long`` - an integral
-        ``chr`` - a character
-        ``unichr`` - a wide-character
-        ``str`` or ``unicode`` - a string or a character
+        ``chr`` - a character that is part of a string
+        ``str`` - a type of string of a specific character width
         ``float`` - a floating point number
-        ``type`` - a pointer
+        ``type`` - a reference (pointer)
         ``None`` - alignment
 
     This can result in the describing of an IDA type and its size
@@ -50,20 +49,26 @@ class typemap(object):
 
         `int` - An integer with the default size
         `(int, 2)` - a 16-bit integer
-        `(chr, 3)` - a 3-byte string
-        `(type, 4)` - a 32-bit pointer
+        `(type, 4)` - a 32-bit referece (pointer)
         `(float, 4)` - a 16-bit floating point (ieee754 single)
         `(None, 16)` - aligned to 16 bytes
+        `(str, 2)` - a 16-bit null-terminated string
+        `(str, 4)` - a 32-bit null-terminated string
+        `(str, 1, 4)` - an 8-bit character string with a 32-bit length prefix.
+        `(str, 2, 2)` - an 16-bit character string with a 16-bit length prefix.
+        `(str, 1, 0)` - an 8-bit character null-terminated string
 
     If an array needs to be represented, then one can simply wrap
     their type within a list. A few examples of this follows:
 
         `[int, 4]` - a 4 element array of default sized integers
-        `[chr, 9]` - a 4 element array of characters
-        `[unichr, 9]` - a 4 element array of wide-characters
+        `[str, 9]` - an 8-bit string of 9 characters
         `[(int, 2), 3]` - a 3 element array of 16-bit integers
         `[(float, 8), 4]` - a 4 element array of 64-bit floating point numbers.
-        `[type, 6]` - a 6 element array of pointers
+        `[type, 6]` - a 6 element array of references (pointers)
+        `[(chr, 2), 7]` - a 7-element string of 16-bit characters
+        `[str, 7]` - a 10-element string of 8-bit characters
+        `[(str, 4), 2]` - a 2-element string of 32-bit characters
 
     These types are commonly associated with members of structures
     and thus can be used to quickly read or apply a type to a
@@ -79,21 +84,44 @@ class typemap(object):
     ## IDA 6.95 types
     if idaapi.__version__ < 7.0:
         integermap = {
-            1:(idaapi.byteflag(), -1),  2:(idaapi.wordflag(), -1),  3:(idaapi.tribyteflag(), -1),
-            4:(idaapi.dwrdflag(), -1),  8:(idaapi.qwrdflag(), -1), 10:(idaapi.tbytflag(), -1),
-            16:(idaapi.owrdflag(), -1),
+            (int,  1):(idaapi.byteflag(), -1), (int, 2):(idaapi.wordflag(), -1), (int,  3):(idaapi.tribyteflag(), -1),
+            (int,  4):(idaapi.dwrdflag(), -1), (int, 8):(idaapi.qwrdflag(), -1), (int, 10):(idaapi.tbytflag(), -1),
+            (int, 16):(idaapi.owrdflag(), -1),
         }
         if hasattr(idaapi, 'ywrdflag'):
             integermap[32] = getattr(idaapi, 'ywrdflag')(), -1
 
         decimalmap = {
-             4:(idaapi.floatflag(), -1),     8:(idaapi.doubleflag(), -1),
-            10:(idaapi.packrealflag(), -1), 12:(idaapi.packrealflag(), -1),
+            (float,  4):(idaapi.floatflag(), -1),     (float, 8):(idaapi.doubleflag(), -1),
+            (float, 10):(idaapi.packrealflag(), -1), (float, 12):(idaapi.packrealflag(), -1),
         }
 
+        # we support either chr or str interchangeably
         stringmap = {
             chr:(idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
             str:(idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
+
+            # null-terminated, char_t and wchar_t
+            (str, 1): (idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
+            (str, 2): (idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
+
+            (chr, 1): (idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
+            (chr, 2): (idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
+
+            # variable-terminated, multiple-byte
+            (str, 1, 0): (idaapi.asciflag(), idaapi.ASCSTR_C),
+            (str, 2, 0): (idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
+            (str, 1, 1): (idaapi.asciflag(), idaapi.ASCSTR_PASCAL),
+            (str, 1, 2): (idaapi.asciflag(), idaapi.ASCSTR_LEN2),
+            (str, 2, 2): (idaapi.asciflag(), idaapi.ASCSTR_ULEN2),
+            (str, 2, 4): (idaapi.asciflag(), idaapi.ASCSTR_ULEN4),
+
+            (chr, 1, 0): (idaapi.asciflag(), idaapi.ASCSTR_C),
+            (chr, 2, 0): (idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
+            (chr, 1, 1): (idaapi.asciflag(), idaapi.ASCSTR_PASCAL),
+            (chr, 1, 2): (idaapi.asciflag(), idaapi.ASCSTR_LEN2),
+            (chr, 2, 2): (idaapi.asciflag(), idaapi.ASCSTR_ULEN2),
+            (chr, 2, 4): (idaapi.asciflag(), idaapi.ASCSTR_ULEN4),
         }
 
         if hasattr(builtins, 'unichr'):
@@ -101,34 +129,71 @@ class typemap(object):
         if hasattr(builtins, 'unicode'):
             stringmap.setdefault(builtins.unicode, (idaapi.asciflag(), idaapi.ASCSTR_UNICODE))
 
-        ptrmap = { sz : (idaapi.offflag() | flg, 0) for sz, (flg, _) in integermap.items() }
+        ptrmap = { (type, sz) : (idaapi.offflag() | flg, 0) for (_, sz), (flg, _) in integermap.items() }
         nonemap = { None :(idaapi.alignflag(), -1) }
 
     ## IDA 7.0 types
     else:
         integermap = {
-            1:(idaapi.byte_flag(), -1),  2:(idaapi.word_flag(), -1),
-            4:(idaapi.dword_flag(), -1),  8:(idaapi.qword_flag(), -1), 10:(idaapi.tbyte_flag(), -1),
-            16:(idaapi.oword_flag(), -1),
+            (int,  1):(idaapi.byte_flag(), -1),  (int, 2):(idaapi.word_flag(), -1),
+            (int,  4):(idaapi.dword_flag(), -1), (int, 8):(idaapi.qword_flag(), -1), (int, 10):(idaapi.tbyte_flag(), -1),
+            (int, 16):(idaapi.oword_flag(), -1),
         }
         if hasattr(idaapi, 'yword_flag'):
-            integermap[32] = getattr(idaapi, 'yword_flag')(), -1
+            integermap[int, 32] = getattr(idaapi, 'yword_flag')(), -1
 
         decimalmap = {
-             4:(idaapi.float_flag(), -1),     8:(idaapi.double_flag(), -1),
-            10:(idaapi.packreal_flag(), -1), 12:(idaapi.packreal_flag(), -1),
+            (float,  4):(idaapi.float_flag(), -1),    (float,  8):(idaapi.double_flag(), -1),
+            (float, 10):(idaapi.packreal_flag(), -1), (float, 12):(idaapi.packreal_flag(), -1),
         }
 
+        # we support either chr or str interchangeably
         stringmap = {
             chr:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
             str:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
+
+            # null-terminated, multiple-byte
+            (str, 1): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (str, 2): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (str, 4): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+
+            (chr, 1): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (chr, 2): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (chr, 4): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+
+            # variable-terminated, multiple-byte
+            (str, 1, 0): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (str, 1, 1): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (str, 1, 2): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (str, 1, 4): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (str, 2, 0): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (str, 2, 1): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (str, 2, 2): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (str, 2, 4): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (str, 4, 0): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+            (str, 4, 1): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+            (str, 4, 2): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+            (str, 4, 4): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+
+            (chr, 1, 0): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (chr, 1, 1): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (chr, 1, 2): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (chr, 1, 4): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B),
+            (chr, 2, 0): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (chr, 2, 1): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (chr, 2, 2): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (chr, 2, 4): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B),
+            (chr, 4, 0): (idaapi.strlit_flag(), idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+            (chr, 4, 1): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+            (chr, 4, 2): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
+            (chr, 4, 4): (idaapi.strlit_flag(), idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B),
         }
         if hasattr(builtins, 'unichr'):
             stringmap.setdefault(builtins.unichr, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
         if hasattr(builtins, 'unicode'):
             stringmap.setdefault(builtins.unicode, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
 
-        ptrmap = { sz : (idaapi.off_flag() | flg, 0) for sz, (flg, _) in integermap.items() }
+        ptrmap = { (type, sz) : (idaapi.off_flag() | flg, 0) for (_, sz), (flg, _) in integermap.items() }
         nonemap = { None :(idaapi.align_flag(), -1) }
 
     # Generate the lookup table for looking up the correct tables for a given type.
@@ -145,19 +210,21 @@ class typemap(object):
     # the IDAPython flags that are defined.
     inverted = {}
     for s, (f, _) in integermap.items():
-        inverted[f & FF_MASKSIZE] = (int, s)
+        inverted[f & FF_MASKSIZE] = s
     for s, (f, _) in decimalmap.items():
-        inverted[f & FF_MASKSIZE] = (float, s)
+        inverted[f & FF_MASKSIZE] = s
     for s, (f, _) in stringmap.items():
-        inverted[f & FF_MASKSIZE] = (str, s)
+        if (next(iter(s)) if isinstance(s, tuple) else s) in {str}: # prioritize `str`
+            inverted[f & FF_MASKSIZE, _] = s
+        continue
     for s, (f, _) in nonemap.items():
-        inverted[f & FF_MASKSIZE] = (None, s)
+        inverted[f & FF_MASKSIZE] = s
 
     # Add all the available flag types to support all available pointer types.
     for s, (f, _) in ptrmap.items():
-        inverted[f & FF_MASK] = (type, s)
-        inverted[f & FF_MASK & ~MS_0TYPE] = (type, s)
-        inverted[f & FF_MASK & ~MS_1TYPE] = (type, s)
+        inverted[f & FF_MASK] = s
+        inverted[f & FF_MASK & ~MS_0TYPE] = s
+        inverted[f & FF_MASK & ~MS_1TYPE] = s
     del f
 
     # FIXME: this is a hack for dealing with structures that
@@ -166,8 +233,8 @@ class typemap(object):
 
     # refinfo map for the sizes (IDA 6.9 uses the same names)
     refinfomap = {
-        1 : idaapi.REF_OFF8,    2 : idaapi.REF_OFF16,
-        4 : idaapi.REF_OFF32,   8 : idaapi.REF_OFF64,
+        (type, 1) : idaapi.REF_OFF8,    (type, 2) : idaapi.REF_OFF16,
+        (type, 4) : idaapi.REF_OFF32,   (type, 8) : idaapi.REF_OFF64,
     }
 
     # Assign the default values for the processor that was selected for the database.
@@ -177,9 +244,9 @@ class typemap(object):
         bits = 64 if info.is_64bit() else 32 if info.is_32bit() else None
         if bits is None: return
 
-        typemap.integermap[None] = typemap.integermap[bits // 8]
-        typemap.decimalmap[None] = typemap.decimalmap[bits // 8]
-        typemap.ptrmap[None] = typemap.ptrmap[bits // 8]
+        typemap.integermap[None] = typemap.integermap[int, bits // 8]
+        typemap.decimalmap[None] = typemap.decimalmap[float, bits // 8]
+        typemap.ptrmap[None] = typemap.ptrmap[type, bits // 8]
         typemap.stringmap[None] = typemap.stringmap[str]
 
     @classmethod
@@ -207,18 +274,37 @@ class typemap(object):
         if (dsize == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
             t = structure.by_identifier(typeid) if offset is None else structure.by_identifier(typeid, offset=offset)
-            sz = t.size
-            return t if sz == size else [t, size // sz]
+
+            # grab the size, and check it it's a variable-length struct so we can size it.
+            sz, variableQ = t.size, t.ptr.props & getattr(idaapi, 'SF_VAR', 1)
+            return t if sz == size else (t, size) if variableQ else [t, size // sz]
 
         # Verify that we actually have the datatype mapped and that we can look it up.
-        if all(item not in cls.inverted for item in [dsize, dtype]):
+        if all(item not in cls.inverted for item in [dsize, dtype, (dtype, typeid)]):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dtype, typeid, size))
 
         # Now that we know the datatype exists, extract the actual type (dtype)
         # and the type's size (dsize) from the inverted map while giving priority
         # to the type. This way we're checking the dtype for pointers (references)
         # and then only afterwards do we fall back to depending on the size.
-        t, sz = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dsize]
+        item = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dtype,typeid] if (dtype, typeid) in cls.inverted else cls.inverted[dsize]
+        if len(item) == 2:
+            t, sz = item
+
+        # If our tuple contains extra information (a string), then hack that in.
+        else:
+            t, width, length = item
+            reduced = item if length > 0 else (t, width) if width > 1 else t
+
+            # XXX: IDA includes the length in the actual count if we're being
+            #      assigned to a structure but not within the database. So, we
+            #      ignore the correct calculation (which makes the python type
+            #      look inaccurate, but it represents the number of characters
+            #      that fit within the prefix) and adjust it in the database module.
+
+            #count = max(0, size - length) // width
+            count = size // width
+            return [reduced, count] if count > 1 else reduced if length > 0 or width > 1 else str
 
         # If the datatype size is not an integer, then we need to calculate the
         # size ourselves using the size parameter we were given and the element
@@ -252,10 +338,19 @@ class typemap(object):
         # first use the type the user gave us to find the actual table containg
         # the sizes we want to look up, and then we extract the flag and typeid
         # from the table that we determined.
-        if isinstance(pythonType, ().__class__):
+        if isinstance(pythonType, ().__class__) and not isinstance(next(iter(pythonType)), (idaapi.struc_t, structure.structure_t)):
+            table = cls.typemap[builtins.next(item for item in pythonType)]
+
+            #t, sz = pythonType
+            #table = cls.typemap[t] if not isinstance(t, tuple) else cls.typemap[t[0]]
+            #(t, sz), count = (pythonType, 1) if len(pythonType) == 2 else ((pythonType[0], pythonType), 1)
+            if pythonType in table:
+                flag, typeid = table[pythonType]
+                t, width, length = pythonType if len(pythonType) == 3 else pythonType + (0,)
+                return flag, typeid, width + length
+
             (t, sz), count = pythonType, 1
-            table = cls.typemap[t]
-            flag, typeid = table[abs(sz) if t in {int, getattr(builtins, 'long', int), float, type} else t]
+            table = table[abs(sz)]
 
         # If we were given a pythonic-type that's a list, then we know that this
         # is an array of some kind. We extract the count from the second element
@@ -278,6 +373,18 @@ class typemap(object):
         # and extract both its type-id and size.
         elif isinstance(pythonType, idaapi.struc_t):
             flag, typeid, sz = struc_flag(), pythonType.id, idaapi.get_struc_size(pythonType)
+
+        # if we got here with a tuple, then that's because we're using a variable-length
+        # structure...which really means the size is forced.
+        elif isinstance(pythonType, ().__class__):
+            t, sz = pythonType
+            sptr = t.ptr if isinstance(t, structure.structure_t) else t
+            flag, typeid = struc_flag(), sptr.id
+
+            # if we're not a variable-length structure, then this pythonic type isn't
+            # valid. we still don't error out, though, and we just correct the size.
+            if not sptr.props & getattr(idaapi, 'SF_VAR', 1):
+                sz = idaapi.get_struc_size(sptr)
 
         # Anything else should be the default value that we're going to have to
         # look up. We start by using the type to figure out the correct table,
