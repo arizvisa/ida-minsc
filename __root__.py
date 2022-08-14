@@ -47,6 +47,16 @@ import segment as seg
 ## shortcuts
 h, top, go, goof = database.h, func.top, database.go, database.go_offset
 
+def hex():
+    import sys, builtins, operator
+    version = sys.version_info.major
+    F = operator.methodcaller('encode', 'hex') if version < 3 else operator.methodcaller('hex')
+    integer_t = int, getattr(builtins, 'long', int)
+    def render(item):
+        return "{:x}".format(item) if isinstance(item, integer_t) else F(bytes(bytearray(item)))
+    return render
+hex = hex()
+
 ## other useful things that we can grab from other modules
 
 # stuff for printing (of course)
