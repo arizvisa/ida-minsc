@@ -1435,7 +1435,7 @@ class address(object):
         # We should.. because we support all of IDA's native types. Then we
         # generate a list of all of the available operands to apply the ref to.
         _, size = typemap.inverted[dsize]
-        ptrmask, _ = typemap.ptrmap[size]
+        ptrmask, _ = typemap.ptrmap[type, size]
         operands = [index for index, opmask in enumerate([idaapi.FF_0OFF, idaapi.FF_1OFF]) if dtype & ptrmask & opmask]
 
         # Before we change anything, do a smoke-test to ensure that we actually
