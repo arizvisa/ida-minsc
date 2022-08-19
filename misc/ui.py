@@ -19,7 +19,7 @@ window that they wish to expose to the user.
 """
 
 import six, builtins
-import sys, os, operator, threading, time, functools, inspect, itertools
+import sys, os, operator, math, threading, time, functools, inspect, itertools
 import logging, ctypes
 
 import idaapi, internal
@@ -1438,7 +1438,8 @@ try:
 
             # now we can calculate the dimensions of the progress bar
             logging.info(u"{:s}.open({!s}, {!s}) : Using dimensions ({:d}, {:d}) for progress bar.".format('.'.join([__name__, cls.__name__]), width, height, int(w*width), int(h*height)))
-            self.object.setFixedWidth(w * width), self.object.setFixedHeight(h * height)
+            fixedWidth, fixedHeight = map(math.trunc, [w * width, h * height])
+            self.object.setFixedWidth(fixedWidth), self.object.setFixedHeight(fixedHeight)
 
             # calculate the center
             if main is None:
@@ -1449,7 +1450,7 @@ try:
                 cx, cy = center.x(), center.y()
 
             # ...and center it.
-            x, y = cx - (w * width * 0.5), cy - (h * height * 1.0)
+            x, y = map(math.trunc, [cx - (w * width * 0.5), cy - (h * height * 1.0)])
             logging.info(u"{:s}.open({!s}, {!s}) : Centering progress bar at ({:d}, {:d}).".format('.'.join([__name__, cls.__name__]), width, height, int(x), int(y)))
             self.object.move(x, y)
 
