@@ -287,6 +287,14 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param \*\*flags: any number of :py:obj:`idaapi.GN_\*` flags to use when fetching the name
    
+.. py:function:: name(packed, \*\*flags)
+   
+   Renames the current address to the given ``packed`` name.
+   
+   :param packed: a tuple of integers or strings to use for the name
+   :type packed: tuple
+   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
+   
 .. py:function:: name(string, \*suffix, \*\*flags)
    
    Renames the current address to ``string``.
@@ -302,6 +310,15 @@ functions and aliases. For more information on this, please see
    
    :param none: the python value :py:obj:`None`
    :type none: None
+   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
+   
+.. py:function:: name(ea, packed, \*\*flags)
+   
+   Renames the address specifed by ``ea`` to the given ``packed`` name.
+   
+   :param ea: an address in the database
+   :param packed: a tuple of integers or strings to use for the name
+   :type packed: tuple
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(ea, string, \*suffix, \*\*flags)
@@ -2850,6 +2867,14 @@ following examples can be used::
    :param bounds: a tuple containing the boundaries of the array to return
    :type bounds: tuple
    
+.. py:function:: get\.array(bounds, type)
+   
+   Return the values within the provided ``bounds`` as an array of the pythonic element ``type``.
+   
+   :param bounds: a tuple containing the boundaries of the array to return
+   :type bounds: tuple
+   :param type: the pythonic type to use for each element
+   
 .. py:function:: get\.array(ea, \*\*length)
    
    Return the values of the array at the address specified by ``ea``.
@@ -5018,6 +5043,21 @@ Some examples of using this namespace can be::
    :param ea: an address within the database containing an array
    :type ea: int or long
    
+.. py:function:: type\.array(bounds)
+   
+   Return the ``[type, length]`` of the specified ``bounds`` as an array.
+   
+   :param bounds:
+   :type bounds: tuple
+   
+.. py:function:: type\.array(ea, size)
+   
+   Return the ``[type, length]`` of the address ``ea`` if it was an array using the specified ``size`` (in bytes).
+   
+   :param ea:
+   :type ea: int or long
+   :param size:
+   
 .. py:function:: type\.array\.element()
    
    Return the type information for the member of the array defined at the current address.
@@ -5148,6 +5188,7 @@ used to identify certain characteristics about them:
 - ``V`` - The type represents a virtual function table
 - ``C`` - The type represents a structure containing a virtual function table
 - ``U`` - The type represents a union
+- ``?`` - The type is currently not defined
 
 The available types that one can filter the local types with are as follows:
 
@@ -5157,6 +5198,7 @@ The available types that one can filter the local types with are as follows:
 - ``definition`` - Filter the local types by applying a glob to their definition.
 - ``regex`` - Filter the local types by applying a regular-expression to their definition.
 - ``typeref`` or ``typedef`` - Filter the local types for any that are an alias declared with typedef.
+- ``defined`` or ``present`` - Filter the local types for any that are defined.
 - ``size`` - Filter the local types according to their size.
 - ``greater`` or ``ge`` - Filter the local types for the ones that are larger or equal to a certain size.
 - ``gt`` - Filter the local types for the ones that are larger than a certain size.
@@ -5178,6 +5220,24 @@ Some examples of using these keywords are as follows::
     > iterable = database.types.iterate(definition='*Cookie*')
     > result = database.types.search(regex='.*const.*')
 
+.. py:function:: types\.add(name, \*\*mangled)
+   
+   Add an empty type with the provided ``name`` to the current type library.
+   
+   :param name: the name of the type to add
+   :type name: str
+   :param \*\*mangled: a boolean that specifies whether the name of the type is mangled
+   
+.. py:function:: types\.add(name, library, \*\*mangled)
+   
+   Add an empty type with the provided ``name`` to the specified type ``library``.
+   
+   :param name: the name of the type to add
+   :type name: str
+   :param library: the :py:obj:`idaapi.til_t` of the library to be added to
+   :type library: idaapi.til_t
+   :param \*\*mangled: a boolean that specifies whether the name of the type is mangled
+   
 .. py:function:: types\.add(name, info, \*\*mangled)
    
    Add the type information in ``info`` to the current type library using the provided ``name``.
@@ -5359,6 +5419,38 @@ Some examples of using these keywords are as follows::
    :param serialized: the tuple containing the fields that describe the serialized type
    :type serialized: tuple
    :param library: the :py:obj:`idaapi.til_t` of the library to serialize the type from
+   :type library: idaapi.til_t
+   
+.. py:function:: types\.has(ordinal)
+   
+   Return whether the current type library has a type at the given ``ordinal``.
+   
+   :param ordinal: the ordinal of the type to check
+   :type ordinal: int or long
+   
+.. py:function:: types\.has(name)
+   
+   Return whether the current type library has a type with the specified ``name``.
+   
+   :param name: the name of the type to check
+   :type name: str
+   
+.. py:function:: types\.has(ordinal, library)
+   
+   Return whether the provided type ``library`` has a type at the given ``ordinal``.
+   
+   :param ordinal:
+   :type ordinal: int or long
+   :param library: the :py:obj:`idaapi.til_t` of the library to check
+   :type library: idaapi.til_t
+   
+.. py:function:: types\.has(name, library)
+   
+   Return whether the provided type ``library`` has a type with the specified ``name``.
+   
+   :param name: the name of the type to check
+   :type name: str
+   :param library: the :py:obj:`idaapi.til_t` of the library to check
    :type library: idaapi.til_t
    
 .. py:function:: types\.iterate(string)

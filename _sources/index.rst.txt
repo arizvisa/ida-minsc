@@ -36,7 +36,7 @@ If your instance of IDA was not installed with Python, or you wish to switch
 between Python 3.x or the Python 2.x series, then please refer to the
 instructions at section :ref:`1.6.2<install-downgrade>` for how to change the
 Python runtime that IDAPython uses for your installation. At the present time,
-only IDA Pro 6.8 to IDA 7.7.220125 are currently supported with Python v3.9.13.
+only IDA Pro 6.8 to IDA 8.0.220729 are currently supported with Python v3.10.5.
 
 Table of Contents
 =================

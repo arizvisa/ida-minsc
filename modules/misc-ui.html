@@ -1139,7 +1139,7 @@ being viewed in graph view or not.</p>
 <dl class="function">
 <dt id="ui.strings.at">
 <code class="descclassname">strings.</code><code class="descname">at</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.at" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the string at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.string_info_t</span></code> for the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> in the strings list.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1153,7 +1153,7 @@ being viewed in graph view or not.</p>
 <dl class="function">
 <dt id="ui.strings.get">
 <code class="descclassname">strings.</code><code class="descname">get</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.get" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the address and the string at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<dd><p>Return the address and its bytes representing the string at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1167,7 +1167,7 @@ being viewed in graph view or not.</p>
 <dl class="function">
 <dt id="ui.strings.iterate">
 <code class="descclassname">strings.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.iterate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Iterate through all of the address and strings in the strings list.</p>
+<dd><p>Iterate through all of the addresses and items in the strings list.</p>
 </dd></dl>
 
 <dl class="function">
@@ -1179,7 +1179,7 @@ being viewed in graph view or not.</p>
 <dl class="function">
 <dt id="ui.strings.size">
 <code class="descclassname">strings.</code><code class="descname">size</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.size" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the number of elements in the strings list.</p>
+<dd><p>Return the number of items available in the strings list.</p>
 </dd></dl>
 
 </div>

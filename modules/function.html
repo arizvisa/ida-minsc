@@ -481,6 +481,24 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
+<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>packed</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the name of the current function to the given <code class="docutils literal notranslate"><span class="pre">packed</span></code> name.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>packed</strong> (<em>tuple</em>) – a tuple of integers or strings to use for the name</li>
+<li><strong>**flags</strong> – any extra flags to use when setting the name. if <code class="docutils literal notranslate"><span class="pre">listed</span></code> is set to true, then ensure the name is added to the &quot;names&quot; list</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the name of the current function to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -510,6 +528,25 @@ functions and aliases. For more information on this, please see
 <li><strong>func</strong> – the function to remove the name for</li>
 <li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 <li><strong>**flags</strong> – any extra flags to use when removing the name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>func</em>, <em>packed</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the name of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to the given <code class="docutils literal notranslate"><span class="pre">packed</span></code> name.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to set the name of</li>
+<li><strong>packed</strong> (<em>tuple</em>) – a tuple of integers or strings to use for the name</li>
+<li><strong>**flags</strong> – any extra flags to use when setting the name. if <code class="docutils literal notranslate"><span class="pre">listed</span></code> is set to true, then ensure the name is added to the &quot;names&quot; list</li>
 </ul>
 </td>
 </tr>
@@ -2016,6 +2053,202 @@ namespace.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="function.block.tag">
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block.tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns all the tags defined for the current basic block.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>key</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the value of the tag identified by <code class="docutils literal notranslate"><span class="pre">key</span></code> for the current basic block.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>key</strong> (<em>str</em>) – a string representing the tag name to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>key</em>, <em>value</em><span class="sig-paren">)</span></dt>
+<dd><p>Sets the value for the tag <code class="docutils literal notranslate"><span class="pre">key</span></code> to <code class="docutils literal notranslate"><span class="pre">value</span></code> for the current basic block.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to assign</li>
+<li><strong>value</strong> – a python object to store at the tag</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>key</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Removes the tag identified by <code class="docutils literal notranslate"><span class="pre">key</span></code> for the current basic block.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to remove</li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns all the tags defined for the basic block at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>tuple</em>) – the address of the basic block</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>ea</em>, <em>key</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the value of the tag identified by <code class="docutils literal notranslate"><span class="pre">key</span></code> for the basic block at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>tuple</em>) – the address of the basic block</li>
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to return</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>ea</em>, <em>key</em>, <em>value</em><span class="sig-paren">)</span></dt>
+<dd><p>Sets the value for the tag <code class="docutils literal notranslate"><span class="pre">key</span></code> to <code class="docutils literal notranslate"><span class="pre">value</span></code> for the basic block at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>tuple</em>) – the address of the basic block</li>
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to assign</li>
+<li><strong>value</strong> – a python object to store at the tag</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>ea</em>, <em>key</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Removes the tag identified by <code class="docutils literal notranslate"><span class="pre">key</span></code> for the basic block at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>tuple</em>) – the address of the basic block</li>
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to remove</li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>bb</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns all the tags defined for the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> given in <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the basic block to return the tags from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>bb</em>, <em>key</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the value of the tag identified by <code class="docutils literal notranslate"><span class="pre">key</span></code> from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> given in <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the basic block to return the tag from</li>
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to return</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>bb</em>, <em>key</em>, <em>value</em><span class="sig-paren">)</span></dt>
+<dd><p>Sets the value for the tag <code class="docutils literal notranslate"><span class="pre">key</span></code> to <code class="docutils literal notranslate"><span class="pre">value</span></code> in the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> given by <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the basic block to assign the tag to</li>
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to assign</li>
+<li><strong>value</strong> – a python object to store at the tag</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">tag</code><span class="sig-paren">(</span><em>bb</em>, <em>key</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Removes the tag identified by <code class="docutils literal notranslate"><span class="pre">key</span></code> from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> given by <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the basic block to remove the tag from</li>
+<li><strong>key</strong> (<em>str</em>) – a string representing the tag name to remove</li>
+<li><strong>none</strong> (<em>None</em>) – the python value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.block.top">
 <code class="descclassname">block.</code><code class="descname">top</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.block.top" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the top address of the basic block at the current address.</p>
@@ -2229,6 +2462,20 @@ If <code class="docutils literal notranslate"><span class="pre">split</span></co
 
 <dl class="function">
 <dt>
+<code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>bb</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> matching the boundaries identifed by <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> containing the boundaries to match</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">blocks.</code><code class="descname">at</code><span class="sig-paren">(</span><em>func</em>, <em>bb</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> in function <code class="docutils literal notranslate"><span class="pre">func</span></code> identifed by <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -2236,8 +2483,8 @@ If <code class="docutils literal notranslate"><span class="pre">split</span></co
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the function containing the basic block</li>
-<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> containing the boundaries to match</li>
+<li><strong>func</strong> – </li>
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – </li>
 </ul>
 </td>
 </tr>
@@ -2320,6 +2567,20 @@ If <code class="docutils literal notranslate"><span class="pre">split</span></co
 <li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – the flags from <code class="docutils literal notranslate"><span class="pre">idaapi.FC_\*</span></code> to use when building the flowchart</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">flowchart</code><span class="sig-paren">(</span><em>bb</em><span class="sig-paren">)</span></dt>
+<dd><p>Return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.FlowChart</span></code> object for the given <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – </td>
 </tr>
 </tbody>
 </table>
@@ -2438,6 +2699,99 @@ If <code class="docutils literal notranslate"><span class="pre">split</span></co
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.BasicBlock</span></code> to traverse the predecessors of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.blocks.select">
+<code class="descclassname">blocks.</code><code class="descname">select</code><span class="sig-paren">(</span><em>**boolean</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.select" title="Permalink to this definition">¶</a></dt>
+<dd><p>Query the basic blocks of the current function for any tags specified by <code class="docutils literal notranslate"><span class="pre">boolean</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**boolean</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">select</code><span class="sig-paren">(</span><em>tag</em>, <em>*Or</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query the basic blocks of the current function for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">Or</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>tag</strong> (<em>str</em>) – </li>
+<li><strong>*Or</strong> – </li>
+<li><strong>**boolean</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">select</code><span class="sig-paren">(</span><em>func</em>, <em>tag</em>, <em>*Or</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query the basic blocks of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">Or</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>tag</strong> (<em>str</em>) – </li>
+<li><strong>*Or</strong> – </li>
+<li><strong>**boolean</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">select</code><span class="sig-paren">(</span><em>func</em>, <em>tag</em>, <em>*Or</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query the basic blocks of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">Or</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>tag</strong> (<em>set</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – </li>
+<li><strong>*Or</strong> – </li>
+<li><strong>**boolean</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">select</code><span class="sig-paren">(</span><em>func</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query the basic blocks of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> for any tags specified by <code class="docutils literal notranslate"><span class="pre">boolean</span></code>. Yields each basic block found along with the matching tags as a dictionary.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">And</span></code> contains an iterable then require the returned address contains them.
+If <code class="docutils literal notranslate"><span class="pre">Or</span></code> contains an iterable then include any other tags that are specified.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>**boolean</strong> – </li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -3543,28 +3897,28 @@ function.</p>
 </table>
 </dd></dl>
 
-<div class="section" id="function-frame-args">
-<span id="ns-function-frame-args"></span><h4>3.1.3.2.5.1. function.frame.args<a class="headerlink" href="#function-frame-args" title="Permalink to this headline">¶</a></h4>
-<p>Aliases: <a class="reference internal" href="#ns-function-frame-args"><span class="std std-ref">function.frame.arguments</span></a></p>
+<div class="section" id="function-frame-arguments">
+<span id="ns-function-frame-arguments"></span><h4>3.1.3.2.5.1. function.frame.arguments<a class="headerlink" href="#function-frame-arguments" title="Permalink to this headline">¶</a></h4>
+<p>Aliases: <a class="reference internal" href="#ns-function-frame-arguments"><span class="std std-ref">function.frame.args</span></a></p>
 <p>This namespace is for returning information about the arguments
 within a function’s frame. By default, this namespace will yield
 each argument as a tuple containing the <code class="docutils literal notranslate"><span class="pre">(offset,</span> <span class="pre">name,</span> <span class="pre">size)</span></code>.</p>
 <p>Some ways of using this are:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">registers</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">location</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">arguments</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">arguments</span><span class="o">.</span><span class="n">registers</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">arguments</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">arguments</span><span class="o">.</span><span class="n">location</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
-<dt id="function.frame.args">
-<code class="descclassname">frame.</code><code class="descname">args</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args" title="Permalink to this definition">¶</a></dt>
+<dt id="function.frame.arguments">
+<code class="descclassname">frame.</code><code class="descname">arguments</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.arguments" title="Permalink to this definition">¶</a></dt>
 <dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(offset,</span> <span class="pre">name,</span> <span class="pre">size)</span></code> of each argument belonging to the current function.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">frame.</code><code class="descname">args</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">frame.</code><code class="descname">arguments</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(offset,</span> <span class="pre">name,</span> <span class="pre">size)</span></code> of each argument belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -3577,14 +3931,14 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 </dd></dl>
 
 <dl class="function">
-<dt id="function.frame.args.iterate">
-<code class="descclassname">frame.args.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.iterate" title="Permalink to this definition">¶</a></dt>
+<dt id="function.frame.arguments.iterate">
+<code class="descclassname">frame.arguments.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.arguments.iterate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(member,</span> <span class="pre">type,</span> <span class="pre">name)</span></code> associated with the arguments for the current function.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">frame.args.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">frame.arguments.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(member,</span> <span class="pre">type,</span> <span class="pre">name)</span></code> associated with the arguments for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -3597,17 +3951,17 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 </dd></dl>
 
 <dl class="function">
-<dt id="function.frame.args.location">
-<code class="descclassname">frame.args.</code><code class="descname">location</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.location" title="Permalink to this definition">¶</a></dt>
+<dt id="function.frame.arguments.location">
+<code class="descclassname">frame.arguments.</code><code class="descname">location</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.arguments.location" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the list of address locations for each of the parameters that are passed to the function call at the current address.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.location" title="function.frame.args.location"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.locations</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.frame.arguments.location" title="function.frame.arguments.location"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.locations</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">frame.args.</code><code class="descname">location</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">frame.arguments.</code><code class="descname">location</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the list of address locations for each of the parameters that are passed to the function call at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.location" title="function.frame.args.location"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.locations</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.frame.arguments.location" title="function.frame.arguments.location"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.locations</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -3620,9 +3974,9 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 
 <dl class="function">
 <dt>
-<code class="descclassname">frame.args.</code><code class="descname">location</code><span class="sig-paren">(</span><em>ea</em>, <em>index</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">frame.arguments.</code><code class="descname">location</code><span class="sig-paren">(</span><em>ea</em>, <em>index</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the initialization address for the parameter at <code class="docutils literal notranslate"><span class="pre">index</span></code> for the function call at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.location" title="function.frame.args.location"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.locations</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.frame.arguments.location" title="function.frame.arguments.location"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.locations</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -3638,17 +3992,17 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 </dd></dl>
 
 <dl class="function">
-<dt id="function.frame.args.registers">
-<code class="descclassname">frame.args.</code><code class="descname">registers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.registers" title="Permalink to this definition">¶</a></dt>
+<dt id="function.frame.arguments.registers">
+<code class="descclassname">frame.arguments.</code><code class="descname">registers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.arguments.registers" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the register information associated with the arguments of the current function.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.registers" title="function.frame.args.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.regs</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.frame.arguments.registers" title="function.frame.arguments.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.regs</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">frame.args.</code><code class="descname">registers</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">frame.arguments.</code><code class="descname">registers</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the register information associated with the arguments of the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.registers" title="function.frame.args.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.regs</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.frame.arguments.registers" title="function.frame.arguments.registers"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.frame.args.regs</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -3660,17 +4014,17 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 </dd></dl>
 
 <dl class="function">
-<dt id="function.frame.args.size">
-<code class="descclassname">frame.args.</code><code class="descname">size</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.args.size" title="Permalink to this definition">¶</a></dt>
+<dt id="function.frame.arguments.size">
+<code class="descclassname">frame.arguments.</code><code class="descname">size</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.arguments.size" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the size of the arguments for the current function.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.size" title="function.frame.args.size"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.get_args_size</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.frame.arguments.size" title="function.frame.arguments.size"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.get_args_size</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">frame.args.</code><code class="descname">size</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">frame.arguments.</code><code class="descname">size</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns the size of the arguments for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#function.frame.args.size" title="function.frame.args.size"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.get_args_size</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.frame.arguments.size" title="function.frame.arguments.size"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.get_args_size</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4478,7 +4832,7 @@ in a function:</p>
 &gt; print( function.argument.name(1) )
 &gt; oldtype = function.argument(0, ‘void*’)
 &gt; oldname = function.argument.name(1)
-&gt; location = function.argument.location(2)
+&gt; storage = function.argument.storage(2)
 &gt; index = function.argument.remove(3)</div></blockquote>
 <dl class="function">
 <dt id="function.type.argument">
@@ -4571,12 +4925,12 @@ in a function:</p>
 <dl class="function">
 <dt id="function.type.argument.location">
 <code class="descclassname">type.argument.</code><code class="descname">location</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#function.type.argument.location" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the location of the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> in the current function.</p>
+<dd><p>Return the address of the parameter at <code class="docutils literal notranslate"><span class="pre">index</span></code> that is passed to the function referenced at the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to return the location of</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
 </tr>
 </tbody>
 </table>
@@ -4584,15 +4938,15 @@ in a function:</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">type.argument.</code><code class="descname">location</code><span class="sig-paren">(</span><em>func</em>, <em>index</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the location of the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> in the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<code class="descclassname">type.argument.</code><code class="descname">location</code><span class="sig-paren">(</span><em>ea</em>, <em>index</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address of the parameter at <code class="docutils literal notranslate"><span class="pre">index</span></code> that is passed to the function referenced at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>func</strong> – the address or function containing the parameter</li>
-<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to return the location of</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
 </ul>
 </td>
 </tr>
@@ -4742,6 +5096,38 @@ in a function:</p>
 </table>
 </dd></dl>
 
+<dl class="function">
+<dt id="function.type.argument.storage">
+<code class="descclassname">type.argument.</code><code class="descname">storage</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#function.type.argument.storage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the storage location of the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> in the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to return the location of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.argument.</code><code class="descname">storage</code><span class="sig-paren">(</span><em>func</em>, <em>index</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the storage location of the parameter at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code> in the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the address or function containing the parameter</li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index of the parameter to return the location of</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </div>
 <div class="section" id="function-type-arguments">
 <span id="ns-function-type-arguments"></span><h4>3.1.3.2.6.2. function.type.arguments<a class="headerlink" href="#function-type-arguments" title="Permalink to this headline">¶</a></h4>
@@ -4866,13 +5252,13 @@ and types in their entirety.</p>
 <dl class="function">
 <dt id="function.type.arguments.iterate">
 <code class="descclassname">type.arguments.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.arguments.iterate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(name,</span> <span class="pre">type,</span> <span class="pre">location)</span></code> of each of the parameters belonging to the current function.</p>
+<dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(name,</span> <span class="pre">type,</span> <span class="pre">storage)</span></code> of each of the parameters belonging to the current function.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.arguments.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(name,</span> <span class="pre">type,</span> <span class="pre">location)</span></code> of each of the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<dd><p>Yield the <code class="docutils literal notranslate"><span class="pre">(name,</span> <span class="pre">type,</span> <span class="pre">storage)</span></code> of each of the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4886,18 +5272,36 @@ and types in their entirety.</p>
 <dl class="function">
 <dt id="function.type.arguments.locations">
 <code class="descclassname">type.arguments.</code><code class="descname">locations</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.arguments.locations" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the locations of each of the parameters belonging to the current function.</p>
+<dd><p>Return the address of each of the parameters being passed to the function referenced at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">type.arguments.</code><code class="descname">locations</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the locations of each of the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<code class="descclassname">type.arguments.</code><code class="descname">locations</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address of each of the parameters being passed to the function referenced at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the prototype with the locations to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.arguments.</code><code class="descname">locations</code><span class="sig-paren">(</span><em>func</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address of each of the parameters for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> that are being passed to the function referenced at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -4961,6 +5365,26 @@ and types in their entirety.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the prototype with the registers to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.type.arguments.storage">
+<code class="descclassname">type.arguments.</code><code class="descname">storage</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.arguments.storage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the storage location for each of the parameters belonging to the current function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.arguments.</code><code class="descname">storage</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the storage locations for each of the parameters belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the address or function containing the prototype with the locations to return</td>
 </tr>
 </tbody>
 </table>
@@ -5094,15 +5518,15 @@ the type information that is returned by a function.</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="function.type.result.location">
-<code class="descclassname">type.result.</code><code class="descname">location</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.result.location" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the location of the result belonging to the current function.</p>
+<dt id="function.type.result.storage">
+<code class="descclassname">type.result.</code><code class="descname">storage</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.result.storage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the storage location of the result belonging to the current function.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">type.result.</code><code class="descname">location</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the location of the result belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<code class="descclassname">type.result.</code><code class="descname">storage</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the storage location of the result belonging to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5321,7 +5745,7 @@ the following globals:</p>
 <li><a class="reference internal" href="#function-chunk">3.1.3.2.3. function.chunk</a></li>
 <li><a class="reference internal" href="#function-chunks">3.1.3.2.4. function.chunks</a></li>
 <li><a class="reference internal" href="#function-frame">3.1.3.2.5. function.frame</a><ul>
-<li><a class="reference internal" href="#function-frame-args">3.1.3.2.5.1. function.frame.args</a></li>
+<li><a class="reference internal" href="#function-frame-arguments">3.1.3.2.5.1. function.frame.arguments</a></li>
 <li><a class="reference internal" href="#function-frame-lvars">3.1.3.2.5.2. function.frame.lvars</a></li>
 <li><a class="reference internal" href="#function-frame-regs">3.1.3.2.5.3. function.frame.regs</a></li>
 </ul>

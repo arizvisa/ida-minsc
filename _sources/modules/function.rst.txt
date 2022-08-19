@@ -235,6 +235,14 @@ functions and aliases. For more information on this, please see
    :type none: None
    :param \*\*flags: any extra flags to use when removing the name
    
+.. py:function:: name(packed, \*\*flags)
+   
+   Set the name of the current function to the given ``packed`` name.
+   
+   :param packed: a tuple of integers or strings to use for the name
+   :type packed: tuple
+   :param \*\*flags: any extra flags to use when setting the name. if ``listed`` is set to true, then ensure the name is added to the \\"names\\" list
+   
 .. py:function:: name(string, \*suffix, \*\*flags)
    
    Set the name of the current function to ``string``.
@@ -252,6 +260,15 @@ functions and aliases. For more information on this, please see
    :param none: the python value :py:obj:`None`
    :type none: None
    :param \*\*flags: any extra flags to use when removing the name
+   
+.. py:function:: name(func, packed, \*\*flags)
+   
+   Set the name of the function ``func`` to the given ``packed`` name.
+   
+   :param func: the function to set the name of
+   :param packed: a tuple of integers or strings to use for the name
+   :type packed: tuple
+   :param \*\*flags: any extra flags to use when setting the name. if ``listed`` is set to true, then ensure the name is added to the \\"names\\" list
    
 .. py:function:: name(func, string, \*suffix, \*\*flags)
    
@@ -1052,6 +1069,108 @@ Some examples of this functionality can be::
    :param \*regs: any other registers to match for
    :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
+.. py:function:: block\.tag()
+   
+   Returns all the tags defined for the current basic block.
+   
+.. py:function:: block\.tag(key)
+   
+   Returns the value of the tag identified by ``key`` for the current basic block.
+   
+   :param key: a string representing the tag name to return
+   :type key: str
+   
+.. py:function:: block\.tag(key, value)
+   
+   Sets the value for the tag ``key`` to ``value`` for the current basic block.
+   
+   :param key: a string representing the tag name to assign
+   :type key: str
+   :param value: a python object to store at the tag
+   
+.. py:function:: block\.tag(key, none)
+   
+   Removes the tag identified by ``key`` for the current basic block.
+   
+   :param key: a string representing the tag name to remove
+   :type key: str
+   :param none: the python value :py:obj:`None`
+   :type none: None
+   
+.. py:function:: block\.tag(ea)
+   
+   Returns all the tags defined for the basic block at ``ea``.
+   
+   :param ea: the address of the basic block
+   :type ea: int or long or tuple
+   
+.. py:function:: block\.tag(ea, key)
+   
+   Returns the value of the tag identified by ``key`` for the basic block at ``ea``.
+   
+   :param ea: the address of the basic block
+   :type ea: int or long or tuple
+   :param key: a string representing the tag name to return
+   :type key: str
+   
+.. py:function:: block\.tag(ea, key, value)
+   
+   Sets the value for the tag ``key`` to ``value`` for the basic block at ``ea``.
+   
+   :param ea: the address of the basic block
+   :type ea: int or long or tuple
+   :param key: a string representing the tag name to assign
+   :type key: str
+   :param value: a python object to store at the tag
+   
+.. py:function:: block\.tag(ea, key, none)
+   
+   Removes the tag identified by ``key`` for the basic block at ``ea``.
+   
+   :param ea: the address of the basic block
+   :type ea: int or long or tuple
+   :param key: a string representing the tag name to remove
+   :type key: str
+   :param none: the python value :py:obj:`None`
+   :type none: None
+   
+.. py:function:: block\.tag(bb)
+   
+   Returns all the tags defined for the :py:obj:`idaapi.BasicBlock` given in ``bb``.
+   
+   :param bb: the basic block to return the tags from
+   :type bb: idaapi.BasicBlock
+   
+.. py:function:: block\.tag(bb, key)
+   
+   Returns the value of the tag identified by ``key`` from the :py:obj:`idaapi.BasicBlock` given in ``bb``.
+   
+   :param bb: the basic block to return the tag from
+   :type bb: idaapi.BasicBlock
+   :param key: a string representing the tag name to return
+   :type key: str
+   
+.. py:function:: block\.tag(bb, key, value)
+   
+   Sets the value for the tag ``key`` to ``value`` in the :py:obj:`idaapi.BasicBlock` given by ``bb``.
+   
+   :param bb: the basic block to assign the tag to
+   :type bb: idaapi.BasicBlock
+   :param key: a string representing the tag name to assign
+   :type key: str
+   :param value: a python object to store at the tag
+   
+.. py:function:: block\.tag(bb, key, none)
+   
+   Removes the tag identified by ``key`` from the :py:obj:`idaapi.BasicBlock` given by ``bb``.
+   
+   :param bb: the basic block to remove the tag from
+   :type bb: idaapi.BasicBlock
+   :param key: a string representing the tag name to remove
+   :type key: str
+   :param none: the python value :py:obj:`None`
+   :type none: None
+   
 .. py:function:: block\.top()
    
    Return the top address of the basic block at the current address.
@@ -1175,12 +1294,19 @@ Some examples of this namespace's usage::
    :param flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
    :type flags: int or long
    
+.. py:function:: blocks\.at(bb)
+   
+   Return the :py:obj:`idaapi.BasicBlock` matching the boundaries identifed by ``bb``.
+   
+   :param bb: the ``idaapi.BasicBlock`` containing the boundaries to match
+   :type bb: idaapi.BasicBlock
+   
 .. py:function:: blocks\.at(func, bb)
    
    Return the :py:obj:`idaapi.BasicBlock` in function ``func`` identifed by ``bb``.
    
-   :param func: the function containing the basic block
-   :param bb: the ``idaapi.BasicBlock`` containing the boundaries to match
+   :param func:
+   :param bb:
    :type bb: idaapi.BasicBlock
    
 .. py:function:: blocks\.digraph()
@@ -1226,6 +1352,13 @@ Some examples of this namespace's usage::
    :param func: the function to return the flowchart for
    :param flags: the flags from ``idaapi.FC_\*`` to use when building the flowchart
    :type flags: int or long
+   
+.. py:function:: blocks\.flowchart(bb)
+   
+   Return an :py:obj:`idaapi.FlowChart` object for the given :py:obj:`idaapi.BasicBlock`.
+   
+   :param bb:
+   :type bb: idaapi.BasicBlock
    
 .. py:function:: blocks\.iterate(\*\*external)
    
@@ -1281,6 +1414,51 @@ Some examples of this namespace's usage::
    
    :param bb: the ``idaapi.BasicBlock`` to traverse the predecessors of
    :type bb: idaapi.BasicBlock
+   
+.. py:function:: blocks\.select(\*\*boolean)
+   
+   Query the basic blocks of the current function for any tags specified by ``boolean``
+   
+   :param \*\*boolean:
+   
+.. py:function:: blocks\.select(tag, \*Or, \*\*boolean)
+   
+   Query the basic blocks of the current function for the specified ``tag`` and any others specified as ``Or``.
+   
+   :param tag:
+   :type tag: str
+   :param \*Or:
+   :param \*\*boolean:
+   
+.. py:function:: blocks\.select(func, tag, \*Or, \*\*boolean)
+   
+   Query the basic blocks of the function ``func`` for the specified ``tag`` and any others specified as ``Or``.
+   
+   :param func:
+   :param tag:
+   :type tag: str
+   :param \*Or:
+   :param \*\*boolean:
+   
+.. py:function:: blocks\.select(func, tag, \*Or, \*\*boolean)
+   
+   Query the basic blocks of the function ``func`` for the specified ``tag`` and any others specified as ``Or``.
+   
+   :param func:
+   :param tag:
+   :type tag: set or list
+   :param \*Or:
+   :param \*\*boolean:
+   
+.. py:function:: blocks\.select(func, \*\*boolean)
+   
+   Query the basic blocks of the function ``func`` for any tags specified by ``boolean``. Yields each basic block found along with the matching tags as a dictionary.
+   
+   If ``And`` contains an iterable then require the returned address contains them.
+   If ``Or`` contains an iterable then include any other tags that are specified.
+   
+   :param func:
+   :param \*\*boolean:
    
 .. py:function:: blocks\.subgraph(start, exits)
    
@@ -1903,13 +2081,13 @@ Some ways of using this can be::
    :param args: the number of bytes to allocate for arguments
    :type args: int or long
    
-.. _ns-function-frame-args:
+.. _ns-function-frame-arguments:
 
-^^^^^^^^^^^^^^^^^^^
-function.frame.args
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
+function.frame.arguments
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-Aliases: :ref:`function.frame.arguments<ns-function-frame-args>`
+Aliases: :ref:`function.frame.args<ns-function-frame-arguments>`
 
 This namespace is for returning information about the arguments
 within a function's frame. By default, this namespace will yield
@@ -1917,82 +2095,82 @@ each argument as a tuple containing the ``(offset, name, size)``.
 
 Some ways of using this are::
 
-    > print( function.frame.args(f) )
-    > print( function.frame.args.registers(f) )
-    > print( function.frame.args.size(f) )
-    > print( function.frame.args.location(ea) )
+    > print( function.frame.arguments(f) )
+    > print( function.frame.arguments.registers(f) )
+    > print( function.frame.arguments.size(f) )
+    > print( function.frame.arguments.location(ea) )
 
-.. py:function:: frame\.args()
+.. py:function:: frame\.arguments()
    
    Yield the ``(offset, name, size)`` of each argument belonging to the current function.
    
-.. py:function:: frame\.args(func)
+.. py:function:: frame\.arguments(func)
    
    Yield the ``(offset, name, size)`` of each argument belonging to the function ``func``.
    
    :param func: the function containing the arguments to yield
    
-.. py:function:: frame\.args\.iterate()
+.. py:function:: frame\.arguments\.iterate()
    
    Yield the ``(member, type, name)`` associated with the arguments for the current function.
    
-.. py:function:: frame\.args\.iterate(func)
+.. py:function:: frame\.arguments\.iterate(func)
    
    Yield the ``(member, type, name)`` associated with the arguments for the function ``func``.
    
    :param func: the function containing the argument information to yield
    
-.. py:function:: frame\.args\.location()
+.. py:function:: frame\.arguments\.location()
    
    Return the list of address locations for each of the parameters that are passed to the function call at the current address.
    
-   Aliases: :py:func:`function.frame.args.locations<frame\.args\.location>`
+   Aliases: :py:func:`function.frame.args.locations<frame\.arguments\.location>`
    
-.. py:function:: frame\.args\.location(ea)
+.. py:function:: frame\.arguments\.location(ea)
    
    Return the list of address locations for each of the parameters that are passed to the function call at ``ea``.
    
-   Aliases: :py:func:`function.frame.args.locations<frame\.args\.location>`
+   Aliases: :py:func:`function.frame.args.locations<frame\.arguments\.location>`
    
    :param ea: the address of the reference to the function
    :type ea: int or long
    
-.. py:function:: frame\.args\.location(ea, index)
+.. py:function:: frame\.arguments\.location(ea, index)
    
    Return the initialization address for the parameter at ``index`` for the function call at ``ea``.
    
-   Aliases: :py:func:`function.frame.args.locations<frame\.args\.location>`
+   Aliases: :py:func:`function.frame.args.locations<frame\.arguments\.location>`
    
    :param ea: the address of the reference to the function
    :type ea: int or long
    :param index: the index of the parameter to return the address of
    :type index: int or long
    
-.. py:function:: frame\.args\.registers()
+.. py:function:: frame\.arguments\.registers()
    
    Return the register information associated with the arguments of the current function.
    
-   Aliases: :py:func:`function.frame.args.regs<frame\.args\.registers>`
+   Aliases: :py:func:`function.frame.args.regs<frame\.arguments\.registers>`
    
-.. py:function:: frame\.args\.registers(func)
+.. py:function:: frame\.arguments\.registers(func)
    
    Return the register information associated with the arguments of the function ``func``.
    
-   Aliases: :py:func:`function.frame.args.regs<frame\.args\.registers>`
+   Aliases: :py:func:`function.frame.args.regs<frame\.arguments\.registers>`
    
    :param func: the function containing the argument register information to return
    
-.. py:function:: frame\.args\.size()
+.. py:function:: frame\.arguments\.size()
    
    Returns the size of the arguments for the current function.
    
-   Aliases: :py:func:`function.get_args_size<frame\.args\.size>`
+   Aliases: :py:func:`function.get_args_size<frame\.arguments\.size>`
    
-.. py:function:: frame\.args\.size(func)
+.. py:function:: frame\.arguments\.size(func)
    
    Returns the size of the arguments for the function ``func``.
    
-   Aliases: :py:func:`function.get_args_size<frame\.args\.size>`
+   Aliases: :py:func:`function.get_args_size<frame\.arguments\.size>`
    
    :param func: the function containing the argument size to return
    
@@ -2477,7 +2655,7 @@ in a function:
     > print( function.argument.name(1) )
     > oldtype = function.argument(0, 'void*')
     > oldname = function.argument.name(1)
-    > location = function.argument.location(2)
+    > storage = function.argument.storage(2)
     > index = function.argument.remove(3)
 
 .. py:function:: type\.argument(index)
@@ -2526,17 +2704,18 @@ in a function:
    
 .. py:function:: type\.argument\.location(index)
    
-   Return the location of the parameter at the specified ``index`` in the current function.
+   Return the address of the parameter at ``index`` that is passed to the function referenced at the current address.
    
-   :param index: the index of the parameter to return the location of
+   :param index:
    :type index: int or long
    
-.. py:function:: type\.argument\.location(func, index)
+.. py:function:: type\.argument\.location(ea, index)
    
-   Return the location of the parameter at the specified ``index`` in the function ``func``.
+   Return the address of the parameter at ``index`` that is passed to the function referenced at the address ``ea``.
    
-   :param func: the address or function containing the parameter
-   :param index: the index of the parameter to return the location of
+   :param ea:
+   :type ea: int or long
+   :param index:
    :type index: int or long
    
 .. py:function:: type\.argument\.name(index)
@@ -2611,6 +2790,21 @@ in a function:
    
    :param func: the address or function to containing the parameter
    :param index: the index of the parameter to remove
+   :type index: int or long
+   
+.. py:function:: type\.argument\.storage(index)
+   
+   Return the storage location of the parameter at the specified ``index`` in the current function.
+   
+   :param index: the index of the parameter to return the location of
+   :type index: int or long
+   
+.. py:function:: type\.argument\.storage(func, index)
+   
+   Return the storage location of the parameter at the specified ``index`` in the function ``func``.
+   
+   :param func: the address or function containing the parameter
+   :param index: the index of the parameter to return the location of
    :type index: int or long
    
 .. _ns-function-type-arguments:
@@ -2688,23 +2882,32 @@ This namespace is aliased as :py:obj:`function.type.args` and :py:obj:`function.
    
 .. py:function:: type\.arguments\.iterate()
    
-   Yield the ``(name, type, location)`` of each of the parameters belonging to the current function.
+   Yield the ``(name, type, storage)`` of each of the parameters belonging to the current function.
    
 .. py:function:: type\.arguments\.iterate(func)
    
-   Yield the ``(name, type, location)`` of each of the parameters belonging to the function ``func``.
+   Yield the ``(name, type, storage)`` of each of the parameters belonging to the function ``func``.
    
    :param func: the address or function containing the prototype with the argument locations to return
    
 .. py:function:: type\.arguments\.locations()
    
-   Return the locations of each of the parameters belonging to the current function.
+   Return the address of each of the parameters being passed to the function referenced at the current address.
    
-.. py:function:: type\.arguments\.locations(func)
+.. py:function:: type\.arguments\.locations(ea)
    
-   Return the locations of each of the parameters belonging to the function ``func``.
+   Return the address of each of the parameters being passed to the function referenced at address ``ea``.
    
-   :param func: the address or function containing the prototype with the locations to return
+   :param ea:
+   :type ea: int or long
+   
+.. py:function:: type\.arguments\.locations(func, ea)
+   
+   Return the address of each of the parameters for the function ``func`` that are being passed to the function referenced at address ``ea``.
+   
+   :param func:
+   :param ea:
+   :type ea: int or long
    
 .. py:function:: type\.arguments\.names()
    
@@ -2743,6 +2946,16 @@ This namespace is aliased as :py:obj:`function.type.args` and :py:obj:`function.
    Aliases: :py:func:`function.type.arguments.regs<type\.arguments\.registers>`
    
    :param func: the address or function containing the prototype with the registers to return
+   
+.. py:function:: type\.arguments\.storage()
+   
+   Return the storage location for each of the parameters belonging to the current function.
+   
+.. py:function:: type\.arguments\.storage(func)
+   
+   Return the storage locations for each of the parameters belonging to the function ``func``.
+   
+   :param func: the address or function containing the prototype with the locations to return
    
 .. py:function:: type\.arguments\.types()
    
@@ -2826,13 +3039,13 @@ Some ways to utilize this namespace can be::
    :param info: the :py:obj:`idaapi.tinfo_t` containing the type information to apply to the result
    :type info: idaapi.tinfo_t
    
-.. py:function:: type\.result\.location()
+.. py:function:: type\.result\.storage()
    
-   Return the location of the result belonging to the current function.
+   Return the storage location of the result belonging to the current function.
    
-.. py:function:: type\.result\.location(func)
+.. py:function:: type\.result\.storage(func)
    
-   Return the location of the result belonging to the function ``func``.
+   Return the storage location of the result belonging to the function ``func``.
    
    :param func: the address or function using the result to return the location of
    

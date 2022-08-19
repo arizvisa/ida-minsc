@@ -780,19 +780,19 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
 .. py:function:: strings\.at(index)
    
-   Return the string at the specified ``index``.
+   Return the :py:obj:`idaapi.string_info_t` for the specified ``index`` in the strings list.
    
    :param index: the index of the string item to return
    
 .. py:function:: strings\.get(index)
    
-   Return the address and the string at the specified ``index``.
+   Return the address and its bytes representing the string at the specified ``index``.
    
    :param index: the index of the string to return
    
 .. py:function:: strings\.iterate()
    
-   Iterate through all of the address and strings in the strings list.
+   Iterate through all of the addresses and items in the strings list.
    
 .. py:function:: strings\.refresh()
    
@@ -800,7 +800,7 @@ Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
    
 .. py:function:: strings\.size()
    
-   Return the number of elements in the strings list.
+   Return the number of items available in the strings list.
    
 .. _ns-ui-structures:
 
