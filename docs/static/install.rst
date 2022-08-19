@@ -52,11 +52,11 @@ it installed. This should put "``git``" within your ``PATH`` and allow you to ru
 it from the command line. This is necessary as it will be used for cloning the
 repository [:ref:`4<software-references>`] that contains the actual plugin.
 
-Currently, IDA versions 6.8 up to 7.7.220125 [:ref:`5<software-references>`] are
+Currently, IDA versions 6.8 up to 8.0.220729 [:ref:`5<software-references>`] are
 supported by the plugin along with both versions of the Python interpreter
 [:ref:`6<software-references>`]. This means that both the **Python 3.x** series
 **and** the older **Python 2.x** series should be usable. However, the installation
-steps described within this document assume that you have Python 3.9 installed
+steps described within this document assume that you have Python 3.10 installed
 [:ref:`7<software-references>`] and that it is also accessible via the command
 line. If this is not the case, you may need to follow additional steps in order
 to install Python and get it working within your instance of IDA Pro. If your
@@ -122,9 +122,9 @@ which is only necessary if you're using an older version of IDA Pro.
 2. `Git: Local branching on the cheap — https://git-scm.com <https://git-scm.com>`_
 3. `Git: Downloads — https://git-scm.com/downloads <https://git-scm.com/downloads>`_
 4. `IDA-Minsc repository — https://github.com/arizvisa/ida-minsc <https://github.com/arizvisa/ida-minsc>`_
-5. `Hex Rays: IDA 7.7 released — https://hex-rays.com/blog/ida-7-7-released/ <https://hex-rays.com/blog/ida-7-7-released/>`_
+5. `Hex Rays: IDA 8.0 released — https://hex-rays.com/blog/ida-8-0-released/ <https://hex-rays.com/blog/ida-8-0-released/>`_
 6. `Python: Welcome to Python.org — https://www.python.org/ <https://www.python.org/>`_
-7. `Python: Downloading Python 3.9.13 — https://wiki.python.org/moin/BeginnersGuide/Download <https://www.python.org/downloads/release/python-3913>`_
+7. `Python: Downloading Python 3.10.6 — https://wiki.python.org/moin/BeginnersGuide/Download <https://www.python.org/downloads/release/python-3106>`_
 8. `IDA-Minsc: Python issues — https://github.com/arizvisa/ida-minsc/issues <https://github.com/arizvisa/ida-minsc/issues/new?title=My+instance+of+IDAPython+appears+broken...>`_
 
 ----------------------------
@@ -678,7 +678,7 @@ code by typing it into the input box::
 
     > import sys
     > sys.version_info
-    sys.version_info(major=3, minor=9, micro=13, releaselevel='final', serial=0)
+    sys.version_info(major=3, minor=10, micro=6, releaselevel='final', serial=0)
 
 Examining the major version of the named tuple that has been returned shows that
 the Python 3.x version of the IDAPython plugin is currently being used. At this
