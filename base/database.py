@@ -1088,7 +1088,7 @@ class names(object):
         listable = [item for item in cls.__iterate__(**type)]
         if len(listable) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)
-            messages = ((u"[{:d}] {:#x} {:s}".format(idx, ea, name if Fmangled_type(utils.string.to(name)) == MANGLED_UNKNOWN else "({:s}) {:s}".format(name, utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM)))) for idx, ea, name in map(utils.fmap(utils.fidentity, f1, f2), listable)))
+            messages = ((u"[{:d}] {:#x} {:s}".format(idx, ea, name if Fmangled_type(utils.string.to(name)) == MANGLED_UNKNOWN else "({:s}) {:s}".format(name, utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name))) for idx, ea, name in map(utils.fmap(utils.fidentity, f1, f2), listable)))
             [ logging.info(msg) for msg in messages ]
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
 
@@ -2008,7 +2008,7 @@ class entries(object):
             # use the unmangled name for displaying the export.
             if function.within(ea):
                 ti, mangled_name_type_t = idaapi.tinfo_t(), Fmangled_type(utils.string.to(realname))
-                dname = realname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_NODEFINIT|MNG_NOPTRTYP))
+                dname = realname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_NODEFINIT|MNG_NOPTRTYP) or realname)
                 demangled = utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_LONG_FORM|MNG_NOSCTYP|MNG_NOCALLC)) or realname
                 description = idaapi.print_tinfo('', 0, 0, idaapi.PRTYPE_DEF, ti, utils.string.to(dname), '') if get_tinfo(ti, ea) else demangled
 
@@ -2151,7 +2151,7 @@ def tag(ea):
     # it's actually special in that we need to demangle it for the real name.
     aname = name(ea)
     if aname and Fmangled_type(utils.string.to(aname)) != MANGLED_UNKNOWN:
-        realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP))
+        realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP) or aname)
     else:
         realname = aname or ''
 
@@ -2772,7 +2772,7 @@ class imports(object):
             # strip out the import prefix, then figure out the type before we render just the name.
             name = name[len(prefix):] if name.startswith(prefix) else name
             mangled_name_type_t = Fmangled_type(utils.string.to(name))
-            realname = name if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP))
+            realname = name if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP) or name)
 
             # Some flags that are probably useful.
             ftyped = 'T' if get_tinfo(idaapi.tinfo_t(), ea) else 't' if t.has_typeinfo(ea) else '-'
