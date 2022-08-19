@@ -96,7 +96,7 @@ class UnicodeException(E.BaseException):
     def __setstate__(self, pack):
         self.args = pack
 
-class MissingTagError(UnicodeException, E.KeyError):
+class MissingTagError(E.KeyError, UnicodeException):
     """
     The requested tag at the specified address does not exist.
     """
@@ -106,27 +106,27 @@ class MissingFunctionTagError(MissingTagError):
     The requested tag for the specified function does not exist.
     """
 
-class MissingMethodError(UnicodeException, E.NotImplementedError):
+class MissingMethodError(E.NotImplementedError, UnicodeException):
     """
     A method belonging to a superclass that is required to be overloaded was called.
     """
 
-class MissingNameError(UnicodeException, E.NameError):
+class MissingNameError(E.NameError, UnicodeException):
     """
     A name that was required was found missing and was unable to be recovered.
     """
 
-class UnsupportedVersion(UnicodeException, E.NotImplementedError):
+class UnsupportedVersion(E.NotImplementedError, UnicodeException):
     """
     This functionality is not supported on the current version of IDA.
     """
 
-class UnsupportedCapability(UnicodeException, E.NotImplementedError, E.EnvironmentError):
+class UnsupportedCapability(E.NotImplementedError, E.EnvironmentError, UnicodeException):
     """
     An unexpected or unsupported capability was specified.
     """
 
-class ResultMissingError(UnicodeException, E.LookupError):
+class ResultMissingError(E.LookupError, UnicodeException):
     """
     The requested item is missing from its results.
     """
@@ -136,42 +136,42 @@ class SearchResultsError(ResultMissingError):
     No results were found.
     """
 
-class DisassemblerError(UnicodeException, E.EnvironmentError):
+class DisassemblerError(E.EnvironmentError, UnicodeException):
     """
     An api call has thrown an error or was unsuccessful.
     """
 
-class MissingTypeOrAttribute(UnicodeException, E.TypeError):
+class MissingTypeOrAttribute(E.TypeError, UnicodeException):
     """
     The specified location is missing some specific attribute or type.
     """
 
-class InvalidTypeOrValueError(UnicodeException, E.TypeError, E.ValueError):
+class InvalidTypeOrValueError(E.TypeError, E.ValueError, UnicodeException):
     """
     An invalid value or type was specified.
     """
 
-class InvalidParameterError(InvalidTypeOrValueError, E.AssertionError):
+class InvalidParameterError(E.AssertionError, InvalidTypeOrValueError):
     """
     An invalid parameter was specified by the user.
     """
 
-class OutOfBoundsError(UnicodeException, E.ValueError):
+class OutOfBoundsError(E.ValueError, UnicodeException):
     """
     The specified item is out of bounds.
     """
 
-class AddressOutOfBoundsError(OutOfBoundsError, E.ArithmeticError):
+class AddressOutOfBoundsError(E.ArithmeticError, OutOfBoundsError):
     """
     The specified address is out of bounds.
     """
 
-class IndexOutOfBoundsError(OutOfBoundsError, E.IndexError, E.KeyError):
+class IndexOutOfBoundsError(E.IndexError, E.KeyError, OutOfBoundsError):
     """
     The specified index is out of bounds.
     """
 
-class ItemNotFoundError(ResultMissingError, E.KeyError):
+class ItemNotFoundError(E.KeyError, ResultMissingError):
     """
     The specified item or type was not found.
     """
@@ -216,17 +216,17 @@ class NetNodeNotFoundError(ItemNotFoundError):
     Unable to locate the specified netnode.
     """
 
-class ReadOrWriteError(UnicodeException, E.IOError, E.ValueError):
+class ReadOrWriteError(E.IOError, E.ValueError, UnicodeException):
     """
     Unable to read or write the specified number of bytes .
     """
 
-class InvalidFormatError(UnicodeException, E.KeyError, E.ValueError):
+class InvalidFormatError(E.KeyError, E.ValueError, UnicodeException):
     """
     The specified data has an invalid format.
     """
 
-class SerializationError(UnicodeException, E.ValueError, E.IOError):
+class SerializationError(E.ValueError, E.IOError, UnicodeException):
     """
     There was an error while trying to serialize or deserialize the specified data.
     """
@@ -236,12 +236,12 @@ class SizeMismatchError(SerializationError):
     There was an error while trying to serialize or deserialize the specified data due to its size not matching.
     """
 
-class UnknownPrototypeError(UnicodeException, E.LookupError):
+class UnknownPrototypeError(E.LookupError, UnicodeException):
     """
     The requested prototype does not match any of the ones that are available.
     """
 
-class DuplicateItemError(DisassemblerError, E.NameError):
+class DuplicateItemError(E.NameError, UnicodeException):
     """
     The requested command has failed due to a duplicate item.
     """
