@@ -2849,7 +2849,7 @@ def tag(func):
     # Collect all of the naming information for the function.
     fname, mangled = name(ea), utils.string.of(idaapi.get_func_name(ea))
     if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
-        realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP))
+        realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
     else:
         realname = fname or ''
 
@@ -3233,7 +3233,7 @@ class type(object):
 
         fname, mangled = name(ea), database.name(ea) if rt else utils.string.of(idaapi.get_func_name(ea))
         if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
-            realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP))
+            realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
         else:
             realname = fname
 
