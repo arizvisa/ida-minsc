@@ -1451,24 +1451,24 @@ class wrap(object):
             asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
             co_stacksize += 1
 
-        # then we can finally pack it into a tuple.
-        asm(cls.co_assemble('BUILD_TUPLE', 1 + len(Fargs[int(bound):])))
+        # then we can finally pack it into a tuple
+        asm(cls.co_assemble('BUILD_TUPLE', 1 + len(Fargs[int(bound):])))        # pack(F, args...)
 
         ## now we need to pack all wildcard arguments...
         for item in Fvarargs:
             asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
-        co_stacksize = max(1 + len(Fvarargs), co_stacksize)
+        co_stacksize = max(2 + len(Fvarargs), co_stacksize)                     # len(varags) + build_tuple + wrapper
 
         # ...into this unpack-with-call tuple.
-        asm(cls.co_assemble('BUILD_TUPLE_UNPACK_WITH_CALL', 1 + len(Fvarargs)))
+        asm(cls.co_assemble('BUILD_TUPLE_UNPACK_WITH_CALL', 1 + len(Fvarargs))) # pack(pack(F, args...), varargs)
 
         ## now we need to pack all kw arguments...
         for item in Fvarkwds:
             asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
-        co_stacksize = max(len(Fvarkwds), co_stacksize)
+        co_stacksize = max(2 + len(Fvarkwds), co_stacksize)                     # len(varkwds) + build_tuple_unpack + wrapper
 
         # ...into this unpack-with-call map.
-        asm(cls.co_assemble('BUILD_MAP_UNPACK_WITH_CALL', len(Fvarkwds)))
+        asm(cls.co_assemble('BUILD_MAP_UNPACK_WITH_CALL', len(Fvarkwds)))       # pack(pack(F, args..., varargs), kwargs)
 
         ## finally we have our arguments, and can now assemble our call...
         asm(cls.co_assemble('CALL_FUNCTION_EX', 1))
@@ -1553,13 +1553,13 @@ class wrap(object):
             co_stacksize += 1
 
         # then we can finally pack it into a list
-        asm(cls.co_assemble('BUILD_LIST', 1 + len(Fargs[int(bound):])))
+        asm(cls.co_assemble('BUILD_LIST', 1 + len(Fargs[int(bound):])))         # pack(F, args)
 
         ## now we need to pack all wildcard arguments...
         for item in Fvarargs:
             asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
             asm(cls.co_assemble('LIST_EXTEND', 1))
-        co_stacksize = max(1 + len(Fvarargs), co_stacksize)
+        co_stacksize = max(2 + len(Fvarargs), co_stacksize)                     # wrapper + pack(F, args) + load_fast(varargs)
 
         # ...and convert it into a tuple
         asm(cls.co_assemble('LIST_TO_TUPLE'))
@@ -1570,7 +1570,7 @@ class wrap(object):
         for item in Fvarkwds:
             asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
             asm(cls.co_assemble('DICT_MERGE', 1))
-        co_stacksize = max(len(Fvarkwds), co_stacksize)
+        co_stacksize = max(2 + len(Fvarkwds), co_stacksize)                     # wrapper + pack(F, args, varargs) + load_fast(varkwds)
 
         ## finally we have our arguments, and can now assemble our call...
         asm(cls.co_assemble('CALL_FUNCTION_EX', 1))
