@@ -38,7 +38,7 @@ class internal_api(object):
         name, _ = self.os.path.splitext(filename)
         return self.imp.find_module(name, [path])
 
-    def iterate_api(self, include='*.py', exclude=None):
+    def iterate_api(self, include='*.py', exclude=None, **attributes):
         """Iterate through all of the files in the directory specified when initializing the loader.
 
         The `include` string is a glob that specifies which files are part of the loader's api.
@@ -78,6 +78,11 @@ class internal_api(object):
     def load_module(self, fullname):
         raise NotImplementedError
 
+    def __iter__(self):
+        '''Yield the full path of each module that is provided by this class.'''
+        return
+        yield
+
 class internal_path(internal_api):
     """
     Loader class which provides all api composed of all of the files within a directory
@@ -99,6 +104,12 @@ class internal_path(internal_api):
         if fullname not in self.cache:
             raise ImportError("path-loader ({:s}) was not able to find a module named `{:s}`".format(self.path, fullname))
         return self.new_api(fullname, self.cache[fullname])
+
+    def __iter__(self):
+        '''Yield each of the available modules.'''
+        for name, _ in self.iterate_api(**self.attrs):
+            yield name
+        return
 
 class internal_submodule(internal_api):
     """
@@ -131,7 +142,10 @@ class internal_submodule(internal_api):
         # Build a temporary cache for the module names and paths to load the api,
         # and use them to build their documentation.
         cache = { name : path for name, path in self.iterate_api(**self.attrs) }
-        module.__doc__ = '\n'.join("{:s} -- {:s}".format(name, path) for name, path in sorted(cache.items()))
+        maximum = max(map(len, cache)) if cache else 0
+        documentation = '\n'.join("{:<{:d}s} : {:s}".format(name, maximum, path) for name, path in sorted(cache.items()))
+        documentation = '\n\n'.join([self.attrs['__doc__'], documentation]) if '__doc__' in self.attrs else documentation
+        module.__doc__ = documentation
 
         # Load each submodule that composes the api, and attach it to the returned submodule.
         stack, count, result = [item for item in cache.items()], len(cache), {}
@@ -181,14 +195,23 @@ class internal_submodule(internal_api):
         # Return the module that we just created.
         return module
 
+    def __iter__(self):
+        '''Yield each of the available modules.'''
+        for name, _ in self.iterate_api(**self.attrs):
+            yield name
+        return
+
 class internal_object(object):
     """
     Loader class which will simply expose an object instance as the module.
     """
     sys = sys
-    def __init__(self, __name__, object):
+    def __init__(self, __name__, object, **attributes):
         '''Initialize the loader with the specified `__name__` and returning the provided `object` as its module.'''
         self.__name__, self.object = __name__, object
+        for name, value in attributes.items():
+            try: setattr(object, name, value)
+            except: continue
 
     def find_module(self, fullname, path=None):
         '''If the module being searched for matches our `fullname`, then act as its loader.'''
@@ -249,33 +272,36 @@ library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
 def finders():
     '''Yield each finder that will be used by the plugin to locate its modules.'''
 
+    documentation = 'This is a ctypes-library to the shared object that is exposed to the IDA SDK.'
+
     # IDA's native lower-level api
     if sys.platform in {'darwin'}:
-        yield internal_object('ida', library(idaapi.idadir("libida{:s}.dylib".format('' if idaapi.BADADDR < 0x100000000 else '64'))))
+        yield internal_object('ida', library(idaapi.idadir("libida{:s}.dylib".format('' if idaapi.BADADDR < 0x100000000 else '64'))), __doc__=documentation)
 
     elif sys.platform in {'linux', 'linux2'}:
-        yield internal_object('ida', library(idaapi.idadir("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64'))))
+        yield internal_object('ida', library(idaapi.idadir("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64'))), __doc__=documentation)
 
     elif sys.platform in {'win32'}:
         if os.path.exists(idaapi.idadir('ida.wll')):
             yield internal_object('ida', library(idaapi.idadir('ida.wll')))
         else:
-            yield internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64'))))
+            yield internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64'))), __doc__=documentation)
 
     else:
         logging.warning("{:s} : Unable to load IDA's native api via ctypes. Ignoring...".format(__name__))
 
     # private (internal) api
-    yield internal_submodule('internal', os.path.join(root, 'base'), include='_*.py')
+    documentation = 'This virtual module contains a number of internal submodules.'
+    yield internal_submodule('internal', os.path.join(root, 'base'), include='_*.py', __doc__=documentation)
 
     # public api
     yield internal_path(os.path.join(root, 'base'), exclude='_*.py')
     yield internal_path(os.path.join(root, 'misc'))
 
     # custom and application api
-    for subdir in ['custom', 'app']:
-        yield internal_submodule(subdir, os.path.join(root, subdir))
-    return
+    documentation = 'This virtual module contains a number of different files as submodules.'
+    yield internal_submodule('custom', os.path.join(root, 'custom'), __doc__=documentation)
+    yield internal_submodule('application', os.path.join(root, 'application'), __doc__=documentation)
 
 # The following logic is simply for detecting the version of IDA and
 # for stashing it directly into the "idaapi" module.
