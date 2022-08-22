@@ -12,7 +12,6 @@ so that it can be exchanged with things outside of the database.
 If you wish to change the directory that the plugin is loaded from, specify the
 location of the plugin's git repository in the variable that is marked below.
 """
-
 import sys, os, logging
 import builtins, six, imp, fnmatch, ctypes, types
 import idaapi
@@ -443,7 +442,7 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
         iterable = (var for var in variables if os.getenv(var, default=None) is not None)
         path = next(iterable, None)
         if path is None:
-            raise OSError("Unable to determine the user's home directory from the environment.")
+            raise OSError("{:s} : Unable to determine the user's home directory from the environment.".format(__name__))
         return path, os.getenv(path)
 
     # Create our coroutine, initialize it, and then feed it some paths.
@@ -458,7 +457,7 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
 
     # If we stopped, then it was read and executed successfully.
     except StopIteration:
-        logging.debug("Successfully read and executed the dotfile at `{!s}`.".format(os.path.join(path, filename)))
+        logging.debug("{:s} : Successfully read and executed the dotfile at `{!s}`.".format(__name__, os.path.join(path, filename)))
 
     # If we received an OSError, then this likely happened while we
     # were trying to find the home directory. Pass it to the user.
@@ -468,13 +467,13 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
     # Any other exception is because of an issue in the user's script,
     # so we'll do our best to log the backtrace for them to debug.
     except Exception:
-        logging.warning("Unexpected exception raised while trying to execute the dotfile at `{!s}`.".format(os.path.join(path, filename)), exc_info=True)
+        logging.warning("{:s} : Unexpected exception raised while trying to execute the dotfile at `{!s}`.".format(__name__, os.path.join(path, filename)), exc_info=True)
 
     # If we didn't get an exception, then literally we couldn't find
     # any file that we were supposed to execute. Log it and move on.
     else:
         vowels, alpha = tuple('aeiou'), next((filename[index:] for index, item in enumerate(filename.lower()) if item in 'abcdefghijklmnopqrstuvwxyz'), filename)
-        logging.warning("Unable to locate a{:s} {:s} dotfile in the user's {:s} directory ({!s}).".format('n' if alpha.startswith(vowels) else '', filename, var, path))
+        logging.warning("{:s} : Unable to locate a{:s} {:s} dotfile in the user's {:s} directory ({!s}).".format(__name__, 'n' if alpha.startswith(vowels) else '', filename, var, path))
     finally:
         tribulations.close()
     return
@@ -601,16 +600,16 @@ class MINSC(idaapi.plugin_t):
         # that the loader is intended to be completely thrown away after usage.
         try:
             filename = __file__ if os.path.exists(__file__) else os.path.join(root, 'plugins', 'minsc.py')
-            module = imp.load_source("{:s}-loader".format(self.wanted_name), filename)
+            module = imp.load_source("{:s}__loader__".format(__name__), filename)
 
         except IOError:
-            logging.critical("{:s} : A critical error occurred while trying to read the plugin loader from the file: {:s}".format(self.wanted_name, filename), exc_info=True)
+            logging.critical("{:s} : A critical error occurred while trying to read the plugin loader from the file: {:s}".format(__name__, filename), exc_info=True)
 
         except ImportError:
-            logging.critical("{:s} : A critical error occurred while initializing the plugin loader in \"{:s}\"".format(self.wanted_name, filename), exc_info=True)
+            logging.critical("{:s} : A critical error occurred while initializing the plugin loader in \"{:s}\"".format(__name__, filename), exc_info=True)
 
         except Exception:
-            logging.critical("{:s} : A critical error occurred while initializing the plugin loader".format(self.wanted_name, filename), exc_info=True)
+            logging.critical("{:s} : A critical error occurred while initializing the plugin loader".format(__name__, filename), exc_info=True)
 
         return module
 
@@ -631,7 +630,7 @@ class MINSC(idaapi.plugin_t):
         # we can uninstall ourselves whenever our plugin is asked to terminate.
         loader = self.get_loader()
         if not loader:
-            raise SystemError("{:s} : Unable to get the loader required by the plugin.".format(self.wanted_name))
+            raise SystemError("{:s} : Unable to get the loader required by the plugin.".format(__name__))
 
         # Seed the metapath, then patch the version into the idaapi module.
         sys.meta_path.extend(loader.finders())
@@ -654,7 +653,7 @@ class MINSC(idaapi.plugin_t):
         # Anything else means that some plugin or somebody else did something
         # crazy, and we have no idea how to recover from this.
         else:
-            logging.warning("{:s} : Skipping installation of the display hook at \"{:s}\" due to a lack of awareness about the current one ({!r}).".format(self.wanted_name, '.'.join(['sys', 'displayhook']), sys.displayhook))
+            logging.warning("{:s} : Skipping installation of the display hook at \"{:s}\" due to a lack of awareness about the current one ({!r}).".format(__name__, '.'.join(['sys', 'displayhook']), sys.displayhook))
 
         # Now we'll try and tamper with the user's namespace. We'll search through
         # Python's module list, and if we find it we'll just swap it out for root.
@@ -665,7 +664,7 @@ class MINSC(idaapi.plugin_t):
             [ns.__dict__.pop(item, None) for item in banner_required]
 
         else:
-            logging.warning("{:s} : Skipping the reset of the primary namespace as \"{:s}\" was not found in Python's module list.".format(self.wanted_name, '__main__'))
+            logging.warning("{:s} : Skipping the reset of the primary namespace as \"{:s}\" was not found in Python's module list.".format(__name__, '__main__'))
 
         # We don't bother tampering with the user's namespace, since technically
         # we don't have access to it.. However, we'll still try to install the
@@ -675,14 +674,14 @@ class MINSC(idaapi.plugin_t):
             import internal, hooks
 
         except (ImportError, Exception):
-            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\".".format(self.wanted_name, 'internal', 'hooks'), exc_info=True)
+            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\".".format(__name__, 'internal', 'hooks'), exc_info=True)
             ok = False
 
         try:
             ok and internal.interface
 
         except AttributeError:
-            logging.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was not properly loaded.".format(self.wanted_name, '.'.join(['internal', 'interface'])))
+            logging.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was not properly loaded.".format(__name__, '.'.join(['internal', 'interface'])))
 
         # Check to see if our notification instance was assigned into idaapi. If
         # it wasn't then try to construct one and assign it for usage.
@@ -691,12 +690,12 @@ class MINSC(idaapi.plugin_t):
                 idaapi.__notification__ = notification = internal.interface.prioritynotification()
 
         except Exception:
-            logging.warning("{:s} : An error occurred while trying to instantiate the notifications interface. Notifications will be left as disabled.".format(self.wanted_name))
+            logging.warning("{:s} : An error occurred while trying to instantiate the notifications interface. Notifications will be left as disabled.".format(__name__))
 
         # Check to see if all is well, and if it is then we can proceed to install
         # the necessary hooks to kick everything off.
         if ok:
-            logging.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(self.wanted_name))
+            logging.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(__name__))
             hooks.make_ida_not_suck_cocks(idaapi.NW_INITIDA)
             self.state = 'local'
 
@@ -704,19 +703,19 @@ class MINSC(idaapi.plugin_t):
             '__main__' in sys.modules and dotfile(sys.modules['__main__'].__dict__)
 
         else:
-            logging.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(self.wanted_name))
+            logging.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(__name__))
             self.state = 'disabled'
 
         return idaapi.PLUGIN_KEEP
 
     def term(self):
         if self.state is None:
-            logging.warning("{:s} : Ignoring the host application request to terminate as the plugin has not yet been initialized.".format(self.wanted_name))
+            logging.warning("{:s} : Ignoring the host application request to terminate as the plugin has not yet been initialized.".format(__name__))
             return
 
         # Figure out how we were started so that we can slowly tear things down.
         if self.state in {'disabled', 'persistent'}:
-            logging.debug("{:s} : Host application requested termination of {:s} plugin.".format(self.wanted_name, self.state))
+            logging.debug("{:s} : Host application requested termination of {:s} plugin.".format(__name__, self.state))
             return
 
         # We were run locally, so we're only allowed to interact with the current
@@ -725,16 +724,16 @@ class MINSC(idaapi.plugin_t):
             import internal, hooks
 
         except ImportError:
-            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\" during plugin termination.".format(self.wanted_name, 'internal', 'hooks'), exc_info=True)
+            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\" during plugin termination.".format(__name__, 'internal', 'hooks'), exc_info=True)
             return
 
         # Now we can just remove our hooks and all should be well.
         try:
-            logging.debug("{:s} : Detaching from the host application as requested.".format(self.wanted_name))
+            logging.debug("{:s} : Detaching from the host application as requested.".format(__name__))
             hooks.make_ida_suck_cocks(idaapi.NW_TERMIDA)
 
         except Exception:
-            logging.critical("{:s} : An error occurred while trying to detach from the host application during plugin termination. Application may become unstable.".format(self.wanted_name), exc_info=True)
+            logging.critical("{:s} : An error occurred while trying to detach from the host application during plugin termination. Application may become unstable.".format(__name__), exc_info=True)
         return
 
     def run(self, args):
