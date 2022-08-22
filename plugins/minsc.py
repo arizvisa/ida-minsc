@@ -473,7 +473,8 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
     # If we didn't get an exception, then literally we couldn't find
     # any file that we were supposed to execute. Log it and move on.
     else:
-        logging.warning("Unable to locate a {:s} dotfile in the user's {:s} directory ({!s}).".format(filename, var, path))
+        vowels, alpha = tuple('aeiou'), next((filename[index:] for index, item in enumerate(filename.lower()) if item in 'abcdefghijklmnopqrstuvwxyz'), filename)
+        logging.warning("Unable to locate a{:s} {:s} dotfile in the user's {:s} directory ({!s}).".format('n' if alpha.startswith(vowels) else '', filename, var, path))
     finally:
         tribulations.close()
     return
@@ -481,7 +482,7 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
 # The following logic is actually responsible for starting up the whole
 # plugin. This is done with by trying with a notification, falling back
 # to a timer, and then straight-up executing things if all else fails.
-def startup():
+def startup(namespace=None):
     '''Patch in a notification hander and start up everything left in the plugin.'''
 
     # First check that we've installed the version patch and it's the
@@ -515,26 +516,56 @@ def startup():
         logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, 'hooks'), exc_info=True)
         raise SystemError("{:s} : Unable to start up plugin without being able to access its \"{:s}\" module.".format(__name__, 'hooks'))
 
-    # Finally we can construct our priority notification class and
-    # inject it into IDA. This needs to exist in order for everything
-    # to initialize and deinitialize properly.
+    # Finally we can construct our priority notification class and inject it into
+    # the IDAPython module. This object needs to exist in order for everything to
+    # initialize and deinitialize properly.
     idaapi.__notification__ = notification = internal.interface.prioritynotification()
 
-    # Now we can install our hooks that initialize/uninitialize MINSC
+    # Now we can proceed to install our hooks that actually initialize and uninitialize
+    # MINSC. We define two closures here (with documentation) because these are actually
+    # accessible by the user if they navigate the hook interface that we expose to them.
+    def execute_user_dotfile(*args, **kwargs):
+        '''This function is responsible for executing the dotfile in the home directory of the user.'''
+        return dotfile(namespace)
+
+    # This second closure is meant to be called from a timer. To avoid having to register
+    # multiple timers, we pack up our logic that loads the plugin and the user's dotfile
+    # within a single function to register.
+    def load_plugin_and_execute_user_dotfile(*args, **kwargs):
+        '''This function is responsible for loading the plugin and executing the dotfile in the home directory of the user.'''
+        result = hooks.ida_is_busy_sucking_cocks(*args, **kwargs)
+        dotfile(namespace)
+        return result
+
+    # Finally we can register the functions that will actually be responsible for
+    # initializing the plugin. If we were given a namespace, then we can register
+    # our closure that loads the user's dotfile too.
     try:
         notification.add(idaapi.NW_INITIDA, hooks.make_ida_not_suck_cocks, -1000)
+        namespace and notification.add(idaapi.NW_INITIDA, execute_user_dotfile, 0)
 
     # If installing that hook failed, then check if we're running in batch mode. If
-    # we are, then just immediately register things.
+    # we are, then just immediately register things and load the user dotfile.
     except Exception:
         TIMEOUT = 5
         if idaapi.cvar.batch:
             hooks.ida_is_busy_sucking_cocks()
+            namespace and dotfile(namespace)
 
         # Otherwise warn the user about this and register our hook with a timer.
-        else:
-            logging.warning("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
+        elif namespace is None:
+            logging.warning("{:s} : Unable to add a notification via `{:s}` for {:s}({:d}).".format(__name__, '.'.join(['idaapi', 'notify_when']), '.'.join(['idaapi', 'NW_INITIDA']), idaapi.NW_INITIDA))
+            logging.warning("{:s} : Registering {:.1f} second timer with `{:s}` in an attempt to load plugin...".format(__name__, TIMEOUT, '.'.join(['idaapi', 'register_timer'])))
             idaapi.register_timer(TIMEOUT, hooks.ida_is_busy_sucking_cocks)
+            six.print_('=' * 86)
+
+        # If we were given a namespace to load into, then we register the closure
+        # that we defined into the timer so that the user's dotfile gets executed.
+        else:
+            logging.warning("{:s} : Unable to add a notification via `{:s}` for {:s}({:d}).".format(__name__, '.'.join(['idaapi', 'notify_when']), '.'.join(['idaapi', 'NW_INITIDA']), idaapi.NW_INITIDA))
+            logging.warning("{:s} : Registering {:.1f} second timer with `{:s}` in an attempt to load plugin...".format(__name__, TIMEOUT, '.'.join(['idaapi', 'register_timer'])))
+            idaapi.register_timer(TIMEOUT, load_plugin_and_execute_user_dotfile)
+            six.print_('=' * 86)
         del(TIMEOUT)
 
     # If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
@@ -544,7 +575,7 @@ def startup():
 
         # Installing the termination hook failed, but it's not really too important...
         except Exception:
-            logging.warning("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
+            logging.warning("{:s} : Unable to add a notification for idaapi.NW_TERMIDA({:d}).".format(__name__, idaapi.NW_TERMIDA))
     return
 
 # Now we can define our plugin_t that literally does nothing if we've already been
@@ -666,6 +697,9 @@ class MINSC(idaapi.plugin_t):
             logging.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(self.wanted_name))
             hooks.make_ida_not_suck_cocks(idaapi.NW_INITIDA)
             self.state = 'local'
+
+            # If there's an accessible "__main__" namespace, then dump the dotfile into it.
+            '__main__' in sys.modules and dotfile(sys.modules['__main__'].__dict__)
 
         else:
             logging.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(self.wanted_name))
