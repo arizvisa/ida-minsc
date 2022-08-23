@@ -10,12 +10,12 @@ to query again.
 
 To manually rebuild the cache for the database, use the following::
 
-    > custom.tagfix.everything()
+    > tools.tagfix.everything()
 
 Likewise to rebuild the cache for just the globals or the contents::
 
-    > custom.tagfix.globals()
-    > custom.tagfix.contents()
+    > tools.tagfix.globals()
+    > tools.tagfix.contents()
 
 """
 
