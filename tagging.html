@@ -267,7 +267,7 @@ format (see <a class="reference internal" href="#tagging-format"><span class="st
 track of any comments and tags that are created by the user and automatically
 update the index as needed. This will then allow a user to quickly query the
 tags that they have marked up in a database. If the index gets corrupted in some
-way, one may repair it by using the module <a class="reference internal" href="modules/custom-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tagfix</span></code></a>. If this situation
+way, one may repair it by using the module <a class="reference internal" href="modules/tools-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tagfix</span></code></a>. If this situation
 happens to the user, please refer to <a class="reference internal" href="#tagging-modules-tagfix"><span class="std std-ref">Tag modules – tagfix</span></a> for more
 information or contact the author for assistance.</p>
 <p>When querying a tag associated with an address, as mentioned before, the tag’s
@@ -467,21 +467,21 @@ to interact with all of the tags defined in a database. These can be used to
 perform various tasks such as exporting all the tags within a database to
 later import into a difference database, translating tags within the database
 in order to match them up to another database, etc. These modules are available
-via the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom</span></code> namespace.</p>
+via the <code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code> namespace.</p>
 <div class="section" id="tag-modules-tags">
 <span id="tagging-modules-tags"></span><h3>2.2.9.1. Tag modules – tags<a class="headerlink" href="#tag-modules-tags" title="Permalink to this headline">¶</a></h3>
-<p>The <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a> module allows for one to export or import all of the
-tags within a database. Please review the documentation for <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a> for
+<p>The <a class="reference internal" href="modules/tools-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools.tags</span></code></a> module allows for one to export or import all of the
+tags within a database. Please review the documentation for <a class="reference internal" href="modules/tools-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools.tags</span></code></a> for
 more about the capabilities of this module.</p>
 </div>
 <div class="section" id="tag-modules-tagfix">
 <span id="tagging-modules-tagfix"></span><h3>2.2.9.2. Tag modules – tagfix<a class="headerlink" href="#tag-modules-tagfix" title="Permalink to this headline">¶</a></h3>
-<p>The <a class="reference internal" href="modules/custom-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tagfix</span></code></a> module allows for one to rebuild the tag cache if
+<p>The <a class="reference internal" href="modules/tools-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools.tagfix</span></code></a> module allows for one to rebuild the tag cache if
 the cache somehow gets corrupted in some way (due to IDA crashing whilst trying
 to write a netnode) or if a database did not complete its initial creation of
 the tag cache.</p>
 <p>This module exposes a number of functions that can be used to rebuild the tag
-cache entirely. Please review the documentation for <a class="reference internal" href="modules/custom-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tagfix</span></code></a> for more
+cache entirely. Please review the documentation for <a class="reference internal" href="modules/tools-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools.tagfix</span></code></a> for more
 information on how to do this.</p>
 </div>
 </div>
@@ -584,10 +584,10 @@ include any “note” tags:</p>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
-<p>This same functionality is also provided within the <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tags</span></code></a> module
-within the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom</span></code> namespace:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">custom</span>
-<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+<p>This same functionality is also provided within the <a class="reference internal" href="modules/tools-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tags</span></code></a> module
+within the <code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code> namespace:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">tools</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
 </pre></div>
 </div>

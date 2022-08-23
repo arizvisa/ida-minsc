@@ -20,7 +20,7 @@
     <script type="text/javascript" src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="3.3.2. tagfix – Tagfix module" href="modules/custom-tagfix.html" />
+    <link rel="prev" title="3.3.3. tagfix – Tagfix module" href="modules/tools-tagfix.html" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
 <!--[if lte IE 6]>
@@ -39,7 +39,7 @@
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="modules/custom-tagfix.html" title="3.3.2. tagfix – Tagfix module"
+          <a href="modules/tools-tagfix.html" title="3.3.3. tagfix – Tagfix module"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li> 
       </ul>
@@ -331,8 +331,8 @@ target. Instead of calculating them though, let’s remain hacky and
 just output their results as a breakpoint. In the prior tutorial,
 we chose <code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code> in order to calculate the
 relative address. Instead of doing it that way, there’s a class in
-the <a class="reference internal" href="modules/misc-tools.html#module-tools" title="tools"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code></a> module that we can use to transform an address
-named <a class="reference internal" href="modules/misc-tools.html#tools.remote" title="tools.remote"><code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code></a>. So let’s use this instead. To
+the <code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code> module that we can use to transform an address
+named <code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code>. So let’s use this instead. To
 construct this class, we’ll need to pass our remote base address
 as a parameter.</li>
 </ol>
@@ -341,7 +341,7 @@ as a parameter.</li>
 </pre></div>
 </div>
 <ol class="arabic simple" start="9">
-<li>Now that we have an instance of <a class="reference internal" href="modules/misc-tools.html#tools.remote" title="tools.remote"><code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code></a>, we can
+<li>Now that we have an instance of <code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code>, we can
 select our instructions tagged with “call-opregs” and produce a
 breakpoint for each one. Let’s do that.</li>
 </ol>
@@ -384,11 +384,11 @@ at time that we need them. This data can also be shared with other
 users so that they will also have the access to the same information.
 Just for fun, let’s serialize this data so that we can transport this
 to another user. Rather than writing the queries to do this manually,
-we can utilise one of the functions provided by the <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a>
-module. Namely the <a class="reference internal" href="modules/custom-tags.html#tags.export" title="tags.export"><code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.export</span></code></a>. We only want to give
+we can utilise one of the functions provided by the <a class="reference internal" href="modules/tools-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools.tags</span></code></a>
+module. Namely the <a class="reference internal" href="modules/tools-tags.html#tags.export" title="tags.export"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.tags.export</span></code></a>. We only want to give
 them the “break-calli” tags which can be exported via the following code.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">data</span> <span class="o">=</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s1">&#39;break-calli&#39;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">data</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s1">&#39;break-calli&#39;</span><span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">pickle</span><span class="o">,</span> <span class="nn">os.path</span>
 <span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
@@ -401,22 +401,22 @@ them the “break-calli” tags which can be exported via the following code.</l
 <ol class="arabic simple" start="12">
 <li>Again, if a user wants to import these pickled tags into their database,
 then can simply unpickle the object and then use the functionality
-available within the <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a> module to do this.</li>
+available within the <a class="reference internal" href="modules/tools-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools.tags</span></code></a> module to do this.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">with</span> <span class="n">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="nb">input</span><span class="p">:</span>
       <span class="n">data</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="13">
 <li>Unfortunately, this will overwrite any tags in the current database with
 the name “break-calli”. If the user wants to map these tags to a different
 name, however, they can provide a dictionary of tag mappings as a keyword
-parameter to <a class="reference internal" href="modules/custom-tags.html#tags.apply" title="tags.apply"><code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.apply</span></code></a>.</li>
+parameter to <a class="reference internal" href="modules/tools-tags.html#tags.apply" title="tags.apply"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.tags.apply</span></code></a>.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s1">&#39;break-calli&#39;</span><span class="p">:</span> <span class="s1">&#39;username.break-calli&#39;</span><span class="p">})</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s1">&#39;break-calli&#39;</span><span class="p">:</span> <span class="s1">&#39;username.break-calli&#39;</span><span class="p">})</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -520,17 +520,17 @@ and the value “leaf” if <code class="xref py py-func docutils literal notran
 <ol class="arabic simple" start="6">
 <li>In the prior tutorials we used the <a class="reference internal" href="modules/database.html#database.functions" title="database.functions"><code class="xref py py-class docutils literal notranslate"><span class="pre">database.functions</span></code></a>
 namespace to enumerate each function. In this case we’ll use another
-useful function in that is provided to us by the <a class="reference internal" href="modules/misc-tools.html#module-tools" title="tools"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code></a>
-module. This functions is <a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a> and takes a callable
+useful function in that is provided to us by the <code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code>
+module. This functions is <code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code> and takes a callable
 as its first parameter. Normally, this callable will be passed an
 address for each function within the database. This callable will
 then be executed against every function similar to using
 <a class="reference internal" href="modules/database.html#database.functions" title="database.functions"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.functions()</span></code></a>. One thing that is interesting about
-<a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a>, however, is that it has the ability to detect
+<code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code>, however, is that it has the ability to detect
 the type of callable that is passed to it. If the callable takes
 two parameters, it will assume that the user intended an index, and
 an address to be passed to it. This can be used to detect how far
-along <a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a> has processed. Let’s redefine the above
+along <code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code> has processed. Let’s redefine the above
 <code class="xref py py-func docutils literal notranslate"><span class="pre">tag_if_leaf()</span></code> function again.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">tag_if_leaf</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">ea</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -544,7 +544,7 @@ along <a class="reference internal" href="modules/misc-tools.html#tools.map" tit
 </pre></div>
 </div>
 <ol class="arabic simple" start="7">
-<li>Now that we have a callable to pass to <a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a>, we
+<li>Now that we have a callable to pass to <code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code>, we
 can simply hand it our callable and proceses the entire database.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">functions</span><span class="p">())</span>
@@ -803,7 +803,7 @@ examples help demonstrate the flexibility that is provided by this plugin.</p>
   <h3 class="sidebar">Navigation</h3>
   <p class="topless">
     Previous topic:
-    <a href="modules/custom-tagfix.html" title="previous chapter">3.3.2. tagfix – Tagfix module</a>
+    <a href="modules/tools-tagfix.html" title="previous chapter">3.3.3. tagfix – Tagfix module</a>
     <br />
   </p>
   <h3 class="sidebar"><a href="index.html">Contents</a></h3>
@@ -859,7 +859,7 @@ examples help demonstrate the flexibility that is provided by this plugin.</p>
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
         <li class="right" >
-          <a href="modules/custom-tagfix.html" title="3.3.2. tagfix – Tagfix module"
+          <a href="modules/tools-tagfix.html" title="3.3.3. tagfix – Tagfix module"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li> 
       </ul>

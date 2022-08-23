@@ -459,15 +459,15 @@ to interact with all of the tags defined in a database. These can be used to
 perform various tasks such as exporting all the tags within a database to
 later import into a difference database, translating tags within the database
 in order to match them up to another database, etc. These modules are available
-via the :py:mod:`custom` namespace.
+via the :py:mod:`tools` namespace.
 
 .. _tagging-modules-tags:
 
 Tag modules -- tags
 *******************
 
-The :py:mod:`custom.tags<tags>` module allows for one to export or import all of the
-tags within a database. Please review the documentation for :py:mod:`custom.tags<tags>` for
+The :py:mod:`tools.tags<tags>` module allows for one to export or import all of the
+tags within a database. Please review the documentation for :py:mod:`tools.tags<tags>` for
 more about the capabilities of this module.
 
 .. _tagging-modules-tagfix:
@@ -475,13 +475,13 @@ more about the capabilities of this module.
 Tag modules -- tagfix
 *********************
 
-The :py:mod:`custom.tagfix<tagfix>` module allows for one to rebuild the tag cache if
+The :py:mod:`tools.tagfix<tagfix>` module allows for one to rebuild the tag cache if
 the cache somehow gets corrupted in some way (due to IDA crashing whilst trying
 to write a netnode) or if a database did not complete its initial creation of
 the tag cache.
 
 This module exposes a number of functions that can be used to rebuild the tag
-cache entirely. Please review the documentation for :py:mod:`custom.tagfix<tagfix>` for more
+cache entirely. Please review the documentation for :py:mod:`tools.tagfix<tagfix>` for more
 information on how to do this.
 
 .. _tagging-examples-querying:
@@ -596,10 +596,10 @@ To list all of the contents tags that have been used in the database::
     >
 
 This same functionality is also provided within the :py:mod:`tags` module
-within the :py:mod:`custom` namespace::
+within the :py:mod:`tools` namespace::
 
-    > import custom
-    > res = custom.tags.list()
+    > import tools
+    > res = tools.tags.list()
     > print repr(res)
 
 .. _tagging-examples-querying-structures:

@@ -1,0 +1,613 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>3.3.2. tags – Tags module &#8212; IDA-minsc  documentation</title>
+    <link rel="stylesheet" href="../_static/pyramid.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3.3.3. tagfix – Tagfix module" href="tools-tagfix.html" />
+    <link rel="prev" title="3.3.1. general – General module" href="tools-general.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tools-tagfix.html" title="3.3.3. tagfix – Tagfix module"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="tools-general.html" title="3.3.1. general – General module"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" accesskey="U">3. Modules</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <span class="target" id="module-tags"></span><div class="section" id="tags-tags-module">
+<h1>3.3.2. tags – Tags module<a class="headerlink" href="#tags-tags-module" title="Permalink to this headline">¶</a></h1>
+<p>This module exposes tools for exporting the currently defined tags
+within the database. Once exported, these tags can then be pickled
+or then re-applied to the same or another database. Some options
+are allowed which will let a user apply translations to the tags
+before applying them to a target database.</p>
+<p>To fetch all of the tags from the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>To export only specific tags from the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s1">&#39;tag1&#39;</span><span class="p">,</span> <span class="s1">&#39;tag2&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To apply previously read tags to the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To apply previously read tags with different names to the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">tools</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">tag1</span><span class="o">=</span><span class="s1">&#39;my_tag1&#39;</span><span class="p">,</span> <span class="n">tag2</span><span class="o">=</span><span class="s1">&#39;my_tag2&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="function-list">
+<h2>3.3.2.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
+<p>The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+<a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
+<dl class="function">
+<dt id="tags.addressToLocation">
+<code class="descclassname">tags.</code><code class="descname">addressToLocation</code><span class="sig-paren">(</span><em>ea</em>, <em>chunks=None</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.addressToLocation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a <code class="docutils literal notranslate"><span class="pre">(function,</span> <span class="pre">id,</span> <span class="pre">offset)</span></code>.</p>
+<p>The fields <code class="docutils literal notranslate"><span class="pre">id</span></code> and <code class="docutils literal notranslate"><span class="pre">offset</span></code> represent the chunk index and the
+offset into the chunk for the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>. If the list
+<code class="docutils literal notranslate"><span class="pre">chunks</span></code> is specified as a parameter, then use it as a tuple
+of ranges in order to calculate the correct address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – an address to possibly convert to a location</li>
+<li><strong>chunks</strong> – the list of chunks to convert the address with</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.list">
+<code class="descclassname">tags.</code><code class="descname">list</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tags.list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the tags for the all of the function contents within the database as a set.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.locationToAddress">
+<code class="descclassname">tags.</code><code class="descname">locationToAddress</code><span class="sig-paren">(</span><em>loc</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.locationToAddress" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert the function location <code class="docutils literal notranslate"><span class="pre">loc</span></code> back into an address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>loc</strong> – an address or a location tuple to convert to an address</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.lvarNameQ">
+<code class="descclassname">tags.</code><code class="descname">lvarNameQ</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.lvarNameQ" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determine whether a <code class="docutils literal notranslate"><span class="pre">name</span></code> is something that IDA named automatically.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> – the string to check for an IDA naming scheme</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="namespace-list">
+<h2>3.3.2.2. Namespace list<a class="headerlink" href="#namespace-list" title="Permalink to this headline">¶</a></h2>
+<p>These are the namespaces available within this module. Namespaces
+group similar functions that can be used typically for the same
+concept. Please see <a class="reference internal" href="../multicase.html#multicase-namespaces"><span class="std std-ref">Classes as namespaces</span></a> for more
+information on namespaces. For more information on multicase
+functions or aliases, please see <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a> or
+<a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
+<div class="section" id="tags-apply">
+<span id="ns-tags-apply"></span><h3>3.3.2.2.1. tags.apply<a class="headerlink" href="#tags-apply" title="Permalink to this headline">¶</a></h3>
+<p>This namespace contains tools that can be used to apply tags that
+have been previously read back into the database.</p>
+<p>Various functions defined within this namespace take a variable number of
+keyword arguments which represent a mapping for the tag names. When a
+tag name was specified, this mapping will be used to rename the tags
+before actually writing them back into the database.</p>
+<dl class="function">
+<dt id="tags.apply">
+<code class="descclassname">tags.</code><code class="descname">apply</code><span class="sig-paren">(</span><em>Globals_Contents_Frames</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> from the <code class="docutils literal notranslate"><span class="pre">Globals_Contents_Frames</span></code> tuple back into the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>Globals_Contents_Frames</strong> – a tuple composed of the global tags, contents tags, and frame members that were read</li>
+<li><strong>**tagmap</strong> – a dictionary used to translate the original tag names with before applying them to the database</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.apply.content">
+<code class="descclassname">apply.</code><code class="descname">content</code><span class="sig-paren">(</span><em>Contents</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.content" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply <code class="docutils literal notranslate"><span class="pre">Contents</span></code> back into a function’s contents within the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>Contents</strong> – the contents tags to apply</li>
+<li><strong>**tagmap</strong> – a dictionary used to map the original tags with before applying them to the database</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.apply.contents">
+<code class="descclassname">apply.</code><code class="descname">contents</code><span class="sig-paren">(</span><em>Contents</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the tags in <code class="docutils literal notranslate"><span class="pre">Contents</span></code> back into each function within the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>Contents</strong> – the contents tags to apply</li>
+<li><strong>**tagmap</strong> – a dictionary used to map the original tags with before applying them to the database</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.apply.everything">
+<code class="descclassname">apply.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>Globals_Contents_Frames</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.everything" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> from the <code class="docutils literal notranslate"><span class="pre">Globals_Contents_Frames</span></code> tuple back into the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>Globals_Contents_Frames</strong> – a tuple composed of the global tags, contents tags, and frame members that are to be applied</li>
+<li><strong>**tagmap</strong> – a dictionary used to translate the original tag names with before applying them to the database</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.apply.frame">
+<code class="descclassname">apply.</code><code class="descname">frame</code><span class="sig-paren">(</span><em>ea</em>, <em>frame</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.frame" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the fields from <code class="docutils literal notranslate"><span class="pre">frame</span></code> back into the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address of the function to apply the frame to</li>
+<li><strong>frame</strong> – the frame members to apply</li>
+<li><strong>**tagmap</strong> – a dictionary used to map the original tags with before applying them to the database</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.apply.frames">
+<code class="descclassname">apply.</code><code class="descname">frames</code><span class="sig-paren">(</span><em>Frames</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.frames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the fields from <code class="docutils literal notranslate"><span class="pre">Frames</span></code> back into each function’s frame.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>Frames</strong> – the frame members to apply</li>
+<li><strong>**tagmap</strong> – a dictionary used to map the original tags with before applying them to the database</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.apply.globals">
+<code class="descclassname">apply.</code><code class="descname">globals</code><span class="sig-paren">(</span><em>Globals</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.globals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the tags in <code class="docutils literal notranslate"><span class="pre">Globals</span></code> back into the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>Globals</strong> – the globals tags to apply</li>
+<li><strong>**tagmap</strong> – a dictionary used to map the original tags with before applying them to the database</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="tags-export">
+<span id="ns-tags-export"></span><h3>3.3.2.2.2. tags.export<a class="headerlink" href="#tags-export" title="Permalink to this headline">¶</a></h3>
+<p>This namespace contains tools that can be used to quickly
+export specific tags out of the database using the cache.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">location</span></code> is specified as true, then read each contents tag
+according to its location rather than an address. This allows one
+to perform a translation of the tags in case the function chunks
+are at different addresses than when the tags were read.</p>
+<dl class="function">
+<dt id="tags.export">
+<code class="descclassname">tags.</code><code class="descname">export</code><span class="sig-paren">(</span><em>*tags</em>, <em>**location</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read the specified tags within the database using the cache.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>*tags</strong> – an iterable of the tags to export</li>
+<li><strong>**location</strong> – if <code class="docutils literal notranslate"><span class="pre">location</span></code> is true, then export the contents tags as a location instead of an address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.export.content">
+<code class="descclassname">export.</code><code class="descname">content</code><span class="sig-paren">(</span><em>F</em>, <em>*tags</em>, <em>**location</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.content" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the specified <code class="docutils literal notranslate"><span class="pre">tags</span></code> belonging to the contents of the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code> using the cache.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>F</strong> – the function to export the content from</li>
+<li><strong>*tags</strong> – an iterable of the contents tags to export</li>
+<li><strong>**location</strong> – if <code class="docutils literal notranslate"><span class="pre">location</span></code> is true, then export the contents tags as a location instead of an address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.export.contents">
+<code class="descclassname">export.</code><code class="descname">contents</code><span class="sig-paren">(</span><em>*tags</em>, <em>**location</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the specified contents <code class="docutils literal notranslate"><span class="pre">tags</span></code> within the database using the cache.</p>
+<p>Each iteration yields a tuple of the format <code class="docutils literal notranslate"><span class="pre">(location,</span> <span class="pre">tags)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">location</span></code> can be either an address or a chunk identifier and offset
+depending on whether <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified as true or not.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>*tags</strong> – an iterable of the contents tags to export</li>
+<li><strong>**location</strong> – if <code class="docutils literal notranslate"><span class="pre">location</span></code> is true, then export the contents tags as a location instead of an address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.export.everything">
+<code class="descclassname">export.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>*tags</em>, <em>**location</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.everything" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read all of the specified <code class="docutils literal notranslate"><span class="pre">tags</span></code> within the database using the cache.</p>
+<p>Returns a tuple of the format <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code>. Each field
+is a dictionary keyed by location or offset that retains the tags that
+were read. If the boolean <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified then key each
+contents tag by location instead of address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>*tags</strong> – an iterable of the tags to export</li>
+<li><strong>**location</strong> – if <code class="docutils literal notranslate"><span class="pre">location</span></code> is true, then export the contents tags as a location instead of an address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.export.frame">
+<code class="descclassname">export.</code><code class="descname">frame</code><span class="sig-paren">(</span><em>F</em>, <em>*tags</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.frame" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through each field containing the specified <code class="docutils literal notranslate"><span class="pre">tags</span></code> within the frame belonging to the function <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>F</strong> – the function to export the frame members from</li>
+<li><strong>*tags</strong> – an iterable of the tags used to select the frame members to export</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.export.frames">
+<code class="descclassname">export.</code><code class="descname">frames</code><span class="sig-paren">(</span><em>*tags</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.frames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the fields in each function’s frame containing the specified <code class="docutils literal notranslate"><span class="pre">tags</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*tags</strong> – an iterable of the tags used to select the frame members to export</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.export.globals">
+<code class="descclassname">export.</code><code class="descname">globals</code><span class="sig-paren">(</span><em>*tags</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.globals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the specified global <code class="docutils literal notranslate"><span class="pre">tags</span></code> within the database using the cache.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*tags</strong> – an iterable of the global tags to export</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="tags-read">
+<span id="ns-tags-read"></span><h3>3.3.2.2.3. tags.read<a class="headerlink" href="#tags-read" title="Permalink to this headline">¶</a></h3>
+<p>This namespace contains tools that can be used to manually read
+tags out of the database without using the cache.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">location</span></code> is specified as true, then read each contents tag
+according to its location rather than an address. This allows one
+to perform a translation of the tags in case the function chunks
+are at different addresses than when the tags were read.</p>
+<dl class="function">
+<dt id="tags.read">
+<code class="descclassname">tags.</code><code class="descname">read</code><span class="sig-paren">(</span><em>location=False</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.read" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read all of the tags defined within the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>location</strong> – whether to read the contents tags as an address or a location</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.read.content">
+<code class="descclassname">read.</code><code class="descname">content</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.content" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through every tag belonging to the contents of the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the function to yield the content for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.read.contents">
+<code class="descclassname">read.</code><code class="descname">contents</code><span class="sig-paren">(</span><em>location=False</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the contents tags for all the functions within the database.</p>
+<p>Each iteration yields a tuple of the format <code class="docutils literal notranslate"><span class="pre">(location,</span> <span class="pre">tags)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">location</span></code> can be either an address or a chunk identifier and offset
+depending on whether <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified as true or not.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>location</strong> – whether to read the contents tags as an address or a location</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.read.everything">
+<code class="descclassname">read.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>location=False</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.everything" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read all of the tags defined within the database.</p>
+<p>Returns a tuple of the format <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code>. Each field
+is a dictionary keyed by location or offset that retains the tags that
+were read. If the boolean <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified then key each
+contents tag by location instead of address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>location</strong> – whether to read the contents tags as an address or a location</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.read.frame">
+<code class="descclassname">read.</code><code class="descname">frame</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.frame" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through each field within the frame belonging to the function <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the function containing the frame members to yield</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.read.frames">
+<code class="descclassname">read.</code><code class="descname">frames</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.frames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through the fields of each frame for all the functions defined within the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tags.read.globals">
+<code class="descclassname">read.</code><code class="descname">globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.globals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the tags defined globally witin the database.</p>
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div>
+  <h3 class="sidebar">IDA-minsc</h3>
+  <p class="sidebar logo">
+    <a href="../index.html">
+      <img class="logo" src="../_images/hamster.svg" alt="Logo"/>
+    </a>
+  </p>
+</div>
+  <h3 class="sidebar">Navigation</h3>
+  <p class="topless">
+    Next topic:
+    <a href="tools-tagfix.html" title="next chapter">3.3.3. tagfix – Tagfix module</a>
+    <br />
+    Previous topic:
+    <a href="tools-general.html" title="previous chapter">3.3.1. general – General module</a>
+    <br />
+  </p>
+  <h3 class="sidebar"><a href="../index.html">Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3.3.2. tags – Tags module</a><ul>
+<li><a class="reference internal" href="#function-list">3.3.2.1. Function list</a></li>
+<li><a class="reference internal" href="#namespace-list">3.3.2.2. Namespace list</a><ul>
+<li><a class="reference internal" href="#tags-apply">3.3.2.2.1. tags.apply</a></li>
+<li><a class="reference internal" href="#tags-export">3.3.2.2.2. tags.export</a></li>
+<li><a class="reference internal" href="#tags-read">3.3.2.2.3. tags.read</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<h3 class="sidebar">Search</h3>
+<div class="searchformwrapper">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" />
+    <input type="submit" value="Go" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+<div id="searchbox" role="search">
+  <script type="text/javascript">$('#searchbox').show(0);</script>
+</div><div class="remove-stupid-js-margin">
+ <p>
+   <h3 class="sidebar">Indices</h3>
+   <ul>
+     <li><a href="../genindex.html">Index of Functions</a></li>
+     <li><a href="../py-modindex.html">Index of Modules</a></li>
+   </ul>
+ </p>
+</div>
+  <div role="note" aria-label="source link">
+    <h3 class="sidebar">This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/modules/tools-tags.rst.txt" rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tools-tagfix.html" title="3.3.3. tagfix – Tagfix module"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="tools-general.html" title="3.3.1. general – General module"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" >3. Modules</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2010-2022, Ali Rizvi-Santiago.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

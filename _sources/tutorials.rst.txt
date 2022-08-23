@@ -348,13 +348,13 @@ database via :py:func:`database.functions`.
     users so that they will also have the access to the same information.
     Just for fun, let's serialize this data so that we can transport this
     to another user. Rather than writing the queries to do this manually,
-    we can utilise one of the functions provided by the :py:mod:`custom.tags<tags>`
-    module. Namely the :py:func:`custom.tags.export<tags.export>`. We only want to give
+    we can utilise one of the functions provided by the :py:mod:`tools.tags<tags>`
+    module. Namely the :py:func:`tools.tags.export<tags.export>`. We only want to give
     them the "break-calli" tags which can be exported via the following code.
 
 .. code-block:: python
 
-   > data = custom.tags.export('break-calli')
+   > data = tools.tags.export('break-calli')
    >
    > import pickle, os.path
    > filename = os.path.join(db.path(), 'breakpoints.pickle')
@@ -365,7 +365,7 @@ database via :py:func:`database.functions`.
 
 12. Again, if a user wants to import these pickled tags into their database,
     then can simply unpickle the object and then use the functionality
-    available within the :py:mod:`custom.tags<tags>` module to do this.
+    available within the :py:mod:`tools.tags<tags>` module to do this.
 
 .. code-block:: python
 
@@ -373,16 +373,16 @@ database via :py:func:`database.functions`.
    > with file(filename, 'rb') as input:
          data = pickle.load(input)
    >
-   > custom.tags.apply(data)
+   > tools.tags.apply(data)
 
 13. Unfortunately, this will overwrite any tags in the current database with
     the name "break-calli". If the user wants to map these tags to a different
     name, however, they can provide a dictionary of tag mappings as a keyword
-    parameter to :py:func:`custom.tags.apply<tags.apply>`.
+    parameter to :py:func:`tools.tags.apply<tags.apply>`.
 
 .. code-block:: python
 
-   > custom.tags.apply(data, **{'break-calli': 'username.break-calli'})
+   > tools.tags.apply(data, **{'break-calli': 'username.break-calli'})
    >
 
 .. _tutorials_hardcore:

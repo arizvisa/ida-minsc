@@ -1,0 +1,124 @@
+.. py:module:: tagfix
+
+tagfix -- Tagfix module
+=======================
+
+This module is provided to a user to allow one to rebuild the
+cache that is built when a database is finished processing. If
+the cache is corrupted through some means, this module can be
+used to rebuild the tag-cache by manually scanning the currently
+defined tags and resetting its references in order to allow one
+to query again.
+
+To manually rebuild the cache for the database, use the following::
+
+    > tools.tagfix.everything()
+
+Likewise to rebuild the cache for just the globals or the contents::
+
+    > tools.tagfix.globals()
+    > tools.tagfix.contents()
+
+-------------
+Function list
+-------------
+
+The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+:ref:`multicase-aliases` and :ref:`multicase-functions`.
+
+.. py:function:: all()
+   
+   Build the index of references for all the globals and generate the caches for every function in the database.
+   
+.. py:function:: contents(ea)
+   
+   Generate the cache for the contents of the function ``ea``.
+   
+   :param ea: the address of the function to build the cache for
+   
+.. py:function:: customnames()
+   
+   Iterate through all of the "custom" names within the database and update their references in either the index or their associated function cache.
+   
+.. py:function:: erase()
+   
+   Erase the index of all the globals and the cache associated with each function from the database.
+   
+.. py:function:: erase_contents()
+   
+   Remove the cache associated with each function from the database.
+   
+.. py:function:: erase_globals()
+   
+   Remove the contents of the index from the database which is used for storing information about the global tags.
+   
+.. py:function:: everything()
+   
+   Rebuild the index for all of the globals and the cache for each function from the database.
+   
+.. py:function:: extracomments()
+   
+   Iterate through all of the "extra" comments within the database and update their references in either the index or their associated function cache.
+   
+.. py:function:: fetch_contents(fn)
+   
+   Fetch the number of references for the contents of function ``fn`` from the database.
+   
+   Returns the tuple ``(function, address, tags)`` where the ``address`` and
+   ``tags`` items are both dictionaries containing the number of references
+   for the addresses and tag names. The ``function`` item contains the address
+   of the function whose references were counted.
+   
+   :param fn: the function to fetch the contents tags from
+   
+.. py:function:: fetch_globals()
+   
+   Fetch the number of references for all of the global tags associated with both functions and non-functions from the database.
+   
+   Returns the tuple ``(address, tags)`` where the ``address`` and ``tags``
+   items are both dictionaries containing the number of references
+   for both addresses and tag names.
+   
+.. py:function:: fetch_globals_data()
+   
+   Fetch the number of references for all of the global tags (non-functions) from the database.
+   
+   Returns a tuple ``(address, tags)`` where the ``address`` and ``tags`` items
+   are both dictionaries containing the number of references for both
+   addresses and tag names for every non-function in the database.
+   
+.. py:function:: fetch_globals_functions()
+   
+   Fetch the number of references for all of the global tags (functions) from the database.
+   
+   Returns the tuple ``(address, tags)`` where the ``address`` and ``tags`` items
+   are both dictionaries containing the number of references for both
+   addresses and tag names for each function from the database.
+   
+.. py:function:: globals()
+   
+   Build the index of references for all of the globals in the database.
+   
+.. py:function:: verify()
+   
+   Use the index to verify the reference counts for the globals, functions, and the caches containing their contents.
+   
+.. py:function:: verify_content(ea)
+   
+   Iterate through the contents cache for an individual function and verify that the addresses in its cache are correct.
+   
+   :param ea: the address of the function to verify the cache for
+   
+.. py:function:: verify_contents()
+   
+   Verify the contents of every single function in the index.
+   
+.. py:function:: verify_globals()
+   
+   Verify the globals for every address from the database.
+   
+.. py:function:: verify_index()
+   
+   Iterate through the index and verify that each contents entry is pointing at the right functions.
+   

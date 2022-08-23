@@ -1,0 +1,382 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>3.3.1. general – General module &#8212; IDA-minsc  documentation</title>
+    <link rel="stylesheet" href="../_static/pyramid.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3.3.2. tags – Tags module" href="tools-tags.html" />
+    <link rel="prev" title="3.2.1. ui – User Interface module" href="misc-ui.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tools-tags.html" title="3.3.2. tags – Tags module"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="misc-ui.html" title="3.2.1. ui – User Interface module"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" accesskey="U">3. Modules</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <span class="target" id="module-general"></span><div class="section" id="general-general-module">
+<h1>3.3.1. general – General module<a class="headerlink" href="#general-general-module" title="Permalink to this headline">¶</a></h1>
+<p>This module provides generalized tools that a user may find
+useful in their reversing adventures. This includes classes
+for performing address translations, coloring marks or tags,
+recursively walking through basic blocks until a sentinel
+block has been reached, or even recursively walking a
+function’s childrens until a particular sentinel function
+is encountered.</p>
+<p>The tools defined within here are unorganized and pretty
+much unmaintained. Thus they may shift around during their
+existence as they eventually find their place.</p>
+<div class="section" id="function-list">
+<h2>3.3.1.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
+<p>The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+<a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
+<dl class="function">
+<dt id="general.above">
+<code class="descclassname">general.</code><code class="descname">above</code><span class="sig-paren">(</span><em>ea</em>, <em>includeSegment=False</em><span class="sig-paren">)</span><a class="headerlink" href="#general.above" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return all of the function names and their offset that calls the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address of the function to output calls to</li>
+<li><strong>includeSegment</strong> – whether to include the segment name in the output</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.below">
+<code class="descclassname">general.</code><code class="descname">below</code><span class="sig-paren">(</span><em>ea</em>, <em>includeSegment=False</em><span class="sig-paren">)</span><a class="headerlink" href="#general.below" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return all of the function names and their offset that are called by the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address of the function to output calls from</li>
+<li><strong>includeSegment</strong> – whether to include the segment name in the output</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.checkmarks">
+<code class="descclassname">general.</code><code class="descname">checkmarks</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#general.checkmarks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Emit all functions that contain more than 1 mark within them.</p>
+<p>As an example, if marks are used to keep track of backtraces then
+this tool will emit where those backtraces intersect.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.collect">
+<code class="descclassname">general.</code><code class="descname">collect</code><span class="sig-paren">(</span><em>ea</em>, <em>sentinel</em><span class="sig-paren">)</span><a class="headerlink" href="#general.collect" title="Permalink to this definition">¶</a></dt>
+<dd><p>Collect all the basic blocks starting at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and recurse until a terminating block is encountered.</p>
+<p>If the set <code class="docutils literal notranslate"><span class="pre">sentinel</span></code> is specified, then its addresses are used as
+sentinel blocks and collection will terminate when those blocks are
+reached.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address of the basic block to start at</li>
+<li><strong>sentinel</strong> – an iterable containing the addresses of any basic blocks to terminate at</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.collectcall">
+<code class="descclassname">general.</code><code class="descname">collectcall</code><span class="sig-paren">(</span><em>ea</em>, <em>sentinel=set</em><span class="sig-paren">)</span><a class="headerlink" href="#general.collectcall" title="Permalink to this definition">¶</a></dt>
+<dd><p>Collect all of the function calls starting at function <code class="docutils literal notranslate"><span class="pre">ea</span></code> and recurse until a terminating function is encountered.</p>
+<p>If the set <code class="docutils literal notranslate"><span class="pre">sentinel</span></code> is specified, then its addresses are used as
+sentinel functions and collection will terminate when one of those
+functions are reached.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address of the function to start from</li>
+<li><strong>sentinel</strong> – an iterable containing the addresses belonging to a functions to terminate at</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.colormarks">
+<code class="descclassname">general.</code><code class="descname">colormarks</code><span class="sig-paren">(</span><em>color=0x7f007f</em><span class="sig-paren">)</span><a class="headerlink" href="#general.colormarks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Walk through the current list of marks whilst coloring them with the specified <code class="docutils literal notranslate"><span class="pre">color</span></code>.</p>
+<p>Each mark’s address is tagged with its description, and if the
+address belongs to a function, the function is also tagged with the
+address of the marks that it contains.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>color</strong> – the rgb color value to color each mark address with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.makecall">
+<code class="descclassname">general.</code><code class="descname">makecall</code><span class="sig-paren">(</span><em>ea=None</em>, <em>target=None</em><span class="sig-paren">)</span><a class="headerlink" href="#general.makecall" title="Permalink to this definition">¶</a></dt>
+<dd><p>Output the function call at <code class="docutils literal notranslate"><span class="pre">ea</span></code> and its arguments with the address they originated from.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">target</span></code> is specified, then assume that the instruction is
+calling <code class="docutils literal notranslate"><span class="pre">target</span></code> instead of the target address that the call
+is referencing.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address of a call instruction</li>
+<li><strong>target</strong> – the address that the call instruction branches to</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.map">
+<code class="descclassname">general.</code><code class="descname">map</code><span class="sig-paren">(</span><em>F</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#general.map" title="Permalink to this definition">¶</a></dt>
+<dd><p>Execute the callback <code class="docutils literal notranslate"><span class="pre">F</span></code> on all functions in the database. Synonymous to <code class="docutils literal notranslate"><span class="pre">map(F,</span> <span class="pre">database.functions())</span></code> but with some extra logging to display the current progress.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">F</span></code> parameter is defined as a function taking either an
+<code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">\*\*kwargs)</span></code> or a <code class="docutils literal notranslate"><span class="pre">(index,</span> <span class="pre">address,</span> <span class="pre">\*\*kwargs)</span></code>. Any
+keyword arguments are passed to <code class="docutils literal notranslate"><span class="pre">F</span></code> unmodified.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>F</strong> – the callback to execute on each function</li>
+<li><strong>**kwargs</strong> – any extra arguments to pass to the callback</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="general.recovermarks">
+<code class="descclassname">general.</code><code class="descname">recovermarks</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#general.recovermarks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Walk through the tags made by <a class="reference internal" href="#general.colormarks" title="general.colormarks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">colormarks</span></code></a> and re-create the marks that were found.</p>
+<p>This is useful if any marks were accidentally deleted and can be used for
+recovering them as long as they were initally tagged properly.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="class-list">
+<h2>3.3.1.2. Class list<a class="headerlink" href="#class-list" title="Permalink to this headline">¶</a></h2>
+<p>Classes provide the definition necessary to instantiate an object.
+In most cases, a class is returned when calling one of the prior
+listed functions and thus have no need to be manually instantiated.
+Classes may also have aliases defined for them. Please refer to the
+documentation for the class to see what is available. For more
+information on aliases, please see <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
+<div class="section" id="remote">
+<h3>3.3.1.2.1. remote<a class="headerlink" href="#remote" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="general.remote">
+<em class="property">class </em><code class="descclassname">general.</code><code class="descname">remote</code><a class="headerlink" href="#general.remote" title="Permalink to this definition">¶</a></dt>
+<dd><p>An object that can be used to translate addresses to and from
+a debugging target so that one does not need to rebase their
+entire database, or come up with some other tricks to translate
+a binary address to its runtime address.</p>
+<dl class="method">
+<dt id="general.remote.get">
+<code class="descname">get</code><span class="sig-paren">(</span><em>self</em>, <em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#general.remote.get" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate a remote address to the local database address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – a remote address to convert to the database address</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="general.remote.go">
+<code class="descname">go</code><span class="sig-paren">(</span><em>self</em>, <em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#general.remote.go" title="Permalink to this definition">¶</a></dt>
+<dd><p>Seek the database to the specified remote address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the remote address to seek to in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="general.remote.put">
+<code class="descname">put</code><span class="sig-paren">(</span><em>self</em>, <em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#general.remote.put" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate a local database address to the remote address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the local address in the database to convert to a remote one</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div>
+  <h3 class="sidebar">IDA-minsc</h3>
+  <p class="sidebar logo">
+    <a href="../index.html">
+      <img class="logo" src="../_images/hamster.svg" alt="Logo"/>
+    </a>
+  </p>
+</div>
+  <h3 class="sidebar">Navigation</h3>
+  <p class="topless">
+    Next topic:
+    <a href="tools-tags.html" title="next chapter">3.3.2. tags – Tags module</a>
+    <br />
+    Previous topic:
+    <a href="misc-ui.html" title="previous chapter">3.2.1. ui – User Interface module</a>
+    <br />
+  </p>
+  <h3 class="sidebar"><a href="../index.html">Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3.3.1. general – General module</a><ul>
+<li><a class="reference internal" href="#function-list">3.3.1.1. Function list</a></li>
+<li><a class="reference internal" href="#class-list">3.3.1.2. Class list</a><ul>
+<li><a class="reference internal" href="#remote">3.3.1.2.1. remote</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<h3 class="sidebar">Search</h3>
+<div class="searchformwrapper">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" />
+    <input type="submit" value="Go" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+<div id="searchbox" role="search">
+  <script type="text/javascript">$('#searchbox').show(0);</script>
+</div><div class="remove-stupid-js-margin">
+ <p>
+   <h3 class="sidebar">Indices</h3>
+   <ul>
+     <li><a href="../genindex.html">Index of Functions</a></li>
+     <li><a href="../py-modindex.html">Index of Modules</a></li>
+   </ul>
+ </p>
+</div>
+  <div role="note" aria-label="source link">
+    <h3 class="sidebar">This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/modules/tools-general.rst.txt" rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tools-tags.html" title="3.3.2. tags – Tags module"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="misc-ui.html" title="3.2.1. ui – User Interface module"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" >3. Modules</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2010-2022, Ali Rizvi-Santiago.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

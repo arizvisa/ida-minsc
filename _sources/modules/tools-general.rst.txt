@@ -1,0 +1,147 @@
+.. py:module:: general
+
+general -- General module
+=========================
+
+This module provides generalized tools that a user may find
+useful in their reversing adventures. This includes classes
+for performing address translations, coloring marks or tags,
+recursively walking through basic blocks until a sentinel
+block has been reached, or even recursively walking a
+function's childrens until a particular sentinel function
+is encountered.
+
+The tools defined within here are unorganized and pretty
+much unmaintained. Thus they may shift around during their
+existence as they eventually find their place.
+
+-------------
+Function list
+-------------
+
+The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+:ref:`multicase-aliases` and :ref:`multicase-functions`.
+
+.. py:function:: above(ea, includeSegment=False)
+   
+   Return all of the function names and their offset that calls the function at ``ea``.
+   
+   :param ea: the address of the function to output calls to
+   :param includeSegment: whether to include the segment name in the output
+   
+.. py:function:: below(ea, includeSegment=False)
+   
+   Return all of the function names and their offset that are called by the function at ``ea``.
+   
+   :param ea: the address of the function to output calls from
+   :param includeSegment: whether to include the segment name in the output
+   
+.. py:function:: checkmarks()
+   
+   Emit all functions that contain more than 1 mark within them.
+   
+   As an example, if marks are used to keep track of backtraces then
+   this tool will emit where those backtraces intersect.
+   
+.. py:function:: collect(ea, sentinel)
+   
+   Collect all the basic blocks starting at address ``ea`` and recurse until a terminating block is encountered.
+   
+   If the set ``sentinel`` is specified, then its addresses are used as
+   sentinel blocks and collection will terminate when those blocks are
+   reached.
+   
+   :param ea: the address of the basic block to start at
+   :param sentinel: an iterable containing the addresses of any basic blocks to terminate at
+   
+.. py:function:: collectcall(ea, sentinel=set)
+   
+   Collect all of the function calls starting at function ``ea`` and recurse until a terminating function is encountered.
+   
+   If the set ``sentinel`` is specified, then its addresses are used as
+   sentinel functions and collection will terminate when one of those
+   functions are reached.
+   
+   :param ea: the address of the function to start from
+   :param sentinel: an iterable containing the addresses belonging to a functions to terminate at
+   
+.. py:function:: colormarks(color=0x7f007f)
+   
+   Walk through the current list of marks whilst coloring them with the specified ``color``.
+   
+   Each mark's address is tagged with its description, and if the
+   address belongs to a function, the function is also tagged with the
+   address of the marks that it contains.
+   
+   :param color: the rgb color value to color each mark address with
+   
+.. py:function:: makecall(ea=None, target=None)
+   
+   Output the function call at ``ea`` and its arguments with the address they originated from.
+   
+   If ``target`` is specified, then assume that the instruction is
+   calling ``target`` instead of the target address that the call
+   is referencing.
+   
+   :param ea: the address of a call instruction
+   :param target: the address that the call instruction branches to
+   
+.. py:function:: map(F, \*\*kwargs)
+   
+   Execute the callback ``F`` on all functions in the database. Synonymous to ``map(F, database.functions())`` but with some extra logging to display the current progress.
+   
+   The ``F`` parameter is defined as a function taking either an
+   ``(address, \*\*kwargs)`` or a ``(index, address, \*\*kwargs)``. Any
+   keyword arguments are passed to ``F`` unmodified.
+   
+   :param F: the callback to execute on each function
+   :param \*\*kwargs: any extra arguments to pass to the callback
+   
+.. py:function:: recovermarks()
+   
+   Walk through the tags made by :py:obj:`colormarks` and re-create the marks that were found.
+   
+   This is useful if any marks were accidentally deleted and can be used for
+   recovering them as long as they were initally tagged properly.
+   
+----------
+Class list
+----------
+
+Classes provide the definition necessary to instantiate an object.
+In most cases, a class is returned when calling one of the prior
+listed functions and thus have no need to be manually instantiated.
+Classes may also have aliases defined for them. Please refer to the
+documentation for the class to see what is available. For more
+information on aliases, please see :ref:`multicase-aliases`.
+
+******
+remote
+******
+
+.. py:class:: remote
+   
+   An object that can be used to translate addresses to and from
+   a debugging target so that one does not need to rebase their
+   entire database, or come up with some other tricks to translate
+   a binary address to its runtime address.
+   
+   .. py:method:: get(self, ea)
+      
+      Translate a remote address to the local database address.
+      
+      :param ea: a remote address to convert to the database address
+      
+   .. py:method:: go(self, ea)
+      
+      Seek the database to the specified remote address.
+      
+      :param ea: the remote address to seek to in the database
+      
+   .. py:method:: put(self, ea)
+      
+      Translate a local database address to the remote address.
+      
+      :param ea: the local address in the database to convert to a remote one
+      

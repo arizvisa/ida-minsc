@@ -1,0 +1,270 @@
+.. py:module:: tags
+
+tags -- Tags module
+===================
+
+This module exposes tools for exporting the currently defined tags
+within the database. Once exported, these tags can then be pickled
+or then re-applied to the same or another database. Some options
+are allowed which will let a user apply translations to the tags
+before applying them to a target database.
+
+To fetch all of the tags from the database::
+
+    > res = tools.tags.read()
+
+To export only specific tags from the database::
+
+    > res = tools.tags.export('tag1', 'tag2', ...)
+
+To apply previously read tags to the database::
+
+    > tools.tags.apply(res)
+
+To apply previously read tags with different names to the database::
+
+    > tools.tags.apply(res, tag1='my_tag1', tag2='my_tag2', ...)
+
+-------------
+Function list
+-------------
+
+The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+:ref:`multicase-aliases` and :ref:`multicase-functions`.
+
+.. py:function:: addressToLocation(ea, chunks=None)
+   
+   Convert the address ``ea`` to a ``(function, id, offset)``.
+   
+   The fields ``id`` and ``offset`` represent the chunk index and the
+   offset into the chunk for the function at ``ea``. If the list
+   ``chunks`` is specified as a parameter, then use it as a tuple
+   of ranges in order to calculate the correct address.
+   
+   :param ea: an address to possibly convert to a location
+   :param chunks: the list of chunks to convert the address with
+   
+.. py:function:: list()
+   
+   Return the tags for the all of the function contents within the database as a set.
+   
+.. py:function:: locationToAddress(loc)
+   
+   Convert the function location ``loc`` back into an address.
+   
+   :param loc: an address or a location tuple to convert to an address
+   
+.. py:function:: lvarNameQ(name)
+   
+   Determine whether a ``name`` is something that IDA named automatically.
+   
+   :param name: the string to check for an IDA naming scheme
+   
+--------------
+Namespace list
+--------------
+
+These are the namespaces available within this module. Namespaces
+group similar functions that can be used typically for the same
+concept. Please see :ref:`multicase-namespaces` for more
+information on namespaces. For more information on multicase
+functions or aliases, please see :ref:`multicase-functions` or
+:ref:`multicase-aliases`.
+
+.. _ns-tags-apply:
+
+**********
+tags.apply
+**********
+
+This namespace contains tools that can be used to apply tags that
+have been previously read back into the database.
+
+Various functions defined within this namespace take a variable number of
+keyword arguments which represent a mapping for the tag names. When a
+tag name was specified, this mapping will be used to rename the tags
+before actually writing them back into the database.
+
+.. py:function:: apply(Globals_Contents_Frames, \*\*tagmap)
+   
+   Apply the tags in the argument ``(Globals, Contents, Frames)`` from the ``Globals_Contents_Frames`` tuple back into the database.
+   
+   :param Globals_Contents_Frames: a tuple composed of the global tags, contents tags, and frame members that were read
+   :param \*\*tagmap: a dictionary used to translate the original tag names with before applying them to the database
+   
+.. py:function:: apply\.content(Contents, \*\*tagmap)
+   
+   Apply ``Contents`` back into a function's contents within the database.
+   
+   :param Contents: the contents tags to apply
+   :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
+   
+.. py:function:: apply\.contents(Contents, \*\*tagmap)
+   
+   Apply the tags in ``Contents`` back into each function within the database.
+   
+   :param Contents: the contents tags to apply
+   :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
+   
+.. py:function:: apply\.everything(Globals_Contents_Frames, \*\*tagmap)
+   
+   Apply the tags in the argument ``(Globals, Contents, Frames)`` from the ``Globals_Contents_Frames`` tuple back into the database.
+   
+   :param Globals_Contents_Frames: a tuple composed of the global tags, contents tags, and frame members that are to be applied
+   :param \*\*tagmap: a dictionary used to translate the original tag names with before applying them to the database
+   
+.. py:function:: apply\.frame(ea, frame, \*\*tagmap)
+   
+   Apply the fields from ``frame`` back into the function at ``ea``.
+   
+   :param ea: the address of the function to apply the frame to
+   :param frame: the frame members to apply
+   :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
+   
+.. py:function:: apply\.frames(Frames, \*\*tagmap)
+   
+   Apply the fields from ``Frames`` back into each function's frame.
+   
+   :param Frames: the frame members to apply
+   :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
+   
+.. py:function:: apply\.globals(Globals, \*\*tagmap)
+   
+   Apply the tags in ``Globals`` back into the database.
+   
+   :param Globals: the globals tags to apply
+   :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
+   
+.. _ns-tags-export:
+
+***********
+tags.export
+***********
+
+This namespace contains tools that can be used to quickly
+export specific tags out of the database using the cache.
+
+If ``location`` is specified as true, then read each contents tag
+according to its location rather than an address. This allows one
+to perform a translation of the tags in case the function chunks
+are at different addresses than when the tags were read.
+
+.. py:function:: export(\*tags, \*\*location)
+   
+   Read the specified tags within the database using the cache.
+   
+   :param \*tags: an iterable of the tags to export
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
+   
+.. py:function:: export\.content(F, \*tags, \*\*location)
+   
+   Iterate through the specified ``tags`` belonging to the contents of the function at ``ea`` using the cache.
+   
+   :param F: the function to export the content from
+   :param \*tags: an iterable of the contents tags to export
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
+   
+.. py:function:: export\.contents(\*tags, \*\*location)
+   
+   Iterate through the specified contents ``tags`` within the database using the cache.
+   
+   Each iteration yields a tuple of the format ``(location, tags)`` where
+   ``location`` can be either an address or a chunk identifier and offset
+   depending on whether ``location`` was specified as true or not.
+   
+   :param \*tags: an iterable of the contents tags to export
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
+   
+.. py:function:: export\.everything(\*tags, \*\*location)
+   
+   Read all of the specified ``tags`` within the database using the cache.
+   
+   Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
+   is a dictionary keyed by location or offset that retains the tags that
+   were read. If the boolean ``location`` was specified then key each
+   contents tag by location instead of address.
+   
+   :param \*tags: an iterable of the tags to export
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
+   
+.. py:function:: export\.frame(F, \*tags)
+   
+   Iterate through each field containing the specified ``tags`` within the frame belonging to the function ``ea``.
+   
+   :param F: the function to export the frame members from
+   :param \*tags: an iterable of the tags used to select the frame members to export
+   
+.. py:function:: export\.frames(\*tags)
+   
+   Iterate through the fields in each function's frame containing the specified ``tags``.
+   
+   :param \*tags: an iterable of the tags used to select the frame members to export
+   
+.. py:function:: export\.globals(\*tags)
+   
+   Iterate through all of the specified global ``tags`` within the database using the cache.
+   
+   :param \*tags: an iterable of the global tags to export
+   
+.. _ns-tags-read:
+
+*********
+tags.read
+*********
+
+This namespace contains tools that can be used to manually read
+tags out of the database without using the cache.
+
+If ``location`` is specified as true, then read each contents tag
+according to its location rather than an address. This allows one
+to perform a translation of the tags in case the function chunks
+are at different addresses than when the tags were read.
+
+.. py:function:: read(location=False)
+   
+   Read all of the tags defined within the database.
+   
+   :param location: whether to read the contents tags as an address or a location
+   
+.. py:function:: read\.content(ea)
+   
+   Iterate through every tag belonging to the contents of the function at ``ea``.
+   
+   :param ea: the address of the function to yield the content for
+   
+.. py:function:: read\.contents(location=False)
+   
+   Iterate through the contents tags for all the functions within the database.
+   
+   Each iteration yields a tuple of the format ``(location, tags)`` where
+   ``location`` can be either an address or a chunk identifier and offset
+   depending on whether ``location`` was specified as true or not.
+   
+   :param location: whether to read the contents tags as an address or a location
+   
+.. py:function:: read\.everything(location=False)
+   
+   Read all of the tags defined within the database.
+   
+   Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
+   is a dictionary keyed by location or offset that retains the tags that
+   were read. If the boolean ``location`` was specified then key each
+   contents tag by location instead of address.
+   
+   :param location: whether to read the contents tags as an address or a location
+   
+.. py:function:: read\.frame(ea)
+   
+   Iterate through each field within the frame belonging to the function ``ea``.
+   
+   :param ea: the address of the function containing the frame members to yield
+   
+.. py:function:: read\.frames()
+   
+   Iterate through the fields of each frame for all the functions defined within the database.
+   
+.. py:function:: read\.globals()
+   
+   Iterate through all of the tags defined globally witin the database.
+   
