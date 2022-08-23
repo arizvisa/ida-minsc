@@ -44,13 +44,9 @@ sys.displayhook = loader.DisplayHook(sys.stdout.write, sys.displayhook).displayh
 # need to preserve it as we'll need one more function after transition.
 loader.load(globals(), preserve={'loader', '_orig_stdout', '_orig_stderr'})
 
-# now we can start everything up and delete the loader afterwards.
-loader.startup()
-
-# try and execute our user's idapythonrc.py
-loader.dotfile(globals())
-
-# that should've been evertyhing
+# now we can start everything up within our namespace and then we can
+# just delete the loader afterwards.
+loader.startup(globals())
 del(loader)
 
 ## stupid fucking idapython hax
