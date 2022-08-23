@@ -20,7 +20,7 @@ import idaapi
 # python's meta_path to locate all of our modules. we also use this path
 # to find out where our loader logic is actually located.
 root = idaapi.get_user_idadir()
-sys.path.remove(root)
+sys.path[:] = [item for item in sys.path if os.path.realpath(item) not in {os.path.realpath(root)}]
 
 # grab the loader, and then use it to seed python's meta_path.
 loader = imp.load_source('__loader__', os.path.join(root, 'plugins', 'minsc.py'))
