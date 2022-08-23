@@ -656,8 +656,12 @@ class MINSC(idaapi.plugin_t):
         # then our module finders have already been loaded and we just need
         # to persist ourselves.
         if isinstance(version, float):
-            self.state = 'persistent'
+            self.state = self.__class__.state = 'persistent'
             return idaapi.PLUGIN_KEEP
+
+        # If our state is already initialized, then we've done this before.
+        elif self.state:
+            logging.critical("{:s} : Loading plugin again despite it already being initialized ({:s}).".format(__name__, self.state))
 
         # Now the version hasn't been assigned yet, then the user didn't
         # install this globally. This means that we don't control the primary
@@ -736,15 +740,15 @@ class MINSC(idaapi.plugin_t):
         # the necessary hooks to kick everything off.
         if ok:
             logging.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(__name__))
+            self.state = self.__class__.state = 'local'
             hooks.make_ida_not_suck_cocks(idaapi.NW_INITIDA)
-            self.state = 'local'
 
             # If there's an accessible "__main__" namespace, then dump the dotfile into it.
             '__main__' in sys.modules and dotfile(sys.modules['__main__'].__dict__)
 
         else:
             logging.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(__name__))
-            self.state = 'disabled'
+            self.state = self.__class__.state = 'disabled'
 
         return idaapi.PLUGIN_KEEP
 
