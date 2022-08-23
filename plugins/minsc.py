@@ -659,8 +659,10 @@ class MINSC(idaapi.plugin_t):
         # Now we'll try and tamper with the user's namespace. We'll search through
         # Python's module list, and if we find it we'll just swap it out for root.
         if '__main__' in sys.modules:
-            ns = sys.modules['__main__']
-            loader.load(ns.__dict__, preserve={'print_banner', '_orig_stdout', '_orig_stderr'})
+            ns, banner_required = sys.modules['__main__'], {'print_banner', 'IDAPYTHON_VERSION', 'sys'}
+            loader.load(ns.__dict__, preserve={'_orig_stdout', '_orig_stderr'} | banner_required)
+            hasattr(ns, 'print_banner') and ns.print_banner()
+            [ns.__dict__.pop(item, None) for item in banner_required]
 
         else:
             logging.warning("{:s} : Skipping the reset of the primary namespace as \"{:s}\" was not found in Python's module list.".format(self.wanted_name, '__main__'))
