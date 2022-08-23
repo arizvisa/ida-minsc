@@ -18,18 +18,65 @@ from internal import comment, utils, interface, exceptions as E
 import idaapi
 
 def greeting():
-    barrier = 93
-    available = ['database', 'function', 'instruction', 'segment', 'structure', 'enumeration', 'ui']
+    barrier = 86
 
-    six.print_('=' * barrier)
+    loaders = {}
+    for item in sys.meta_path:
+        if item.__module__.endswith('__loader__'):
+            if hasattr(item, '__iter__'):
+                name = getattr(item, '__name__', None)
+            else:
+                name, item = None, [item.__name__]
+            loaders.setdefault(name, []).append(item)
+        continue
+
+    items = itertools.chain(*(items for name, items in loaders.items() if name is None))
+    available = sorted(item for item in itertools.chain(*items) if item != 'hooks')
+
+    loaders.pop('internal', None)
+    submodules = ((name, itertools.chain(*map(sorted, items))) for name, items in loaders.items() if name)
+    loaded = {name: ['.'.join([name, item]) for item in items if not item.startswith('_')] for name, items in submodules}
+    maximum = 1 + max(map(len, loaded))
+    submodules = (' '.join(["{:<{:d}s}".format(name + ':', maximum), ', '.join(loaded[name])] if loaded[name] else ["{:<{:d}s}".format(name + ':', maximum)]) for name in sorted(loaded, key=len))
+
     six.print_("Welcome to the ida-minsc plugin!")
+    six.print_("You are currently running python {:s} in IDA {:.1f} ({:s}).".format('.'.join("{:d}".format(getattr(sys.version_info, field, 0)) for field in ['major', 'minor', 'micro']), idaapi.__version__, sys.platform))
     six.print_("")
-    six.print_("You can find documentation at https://arizvisa.github.io/ida-minsc/")
+
+    if available:
+        six.print_("The following namespaces have been introduced into IDAPython:")
+        six.print_("    {:s}".format(', '.join(available)))
+        six.print_("")
+
+    if submodules:
+        six.print_("The following modules are available and may also be imported:")
+        [six.print_("    {:s}".format(submodule)) for submodule in submodules]
+        six.print_("")
+
+    useful_modules = [
+        ('ida_hexrays', 'https://hex-rays.com/decompiler/', 'for a freaking decompiler'),
+        ('networkx', 'https://pypi.org/project/networkx/', 'for a real graph api'),
+        ('dill', 'https://pypi.org/project/dill/', 'to save (and load) your game'),
+    ]
+
+    results, find_loader = [], __import__('imp').find_module if sys.version_info.major < 3 else __import__('importlib').find_loader
+    for name, url, description in useful_modules:
+        try:
+            if find_loader(name) is None:
+                raise ImportError
+        except ImportError:
+            results.append((name, url, description))
+        continue
+
+    if results:
+        for name, url, description in results:
+            six.print_("You should consider installing the `{:s}` module ({:s}){:s}.".format(name, url, " {:s}".format(description) if description else ''))
+        six.print_("")
+
+    six.print_("Your globals have been cleaned, use `dir()` to see your work.")
     six.print_("")
-    six.print_("The available namespaces are: {:s}".format(', '.join(available)))
-    six.print_("Please use `help(namespace)` for their usage.")
-    six.print_("")
-    six.print_("Your globals have also been cleaned, use `dir()` to see your work.")
+    six.print_("Please use `help(namespace)` or `help(modulename)` for general usage.")
+    six.print_("You may also visit {:s} for html-based help.".format('https://arizvisa.github.io/ida-minsc'))
     six.print_('-' * barrier)
 
 ### comment hooks
