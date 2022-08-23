@@ -12,16 +12,19 @@ its contents in order to assign the path that you have cloned the repository
 into. After it has been modified, when starting up IDA you should then notice
 that the "About Minsc" menu item is listed under your currently installed plugins.
 
-However, if you are using an "older" version of IDA Pro, you may need to use
-the previous installation methodology (at section :ref:`1.6<install-older>`).
-This ensures that IDA-Minsc is loaded immediately after IDA has been started.
-To install it in this manner, the idea is that the "``idapythonrc.py``" file
-from the IDA-Minsc repository is executed by IDAPython when the user starts up
-IDA. This is done by cloning the IDA-Minsc repository directly into the IDA
-user directory.  This way when IDA starts, IDA-Minsc will then empty out the
-default namespace and replace it with its own.
+However, if you are using an "older" version of IDA Pro or you want the modules
+provided by the plugin to be accessible by other plugins, you may need to use the
+global installation methodology (at section :ref:`1.6<install-global>`). This
+ensures that IDA-Minsc is loaded immediately after IDA has been started and before
+any other plugins have loaded. To install it in this manner, the main idea is that
+the "``idapythonrc.py``" file from the IDA-Minsc repository is executed by IDAPython
+when the user starts up IDA. This can be done by cloning the IDA-Minsc repository
+directly into the IDA user directory so that when IDAPython starts up, the IDA-Minsc
+loader will be executed during IDAPython's initialization. Once this is complete,
+other plugins should then have access to the available functionality.
 
-In summary, you will be performing the following steps.
+In summary, you will be performing the following steps for installing IDA-Minsc
+as a plugin.
 
     1. Ensure that Git is installed, IDA Pro works and you can use IDAPython.
     2. Using Git, clone the repository at https://github.com/arizvisa/ida-minsc
@@ -66,9 +69,10 @@ so that the documentation can be updated.
 If you have already installed IDA and realized that another plugin that you are
 interested in using requires you to use Python 2.x for it to work, please review
 the `Downgrading the IDAPython version to Python 2.x for other plugins`_ section
-for your platform which describes how to switch between them. To be clear, none
-of this is required for the IDA-Minsc plugin and is instead only described in order
-to support older versions of other plugins that you may use in your endeavors.
+for your platform which describes how to switch between the different versions.
+To be clear, none of this is required for the IDA-Minsc plugin and is instead only
+described in order to support older versions of other plugins that you may depend
+on in your reversing endeavors.
 
 Cloning the repository
 ----------------------
@@ -97,7 +101,7 @@ Required Python dependencies
 This project depends on a small number of Python modules that you will need to
 install into Python's "``site-packages``" directory. These modules are mostly
 used to provide a reasonable graph implementation, but there are other modules
-which are used for retaining compatibility with both Python3 and Python2.
+which are used for retaining compatibility between either Python3 or Python2.
 
 To install these required modules you can use the "``pip``" tool which comes
 with Python to install them. In the root of the repository, there's a file
@@ -111,9 +115,10 @@ in the directory that you cloned the repository into.
 
 This should install all of the required Python dependencies, and then you can
 proceed with installing the actual plugin. There are two ways to install the
-plugin. The new way which requires you to modify a file and manually deploy
-it within the plugin directory, and then the old way (section :ref:`1.6<install-older>`)
-which is only necessary if you're using an older version of IDA Pro.
+plugin. The plugin methodology which requires you to modify a file and manually
+deploy it within the plugin directory, and then the global methodology (section :ref:`1.6<install-global>`)
+which is only necessary if you want to expose some of the functionality of IDA-Minsc
+to other plugins that you may have installed.
 
 .. _software-references:
 .. rubric:: References
@@ -139,7 +144,7 @@ modified, you can then deploy it into the IDA user directory [:ref:`1<install-re
 Near the very top of "``./plugins/minsc.py``" file, you should see the following code
 which is a variable that tells the plugin where its repository is actually located.
 By default it uses the current IDA user directory for the prior installation method
-that is described in section :ref:`1.6<install-older>`, but it can actually be changed
+that is described in section :ref:`1.6<install-global>`, but it can actually be changed
 to reference any directory that you prefer.
 
 .. code-block:: python
@@ -200,10 +205,10 @@ Sanity checking the installation
 
 To check that IDA-Minsc has been installed properly, you should be able to just
 startup your instance of IDA and check your Plugins menu under "Edit" 🠞 "Plugins".
-As if the plugin has been successfully loaded, the "About Minsc" menu item should be
-listed. However, a programmatic method can be also used to check if the plugin
-has been installed. To do this, ensure that the IDAPython prompt is selected as
-"Python" (not "IDC") and then execute the following::
+If the plugin has been successfully loaded, the "About Minsc" menu item should be
+listed in the plugins menu. An alternative way to check if the plugin has been
+installed is to do it programmatically. To do this, ensure that the IDAPython
+prompt is selected as "Python" (not "IDC") and then execute the following::
 
     > database.config.version()
 
@@ -311,6 +316,15 @@ from IDAPython when you start up IDA Pro.
 +-----------------+----+-----------------------------------------------------------------+
 | :py:func:`goof` | -- | Aliased from :py:func:`database.go_offset` which will navigate  |
 |                 |    | to the specified offset from the lowest address in the database |
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`hex`  | -- | An extended version of Python's :py:func:`hex` function that    |
+|                 |    | works with integers, bytes, bytearrays, and lists.              |
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`p`    | -- | Aliased from Python's :py:func:`print` function.                |
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`pp`   | -- | Aliased from Python's :py:func:`pprint.pprint` function.        |
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`pp`   | -- | Aliased from Python's :py:func:`pprint.pformat` function.       |
 +-----------------+----+-----------------------------------------------------------------+
 
 There are also a number of combinators that are exposed to the user via the
@@ -449,26 +463,27 @@ about getting it added to this list.
 4. `Sark: IDAPython plugin and scripting library — https://sark.readthedocs.io <https://sark.readthedocs.io>`_
 5. `BIP: Object-oriented IDAPython library — https://synacktiv.github.io/bip/build/html/index.html <https://synacktiv.github.io/bip/build/html/index.html>`_
 
-.. _install-older:
+.. _install-global:
 
--------------------------------------------
-Previous installation method for the plugin
--------------------------------------------
+--------------------------------------
+Alternative installation methodologies
+--------------------------------------
 
-The following section describes other ways that the plugin may be
-installed or how to customize which version of the Python
-interpreter that the IDAPython plugin will use in order for
-it to work on older versions of IDA Pro.
+The following section describes other ways that the plugin may be installed or
+how to customize which version of the Python interpreter that the IDAPython
+plugin will use in order for it to remain compatible with older plugins or older
+versions of IDA Pro.
 
-Installing the plugin "directly" into the IDA user directory
-------------------------------------------------------------
+Installing the plugin "globally"
+--------------------------------
 
 To install the plugin in this manner, the contents of the repository must be
-cloned or extracted into the IDA user directory. The repository to be cloned
-can be located at the referenced URL  on GitHub [:ref:`1<install-clone-references>`].
+cloned or extracted into the IDA user directory. This has the effect of ensuring
+the plugin is run before any of the other plugins. The repository to be cloned
+can be located at the referenced URL on GitHub [:ref:`1<install-global-references>`].
 On the Windows platform, IDA Pro's user directory can be typically found at the
 "``%APPDATA%/Roaming/Hex-Rays/IDA Pro``" directory whereas on Linux or MacOS the
-path to this directory can be found at "``$HOME/.idapro``" [:ref:`2<install-clone-references>`].
+path to this directory can be found at "``$HOME/.idapro``" [:ref:`2<install-global-references>`].
 If the user is not sure where the path of the IDA user directory is located at,
 they can simply execute the following at the IDAPython prompt to output the correct path:
 
@@ -476,14 +491,14 @@ they can simply execute the following at the IDAPython prompt to output the corr
 
     > print idaapi.get_user_idadir()
 
-To then clone the repository, one can use Git [:ref:`3<install-clone-references>`].
+To then clone the repository, one can use Git [:ref:`3<install-global-references>`].
 When cloning, the directory containing the plugin's repository should replace the
 contents of the IDA user directory. If there are any existing files that the user
 currently has in their IDA user directory, the user can simply move these files
 into the repository's directory after cloning. This is done so that IDAPython
 will execute the "``idapythonrc.py``" file that is in the root of the IDA-Minsc
 repository upon startup. The following can be typed at the command line in order
-to clone the repository of the plugin [:ref:`1<install-clone-references>`] directly
+to clone the repository of the plugin [:ref:`1<install-global-references>`] directly
 into the IDA user directory:
 
 .. code-block:: sh
@@ -499,7 +514,7 @@ After the repository has been cloned, you will then need to install any of the
 :ref:`Required Python dependencies<install-dependencies>` and then you can proceed
 to :ref:`Sanity checking the installation<install-sanity-check>`.
 
-.. _install-clone-references:
+.. _install-global-references:
 .. rubric:: References
 
 1. `IDA-Minsc — https://github.com/arizvisa/ida-minsc <https://github.com/arizvisa/ida-minsc>`_
