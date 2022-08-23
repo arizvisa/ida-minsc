@@ -298,10 +298,11 @@ def finders():
     yield internal_path(os.path.join(root, 'base'), exclude='_*.py')
     yield internal_path(os.path.join(root, 'misc'))
 
-    # custom and application api
+    # tools and application api
     documentation = 'This virtual module contains a number of different files as submodules.'
-    yield internal_submodule('custom', os.path.join(root, 'custom'), __doc__=documentation)
-    yield internal_submodule('application', os.path.join(root, 'application'), __doc__=documentation)
+    for directory in ['tools', 'application']:
+        yield internal_submodule(directory, os.path.join(root, directory), __doc__=documentation)
+    return
 
 # The following logic is simply for detecting the version of IDA and
 # for stashing it directly into the "idaapi" module.
