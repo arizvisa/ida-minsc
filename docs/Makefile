@@ -1,9 +1,9 @@
 SPHINXOPTS    =
-SPHINXBUILD   = python -msphinx
+SPHINXBUILD   = python2 -msphinx
 SPHINXPROJ    = ida-minsc
 SOURCEDIR     = _source
 BUILDDIR      = _build
-RSTGENERATE   = python docparse.py
+RSTGENERATE   = python2 docparse.py
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 ROOTDIR := $(realpath $(MAKEDIR)..)
