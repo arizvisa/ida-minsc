@@ -20,9 +20,9 @@ import idaapi
 def greeting():
     barrier = 86
 
-    loaders = {}
+    loaders, loader_suffix = {}, '__loader__'
     for item in sys.meta_path:
-        if item.__module__.endswith('__loader__'):
+        if item.__module__.endswith(loader_suffix):
             if hasattr(item, '__iter__'):
                 name = getattr(item, '__name__', None)
             else:
@@ -30,17 +30,35 @@ def greeting():
             loaders.setdefault(name, []).append(item)
         continue
 
+    # iterate through our loaders to try and find the one that actually contains
+    # our plugin state. we abuse each loader's __module__ attribute and consolidate
+    # them into a set so that we can take the first.
+    items = {item.__module__ for item in itertools.chain(*(items for _, items in loaders.items())) if hasattr(item, '__module__')}
+    module_name = next((name for name in items), loader_suffix)
+
+    # next we trim out the module suffix and use it to find the actual module
+    # that should contain our plugin so we can extract our plugin state. if the
+    # module name is empty, then we assume we've been loaded persistently.
+    module_name = module_name[:-len(loader_suffix)] if module_name.endswith(loader_suffix) else module_name
+    load_state = sys.modules[module_name].MINSC.state if module_name and module_name in sys.modules else 'persistent'
+
+    # now we iterate through all of the loaders that do not have a module name
+    # while ignoring the hooks module because that it should really be internal.
     items = itertools.chain(*(items for name, items in loaders.items() if name is None))
     available = sorted(item for item in itertools.chain(*items) if item != 'hooks')
 
+    # hide the internal module from our display.
     loaders.pop('internal', None)
+
+    # grab all the loaders that represent a submodule.
     submodules = ((name, itertools.chain(*map(sorted, items))) for name, items in loaders.items() if name)
     loaded = {name: ['.'.join([name, item]) for item in items if not item.startswith('_')] for name, items in submodules}
     maximum = 1 + max(map(len, loaded))
     submodules = (' '.join(["{:<{:d}s}".format(name + ':', maximum), ', '.join(loaded[name])] if loaded[name] else ["{:<{:d}s}".format(name + ':', maximum)]) for name in sorted(loaded, key=len))
 
     six.print_("Welcome to the ida-minsc plugin!")
-    six.print_("You are currently running python {:s} in IDA {:.1f} ({:s}).".format('.'.join("{:d}".format(getattr(sys.version_info, field, 0)) for field in ['major', 'minor', 'micro']), idaapi.__version__, sys.platform))
+    six.print_("")
+    six.print_("The plugin is {:s} and is currently using python {:s} in IDA {:.1f} ({:s}).".format(load_state, '.'.join("{:d}".format(getattr(sys.version_info, field, 0)) for field in ['major', 'minor', 'micro']), idaapi.__version__, sys.platform))
     six.print_("")
 
     if available:
