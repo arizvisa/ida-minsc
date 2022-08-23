@@ -29,9 +29,9 @@ if idaapi.__version__ >= 7.4:
 
 ### customize the root namespace
 import segment, database, function, instruction
-import structure, enumeration
+import structure, enumeration, ui
 
-## some aliases for them
+## some aliases for the base modules
 import database as db
 import function as func
 import instruction as ins
@@ -79,6 +79,3 @@ Any = utils.PatternAny()
 # some types that the user might want to compare with
 architecture_t, register_t, symbol_t, bounds_t, location_t = (getattr(__import__('internal').interface, item) for item in ['architecture_t', 'register_t', 'symbol_t', 'bounds_t', 'location_t'])
 ref_t, opref_t = (getattr(__import__('internal').interface, item) for item in ['ref_t', 'opref_t'])
-
-# other miscellaneous modules to expose to the user
-import ui, tools, custom
