@@ -1,16 +1,17 @@
 """
-Tools module
+General module
 
-This module provides miscellaneous tools that a user may find
+This module provides generalized tools that a user may find
 useful in their reversing adventures. This includes classes
 for performing address translations, coloring marks or tags,
 recursively walking through basic blocks until a sentinel
-block has been reached, or even recursivelly walking a
+block has been reached, or even recursively walking a
 function's childrens until a particular sentinel function
 is encountered.
 
-The tools defined within here are unorganized and thus may
-shift around during development as they find their place.
+The tools defined within here are unorganized and pretty
+much unmaintained. Thus they may shift around during their
+existence as they eventually find their place.
 """
 
 import six, sys, logging, builtins
