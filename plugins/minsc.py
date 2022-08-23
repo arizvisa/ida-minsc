@@ -503,6 +503,14 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
         logging.warning("{:s} : Unable to locate a{:s} {:s} dotfile in the user's {:s} directory ({!s}).".format(__name__, 'n' if alpha.startswith(vowels) else '', filename, var, path))
     finally:
         tribulations.close()
+
+    # Verify that executing the dotfile did not add the root directory
+    # to the system path because the contents of the root directory is
+    # explicitly handled by our loaders.
+    busted = [(index, item) for index, item in enumerate(sys.path) if os.path.realpath(item) in {os.path.realpath(root)}]
+    if busted:
+        logging.warning("{:s} : Execution of `{!s}` has resulted in a conflict between the repository path ({!r}) and the system path.".format(__name__, filename, root))
+        [ logging.warning("{:s} : The system path at index {:d} ({!r}) resolves to {!r} which conflicts with the plugin and may interfere with imports.".format(__name__, index, item, os.path.realpath(item))) for index, item in busted ]
     return
 
 # The following logic is actually responsible for starting up the whole
@@ -658,6 +666,11 @@ class MINSC(idaapi.plugin_t):
         loader = self.get_loader()
         if not loader:
             raise SystemError("{:s} : Unable to get the loader required by the plugin.".format(__name__))
+
+        # Iterate through all of the items in our system path in order to remove
+        # any that reference our plugin root. This is because we're using our
+        # own loaders to find modules instead of Python's file loaders.
+        sys.path[:] = [item for item in sys.path if os.path.realpath(item) not in {os.path.realpath(root)}]
 
         # Seed the metapath, then patch the version into the idaapi module.
         sys.meta_path.extend(loader.finders())
