@@ -4760,6 +4760,50 @@ class type(object):
 
         @utils.multicase()
         @classmethod
+        def folded(cls):
+            '''Return whether the structure displayed at the current address has been folded into a single line.'''
+            return cls.folded(ui.current.address())
+        @utils.multicase(terse=bool)
+        @classmethod
+        def folded(cls, terse):
+            '''Modify the way the structure at the current address is displayed as specified by the boolean in `terse`.'''
+            return cls.folded(ui.current.address(), terse)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def folded(cls, ea):
+            '''Return whether the structure at the address `ea` has been folded into a single line.'''
+            return True if interface.node.aflags(ea, idaapi.AFL_TERSESTR) else False
+        @utils.multicase(ea=six.integer_types, terse=(six.integer_types, bool))
+        @classmethod
+        def folded(cls, ea, terse):
+            '''Modify the way the structure at the address `ea` is displayed as specified by the boolean in `terse`.'''
+            res = interface.node.aflags(ea, idaapi.AFL_TERSESTR)
+            interface.node.aflags(ea, idaapi.AFL_TERSESTR, -1 if terse else 0)
+            return True if res else False
+        @utils.multicase()
+        @classmethod
+        def fold(cls):
+            '''Fold the structure displayed at the current address into a terse format.'''
+            return cls.folded(ui.current.address(), True)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def fold(cls, ea):
+            '''Fold the structure displayed at the address `ea` into a terse format.'''
+            return cls.folded(ea, True)
+        @utils.multicase()
+        @classmethod
+        def unfold(cls):
+            '''Fold the structure displayed at the current address into a terse format.'''
+            return cls.folded(ui.current.address(), False)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def unfold(cls, ea):
+            '''Fold the structure displayed at the address `ea` into a terse format.'''
+            return cls.folded(ea, False)
+        show, hide = utils.alias(unfold, 'type.structure'), utils.alias(fold, 'type.structure')
+
+        @utils.multicase()
+        @classmethod
         def size(cls):
             '''Return the total size of the structure at the current address.'''
             return cls.size(ui.current.address())
