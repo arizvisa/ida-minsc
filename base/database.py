@@ -4837,38 +4837,6 @@ class type(object):
 
     @utils.multicase()
     @classmethod
-    def is_importref(cls):
-        '''Return true if the instruction at the current address references an import.'''
-        return cls.is_importref(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def is_importref(cls, ea):
-        '''Return true if the instruction at `ea` references an import.'''
-        ea = interface.address.inside(ea)
-
-        # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
-        datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
-        return len(datarefs) == len(coderefs) and len(coderefs) > 0
-    importref = isimportref = importrefQ = utils.alias(is_importref, 'type')
-
-    @utils.multicase()
-    @classmethod
-    def is_globalref(cls):
-        '''Return true if the instruction at the current address references a global.'''
-        return cls.is_globalref(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def is_globalref(cls, ea):
-        '''Return true if the instruction at `ea` references a global.'''
-        ea = interface.address.inside(ea)
-
-        # FIXME: this doesn't seem like the right way to determine this...
-        datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
-        return len(datarefs) > len(coderefs)
-    globalref = isglobalref = globalrefQ = utils.alias(is_globalref, 'type')
-
-    @utils.multicase()
-    @classmethod
     def is_exception(cls, **flags):
         '''Return if the current address or selection is guarded by an exception or part of an exception handler.'''
         address, selection = ui.current.address(), ui.current.selection()
