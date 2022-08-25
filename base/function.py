@@ -3373,7 +3373,7 @@ class type(object):
         AFL_HR_DETERMINED = getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000)
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return interface.node.aflags(ea, AFL_HR_DETERMINED)
-    decompiledQ = utils.alias(is_decompiled, 'type')
+    decompiled = decompiledQ = utils.alias(is_decompiled, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3386,7 +3386,7 @@ class type(object):
         '''Return if the function `func` has a frame allocated to it.'''
         fn = by(func)
         return fn.frame != idaapi.BADADDR
-    frameQ = utils.alias(has_frame, 'type')
+    frame = frameQ = utils.alias(has_frame, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3398,7 +3398,7 @@ class type(object):
     def has_frameptr(cls, func):
         '''Return if the function `func` uses a frame pointer (register).'''
         return True if cls.flags(func, idaapi.FUNC_FRAME) else False
-    frameptrQ = utils.alias(has_frameptr, 'type')
+    frameptr = frameptrQ = utils.alias(has_frameptr, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3411,7 +3411,7 @@ class type(object):
         '''Return if the function `func` has a user-defined name.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return database.type.has_customname(ea)
-    nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
+    named = nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3426,7 +3426,7 @@ class type(object):
         if fn.flags & idaapi.FUNC_NORET_PENDING == idaapi.FUNC_NORET_PENDING:
             logging.warning(u"{:s}.has_return({:s}) : Analysis for function return is still pending. The flag (`idaapi.FUNC_NORET_PENDING`) is still set.".format('.'.join([__name__, cls.__name__]), ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
-    returnQ = utils.alias(has_return, 'type')
+    returns = returnQ = utils.alias(has_return, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3494,7 +3494,7 @@ class type(object):
     def is_far(cls, func):
         '''Return a boolean describing whether the function `func` is considered a "far" function by IDA or the user.'''
         return True if cls.flags(func, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
-    farQ = utils.alias(is_far, 'type')
+    far = farQ = utils.alias(is_far, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3565,7 +3565,7 @@ class type(object):
         '''Return a boolean describing whether the function `func` has a prototype associated with it.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return database.type.has_typeinfo(ea)
-    prototypeQ = has_typeinfo = typeinfoQ = utils.alias(has_prototype, 'type')
+    prototype = prototypeQ = has_typeinfo = typeinfoQ = utils.alias(has_prototype, 'type')
 
     @utils.multicase()
     @classmethod
