@@ -8344,14 +8344,14 @@ class get(object):
         def __of_label__(cls, ea):
             F, get_switch_info = type.flags(ea), idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
-            # Verify that the label at the specified address has an actual name.
-            # We can then use its address to grab all of the data references to it.
-            if idaapi.has_dummy_name(F) or idaapi.has_user_name(F):
-                drefs = (ref for ref in xref.data_up(ea))
+            # Technically a label for a switch is a code data type that is
+            # referenced by by some data. We do this instead of checking the names.
+            if type.is_code(ea) and type.is_referenced(ea):
+                drefs = (ref for ref in xref.data_up(ea) if type.is_data(ref))
 
                 # With the data references, we need need to walk up one more step
-                # and grab all types of references to it while looking for a switch.
-                refs = (ref for ref in itertools.chain(*map(xref.up, drefs)) if get_switch_info(ref) is not None)
+                # and grab any code references to it while looking for a switch.
+                refs = (ref for ref in itertools.chain(*map(xref.data_up, drefs)) if type.is_code(ref) and get_switch_info(ref) is not None)
 
                 # Now we'll just grab the very first reference we found. If we
                 # got an address, then use it to grab the switch_info_t we want.
@@ -8373,9 +8373,9 @@ class get(object):
         def __of_array__(cls, ea):
             get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
-            # Grab all of the upward references to the array at the given address
-            # that can give us an actual switch_info_t.
-            refs = (ea for ea in xref.up(ea) if get_switch_info(ea) is not None)
+            # Grab all of the upward data references to the array at the given
+            # address # that can give us an actual switch_info_t.
+            refs = (ea for ea in xref.data_up(ea) if get_switch_info(ea) is not None)
 
             # Then we can grab the first one and use it. If we didn't get a valid
             # reference, then we're not going to get a valid switch.
@@ -8406,8 +8406,11 @@ class get(object):
 
             # Otherwise, we iterate through all of the address' downward
             # references to see if any valid candidates can be derived.
-            for ref in xref.down(ea):
+            for ref in xref.code_down(ea):
                 found = not (get_switch_info(ref) is None)
+
+                if interface.node.is_identifier(ref):
+                    continue
 
                 # If we actually grabbed the switch, then the current reference
                 # actually is our only candidate and we should use it.
@@ -8417,8 +8420,8 @@ class get(object):
                 # Otherwise if the reference is pointing to data, then treat
                 # it an array where we need to follow the downward references.
                 elif type.is_data(ref):
-                    items = (case for case in xref.down(ref))
-                    candidates = (label for label in itertools.chain(*map(xref.up, items)) if get_switch_info(label))
+                    items = (case for case in xref.code_down(ref))
+                    candidates = (label for label in itertools.chain(*map(xref.data_up, items)) if get_switch_info(label))
 
                 # Otherwise this must be code and so we'll check any of its
                 # upward references to derive the necessary candidates.
