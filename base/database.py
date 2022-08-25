@@ -4334,7 +4334,7 @@ class type(object):
         '''Return if the address specified by `ea` up to `size` bytes is initialized.'''
         ea = interface.address.within(ea)
         return all(cls.flags(ea + offset, idaapi.FF_IVL) == idaapi.FF_IVL for offset in builtins.range(size))
-    initializedQ = utils.alias(is_initialized, 'type')
+    initialize = initialized = initializedQ = utils.alias(is_initialized, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4352,7 +4352,7 @@ class type(object):
         '''Return if the address specified by `ea` up to `size` bytes is marked as code.'''
         ea = interface.address.within(ea)
         return all(cls.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_CODE for offset in builtins.range(size))
-    codeQ = utils.alias(is_code, 'type')
+    code = codeQ = utils.alias(is_code, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4370,7 +4370,7 @@ class type(object):
         '''Return if the address specified by `ea` up to `size` bytes is marked as data.'''
         ea = interface.address.within(ea)
         return all(cls.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_DATA for offset in builtins.range(size))
-    dataQ = utils.alias(is_data, 'type')
+    data = dataQ = utils.alias(is_data, 'type')
 
     # True if ea marked unknown
     @utils.multicase()
@@ -4389,7 +4389,7 @@ class type(object):
         '''Return if the address specified by `ea` up to `size` bytes is marked as unknown.'''
         ea = interface.address.within(ea)
         return all(cls.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_UNK for offset in builtins.range(size))
-    unknownQ = is_undefined = undefinedQ = utils.alias(is_unknown, 'type')
+    unknown = unknownQ = is_undefined = undefinedQ = utils.alias(is_unknown, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4401,7 +4401,7 @@ class type(object):
     def is_head(cls, ea):
         '''Return if the address `ea` is aligned to a definition in the database.'''
         return cls.flags(interface.address.within(ea), idaapi.FF_DATA) != 0
-    headQ = utils.alias(is_head, 'type')
+    head = headQ = utils.alias(is_head, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4413,7 +4413,7 @@ class type(object):
     def is_tail(cls, ea):
         '''Return if the address `ea` is not aligned to a definition in the database.'''
         return cls.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_TAIL
-    tailQ = utils.alias(is_tail, 'type')
+    tail = tailQ = utils.alias(is_tail, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4426,7 +4426,7 @@ class type(object):
         '''Return if the address at `ea` is defined as an alignment.'''
         is_align = idaapi.isAlign if idaapi.__version__ < 7.0 else idaapi.is_align
         return is_align(cls.flags(ea))
-    alignQ = utils.alias(is_align, 'type')
+    align = aligned = alignQ = utils.alias(is_align, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4438,7 +4438,7 @@ class type(object):
     def has_comment(cls, ea):
         '''Return if the address at `ea` is commented.'''
         return cls.flags(interface.address.within(ea), idaapi.FF_COMM) == idaapi.FF_COMM
-    commentQ = utils.alias(has_comment, 'type')
+    comment = commented = commentQ = utils.alias(has_comment, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4450,7 +4450,7 @@ class type(object):
     def has_reference(cls, ea):
         '''Return if the data at the address `ea` is referenced by another address.'''
         return cls.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF
-    referenceQ = refQ = utils.alias(has_reference, 'type')
+    referenced = referencedQ = is_referenced = utils.alias(has_reference, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4462,7 +4462,7 @@ class type(object):
     def has_label(cls, ea):
         '''Return if the address at `ea` has a label.'''
         return idaapi.has_any_name(cls.flags(ea)) or cls.has_dummyname(ea) or cls.has_customname(ea)
-    labelQ = nameQ = has_name = utils.alias(has_label, 'type')
+    label = labeled = labelQ = nameQ = has_name = utils.alias(has_label, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4474,7 +4474,7 @@ class type(object):
     def has_customname(cls, ea):
         '''Return if the address at `ea` has a custom name.'''
         return cls.flags(interface.address.within(ea), idaapi.FF_NAME) == idaapi.FF_NAME
-    customnameQ = utils.alias(has_customname, 'type')
+    customname = customnamed = customnameQ = utils.alias(has_customname, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4486,7 +4486,7 @@ class type(object):
     def has_dummyname(cls, ea):
         '''Return if the address at `ea` has a dummy name.'''
         return cls.flags(ea, idaapi.FF_LABL) == idaapi.FF_LABL
-    dummynameQ = utils.alias(has_dummyname, 'type')
+    dummyname = dummynamed = dummynameQ = utils.alias(has_dummyname, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4498,7 +4498,7 @@ class type(object):
     def has_autoname(cls, ea):
         '''Return if the address `ea` was automatically named.'''
         return idaapi.has_auto_name(cls.flags(ea))
-    autonameQ = utils.alias(has_autoname, 'type')
+    autoname = autonamed = autonameQ = utils.alias(has_autoname, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4510,7 +4510,7 @@ class type(object):
     def has_publicname(cls, ea):
         '''Return if the address at `ea` has a public name.'''
         return idaapi.is_public_name(interface.address.within(ea))
-    publicnameQ = utils.alias(has_publicname, 'type')
+    publicname = publicnamed = publicnameQ = utils.alias(has_publicname, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4522,7 +4522,7 @@ class type(object):
     def has_weakname(cls, ea):
         '''Return if the address at `ea` has a name with a weak type.'''
         return idaapi.is_weak_name(interface.address.within(ea))
-    weaknameQ = utils.alias(has_weakname, 'type')
+    weakname = weaknamed = weaknameQ = utils.alias(has_weakname, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4534,7 +4534,7 @@ class type(object):
     def has_listedname(cls, ea):
         '''Return if the address at `ea` has a name that is listed.'''
         return idaapi.is_in_nlist(interface.address.within(ea))
-    listednameQ = utils.alias(has_listedname, 'type')
+    listedname = listednameQ = utils.alias(has_listedname, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4556,7 +4556,7 @@ class type(object):
             realname = name(ea)
             ok = internal.declaration.demangle(realname) != realname
         return ok
-    typeinfoQ = infoQ = utils.alias(has_typeinfo, 'type')
+    typeinfo = info = typeinfoQ = infoQ = utils.alias(has_typeinfo, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4569,7 +4569,7 @@ class type(object):
         '''Return if the address at `ea` is defined as a string.'''
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
         return cls.flags(ea, idaapi.DT_TYPE) == FF_STRLIT
-    stringQ = utils.alias(is_string, 'type')
+    string = stringQ = utils.alias(is_string, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4582,7 +4582,7 @@ class type(object):
         '''Return if the address at `ea` is defined as a structure.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         return cls.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
-    structQ = structureQ = is_struc = is_struct = utils.alias(is_structure, 'type')
+    struct = structure = structQ = structureQ = is_struc = is_struct = utils.alias(is_structure, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4603,7 +4603,7 @@ class type(object):
         # from our list unless it has the CF_STOP feature applied to it.
         ignored = {address.next(ea)} if cls.is_code(ea) and _instruction.type.feature(ea, idaapi.CF_STOP) != idaapi.CF_STOP else {}
         return any(item not in ignored for item in itertools.chain(xref.code(ea, True), xref.data(ea, True)))
-    is_ref = is_referenced = utils.alias(is_reference, 'type')
+    reference = is_ref = referenceQ = utils.alias(is_reference, 'type')
 
     class array(object):
         """
@@ -4849,7 +4849,7 @@ class type(object):
         # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
         datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
         return len(datarefs) == len(coderefs) and len(coderefs) > 0
-    isimportref = importrefQ = utils.alias(is_importref, 'type')
+    importref = isimportref = importrefQ = utils.alias(is_importref, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4865,7 +4865,7 @@ class type(object):
         # FIXME: this doesn't seem like the right way to determine this...
         datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
         return len(datarefs) > len(coderefs)
-    isglobalref = globalrefQ = utils.alias(is_globalref, 'type')
+    globalref = isglobalref = globalrefQ = utils.alias(is_globalref, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4955,7 +4955,7 @@ class type(object):
     def is_exception(cls, bounds, flags):
         '''Return if the given `bounds` is referenced by an exception matching the specified `flags` (``idaapi.TBEA_*``).'''
         return any(cls.is_exception(ea, flags) for ea in address.iterate(bounds))
-    has_exception = isexception = hasexception = exceptionQ = utils.alias(is_exception, 'type')
+    exception = has_exception = isexception = hasexception = exceptionQ = utils.alias(is_exception, 'type')
 
 t = type    # XXX: ns alias
 
