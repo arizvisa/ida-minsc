@@ -4827,13 +4827,43 @@ class type(object):
     @utils.multicase()
     @classmethod
     def switch(cls):
-        '''Return the switch_t at the current address.'''
-        return get.switch(ui.current.address())
+        '''Return whether the current address is part of a switch_t.'''
+        return cls.switch(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def switch(cls, ea):
-        '''Return the switch_t at the address `ea`.'''
-        return get.switch(ea)
+        '''Return whether the address `ea` is part of a switch_t.'''
+        F, get_switch_info = cls.flags(ea), idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+
+        # First check if the address is already part of the switch. This
+        # is technically the fast path.
+        if get_switch_info(ea):
+            return True
+
+        # If we're code being referenced by data, then try all their
+        # data refs to see if they're part of a table for a switch.
+        elif cls.is_code(ea) and cls.is_referenced(ea):
+            drefs = (ref for ref in xref.data_up(ea) if not interface.node.is_identifier(ref) and cls.is_data(ref))
+            refs = (ref for ref in itertools.chain(*map(xref.data_up, drefs)) if cls.is_code(ref))
+
+        # Otherwise, if we're pointing at data and it's referencing something
+        # as well as being referenced, then we need its upward refs to check.
+        elif cls.is_data(ea) and cls.has_reference(ea) and cls.is_referenced(ea):
+            refs = (ref for ref in xref.data_up(ea) if not interace.node.is_identifier(ref) and cls.is_code(ref))
+
+        # Any other case means that it's code that's referencing an entry
+        # into the switch. We can't do any instruction-based logic here, so
+        # we literally follow the reference and then look for a dataref to it.
+        elif cls.is_code(ea) and cls.is_reference(ea):
+            crefs = (ref for ref in xref.code_down(ea))
+            drefs = (ref for ref in itertools.chain(*map(xref.data_up, crefs)) if cls.is_data(ref))
+            refs = (ref for ref in itertools.chain(*map(xref.data_up, drefs)) if cls.is_code(ref))
+
+        # Anything else, isn't a switch because it doesn't have enough references.
+        else:
+            refs = ()
+
+        return True if any(get_switch_info(ref) for ref in refs) else False
 
     @utils.multicase()
     @classmethod
