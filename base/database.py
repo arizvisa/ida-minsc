@@ -4443,12 +4443,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_reference(cls):
-        '''Return if the current address is referencing another address.'''
+        '''Return if the data at the current address is referenced by another address.'''
         return cls.has_reference(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def has_reference(cls, ea):
-        '''Return if the address at `ea` is referencing another address.'''
+        '''Return if the data at the address `ea` is referenced by another address.'''
         return cls.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF
     referenceQ = refQ = utils.alias(has_reference, 'type')
 
@@ -4587,14 +4587,22 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_reference(cls):
-        '''Return if the data at the current address is referenced by another address.'''
+        '''Return if the current address is referencing another address.'''
         return cls.is_reference(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def is_reference(cls, ea):
-        '''Return if the data at the address `ea` is referenced by another address.'''
-        X, flags = idaapi.xrefblk_t(), idaapi.XREF_FAR | idaapi.XREF_DATA
-        return X.first_to(ea, flags)
+        '''Return if the address at `ea` is referencing another address.'''
+
+        # If it has reference information, then we're good. It's a reference.
+        if interface.address.refinfo(ea):
+            return True
+
+        # Otherwise, we need to check our downrefs to see if any exist. However,
+        # if it's code with codeflow, then we need to exclude the next instruction
+        # from our list unless it has the CF_STOP feature applied to it.
+        ignored = {address.next(ea)} if cls.is_code(ea) and _instruction.type.feature(ea, idaapi.CF_STOP) != idaapi.CF_STOP else {}
+        return any(item not in ignored for item in itertools.chain(xref.code(ea, True), xref.data(ea, True)))
     is_ref = is_referenced = utils.alias(is_reference, 'type')
 
     class array(object):
