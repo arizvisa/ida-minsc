@@ -2240,7 +2240,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is a sentinel-type instruction.'''
         ea = interface.address.inside(ea)
         return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
-    issentinel = sentinelQ = utils.alias(is_sentinel, 'type')
+    sentinel = issentinel = sentinelQ = utils.alias(is_sentinel, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2255,7 +2255,7 @@ class type(object):
         F, (Xci, Xdi) = cls.feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
         Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
         return cls.is_sentinel(ea) and not any([F & idaapi.CF_JUMP, Xc, Xd])
-    isreturn = returnQ = retQ = utils.alias(is_return, 'type')
+    ret = isreturn = returnQ = retQ = utils.alias(is_return, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2268,7 +2268,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
         ea = interface.address.inside(ea)
         return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_SHFT)])
-    isshift = shiftQ = utils.alias(is_shift, 'type')
+    shift = isshift = shiftQ = utils.alias(is_shift, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2283,7 +2283,7 @@ class type(object):
         F, (Xci, Xdi) = cls.feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
         Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
         return database.type.is_code(ea) and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc])])
-    isbranch = branchQ = utils.alias(is_branch, 'type')
+    branch = isbranch = branchQ = utils.alias(is_branch, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2296,7 +2296,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is an immediate and indirect branch.'''
         ea = interface.address.inside(ea)
         return cls.is_branch(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
-    isjmp = jmpQ = utils.alias(is_jmp, 'type')
+    jmp = isjmp = jmpQ = utils.alias(is_jmp, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2309,7 +2309,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is a conditional branch.'''
         ea = interface.address.inside(ea)
         return cls.is_branch(ea) and not all([cls.feature(ea, idaapi.CF_STOP)])
-    isjxx = jxxQ = utils.alias(is_jxx, 'type')
+    jxx = isjxx = jxxQ = utils.alias(is_jxx, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2322,7 +2322,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is an indirect branch.'''
         ea = interface.address.inside(ea)
         return cls.is_branch(ea) and all([cls.feature(ea, idaapi.CF_JUMP)])
-    isjmpi = jmpiQ = utils.alias(is_jmpi, 'type')
+    jmpi = isjmpi = jmpiQ = utils.alias(is_jmpi, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2338,7 +2338,7 @@ class type(object):
             idaapi.decode_insn(ea)
             return idaapi.is_call_insn(ea)
         return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_CALL)])
-    iscall = callQ = utils.alias(is_call, 'type')
+    call = iscall = callQ = utils.alias(is_call, 'type')
 
     @utils.multicase()
     @classmethod
@@ -2352,7 +2352,7 @@ class type(object):
         ea = interface.address.inside(ea)
         F = cls.feature(ea)
         return database.type.is_code(ea) and all([F & idaapi.CF_CALL, F & idaapi.CF_JUMP])
-    iscalli = calliQ = utils.alias(is_calli, 'type')
+    calli = iscalli = calliQ = utils.alias(is_calli, 'type')
 
 t = type    # XXX: ns alias
 
