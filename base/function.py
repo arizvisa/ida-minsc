@@ -535,6 +535,23 @@ class chunks(object):
             continue
         return
 
+    @utils.multicase()
+    @classmethod
+    def points(cls):
+        '''Yield the `(address, delta)` for each stack point where the delta changes in the current function.'''
+        return cls.points(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def points(cls, func):
+        '''Yield the `(address, delta)` for each stack point where the delta changes in the function `func`.'''
+        fn = by(func)
+        for ch, _ in cls(fn):
+            for ea, delta in chunk.points(fn, ch):
+                yield ea, delta
+            continue
+        return
+    stackpoints = utils.alias(points, 'chunks')
+
 iterate = utils.alias(chunks.iterate, 'chunks')
 contains = utils.alias(chunks.contains, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
@@ -710,18 +727,18 @@ class chunk(object):
     @utils.multicase()
     @classmethod
     def points(cls):
-        '''Iterate through the current function chunk and yield each address and stack delta that was calculated.'''
+        '''Yield the `(address, delta)` for each stack point where the delta changes in the current function chunk.'''
         return cls.points(ui.current.function(), ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def points(cls, ea):
-        '''Iterate through the function chunk containing the address `ea` and yield each address and stack delta that was calculated.'''
+        '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea`.'''
         fn = by_address(ea)
         return cls.points(fn, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def points(cls, func, ea):
-        '''Iterate through the chunk belonging to the function `func` and containing the address `ea` in order to yield each address and stack delta that was calculated.'''
+        '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea` belonging to the function `func`.'''
         ch = idaapi.get_fchunk(ea)
 
         # If we were unable to get the function chunk for the provided address,
@@ -762,6 +779,7 @@ class chunk(object):
         for point in iterable:
             yield point.ea, point.spd
         return
+    stackpoints = utils.alias(points, 'chunk')
 
     @utils.multicase()
     @classmethod
@@ -2382,7 +2400,7 @@ class frame(object):
                 locations = {}
                 for index, offset, name, tinfo in items:
                     if operator.contains(locations, offset):
-                        old_index, old_name, _ = result[offset]
+                        old_index, old_name, _ = locations[offset]
                         logging.warning(u"{:s}({:#x}) : Overwriting the parameter {:s}(index {:d}) for function ({:#x}) due to parameter {:s}(index {:d}) being allocated at the same frame offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(old_name, '"')) if old_name else '', old_index, ea, "\"{:s}\" ".format(utils.string.escape(name, '"')) if name else '', index, offset))
                     locations[offset] = (index, name, tinfo)
 
@@ -2409,7 +2427,7 @@ class frame(object):
                 # now we can iterate through all our locations and yield each one.
                 for offset in sorted(locations):
                     _, name, ti = locations[offset]
-                    result.append((offset, name or None, ti.get_size()))
+                    results.append((offset, name or None, ti.get_size()))
                 return results
 
             # to proceed, we need to know the function to get its frame sizes.
@@ -2433,13 +2451,13 @@ class frame(object):
 
                     # if our member size matches our tinfo size, then we can yield it.
                     if tsize == size:
-                        result.append((stkoff, name, tsize))
+                        results.append((stkoff, name, tsize))
 
                     # if the tinfo size is smaller then the member's, then we're
                     # going to need to pad it up to the expected member size.
                     elif tsize < size:
-                        result.append((stkoff, name, tsize))
-                        result.append((stkoff + tsize, None, size - tsize))
+                        results.append((stkoff, name, tsize))
+                        results.append((stkoff + tsize, None, size - tsize))
 
                     # otherwise, the member size is smaller than the tinfo size.
                     # if this is the case, then we need to use the member size
@@ -3359,7 +3377,7 @@ class type(object):
         # Now we can just ask if the specified problem exists for the function.
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return Fproblem(problem, ea)
-    problemQ = utils.alias(has_problem, 'type')
+    problem = problemQ = utils.alias(has_problem, 'type')
 
     @utils.multicase()
     @classmethod
