@@ -2692,7 +2692,7 @@ class tinfo(object):
             ridx1, regoff = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
             try: reg = architecture.by_indexsize(ridx1, ti.get_size())
             except KeyError: reg = architecture.by_index(ridx1)
-            return reg, regoff
+            return phrase_t(reg, regoff) if regoff else reg
 
         # A pair of registers gets returned as a list since they're contiguous.
         elif loctype == idaapi.ALOC_REG2:
@@ -2705,12 +2705,13 @@ class tinfo(object):
 
             return [reg1, reg2]
 
-        # Seems to be a value relative to a register (reg+off).
+        # Seems to be a value relative to a register (reg+off) which we return
+        # as a phrase_t if there's an offset, otherwise just the register.
         elif loctype in {idaapi.ALOC_RREL}:
             ridx, roff = locinfo
             try: reg = architecture.by_indexsize(ridx, ti.get_size())
             except KeyError: reg = architecture.by_index(ridx)
-            return reg, roff
+            return phrase_t(reg, roff) if roff else reg
 
         # Scattered shit should really just be a list of things, and we
         # can just recurse into it in order to extract our results.
@@ -2731,12 +2732,12 @@ class tinfo(object):
                     reg = architecture.promote(reg)
 
                 if (reg.position, reg.bits) != (8 * regoff, 8 * size):
-                    reg = reg, 8 * regoff, 8 * size
+                    reg = partialregister_t(reg, 8 * regoff, 8 * size)
             except KeyError:
-                reg = architecture.by_index(ridx1), 8 * regoff, 8 * size
+                reg = partialregister_t(architecture.by_index(ridx1), 8 * regoff, 8 * size)
             return offset, reg
 
-        # This is ALOC_STACK, but for argpart_t. We return it as a key-value pair.
+        # This is ALOC_STACK, but for argpart_t we return it as a key-value pair.
         elif loctype == idaapi.ALOC_STACK:
             linfo, offset, size = locinfo
             return offset, location_t(linfo, size)
@@ -2747,7 +2748,8 @@ class tinfo(object):
 
         # FIXME: We're not supporting this because I've never used this fucker.
         elif loctype in {idaapi.ALOC_CUSTOM}:
-            pass
+            ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
+            raise NotImplementedError(u"{:s}.location({!r}, {!r}, {:d}, {!r}, ...) : Unable to decode location of type {:s} that uses the specified information ({!s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), architecture, loctype, locinfo, "{:s}({:d})".format(ltypes[loctype], loctype) if loctype in ltypes else "{:d}".format(loctype), locinfo))
 
         # Anything else we just return, because we have no context to even
         # raise an exception that can inform the user about what happened.
@@ -4021,6 +4023,51 @@ class bounds_t(integerish):
             return "{:#x}..{:#x}".format(left, right - 1)
         return "{:#x}".format(left)
 
+# FIXME: should probably be a register_t, but with the different attributes
+class partialregister_t(namedtypedtuple, symbol_t):
+    _fields = 'register', 'position', 'bits'
+    _types = register_t, six.integer_types, six.integer_types
+    _operands = internal.utils.fconstant, internal.utils.fcurry, internal.utils.fcurry
+
+    def __hash__(self):
+        cls = self.__class__
+        register, position, bits = self
+        return hash((cls, register, position, bits))
+
+    @property
+    def symbols(self):
+        '''Yield the symbolic components that compose the register part.'''
+        register, _, _ = self
+        yield register
+
+    @property
+    def size(self):
+        '''Return the size of the register part in bytes.'''
+        _, _, bits = self
+        return bits // 8
+
+    @property
+    def type(self):
+        '''Return the pythonic type of the current register part.'''
+        _, _, bits = self
+        return builtins.int, bits // 8
+
+    @property
+    def bytes(self):
+        '''Return the bytes that make up the value of the current register part.'''
+        register, position, bits = self
+        index, size = position // 8, bits // 8
+        return register.bytes[index : index + size]
+
+    def __int__(self):
+        '''Return the integer value of the current register part.'''
+        bytes = bytearray(self.bytes)
+        return functools.reduce(lambda agg, item: agg * 0x100 + item, bytes, 0)
+
+    def __float__(self):
+        '''Return the floating-point value of the current register part.'''
+        raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to resolve as a floating-point number.".format(self, rv.rvtype))
+
 class location_t(integerish):
     """
     This tuple is used to represent the size at a given location and has the format `(offset, size)`.
@@ -4105,7 +4152,7 @@ class phrase_t(integerish, symbol_t):
     This tuple is used to represent a phrase relative to a register and has the format `(register, offset)`.
     """
     _fields = 'register', 'offset'
-    _types = register_t, six.integer_types
+    _types = (register_t, partialregister_t), six.integer_types
     _operands = internal.utils.fconstant, internal.utils.fcurry
     _formats = "{!s}".format, "{:#x}".format
 
