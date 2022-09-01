@@ -2648,6 +2648,8 @@ class tinfo(object):
     # are recursive, and we want to return everything that we can.
     def process_location(atype, location, table):
         F = table.get(atype, internal.utils.fidentity)
+        if isinstance(location, idaapi.argpart_t):
+            return atype, (F(location), location.off, location.size)
         return atype, F(location)
 
     # Our first user of process_location which handles any argloc_t items
@@ -2655,7 +2657,7 @@ class tinfo(object):
     process_items = lambda vectorator, table, process=process_location: [ process(vectorator[index].atype(), vectorator[index], table) for index in builtins.range(vectorator.size()) ]
 
     # Now we can use these two closures to support scattered types.
-    location_table[idaapi.ALOC_DIST] = internal.utils.fcompose(operator.methodcaller('scattered'), lambda scatter_t, process=process_items, table=location_table: process(scatter_t.atype(), scatter_t, table))
+    location_table[idaapi.ALOC_DIST] = internal.utils.fcompose(operator.methodcaller('scattered'), lambda scatter_t, process=process_items, table=location_table: process(scatter_t, table))
 
     # Custom types are supported...but not really.
     location_table[idaapi.ALOC_CUSTOM] = operator.methodcaller('get_custom')
@@ -2677,7 +2679,7 @@ class tinfo(object):
         '''Return the symbolic location for the raw `loctype` and `locinfo` using the ``tinfo_t`` in `ti` and the ``architecture_t`` within the `architecture` parameter.'''
 
         # This just contains an offset relative to the bottom of the args.
-        if loctype == idaapi.ALOC_STACK:
+        if loctype == idaapi.ALOC_STACK and not hasattr(locinfo, '__iter__'):
             return location_t(locinfo, ti.get_size())
 
         # This is just an address for the user to figure out on their own.
@@ -2686,13 +2688,13 @@ class tinfo(object):
 
         # A single register and its offset. Offset seems to only be used
         # when using scattered (ALOC_DIST) argument location types.
-        elif loctype == idaapi.ALOC_REG1:
+        elif loctype == idaapi.ALOC_REG1 and not hasattr(locinfo, '__iter__'):
             ridx1, regoff = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
             try: reg = architecture.by_indexsize(ridx1, ti.get_size())
             except KeyError: reg = architecture.by_index(ridx1)
             return reg, regoff
 
-        # A pair of registers gets returned as a tuple.
+        # A pair of registers gets returned as a list since they're contiguous.
         elif loctype == idaapi.ALOC_REG2:
             ridx1, ridx2 = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
             try: reg1 = architecture.by_indexsize(ridx1, ti.get_size() // 2)
@@ -2701,7 +2703,7 @@ class tinfo(object):
             try: reg2 = architecture.by_indexsize(ridx2, ti.get_size() // 2)
             except KeyError: reg2 = architecture.by_index(ridx2)
 
-            return reg1, reg2
+            return [reg1, reg2]
 
         # Seems to be a value relative to a register (reg+off).
         elif loctype in {idaapi.ALOC_RREL}:
@@ -2713,7 +2715,31 @@ class tinfo(object):
         # Scattered shit should really just be a list of things, and we
         # can just recurse into it in order to extract our results.
         elif loctype in {idaapi.ALOC_DIST}:
-            return [ cls.location(item) for item in locinfo ]
+            F = lambda atype, item, offset, size: cls.location(size, architecture, atype, (item, offset, size))
+            # XXX: we can't translate scattered_t because it's an empty vector
+            #      and its stkoff() appears to be uninitialized.
+            iterable = ( F(atype, *item) for atype, item in locinfo )
+            return { offset : item for offset, item in iterable }
+
+        # ALOC_REG1, but for argpart_t as a key-value pair since we handle the original further up.
+        elif loctype == idaapi.ALOC_REG1:
+            locinfo, offset, size = locinfo
+            ridx1, regoff = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
+            try:
+                reg = architecture.by_index(ridx1)
+                while reg.size < regoff + size:
+                    reg = architecture.promote(reg)
+
+                if (reg.position, reg.bits) != (8 * regoff, 8 * size):
+                    reg = reg, 8 * regoff, 8 * size
+            except KeyError:
+                reg = architecture.by_index(ridx1), 8 * regoff, 8 * size
+            return offset, reg
+
+        # This is ALOC_STACK, but for argpart_t. We return it as a key-value pair.
+        elif loctype == idaapi.ALOC_STACK:
+            linfo, offset, size = locinfo
+            return offset, location_t(linfo, size)
 
         # Return None if there wasn't a location type.
         elif loctype in {idaapi.ALOC_NONE}:
@@ -2908,10 +2934,18 @@ class namedtypedtuple(tuple):
             F = lambda self: object.__getattribute__(self, name)
         return F(self)
 
-    def __repr__(self):
-        cls = self.__class__
-        res = ("{!s}={!s}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
+    def __str__(self):
+        cls, formats = self.__class__, itertools.chain(getattr(self, '_formats', []), len(self._fields) * ["{!s}".format])
+        res = ("{!s}={!s}".format(internal.utils.string.escape(name, ''), format(value)) for name, value, format in zip(self._fields, self, formats))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
+
+    def __unicode__(self):
+        cls, formats = self.__class__, itertools.chain(getattr(self, '_formats', []), len(self._fields) * ["{!s}".format])
+        res = ("{!s}={!s}".format(internal.utils.string.escape(name, ''), format(value)) for name, value, format in zip(self._fields, self, formats))
+        return u"{:s}({:s})".format(cls.__name__, ', '.join(res))
+
+    def __repr__(self):
+        return u"{!s}".format(self)
 
     def _replace(self, **fields):
         '''Assign the specified `fields` to the fields within the tuple.'''
@@ -3049,7 +3083,7 @@ class symbol_t(object):
     """
     def __hash__(self):
         cls, res = self.__class__, id(self)
-        return hash(cls, res)
+        return hash((cls, res))
 
     @property
     def symbols(self):
@@ -3427,6 +3461,7 @@ class opref_t(integerish):
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, six.integer_types, reftype_t)
     _operands = (internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant)
+    _formats = "{:#x}".format, "{!s}".format, "{!s}".format
 
     @property
     def ea(self):
@@ -3449,11 +3484,6 @@ class opref_t(integerish):
             _, onum, ostate = other
             return any([onum is None, num == onum]) and state & ostate
         return False
-
-    def __repr__(self):
-        cls, fields = self.__class__, {'address'}
-        res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
-        return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
 # XXX: is .startea always guaranteed to point to an instruction that modifies
 #      the switch's register? if so, then we can use this to calculate the
@@ -3869,6 +3899,7 @@ class bounds_t(integerish):
     _fields = ('left', 'right')
     _types = (six.integer_types, six.integer_types)
     _operands = (internal.utils.fcurry, internal.utils.fcurry)
+    _formats = "{:#x}".format, "{:#x}".format
 
     def __new__(cls, *args, **kwargs):
         if len(args) == 2 and not kwargs:
@@ -3990,19 +4021,6 @@ class bounds_t(integerish):
             return "{:#x}..{:#x}".format(left, right - 1)
         return "{:#x}".format(left)
 
-    def __str__(self):
-        cls = self.__class__
-        items = ("{!s}={:#x}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
-        return "{:s}({:s})".format(cls.__name__, ', '.join(items))
-
-    def __unicode__(self):
-        cls = self.__class__
-        items = (u"{!s}={:#x}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
-        return u"{:s}({:s})".format(cls.__name__, u', '.join(items))
-
-    def __repr__(self):
-        return u"{!s}".format(self)
-
 class location_t(integerish):
     """
     This tuple is used to represent the size at a given location and has the format `(offset, size)`.
@@ -4010,6 +4028,7 @@ class location_t(integerish):
     _fields = ('offset', 'size')
     _types = ((six.integer_types, register_t), six.integer_types)
     _operands = (internal.utils.fcurry, internal.utils.fconstant)
+    _formats = lambda offset: "{:#x}".format(offset) if isinstance(offset, six.integer_types) else "{!s}".format(offset), "{:d}".format
 
     def __new__(cls, offset, size):
         return super(location_t, cls).__new__(cls, offset, max(0, size))
@@ -4080,3 +4099,33 @@ class location_t(integerish):
         '''Return if the given `offset` is contained by the current location.'''
         return self.bounds.contains(offset)
     __contains__ = contains
+
+class phrase_t(integerish, symbol_t):
+    """
+    This tuple is used to represent a phrase relative to a register and has the format `(register, offset)`.
+    """
+    _fields = 'register', 'offset'
+    _types = register_t, six.integer_types
+    _operands = internal.utils.fconstant, internal.utils.fcurry
+    _formats = "{!s}".format, "{:#x}".format
+
+    def __hash__(self):
+        cls = self.__class__
+        register, offset = self
+        return hash((cls, register, offset))
+
+    @property
+    def symbols(self):
+        '''Yield the register part of the tuple.'''
+        register, _ = self
+        yield register
+
+    def __int__(self):
+        '''Return the offset part of the tuple.'''
+        _, offset = self
+        return offset
+
+    def __same__(self, other):
+        register, _ = self
+        oregister, _ = other
+        return any([register is None, oregister is None, register == oregister])
