@@ -3706,7 +3706,9 @@ class map_t(object):
         if name.startswith('__'):
             return getattr(self.__class__, name)
         res = self.__state__
-        return res[name]
+        if name in res:
+            return res[name]
+        raise AttributeError(name)
 
     def __setattr__(self, name, register):
         res = self.__state__
@@ -3829,7 +3831,7 @@ class architecture_t(object):
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
         self.__cache__[idaname or name, dtype] = name
-        parent.__children__[position] = res
+        parent.__children__[position, ptype] = res
         return res
 
     def by_index(self, index):
@@ -3853,7 +3855,7 @@ class architecture_t(object):
 
     def by_name(self, name):
         '''Lookup a register according to its `name`.'''
-        if any(name.startswith(prefix) for prefix in {'%', '$'}):        # at&t, mips
+        if name.startswith(('%', '$', '@')): # at&t, mips, windbg
             return getattr(self.__register__, name[1:].lower())
         if name.lower() in self.__register__:
             return getattr(self.__register__, name.lower())
@@ -3866,6 +3868,14 @@ class architecture_t(object):
         dtype = dtype_by_size(size)
         return self.by_indextype(index, dtype)
     byindexsize = internal.utils.alias(by_indexsize)
+
+    def has(self, name):
+        '''Check if a register with the given `name` exists.'''
+        if name.startswith(('%', '$', '@')): # at&t, mips, windbg
+            return hasattr(self.__register__, name[1:].lower())
+        if name.lower() in self.__register__:
+            return hasattr(self.__register__, name.lower())
+        return hasattr(self.__register__, name)
 
     def promote(self, register, bits=None):
         '''Promote the specified `register` to its next larger size as specified by `bits`.'''
@@ -3880,10 +3890,11 @@ class architecture_t(object):
             raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to promote the specified register to a size larger than {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register))
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to promote {!s}.".format('.'.join([__name__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
-    def demote(self, register, bits=None):
+    def demote(self, register, bits=None, type=None):
         '''Demote the specified `register` to its next smaller size as specified by `bits`.'''
         childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('items'))
-        firstchild = internal.utils.fcompose(childitems, functools.partial(sorted, key=operator.itemgetter(0)), iter, next, operator.itemgetter(1))
+        firsttype = internal.utils.fcompose(childitems, lambda items: ((key, value) for key, value in items if key[1] == type), iter, next, operator.itemgetter(1))
+        firstchild = internal.utils.fcompose(childitems, functools.partial(sorted, key=internal.utils.fcompose(operator.itemgetter(0), operator.itemgetter(0))), iter, next, operator.itemgetter(1))
         try:
             if bits is None:
                 return firstchild(register)
