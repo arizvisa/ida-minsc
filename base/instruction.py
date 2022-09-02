@@ -2517,8 +2517,9 @@ class operand_types:
         # base register doesn't actually exist in o_mem types, so we label it as unknown.
         unknown, index = (sib & 0x07) >> 0, (sib & 0x38) >> 3
 
-        # If the index register is INDEX_NONE, then there there's nothing here.
-        # We still process our unknown index though so that it follows rules for o_phrase.
+        # If the index register is INDEX_NONE, then there there's nothing here and we'll
+        # eventually be returning a SegmentOffset. We still process our unknown index though
+        # so that it follows rules for o_phrase.
         if index in {INDEX_NONE}:
             index = None
             unknown |= 8 if rex & REX_B else 0
@@ -2539,10 +2540,15 @@ class operand_types:
         regular = res if res < 0 else offset & (maximum - 1)
         inverted = offset & (maximum - 1) if res < 0 else offset - maximum
 
-        # Finally we can use these values to populate our tuple.
+        # Figure out the selector and the offset. If our index is None, then we don't
+        # need to return a phrase and can return the segment and its offset.
         sel = segsel if segrg == SEGREG_IMM else architecture.by_index(segrg)
         offset_ = res and inverted if interface.node.alt_opinverted(insn.ea, op.n) else regular
-        index_ = None if index is None else architecture.by_indextype(index, dtype)
+        if index is None:
+            return intelops.SegmentOffset(sel, offset_)
+
+        # Otherwise we calculate the index register and scale and return our tuple.
+        index_ = architecture.by_indextype(index, dtype)
         scale_ = [1, 2, 4, 8][(sib & 0xc0) // 0x40]
         return intelops.SegmentOffsetBaseIndexScale(sel, offset_, None, index_, scale_)
 
@@ -2779,7 +2785,7 @@ class intelops:
     This internal namespace contains the different operand types that
     can be returned for the Intel architecture.
     """
-    class SegmentOffset(interface.integerish, interface.symbol_t):
+    class SegmentOffset(interface.phrase_t):
         """
         A tuple representing an address with a segment register attached on the Intel architecture.
 
@@ -2790,7 +2796,6 @@ class intelops:
             (None.__class__, interface.register_t, six.integer_types),
             six.integer_types,
         )
-        _operands = (internal.utils.fconstant, internal.utils.fcurry)
 
         @property
         def symbols(self):
@@ -2809,11 +2814,6 @@ class intelops:
             osegment, _ = other
             return any([segment is None, osegment is None, segment == osegment])
 
-        def __repr__(self):
-            cls, fields = self.__class__, {'offset'}
-            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
-            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
-
     class SegmentOffsetBaseIndexScale(interface.integerish, interface.symbol_t):
         """
         A tuple representing a memory phrase operand on the Intel architecture.
@@ -2831,6 +2831,7 @@ class intelops:
             six.integer_types,
         )
         _operands = (internal.utils.fconstant, internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant, internal.utils.fconstant)
+        _formats = "{!s}".format, "{:#x}".format, "{!s}".format, "{!s}".format, "{!s}".format
 
         @property
         def symbols(self):
@@ -2872,6 +2873,7 @@ class intelops:
             (None.__class__, interface.register_t),
             six.integer_types,
         )
+        _formats = "{:#x}".format, "{!s}".format, "{!s}".format, "{!s}".format
 
         @property
         def symbols(self):
@@ -2891,11 +2893,6 @@ class intelops:
             _, base, index, scale = self
             _, obase, oindex, oscale = other
             return all(any([this == that, this is None, that is None]) for this, that in [(base, obase), (index, oindex), (scale, oscale)])
-
-        def __repr__(self):
-            cls, fields = self.__class__, {'offset'}
-            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
-            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
 ## arm operands
 class armops:
@@ -2946,7 +2943,7 @@ class armops:
                 yield register
             return
 
-    class immediatephrase(interface.integerish, interface.symbol_t):
+    class immediatephrase(interface.phrase_t):
         """
         A tuple representing a memory displacement operand on either the AArch32 or AArch64 architectures.
 
@@ -2954,34 +2951,9 @@ class armops:
         the integer that is added to the register.
         """
         _fields = ('Rn', 'offset')
-        _types = (
-            interface.register_t,
-            six.integer_types,
-        )
-        _operands = (internal.utils.fconstant, internal.utils.fcurry)
 
         register = property(fget=operator.itemgetter(0))
         offset = property(fget=operator.itemgetter(1))
-
-        @property
-        def symbols(self):
-            '''Yield the `Rn` register from the tuple.'''
-            register, _ = self
-            yield register
-
-        def __int__(self):
-            _, offset = self
-            return offset
-
-        def __same__(self, other):
-            register, _ = self
-            oregister, _ = other
-            return any([register is None, oregister is None, register == oregister])
-
-        def __repr__(self):
-            cls, fields = self.__class__, {'offset'}
-            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
-            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     class registerphrase(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -3015,6 +2987,7 @@ class armops:
         """
         _fields = ('address', 'value')
         _types = (six.integer_types, six.integer_types)
+        _formats = "{:#x}".format, "{:#x}".format
 
         @property
         def symbols(self):
@@ -3109,11 +3082,6 @@ class armops:
         __ror__ = __or__
         __rxor__ = __xor__
 
-        def __repr__(self):
-            cls, fields = self.__class__, {'address', 'value'}
-            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
-            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
-
     class condition_t(interface.symbol_t):
         """
         A symbol for representing a condition operand on either the AArch32 or AArch64 architectures.
@@ -3186,7 +3154,7 @@ class mipsops:
     are used by the MIPS architectures.
     """
 
-    class phrase(interface.integerish, interface.symbol_t):
+    class phrase(interface.phrase_t):
         """
         A tuple for representing a memory phrase operand on the MIPS architectures.
 
@@ -3196,29 +3164,10 @@ class mipsops:
         _fields = ('Rn', 'Offset')
         _types = (interface.register_t, six.integer_types)
         _operands = (internal.utils.fconstant, internal.utils.fcurry)
+        _formats = "{!s}".format, "{:#x}".format
 
         register = property(fget=operator.itemgetter(0))
         immediate = property(fget=operator.itemgetter(1))
-
-        @property
-        def symbols(self):
-            '''Yield the `Rn` register from this tuple.'''
-            register, _ = self
-            yield register
-
-        def __int__(self):
-            _, offset = self
-            return offset
-
-        def __same__(self, other):
-            register, _ = self
-            oregister, _ = other
-            return any([register is None, oregister is None, register == oregister])
-
-        def __repr__(self):
-            cls, fields = self.__class__, {'Offset'}
-            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
-            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     class trap(interface.namedtypedtuple, interface.symbol_t):
         """
