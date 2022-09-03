@@ -3238,7 +3238,6 @@ class Intel(interface.architecture_t):
         [ setitem(_+'l', self.child(self.by_name(_+'x'), _+'l', 0, 8)) for _ in ('a', 'c', 'd', 'b') ]
         [ setitem(_+'l', self.child(self.by_name(_), _+'l', 0, 8)) for _ in ('sp', 'bp', 'si', 'di') ]
         [ setitem(    _, self.new(_, 16)) for _ in ('es', 'cs', 'ss', 'ds', 'fs', 'gs') ]
-        setitem('fpstack', self.new('fptags', 80*8, dtype=None))    # FIXME: is this the right IDA register name??
 
         # FIXME: rex-prefixed 32-bit registers are implicitly extended to the 64-bit regs which implies that 64-bit are children of 32-bit
         for _ in ['ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip']:
@@ -3251,38 +3250,101 @@ class Intel(interface.architecture_t):
         # explicitly set the lookups for (word-register, idaapi.dt_byte) which exist due to ida's love for the inconsistent
         [ self.__cache__.setdefault((_+'x', self.by_name(_+'l').dtype), self.by_name(_+'l').__name__) for _ in ('a', 'c', 'd', 'b') ]
 
-        fpstack = self.__register__.fpstack
+        setitem('fpstack', self.new('fpstack', 80*8, dtype=None))
         # single precision
-        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float, ptype=float)) for _ in range(8) ]
+        [ setitem("st{:d}f".format(_), self.child(self.by_name('fpstack'), "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float, ptype=float)) for _ in range(8) ]
         # double precision
-        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double, ptype=float)) for _ in range(8) ]
+        [ setitem("st{:d}d".format(_), self.child(self.by_name('fpstack'), "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double, ptype=float)) for _ in range(8) ]
         # umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
-        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte, ptype=float)) for _ in range(8) ]
+        [ setitem("st{:d}".format(_), self.child(self.by_name('fpstack'), "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte, ptype=float)) for _ in range(8) ]
 
         # not sure if the mmx registers trash the other 16 bits of an fp register
-        [ setitem("mm{:d}".format(_), self.child(fpstack, "mm{:d}".format(_), _*80, 64, dtype=idaapi.dt_qword)) for _ in range(8) ]
+        [ setitem("mm{:d}".format(_), self.child(self.by_name('fpstack'), "mm{:d}".format(_), _*80, 64, dtype=idaapi.dt_qword)) for _ in range(8) ]
 
         # sse1/sse2 simd registers
-        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16, ptype=float)) for _ in range(16) ]
-        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 256, dtype=idaapi.dt_byte32, ptype=float)) for _ in range(16) ]
+        [ setitem("zmm{:d}".format(_), self.new("zmm{:d}".format(_), 512, dtype=idaapi.dt_byte64, ptype=float)) for _ in range(32) ]
+        [ setitem("ymm{:d}".format(_), self.child(self.by_name("zmm{:d}".format(_)), "ymm{:d}".format(_), 0, 256, dtype=idaapi.dt_byte32, ptype=float)) for _ in range(32) ]
+        [ setitem("xmm{:d}".format(_), self.child(self.by_name("ymm{:d}".format(_)), "xmm{:d}".format(_), 0, 128, dtype=idaapi.dt_byte16, ptype=float)) for _ in range(32) ]
 
         # control registers (32-bit and 64-bit)
         [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in range(0, 8) ]
         [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in range(8, 16) ]
 
-        ##fpctrl, fpstat, fptags
-        ##mxcsr
+        # kr registers
+        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), database.config.bits())) for _ in range(8) ]
+
+        # flags
         setitem('rflags', self.new('rflags', 64))
         setitem('eflags', self.child(self.by_name('rflags'), 'eflags', 0, 32, idaname='efl'))
-        setitem('cf', self.child(self.by_name('eflags'), 'cf',  0, 1, idaname='cf'))
-        setitem('pf', self.child(self.by_name('eflags'), 'pf',  2, 1, idaname='pf'))
-        setitem('af', self.child(self.by_name('eflags'), 'af',  4, 1, idaname='af'))
-        setitem('zf', self.child(self.by_name('eflags'), 'zf',  6, 1, idaname='zf'))
-        setitem('sf', self.child(self.by_name('eflags'), 'sf',  7, 1, idaname='sf'))
-        setitem('tf', self.child(self.by_name('eflags'), 'tf',  8, 1, idaname='tf'))
-        setitem('if', self.child(self.by_name('eflags'), 'if',  9, 1, idaname='if'))
-        setitem('df', self.child(self.by_name('eflags'), 'df', 10, 1, idaname='df'))
-        setitem('of', self.child(self.by_name('eflags'), 'of', 11, 1, idaname='of'))
+        setitem('cf', self.child(self.by_name('eflags'), 'cf',  0, 1))
+        setitem('pf', self.child(self.by_name('eflags'), 'pf',  2, 1))
+        setitem('af', self.child(self.by_name('eflags'), 'af',  4, 1))
+        setitem('zf', self.child(self.by_name('eflags'), 'zf',  6, 1))
+        setitem('sf', self.child(self.by_name('eflags'), 'sf',  7, 1))
+        setitem('tf', self.child(self.by_name('eflags'), 'tf',  8, 1))
+        setitem('if', self.child(self.by_name('eflags'), 'if',  9, 1))
+        setitem('df', self.child(self.by_name('eflags'), 'df', 10, 1))
+        setitem('of', self.child(self.by_name('eflags'), 'of', 11, 1))
+
+        # fpstat (fpsr)
+        setitem('fpsw', self.new('fpsw', 16, idaname='fpstat'))
+        setitem('fpsw_ie',  self.child(self.by_name('fpsw'), 'fpsw.ie',  0,  1))    # invalid exception
+        setitem('fpsw_de',  self.child(self.by_name('fpsw'), 'fpsw.de',  1,  1))    # denormalized exception
+        setitem('fpsw_ze',  self.child(self.by_name('fpsw'), 'fpsw.ze',  2,  1))    # zero-divide exception
+        setitem('fpsw_oe',  self.child(self.by_name('fpsw'), 'fpsw.oe',  3,  1))    # overflow exception
+        setitem('fpsw_ue',  self.child(self.by_name('fpsw'), 'fpsw.ue',  4,  1))    # underflow exception
+        setitem('fpsw_pe',  self.child(self.by_name('fpsw'), 'fpsw.pe',  5,  1))    # precision exception
+        setitem('fpsw_sf',  self.child(self.by_name('fpsw'), 'fpsw.sf',  6,  1))    # stack fault
+        setitem('fpsw_es',  self.child(self.by_name('fpsw'), 'fpsw.es',  7,  1))    # error status
+        setitem('fpsw_c0',  self.child(self.by_name('fpsw'), 'fpsw.c0',  8,  1))    # cc 0
+        setitem('fpsw_c1',  self.child(self.by_name('fpsw'), 'fpsw.c1',  9,  1))    # cc 1
+        setitem('fpsw_c2',  self.child(self.by_name('fpsw'), 'fpsw.c2',  10, 1))    # cc 2
+        setitem('fpsw_top', self.child(self.by_name('fpsw'), 'fpsw.top', 11, 3))    # top of register stack
+        setitem('fpsw_c3',  self.child(self.by_name('fpsw'), 'fpsw.c3',  14, 1))    # cc 3
+        setitem('fpsw_b',   self.child(self.by_name('fpsw'), 'fpsw.b',   15, 1))    # busy
+
+        # fpstat aliases (because of hexrays)
+        setitem('c0', self.by_name('fpsw.c0'))
+        setitem('c1', self.by_name('fpsw.c1'))
+        setitem('c2', self.by_name('fpsw.c2'))
+        setitem('c3', self.by_name('fpsw.c3'))
+
+        # fpctrl (fpcr)
+        setitem('fpcr', self.new('fpcr', 16, idaname='fpctrl'))
+        setitem('fpcr_im',  self.child(self.by_name('fpcr'), 'fpcr.im',  0,  1))    # invalid mask
+        setitem('fpcr_dm',  self.child(self.by_name('fpcr'), 'fpcr.dm',  1,  1))    # denormal mask
+        setitem('fpcr_zm',  self.child(self.by_name('fpcr'), 'fpcr.zm',  2,  1))    # zero-divide mask
+        setitem('fpcr_om',  self.child(self.by_name('fpcr'), 'fpcr.om',  3,  1))    # overflow mask
+        setitem('fpcr_um',  self.child(self.by_name('fpcr'), 'fpcr.um',  4,  1))    # underflow mask
+        setitem('fpcr_pm',  self.child(self.by_name('fpcr'), 'fpcr.pm',  5,  1))    # precision mask
+        setitem('fpcr_ext', self.child(self.by_name('fpcr'), 'fpcr.ext', 6,  2))
+        setitem('fpcr_pc',  self.child(self.by_name('fpcr'), 'fpcr.pc',  8,  2))    # precision control
+        setitem('fpcr_rc',  self.child(self.by_name('fpcr'), 'fpcr.rc',  10, 2))    # rounding control
+        setitem('fpcr_ic',  self.child(self.by_name('fpcr'), 'fpcr.ic',  12, 1))    # infinity control
+
+        # fptags (fptw)
+        setitem('fptw', self.new('fptw', 16, idaname='fptags'))
+        [ setitem("fptw.t{:d}".format(_), self.child(self.by_name('fptw'), "fptw.t{:d}".format(_), 2*_, 2)) for _ in range(8) ]
+
+        #mxcsr
+        setitem('mxcsr', self.new('mxcsr', 32, idaname='mxcsr'))
+        setitem('mxcsr_ie',  self.child(self.by_name('fpcr'), 'mxcsr.ie',  0,  1))  # invalid exception
+        setitem('mxcsr_de',  self.child(self.by_name('fpcr'), 'mxcsr.de',  1,  1))  # denormalized exception
+        setitem('mxcsr_ze',  self.child(self.by_name('fpcr'), 'mxcsr.ze',  2,  1))  # zero-divide exception
+        setitem('mxcsr_oe',  self.child(self.by_name('fpcr'), 'mxcsr.oe',  3,  1))  # overflow exception
+        setitem('mxcsr_ue',  self.child(self.by_name('fpcr'), 'mxcsr.ue',  4,  1))  # underflow exception
+        setitem('mxcsr_pe',  self.child(self.by_name('fpcr'), 'mxcsr.pe',  5,  1))  # precision exception
+        setitem('mxcsr_daz', self.child(self.by_name('fpcr'), 'mxcsr.daz', 6,  1))  # denormals are zeros
+        setitem('mxcsr_im',  self.child(self.by_name('fpcr'), 'mxcsr.im',  7,  1))  # invalid mask
+        setitem('mxcsr_dm',  self.child(self.by_name('fpcr'), 'mxcsr.dm',  8,  1))  # denormal mask
+        setitem('mxcsr_zm',  self.child(self.by_name('fpcr'), 'mxcsr.zm',  9,  1))  # zero-divide mask
+        setitem('mxcsr_om',  self.child(self.by_name('fpcr'), 'mxcsr.om', 10,  1))  # overflow mask
+        setitem('mxcsr_um',  self.child(self.by_name('fpcr'), 'mxcsr.um', 11,  1))  # underflow mask
+        setitem('mxcsr_pm',  self.child(self.by_name('fpcr'), 'mxcsr.pm', 12,  1))  # precision mask
+        setitem('mxcsr_rc',  self.child(self.by_name('fpcr'), 'mxcsr.rc', 13,  2))  # rounding control
+        setitem('mxcsr_fz',  self.child(self.by_name('fpcr'), 'mxcsr.fz', 15,  1))  # flush-zero
+
+        [ setitem("bnd{:d}".format(_), self.new("bnd{:d}".format(_), 128)) for _ in range(4) ]
 
     def by_float(self, index):
         '''Return the desired floating-point stack register by the specified `index`.'''
