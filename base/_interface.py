@@ -3155,18 +3155,19 @@ class register_t(symbol_t):
         if spec != 's':
             cls = self.__class__
             raise TypeError("unsupported format string ({!s}) passed to {:s}".format(spec, '.'.join([cls.__name__, '__format__'])))
-        prefix = self.architecture.prefix if hasattr(self, 'architecture') else ''
+        prefix = getattr(self.architecture, 'prefix', '') if hasattr(self, 'architecture') else ''
         return prefix + self.name
 
     def __str__(self):
         '''Return the architecture's register prefix concatenated to the register's name.'''
-        prefix = self.architecture.prefix if hasattr(self, 'architecture') else ''
+        prefix = getattr(self.architecture, 'prefix', '') if hasattr(self, 'architecture') else ''
         return prefix + self.name
 
     def __repr__(self):
+        iterable = (name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi, name) == self.dtype)
         try:
-            dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi, name) == self.dtype]
-        except (AttributeError, ValueError):
+            dt = next(iterable)
+        except StopIteration:
             dt = 'unknown'
         cls = register_t
         return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, internal.utils.string.escape(self.name, '\''), self.position, self.bits)
