@@ -3132,7 +3132,8 @@ class register_t(symbol_t):
     @property
     def size(self):
         '''Return the size of the register in bytes.'''
-        return self.__size__ // 8
+        res = math.ceil(self.__size__ / 8)
+        return math.trunc(res)
     @property
     def position(self):
         '''Return the binary offset of the current register into its full register that contains it.'''
