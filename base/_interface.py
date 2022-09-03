@@ -3100,7 +3100,8 @@ class register_t(symbol_t):
     """
 
     def __hash__(self):
-        items = self.id, self.dtype, self.position, self.size
+        identity = self.name if self.realname is None else self.realname
+        items = identity, self.dtype, self.position, self.size
         return hash(items)
 
     @property
@@ -3112,9 +3113,15 @@ class register_t(symbol_t):
     @property
     def id(self):
         '''Return the index of the register as ordered in IDA's list of registers.'''
+        if isinstance(self.realname, six.integer_types):
+            return self.realname
+
+        # otherwise we need to look in our register index for the name.
         res = idaapi.ph.regnames
-        try: return res.index(self.realname or self.name)
-        except ValueError: pass
+        try:
+            return res.index(self.realname or self.name)
+        except ValueError:
+            pass
         return -1
 
     @property
