@@ -96,7 +96,7 @@ class UnicodeException(E.BaseException):
     def __setstate__(self, pack):
         self.args = pack
 
-class MissingTagError(E.KeyError, UnicodeException):
+class MissingTagError(UnicodeException, E.KeyError):
     """
     The requested tag at the specified address does not exist.
     """
@@ -112,7 +112,7 @@ class MissingFunctionTagError(MissingTagError):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class MissingMethodError(E.NotImplementedError, UnicodeException):
+class MissingMethodError(UnicodeException, E.NotImplementedError):
     """
     A method belonging to a superclass that is required to be overloaded was called.
     """
@@ -120,7 +120,7 @@ class MissingMethodError(E.NotImplementedError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class MissingNameError(E.NameError, UnicodeException):
+class MissingNameError(UnicodeException, E.NameError):
     """
     A name that was required was found missing and was unable to be recovered.
     """
@@ -128,7 +128,7 @@ class MissingNameError(E.NameError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class UnsupportedVersion(E.NotImplementedError, UnicodeException):
+class UnsupportedVersion(UnicodeException, E.NotImplementedError):
     """
     This functionality is not supported on the current version of IDA.
     """
@@ -136,7 +136,7 @@ class UnsupportedVersion(E.NotImplementedError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class UnsupportedCapability(E.NotImplementedError, E.EnvironmentError, UnicodeException):
+class UnsupportedCapability(UnicodeException, E.NotImplementedError, E.EnvironmentError):
     """
     An unexpected or unsupported capability was specified.
     """
@@ -144,7 +144,7 @@ class UnsupportedCapability(E.NotImplementedError, E.EnvironmentError, UnicodeEx
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class ResultMissingError(E.LookupError, UnicodeException):
+class ResultMissingError(UnicodeException, E.LookupError):
     """
     The requested item is missing from its results.
     """
@@ -160,7 +160,7 @@ class SearchResultsError(ResultMissingError):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class DisassemblerError(E.EnvironmentError, UnicodeException):
+class DisassemblerError(UnicodeException, E.EnvironmentError):
     """
     An api call has thrown an error or was unsuccessful.
     """
@@ -168,7 +168,7 @@ class DisassemblerError(E.EnvironmentError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class MissingTypeOrAttribute(E.TypeError, UnicodeException):
+class MissingTypeOrAttribute(UnicodeException, E.TypeError):
     """
     The specified location is missing some specific attribute or type.
     """
@@ -176,7 +176,7 @@ class MissingTypeOrAttribute(E.TypeError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class InvalidTypeOrValueError(E.TypeError, E.ValueError, UnicodeException):
+class InvalidTypeOrValueError(UnicodeException, E.TypeError, E.ValueError):
     """
     An invalid value or type was specified.
     """
@@ -184,7 +184,7 @@ class InvalidTypeOrValueError(E.TypeError, E.ValueError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class InvalidParameterError(E.AssertionError, InvalidTypeOrValueError):
+class InvalidParameterError(InvalidTypeOrValueError, E.AssertionError):
     """
     An invalid parameter was specified by the user.
     """
@@ -192,7 +192,7 @@ class InvalidParameterError(E.AssertionError, InvalidTypeOrValueError):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class OutOfBoundsError(E.ValueError, UnicodeException):
+class OutOfBoundsError(UnicodeException, E.ValueError):
     """
     The specified item is out of bounds.
     """
@@ -200,7 +200,7 @@ class OutOfBoundsError(E.ValueError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class AddressOutOfBoundsError(E.ArithmeticError, OutOfBoundsError):
+class AddressOutOfBoundsError(OutOfBoundsError, E.ArithmeticError):
     """
     The specified address is out of bounds.
     """
@@ -208,7 +208,7 @@ class AddressOutOfBoundsError(E.ArithmeticError, OutOfBoundsError):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class IndexOutOfBoundsError(E.IndexError, E.KeyError, OutOfBoundsError):
+class IndexOutOfBoundsError(OutOfBoundsError, E.IndexError, E.KeyError):
     """
     The specified index is out of bounds.
     """
@@ -216,7 +216,7 @@ class IndexOutOfBoundsError(E.IndexError, E.KeyError, OutOfBoundsError):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class ItemNotFoundError(E.KeyError, ResultMissingError):
+class ItemNotFoundError(ResultMissingError, E.KeyError):
     """
     The specified item or type was not found.
     """
@@ -288,7 +288,7 @@ class NetNodeNotFoundError(ItemNotFoundError):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class ReadOrWriteError(E.IOError, E.ValueError, UnicodeException):
+class ReadOrWriteError(UnicodeException, E.IOError, E.ValueError):
     """
     Unable to read or write the specified number of bytes .
     """
@@ -296,7 +296,7 @@ class ReadOrWriteError(E.IOError, E.ValueError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class InvalidFormatError(E.KeyError, E.ValueError, UnicodeException):
+class InvalidFormatError(UnicodeException, E.KeyError, E.ValueError):
     """
     The specified data has an invalid format.
     """
@@ -304,7 +304,7 @@ class InvalidFormatError(E.KeyError, E.ValueError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class SerializationError(E.ValueError, E.IOError, UnicodeException):
+class SerializationError(UnicodeException, E.ValueError, E.IOError):
     """
     There was an error while trying to serialize or deserialize the specified data.
     """
@@ -320,7 +320,7 @@ class SizeMismatchError(SerializationError):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class UnknownPrototypeError(E.LookupError, UnicodeException):
+class UnknownPrototypeError(UnicodeException, E.LookupError):
     """
     The requested prototype does not match any of the ones that are available.
     """
@@ -328,7 +328,7 @@ class UnknownPrototypeError(E.LookupError, UnicodeException):
         self.__args__ = args
         self.__message__ = args[0] if len(args) == 1 else ''
 
-class DuplicateItemError(E.NameError, UnicodeException):
+class DuplicateItemError(UnicodeException, E.NameError):
     """
     The requested command has failed due to a duplicate item.
     """
