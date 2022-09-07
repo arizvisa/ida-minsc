@@ -4605,6 +4605,26 @@ class type(object):
         return any(item not in ignored for item in itertools.chain(xref.code(ea, True), xref.data(ea, True)))
     reference = is_ref = referenceQ = utils.alias(is_reference, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def has_relocation(cls):
+        '''Return if the current address was relocated by a relocation during load.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.has_relocation(address)
+        return cls.has_relocation(selection)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def has_relocation(cls, ea):
+        '''Return if the address at `ea` was relocated by a relocation during load.'''
+        return True if internal.interface.address.refinfo(ea) else False
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def has_relocation(cls, bounds):
+        '''Return if an address within the specified `bounds` was relocated by a relocation during load.'''
+        return any(internal.interface.address.refinfo(ea) for ea in address.iterate(bounds))
+    relocation = relocated = is_relocation = is_relocated = relocationQ = relocatedQ = utils.alias(has_relocation, 'type')
+
     class array(object):
         """
         This namespace is for returning type information about an array
