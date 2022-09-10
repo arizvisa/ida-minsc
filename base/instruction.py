@@ -1761,18 +1761,18 @@ def op_refinfo(ea, opnum):
 @utils.multicase(opnum=six.integer_types)
 def op_reference(opnum):
     '''Return the address being referenced by the operand `opnum` belonging to the instruction at the current address.'''
-    return op_ref(ui.current.address(), opnum)
+    return op_reference(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
 def op_reference(reference):
     '''Return the address being referenced by the operand pointed to by `reference`.'''
     address, opnum, _ = reference
-    return op_ref(address, opnum)
+    return op_reference(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_reference(ea, opnum):
     '''Return the address being referenced by the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn, ops = at(ea), operands(ea)
-    if len(ops) < opnum:
-        raise E.InvalidTypeOrValueError(u"{:s}.op_ref({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+    if not(opnum < len(ops)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_reference({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # Grab the operand and its reference if it it actually has one. We'll use this
     # to figure out exactly what address is being referenced by the operand.
@@ -1782,7 +1782,7 @@ def op_reference(ea, opnum):
 
         # Try and calculate the reference for the operand value. If we couldn't, then we simply treat the value as-is.
         if not idaapi.calc_reference_data(target.cast(), base.cast(), ea, ri, value):
-            logging.debug(u"{:s}.op_ref({:#x}, {:d}) : The disassembler could not calculate the target for the reference ({:d}) at address {:#x}.".format(__name__, ea, opnum, ri.flags & idaapi.REFINFO_TYPE, ea))
+            logging.debug(u"{:s}.op_reference({:#x}, {:d}) : The disassembler could not calculate the target for the reference ({:d}) at address {:#x}.".format(__name__, ea, opnum, ri.flags & idaapi.REFINFO_TYPE, ea))
             return value
         return target.value()
 
@@ -1796,7 +1796,7 @@ def op_reference(ea, opnum):
         # If we weren't given the base address, then we're supposed to figure it out ourselves.
         seg = idaapi.getseg(ea)
         if seg is None:
-            raise E.SegmentNotFoundError(u"{:s}.op_ref({:#x}, {:d}) : Unable to locate segment containing the specified instruction address ({:#x}).".format(__name__, ea, ea))
+            raise E.SegmentNotFoundError(u"{:s}.op_reference({:#x}, {:d}) : Unable to locate segment containing the specified instruction address ({:#x}).".format(__name__, ea, ea))
 
         imagebase, segbase = idaapi.get_imagebase(), idaapi.get_segm_base(seg)
         base, offset = imagebase, seg.start_ea - imagebase
@@ -1807,7 +1807,7 @@ def op_reference(ea, opnum):
     ri = idaapi.refinfo_t()
     ri.set_type(idaapi.get_default_reftype(ea))
     if op.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far}:
-        raise E.DisassemblerError(u"{:s}.op_ref({:#x}, {:d}) : Unable to get the reference information from the operand type ({:d}) at the specified operand ({:d}) belonging to the address {:#x}.".format(__name__, ea, opnum, op.type, opnum, ea))
+        raise E.DisassemblerError(u"{:s}.op_reference({:#x}, {:d}) : Unable to get the reference information from the operand type ({:d}) at the specified operand ({:d}) belonging to the address {:#x}.".format(__name__, ea, opnum, op.type, opnum, ea))
 
     # If the target base can't be calculated, then we need to use the imagebase.
     res = idaapi.calc_target(ea, op.addr, ri)
@@ -1815,20 +1815,20 @@ def op_reference(ea, opnum):
 op_ref = utils.alias(op_reference)
 
 @utils.multicase(opnum=six.integer_types)
-def op_refs(opnum):
+def op_references(opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the current instruction.'''
-    return op_refs(ui.current.address(), opnum)
+    return op_references(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
-def op_refs(reference):
+def op_references(reference):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand pointed to by `reference`.'''
     address, opnum, _ = reference
-    return op_refs(address, opnum)
+    return op_references(address, opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_refs(ea, opnum):
+def op_references(ea, opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
     insn, ops = at(ea), operands(ea)
-    if len(ops) < opnum:
-        raise E.InvalidTypeOrValueError(u"{:s}.op_refs({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+    if not(opnum < len(ops)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_references({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # Start out by doing sanity check so that we can determine whether
     # the operand is referencing a local or a global. We grab both the
@@ -1846,7 +1846,7 @@ def op_refs(ea, opnum):
     if has_xrefs and info is None:
         fn = idaapi.get_func(insn.ea)
         if fn is None:
-            raise E.FunctionNotFoundError(u"{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, ea, opnum, insn.ea))
+            raise E.FunctionNotFoundError(u"{:s}.op_references({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, ea, opnum, insn.ea))
 
         # Use IDAPython's api to calculate the structure offset into the
         # function's frame using the instruction operand.
@@ -1861,13 +1861,13 @@ def op_refs(ea, opnum):
         # it with IDAPython to check if it's actually a frame member.
         res = idaapi.get_stkvar(op, sval) if idaapi.__version__ < 7.0 else idaapi.get_stkvar(insn, op, sval)
         if res is None:
-            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : The instruction operand's value ({:#x}) does not appear to point to a frame variable at the same offset ({:#x}).".format(__name__, ea, opnum, sval.value, stkofs_))
+            raise E.DisassemblerError(u"{:s}.op_references({:#x}, {:d}) : The instruction operand's value ({:#x}) does not appear to point to a frame variable at the same offset ({:#x}).".format(__name__, ea, opnum, sval.value, stkofs_))
 
         # Now we have the actual frame member and the offset into the
         # frame, and we can use it to validate against our expectation.
         member, stkofs = res
         if stkofs != stkofs_:
-            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The stack variable offset ({:#x}) for the instruction operand does not match what was expected ({:#x}).".format(__name__, ea, opnum, stkofs, stkofs_))
+            logging.warning(u"{:s}.op_references({:#x}, {:d}) : The stack variable offset ({:#x}) for the instruction operand does not match what was expected ({:#x}).".format(__name__, ea, opnum, stkofs, stkofs_))
 
         # Finally we can instantiate an idaapi.xreflist_t, and call directly
         # into the IDAPython api in order to let it build all of the
@@ -1894,7 +1894,7 @@ def op_refs(ea, opnum):
         X = idaapi.xrefblk_t()
         if not X.first_to(mid, idaapi.XREF_ALL):
             fullname = '.'.join([enumeration.name(eid), enumeration.member.name(mid)])
-            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references were found for the enumeration member {:s} ({:#x}) at operand {:d} of the instruction at {:#x}.".format(__name__, ea, opnum, fullname, mid, opnum, insn.ea))
+            logging.warning(u"{:s}.op_references({:#x}, {:d}) : No references were found for the enumeration member {:s} ({:#x}) at operand {:d} of the instruction at {:#x}.".format(__name__, ea, opnum, fullname, mid, opnum, insn.ea))
             return []
 
         # As we were able to find one, we can just continue to iterate through
@@ -1939,7 +1939,7 @@ def op_refs(ea, opnum):
         elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
             offset = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
         else:
-            raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}.".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
+            raise E.UnsupportedCapability(u"{:s}.op_references({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}.".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
 
         # Hopefully that was it, now we should be able to figure out our path.
         _, items = interface.node.calculate_stroff_path(offset, items)
@@ -1980,7 +1980,7 @@ def op_refs(ea, opnum):
             X = idaapi.xrefblk_t()
             if not X.first_to(mptr.id, idaapi.XREF_ALL):
                 fullname = idaapi.get_member_fullname(mptr.id)
-                logging.info(u"{:s}.op_refs({:#x}, {:d}) : No references were found for structure member \"{:s}\".".format(__name__, ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
+                logging.info(u"{:s}.op_references({:#x}, {:d}) : No references were found for structure member \"{:s}\".".format(__name__, ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
                 continue
 
             # If we were able to get an xref, then we can gather the rest of
@@ -2042,7 +2042,7 @@ def op_refs(ea, opnum):
                 # member id of the frame that we need to descend into.
                 item = idaapi.get_stkvar(at(ea), op, op.value if op.type in {idaapi.o_imm} else op.addr)
                 if item is None:
-                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, insn.ea, opnum, refopnum, ea))
+                    logging.warning(u"{:s}.op_references({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, insn.ea, opnum, refopnum, ea))
                     continue
                 mptr, actval = item
                 offset = actval - mptr.soff
@@ -2052,7 +2052,7 @@ def op_refs(ea, opnum):
                 # we can use the actual value to compose a path through it.
                 msptr = idaapi.get_sptr(mptr)
                 if msptr is None:
-                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, insn.ea, opnum, refopnum, ea))
+                    logging.warning(u"{:s}.op_references({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, insn.ea, opnum, refopnum, ea))
                     continue
 
                 # Instantiate a structure_t in order to grab its members_t. From
@@ -2131,14 +2131,14 @@ def op_refs(ea, opnum):
     elif any(hasattr(res, attribute) for attribute in ['offset', 'Offset', 'address']):
         value = res.offset if hasattr(res, 'offset') else res.Offset if hasattr(res, 'Offset') else res.address
     else:
-        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}.".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
+        raise E.UnsupportedCapability(u"{:s}.op_references({:#x}, {:d}) : An unexpected type ({!s}) was decoded from the operand ({:d}) for the instruction at {:#x}.".format(__name__, ea, opnum, res.__class__, opnum, insn.ea))
 
     # Now we can try to get all the xrefs from the address or value that
     # we extracted. If we couldn't grab anything, then just warn the user
     # about it and return an empty list.
     X = idaapi.xrefblk_t()
     if not X.first_to(value, idaapi.XREF_ALL):
-        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The operand ({:d}) at the specified address ({:#x}) does not have any references.".format(__name__, insn.ea, opnum, opnum, insn.ea))
+        logging.warning(u"{:s}.op_references({:#x}, {:d}) : The operand ({:d}) at the specified address ({:#x}) does not have any references.".format(__name__, insn.ea, opnum, opnum, insn.ea))
         return []
 
     # However, if we were able to find the first value, then we can
@@ -2182,6 +2182,7 @@ def op_refs(ea, opnum):
             iterable = (item for item in [ref])
         res.extend(iterable)
     return res
+op_refs = utils.alias(op_references)
 
 ## types of instructions
 class type(object):
