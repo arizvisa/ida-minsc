@@ -79,6 +79,17 @@ def by(ea):
 def by(name):
     '''Return the function with the specified `name`.'''
     return by_name(name)
+@utils.multicase(frame=idaapi.struc_t)
+def by(frame):
+    '''Return the function that owns the specified `frame`.'''
+    if frame.props & idaapi.SF_FRAME:
+        ea = idaapi.get_func_by_frame(frame.id)
+        return by(ea)
+    raise E.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate function using a structure that is not a frame.".format(__name__, frame.id))
+@utils.multicase(frame=structure.structure_t)
+def by(frame):
+    '''Return the function that owns the specified `frame`.'''
+    return by(frame.ptr)
 
 # FIXME: implement a matcher class for func_t
 
