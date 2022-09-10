@@ -2650,7 +2650,7 @@ class frame(object):
             fr = None if rt else frame(ea) if idaapi.get_frame(ea) else None
             for index, name, ti, location in items:
                 atype, ainfo = location
-                loc = interface.tinfo.location(ti, instruction.architecture, atype, ainfo)
+                loc = interface.tinfo.location(ti.get_size(), instruction.architecture, atype, ainfo)
 
                 # If it's a location, then we can just add the register size to
                 # find where the member is located at. This becomes our result
@@ -3767,7 +3767,7 @@ class type(object):
             locinfo = interface.tinfo.location_raw(location)
 
             # Get the location out of it, and then figure out how to return it.
-            result = interface.tinfo.location(tinfo, instruction.architecture, *locinfo)
+            result = interface.tinfo.location(tinfo.get_size(), instruction.architecture, *locinfo)
             if builtins.isinstance(result, builtins.tuple) and any(isinstance(item, interface.register_t) for item in result):
                 reg, offset = result
                 return result if offset else reg
@@ -4138,7 +4138,7 @@ class type(object):
             for index, item in enumerate(items):
                 name, ti, storage = item
                 ltype, linfo = storage
-                result = interface.tinfo.location(ti, instruction.architecture, ltype, linfo)
+                result = interface.tinfo.location(ti.get_size(), instruction.architecture, ltype, linfo)
 
                 # Check to see if we got an error. We do this with a hack, by
                 # doing an identity check on what was returned.
