@@ -2675,12 +2675,12 @@ class tinfo(object):
     # stash the process_location closure because we need a reference to it
     # in order to access the location_table with our entries.
     @classmethod
-    def location(cls, ti, architecture, loctype, locinfo, process=process_location):
-        '''Return the symbolic location for the raw `loctype` and `locinfo` using the ``tinfo_t`` in `ti` and the ``architecture_t`` within the `architecture` parameter.'''
+    def location(cls, size, architecture, loctype, locinfo, process=process_location):
+        '''Return the symbolic location for the raw `loctype`, `locinfo`, and `size` on the given `architecture`.'''
 
         # This just contains an offset relative to the bottom of the args.
         if loctype == idaapi.ALOC_STACK and not hasattr(locinfo, '__iter__'):
-            return location_t(locinfo, ti.get_size())
+            return location_t(locinfo, size)
 
         # This is just an address for the user to figure out on their own.
         elif loctype == idaapi.ALOC_STATIC:
@@ -2690,17 +2690,17 @@ class tinfo(object):
         # when using scattered (ALOC_DIST) argument location types.
         elif loctype == idaapi.ALOC_REG1 and not hasattr(locinfo, '__iter__'):
             ridx1, regoff = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
-            try: reg = architecture.by_indexsize(ridx1, ti.get_size())
+            try: reg = architecture.by_indexsize(ridx1, size)
             except KeyError: reg = architecture.by_index(ridx1)
             return phrase_t(reg, regoff) if regoff else reg
 
         # A pair of registers gets returned as a list since they're contiguous.
         elif loctype == idaapi.ALOC_REG2:
             ridx1, ridx2 = (locinfo & 0x0000ffff) >> 0, (locinfo & 0xffff0000) >> 16
-            try: reg1 = architecture.by_indexsize(ridx1, ti.get_size() // 2)
+            try: reg1 = architecture.by_indexsize(ridx1, size // 2)
             except KeyError: reg1 = architecture.by_index(ridx1)
 
-            try: reg2 = architecture.by_indexsize(ridx2, ti.get_size() // 2)
+            try: reg2 = architecture.by_indexsize(ridx2, size // 2)
             except KeyError: reg2 = architecture.by_index(ridx2)
 
             return [reg1, reg2]
@@ -2709,7 +2709,7 @@ class tinfo(object):
         # as a phrase_t if there's an offset, otherwise just the register.
         elif loctype in {idaapi.ALOC_RREL}:
             ridx, roff = locinfo
-            try: reg = architecture.by_indexsize(ridx, ti.get_size())
+            try: reg = architecture.by_indexsize(ridx, size)
             except KeyError: reg = architecture.by_index(ridx)
             return phrase_t(reg, roff) if roff else reg
 
