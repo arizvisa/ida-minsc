@@ -914,11 +914,11 @@ def read(bounds):
     bounds = ea, _ = interface.bounds_t(*bounds)
     return get_bytes(ea, bounds.size) or b''
 
-@utils.multicase(data=bytes)
+@utils.multicase(data=b''.__class__)
 def write(data, **persist):
     '''Modify the database at the current address with the bytes specified in `data`.'''
     return write(ui.current.address(), data, **persist)
-@utils.multicase(ea=six.integer_types, data=bytes)
+@utils.multicase(ea=six.integer_types, data=b''.__class__)
 def write(ea, data, **persist):
     """Modify the database at address `ea` with the bytes specified in `data`
 
@@ -1182,7 +1182,7 @@ class search(object):
         if idaapi.__version__ < 7.5:
 
             # Convert the bytes directly into a string of base-10 integers.
-            if (isinstance(data, bytes) and radix == 0) or isinstance(data, bytearray):
+            if (isinstance(data, b''.__class__) and radix == 0) or isinstance(data, bytearray):
                 query = ' '.join(map(format, bytearray(data)))
 
             # Convert the string directly into a string of base-10 integers.
@@ -1205,7 +1205,7 @@ class search(object):
             return res
 
         # Now that we know the radix, if we were given bytes then we need to format them into the right query.
-        if isinstance(data, (bytes, bytearray)):
+        if isinstance(data, (b''.__class__, bytearray)):
             query = ' '.join(map(format, bytearray(data)))
 
         # If we were given a string, then we need to encode it into some bytes.
@@ -1345,24 +1345,24 @@ class search(object):
         return res
     byname = utils.alias(by_name, 'search')
 
-    @utils.multicase(pattern=(six.string_types, bytes, bytearray))
+    @utils.multicase(pattern=(six.string_types, b''.__class__, bytearray))
     @classmethod
     def iterate(cls, pattern, **options):
         '''Iterate through all search results that match the `pattern` starting at the current address.'''
         predicate = options.pop('predicate', cls)
         return cls.iterate(ui.current.address(), pattern, predicate, **options)
-    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes, bytearray))
+    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, b''.__class__, bytearray))
     @classmethod
     def iterate(cls, ea, pattern, **options):
         '''Iterate through all search results that match the specified `pattern` starting at address `ea`.'''
         predicate = options.pop('predicate', cls)
         return cls.iterate(ea, pattern, predicate, **options)
-    @utils.multicase(pattern=(six.string_types, bytes, bytearray))
+    @utils.multicase(pattern=(six.string_types, b''.__class__, bytearray))
     @classmethod
     def iterate(cls, pattern, predicate, **options):
         '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at the current address.'''
         return cls.iterate(ui.current.address(), pattern, predicate, **options)
-    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, bytes, bytearray))
+    @utils.multicase(ea=six.integer_types, pattern=(six.string_types, b''.__class__, bytearray))
     @classmethod
     def iterate(cls, ea, pattern, predicate, **options):
         '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at address `ea`.'''
@@ -1426,7 +1426,7 @@ class search(object):
 
             # If we were given some bytes instead of a string, then format them into a
             # proper string using the specified radix.
-            string = ' '.join(map(format, bytearray(item))) if isinstance(item, (bytes, bytearray)) else item
+            string = ' '.join(map(format, bytearray(item))) if isinstance(item, (b''.__class__, bytearray)) else item
 
             # Now to parse each one with idaapi.parse_binpat_str(), but of course the idaapi.parse_binpat_str()
             # api returns an empty string on success and a None on failure.
@@ -5456,7 +5456,7 @@ class types(object):
         # ugh..because ida can return a non-bytes as one of the comments, we
         # need to convert it so that the api will fucking understand us.
         res = cmt or fieldcmts or b''
-        comments = res if isinstance(res, bytes) else res.encode('latin1')
+        comments = res if isinstance(res, b''.__class__) else res.encode('latin1')
 
         # we need to generate a description so that we can format error messages the user will understand.
         errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
@@ -5551,7 +5551,7 @@ class types(object):
         # we need to now assign the serialized data we were given, making sure
         # that any of the any of the comments are properly being passed as bytes
         # and then we can check to see if it returned an error.
-        res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, bytes) else cmt, fieldcmts if isinstance(fieldcmts, bytes) else fieldcmts.encode('latin1'), sclass)
+        res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, b''.__class__) else cmt, fieldcmts if isinstance(fieldcmts, b''.__class__) else fieldcmts.encode('latin1'), sclass)
         if res == idaapi.TERR_WRONGNAME:
             raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the type library with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
         elif res != idaapi.TERR_OK:
@@ -5667,7 +5667,7 @@ class types(object):
 
         # we can now assign the serialized data that we got, making sure that
         # the comments are properly being passed as bytes before checking for error.
-        res = idaapi.set_numbered_type(library, ordinal, flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, bytes) else cmt, fieldcmts if isinstance(fieldcmts, bytes) else fieldcmts.encode('latin1'), sclass)
+        res = idaapi.set_numbered_type(library, ordinal, flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, b''.__class__) else cmt, fieldcmts if isinstance(fieldcmts, b''.__class__) else fieldcmts.encode('latin1'), sclass)
         if res == idaapi.TERR_OK:
             return ordinal
 
@@ -6376,7 +6376,7 @@ class extra(object):
             if count is None: return None
 
             # now we can fetch them
-            res = (sup.get(Fnetnode(ea), base + i, type=bytes) for i in builtins.range(count))
+            res = (sup.get(Fnetnode(ea), base + i, type=b''.__class__) for i in builtins.range(count))
 
             # remove the null-terminator if there is one
             res = (row.rstrip(b'\0') for row in res)
