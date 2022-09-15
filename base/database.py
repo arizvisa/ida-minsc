@@ -892,9 +892,11 @@ disasm = utils.alias(disassemble)
 
 @utils.multicase()
 def read():
-    '''Return the bytes defined at the current address.'''
-    res = ui.current.address()
-    return read(res, type.size(res))
+    '''Return the bytes defined at the current selection or address.'''
+    address, selection = ui.current.address(), ui.current.selection()
+    if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        return read(address, type.size(address))
+    return read(selection)
 @utils.multicase(ea=six.integer_types)
 def read(ea):
     '''Return the number of bytes associated with the address `ea`.'''
@@ -4643,7 +4645,7 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the `[type, length]` of the array at the current address.'''
+            '''Return the `[type, length]` of the array at the current selection or address.'''
             address, selection = ui.current.address(), ui.current.selection()
             if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
                 return cls(address)
@@ -4888,7 +4890,7 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_exception(cls, **flags):
-        '''Return if the current address or selection is guarded by an exception or part of an exception handler.'''
+        '''Return if the current selection or address is guarded by an exception or part of an exception handler.'''
         address, selection = ui.current.address(), ui.current.selection()
         if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.is_exception(address, **flags)
@@ -6687,7 +6689,7 @@ class set(object):
     @utils.multicase()
     @classmethod
     def unknown(cls):
-        '''Set the data at the current address or selection to undefined.'''
+        '''Set the data at the current selection or address to undefined.'''
         selection = ui.current.selection()
         if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.unknown(ui.current.address())
@@ -6876,7 +6878,7 @@ class set(object):
     @utils.multicase()
     @classmethod
     def string(cls, **strtype):
-        '''Set the data at the current address to a string with the specified `strtype`.'''
+        '''Set the data at the current selection or address to a string with the specified `strtype`.'''
         address, selection = ui.current.address(), ui.current.selection()
         if 'length' in strtype or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.string(address, **strtype)
@@ -7841,7 +7843,7 @@ class get(object):
     @utils.multicase()
     @classmethod
     def array(cls, **length):
-        '''Return the values of the array at the current address.'''
+        '''Return the values of the array at the current selection or address.'''
         address, selection = ui.current.address(), ui.current.selection()
         if 'length' in length or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.array(address, **length)
@@ -8078,7 +8080,7 @@ class get(object):
     @utils.multicase()
     @classmethod
     def string(cls, **length):
-        '''Return the array at the current address as a string.'''
+        '''Return the array at the current selection or address as a string.'''
         address, selection = ui.current.address(), ui.current.selection()
         if 'length' in length or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.string(address, **length)
