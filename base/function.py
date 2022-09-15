@@ -3392,6 +3392,21 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def problems(cls):
+        '''Return the problems within the current function as set of integers which correspond to one of the ``idaapi.PR_*`` constants.'''
+        return cls.problems(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def problems(cls, func):
+        '''Return the problems within the function `func` as set of integers which correspond to one of the ``idaapi.PR_*`` constants.'''
+        PR_END = getattr(idaapi, 'PR_END', 17)
+        iterable = (getattr(idaapi, attribute) for attribute in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, attribute))
+        Fproblem = builtins.next(iterable, utils.fconstant(False))
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        return {problem for problem in builtins.range(1, PR_END) if Fproblem(problem, ea)}
+
+    @utils.multicase()
+    @classmethod
     def is_decompiled(cls):
         '''Return if the current function has been decompiled.'''
         return cls.is_decompiled(ui.current.address())
