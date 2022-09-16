@@ -534,21 +534,12 @@ def startup(namespace=None):
         internal.interface
 
     except ImportError:
-        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
+        logging.critical("{:s} : An error occured while trying to import the \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
         raise SystemError("{:s} : Unable to start up plugin without being able to access its \"{:s}\" modules.".format(__name__, 'internal'))
 
     except AttributeError:
-        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, '.'.join(['internal', 'interface'])), exc_info=True)
+        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, '.'.join(['internal', 'interface'])))
         raise SystemError("{:s} : Unable to start up plugin due to an error while loading its \"{:s}\" modules.".format(__name__, 'internal'))
-
-    # The next module we need to make sure we have access to is our
-    # hooks module which contains all of our startup logic.
-    try:
-        import hooks
-
-    except ImportError:
-        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, 'hooks'), exc_info=True)
-        raise SystemError("{:s} : Unable to start up plugin without being able to access its \"{:s}\" module.".format(__name__, 'hooks'))
 
     # Finally we can construct our priority notification class and inject it into
     # the IDAPython module. This object needs to exist in order for everything to
@@ -567,15 +558,28 @@ def startup(namespace=None):
     # within a single function to register.
     def load_plugin_and_execute_user_dotfile(*args, **kwargs):
         '''This function is responsible for loading the plugin and executing the dotfile in the home directory of the user.'''
-        result = hooks.ida_is_busy_sucking_cocks(*args, **kwargs)
+        result = internal.hooks.ida_is_busy_sucking_cocks(*args, **kwargs)
         dotfile(namespace)
         return result
+
+    # Before we attempt to use the hooks, though, we first check if we can access
+    # the hooks since they are pretty critical for all of our startup logic.
+    try:
+        import internal
+        internal.hooks
+
+    # If we couldn't access the hooks, then we can still proceed but as a typical
+    # set of importable python modules. Log a warning and try the user's dotfile.
+    except AttributeError:
+        logging.warning("{:s} : An error occured while trying to access the \"{:s}\" module which will result in missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
+        namespace and dotfile(namespace)
+        return
 
     # Finally we can register the functions that will actually be responsible for
     # initializing the plugin. If we were given a namespace, then we can register
     # our closure that loads the user's dotfile too.
     try:
-        notification.add(idaapi.NW_INITIDA, hooks.make_ida_not_suck_cocks, -1000)
+        notification.add(idaapi.NW_INITIDA, internal.hooks.make_ida_not_suck_cocks, -1000)
         namespace and notification.add(idaapi.NW_INITIDA, execute_user_dotfile, 0)
 
     # If installing that hook failed, then check if we're running in batch mode. If
@@ -583,14 +587,14 @@ def startup(namespace=None):
     except Exception:
         TIMEOUT = 5
         if idaapi.cvar.batch:
-            hooks.ida_is_busy_sucking_cocks()
+            internal.hooks.ida_is_busy_sucking_cocks()
             namespace and dotfile(namespace)
 
         # Otherwise warn the user about this and register our hook with a timer.
         elif namespace is None:
             logging.warning("{:s} : Unable to add a notification via `{:s}` for {:s}({:d}).".format(__name__, '.'.join(['idaapi', 'notify_when']), '.'.join(['idaapi', 'NW_INITIDA']), idaapi.NW_INITIDA))
             logging.warning("{:s} : Registering {:.1f} second timer with `{:s}` in an attempt to load plugin...".format(__name__, TIMEOUT, '.'.join(['idaapi', 'register_timer'])))
-            idaapi.register_timer(TIMEOUT, hooks.ida_is_busy_sucking_cocks)
+            idaapi.register_timer(TIMEOUT, internal.hooks.ida_is_busy_sucking_cocks)
             six.print_('=' * 86)
 
         # If we were given a namespace to load into, then we register the closure
@@ -605,7 +609,7 @@ def startup(namespace=None):
     # If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
     else:
         try:
-            notification.add(idaapi.NW_TERMIDA, hooks.make_ida_suck_cocks, +1000)
+            notification.add(idaapi.NW_TERMIDA, internal.hooks.make_ida_suck_cocks, +1000)
 
         # Installing the termination hook failed, but it's not really too important...
         except Exception:
@@ -715,17 +719,24 @@ class MINSC(idaapi.plugin_t):
         # necessary hooks or other features depending what we found available.
         ok = True
         try:
-            import internal, hooks
+            import internal
 
         except (ImportError, Exception):
-            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\".".format(__name__, 'internal', 'hooks'), exc_info=True)
+            logging.critical("{:s} : An error occurred while trying to import the critical \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
+            ok = False
+
+        try:
+            ok and internal.hooks
+
+        except AttributeError:
+            logging.warning("{:s} : One of the internal modules, \"{:s}\" was not properly loaded and may result in some missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
             ok = False
 
         try:
             ok and internal.interface
 
         except AttributeError:
-            logging.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was not properly loaded.".format(__name__, '.'.join(['internal', 'interface'])))
+            logging.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was unable to be loaded.".format(__name__, '.'.join(['internal', 'interface'])))
 
         # Check to see if our notification instance was assigned into idaapi. If
         # it wasn't then try to construct one and assign it for usage.
@@ -741,7 +752,7 @@ class MINSC(idaapi.plugin_t):
         if ok:
             logging.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(__name__))
             self.state = self.__class__.state = 'local'
-            hooks.make_ida_not_suck_cocks(idaapi.NW_INITIDA)
+            internal.hooks.make_ida_not_suck_cocks(idaapi.NW_INITIDA)
 
             # If there's an accessible "__main__" namespace, then dump the dotfile into it.
             '__main__' in sys.modules and dotfile(sys.modules['__main__'].__dict__)
