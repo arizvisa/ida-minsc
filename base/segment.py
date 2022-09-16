@@ -34,17 +34,12 @@ Some examples of using these keywords are as follows::
 
 """
 
-import six, builtins
-
-import functools, operator, itertools, types
-import os, logging
+import functools, operator, itertools, logging, builtins, os, six
 import math, re, fnmatch
 
-import database
-import ui, internal
-from internal import utils, interface, exceptions as E
-
-import idaapi
+import database, ui
+import idaapi, internal
+from internal import utils, interface, types, exceptions as E
 
 ## enumerating
 __matcher__ = utils.matcher()
@@ -78,7 +73,7 @@ def __iterate__(**type):
         iterable = (item for item in __matcher__.match(key, value, iterable))
     for item in iterable: yield item
 
-@utils.multicase(string=six.string_types)
+@utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string')
 def list(string):
     '''List all of the segments whose name matches the glob specified by `string`.'''
@@ -144,12 +139,12 @@ byaddress = utils.alias(by_address)
 def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
     return segment
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
 def by(name):
     '''Return the segment by its `name`.'''
     return by_name(name)
-@utils.multicase(ea=six.integer_types)
+@utils.multicase(ea=types.integer)
 def by(ea):
     '''Return the segment containing the address `ea`.'''
     return by_address(ea)
@@ -178,7 +173,7 @@ def by(**type):
         raise E.SearchResultsError(u"{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
 def search(name):
     '''Search through all the segments and return the first one matching the glob `name`.'''
@@ -241,32 +236,32 @@ def size(segment):
 def offset():
     '''Return the offset of the current address from the beginning of the current segment.'''
     return offset(ui.current.segment(), ui.current.address())
-@utils.multicase(ea=six.integer_types)
+@utils.multicase(ea=types.integer)
 def offset(ea):
     '''Return the offset of the address `ea` from the beginning of the current segment.'''
     return offset(ui.current.segment(), ea)
-@utils.multicase(ea=six.integer_types)
+@utils.multicase(ea=types.integer)
 def offset(segment, ea):
     '''Return the offset of the address `ea` from the beginning of `segment`.'''
     seg = by(segment)
     return ea - interface.range.start(seg)
 
-@utils.multicase(offset=six.integer_types)
+@utils.multicase(offset=types.integer)
 def by_offset(offset):
     '''Return the specified `offset` translated to the beginning of the current segment.'''
     return by_offset(ui.current.segment(), offset)
-@utils.multicase(offset=six.integer_types)
+@utils.multicase(offset=types.integer)
 def by_offset(segment, offset):
     '''Return the specified `offset` translated to the beginning of `segment`.'''
     seg = by(segment)
     return interface.range.start(seg) + offset
 byoffset = utils.alias(by_offset)
 
-@utils.multicase(offset=six.integer_types)
+@utils.multicase(offset=types.integer)
 def go_offset(offset):
     '''Go to the `offset` of the current segment.'''
     return go_offset(ui.current.segment(), offset)
-@utils.multicase(offset=six.integer_types)
+@utils.multicase(offset=types.integer)
 def go_offset(segment, offset):
     '''Go to the `offset` of the specified `segment`.'''
     seg = by(segment)
@@ -365,17 +360,17 @@ def color(segment):
     seg = by(segment)
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
-@utils.multicase(none=None.__class__)
+@utils.multicase(none=types.none)
 def color(none):
     '''Clear the color of the current segment.'''
     return color(ui.current.segment(), None)
-@utils.multicase(none=None.__class__)
+@utils.multicase(none=types.none)
 def color(segment, none):
     '''Clear the color of the segment identified by `segment`.'''
     seg = by(segment)
     seg.color = 0xffffffff
     return bool(seg.update())
-@utils.multicase(rgb=six.integer_types)
+@utils.multicase(rgb=types.integer)
 def color(segment, rgb):
     '''Sets the color of the segment identified by `segment` to `rgb`.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
@@ -387,27 +382,27 @@ def color(segment, rgb):
 def within():
     '''Returns true if the current address is within any segment.'''
     return within(ui.current.address())
-@utils.multicase(ea=six.integer_types)
+@utils.multicase(ea=types.integer)
 def within(ea):
     '''Returns true if the address `ea` is within any segment.'''
     return any(interface.range.within(ea, seg) for seg in __iterate__())
 
-@utils.multicase(ea=six.integer_types)
+@utils.multicase(ea=types.integer)
 def contains(ea):
     '''Returns true if the address `ea` is contained within the current segment.'''
     return contains(ui.current.segment(), ea)
-@utils.multicase(address=six.integer_types, ea=six.integer_types)
+@utils.multicase(address=types.integer, ea=types.integer)
 def contains(address, ea):
     '''Returns true if the address `ea` is contained within the segment belonging to the specified `address`.'''
     seg = by_address(address)
     return contains(seg, ea)
-@utils.multicase(name=six.string_types, ea=six.integer_types)
+@utils.multicase(name=types.string, ea=types.integer)
 @utils.string.decorate_arguments('name')
 def contains(name, ea):
     '''Returns true if the address `ea` is contained within the segment with the specified `name`.'''
     seg = by_name(name)
     return contains(seg, ea)
-@utils.multicase(segment=idaapi.segment_t, ea=six.integer_types)
+@utils.multicase(segment=idaapi.segment_t, ea=types.integer)
 def contains(segment, ea):
     '''Returns true if the address `ea` is contained within the ``idaapi.segment_t`` specified by `segment`.'''
     return interface.range.within(ea, segment)
@@ -416,7 +411,7 @@ def contains(segment, ea):
 def type():
     '''Return the type of the current segment.'''
     return type(ui.current.segment())
-@utils.multicase(ea=six.integer_types)
+@utils.multicase(ea=types.integer)
 def type(ea):
     '''Return the type of the segment containing the address `ea`.'''
     result = idaapi.segtype(ea)
@@ -424,7 +419,7 @@ def type(ea):
         bounds, results = "{:#x}<>{:#x}".format(*database.config.bounds()), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('SEG_')}
         logging.warning(u"{:s}.type({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, bounds))
     return result
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
 def type(name):
     '''Return the type of the segment with the specified `name`.'''
@@ -434,7 +429,7 @@ def type(name):
 def type(segment):
     '''Return the type of the ``idaapi.segment_t`` specified by `segment`.'''
     return segment.type
-@utils.multicase(segtype=six.integer_types)
+@utils.multicase(segtype=types.integer)
 def type(segment, segtype):
     '''Return whether the given `segment` is of the provided `segtype`.'''
     return type(segment) == segtype
