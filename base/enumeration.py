@@ -30,28 +30,22 @@ as follows:
 
 """
 
-import six, builtins
-
-import functools, operator, itertools
-import logging, sys, math
-import fnmatch, re
+import functools, operator, itertools, logging, six
+import builtins, math, fnmatch, re
 
 import database
-
-import internal
-from internal import utils, interface, exceptions as E
-
-import idaapi
+import idaapi, internal
+from internal import utils, interface, types, exceptions as E
 
 # FIXME: complete this with more types similar to the 'structure' module.
 # FIXME: normalize the documentation.
 
-@utils.multicase(enum=six.integer_types)
+@utils.multicase(enum=types.integer)
 def has(enum):
     '''Return truth if an enumeration with the identifier `enum` exists within the database.'''
     ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL = -1, -3, -5, -8
     return interface.node.is_identifier(enum) and idaapi.get_enum_idx(enum) != idaapi.BADADDR
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 def has(name):
     '''Return truth if an enumeration with the specified `name` exists within the database.'''
     string = utils.string.to(name)
@@ -66,7 +60,7 @@ def flags(enum):
     '''Return the flags for the enumeration identified by `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_flag(eid)
-@utils.multicase(flags=six.integer_types)
+@utils.multicase(flags=types.integer)
 def flags(enum, flags):
     '''Set the flags for the enumeration `enum` to the value specified by `flags`.'''
     eid = by(enum)
@@ -86,7 +80,7 @@ def index(enum):
     '''Return the index in the enumeration list for the enumeration identified by `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_idx(eid)
-@utils.multicase(index=six.integer_types)
+@utils.multicase(index=types.integer)
 def index(enum, index):
     '''Set the position in the enumeration list for the enumeration `enum` to the specified `index`.'''
     eid = by(enum)
@@ -120,11 +114,11 @@ def by_identifier(eid):
     return eid
 byidentifier = utils.alias(by_identifier)
 
-@utils.multicase(index=six.integer_types)
+@utils.multicase(index=types.integer)
 def by(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
     return by_identifier(index) if interface.node.is_identifier(index) else by_index(index)
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
 def by(name):
     '''Return the identifier for the enumeration with the specified `name`.'''
@@ -147,7 +141,7 @@ def by(**type):
         raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
-@utils.multicase(string=six.string_types)
+@utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string')
 def search(string):
     '''Return the identifier of the first enumeration that matches the glob `string`.'''
@@ -190,7 +184,7 @@ def name(enum):
     eid = by(enum)
     res = idaapi.get_enum_name(eid)
     return utils.string.of(res)
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
 def name(enum, name):
     '''Rename the enumeration `enum` to the string `name`.'''
@@ -209,7 +203,7 @@ def comment(enum, **repeatable):
     eid = by(enum)
     res = idaapi.get_enum_cmt(eid, repeatable.get('repeatable', True))
     return utils.string.of(res)
-@utils.multicase(comment=six.string_types)
+@utils.multicase(comment=types.string)
 @utils.string.decorate_arguments('comment')
 def comment(enum, comment, **repeatable):
     """Set the comment for the enumeration `enum` to `comment`.
@@ -222,7 +216,7 @@ def comment(enum, comment, **repeatable):
         adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
         raise E.DisassemblerError(u"{:s}.comment({!r}, {!s}{:s}) : Unable to set the {:s}comment for the specified enumeration ({:#x}) to {!s}.".format(__name__, enum, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', eid, utils.string.repr(comment)))
     return utils.string.of(res)
-@utils.multicase(none=None.__class__)
+@utils.multicase(none=types.none)
 def comment(enum, none, **repeatable):
     '''Remove the comment from the enumeration `enum`.'''
     return comment(enum, none or u'', **repeatable)
@@ -232,7 +226,7 @@ def size(enum):
     '''Return the number of bytes for the enumeration `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_width(eid)
-@utils.multicase(width=six.integer_types)
+@utils.multicase(width=types.integer)
 def size(enum, width):
     '''Set the number of bytes for the enumeration `enum` to `width`.'''
     eid = by(enum)
@@ -245,7 +239,7 @@ def size(enum, width):
 def bits(enum):
     '''Return the number of bits for the enumeration `enum`.'''
     return 8 * size(enum)
-@utils.multicase(width=six.integer_types)
+@utils.multicase(width=types.integer)
 def bits(enum, width):
     '''Set the number of bits for the enumeration `enum` to `width`.'''
     res = math.trunc(math.ceil(width / 8.0))
@@ -262,7 +256,7 @@ def bitfield(enum):
     '''Return whether the enumeration identified by `enum` is a bitfield or not.'''
     eid = by(enum)
     return idaapi.is_bf(eid)
-@utils.multicase(boolean=(six.integer_types, bool))
+@utils.multicase(boolean=(types.integer, types.bool))
 def bitfield(enum, boolean):
     '''Toggle the bitfield setting of the enumeration `enum` depending on the value of `boolean`.'''
     eid = by(enum)
@@ -409,7 +403,7 @@ def iterate(**type):
         listable = [item for item in __matcher__.match(key, value, listable)]
     for item in listable: yield item
 
-@utils.multicase(string=six.string_types)
+@utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string')
 def list(string):
     '''List any enumerations that match the glob in `string`.'''
@@ -479,7 +473,7 @@ class members(object):
             continue
         return
 
-    @utils.multicase(name=six.string_types)
+    @utils.multicase(name=types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def has(cls, enum, name):
@@ -490,7 +484,7 @@ class members(object):
         except E.MemberNotFoundError:
             return False
         return True
-    @utils.multicase(value=six.integer_types)
+    @utils.multicase(value=types.integer)
     @classmethod
     def has(cls, enum, value, **bitmask):
         """Return whether the enumeration `enum` contains a member with the specified `value`.
@@ -519,7 +513,7 @@ class members(object):
         eid = by(enum)
         bmask = bitmask.get('bitmask', idaapi.DEFMASK)
 
-        fullname = interface.tuplename(name) if isinstance(name, tuple) else name
+        fullname = interface.tuplename(name) if isinstance(name, types.tuple) else name
         string = utils.string.to(fullname)
         ok = idaapi.add_enum_member(eid, string, value, bmask)
 
@@ -530,7 +524,7 @@ class members(object):
     new = create = utils.alias(add, 'members')
 
     @classmethod
-    @utils.multicase(mid=six.integer_types)
+    @utils.multicase(mid=types.integer)
     def remove(cls, mid):
         '''Remove the member identified by `mid` from the enumeration that owns it.'''
         eid = member.parent(mid)
@@ -699,12 +693,12 @@ class members(object):
         raise E.MemberNotFoundError(u"{:s}.by_name({!r}, {!s}) : Unable to locate a member in the enumeration ({:#x}) with the specified name ({!s}).".format('.'.join([__name__, cls.__name__]), enum, utils.string.repr(name), eid, utils.string.repr(name)))
     byname = utils.alias(by_name, 'members')
 
-    @utils.multicase(n=six.integer_types)
+    @utils.multicase(n=types.integer)
     @classmethod
     def by(cls, enum, n):
         '''Return the member belonging to `enum` identified by its index or id in `n`.'''
         return cls.by_identifier(enum, n) if interface.node.is_identifier(n) else cls.by_index(enum, n)
-    @utils.multicase(name=six.string_types)
+    @utils.multicase(name=types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by(cls, enum, name):
@@ -830,7 +824,7 @@ class member(object):
         eid = cls.parent(mid)
         return members.by_identifier(eid, mid)
 
-    @utils.multicase(mid=six.integer_types)
+    @utils.multicase(mid=types.integer)
     @classmethod
     def remove(cls, mid):
         '''Remove the enumeration member with the given `mid`.'''
@@ -848,7 +842,7 @@ class member(object):
         return cls.remove(mid)
 
     ## properties
-    @utils.multicase(mid=six.integer_types)
+    @utils.multicase(mid=types.integer)
     @classmethod
     def name(cls, mid):
         '''Return the name of the enumeration member `mid`.'''
@@ -863,18 +857,18 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.name(mid)
-    @utils.multicase(mid=six.integer_types, name=(six.string_types, tuple))
+    @utils.multicase(mid=types.integer, name=(types.string, types.tuple))
     @classmethod
     @utils.string.decorate_arguments('name')
     def name(cls, mid, name):
         '''Rename the enumeration member `mid` to `name`.'''
-        fullname = interface.tuplename(*name) if isinstance(name, tuple) else name
+        fullname = interface.tuplename(*name) if isinstance(name, types.tuple) else name
         string = utils.string.to(fullname)
         res, ok = idaapi.get_enum_member_name(mid), idaapi.set_enum_member_name(mid, string)
         if not ok:
             raise E.DisassemblerError(u"{:s}.name({:#x}, {!s}) : Unable to set the name for the specified member ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(name), mid, utils.string.repr(fullname)))
         return utils.string.of(res)
-    @utils.multicase(name=six.string_types)
+    @utils.multicase(name=types.string)
     @classmethod
     @utils.string.decorate_arguments('name', 'suffix')
     def name(cls, enum, member, name, *suffix):
@@ -884,7 +878,7 @@ class member(object):
         fullname = (name,) + suffix
         return cls.name(mid, fullname)
 
-    @utils.multicase(mid=six.integer_types)
+    @utils.multicase(mid=types.integer)
     @classmethod
     def comment(cls, mid, **repeatable):
         """Return the comment for the enumeration member `mid`.
@@ -902,7 +896,7 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.comment(mid, **repeatable)
-    @utils.multicase(mid=six.integer_types, comment=six.string_types)
+    @utils.multicase(mid=types.integer, comment=types.string)
     @classmethod
     @utils.string.decorate_arguments('comment')
     def comment(cls, mid, comment, **repeatable):
@@ -918,7 +912,7 @@ class member(object):
             adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
             raise E.DisassemblerError(u"{:s}.comment({:#x}, {!s}{:s})) : Unable to set the {:s}comment for the specified member ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', mid, utils.string.repr(comment)))
         return utils.string.of(res)
-    @utils.multicase(comment=six.string_types)
+    @utils.multicase(comment=types.string)
     @classmethod
     @utils.string.decorate_arguments('comment')
     def comment(cls, enum, member, comment, **repeatable):
@@ -926,13 +920,13 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.comment(mid, comment, **repeatable)
-    @utils.multicase(none=None.__class__)
+    @utils.multicase(none=types.none)
     @classmethod
     def comment(cls, enum, member, none, **repeatable):
         '''Remove the comment from the `member` belonging to the enumeration `enum`.'''
         return cls.comment(enum, member, none or u'', **repeatable)
 
-    @utils.multicase(mid=six.integer_types)
+    @utils.multicase(mid=types.integer)
     @classmethod
     def value(cls, mid):
         '''Return the value of the enumeration member `mid`.'''
@@ -946,7 +940,7 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.value(mid)
-    @utils.multicase(mid=six.integer_types, value=six.integer_types)
+    @utils.multicase(mid=types.integer, value=types.integer)
     @classmethod
     def value(cls, mid, value):
         '''Assign the integer specified by `value` to the enumeration member `mid`.'''
@@ -971,7 +965,7 @@ class member(object):
         if not ok:
             raise E.DisassemblerError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to set the value for the specified member ({:#x}) to {:#x}{:s}.".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid, value, u" & {:#x}".format(bmask) if bmask else u''))
         return res
-    @utils.multicase(value=six.integer_types)
+    @utils.multicase(value=types.integer)
     @classmethod
     def value(cls, enum, member, value, **bitmask):
         '''Set the `value` for the enumeration `member` belonging to `enum`.'''
@@ -979,7 +973,7 @@ class member(object):
         mid = members.by(eid, member)
         return cls.value(mid, value)
 
-    @utils.multicase(mid=six.integer_types)
+    @utils.multicase(mid=types.integer)
     @classmethod
     def serial(cls, mid):
         '''Return the serial of the enumeration member `mid`.'''
@@ -995,7 +989,7 @@ class member(object):
         mid = members.by(eid, member)
         return cls.serial(mid)
 
-    @utils.multicase(mid=six.integer_types)
+    @utils.multicase(mid=types.integer)
     @classmethod
     def mask(cls, mid):
         '''Return the bitmask for the enumeration member `mid`.'''
@@ -1106,26 +1100,26 @@ class masks(object):
             yield item
         return
 
-    @utils.multicase(mask=six.integer_types)
+    @utils.multicase(mask=types.integer)
     @classmethod
     def name(cls, enum, mask):
         '''Return the name for the given `mask` belonging to the enumeration `enum`.'''
         eid = by(enum)
         res = idaapi.get_bmask_name(eid, mask)
         return utils.string.of(res) or ''
-    @utils.multicase(mask=six.integer_types, name=(six.string_types, tuple))
+    @utils.multicase(mask=types.integer, name=(types.string, types.tuple))
     @classmethod
     @utils.string.decorate_arguments('name')
     def name(cls, enum, mask, name):
         '''Set the name for the `mask` belonging to the enumeration `enum` to the provided `name`.'''
         eid = by(enum)
-        fullname = interface.tuplename(*name) if isinstance(name, tuple) else name
+        fullname = interface.tuplename(*name) if isinstance(name, types.tuple) else name
         string = utils.string.to(fullname)
         res, ok = idaapi.get_bmask_name(eid, mask), idaapi.set_bmask_name(eid, mask, string)
         if not ok:
             raise E.DisassemblerError(u"{:s}.name({!r}, {:#x}, {!s}) : Unable to rename the mask ({:#x}) for the specified enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), enum, mask, utils.string.repr(name), 2 + 2 * size(eid), eid, utils.string.repr(fullname)))
         return utils.string.of(res)
-    @utils.multicase(mask=six.integer_types, name=six.string_types)
+    @utils.multicase(mask=types.integer, name=types.string)
     @classmethod
     @utils.string.decorate_arguments('name', 'suffix')
     def name(cls, enum, mask, name, *suffix):
@@ -1134,7 +1128,7 @@ class masks(object):
         fullname = (name,) + suffix
         return cls.name(eid, mask, fullname)
 
-    @utils.multicase(mask=six.integer_types)
+    @utils.multicase(mask=types.integer)
     @classmethod
     def comment(cls, enum, mask, **repeatable):
         """Return the comment for the `mask` belonging to the enumeration `enum`.
@@ -1144,7 +1138,7 @@ class masks(object):
         eid = by(enum)
         res = idaapi.get_bmask_cmt(eid, mask, repeatable.get('repeatable', True))
         return utils.string.of(res)
-    @utils.multicase(mask=six.integer_types, comment=six.string_types)
+    @utils.multicase(mask=types.integer, comment=types.string)
     @classmethod
     @utils.string.decorate_arguments('comment')
     def comment(cls, enum, mask, comment, **repeatable):
@@ -1159,7 +1153,7 @@ class masks(object):
             adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
             raise E.DisassemblerError(u"{:s}.comment({!r}, {:#x}, {!s}, {:s}) : Unable to set the {:s}comment for the specified mask ({:#0{:d}x}) from the enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), enum, mask, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', mask, 2 + 2 * size(eid), eid, utils.string.repr(comment)))
         return utils.string.of(res)
-    @utils.multicase(mask=six.integer_types, none=None.__class__)
+    @utils.multicase(mask=types.integer, none=types.none)
     @classmethod
     def comment(cls, enum, mask, none, **repeatable):
         '''Remove the comment for the `mask` belonging to the enumeration `enum`.'''
