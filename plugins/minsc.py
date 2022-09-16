@@ -292,11 +292,11 @@ def finders():
 
     # private (internal) api
     documentation = 'This virtual module contains a number of internal submodules.'
-    yield internal_submodule('internal', os.path.join(root, 'base'), include='_*.py', __doc__=documentation)
+    yield internal_submodule('internal', os.path.join(root, 'misc'), include='_*.py', __doc__=documentation)
 
     # public api
-    yield internal_path(os.path.join(root, 'base'), exclude='_*.py')
-    yield internal_path(os.path.join(root, 'misc'))
+    yield internal_path(os.path.join(root, 'base'))
+    yield internal_path(os.path.join(root, 'misc'), exclude='_*.py')
 
     # tools and application api
     documentation = 'This virtual module contains a number of different files as submodules.'
