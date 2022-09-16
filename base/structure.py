@@ -39,17 +39,12 @@ Some examples of using these keywords are as follows::
 
 """
 
-import six, builtins
-
-import functools, operator, itertools, types
-import sys, logging
+import builtins, functools, operator, itertools, logging, six
 import re, fnmatch
 
-import database, instruction
-import ui, internal
-from internal import utils, interface, exceptions as E
-
-import idaapi
+import database, instruction, ui
+import idaapi, internal
+from internal import utils, interface, types, exceptions as E
 
 def __instance__(identifier, **options):
     '''Create a new instance of the structure identified by `identifier`.'''
@@ -84,11 +79,11 @@ def __iterate__():
         yield __instance__(idaapi.get_struc_by_idx(res))
     return
 
-@utils.multicase(string=six.string_types)
+@utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def iterate(string, *suffix):
     '''Iterate through all of the structures in the database with a glob that matches `string`.'''
-    res = string if isinstance(string, tuple) else (string,)
+    res = string if isinstance(string, types.tuple) else (string,)
     return iterate(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
@@ -100,11 +95,11 @@ def iterate(**type):
         listable = [item for item in __matcher__.match(key, value, listable)]
     for item in listable: yield item
 
-@utils.multicase(string=six.string_types)
+@utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def list(string, *suffix):
     '''List any structures that match the glob in `string`.'''
-    res = string if isinstance(string, tuple) else (string,)
+    res = string if isinstance(string, types.tuple) else (string,)
     return list(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
@@ -120,7 +115,7 @@ def list(**type):
         six.print_(u"[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), u" // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
     return
 
-@utils.multicase(tag=six.string_types)
+@utils.multicase(tag=types.string)
 @utils.string.decorate_arguments('And', 'Or')
 def select(tag, *And, **boolean):
     '''Query all of the structure tags for the specified `tag` and any others specified as `And`.'''
@@ -135,8 +130,7 @@ def select(**boolean):
     If `And` contains an iterable then require the returned structure contains them.
     If `Or` contains an iterable then include any other tags that are specified.
     """
-    containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
+    boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
     # User is not asking for anything specifically, so just yield all the
     # structures that are available.
@@ -172,7 +166,7 @@ def select(**boolean):
         if collected: yield st, collected
     return
 
-@utils.multicase(string=(six.string_types, tuple))
+@utils.multicase(string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def new(string, *suffix, **offset):
     """Return a new structure or union using the name specified by `string`.
@@ -180,7 +174,7 @@ def new(string, *suffix, **offset):
     If the boolean `union` is provided, then create a union instead of a structure.
     If the integer `offset` is provided, then use it as the base offset for the newly created structure.
     """
-    res = string if isinstance(string, tuple) else (string,)
+    res = string if isinstance(string, types.tuple) else (string,)
     name = interface.tuplename(*(res + suffix))
 
     # add a structure with the specified name
@@ -192,11 +186,11 @@ def new(string, *suffix, **offset):
     # return a new instance using the specified identifier
     return __instance__(id, **offset)
 
-@utils.multicase(string=six.string_types)
+@utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def search(string, *suffix):
     '''Search through all the structure names matching the glob `string`.'''
-    res = string if isinstance(string, tuple) else (string,)
+    res = string if isinstance(string, types.tuple) else (string,)
     return by(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
 def search(**type):
@@ -206,7 +200,7 @@ def search(**type):
 @utils.string.decorate_arguments('name', 'suffix')
 def by_name(name, *suffix, **options):
     '''Return a structure by its name.'''
-    string = name if isinstance(name, tuple) else (name,)
+    string = name if isinstance(name, types.tuple) else (name,)
     res = utils.string.to(interface.tuplename(*(string + suffix)))
 
     # try and find the structure id according to its name
@@ -251,7 +245,7 @@ class structure_t(object):
     __slots__ = ('__ptr__', '__name__', '__members__')
 
     def __init__(self, sptr, offset=0):
-        if not isinstance(sptr, (idaapi.struc_t, six.integer_types)):
+        if not isinstance(sptr, (idaapi.struc_t, types.integer)):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({!s}, offset={:+#x}) : Unable to instantiate a structure using the provided type ({!s}).".format('.'.join([__name__, cls.__name__]), sptr, offset, sptr))
 
@@ -324,7 +318,7 @@ class structure_t(object):
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
             res.setdefault('__typeinfo__', ti_s)
         return res
-    @utils.multicase(key=six.string_types)
+    @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the structure.'''
@@ -333,7 +327,7 @@ class structure_t(object):
             return res[key]
         cls = self.__class__
         raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
-    @utils.multicase(key=six.string_types)
+    @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the structure.'''
@@ -367,7 +361,7 @@ class structure_t(object):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(self.name)))
         return res
-    @utils.multicase(key=six.string_types, none=None.__class__)
+    @utils.multicase(key=types.string, none=types.none)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the structure.'''
@@ -690,7 +684,7 @@ class structure_t(object):
     @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the structure to `string`.'''
-        if isinstance(string, tuple):
+        if isinstance(string, types.tuple):
             string = interface.tuplename(*string)
 
         # convert the specified string into a form that IDA can handle
@@ -930,15 +924,15 @@ class structure_t(object):
         return
 
 ### Functions that are related to finding and using a structure_t.
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def has(id):
     '''Return whether a structure with the specified `id` exists within the database.'''
     return True if interface.node.is_identifier(id) and idaapi.get_struc(id) else False
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def has(name, *suffix):
     '''Return if a structure with the specified `name` exists within the database.'''
-    string = name if isinstance(name, tuple) else (name,)
+    string = name if isinstance(name, types.tuple) else (name,)
     res = utils.string.to(interface.tuplename(*(string + suffix)))
     return has(idaapi.get_struc_id(res))
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
@@ -958,12 +952,12 @@ def has(tinfo):
         return has(pi.obj_type)
     return False
 
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def by(name, *suffix, **options):
     '''Return the structure with the given `name`.'''
     return by_name(name, *suffix, **options)
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def by(id, **options):
     '''Return the structure with the specified `id` or index.'''
     if interface.node.is_identifier(id):
@@ -1022,7 +1016,7 @@ def name(id):
 @utils.multicase(structure=structure_t)
 def name(structure):
     return name(structure.id)
-@utils.multicase(string=six.string_types)
+@utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(id, string, *suffix):
     '''Set the name of the structure identified by `id` to `string`.'''
@@ -1040,13 +1034,13 @@ def name(id, string, *suffix):
 
     # now we can set the name of the structure
     return idaapi.set_struc_name(id, ida_string)
-@utils.multicase(structure=structure_t, string=six.string_types)
+@utils.multicase(structure=structure_t, string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(structure, string, *suffix):
     '''Set the name of the specified `structure` to `string`.'''
     return name(structure.id, string, *suffix)
 
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def comment(id, **repeatable):
     """Return the comment of the structure identified by `id`.
 
@@ -1058,16 +1052,16 @@ def comment(id, **repeatable):
 def comment(structure, **repeatable):
     '''Return the comment for the specified `structure`.'''
     return comment(structure.id, **repeatable)
-@utils.multicase(structure=structure_t, cmt=six.string_types)
+@utils.multicase(structure=structure_t, cmt=types.string)
 @utils.string.decorate_arguments('cmt')
 def comment(structure, cmt, **repeatable):
     '''Set the comment to `cmt` for the specified `structure`.'''
     return comment(structure.id, cmt, **repeatable)
-@utils.multicase(structure=structure_t, none=None.__class__)
+@utils.multicase(structure=structure_t, none=types.none)
 def comment(structure, none, **repeatable):
     '''Remove the comment from the specified `structure`.'''
     return comment(structure.id, none or '', **repeatable)
-@utils.multicase(id=six.integer_types, cmt=six.string_types)
+@utils.multicase(id=types.integer, cmt=types.string)
 @utils.string.decorate_arguments('cmt')
 def comment(id, cmt, **repeatable):
     """Set the comment of the structure identified by `id` to `cmt`.
@@ -1076,12 +1070,12 @@ def comment(id, cmt, **repeatable):
     """
     res = utils.string.to(cmt)
     return idaapi.set_struc_cmt(id, res, repeatable.get('repeatable', True))
-@utils.multicase(id=six.integer_types, none=None.__class__)
+@utils.multicase(id=types.integer, none=types.none)
 def comment(id, none, **repeatable):
     '''Remove the comment from the structure identified by `id`.'''
     return comment(id, none or '', **repeatable)
 
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def index(id):
     '''Return the index of the structure identified by `id`.'''
     return idaapi.get_struc_idx(id)
@@ -1089,11 +1083,11 @@ def index(id):
 def index(structure):
     '''Return the index of the specified `structure`.'''
     return index(structure.id)
-@utils.multicase(id=six.integer_types, index=six.integer_types)
+@utils.multicase(id=types.integer, index=types.integer)
 def index(id, index):
     '''Move the structure identified by `id` to the specified `index` in the structure list.'''
     return idaapi.set_struc_idx(id, index)
-@utils.multicase(structure=structure_t, index=six.integer_types)
+@utils.multicase(structure=structure_t, index=types.integer)
 def index(structure, index):
     '''Move the specified `structure` to the specified `index` in the structure list.'''
     return index(structure.id, index)
@@ -1102,12 +1096,12 @@ def index(structure, index):
 def size(structure):
     '''Return the size of the specified `structure`.'''
     return size(structure.id)
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def size(id):
     '''Return the size of the structure identified by `id`.'''
     return idaapi.get_struc_size(id)
 
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def is_union(id):
     '''Return whether the structure identified by `id` is a union or not.'''
     sptr = idaapi.get_struc(id)
@@ -1122,7 +1116,7 @@ def is_union(structure):
     return True if sptr.props & SF_UNION else False
 unionQ = isunion = utils.alias(is_union)
 
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def is_frame(id):
     '''Return whether the structure identified by `id` is a frame or not.'''
     sptr = idaapi.get_struc(id)
@@ -1140,7 +1134,7 @@ def members(structure, **base):
     '''Yield each member of the given `structure` as a tuple containing its attributes.'''
     st = by(structure)
     return members(st.id, **base)
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def members(id, **base):
     """Yield each member of the structure with the specified `id` as a tuple of containing its `(offset, size, tags)`.
 
@@ -1195,17 +1189,17 @@ def members(id, **base):
         offset += msize
     return
 
-@utils.multicase(offset=six.integer_types)
+@utils.multicase(offset=types.integer)
 def fragment(structure, offset, **base):
     '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
     st = by(structure)
     return fragment(st.id, offset, st.size, **base)
-@utils.multicase(offset=six.integer_types, size=six.integer_types)
+@utils.multicase(offset=types.integer, size=types.integer)
 def fragment(structure, offset, size, **base):
     '''Yield each member of the given `structure` from the specified `offset` up to `size` as a tuple containing its attributes.'''
     st = by(structure)
     return fragment(st.id, offset, size, **base)
-@utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
+@utils.multicase(id=types.integer, offset=types.integer, size=types.integer)
 def fragment(id, offset, size, **base):
     """Yield each member of the structure with the specified `id` from the given `offset` up to `size` as a tuple containing its `(offset, size, tags)`.
 
@@ -1240,13 +1234,13 @@ def remove(structure):
     if not idaapi.del_struc(structure.ptr):
         raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to remove structure {:#x}.".format(__name__, structure, structure.id))
     return True
-@utils.multicase(name=six.string_types)
+@utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def remove(name, *suffix):
     '''Remove the structure with the specified `name`.'''
     res = by_name(name, *suffix)
     return remove(res)
-@utils.multicase(id=six.integer_types)
+@utils.multicase(id=types.integer)
 def remove(id):
     '''Remove a structure by its index or `id`.'''
     res = by(id)
@@ -1306,18 +1300,18 @@ class members_t(object):
         for key, value in type.items():
             listable = [item for item in self.__members_matcher.match(key, value, listable)]
         for item in listable: yield item
-    @utils.multicase(string=six.string_types)
+    @utils.multicase(string=types.string)
     @utils.string.decorate_arguments('string', 'suffix')
     def iterate(self, string, *suffix):
         '''Iterate through all of the members in the structure with a name that matches the glob in `string`.'''
-        res = string if isinstance(string, tuple) else (string,)
+        res = string if isinstance(string, types.tuple) else (string,)
         return self.iterate(like=interface.tuplename(*(res + suffix)))
 
-    @utils.multicase(string=six.string_types)
+    @utils.multicase(string=types.string)
     @utils.string.decorate_arguments('string', 'suffix')
     def list(self, string, *suffix):
         '''List any members that match the glob in `string`.'''
-        res = string if isinstance(string, tuple) else (string,)
+        res = string if isinstance(string, types.tuple) else (string,)
         return self.list(like=interface.tuplename(*(res + suffix)))
     @utils.multicase()
     @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
@@ -1356,16 +1350,16 @@ class members_t(object):
             cls = self.__class__
             raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, searchstring))
         return res
-    @utils.multicase(name=six.string_types)
+    @utils.multicase(name=types.string)
     @utils.string.decorate_arguments('name', 'suffix')
     def by(self, name, *suffix):
         '''Return the member with the specified `name`.'''
         return self.by_name(name, *suffix)
-    @utils.multicase(offset=six.integer_types)
+    @utils.multicase(offset=types.integer)
     def by(self, offset):
         '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
-    @utils.multicase(location=tuple)
+    @utils.multicase(location=types.tuple)
     def by(self, location):
         '''Return the member at the specified `location`.'''
         offset, size = location
@@ -1381,7 +1375,7 @@ class members_t(object):
     @utils.string.decorate_arguments('name', 'suffix')
     def by_name(self, name, *suffix):
         '''Return the member with the specified `name`.'''
-        string = name if isinstance(name, tuple) else (name,)
+        string = name if isinstance(name, types.tuple) else (name,)
         res = utils.string.to(interface.tuplename(*(string + suffix)))
         owner = self.owner
 
@@ -1399,7 +1393,7 @@ class members_t(object):
     @utils.string.decorate_arguments('fullname', 'suffix')
     def by_fullname(self, fullname, *suffix):
         '''Return the member with the specified `fullname`.'''
-        string = fullname if isinstance(fullname, tuple) else (fullname,)
+        string = fullname if isinstance(fullname, types.tuple) else (fullname,)
         res = utils.string.to(interface.tuplename(*(string + suffix)))
         owner = self.owner
 
@@ -1511,12 +1505,12 @@ class members_t(object):
                 # First we need to check to see if it's an array, because this
                 # might actually be an array of structures which we'll need to
                 # check the requested offset against.
-                if isinstance(res, builtins.list):
+                if isinstance(res, types.list):
                     type, length = res
 
                     # If we received a tuple, then we can extract the member size
                     # directly to see if it aligns properly.
-                    if isinstance(type, builtins.tuple):
+                    if isinstance(type, types.tuple):
                         _, msize = type
                         index, byte = divmod(realoffset, msize)
 
@@ -1553,7 +1547,7 @@ class members_t(object):
 
                 # If it's a tuple, then this only matches if we're pointing
                 # directly to the member.
-                elif isinstance(res, builtins.tuple):
+                elif isinstance(res, types.tuple):
                     selected.append(mptr) if realoffset else selected.insert(0, mptr)
 
                 # Anything else and we have no idea what this is, so simply
@@ -1651,12 +1645,12 @@ class members_t(object):
         return self[index]
 
     # adding/removing members
-    @utils.multicase(name=(six.string_types, tuple))
+    @utils.multicase(name=(types.string, types.tuple))
     @utils.string.decorate_arguments('name')
     def add(self, name):
         '''Append the specified member `name` with the default type at the end of the structure.'''
         return self.add(name, int)
-    @utils.multicase(name=(six.string_types, tuple))
+    @utils.multicase(name=(types.string, types.tuple))
     @utils.string.decorate_arguments('name')
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` at the end of the structure.'''
@@ -1672,7 +1666,7 @@ class members_t(object):
         # the offset to add the member at, and proceed as asked.
         offset = owner.size + self.baseoffset
         return self.add(name, type, offset)
-    @utils.multicase(name=(six.string_types, tuple), offset=six.integer_types)
+    @utils.multicase(name=(types.string, types.tuple), offset=types.integer)
     @utils.string.decorate_arguments('name')
     def add(self, name, type, offset):
         """Add a member at `offset` with the given `name` and `type`.
@@ -1716,7 +1710,7 @@ class members_t(object):
             name = 'field', realoffset
 
         # If we were given a tuple, then we need to concatenate it into a string.
-        if isinstance(name, builtins.tuple):
+        if isinstance(name, types.tuple):
             name = interface.tuplename(*name)
 
         # Finally we can use IDAPython to add the structure member with the
@@ -2011,7 +2005,7 @@ class members_t(object):
         # If our member type is an array, then we need to do some things
         # to try and figure out which index we're actually going to be
         # at. Before that, we need to take our dissolved type and unpack it.
-        if isinstance(mtype, builtins.list):
+        if isinstance(mtype, types.list):
             item, length = mtype
             _, size = (item, item.size) if isinstance(item, structure_t) else item
             prefix = [self.by_identifier(item.id) for item in [mptr]]
@@ -2025,7 +2019,7 @@ class members_t(object):
             # If it's just an atomic type, then we can return the difference
             # between our target offset and the member offset since it's up
             # to the caller to figure out what the index actually means.
-            if isinstance(item, builtins.tuple):
+            if isinstance(item, types.tuple):
                 return prefix, offset - moffset
 
             # If our array type is a structure, we will need to recurse in
@@ -2047,7 +2041,7 @@ class members_t(object):
         sptr = idaapi.get_sptr(mptr)
         if not sptr:
             prefix = (self.by_identifier(item.id) for item in [mptr])
-            return builtins.tuple(prefix), offset - moffset
+            return tuple(prefix), offset - moffset
 
         # Otherwise, the member type is a structure, and we'll need
         # to recurse in order to figure out which field should be at
@@ -2055,24 +2049,15 @@ class members_t(object):
         st = __instance__(sptr.id, offset=self.baseoffset + moffset)
         result, nextoffset = st.members.__walk_to_realoffset__(offset - moffset, filter=filter)
 
-        # If we haven't encountered a list yet, then our prefix will
-        # still be a tuple and we need to ensure it's the correct type.
-        iterable = (self.by_identifier(item.id) for item in [mptr])
-        if isinstance(result, builtins.tuple):
-            prefix = builtins.tuple(iterable)
-
-        # If our result was a list, then we've encountered an array
-        # and we need to preserve its type.
-        elif isinstance(result, builtins.list):
-            prefix = builtins.list(iterable)
-
         # Bail if we don't know what the type is.
-        else:
+        if not isinstance(result, (types.tuple, types.list)):
             raise TypeError(result)
 
-        # Now we can concatenate our prefix to our current results,
-        # and then return what we've aggregated back to our caller.
-        return prefix + result, nextoffset
+        # Otherwise use the type of our result to concatenate our
+        # prefix to our current results, and then return what we've
+        # aggregated back to our caller with the next offset.
+        iterable = (self.by_identifier(item.id) for item in [mptr])
+        return result.__class__(itertools.chain(iterable, result)), nextoffset
 
     ## Matching
     __members_matcher = utils.matcher()
@@ -2099,7 +2084,7 @@ class members_t(object):
             yield member_t(self.owner, idx)
         return
 
-    @utils.multicase(tag=six.string_types)
+    @utils.multicase(tag=types.string)
     @utils.string.decorate_arguments('And', 'Or')
     def select(self, tag, *And, **boolean):
         '''Query all of the members for the specified `tag` and any others specified as `And`.'''
@@ -2114,8 +2099,7 @@ class members_t(object):
         If `And` contains an iterable then require the returned members contains them.
         If `Or` contains an iterable then include any other tags that are specified.
         """
-        containers = (builtins.tuple, builtins.set, builtins.list)
-        boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
+        boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
         # For some reason the user wants to iterate through everything, so
         # we'll try and do as we're told but only if they have tags.
@@ -2199,10 +2183,10 @@ class members_t(object):
     def __getitem__(self, index):
         '''Return the member at the specified `index`.'''
         owner = self.owner
-        if isinstance(index, six.integer_types):
+        if isinstance(index, types.integer):
             index = owner.ptr.memqty + index if index < 0 else index
             res = member_t(owner, index) if 0 <= index < owner.ptr.memqty else None
-        elif isinstance(index, six.string_types):
+        elif isinstance(index, types.string):
             res = self.by_name(index)
         elif isinstance(index, slice):
             sliceable = [self[idx] for idx in range(owner.ptr.memqty)]
@@ -2249,11 +2233,11 @@ class members_t(object):
         owner, baseoffset, _ = state
 
         # figure out our parent here.
-        if isinstance(owner, tuple) and len(owner) == 2:
+        if isinstance(owner, types.tuple) and len(owner) == 2:
             sprops, ownername = owner
 
         # backwards compatibility
-        elif isinstance(owner, six.string_types):
+        elif isinstance(owner, types.string):
             sprops, ownername = 0, owner
 
         # grab the structure containing our members so we can instantiate it
@@ -2342,7 +2326,7 @@ class member_t(object):
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(aname), '')
             res.setdefault('__typeinfo__', ti_s)
         return res
-    @utils.multicase(key=six.string_types)
+    @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the member.'''
@@ -2351,7 +2335,7 @@ class member_t(object):
             return res[key]
         cls = self.__class__
         raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"'), utils.string.repr(self.fullname)))
-    @utils.multicase(key=six.string_types)
+    @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the member.'''
@@ -2397,7 +2381,7 @@ class member_t(object):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(self.fullname)))
         return res
-    @utils.multicase(key=six.string_types, none=None.__class__)
+    @utils.multicase(key=types.string, none=types.none)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
@@ -2544,7 +2528,7 @@ class member_t(object):
                 # now we can do some math to determine if the operands really
                 # are pointing to our structure member.
                 for opnum, ri, value in iterable:
-                    offset = value if isinstance(value, six.integer_types) else builtins.next((getattr(value, attribute) for attribute in {'offset', 'address'} if hasattr(value, attribute)), None)
+                    offset = value if isinstance(value, types.integer) else types.next((getattr(value, attribute) for attribute in {'offset', 'address'} if hasattr(value, attribute)), None)
 
                     # check if we got a valid offset and align it if so, because if
                     # not then we can't calculate the target and need to move on.
@@ -2655,11 +2639,11 @@ class member_t(object):
     @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the member to `string`.'''
-        if isinstance(string, tuple):
+        if isinstance(string, types.tuple):
             string = interface.tuplename(*string)
 
         # Type safety is fucking valuable.
-        if not isinstance(string, (None.__class__, six.string_types)):
+        if not isinstance(string, (types.none, types.string)):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).name({!r}) : Unable to assign the provided type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), self.id, string, string.__class__))
 
@@ -2779,14 +2763,14 @@ class member_t(object):
         res = interface.typemap.dissolve(self.flag, self.typeid, self.size, offset=self.offset)
         if isinstance(res, structure_t):
             res = __instance__(res.id, offset=self.offset)
-        elif isinstance(res, tuple):
+        elif isinstance(res, types.tuple):
             iterable = (item for item in res)
             t = next(iterable)
             if isinstance(t, structure_t):
                 t = __instance__(t.id, offset=self.offset)
-            elif isinstance(t, builtins.list) and isinstance(t[0], structure_t):
+            elif isinstance(t, types.list) and isinstance(t[0], structure_t):
                 t[0] = __instance__(t[0].id, offset=self.offset)
-            res = builtins.tuple(itertools.chain([t], iterable))
+            res = tuple(itertools.chain([t], iterable))
         return res
     @type.setter
     def type(self, type):
@@ -2795,7 +2779,7 @@ class member_t(object):
 
         # if we were given a tinfo_t or a string to use, then we pretty much use
         # it with the typeinfo api, but allow it the ability to destroy other members.
-        if isinstance(type, (six.string_types, idaapi.tinfo_t)):
+        if isinstance(type, (types.string, idaapi.tinfo_t)):
             info = type if isinstance(type, idaapi.tinfo_t) else internal.declaration.parse(type)
             res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), info, idaapi.SET_MEMTI_MAY_DESTROY)
             if res in {idaapi.SMT_OK, idaapi.SMT_KEEP}:
@@ -2860,7 +2844,7 @@ class member_t(object):
         set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
 
         # Type safety is fucking valuable, and anything that doesn't match gives you an exception.
-        if not isinstance(info, (idaapi.tinfo_t, None.__class__, six.string_types)):
+        if not isinstance(info, (idaapi.tinfo_t, types.none, types.string)):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info.__class__))
 
@@ -2875,7 +2859,7 @@ class member_t(object):
 
         # Otherwise if it's a string, then we'll need to parse our info parameter into a
         # tinfo_t, so that we can assign it to the typeinfo for the member.
-        elif isinstance(info, six.string_types):
+        elif isinstance(info, types.string):
             ti = internal.declaration.parse(info)
             if ti is None:
                 cls = self.__class__
@@ -3030,7 +3014,7 @@ class member_t(object):
 
         # if we have an integer or a structure_t, then assign it as the identifier for the opinfo.
         else:
-            opinfo.tid = mytype if isinstance(mytype, six.integer_types) else mytype.id
+            opinfo.tid = mytype if isinstance(mytype, types.integer) else mytype.id
 
         # add the member to the database, and then check whether there was a naming
         # issue of some sort so that we can warn the user or resolve it.
@@ -3077,7 +3061,7 @@ class member_t(object):
 
         # if we're using the new tinfo version (a list), then try our hardest
         # to parse it. if we succeed, then we likely can apply it later.
-        if isinstance(ti, builtins.list) and len(ti) == 2:
+        if isinstance(ti, types.list) and len(ti) == 2:
             tname, tinfo = ti
             typeinfo = internal.declaration.parse(tname) if tname else None
             typeinfo = typeinfo if typeinfo else internal.declaration.parse(tinfo)
