@@ -311,8 +311,8 @@ class current(object):
 
         # If we successfully grabbed the selection, then return its boundaries.
         if ok:
-            l, r = internal.interface.address.inside(ea_l, ea_r)
-            return internal.interface.bounds_t(l, r + 1)
+            l, r = internal.interface.address.head(ea_l, ea_r if ea_l == ea_r else ea_r + 1)
+            return internal.interface.bounds_t(l, r)
 
         # Otherwise we just use the current address for both sides.
         ea = idaapi.get_screen_ea()
