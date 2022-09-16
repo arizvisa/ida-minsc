@@ -57,9 +57,9 @@ character is prefixed with a backslash, it will decode into a character
 that is prefixed with a backslash.
 """
 
-import functools, operator, itertools, types
+import functools, operator, itertools
 import collections, heapq, string
-import sys, six, logging
+import sys, logging
 
 import internal, idaapi
 import codecs
@@ -204,7 +204,7 @@ class default(object):
 class _int(default):
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, six.integer_types)
+        return isinstance(instance, internal.types.integer)
 
     @classmethod
     def encode(cls, instance):
@@ -243,7 +243,7 @@ class _int(default):
 class _float(default):
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, float)
+        return isinstance(instance, internal.types.float)
     @classmethod
     def encode(cls, instance):
         return "float({:f})".format(instance)
@@ -261,7 +261,7 @@ if sys.version_info.major < 3:
 
         @classmethod
         def type(cls, instance):
-            return isinstance(instance, six.string_types)
+            return isinstance(instance, internal.types.string)
 
         @classmethod
         def _unescape(cls, iterable):
@@ -337,7 +337,7 @@ else:
     class _bytes(default):
         @classmethod
         def type(cls, instance):
-            return isinstance(instance, bytes)
+            return isinstance(instance, internal.types.bytes)
 
         @classmethod
         def decode(cls, data):
@@ -351,7 +351,7 @@ else:
     class _str(default):
         @classmethod
         def type(cls, instance):
-            return isinstance(instance, six.string_types)
+            return isinstance(instance, internal.types.string)
 
         @classmethod
         def _unescape(cls, iterable):
@@ -391,7 +391,7 @@ else:
 
         @classmethod
         def decode(cls, data):
-            res = data if isinstance(data, six.string_types) else data.decode('utf8')
+            res = data if isinstance(data, internal.types.string) else data.decode('utf8')
             return str().join(cls._unescape(iter(res.lstrip())))
 
         @classmethod
@@ -403,20 +403,20 @@ else:
 class _dict(default):
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, dict)
+        return isinstance(instance, internal.types.dictionary)
     @classmethod
     def encode(cls, instance):
-        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, internal.types.integer) else "{!r}".format(item)
         return '{' + ', '.join("{:s}: {!r}".format(f(key), instance[key]) for key in instance) + '}'
 
 @cache.register(list, pattern.star(' \t'), '[')
 class _list(default):
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, list)
+        return isinstance(instance, internal.types.list)
     @classmethod
     def encode(cls, instance):
-        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, internal.types.integer) else "{!r}".format(item)
         return '[' + ', '.join(map(f, instance)) + ']'
 
 @cache.register(tuple, pattern.star(' \t'), '(')
@@ -424,20 +424,20 @@ class _list(default):
 class _tuple(default):
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, tuple)
+        return isinstance(instance, internal.types.tuple)
     @classmethod
     def encode(cls, instance):
-        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, internal.types.integer) else "{!r}".format(item)
         return '(' + ', '.join(map(f, instance)) + (', ' if len(instance) == 1 else '') + ')'
 
 @cache.register(set, pattern.star(' \t'), *'set([')
 class _set(default):
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, set)
+        return isinstance(instance, internal.types.set)
     @classmethod
     def encode(cls, instance):
-        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, internal.types.integer) else "{!r}".format(item)
         return 'set([' + ', '.join(map(f, instance)) + '])'
 
 ### general tag encoding/decoding
@@ -657,7 +657,7 @@ def decode(data, default=u''):
 
             # if our previous value is already a string, then we can use
             # it as-is and append it to the default key separated by a newline.
-            if isinstance(value, six.string_types):
+            if isinstance(value, internal.types.string):
                 string = value
 
             # if it's not, however, then we need to demote the value to
@@ -865,7 +865,7 @@ class contents(tagging):
 
         # If our key was a list, then we need to warn the user that
         # we're going to take a guess on which function we'll return.
-        elif isinstance(key, list):
+        elif isinstance(key, internal.types.list):
             key, _ = key[0], logging.critical(u"{:s}._read_header({!r}, {:#x}) : Choosing to read header from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
         view = internal.netnode.sup.get(node, key, type=memoryview)
@@ -902,7 +902,7 @@ class contents(tagging):
 
         # If our key was a list, then we raise an exception because
         # we'd likely overwrite an address with an unrelated header.
-        elif isinstance(key, list):
+        elif isinstance(key, internal.types.list):
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to determine the owner of the address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
         # If our header is empty, then we just need to remove the supvalue
@@ -944,7 +944,7 @@ class contents(tagging):
 
         # If we received a list as the key, then we need to warn the
         # user that we have to guess which supval to read from.
-        elif isinstance(key, list):
+        elif isinstance(key, internal.types.list):
             key, _ = key[0], logging.critical(u"{:s}._read({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
         encdata = internal.netnode.blob.get(key, cls.btag)
@@ -982,7 +982,7 @@ class contents(tagging):
 
         # If our key was a list, then we raise an exception instead
         # of just choosing something at random to overwrite.
-        elif isinstance(key, list):
+        elif isinstance(key, internal.types.list):
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to determine the owner of the address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
         # erase cache and blob if no data is specified
@@ -1053,11 +1053,11 @@ class contents(tagging):
         # If we weren't given a target, then we need to figure the key out ourselves.
         if target.get('target', None) is None:
             res = cls._key(address)
-            keys = res if isinstance(res, list) else [res]
+            keys = res if isinstance(res, internal.types.list) else [res]
 
         # If we were given a valid target, then turn it into a list unless it already is.
         else:
-            keys = target['target'] if isinstance(target['target'], list) else [target['target']]
+            keys = target['target'] if isinstance(target['target'], internal.types.list) else [target['target']]
 
         # Now we just iterate through all of the keys and update the cache.
         result = 0
@@ -1090,11 +1090,11 @@ class contents(tagging):
         # If we were asked to figure the target out ourselves, then do as we're told.
         if target.get('target', None) is None:
             res = cls._key(address)
-            keys = res if isinstance(res, list) else [res]
+            keys = res if isinstance(res, internal.types.list) else [res]
 
         # Otherwise turn what we were given into a list unless it already was.
         else:
-            keys = target['target'] if isinstance(target['target'], list) else [target['target']]
+            keys = target['target'] if isinstance(target['target'], internal.types.list) else [target['target']]
 
         # Now we can just iterate through all of the keys to update each cache.
         result = 0
