@@ -9,7 +9,7 @@ functions, and a number of functional programming primitives (combinators).
 
 import six, builtins
 
-import os, logging, types, weakref
+import os, logging, weakref
 import functools, operator, itertools
 import sys, codecs, heapq, collections, array, math
 
@@ -126,7 +126,7 @@ class PatternAnyType(Pattern):
     def __types__(self):
         items = {item for item in []}
         for item in self.types:
-            if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
+            if isinstance(item, internal.types.unordered):
                 for item in item:
                     items |= {item.__name__}
                 continue
@@ -140,7 +140,7 @@ class pycompat(object):
     class function_2x(object):
         @classmethod
         def new(cls, code, globals, name, argdefs, closure):
-            return types.FunctionType(code, globals, name, argdefs, closure)
+            return internal.types.function(code, globals, name, argdefs, closure)
 
         @classmethod
         def name(cls, object):
@@ -227,7 +227,7 @@ class pycompat(object):
         @classmethod
         def new(cls, attributes, extra=()):
             argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
-            return types.CodeType(*attributes)
+            return internal.types.code(*attributes)
 
     class code_37(code_2x):
         @classmethod
@@ -237,7 +237,7 @@ class pycompat(object):
         def new(cls, attributes, extra=(0,)):
             argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
             kwonlyargcount, = extra
-            return types.CodeType(argcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
+            return internal.types.code(argcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
     class code_38(code_2x):
         @classmethod
@@ -247,7 +247,7 @@ class pycompat(object):
         def new(cls, attributes, extra=(0, 0)):
             argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
             posonlyargcount, kwonlyargcount = extra
-            return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
+            return internal.types.code(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
     class code_311(code_2x):
         @classmethod
@@ -257,14 +257,14 @@ class pycompat(object):
         def new(cls, attributes, extra=(0, 0, str(), bytes())):
             argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
             posonlyargcount, kwonlyargcount, qualname, exceptiontable = extra
-            return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, qualname or name, firstlineno, lnotab, exceptiontable, freevars, cellvars)
+            return internal.types.code(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, qualname or name, firstlineno, lnotab, exceptiontable, freevars, cellvars)
 
     code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38 if (sys.version_info.major, sys.version_info.minor) < (3, 11) else code_311
 
     class method_2x(object):
         @classmethod
         def new(cls, function, instance, type):
-            return types.MethodType(function, instance, type)
+            return internal.types.method(function, instance, type)
 
         @classmethod
         def self(cls, object):
@@ -281,7 +281,7 @@ class pycompat(object):
     class method_3x(object):
         @classmethod
         def new(cls, function, instance, type=None):
-            return types.MethodType(function, instance)
+            return internal.types.method(function, instance)
 
         @classmethod
         def self(cls, object):
@@ -379,7 +379,7 @@ class multicase(object):
             # also check to see if it's using the magic name "__new__" which takes
             # an implicit parameter that gets passed to it.
             args, defaults, (star, starstar) = cls.ex_args(func)
-            s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) or func.__name__ in {'__new__'} else 0
+            s_args = 1 if isinstance(wrapped, (internal.types.classmethod, internal.types.method)) or func.__name__ in {'__new__'} else 0
 
             # If the user decorated us whilst explicitly providing the previous
             # function that this case is a part of, then make sure that we use it.
@@ -440,8 +440,8 @@ class multicase(object):
         # Validate the types of all of our arguments and raise an exception if it used
         # an unsupported type.
         for name, type in t_args.items():
-            if not isinstance(type, (builtins.type, builtins.tuple)) and type not in {callable}:
-                error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(t_.__name__ for t_ in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
+            if not isinstance(type, (internal.types.type, internal.types.tuple)) and type not in {internal.types.callable}:
+                error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, internal.types.type) or type in {internal.types.callable} else '|'.join(t_.__name__ for t_ in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
                 raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), type, string.escape(name, '"')))
             continue
 
@@ -451,14 +451,14 @@ class multicase(object):
         try:
             [cls.ex_function(item) for item in other]
         except Exception:
-            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
+            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, internal.types.type) or type in {internal.types.callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
 
         # If we were given an unexpected number of arguments to decorate with, then
         # raise an exception. This is strictly done to assist with debugging.
         if len(other) > 1:
-            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, builtins.type) or type in {callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
-            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(pycompat.code.name(c) if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
+            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, internal.types.type) or type in {internal.types.callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
+            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(pycompat.code.name(c) if isinstance(c, internal.types.code) else c.__name__, '"')) for c in other)))
         return result
 
     @classmethod
@@ -487,7 +487,7 @@ class multicase(object):
         '''Take the provided `iterable` (or tree) and then yield each individual element resulting in it being "flattened".'''
         duplicates = {item for item in []}
         for item in iterable:
-            if isinstance(item, (builtins.list, builtins.tuple, builtins.set)):
+            if isinstance(item, internal.types.unordered):
                 for item in cls.flatten(item):
                     if item in duplicates:
                         continue
@@ -523,7 +523,7 @@ class multicase(object):
                 # Figure out which constraint to use for each item, and yield how
                 # it should be represented back to the caller.
                 constraint = constraints[item]
-                if isinstance(constraint, builtins.type) or constraint in {callable}:
+                if isinstance(constraint, internal.types.type) or constraint in {internal.types.callable}:
                     yield item, constraint.__name__
                 elif hasattr(constraint, '__iter__'):
                     yield item, '|'.join(type.__name__ for type in cls.flatten(constraint))
@@ -718,30 +718,30 @@ class multicase(object):
     @classmethod
     def ex_function(cls, object):
         '''Extract the actual function type from a callable.'''
-        if isinstance(object, types.FunctionType):
+        if isinstance(object, internal.types.function):
             return object
-        elif isinstance(object, types.MethodType):
+        elif isinstance(object, internal.types.method):
             return pycompat.method.function(object)
-        elif isinstance(object, types.CodeType):
-            res, = (item for item in gc.get_referrers(c) if pycompat.function.name(item) == pycompat.code.name(c) and isinstance(item, types.FunctionType))
+        elif isinstance(object, internal.types.code):
+            res, = (item for item in gc.get_referrers(c) if pycompat.function.name(item) == pycompat.code.name(c) and isinstance(item, internal.types.function))
             return res
-        elif isinstance(object, (staticmethod, classmethod)):
+        elif isinstance(object, internal.types.descriptor):
             return object.__func__
         raise internal.exceptions.InvalidTypeOrValueError(object)
 
     @classmethod
     def reconstructor(cls, item):
         '''Return a closure that returns the original callable type for a function.'''
-        if isinstance(item, types.FunctionType):
+        if isinstance(item, internal.types.function):
             return lambda f: f
-        if isinstance(item, types.MethodType):
+        if isinstance(item, internal.types.method):
             return lambda f: pycompat.method.new(f, pycompat.method.self(item), pycompat.method.type(item))
-        if isinstance(item, (staticmethod, classmethod)):
+        if isinstance(item, internal.types.descriptor):
             return lambda f: type(item)(f)
-        if isinstance(item, types.InstanceType):
-            return lambda f: types.InstanceType(type(item), dict(f.__dict__))
-        if isinstance(item, (builtins.type, types.ClassType)):
-            return lambda f: type(item)(item.__name__, item.__bases__, dict(f.__dict__))
+        if isinstance(item, internal.types.InstanceType):
+            return lambda f: internal.types.InstanceType(type(item), {key : value for key, value in f.__dict__.items()})
+        if isinstance(item, (internal.types.type, internal.types.ClassType)):
+            return lambda f: type(item)(item.__name__, item.__bases__, {key : value for key, value in f.__dict__.items()})
         raise internal.exceptions.InvalidTypeOrValueError(type(item))
 
     @classmethod
@@ -767,7 +767,7 @@ class multicase(object):
 class alias(object):
     def __new__(cls, other, klass=None):
         cons, func = multicase.reconstructor(other), multicase.ex_function(other)
-        if isinstance(other, types.MethodType) or klass:
+        if isinstance(other, internal.types.method) or klass:
             module = (func.__module__, klass or pycompat.method.type(other).__name__)
         else:
             module = (func.__module__,)
@@ -798,7 +798,7 @@ class matcher(object):
     def __attrib__(self, *attributes):
         if not attributes:
             return lambda item: item
-        res = [(operator.attrgetter(callable_or_attribute) if isinstance(callable_or_attribute, six.string_types) else callable_or_attribute) for callable_or_attribute in attributes]
+        res = [(operator.attrgetter(callable_or_attribute) if isinstance(callable_or_attribute, internal.types.string) else callable_or_attribute) for callable_or_attribute in attributes]
         return fcompose(*res) if len(res) > 1 else res[0]
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)
@@ -936,7 +936,7 @@ class character(object):
                 result.send(ch)
 
             # check if character is printable (ascii)
-            elif isinstance(ch, six.string_types) and cls.asciiQ(ch):
+            elif isinstance(ch, internal.types.string) and cls.asciiQ(ch):
                 result.send(ch)
 
             # check if character is a single-byte ascii
@@ -1278,34 +1278,34 @@ class string(object):
         """
 
         # Python2 string types (str/bytes and unicode)
-        if isinstance(item, six.string_types) and sys.version_info.major < 3:
-            res = cls.escape(item.decode('latin1') if isinstance(item, bytes) else item, u'\'')
+        if isinstance(item, internal.types.string) and sys.version_info.major < 3:
+            res = cls.escape(item.decode('latin1') if isinstance(item, internal.types.bytes) else item, u'\'')
             if all(ord(ch) < 0x100 for ch in item):
                 return u"'{:s}'".format(res)
             return u"u'{:s}'".format(res)
 
         # Python3 string types (str and bytes)
-        elif isinstance(item, six.string_types):
+        elif isinstance(item, internal.types.string):
             res = cls.escape(item, u'\'')
             return u"'{:s}'".format(res)
 
-        elif isinstance(item, bytes):
+        elif isinstance(item, internal.types.bytes):
             res = cls.escape(item.decode('latin1'), u'\'')
             return u"b'{:s}'".format(res)
 
-        elif isinstance(item, tuple):
+        elif isinstance(item, internal.types.tuple):
             res = map(cls.repr, item)
             return u"({:s}{:s})".format(', '.join(res), ',' if len(item) == 1 else '')
 
-        elif isinstance(item, list):
+        elif isinstance(item, internal.types.list):
             res = map(cls.repr, item)
             return u"[{:s}]".format(', '.join(res))
 
-        elif isinstance(item, set):
+        elif isinstance(item, internal.types.set):
             res = map(cls.repr, item)
             return u"set([{:s}])".format(', '.join(res))
 
-        elif isinstance(item, dict):
+        elif isinstance(item, internal.types.dictionary):
             res = ("{:s}: {:s}".format(cls.repr(k), cls.repr(v)) for k, v in item.items())
             return u"{{{:s}}}".format(', '.join(res))
 
@@ -1890,7 +1890,7 @@ class wrap(object):
         Fassemble = cls.assemble_2x if sys.version_info.major < 3 else cls.assemble_38x if sys.version_info.minor < 9 else cls.assemble_39x if sys.version_info.minor < 11 else cls.assemble_311x
 
         # create a wrapper for the function that'll execute `callable` with the function as its first argument, and the rest with any args
-        res = Fassemble(callable, wrapper, bound=isinstance(callable, (classmethod, types.MethodType)))
+        res = Fassemble(callable, wrapper, bound=isinstance(callable, (internal.types.classmethod, internal.types.method)))
         res.__module__ = getattr(callable, '__module__', getattr(callable, '__module__', '__main__'))
 
         # now we re-construct it and then return it
@@ -1901,20 +1901,20 @@ class wrap(object):
         '''Extract a ``types.FunctionType`` from a callable.'''
 
         # `object` is already a function
-        if isinstance(object, types.FunctionType):
+        if isinstance(object, internal.types.function):
             return object
 
         # if it's a method, then extract the function from its propery
-        elif isinstance(object, types.MethodType):
+        elif isinstance(object, internal.types.method):
             return pycompat.method.function(object)
 
         # if it's a code type, then walk through all of its referrers finding one that matches it
-        elif isinstance(object, types.CodeType):
-            res, = (item for item in gc.get_referrers(c) if pycompat.function.name(item) == pycompat.code.name(c) and isinstance(item, types.FunctionType))
+        elif isinstance(object, internal.types.code):
+            res, = (item for item in gc.get_referrers(c) if pycompat.function.name(item) == pycompat.code.name(c) and isinstance(item, internal.types.function))
             return res
 
         # if it's a property decorator, then they hide the function in an attribute
-        elif isinstance(object, (staticmethod, classmethod)):
+        elif isinstance(object, internal.types.descriptor):
             return object.__func__
 
         # okay, no go. we have no idea what this is.
@@ -1936,24 +1936,24 @@ class wrap(object):
         '''Return a closure that constructs the original `callable` type from a function.'''
 
         # `callable` is a function type, so just return a closure that returns it
-        if isinstance(callable, types.FunctionType):
+        if isinstance(callable, internal.types.function):
             return lambda func: func
 
         # if it's a method type, then we just need to extract the related properties to construct it
-        elif isinstance(callable, types.MethodType):
+        elif isinstance(callable, internal.types.method):
             return lambda method, self=pycompat.method.self(callable), cls=pycompat.method.type(callable): pycompat.method.new(method, self, cls)
 
         # if it's a property decorator, we just need to pass the function as an argument to the decorator
-        elif isinstance(callable, (staticmethod, classmethod)):
+        elif isinstance(callable, internal.types.descriptor):
             return lambda method, mt=callable.__class__: mt(method)
 
         # if it's a method instance, then we just need to instantiate it so that it's bound
-        elif isinstance(callable, types.InstanceType):
-            return lambda method, mt=callable.__class__: types.InstanceType(mt, dict(method.__dict__))
+        elif isinstance(callable, internal.types.InstanceType):
+            return lambda method, mt=callable.__class__: internal.types.InstanceType(mt, {key : value for key, value in method.__dict__.items()})
 
         # otherwise if it's a class or a type, then we just need to create the object with its bases
-        elif isinstance(n, (builtins.type, types.ClassType)):
-            return lambda method, t=callable.__class__, name=callable.__name__, bases=callable.__bases__: t(name, bases, dict(method.__dict__))
+        elif isinstance(n, (internal.types.type, internal.types.ClassType)):
+            return lambda method, t=callable.__class__, name=callable.__name__, bases=callable.__bases__: t(name, bases, {key : value for key, value in method.__dict__.items()})
 
         # if we get here, then we have no idea what kind of type `callable` is
         raise internal.exceptions.InvalidTypeOrValueError(callable.__class__)
