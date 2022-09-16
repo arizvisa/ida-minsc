@@ -1656,14 +1656,13 @@ class hook(object):
 
     @classmethod
     def __start_ida__(ns):
-        import hooks
 
         # Create an alias to save some typing and a table of the attribute
         # name, the base hook class, and the supermethods we need to patch.
         priorityhook, api = internal.interface.priorityhook, {
-            'idp':  (idaapi.IDP_Hooks,  hooks.supermethods.IDP_Hooks.mapping),
-            'idb':  (idaapi.IDB_Hooks,  hooks.supermethods.IDB_Hooks.mapping),
-            'ui':   (idaapi.UI_Hooks,   hooks.supermethods.UI_Hooks.mapping),
+            'idp':  (idaapi.IDP_Hooks,  internal.hooks.supermethods.IDP_Hooks.mapping),
+            'idb':  (idaapi.IDB_Hooks,  internal.hooks.supermethods.IDB_Hooks.mapping),
+            'ui':   (idaapi.UI_Hooks,   internal.hooks.supermethods.UI_Hooks.mapping),
         }
 
         # Iterate through our table and use it to instantiate the necessary
