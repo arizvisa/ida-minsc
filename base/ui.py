@@ -18,12 +18,11 @@ in use. This can allow for one to automatically show or hide a
 window that they wish to expose to the user.
 """
 
-import six, builtins
-import sys, os, operator, math, threading, time, functools, inspect, itertools
-import logging, ctypes
+import builtins, os, operator, math, functools, itertools, six, threading
+import logging, inspect, time
 
 import idaapi, internal
-import database as _database, segment as _segment
+import database as _database
 
 ## TODO:
 # locate window under current cursor position
@@ -71,7 +70,7 @@ class ask(object):
     def __new__(cls, **default):
         '''Request the user choose from the options "yes", "no", or "cancel".'''
         return cls(u'', **default)
-    @internal.utils.multicase(message=six.string_types)
+    @internal.utils.multicase(message=internal.types.string)
     def __new__(cls, message, **default):
         '''Request the user choose from the options "yes", "no", or "cancel" using the specified `message` as the prompt.'''
         return cls.yn(message, **default)
@@ -81,7 +80,7 @@ class ask(object):
     def yn(cls, **default):
         '''Request the user choose from the options "yes", "no", or "cancel".'''
         return cls.yn(u'', **default)
-    @internal.utils.multicase(message=six.string_types)
+    @internal.utils.multicase(message=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def yn(cls, message, **default):
@@ -108,7 +107,7 @@ class ask(object):
     def address(cls, **default):
         '''Request the user provide an address.'''
         return cls.address(u'', **default)
-    @internal.utils.multicase(message=six.string_types)
+    @internal.utils.multicase(message=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def address(cls, message, **default):
@@ -147,7 +146,7 @@ class ask(object):
     def integer(cls, **default):
         '''Request the user provide an integer.'''
         return cls.integer(u'', **default)
-    @internal.utils.multicase(message=six.string_types)
+    @internal.utils.multicase(message=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def integer(cls, message, **default):
@@ -169,7 +168,7 @@ class ask(object):
     def segment(cls, **default):
         '''Request the user provide a segment.'''
         return cls.segment(u'', **default)
-    @internal.utils.multicase(message=six.string_types)
+    @internal.utils.multicase(message=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def segment(cls, message, **default):
@@ -177,25 +176,14 @@ class ask(object):
         res = current.segment()
         dflt = next((default[k] for k in ['default', 'segment', 'seg'] if k in default), internal.interface.range.start(res) if res else idaapi.BADADDR)
         ea = idaapi.ask_seg(dflt, internal.utils.string.to(message))
-
-        # Try and convert whatever it was that we were given into an actual segment.
-        try:
-            seg = _segment.by(ea)
-
-        # If we got an exception, then just set our result to None so that we can
-        # let the caller figure out how much they really want it.
-        except Exception:
-            return None
-
-        # Return the segment_t back to the caller.
-        return seg
+        return idaapi.getseg(ea)
 
     @internal.utils.multicase()
     @classmethod
     def string(cls, **default):
         '''Request the user provide a string.'''
         return cls.string(u'', **default)
-    @internal.utils.multicase(message=six.string_types)
+    @internal.utils.multicase(message=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
     def string(cls, message, **default):
@@ -214,7 +202,7 @@ class ask(object):
     def note(cls, **default):
         '''Request the user provide a multi-lined string.'''
         return cls.note(u'', **default)
-    @internal.utils.multicase(message=six.string_types)
+    @internal.utils.multicase(message=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
     def note(cls, message, **default):
@@ -390,8 +378,8 @@ class message(object):
         F = builtins.next((mapping[k] for k in icon if mapping.get(k, False)), idaapi.info)
 
         # format it and give a warning if it's not the right type.
-        formatted = message if isinstance(message, six.string_types) else "{!s}".format(message)
-        if not isinstance(message, six.string_types):
+        formatted = message if isinstance(message, internal.types.string) else "{!s}".format(message)
+        if not isinstance(message, internal.types.string):
             logging.warning(u"{:s}({!r}{:s}) : Formatted the given message ({!r}) as a string ({!r}) prior to displaying it.".format('.'.join([__name__, cls.__name__]), message, ", {:s}".format(internal.utils.string.kwargs(icon)) if icon else '', message, formatted))
 
         # set it off...
@@ -615,7 +603,7 @@ class notepad(appwindow):
         result = editor.toPlainText()
         return len(result)
 
-    @internal.utils.multicase(string=six.string_types)
+    @internal.utils.multicase(string=internal.types.string)
     @classmethod
     def set(cls, string):
         '''Set the text that is currently stored within the notepad window to `string`.'''
@@ -623,13 +611,13 @@ class notepad(appwindow):
         result, none = editor.toPlainText(), editor.setPlainText(string)
         return result
 
-    @internal.utils.multicase(items=(builtins.list, builtins.tuple))
+    @internal.utils.multicase(items=internal.types.ordered)
     @classmethod
     def set(cls, items):
         '''Set each line that is currently stored within the notepad window to `items`.'''
         return cls.set('\n'.join(items))
 
-    @internal.utils.multicase(string=six.string_types)
+    @internal.utils.multicase(string=internal.types.string)
     @classmethod
     def append(cls, string):
         '''Append the provided `string` to the current text that is stored within the notepad window.'''
@@ -923,7 +911,7 @@ class window(object):
         #        exact one that is in use so that we can cast it to a QWindow.
         return application.window()
 
-    @internal.utils.multicase(xy=tuple)
+    @internal.utils.multicase(xy=internal.types.tuple)
     def at(cls, xy):
         '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
         x, y = xy
@@ -954,12 +942,12 @@ class widget(object):
     def __new__(cls):
         '''Return the widget that is currently being used.'''
         return cls.of(current.widget())
-    @internal.utils.multicase(xy=tuple)
+    @internal.utils.multicase(xy=internal.types.tuple)
     def __new__(cls, xy):
         '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
         res = x, y = xy
         return cls.at(res)
-    @internal.utils.multicase(title=six.string_types)
+    @internal.utils.multicase(title=internal.types.string)
     def __new__(cls, title):
         '''Return the widget that is using the specified `title`.'''
         return cls.by(title)
@@ -1013,7 +1001,7 @@ class widget(object):
         twidget = cls.form(widget) if cls.isinstance(widget) else widget
         return idaapi.get_widget_title(twidget)
 
-    @internal.utils.multicase(title=six.string_types)
+    @internal.utils.multicase(title=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('title')
     def by(cls, title):
@@ -1086,7 +1074,7 @@ class keyboard(object):
         Modifiers = {'ctrl', 'shift', 'alt'}
 
         # Validate the type of our parameter
-        if not isinstance(key, tuple):
+        if not isinstance(key, internal.types.tuple):
             raise internal.exceptions.InvalidParameterError(u"{:s}.of_key({!r}) : A key combination of an invalid type was provided as a parameter.".format('.'.join([__name__, cls.__name__]), key))
 
         # Find a separator that we can use, and use it to join our tuple into a
@@ -1107,16 +1095,16 @@ class keyboard(object):
         # have been given a valid hotkey. However, we still need to validate this.
         # So, to do that we'll concatenate each component together back into a string
         # and then recurse so we can validate using the same logic.
-        if isinstance(hotkey, (tuple, list, set)):
+        if isinstance(hotkey, internal.types.unordered):
             try:
                 # If we were mistakenly given a set, then we need to reformat it.
-                if isinstance(hotkey, set):
+                if isinstance(hotkey, internal.types.set):
                     raise ValueError
 
                 modifiers, key = hotkey
 
                 # If modifiers is not of the correct type, then still need to reformat.
-                if not isinstance(modifiers, (tuple, list, set)):
+                if not isinstance(modifiers, internal.types.unorered):
                     raise ValueError
 
             # If the tuple we received was of an invalid format, then extract the
@@ -1198,7 +1186,7 @@ class keyboard(object):
             if inspect.ismethod(closure):
                 klass = closure.im_self.__class__ if closure.im_self else closure.im_class
                 clsinfo = klass.__name__ if getattr(klass, '__module__', '__main__') in {'__main__'} else '.'.join([klass.__module__, klass.__name__])
-            elif inspect.isclass(closure) or isinstance(closure, object):
+            elif inspect.isclass(closure) or isinstance(closure, internal.types.object):
                 clsinfo = '' if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
             else:
                 clsinfo = None if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
@@ -1357,7 +1345,7 @@ try:
             q = cls()
             widgets = q.topLevelWidgets()
             return next(widget for widget in widgets if isinstance(widget, PyQt5.QtWidgets.QMainWindow))
-        @internal.utils.multicase(x=six.integer_types, y=six.integer_types)
+        @internal.utils.multicase(x=internal.types.integer, y=internal.types.integer)
         @classmethod
         def window(cls, x, y):
             '''Return the window at the specified `x` and `y` coordinate.'''
@@ -1559,7 +1547,7 @@ try:
             # Apparently PySide.QtCore.QCoreApplication is actually considered
             # the main window for the application. Go figure...
             return cls()
-        @internal.utils.multicase(x=six.integer_types, y=six.integer_types)
+        @internal.utils.multicase(x=internal.types.integer, y=internal.types.integer)
         @classmethod
         def window(cls, x, y):
             '''Return the window at the specified `x` and `y` coordinate.'''
