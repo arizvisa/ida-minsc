@@ -9,7 +9,7 @@ individuals to attempt to understand this craziness.
 
 import six, builtins
 import sys, logging, contextlib
-import functools, operator, itertools, types
+import functools, operator, itertools
 import collections, heapq, traceback, ctypes, math
 import unicodedata as _unicodedata, string as _string, array as _array
 
@@ -214,7 +214,7 @@ class typemap(object):
     for s, (f, _) in decimalmap.items():
         inverted[f & FF_MASKSIZE] = s
     for s, (f, _) in stringmap.items():
-        if (next(iter(s)) if isinstance(s, tuple) else s) in {str}: # prioritize `str`
+        if (next(iter(s)) if isinstance(s, internal.types.tuple) else s) in {str}: # prioritize `str`
             inverted[f & FF_MASKSIZE, _] = s
         continue
     for s, (f, _) in nonemap.items():
@@ -271,7 +271,7 @@ class typemap(object):
         # figure out the structure's size. We also do an explicit check if the type-id
         # is a structure because in some cases, IDA will forget to set the FF_STRUCT
         # flag but still assign the structure type-id to a union member.
-        if (dsize == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
+        if (dsize == FF_STRUCT and isinstance(typeid, internal.types.integer)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
             t = structure.by_identifier(typeid) if offset is None else structure.by_identifier(typeid, offset=offset)
 
@@ -309,7 +309,7 @@ class typemap(object):
         # If the datatype size is not an integer, then we need to calculate the
         # size ourselves using the size parameter we were given and the element
         # size of the datatype as determined by the flags (DT_TYPE | MS_CLS).
-        if not isinstance(sz, six.integer_types):
+        if not isinstance(sz, internal.types.integer):
             count = size // idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
             return [t, count] if count > 1 else t
 
@@ -342,7 +342,7 @@ class typemap(object):
             table = cls.typemap[builtins.next(item for item in pythonType)]
 
             #t, sz = pythonType
-            #table = cls.typemap[t] if not isinstance(t, tuple) else cls.typemap[t[0]]
+            #table = cls.typemap[t] if not isinstance(t, internal.types.tuple) else cls.typemap[t[0]]
             #(t, sz), count = (pythonType, 1) if len(pythonType) == 2 else ((pythonType[0], pythonType), 1)
             if pythonType in table:
                 flag, typeid = table[pythonType]
@@ -357,7 +357,7 @@ class typemap(object):
         # of the list, but then we'll need to recurse into ourselves in order to
         # figure out the actual flag, type-id, and size of the type that we were
         # given by the first element of the list.
-        elif isinstance(pythonType, [].__class__):
+        elif isinstance(pythonType, internal.types.list):
             res, count = pythonType
             flag, typeid, sz = cls.resolve(res)
 
@@ -376,7 +376,7 @@ class typemap(object):
 
         # if we got here with a tuple, then that's because we're using a variable-length
         # structure...which really means the size is forced.
-        elif isinstance(pythonType, ().__class__):
+        elif isinstance(pythonType, internal.types.tuple):
             t, sz = pythonType
             sptr = t.ptr if isinstance(t, structure.structure_t) else t
             flag, typeid = struc_flag(), sptr.id
@@ -532,16 +532,16 @@ class prioritybase(object):
 
             # If a method is passed to us, then we need to extract all
             # of the relevant components that describe it.
-            if isinstance(object, (types.MethodType, staticmethod, classmethod)):
+            if isinstance(object, (internal.types.method, internal.types.descriptor)):
                 cls = pycompat.method.type(object)
                 func = pycompat.method.function(object)
                 module, name = func.__module__, pycompat.function.name(func)
                 iterable = parameters(func)
-                None if isinstance(object, staticmethod) else next(iterable)
+                None if isinstance(object, internal.types.staticmethod) else next(iterable)
                 return '.'.join([module, cls.__name__, name]), tuple(iterable)
 
             # If our object is a function-type, then it's easy to grab.
-            elif isinstance(object, types.FunctionType):
+            elif isinstance(object, internal.types.function):
                 module, name = object.__module__, pycompat.function.name(object)
                 iterable = parameters(object)
                 return '.'.join([module, name]), tuple(iterable)
@@ -622,15 +622,15 @@ class prioritybase(object):
     def add(self, target, callable, priority):
         '''Add the `callable` to the queue for the specified `target` with the given `priority`.'''
         if not builtins.callable(callable):
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a non-callable ({!s}) for the requested target with the given priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, format(priority)))
-        elif not isinstance(priority, six.integer_types):
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+        elif not isinstance(priority, internal.types.integer):
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({!s}) for the requested target with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, format(priority)))
 
         # attach to the requested target if possible
         if target not in self.__cache__:
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise NameError(u"{:s}.add({!r}, {!s}, priority={:s}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, callable, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no currently attached targets to add to.'))
 
         # discard any callables already attached to the specified target
@@ -657,7 +657,7 @@ class prioritybase(object):
     def pop(self, target, index):
         '''Pop the item at the specified `index` from the given `target`.'''
         if target not in self.__cache__:
-            cls, format = self.__class__, "{:d}".format if isinstance(index, six.integer_types) else "{!r}".format
+            cls, format = self.__class__, "{:d}".format if isinstance(index, internal.types.integer) else "{!r}".format
             raise NameError(u"{:s}.pop({!r}, {:d}) : The requested target ({:s}) is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, format(index), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no targets currently attached to pop from.'))
         state = []
 
@@ -709,7 +709,7 @@ class prioritybase(object):
     def remove(self, target, priority):
         '''Remove the first callable from the specified `target` that has the provided `priority`.'''
         if target not in self.__cache__:
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise NameError(u"{:s}.remove({!r}, {:s}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no targets currently attached to remove from.'))
         state, table = [], {}
 
@@ -722,7 +722,7 @@ class prioritybase(object):
         # Before we do anything, we need to ping the priority we're searching for
         # in the table and then we grab the first index for the given priority.
         if priority not in table:
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise internal.exceptions.ItemNotFoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the specific priority ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(prio), format(prio)))
         index = table[priority].pop(0)
 
@@ -1030,7 +1030,7 @@ class priorityhook(prioritybase):
 
         # Try and attach to the target name with a closure.
         if not self.attach(name):
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, six.integer_types) else "{!r}".format
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:s}) : Unable to attach to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, format(priority), self.__formatter__(name)))
 
         # We should've attached, so all that's left is to add it for
@@ -1062,7 +1062,7 @@ class prioritynotification(prioritybase):
 
     def __formatter__(self, notification):
         name = self.__lookup.get(notification, '')
-        return "{:s}({:#x})".format(name, notification) if name else "{:#x}".format(notification)
+        return "{:s}({:#x})".format(name, notification) if name else "{:#x}".format(notification) if isinstance(notification, internal.types.integer) else "{!r} (notification needs to be an integer)".format(notification)
 
     @property
     def available(self):
@@ -1141,7 +1141,7 @@ class priorityhxevent(prioritybase):
 
     def __formatter__(self, event):
         name = self.__events__.get(event, '')
-        return "{:s}({:#x})".format(name, event) if name else "{:#x}".format(event)
+        return "{:s}({:#x})".format(name, event) if name else "{:#x}".format(event) if isinstance(event, internal.types.integer) else "{!r} (event needs to be an integer)".format(event)
 
     @property
     def available(self):
@@ -1345,7 +1345,7 @@ class address(object):
         '''Check that `ea` is within the database and adjust it to point to the beginning of its item.'''
         entryframe = cls.pframe()
 
-        if not isinstance(ea, six.integer_types):
+        if not isinstance(ea, internal.types.integer):
             raise internal.exceptions.InvalidParameterError(u"{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
@@ -1359,7 +1359,7 @@ class address(object):
 
         entryframe = cls.pframe()
         start, end = cls.within(start, end)
-        if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
+        if not isinstance(start, internal.types.integer) or not isinstance(end, internal.types.integer):
             raise internal.exceptions.InvalidParameterError(u"{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
         return cls.head(start, silent=True), cls.tail(end, silent=True) - 1
     @classmethod
@@ -1374,7 +1374,7 @@ class address(object):
         '''Check that `ea` is within the database.'''
         entryframe = cls.pframe()
 
-        if not isinstance(ea, six.integer_types):
+        if not isinstance(ea, internal.types.integer):
             raise internal.exceptions.InvalidParameterError(u"{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
@@ -1389,7 +1389,7 @@ class address(object):
         '''Check that both `start` and `end` are within the database.'''
         entryframe = cls.pframe()
 
-        if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
+        if not isinstance(start, internal.types.integer) or not isinstance(end, internal.types.integer):
             raise internal.exceptions.InvalidParameterError(u"{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
 
         # If the start and end are matching, then we don't need to fit the bounds.
@@ -1404,13 +1404,13 @@ class address(object):
             return cls.__within2__(*args)
         return cls.__within1__(*args)
 
-    @internal.utils.multicase(ea=six.integer_types)
+    @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
     def refinfo(cls, ea):
         '''This returns the ``idaapi.refinfo_t`` for the address given in `ea`.'''
         OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
         return cls.refinfo(ea, OPND_ALL)
-    @internal.utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+    @internal.utils.multicase(ea=internal.types.integer, opnum=internal.types.integer)
     @classmethod
     def refinfo(cls, ea, opnum):
         '''This returns the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the address given in `ea`.'''
@@ -1594,7 +1594,7 @@ class node(object):
             return start <= identifier < stop
         return start <= identifier or identifier < stop
 
-    @internal.utils.multicase(sup=bytes)
+    @internal.utils.multicase(sup=internal.types.bytes)
     @classmethod
     def sup_functype(cls, sup, *supfields):
         """Given a supval, return the pointer size, model, calling convention, return type, and a tuple composed of the argument stack size and the arguments for a function.
@@ -1648,7 +1648,7 @@ class node(object):
 
         # Now we can return everything that we've collected from the type.
         return tuple(res)
-    @internal.utils.multicase(sup=bytes, ptrsize=(None.__class__, six.integer_types), model=(None.__class__, six.integer_types), cc=(None.__class__, six.integer_types), rettype=(None.__class__, idaapi.tinfo_t), arglocs=(None.__class__, builtins.list, builtins.tuple))
+    @internal.utils.multicase(sup=internal.types.bytes, ptrsize=(internal.types.none, internal.types.integer), model=(internal.types.none, internal.types.integer), cc=(internal.types.none, internal.types.integer), rettype=(internal.types.none, idaapi.tinfo_t), arglocs=(internal.types.none, internal.types.ordered))
     @classmethod
     def sup_functype(cls, sup, ptrsize, model, cc, rettype, arglocs):
         '''Given the old supval, re-encode any of the given parameters into it whilst ignoring the parameters that are specified as ``None``.'''
@@ -1717,7 +1717,7 @@ class node(object):
         # if we were given a tuple, because if we were then this is a tuple
         # composed of the argument stack size and our actual argument list.
         else:
-            _, arglocs = arglocs if isinstance(arglocs, tuple) else (0, arglocs)
+            _, arglocs = arglocs if isinstance(arglocs, internal.types.tuple) else (0, arglocs)
 
             # Now that we have our real list of arguments, we can start by
             # appending the number of arguments that we were given.
@@ -1926,7 +1926,7 @@ class node(object):
         offset, items = id64(sup) if bit64Q else id32(sup)
         return offset, [Fidentifier(item) for item in items]
 
-    @internal.utils.multicase(ea=six.integer_types)
+    @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
     def aflags(cls, ea):
         '''Return the additional flags for the instruction at the address `ea`.'''
@@ -1934,12 +1934,12 @@ class node(object):
         if hasattr(idaapi, 'get_aflags'):
             return idaapi.get_aflags(ea)
         return internal.netnode.alt.get(idaapi.ea2node(ea) if hasattr(idaapi, 'ea2node') else ea, NALT_AFLAGS)
-    @internal.utils.multicase(ea=six.integer_types, mask=six.integer_types)
+    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer)
     @classmethod
     def aflags(cls, ea, mask):
         '''Return the additional flags for the instruction at the address `ea` masked with the integer provided by `mask`.'''
         return cls.aflags(ea) & mask
-    @internal.utils.multicase(ea=six.integer_types, mask=six.integer_types, value=six.integer_types)
+    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer, value=internal.types.integer)
     @classmethod
     def aflags(cls, ea, mask, value):
         '''Set the additional flags for the instruction at address `ea` using the provided `mask` and `value`.'''
@@ -2065,7 +2065,7 @@ class strpath(object):
             # current offset with it. This allows one to consolidate multiple offsets, but
             # as there's a chance of there being no member defined yet will result in an
             # error as soon as they try to transition to one.
-            if isinstance(item, six.integer_types):
+            if isinstance(item, internal.types.integer):
                 offset += item
 
             # If we were given a structure and it's the same as the one that we're on,
@@ -2485,14 +2485,14 @@ class strpath(object):
 
                 # If it's a string and the previous element was an mptr, then we need
                 # to transition to the last member's type (sptr) and then look it up.
-                elif isinstance(item, six.string_types) and isinstance(last, idaapi.member_t):
+                elif isinstance(item, internal.types.string) and isinstance(last, idaapi.member_t):
                     last = idaapi.get_sptr(last)
                     sptr = collector.send(last)
                     mptr = idaapi.get_member_by_name(sptr, internal.utils.string.to(item))
 
                 # If it's a string, then we can just look it up in our current
                 # sptr to figure out which member_t it is.
-                elif isinstance(item, six.string_types):
+                elif isinstance(item, internal.types.string):
                     mptr = idaapi.get_member_by_name(sptr, internal.utils.string.to(item))
 
                 # Anything else should by one of the native types or an offset.
@@ -2500,7 +2500,7 @@ class strpath(object):
                     mptr = item
 
                 # Submit it to the collector and save it away if it's not an integer.
-                sptr, last = collector.send(mptr), last if isinstance(mptr, six.integer_types) else mptr
+                sptr, last = collector.send(mptr), last if isinstance(mptr, internal.types.integer) else mptr
 
         # If we received an exception, then that's because there was a busted type
         # in the collected path which we'll need to add back to our list.
@@ -2772,7 +2772,7 @@ class tinfo(object):
     @classmethod
     def function_details(cls, func, ti):
         '''Given a function location in `func` and its type information as `ti`, return the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it.'''
-        rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+        rt, ea = addressOfRuntimeOrStatic(func)
 
         # If our type is a function pointer, then we need to dereference it
         # in order to get the type that we want to extract the argument from.
@@ -2811,7 +2811,7 @@ class tinfo(object):
     @classmethod
     def update_function_details(cls, func, ti):
         '''Given a function location in `func` and its type information as `ti`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the function with the ``idaapi.func_type_data_t`` that is sent back.'''
-        rt, ea = internal.interface.addressOfRuntimeOrStatic(func)
+        rt, ea = addressOfRuntimeOrStatic(func)
         set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
 
         # Similar to function_details, we first need to figure out if our type is a
@@ -2819,7 +2819,7 @@ class tinfo(object):
         if rt and ti.is_funcptr():
             pi = idaapi.ptr_type_data_t()
             if not ti.get_ptr_details(pi):
-                raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
             tinfo = pi.obj_type
 
         # If the previous case failed, then we're our type isn't related to a function
@@ -2835,31 +2835,31 @@ class tinfo(object):
 
         # Anything else is a type error that we need to raise to the user.
         else:
-            raise E.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
 
         # Next we need to ensure that the type information has details that
         # we can modify. If they aren't there, then we need to bail.
         if not tinfo.has_details():
-            raise E.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
 
         # Now we can grab our function details from the tinfo.
         ftd = idaapi.func_type_data_t()
         if not tinfo.get_func_details(ftd):
-            raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
 
         # Yield the function type along with the details to the caller and then
         # receive one back (tit-for-tat) which we'll use to re-create the tinfo_t
         # that we'll apply back to the address.
         ftd = (yield (tinfo, ftd))
         if not tinfo.create_func(ftd):
-            raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
 
         # If we were a runtime-linked address, then we're a pointer and we need
         # to re-create it for our tinfo_t.
         if rt:
             pi.obj_type = tinfo
             if not ti.create_ptr(pi):
-                raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(tinfo), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(tinfo), ea))
             newinfo = ti
 
         # If it wasn't a runtime function, then we're fine and can just apply the
@@ -2870,7 +2870,7 @@ class tinfo(object):
         # Finally we have a proper idaapi.tinfo_t that we can apply. After we apply it,
         # all we need to do is return the previous one to the caller and we're good.
         if not set_tinfo(ea, newinfo):
-            raise E.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(newinfo), ea))
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(newinfo), ea))
 
         # Spinning on that dizzy edge.. I kissed her face and kissed her head..
         # And dreamed of all the ways.. That I had to make her glow. Why are you
@@ -2887,7 +2887,7 @@ class tinfo(object):
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
-    iterable = ("{:x}".format(abs(item)) if isinstance(item, six.integer_types) else item for item in names)
+    iterable = ("{:x}".format(abs(item)) if isinstance(item, internal.types.integer) else item for item in names)
     return '_'.join(iterable)
 
 # copied mostly from the collections.namedtuple template
@@ -2995,7 +2995,7 @@ class integerish(namedtypedtuple):
 
     def __operator__(self, operation, other):
         cls, transform = self.__class__, [F(item) for F, item in zip(self._operands, self)]
-        if isinstance(other, six.integer_types):
+        if isinstance(other, internal.types.integer):
             result = [Fitem(operation, other) for Fitem in transform]
         elif isinstance(other, self.__class__) and self.__same__(other):
             result = [item if Fitem(operation, item) is None else Fitem(operation, item) for Fitem, item in zip(transform, other)]
@@ -3122,7 +3122,7 @@ class register_t(symbol_t):
     @property
     def id(self):
         '''Return the index of the register as ordered in IDA's list of registers.'''
-        if isinstance(self.realname, six.integer_types):
+        if isinstance(self.realname, internal.types.integer):
             return self.realname
 
         # otherwise we need to look in our register index for the name.
@@ -3182,7 +3182,7 @@ class register_t(symbol_t):
         return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, internal.utils.string.escape(self.name, '\''), self.position, self.bits)
 
     def __eq__(self, other):
-        if isinstance(other, six.string_types):
+        if isinstance(other, internal.types.string):
             return self.name.lower() == other.lower()
         elif isinstance(other, register_t):
             return self is other
@@ -3275,7 +3275,7 @@ class regmatch(object):
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # convert any regs that are strings into their correct object type
-        regs = { _instruction.architecture.by_name(r) if isinstance(r, six.string_types) else r for r in regs }
+        regs = { _instruction.architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in regs }
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
         match = lambda r, regs=regs: any(map(r.relatedQ, regs))
@@ -3356,11 +3356,11 @@ class reftype_t(object):
         cls = self.__class__
         if isinstance(item, cls):
             res = F(self.S, item.S)
-        elif isinstance(item, six.integer_types):
+        elif isinstance(item, internal.types.integer):
             res = F(self.S, cls.of(item))
         else:
             res = F(self.S, item)
-        return cls.of_action(str().join(res)) if isinstance(res, set) else res
+        return cls.of_action(str().join(res)) if isinstance(res, internal.types.unordered) else res
 
     def __hash__(self):
         return hash(self.F)
@@ -3377,13 +3377,13 @@ class reftype_t(object):
     def __sub__(self, other):
         return self.__operator__(operator.sub, {item for item in other})
     def __contains__(self, type):
-        if isinstance(type, six.integer_types):
+        if isinstance(type, internal.types.integer):
             res = self.F & type
         else:
             res = operator.contains(self.S, type.lower())
         return True if res else False
     def __getitem__(self, type):
-        if isinstance(type, six.integer_types):
+        if isinstance(type, internal.types.integer):
             res = self.F & type
         else:
             res = operator.contains(self.S, type.lower())
@@ -3405,7 +3405,7 @@ class reftype_t(object):
     @classmethod
     def of_type(cls, xrtype):
         '''Convert an IDA reference type in `xrtype` to a ``reftype_t``.'''
-        if not isinstance(xrtype, six.integer_types):
+        if not isinstance(xrtype, internal.types.integer):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing the coercion of a non-integral {!s} into the required type ({!s}).".format('.'.join([__name__, cls.__name__]), xrtype, xrtype.__class__, 'xrtype'))
         items = cls.__mapper__.get(xrtype, '')
         iterable = (item for item in items)
@@ -3443,7 +3443,7 @@ class ref_t(integerish):
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
-    _types = (six.integer_types, (six.integer_types, None.__class__), reftype_t)
+    _types = (internal.types.integer, (internal.types.integer, internal.types.none), reftype_t)
     _operands = (internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant)
 
     @property
@@ -3479,7 +3479,7 @@ class opref_t(integerish):
     and has the format `(address, opnum, reftype_t)`.
     """
     _fields = ('address', 'opnum', 'reftype')
-    _types = (six.integer_types, six.integer_types, reftype_t)
+    _types = (internal.types.integer, internal.types.integer, reftype_t)
     _operands = (internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant)
     _formats = "{:#x}".format, "{!s}".format, "{!s}".format
 
@@ -3663,7 +3663,7 @@ def addressOfRuntimeOrStatic(func):
         exc_info = sys.exc_info()
 
         # if func is not an address, then there ain't shit we can do
-        if not isinstance(func, six.integer_types): six.reraise(*exc_info)
+        if not isinstance(func, internal.types.integer): six.reraise(*exc_info)
 
         # make sure that we're actually data
         if not database.type.is_data(func): six.reraise(*exc_info)
@@ -3931,7 +3931,7 @@ class bounds_t(integerish):
     and has the format `(left, right)`.
     """
     _fields = ('left', 'right')
-    _types = (six.integer_types, six.integer_types)
+    _types = (internal.types.integer, internal.types.integer)
     _operands = (internal.utils.fcurry, internal.utils.fcurry)
     _formats = "{:#x}".format, "{:#x}".format
 
@@ -4003,11 +4003,11 @@ class bounds_t(integerish):
     def contains(self, ea):
         '''Return if the address `ea` is contained by the current boundary.'''
         left, right = sorted(self)
-        if isinstance(ea, six.integer_types):
+        if isinstance(ea, internal.types.integer):
             return left <= ea <= right
 
         # compare against another boundary
-        elif isinstance(ea, tuple):
+        elif isinstance(ea, internal.types.tuple):
             other_left, other_right = ea
             return all([left <= other_left, right >= other_right])
 
@@ -4018,7 +4018,7 @@ class bounds_t(integerish):
     def overlaps(self, bounds):
         '''Return if the boundary `bounds` overlaps with the current boundary.'''
         left, right = sorted(self)
-        if isinstance(bounds, six.integer_types):
+        if isinstance(bounds, internal.types.integer):
             return left <= bounds <= right
 
         other_left, other_right = sorted(bounds)
@@ -4026,7 +4026,7 @@ class bounds_t(integerish):
 
     def union(self, other):
         '''Return a union of the current boundary with `other`.'''
-        if not isinstance(other, tuple):
+        if not isinstance(other, internal.types.tuple):
             return super(bounds_t, self).__or__(other)
         (left, right), (other_left, other_right) = map(sorted, [self, other])
         return self.__class__(min(left, other_left), max(right, other_right))
@@ -4034,7 +4034,7 @@ class bounds_t(integerish):
 
     def intersection(self, other):
         '''Return an intersection of the current boundary with `other`.'''
-        if not isinstance(other, tuple):
+        if not isinstance(other, internal.types.tuple):
             return super(bounds_t, self).__and__(other)
 
         # if they don't overlap, then we can't intersect and so we bail.
@@ -4058,7 +4058,7 @@ class bounds_t(integerish):
 # FIXME: should probably be a register_t, but with the different attributes
 class partialregister_t(namedtypedtuple, symbol_t):
     _fields = 'register', 'position', 'bits'
-    _types = register_t, six.integer_types, six.integer_types
+    _types = register_t, internal.types.integer, internal.types.integer
     _operands = internal.utils.fconstant, internal.utils.fcurry, internal.utils.fcurry
 
     def __hash__(self):
@@ -4105,16 +4105,16 @@ class location_t(integerish):
     This tuple is used to represent the size at a given location and has the format `(offset, size)`.
     """
     _fields = ('offset', 'size')
-    _types = ((six.integer_types, register_t), six.integer_types)
+    _types = ((internal.types.integer, register_t), internal.types.integer)
     _operands = (internal.utils.fcurry, internal.utils.fconstant)
-    _formats = lambda offset: "{:#x}".format(offset) if isinstance(offset, six.integer_types) else "{!s}".format(offset), "{:d}".format
+    _formats = lambda offset: "{:#x}".format(offset) if isinstance(offset, internal.types.integer) else "{!s}".format(offset), "{:d}".format
 
     def __new__(cls, offset, size):
         return super(location_t, cls).__new__(cls, offset, max(0, size))
 
     def __int__(self):
         offset, size = self
-        if isinstance(offset, six.integer_types):
+        if isinstance(offset, internal.types.integer):
             return offset
 
         elif isinstance(offset, symbol_t):
@@ -4139,7 +4139,7 @@ class location_t(integerish):
     def symbols(self):
         '''Yield the symbolic components of this location.'''
         offset, size = self
-        if not isinstance(offset, six.integer_types):
+        if not isinstance(offset, internal.types.integer):
             yield offset
         return
 
@@ -4159,7 +4159,7 @@ class location_t(integerish):
     def bounds(self):
         '''Return the boundaries of the current location as a ``bounds_t``.'''
         offset, size = self
-        if isinstance(offset, six.integer_types):
+        if isinstance(offset, internal.types.integer):
             return bounds_t(offset, offset + size)
 
         # If the offset is a symbol, then we can try for an integer if possible.
@@ -4184,7 +4184,7 @@ class phrase_t(integerish, symbol_t):
     This tuple is used to represent a phrase relative to a register and has the format `(register, offset)`.
     """
     _fields = 'register', 'offset'
-    _types = (register_t, partialregister_t), six.integer_types
+    _types = (register_t, partialregister_t), internal.types.integer
     _operands = internal.utils.fconstant, internal.utils.fcurry
     _formats = "{!s}".format, "{:#x}".format
 
