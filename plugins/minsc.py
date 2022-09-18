@@ -13,7 +13,7 @@ If you wish to change the directory that the plugin is loaded from, specify the
 location of the plugin's git repository in the variable that is marked below.
 """
 import sys, os, logging
-import builtins, six, imp, fnmatch, ctypes, types
+import builtins, six, imp, fnmatch, ctypes, itertools, types
 import idaapi
 
 # :: Point this variable at the directory containing the repository of the plugin ::
@@ -206,6 +206,7 @@ class internal_object(object):
     Loader class which will simply expose an object instance as the module.
     """
     sys = sys
+
     def __init__(self, __name__, object, **attributes):
         '''Initialize the loader with the specified `__name__` and returning the provided `object` as its module.'''
         self.__name__, self.object = __name__, object
@@ -223,6 +224,242 @@ class internal_object(object):
             raise ImportError("object-loader ({:s}) was not able to find a module named `{:s}`".format(self.__name__, fullname))
         module = self.sys.modules[fullname] = self.object
         return module
+
+class object_proxy(object):
+    """
+    This class is responsible for generating a proxy type that
+    can be used to access attributes from a completely different
+    object.
+
+    Upon using this class, two objects will be returned. The first
+    object is an instance of the proxy object that may be accessed
+    and used as the object that is being proxied. The second object
+    that is returned is a coroutine that can be used to switch the
+    backing for the proxy object to a different type.
+    """
+    class reference(object):
+        __slots__ = {'object'}
+
+    class attributes(object):
+        """
+        This properties within this namespace contains an unordered list
+        of properties that may be used or ignored when copying or removing
+        attributes from an object into a proxy object.
+        """
+        description = {'__module__', '__name__', '__doc__'}
+        ignored = {'__class__', '__dict__', '__weakref__'}
+        required = {'__eq__', '__ne__', '__hash__', '__str__', '__repr__', '__unicode__'}
+
+        klass = {key for key, value in itertools.chain(object.__dict__.items(), type.__dict__.items()) if callable(value)} | ignored
+        instance = (lambda klass=klass: {key for key in dir(object()) if key not in klass})() | ignored
+
+    def __new__(cls, module, name):
+        mutable_t = type('|strongref|', tuple(subclass for subclass in cls.reference.__subclasses__()), {key : None for key, value in cls.reference.__dict__.items() if key in cls.reference.__slots__})
+        if module:
+            mutable_t.__module__ = module
+        mutable = mutable_t()
+
+        # create a proxy_t and instantiate it before passing it to the updater.
+        proxy_t = cls.proxy(mutable, name)
+        updater = cls.proxy_updater(mutable, proxy_t)
+
+        # now we can initialize the updater coroutine to return the proxy from its
+        # first yielded result, and return the coroutine to allow updating the proxy.
+        return next(updater), updater
+
+    @classmethod
+    def proxy_updater(cls, mutable, proxy_t):
+        '''This coroutine is responsible for synchronizing the `mutable` object with any of the objects that it receives and updating the documentation for `proxy_t`.'''
+        state = {key : getattr(proxy_t, key) for key in dir(proxy_t) if hasattr(proxy_t, key)}
+        C = cls.update_none(proxy_t)
+        backing = proxy = next(C)
+        while True:
+            backing = (yield backing)
+            C.close()
+
+            # First thing we need to do is to update our mutable instance
+            # to reference the backing type that we received.
+            mutable.object = backing
+
+            # Figure out which updater we need to use for the backing object.
+            if isinstance(backing, types.FunctionType):
+                C = cls.update_callable(proxy_t)
+            elif isinstance(backing, object):
+                #C = cls.update_object(proxy_t, proxy)
+                C = cls.update_class(proxy_t)
+            elif isinstance(backing, types.ModuleType):
+                raise TypeError(backing)
+                C = cls.update_module(proxy)
+            else:
+                raise TypeError(backing)
+
+            # Start the updater that we determined and proceed to update our proxy object.
+            state = next(C)
+            C.send(backing)
+            C.send(backing)
+            C.send(backing)
+        return
+
+    @classmethod
+    def proxy(cls, mutable, name, **attributes):
+        """Return a new modifiable type of the given `name` that proxies all attribute access to the instance provided by `mutable`.
+
+        If any `attributes` are given, then use the given attribute instead of the `backing` instance.
+        """
+        def __getattribute__(attribute):
+            '''This method proxies all attribute fetches to an inaccessible backing object.'''
+            return attributes[attribute] if attribute in attributes else object.__getattribute__(mutable.object, attribute)
+
+        def __setattribute__(attribute, value):
+            '''This method proxies all attribute assignments to an inaccessible backing object.'''
+            try:
+                object.__setattr__(mutable.object, attribute, value)
+            except AttributeError:
+                attributes[attribute] = value
+            return
+
+        def __delattr__(attribute):
+            '''This method proxies all attribute removals to an inaccessible backing object.'''
+            attributes.pop(attribute) if attribute in attributes else delattr(mutable.object, attribute)
+
+        namespace = {'__getattribute__': __getattribute__, '__setattr__': __setattribute__, '__delattr__': __delattr__}
+        return type(name, (object,), {key : staticmethod(value) for key, value in namespace.items()})
+
+    @classmethod
+    def update_none(cls, proxy_t):
+        '''This coroutine is a dummy coroutine that uses `proxy_t` to construct an object and yield it during initialization.'''
+        yield proxy_t()
+        while True:
+            (yield)
+        return
+
+    @classmethod
+    def update_class(cls, proxy):
+        '''This coroutine is responsible for updating the documentation of the provided `proxy` (class) with the attributes belonging to the object (class) that is received.'''
+        state = {}
+        object = (yield state)
+
+        # collect all of the attributes from the class belonging to the object
+        # we received while including any of our description-related attributes.
+        state.update({key : value for key, value in object.__class__.__dict__.items() if key not in cls.attributes.klass})
+        state.update({key : getattr(object.__class__, key, None) for key in cls.attributes.description})
+
+        # FIXME: the attributes in `cls.attributes.required` may already be defined,
+        #        in our backing object but we're not yet copying them into our proxy
+        #        type since they might be a builtin that inherits from object.
+
+        # before we apply any of the state to the proxy, yield as a sort-of
+        # breakpoint to allow the caller to tamper with the state if necessary.
+        try:
+            (yield)
+
+            # now we can update the proxy atributes we snagged and spin
+            # until the user decides to close us.
+            [setattr(proxy, key, value) for key, value in state.items() if key not in cls.attributes.description]
+            [setattr(proxy, key, state[key]) for key in cls.attributes.description if state.get(key, None) is not None]
+
+            while True: (yield)
+
+        # remove any and all attributes that we added to the proxy's class.
+        finally:
+            [delattr(proxy, key) for key in state if key not in cls.attributes.description]
+        state.clear()
+
+    @classmethod
+    def update_instance(cls, proxy):
+        '''This coroutine is responsible for updating the documentation of the provided `proxy` with the attributes belonging to the object that is received.'''
+        state = {}
+        object = (yield state)
+
+        # preserve all attributes and any description attributes for the instance
+        # of the object that we're trying to mirror.
+        state.update({key : value for key, value in object.__dict__.items() if key not in cls.attributes.instance})
+        state.update({key : getattr(object.__class__, key, None) for key in cls.attributes.description})
+        #[state.pop(key, None) for key, value in proxy.__class__.__dict__.items() if key in state and value == state[key]]
+
+        # then we yield in order to give the caller a chance to tamper or display
+        # the state if they feel it's absolutely necessary.
+        try:
+            (yield)
+
+            # update the proxy with the non-description attributes we collected.
+            updates = {key : value for key, value in state.items() if key not in cls.attributes.description}
+            [setattr(proxy, key, value) for key, value in updates.items()]
+
+            # then update the proxy with the description attributes if any are available.
+            descriptions = {key : state.get(key, None) for key in cls.attributes.description}
+            for key, value in {attribute : state.pop(attribute, None) for attribute in cls.attributes.description}.items():
+                if value:
+                    setattr(proxy, key, value)
+                continue
+
+            # once we're done spin until the user decides they're ready to close us.
+            while True: (yield)
+
+        # delete all the attributes that are non-description. non-description attributes
+        # are non-removable which is why we skip over them entirely.
+        finally:
+            [delattr(proxy, key) for key in state if key not in cls.attributes.description]
+        state.clear()
+
+    @classmethod
+    def update_callable(cls, proxy):
+        '''This coroutine is responsible for updating the documentation of the provided `proxy` with the attributes belonging to the callable that is received.'''
+        state = {}
+        callable = (yield state)
+
+        # callables will require us to associate it as a staticmethod to discard
+        # the first parameter, and include each of its description attributes
+        state['__call__'] = staticmethod(callable)
+        state.update({key : getattr(callable, key, None) for key in cls.attributes.description})
+
+        # pydoc._getowndoc will refuse to return documentation if `proxy.__doc__` is the same
+        # as `type(proxy).__doc__`. Of course, this is always true because we're forwarding
+        # all attribute fetches to the backing type which makes this object look completely
+        # like a function. to deal with this, we promote __doc__ to a property so it doesn't match.
+        if '__doc__' in state:
+            state['__doc__'] = property(fget=lambda _, __doc__=state['__doc__']: __doc__)
+
+        # yield to give the caller a chance to mess with the state and
+        # act similarly to the other updater implementations.
+        try:
+            (yield)
+
+            # now we update the proxy, and spin until the caller is done.
+            [setattr(proxy, key, value) for key, value in state.items() if value is not None]
+            while True: (yield)
+
+        # afterwards we can just undo the attributes we attached.
+        finally:
+            [delattr(proxy, key) for key, value in state.items() if key not in cls.attributes.description]
+        state.clear()
+
+    @classmethod
+    def update_object(cls, proxy_t, proxy):
+        '''This coroutine is responsible for updating the documentation of the provided `proxy` by combining the implementations of `update_class` and `update_instance`.'''
+        state = {}
+
+        # Create our coroutines for both the class and proxy, and set them off.
+        Cclass, Cinstance = cls.update_class(proxy), cls.update_instance(proxy)
+        Sclass, Sinstance = (next(C) for C in [Cclass, Cinstance])
+        [state.update(S) for S in [Sclass, Sinstance]]
+
+        # Now we receive the object from the user so we can send it to both
+        # coroutines that we've just started up.
+        object = (yield state)
+        [C.send(object) for C in [Cclass, Cinstance]]
+
+        # Now we can just spin indefinitely while ensuring that we cycle both
+        # coroutines to update the state we yielded to the caller.
+        try:
+            while True:
+                (yield)
+                [next(C) for C in [Cclass, Cinstance]]
+                [state.update(S) for S in [Sclass, Sinstance]]
+
+        finally:
+            pass
+        return
 
 class plugin_module(object):
     """
