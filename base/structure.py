@@ -287,7 +287,7 @@ class structure_t(object):
         # check for duplicate keys
         if six.viewkeys(d1) & six.viewkeys(d2):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment() : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}({:#x}).tag() : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name), ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
         res = {}
@@ -328,22 +328,90 @@ class structure_t(object):
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the structure.'''
         res = self.tag()
-        return res[key]
+        if key in res:
+            return res[key]
+        cls = self.__class__
+        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"'), utils.string.repr(self.name)))
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the structure.'''
-        state = self.tag()
-        repeatable, res, state[key] = True, state.get(key, None), value
-        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
+        repeatable = True
+
+        # Guard against a bunk type being used to set the value.
+        if value is None:
+            cls = self.__class__
+            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.escape(key, '"'), value))
+
+        # First we need to read both comments to figure out what the user is trying to say.
+        comment_right = utils.string.of(idaapi.get_struc_cmt(self.id, repeatable))
+        comment_wrong = utils.string.of(idaapi.get_struc_cmt(self.id, not repeatable))
+
+        # Decode the tags that are written to both comment types to figure out which
+        # comment type the user actually means. The logic here reads weird because the
+        # "repeatable" variable toggles which comment to give priority. We explicitly
+        # check the "wrong" place but fall back to the "right" one.
+        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+
+        # If there were any duplicate keys in any of the dicts, then warn the user about it.
+        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
+        if key in duplicates:
+            cls = self.__class__
+            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.repr(self.name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Now we can just update the dict and re-encode to the proper comment location.
+        res, state[key] = state.get(key, None), value
+        if not idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), where):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(self.name)))
         return res
     @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the structure.'''
-        state = self.tag()
-        repeatable, res = True, state.pop(key)
-        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
+        repeatable = True
+
+        # First we check if the key is one of the implicit tags that we support. These
+        # aren't we can modify since they only exist in special circumstances.
+        if key in {'__name__', '__typeinfo__'} and key in self.tag():
+            message_typeinfo = 'modified by the user from the default type library'
+            message_name = 'flagged as listed by the user'
+
+            # The characteristics aren't actually documented anywhere, so we'll raise an
+            # exception that attempts to describe what causes them to exist. Hopefully
+            # the user figures out that they can use them to find structures they created.
+            cls, message = self.__class__, message_typeinfo if key == '__typeinfo__' else message_name
+            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove the implicit tag \"{:s}\" due to the structure being {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"'), message))
+
+        # We need to read both comments to figure out where the tag is that we're trying to remove.
+        comment_right = utils.string.of(idaapi.get_struc_cmt(self.id, repeatable))
+        comment_wrong = utils.string.of(idaapi.get_struc_cmt(self.id, not repeatable))
+
+        # Decode the tags that are written to both comment types, and then test them
+        # to figure out which comment the key is encoded in. In this, we want
+        # "repeatable" to be a toggle and we want to default to the selected comment.
+        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+
+        # If the key isn't where we expect it, then raise an exception since we can't
+        # remove it if it doesn't actually exist.
+        if key not in state:
+            cls = self.__class__
+            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"'), utils.string.repr(self.name)))
+
+        # If the key is in both dictionaries, then be kind and warn the user about it
+        # so that they'll know that their key will still be part of the dict.
+        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
+        if key in (six.viewkeys(state_right) & six.viewkeys(state_wrong)):
+            cls = self.__class__
+            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.repr(self.name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Now we can just pop the value out of the dict and re-encode back into the comment.
+        res = state.pop(key)
+        if not idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), where):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(self.name)))
         return res
 
     def destroy(self):
@@ -2220,7 +2288,7 @@ class member_t(object):
         # check for duplicate keys
         if six.viewkeys(d1) & six.viewkeys(d2):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}({:#x}).tag() : The repeatable and non-repeatable comment for {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.fullname), ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one before adding implicit tags.
         res = {}
@@ -2269,90 +2337,100 @@ class member_t(object):
         if key in res:
             return res[key]
         cls = self.__class__
-        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read tag (\"{:s}\") from the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"')))
+        raise E.MissingTagError(u"{:s}({:#x}).tag({!r}) : Unable to read the non-existing tag named \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, utils.string.escape(key, '"'), utils.string.repr(self.fullname)))
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the member.'''
+        repeatable = True
+
+        # Guard against a bunk type being used to set the value.
         if value is None:
             cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.escape(key, '"'), value))
+            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.escape(key, '"'), value))
 
-        # grab the repeatable and non-repeatable comment so we capture the
-        # tag state, but exclude any of hte implicit tags.
-        res = utils.string.of(idaapi.get_member_cmt(self.id, False))
-        d1 = internal.comment.decode(res)
-        res = utils.string.of(idaapi.get_member_cmt(self.id, True))
-        d2 = internal.comment.decode(res)
-
-        # check for duplicate keys to warn the user about what we're going to do.
-        if six.viewkeys(d1) & six.viewkeys(d2):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
-
-        # then we merge the dictionaries into one before updating it and
-        # encoding it back into the member's comments.
-        state, repeatable = {}, True
-        [state.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
-
-        # If any of the implicit tags were specified, then figure out
-        # the correct one to assign it to the member correctly.
-        tags = self.tag()
+        # Before we do absolutely anything, we need to check if the user is updating
+        # one of the implicit tags and act on them by assigning their new value.
         if key == '__name__':
+            tags = self.tag()
             result, self.name = tags.pop(key, None), value
             return result
+
         elif key == '__typeinfo__':
+            tags = self.tag()
             result, self.typeinfo = tags.pop(key, None), value
             return result
 
-        # now we just need to modify the state with the new value and re-encoded it.
-        repeatable, res, state[key] = True, state.get(key, None), value
-        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
+        # We need to grab both types of comments so that we can figure out
+        # where the one that we're modifying is going to be located at.
+        comment_right = utils.string.of(idaapi.get_member_cmt(self.id, repeatable))
+        comment_wrong = utils.string.of(idaapi.get_member_cmt(self.id, not repeatable))
+
+        # Now we'll decode both comments and figure out which one contains the key
+        # that the user is attempting to modify. The "repeatable" variable is used
+        # to toggle which comment gets priority which modifying the member's tags.
+        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+
+        # Check if the key is a dupe so that we can warn the user about it.
+        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
+        if key in duplicates:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to apply the encoded tags to the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, value))
+            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.repr(self.fullname), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Now we just need to modify the state with the new value and re-encode it.
+        res, state[key] = state.get(key, None), value
+        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), where):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(self.fullname)))
         return res
     @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
+        repeatable = True
 
-        # grab the repeatable and non-repeatable comment so we capture the
-        # tag state, but exclude any of hte implicit tags.
-        res = utils.string.of(idaapi.get_member_cmt(self.id, False))
-        d1 = internal.comment.decode(res)
-        res = utils.string.of(idaapi.get_member_cmt(self.id, True))
-        d2 = internal.comment.decode(res)
-
-        # check for duplicate keys to warn the user about what we're going to do.
-        if six.viewkeys(d1) & six.viewkeys(d2):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
-
-        # then we merge the dictionaries into one before updating it and
-        # encoding it back into the member's comments.
-        state, repeatable = {}, True
-        [state.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
-
-        # Check which implicit tag we're being asked to remove so that we
-        # can remove it from whatever it represents.
-        tags = self.tag()
+        # Check if the key is an implicit tag that we're being asked to
+        # remove so that we can remove it from whatever it represents.
         if key == '__name__':
+            tags = self.tag()
             result, self.name = tags.pop(key, None), None
             return result
+
         elif key == '__typeinfo__':
+            tags = self.tag()
             result, self.typeinfo = tags.pop(key, None), None
             return result
 
-        # Now we just need to modify the state and we should be good to go.
+        # Read both the comment types to figure out where the tag we want to remove is located at.
+        comment_right = utils.string.of(idaapi.get_member_cmt(self.id, repeatable))
+        comment_wrong = utils.string.of(idaapi.get_member_cmt(self.id, not repeatable))
+
+        # Now we need to decode them and figure out which comment the tag we need
+        # to remove is located in. This reads weird because "repeatable" is intended
+        # to toggle which comment type we give priority to during removal.
+        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+
+        # If the key is not in the dictionary that we determined, then it's missing
+        # and so we need to bail with an exception since it doesn't exist.
         if key not in state:
             cls = self.__class__
-            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"')))
-        repeatable, res, = True, state.pop(key)
+            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"'), utils.string.repr(self.fullname)))
 
-        # Then the very last thing to do is to encode our state into the comment.
-        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
+        # If there's any duplicate keys and the user's key is one of them, then warn
+        # the user about it so they'll know that they'll need to remove it twice.
+        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
+        if key in duplicates:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!s}) : Unable to apply the encoded tags to the specified member.".format('.'.join([__name__, cls.__name__]), self.id, key, value))
+            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.repr(self.fullname), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # The very last thing to do is to remove the key from the dictionary
+        # and then encode our updated state into the member's comment.
+        res = state.pop(key)
+        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), where):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(self.fullname)))
         return res
 
     def refs(self):
