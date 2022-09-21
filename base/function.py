@@ -173,7 +173,7 @@ def name(func):
     if rt:
         name = get_name(ea)
         mangled_name_type_t = Fmangled_type(name)
-        return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM))
+        return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name)
         #return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
         #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
 
@@ -185,7 +185,7 @@ def name(func):
     # decode the string from IDA's UTF-8 and demangle it if we need to
     # XXX: how does demangling work with utf-8? this would be implementation specific, no?
     mangled_name_type_t = Fmangled_type(name)
-    return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM))
+    return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name)
     #return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
@@ -4107,6 +4107,11 @@ class type(object):
             # Iterate through the function details and return each name as a list.
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [utils.string.to(item.name) for item in iterable]
+        @utils.multicase(names=(builtins.list, builtins.tuple))
+        @classmethod
+        def names(cls, names):
+            '''Overwrite the names for the parameters belonging to the current function with the provided list of `names`.'''
+            return cls.names(ui.current.address(), names)
         @utils.multicase(names=(builtins.list, builtins.tuple))
         @classmethod
         def names(cls, func, names):
