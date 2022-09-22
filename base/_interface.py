@@ -1434,13 +1434,14 @@ class address(object):
         # First we'll grab the size and make sure that we actually support it.
         # We should.. because we support all of IDA's native types. Then we
         # generate a list of all of the available operands to apply the ref to.
-        _, size = typemap.inverted[dsize]
-        ptrmask, _ = typemap.ptrmap[type, size]
-        operands = [index for index, opmask in enumerate([idaapi.FF_0OFF, idaapi.FF_1OFF]) if dtype & ptrmask & opmask]
+        ptype, (_, size) = type, typemap.inverted[dsize]
+        ritype = ptype, size
+        ptrmask, _ = typemap.ptrmap[ritype]
+        operands = [index for index, opmask in enumerate(opmasks) if dtype & ptrmask & opmask]
 
         # Before we change anything, do a smoke-test to ensure that we actually
         # are able to choose a default reference size if we're going to update.
-        if len(operands) > 0 and size not in typemap.refinfomap:
+        if len(operands) > 0 and ritype not in typemap.refinfomap:
             logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : Unable to determine a default reference type for the given size ({:d}).".format('.'.join([__name__, cls.__name__]), ea, flag, size))
             return 0
 
@@ -1449,8 +1450,8 @@ class address(object):
         # api should _never_ fail, so we only log warnings if they do.
         api = [set_refinfo.__module__, set_refinfo.__name__] if hasattr(set_refinfo, '__module__') else [set_refinfo.__name__]
         for opnum in operands:
-            if not set_refinfo(ea, opnum, typemap.refinfomap[size]):
-                logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : The api call to `{:s}(ea={:#x}, n={:d}, ri={:d})` returned failure.".format('.'.join([__name__, cls.__name__]), ea, flag, '.'.join(api), ea, opnum, typemap.refinfomap[size]))
+            if not set_refinfo(ea, opnum, typemap.refinfomap[ritype]):
+                logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : The api call to `{:s}(ea={:#x}, n={:d}, ri={:d})` returned failure.".format('.'.join([__name__, cls.__name__]), ea, flag, '.'.join(api), ea, opnum, typemap.refinfomap[ritype]))
             continue
 
         # FIXME: figure out how to update the ui so that it references the new
