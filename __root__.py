@@ -60,8 +60,8 @@ hex = hex()
 ## other useful things that we can grab from other modules
 
 # stuff for printing (of course)
+pp, pf = pprint, pformat = [getattr(__import__('pprint'), p) for p in ['pprint', 'pformat']]
 p = __import__('six').print_
-pp, pf = pprint, pformat = [getattr(__import__('pprint'), _) for _ in ['pprint', 'pformat']]
 
 # snag the custom exceptions that we use while excluding any modules
 exceptions = __import__('internal').exceptions
