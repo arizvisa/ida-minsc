@@ -163,7 +163,7 @@ class internal_submodule(internal_api):
             # know after we've completely loaded the module.
             except Exception as E:
                 import logging
-                logging.info("{:s} : Error trying to import module `{:s}` from {!s}. Queuing it until later.".format(self.__name__, name, path), exc_info=True)
+                logging.debug("{:s} : Error trying to import module `{:s}` from {!s}. Queuing it until later.".format(self.__name__, name, path), exc_info=True)
 
                 # If we caught an exception while trying to import the module, then stash
                 # our exception info state into a dictionary and decrease a counter. This
@@ -187,7 +187,7 @@ class internal_submodule(internal_api):
         # If we caught an exception despite our stack being empty, then this is because of a
         # recursion issue. In case someone wants to track these situations down, we go through
         # our caught exceptions and create some logging events with the backtrace. These errors
-        # are non-fatal because importing another sub-module helped resolve it.
+        # are considered non-fatal because importing another sub-module helped resolve it.
         import logging
         for name, exc_info in result.items():
             logging.info("{!s} : Encountered a non-fatal exception while trying to import recursive module `{:s}` from {!s}".format(self.__name__, name, cache[name]), exc_info=result[name])
