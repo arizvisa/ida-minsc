@@ -944,6 +944,18 @@ def has(name, *suffix):
 def has(structure):
     '''Return whether the database includes the provided `structure`.'''
     return has(structure.id)
+@utils.multicase(tinfo=idaapi.tinfo_t)
+def has(tinfo):
+    '''Return whether the database includes a structure for the specified `tinfo`.'''
+    if tinfo.is_struct():
+        return has(tinfo.get_type_name())
+
+    # If the type information we were given is a pointer, then dereference it
+    # and recurse until we get to a structure type of some sort.
+    pi = idaapi.ptr_type_data_t()
+    if tinfo.is_ptr() and tinfo.has_details() and tinfo.get_ptr_details(pi):
+        return has(pi.obj_type)
+    return False
 
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name', 'suffix')
