@@ -1644,6 +1644,7 @@ class hook(object):
 
     @classmethod
     def __start_ida__(ns):
+        ns.__state__ = state = ns.__state__ if hasattr(ns, '__state__') else internal.hooks.module()
 
         # Create an alias to save some typing and a table of the attribute
         # name, the base hook class, and the supermethods we need to patch.
@@ -1651,6 +1652,7 @@ class hook(object):
             'idp':  (idaapi.IDP_Hooks,  internal.hooks.supermethods.IDP_Hooks.mapping),
             'idb':  (idaapi.IDB_Hooks,  internal.hooks.supermethods.IDB_Hooks.mapping),
             'ui':   (idaapi.UI_Hooks,   internal.hooks.supermethods.UI_Hooks.mapping),
+            'notification' : (object,   {}),
         }
 
         # Iterate through our table and use it to instantiate the necessary
@@ -1661,37 +1663,29 @@ class hook(object):
             if hasattr(ns, attribute):
                 instance = getattr(ns, attribute)
 
-            # Otherwise instantiate the priority hooks for each hook type,
+            # Otherwise grab the priority hooks from our state for each hook type,
             # and assign it directly into our class. We attach a supermethod
-            # mapping to patch the original supermethods of each hook where
-            # it can either have a completely different number of parameters
-            # or different types than what is listed within the documentation.
+            # mapping to patch the original supermethods of each hook where it can
+            # either have a completely different number of parameters or different
+            # types than what is listed within the documentation.
             else:
-                instance = priorityhook(klass, supermethods)
+                instance = getattr(state, attribute)
                 setattr(ns, attribute, instance)
 
             # Log some information about what we've just done.
             logging.info(u"{:s} : Attached an instance of `{:s}` to `{:s}` which is now available at `{:s}`.".format('.'.join([__name__, ns.__name__]), instance.__class__.__name__, klass.__name__, '.'.join([__name__, ns.__name__, attribute])))
-
-        # If the idaapi.__notification__ object exists, then also
-        # assign it directly into our namespace.
-        if not hasattr(ns, 'notification') and hasattr(idaapi, '__notification__'):
-            instance = idaapi.__notification__
-            setattr(ns, 'notification', instance)
-            logging.info(u"{:s} : Attached an instance of `{:s}` to {:s} which is now accessible at `{:s}`.".format('.'.join([__name__, ns.__name__]), instance.__class__.__name__, 'notifications', '.'.join([__name__, ns.__name__, 'notification'])))
         return
 
     @classmethod
     def __stop_ida__(ns):
-        for api in ['idp', 'idb', 'ui']:
+        state = ns.__state__
 
-            # grab the individual class that was used to hook things
-            instance = getattr(ns, api)
-
-            # and then unhook it completely, because IDA on linux
-            # seems to still dispatch to those hooks...even when
-            # the language extension is unloaded.
-            instance.close()
+        for api in ['idp', 'idb', 'ui', 'notification']:
+            if hasattr(ns, api):
+                delattr(ns, api)
+            if hasattr(state, api):
+                delattr(state, api)
+            continue
         return
 
     # if there's a __notification__ attribute attached to IDA, then
