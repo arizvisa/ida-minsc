@@ -2197,3 +2197,78 @@ def ida_is_busy_sucking_cocks(*args, **kwargs):
     make_ida_not_suck_cocks(idaapi.NW_INITIDA)
     hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
     return -1
+
+class singleton_descriptor(object):
+    '''
+    This object is a descriptor that simply wraps a callable and manages its scope.
+    '''
+    def __init__(self, callable, klass, *args, **attributes):
+        self.__owner__ = {}
+        self.__constructor__ = functools.partial(callable, klass, *args)
+        self.__name__ = name = '.'.join(getattr(klass, attribute) for attribute in ['__module__', '__name__'] if hasattr(klass, attribute)) or '.'.join([__name__, self.__class__.__name__])
+
+        # Use any attributes we were given so that we can return an object
+        # displaying something useful whenever we're asked for help.
+        documentation_t = type(name, (object,), attributes)
+        self.__documentation__ = documentation_t()
+
+    def __get__(self, obj, type=None):
+        if obj in self.__owner__:
+            return self.__owner__[obj]
+
+        # If obj is not actually an object (None), then our attribute is being fetched
+        # by help and we need to return our dummy object for the documentation.
+        elif obj is None:
+            return self.__documentation__
+
+        klass, count = obj.__class__, len(self.__owner__)
+        owner = '.'.join(getattr(klass, attribute) for attribute in ['__module__', '__name__'] if hasattr(klass, attribute))
+
+        logging.debug(u"{:s} : Creating a new instance to be attached to the {:s} object at {:#x} ({:d} reference{:s} currently exist).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's'))
+        cons = self.__constructor__
+        return self.__owner__.setdefault(obj, cons())
+
+    def __delete__(self, obj):
+        klass, count = obj.__class__, len(self.__owner__)
+        owner = '.'.join(getattr(klass, attribute) for attribute in ['__module__', '__name__'] if hasattr(klass, attribute))
+        if obj not in self.__owner__:
+            logging.critical(u"{:s} : The instance being suggested for removal is not attached to the {:s} object at {:#x}{:s}.".format(self.__name__, owner, id(obj), " ({:d} references are in scope)".format(count) if count != 1 else ''))
+            return
+
+        instance = self.__owner__.pop(obj)
+        logging.debug(u"{:s} : Found an instance attached to the {:s} object at {:#x} that will be removed ({:d} reference{:s} currently exist).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's'))
+        instance and instance.close()
+
+class module(object):
+    """
+    This object exposes the ability to hook different parts of IDA.
+
+    There are 4 different event types in IDA that can be hooked. These
+    are available under the ``hook.idp``, ``hook.idb``, ``hook.ui``,
+    and ``hook.notification`` objects.
+
+    To add a hook for any of these event types, one can use
+    the `add(target, callable, priority)` method to associate a python
+    callable with the desired event. After the callable has been
+    attached, the `enable(target)` or `disable(target)` methods can be
+    used to temporarily enable or disable the hook.
+
+    Please refer to the documentation for the ``idaapi.IDP_Hooks``,
+    ``idaapi.IDB_Hooks``, and ``idaapi.UI_Hooks`` classes for
+    identifying what event targets are available to hook. Similarly,
+    the documentation for ``idaapi.notify_when`` can be used to list
+    the targets available for notification hooks.
+    """
+    __slots__ = []
+
+    # Create a descriptor for the notifications which should always exist if we're loaded.
+    notification = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.prioritynotification,   __repr__=staticmethod(lambda: 'Notifications currently attached to a callable.'))
+
+    # Create some descriptors for each of the available hooks with the supermethods
+    # that we'll need to patch for compatibility with older versions of the disassembler.
+    idp = singleton_descriptor(internal.interface.priorityhook, idaapi.IDP_Hooks, supermethods.IDP_Hooks.mapping,   __repr__=staticmethod(lambda item=idaapi.IDP_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+    idb = singleton_descriptor(internal.interface.priorityhook, idaapi.IDB_Hooks, supermethods.IDB_Hooks.mapping,   __repr__=staticmethod(lambda item=idaapi.IDB_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+    ui  = singleton_descriptor(internal.interface.priorityhook, idaapi.UI_Hooks,  supermethods.UI_Hooks.mapping,    __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+
+# Now we just need to change the name of our class so that the documentation reads right.
+module.__name__ = 'hook'
