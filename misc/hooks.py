@@ -9,7 +9,7 @@ to be used by the average user.
 
 import six
 import sys, logging
-import functools, operator, itertools, types
+import functools, operator, itertools
 
 import database, function, instruction, ui
 import internal
@@ -1908,8 +1908,7 @@ class supermethods(object):
     Define all of the functions that will be used as supermethods for
     the situation when the original hook supermethod does not take the
     same parameters as listed in IDAPython's documentation. This is
-    used when setting up the hooks via the priorityhook class during
-    the initialization of them by the ui.hook namepsace.
+    used when initializing the hooks module via the priorityhook class.
     """
 
     class IDP_Hooks(object):
@@ -2028,135 +2027,144 @@ class supermethods(object):
 
 def make_ida_not_suck_cocks(nw_code):
     '''Start hooking all of IDA's API.'''
+    import hook
 
-    ## initialize the priorityhook api for all three of IDA's interfaces
+    # at this point, the hook classes should already have been instantiated by the
+    # loader. so we just verify that the necessary attributes exist to be safe.
+    for attribute in ['notification', 'idp', 'idb', 'ui']:
+        if not hasattr(hook, attribute):
+            logging.warning(u"{:s} : Unable to locate the \"{:s}\" hook type that should have been attached during load.".format(__name__, attribute))
+        continue
+
+    ## initialize the priorityhook api for all three of IDA's interfaces in the
+    ## "ui" module for backwards compatibility with older versions of the plugin.
     ui.hook.__start_ida__()
 
     ## setup default integer types for the typemapper once the loader figures everything out
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_newprc', interface.typemap.__ev_newprc__, 0)
+        hook.idp.add('ev_newprc', interface.typemap.__ev_newprc__, 0)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('newprc', interface.typemap.__newprc__, 0)
+        hook.idp.add('newprc', interface.typemap.__newprc__, 0)
 
     else:
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
+        hook.notification.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
 
     ## monitor when ida enters its various states so we can pre-build the tag cache
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', on_init, -100)
-        ui.hook.idp.add('ev_newfile', on_newfile, -100)
-        ui.hook.idp.add('ev_oldfile', on_oldfile, -100)
-        ui.hook.idp.add('ev_auto_queue_empty', auto_queue_empty, -100)
+        hook.idp.add('ev_init', on_init, -100)
+        hook.idp.add('ev_newfile', on_newfile, -100)
+        hook.idp.add('ev_oldfile', on_oldfile, -100)
+        hook.idp.add('ev_auto_queue_empty', auto_queue_empty, -100)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('init', on_init, -100)
-        ui.hook.idp.add('newfile', on_newfile, -100)
-        ui.hook.idp.add('oldfile', on_oldfile, -100)
-        ui.hook.idp.add('auto_empty', on_ready, -100)
+        hook.idp.add('init', on_init, -100)
+        hook.idp.add('newfile', on_newfile, -100)
+        hook.idp.add('oldfile', on_oldfile, -100)
+        hook.idp.add('auto_empty', on_ready, -100)
 
     else:
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_init, -50)
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
-        ui.hook.idp.add('auto_empty', on_ready, 0)
+        hook.notification.add(idaapi.NW_OPENIDB, nw_on_init, -50)
+        hook.notification.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
+        hook.notification.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
+        hook.idp.add('auto_empty', on_ready, 0)
 
-    ui.hook.idb.add('closebase', on_close, 10000) if 'closebase' in ui.hook.idb.available else ui.hook.idp.add('closebase', on_close, 10000)
+    hook.idb.add('closebase', on_close, 10000) if 'closebase' in hook.idb.available else hook.idp.add('closebase', on_close, 10000)
 
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', comment.tagging.__init_tagcache__, -1)
+        hook.idp.add('ev_init', comment.tagging.__init_tagcache__, -1)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
+        hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
 
     else:
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
+        hook.notification.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
 
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', address.database_init, 0)
-        ui.hook.idp.add('ev_init', globals.database_init, 0)
-        ui.hook.idb.add('changing_range_cmt', globals.changing, 0)
-        ui.hook.idb.add('range_cmt_changed', globals.changed, 0)
+        hook.idp.add('ev_init', address.database_init, 0)
+        hook.idp.add('ev_init', globals.database_init, 0)
+        hook.idb.add('changing_range_cmt', globals.changing, 0)
+        hook.idb.add('range_cmt_changed', globals.changed, 0)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('init', address.database_init, 0)
-        ui.hook.idp.add('init', globals.database_init, 0)
-        ui.hook.idb.add('changing_area_cmt', globals.changing, 0)
-        ui.hook.idb.add('area_cmt_changed', globals.changed, 0)
+        hook.idp.add('init', address.database_init, 0)
+        hook.idp.add('init', globals.database_init, 0)
+        hook.idb.add('changing_area_cmt', globals.changing, 0)
+        hook.idb.add('area_cmt_changed', globals.changed, 0)
 
     else:
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
-        ui.hook.idb.add('area_cmt_changed', globals.old_changed, 0)
+        hook.notification.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
+        hook.notification.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
+        hook.idb.add('area_cmt_changed', globals.old_changed, 0)
 
     # hook the changing of a comment
     if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('changing_cmt', address.changing, 0)
-        ui.hook.idb.add('cmt_changed', address.changed, 0)
+        hook.idb.add('changing_cmt', address.changing, 0)
+        hook.idb.add('cmt_changed', address.changed, 0)
 
     else:
-        ui.hook.idb.add('cmt_changed', address.old_changed, 0)
+        hook.idb.add('cmt_changed', address.old_changed, 0)
 
     ## hook renames to support updating the "__name__" implicit tag
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', naming.database_init, 0)
-        ui.hook.idp.add('ev_rename', naming.changing, 0)
-        ui.hook.idb.add('renamed', naming.changed, 0)
+        hook.idp.add('ev_init', naming.database_init, 0)
+        hook.idp.add('ev_rename', naming.changing, 0)
+        hook.idb.add('renamed', naming.changed, 0)
 
     else:
-        ui.hook.idp.add('rename', naming.rename, 0)
+        hook.idp.add('rename', naming.rename, 0)
 
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
-        ui.hook.idb.add('deleting_func_tail', removing_func_tail, 0)
-        ui.hook.idb.add('func_added', add_func, 0)
-        ui.hook.idb.add('deleting_func', del_func, 0)
-        ui.hook.idb.add('set_func_start', set_func_start, 0)
-        ui.hook.idb.add('set_func_end', set_func_end, 0)
+        hook.idb.add('deleting_func_tail', removing_func_tail, 0)
+        hook.idb.add('func_added', add_func, 0)
+        hook.idb.add('deleting_func', del_func, 0)
+        hook.idb.add('set_func_start', set_func_start, 0)
+        hook.idb.add('set_func_end', set_func_end, 0)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('removing_func_tail', removing_func_tail, 0)
-        [ ui.hook.idp.add(item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
+        hook.idb.add('removing_func_tail', removing_func_tail, 0)
+        [ hook.idp.add(item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
 
     else:
-        ui.hook.idb.add('func_tail_removed', func_tail_removed, 0)
-        ui.hook.idp.add('add_func', add_func, 0)
-        ui.hook.idp.add('del_func', del_func, 0)
-        ui.hook.idb.add('tail_owner_changed', tail_owner_changed, 0)
+        hook.idb.add('func_tail_removed', func_tail_removed, 0)
+        hook.idp.add('add_func', add_func, 0)
+        hook.idp.add('del_func', del_func, 0)
+        hook.idb.add('tail_owner_changed', tail_owner_changed, 0)
 
-    [ ui.hook.idb.add(item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
+    [ hook.idb.add(item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
 
     ## Relocate the tagcache for an individual segment if that segment is moved.
-    ui.hook.idb.add('segm_start_changed', segm_start_changed, 0)
-    ui.hook.idb.add('segm_end_changed', segm_end_changed, 0)
-    ui.hook.idb.add('segm_moved', segm_moved, 0)
+    hook.idb.add('segm_start_changed', segm_start_changed, 0)
+    hook.idb.add('segm_end_changed', segm_end_changed, 0)
+    hook.idb.add('segm_moved', segm_moved, 0)
 
     ## switch the instruction set when the processor is switched
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_newprc', instruction.__ev_newprc__, 0)
+        hook.idp.add('ev_newprc', instruction.__ev_newprc__, 0)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('newprc', instruction.__newprc__, 0)
+        hook.idp.add('newprc', instruction.__newprc__, 0)
 
     else:
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
+        hook.notification.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
 
     ## ensure the database.config namespace is initialized as it's
     ## necessary and used by the processor detection.
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', database.config.__init_info_structure__, -100)
+        hook.idp.add('ev_init', database.config.__init_info_structure__, -100)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('init', database.config.__init_info_structure__, -100)
+        hook.idp.add('init', database.config.__init_info_structure__, -100)
 
     else:
-        hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
+        hook.notification.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
 
     ## keep track of individual tags like colors and type info
     if idaapi.__version__ >= 7.2:
-        ui.hook.idb.add('item_color_changed', item_color_changed, 0)
+        hook.idb.add('item_color_changed', item_color_changed, 0)
 
     # anything earlier than v7.0 doesn't expose the "changing_ti" and "ti_changed"
     # hooks... plus, v7.1 doesn't pass us the correct type (idaapi.tinfo_t) as its
@@ -2164,38 +2172,38 @@ def make_ida_not_suck_cocks(nw_code):
     # completely fucking useless to us. so if we're using 7.1 or earlier, then
     # we completely skip the addition of the typeinfo hooks.
     if idaapi.__version__ >= 7.2:
-        ui.hook.idp.add('ev_init', typeinfo.database_init, 0)
-        ui.hook.idb.add('changing_ti', typeinfo.changing, 0)
-        ui.hook.idb.add('ti_changed', typeinfo.changed, 0)
+        hook.idp.add('ev_init', typeinfo.database_init, 0)
+        hook.idb.add('changing_ti', typeinfo.changing, 0)
+        hook.idb.add('ti_changed', typeinfo.changed, 0)
 
     # earlier versions of IDAPython don't expose anything about "extra" comments
     # so we can't do anything here.
     if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('extra_cmt_changed', extra_cmt.changed, 0)
+        hook.idb.add('extra_cmt_changed', extra_cmt.changed, 0)
 
     ## just some debugging notification hooks
-    #[ ui.hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
-    #[ ui.hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
-    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['closebase','savebase','loader_finished', 'auto_empty', 'thunk_func_created','func_tail_appended'] ]
-    #[ ui.hook.idp.add(item, notify(item), -100) for item in ['add_func','del_func','set_func_start','set_func_end'] ]
-    #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
-    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['cmt_changed', 'changing_cmt', 'range_cmt_changed', 'changing_range_cmt'] ]
-    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['changing_ti', 'ti_changed', 'changing_op_type', 'op_type_changed'] ]
-    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['changing_op_ti', 'op_ti_changed'] ]
-    #ui.hook.idb.add('item_color_changed', notify(item), -100)
-    #ui.hook.idb.add('extra_cmt_changed', notify(item), -100)
+    #[ hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
+    #[ hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
+    #[ hook.idb.add(item, notify(item), -100) for item in ['closebase','savebase','loader_finished', 'auto_empty', 'thunk_func_created','func_tail_appended'] ]
+    #[ hook.idp.add(item, notify(item), -100) for item in ['add_func','del_func','set_func_start','set_func_end'] ]
+    #hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
+    #[ hook.idb.add(item, notify(item), -100) for item in ['cmt_changed', 'changing_cmt', 'range_cmt_changed', 'changing_range_cmt'] ]
+    #[ hook.idb.add(item, notify(item), -100) for item in ['changing_ti', 'ti_changed', 'changing_op_type', 'op_type_changed'] ]
+    #[ hook.idb.add(item, notify(item), -100) for item in ['changing_op_ti', 'op_ti_changed'] ]
+    #hook.idb.add('item_color_changed', notify(item), -100)
+    #hook.idb.add('extra_cmt_changed', notify(item), -100)
 
     ### ...and that's it for all the hooks, so give out our greeting
     return greeting()
 
 def make_ida_suck_cocks(nw_code):
     '''Unhook all of IDA's API.'''
-    hasattr(idaapi, '__notification__') and idaapi.__notification__.close()
-    ui.hook.__stop_ida__()
+    __import__('hook').close()
 
 def ida_is_busy_sucking_cocks(*args, **kwargs):
+    import hook
     make_ida_not_suck_cocks(idaapi.NW_INITIDA)
-    hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
+    hook.notification.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
     return -1
 
 class singleton_descriptor(object):
@@ -2224,7 +2232,7 @@ class singleton_descriptor(object):
         klass, count = obj.__class__, len(self.__owner__)
         owner = '.'.join(getattr(klass, attribute) for attribute in ['__module__', '__name__'] if hasattr(klass, attribute))
 
-        logging.debug(u"{:s} : Creating a new instance to be attached to the {:s} object at {:#x} ({:d} reference{:s} currently exist).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's'))
+        logging.debug(u"{:s} : Creating a new instance to be attached to the {:s} object at {:#x} ({:d} reference{:s} currently exist{:s}).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's', 's' if count == 1 else ''))
         cons = self.__constructor__
         return self.__owner__.setdefault(obj, cons())
 
@@ -2232,11 +2240,11 @@ class singleton_descriptor(object):
         klass, count = obj.__class__, len(self.__owner__)
         owner = '.'.join(getattr(klass, attribute) for attribute in ['__module__', '__name__'] if hasattr(klass, attribute))
         if obj not in self.__owner__:
-            logging.critical(u"{:s} : The instance being suggested for removal is not attached to the {:s} object at {:#x}{:s}.".format(self.__name__, owner, id(obj), " ({:d} references are in scope)".format(count) if count != 1 else ''))
+            logging.critical(u"{:s} : The instance being suggested for removal is not attached to the {:s} object at {:#x}{:s}.".format(self.__name__, owner, id(obj), " ({:d} references still exist)".format(count) if count != 1 else ''))
             return
 
         instance = self.__owner__.pop(obj)
-        logging.debug(u"{:s} : Found an instance attached to the {:s} object at {:#x} that will be removed ({:d} reference{:s} currently exist).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's'))
+        logging.debug(u"{:s} : Found an instance attached to the {:s} object at {:#x} that will be removed ({:d} reference{:s} currently exist{:s}).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's', 's' if count == 1 else ''))
         instance and instance.close()
 
 class module(object):
@@ -2259,7 +2267,6 @@ class module(object):
     the documentation for ``idaapi.notify_when`` can be used to list
     the targets available for notification hooks.
     """
-    __slots__ = []
 
     # Create a descriptor for the notifications which should always exist if we're loaded.
     notification = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.prioritynotification,   __repr__=staticmethod(lambda: 'Notifications currently attached to a callable.'))
@@ -2269,6 +2276,14 @@ class module(object):
     idp = singleton_descriptor(internal.interface.priorityhook, idaapi.IDP_Hooks, supermethods.IDP_Hooks.mapping,   __repr__=staticmethod(lambda item=idaapi.IDP_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
     idb = singleton_descriptor(internal.interface.priorityhook, idaapi.IDB_Hooks, supermethods.IDB_Hooks.mapping,   __repr__=staticmethod(lambda item=idaapi.IDB_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
     ui  = singleton_descriptor(internal.interface.priorityhook, idaapi.UI_Hooks,  supermethods.UI_Hooks.mapping,    __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+
+    def close(self):
+        '''Disconnect all of the hook instances associated with this object.'''
+        for phook in ['idp', 'idb', 'ui']:
+            if hasattr(self, phook):
+                delattr(self, phook)
+            continue
+        delattr(self, 'notification')
 
 # Now we just need to change the name of our class so that the documentation reads right.
 module.__name__ = 'hook'
