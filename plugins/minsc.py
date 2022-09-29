@@ -550,6 +550,9 @@ def finders():
     documentation = 'This virtual module contains a number of internal submodules.'
     yield internal_submodule('internal', os.path.join(root, 'misc'), __doc__=documentation)
 
+    # public (hooking) api
+    yield internal_object('hook', lambda: __import__('internal').hooks.module(), __name__='hook')
+
     # public api
     yield internal_path(os.path.join(root, 'base'))
 
