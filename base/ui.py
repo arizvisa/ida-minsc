@@ -1642,56 +1642,57 @@ class hook(object):
     the targets available for notification hooks.
     """
 
+    class hook_descriptor(object):
+        '''A temporary descriptor class for returning an object that can be used to hook the disassembler.'''
+        def __init__(self, attribute, context, default=None):
+            self.__attribute__ = attribute
+            self.__context__ = context
+            self.__default__ = default
+
+        def __get__(self, obj, type=None):
+            import hook
+            if hasattr(hook, self.__attribute__):
+                return getattr(hook, self.__attribute__)
+
+            # If we received a callable that should always succeed, then use it.
+            elif callable(self.__default__):
+                return self.__default__()
+
+            # If we couldn't find an attribute, then we need to bail because the
+            # requested hook doesn't appear to be supported by the disassembler.
+            attribute, context = self.__attribute__, self.__context__
+            description = '.'.join(getattr(context, attribute) for attribute in ['__module__', '__name__'] if hasattr(context, attribute))
+            raise internal.exceptions.UnsupportedCapability(u"{:s} : The specified hook type `{:s}` is currently unavailable.".format('.'.join([__name__, 'hook', attribute]), description or attribute))
+
+    # Use the hook descriptor to create some lazy attributes that can be
+    # used to fetch an instance of the related hook object.
+    notification = hook_descriptor('notification', None, lambda: idaapi.__notification__)
+    idp = hook_descriptor('idp', getattr(idaapi, 'IDP_Hooks', None))
+    idb = hook_descriptor('idb', getattr(idaapi, 'IDB_Hooks', None))
+    ui = hook_descriptor('ui', getattr(idaapi, 'UI_Hooks', None))
+
+    # We're done, so we can remove the descriptor we defined.
+    del(hook_descriptor)
+
     @classmethod
     def __start_ida__(ns):
-        ns.__state__ = state = ns.__state__ if hasattr(ns, '__state__') else internal.hooks.module()
+        import hook
 
-        # Create an alias to save some typing and a table of the attribute
-        # name, the base hook class, and the supermethods we need to patch.
-        priorityhook, api = internal.interface.priorityhook, {
-            'idp':  (idaapi.IDP_Hooks,  internal.hooks.supermethods.IDP_Hooks.mapping),
-            'idb':  (idaapi.IDB_Hooks,  internal.hooks.supermethods.IDB_Hooks.mapping),
-            'ui':   (idaapi.UI_Hooks,   internal.hooks.supermethods.UI_Hooks.mapping),
-            'notification' : (object,   {}),
-        }
+        # Iterate through all of our hook attributes so that we can attach the related
+        # hooks object directly into our namespace for backwards compatibility.
+        for attribute in ['notification', 'idp', 'idb', 'ui']:
 
-        # Iterate through our table and use it to instantiate the necessary
-        # objects for each hook type whilst attaching the patched supermethods.
-        for attribute, (klass, supermethods) in api.items():
-
-            # If there's an instance already attached to us, then use it.
+            # If the attribute has been assigned to us, then we can just return it.
             if hasattr(ns, attribute):
                 instance = getattr(ns, attribute)
+                logging.info(u"{:s} : Attached the instance of `{:s}` to the \"{:s}\" attribute under `{:s}`.".format('.'.join([__name__, ns.__name__]), instance.__class__.__name__, attribute, '.'.join([__name__, ns.__name__])))
 
-            # Otherwise grab the priority hooks from our state for each hook type,
-            # and assign it directly into our class. We attach a supermethod
-            # mapping to patch the original supermethods of each hook where it can
-            # either have a completely different number of parameters or different
-            # types than what is listed within the documentation.
+            # Otherwise we warn the user about it in case they want to troubleshoot.
             else:
-                instance = getattr(state, attribute)
-                setattr(ns, attribute, instance)
-
-            # Log some information about what we've just done.
-            logging.info(u"{:s} : Attached an instance of `{:s}` to `{:s}` which is now available at `{:s}`.".format('.'.join([__name__, ns.__name__]), instance.__class__.__name__, klass.__name__, '.'.join([__name__, ns.__name__, attribute])))
-        return
-
-    @classmethod
-    def __stop_ida__(ns):
-        state = ns.__state__
-
-        for api in ['idp', 'idb', 'ui', 'notification']:
-            if hasattr(ns, api):
-                delattr(ns, api)
-            if hasattr(state, api):
-                delattr(state, api)
+                instance = getattr(hook, attribute)
+                logging.info(u"{:s} : The instance of `{:s}` was not successfully attached to the \"{:s}\" attribute under `{:s}`.".format('.'.join([__name__, ns.__name__]), instance.__class__.__name__, attribute, '.'.join([__name__, ns.__name__])))
             continue
         return
-
-    # if there's a __notification__ attribute attached to IDA, then
-    # assign it to our namespace so it can be used.
-    if hasattr(idaapi, '__notification__'):
-        notification = idaapi.__notification__
 
 hooks = hook    # XXX: ns alias
 
