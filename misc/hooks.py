@@ -11,9 +11,9 @@ import six
 import sys, logging
 import functools, operator, itertools
 
-import database, function, instruction, ui
+import database, function, ui
 import internal
-from internal import comment, utils, interface, exceptions as E
+from internal import utils, interface, exceptions as E
 
 import idaapi
 
@@ -2073,13 +2073,13 @@ def make_ida_not_suck_cocks(nw_code):
 
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_init', comment.tagging.__init_tagcache__, -1)
+        hook.idp.add('ev_init', internal.comment.tagging.__init_tagcache__, -1)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
+        hook.idp.add('init', internal.comment.tagging.__init_tagcache__, -1)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
+        hook.notification.add(idaapi.NW_OPENIDB, internal.comment.tagging.__nw_init_tagcache__, -40)
 
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
@@ -2142,14 +2142,15 @@ def make_ida_not_suck_cocks(nw_code):
     hook.idb.add('segm_moved', segm_moved, 0)
 
     ## switch the instruction set when the processor is switched
+    import __catalog__ as catalog
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_newprc', instruction.__ev_newprc__, 0)
+        hook.idp.add('ev_newprc', catalog.ev_newprc, 0)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('newprc', instruction.__newprc__, 0)
+        hook.idp.add('newprc', catalog.newprc, 0)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
+        hook.notification.add(idaapi.NW_OPENIDB, catalog.nw_newprc, -10)
 
     ## ensure the database.config namespace is initialized as it's
     ## necessary and used by the processor detection.
