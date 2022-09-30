@@ -272,22 +272,55 @@ class object_proxy(object):
         klass = {key for key, value in itertools.chain(object.__dict__.items(), type.__dict__.items()) if callable(value)} | ignored
         instance = (lambda klass=klass: {key for key in dir(object()) if key not in klass})() | ignored
 
+    class attribute_descriptor(object):
+        """
+        This descriptor is responsible for returning a particular value
+        when the attribute it is assigned to is requested. This is
+        specifically for dealing with Py2's inability to assign certain
+        attributes (such as "__doc__") after a type has been created.
+        """
+        def __init__(self, Fcontents):
+            self.__contents__ = Fcontents
+        def __get__(self, *args):
+            return self.__contents__(*args)
+
     def __new__(cls, module, name):
         mutable_t = type('|strongref|', tuple(subclass for subclass in cls.reference.__subclasses__()), {key : None for key, value in cls.reference.__dict__.items() if key in cls.reference.__slots__})
         if module:
             mutable_t.__module__ = module
         mutable = mutable_t()
 
+        # if we're using Py2, then we need to instantiate our proxy_t differently
+        # because we're not allowed to update certain attributes. we deal with
+        # this by making the immutable attributes into descriptors so that way
+        # we can use a function to update some mutable state.
+        descriptors, callables = {}, {}
+        if sys.version_info.major < 3:
+            descriptor, update = cls.mutable_descriptor()
+            descriptors['__doc__'] = descriptor
+            callables['__doc__'] = update
+
         # create a proxy_t and instantiate it before passing it to the updater.
-        proxy_t = cls.proxy(mutable, name)
-        updater = cls.proxy_updater(mutable, proxy_t)
+        proxy_t = cls.proxy(mutable, name, **descriptors)
+        updater = cls.proxy_updater(mutable, proxy_t, **callables)
 
         # now we can initialize the updater coroutine to return the proxy from its
         # first yielded result, and return the coroutine to allow updating the proxy.
         return next(updater), updater
 
     @classmethod
-    def proxy_updater(cls, mutable, proxy_t):
+    def mutable_descriptor(cls):
+        '''This method returns a descriptor that captures some mutable state along with a closure to allow its update.'''
+        mutable = [None]
+        def update(value):
+            mutable[:] = [value]
+        def fetch(obj, type=None):
+            item, = mutable
+            return item
+        return cls.attribute_descriptor(fetch), update
+
+    @classmethod
+    def proxy_updater(cls, mutable, proxy_t, **kwargs):
         '''This coroutine is responsible for synchronizing the `mutable` object with any of the objects that it receives and updating the documentation for `proxy_t`.'''
         state = {key : getattr(proxy_t, key) for key in dir(proxy_t) if hasattr(proxy_t, key)}
         C = cls.update_none(proxy_t)
@@ -302,21 +335,23 @@ class object_proxy(object):
 
             # Figure out which updater we need to use for the backing object.
             if isinstance(backing, types.FunctionType):
-                C = cls.update_callable(proxy_t)
+                C = cls.update_callable(proxy_t, **kwargs)
             elif isinstance(backing, object):
-                #C = cls.update_object(proxy_t, proxy)
-                C = cls.update_class(proxy_t)
+                #C = cls.update_object(proxy_t, proxy, **kwargs)
+                C = cls.update_class(proxy_t, **kwargs)
             elif isinstance(backing, types.ModuleType):
                 raise TypeError(backing)
-                C = cls.update_module(proxy)
+                C = cls.update_module(proxy, **kwargs)
             else:
                 raise TypeError(backing)
 
             # Start the updater that we determined and proceed to update our proxy object.
             state = next(C)
-            C.send(backing)
-            C.send(backing)
-            C.send(backing)
+
+            # We send this multiple times since between each modification the caller
+            # is allowed to tamper with the backing object. This really should be
+            # consolidated to a single one, but it really helps with debugging.
+            C.send(backing), C.send(backing), C.send(backing)
         return
 
     @classmethod
@@ -341,11 +376,15 @@ class object_proxy(object):
             '''This method proxies all attribute removals to an inaccessible backing object.'''
             attributes.pop(attribute) if attribute in attributes else delattr(mutable.object, attribute)
 
-        namespace = {'__getattribute__': __getattribute__, '__setattr__': __setattribute__, '__delattr__': __delattr__}
-        return type(name, (object,), {key : staticmethod(value) for key, value in namespace.items()})
+        # First assign the methods that are used to proxy the default attributes,
+        # and then attach any custom attributes that we were asked to include.
+        methods = {'__getattribute__': __getattribute__, '__setattr__': __setattribute__, '__delattr__': __delattr__}
+        namespace = {key : staticmethod(value) for key, value in methods.items()}
+        namespace.update(attributes)
+        return type(name, (object,), namespace)
 
     @classmethod
-    def update_none(cls, proxy_t):
+    def update_none(cls, proxy_t, **callables):
         '''This coroutine is a dummy coroutine that uses `proxy_t` to construct an object and yield it during initialization.'''
         yield proxy_t()
         while True:
@@ -353,8 +392,11 @@ class object_proxy(object):
         return
 
     @classmethod
-    def update_class(cls, proxy):
-        '''This coroutine is responsible for updating the documentation of the provided `proxy` (class) with the attributes belonging to the object (class) that is received.'''
+    def update_class(cls, proxy, **callables):
+        """This coroutine is responsible for updating the documentation of the provided `proxy` (class) with the attributes belonging to the object (class) that is received.
+
+        If any attributes are provided with a callable, then execute it with the desired attribute.
+        """
         state = {}
         object = (yield state)
 
@@ -367,6 +409,14 @@ class object_proxy(object):
         #        in our backing object but we're not yet copying them into our proxy
         #        type since they might be a builtin that inherits from object.
 
+        # figure out any attributes that we need to skip when copying since we
+        # were given an attribute that we're supposed to call instead.
+        callable_attributes = {}
+        for key in callables:
+            if key in state:
+                callable_attributes[key] = state.pop(key)
+            continue
+
         # before we apply any of the state to the proxy, yield as a sort-of
         # breakpoint to allow the caller to tamper with the state if necessary.
         try:
@@ -377,6 +427,10 @@ class object_proxy(object):
             [setattr(proxy, key, value) for key, value in state.items() if key not in cls.attributes.description]
             [setattr(proxy, key, state[key]) for key in cls.attributes.description if state.get(key, None) is not None]
 
+            # the last thing to do is to update the callable attributes since
+            # we can't explicitly update them via setattr.
+            [callables[key](value) for key, value in callable_attributes.items()]
+
             while True: (yield)
 
         # remove any and all attributes that we added to the proxy's class.
@@ -385,7 +439,7 @@ class object_proxy(object):
         state.clear()
 
     @classmethod
-    def update_instance(cls, proxy):
+    def update_instance(cls, proxy, **callables):
         '''This coroutine is responsible for updating the documentation of the provided `proxy` with the attributes belonging to the object that is received.'''
         state = {}
         object = (yield state)
@@ -422,7 +476,7 @@ class object_proxy(object):
         state.clear()
 
     @classmethod
-    def update_callable(cls, proxy):
+    def update_callable(cls, proxy, **callables):
         '''This coroutine is responsible for updating the documentation of the provided `proxy` with the attributes belonging to the callable that is received.'''
         state = {}
         callable = (yield state)
