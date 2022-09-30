@@ -241,7 +241,7 @@ class trap(interface.namedtypedtuple, interface.symbol_t):
     @property
     def symbols(self):
         '''This operand type is not composed of any symbols.'''
-        raise StopIteration
+        return
         yield   # so that this function is still treated as a generator
 
 def coprocessor(index):
