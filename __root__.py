@@ -77,5 +77,5 @@ AnyBytes = utils.PatternAnyType(bytes)
 Any = utils.PatternAny()
 
 # some types that the user might want to compare with
-architecture_t, register_t, symbol_t, bounds_t, location_t = (getattr(__import__('internal').interface, item) for item in ['architecture_t', 'register_t', 'symbol_t', 'bounds_t', 'location_t'])
+register_t, symbol_t, bounds_t, location_t = (getattr(__import__('internal').interface, item) for item in ['register_t', 'symbol_t', 'bounds_t', 'location_t'])
 ref_t, opref_t = (getattr(__import__('internal').interface, item) for item in ['ref_t', 'opref_t'])
