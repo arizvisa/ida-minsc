@@ -480,6 +480,34 @@ class object_proxy(object):
             pass
         return
 
+class internal_proxy(object):
+    """
+    Loader class which will expose a proxy object as its module. The backend object
+    that is used by the proxy object that gets returned during import can then be
+    changed by using the `internal_proxy.update_module` method with any object.
+    """
+    sys = sys
+    def __init__(self, module, name):
+        self.__name__ = module
+        proxy, updater = object_proxy(module, name)
+        self.__proxy__, self.__update__ = proxy, updater
+        self.__backing_name__ = name
+
+    def find_module(self, fullname, path=None):
+        '''If the module being searched for matches our `fullname`, then act as its loader.'''
+        return self if path is None and fullname == self.__name__ else None
+
+    def update_module(self, object):
+        '''Update the proxy module with the backing object that is specifed by `object`.'''
+        return self.__update__.send(object)
+
+    def load_module(self, fullname):
+        '''Return the specific object for the module specified by `fullname`.'''
+        if fullname != self.__name__:
+            raise ImportError("object-loader ({:s}) was not able to find a module named `{:s}`".format(self.__name__, fullname))
+        module = self.sys.modules[fullname] = self.__proxy__
+        return module
+
 class plugin_module(object):
     """
     Loader class which iterates through all of the files in a directory, and
@@ -552,6 +580,18 @@ def finders():
 
     # public (hooking) api
     yield internal_object('hook', lambda: __import__('internal').hooks.module(), __name__='hook')
+
+    # private (processors) api
+    yield internal_submodule('processors', os.path.join(root, 'procs'), __doc__='This virtual module contains definitions for a number of different processors.')
+
+    # public (architecture) api that proxies its attributes
+    catalog_proxy = internal_proxy('architecture', 'architecture')
+    yield catalog_proxy
+
+    # private (catalog) api that updates its proxy
+    documentation = 'This virtual module maintains the architecturess that are registered by the plugin.'
+    catalog = internal_object('__catalog__', lambda update=catalog_proxy.update_module: __import__('internal').architecture.module(update), __name__='catalog', __doc__=documentation)
+    yield catalog
 
     # public api
     yield internal_path(os.path.join(root, 'base'))
