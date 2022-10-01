@@ -879,8 +879,9 @@ def startup(namespace=None):
     if not isinstance(idaapi.__version__, float):
         raise SystemError("{:s} : Unable to start up plugin due to the \"{:s}\" attribute not being a valid type ({!r})".format(__name__, '.'.join([idaapi.__module__, '__version_']), idaapi.__version__))
 
-    # Now we need to make sure we have access to our internal module.
-    # We can simply trap for ImportError to ensure this works.
+    # Now we need to make sure we have access to our internal module which is
+    # a precursor for pretty much everything. We can simply trap for ImportError
+    # to ensure this actually worked.
     try:
         import internal
         internal.interface
@@ -893,10 +894,20 @@ def startup(namespace=None):
         logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, '.'.join(['internal', 'interface'])))
         raise SystemError("{:s} : Unable to start up plugin due to an error while loading its \"{:s}\" modules.".format(__name__, 'internal'))
 
-    # Finally we can construct our priority notification class and inject it into
-    # the IDAPython module. This object needs to exist in order for everything to
-    # initialize and deinitialize properly.
-    idaapi.__notification__ = notification = internal.interface.prioritynotification()
+    # Now we need to make sure we have access to our hook module as this is the
+    # gateway to pretty much all of our disassembler trickery. The "hook.notification"
+    # attribute really shouldn't be able to fail during instantiation.
+    try:
+        import hook
+        hook.notification
+
+    except ImportError:
+        logging.critical("{:s} : An error occured while trying to import the \"{:s}\" module.".format(__name__, 'hook'), exc_info=True)
+        raise SystemError("{:s} : Unable to start up plugin without loading the \"{:s}\" module.".format(__name__, 'hook'))
+
+    except AttributeError:
+        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" attribute.".format(__name__, '.'.join(['hook', 'notification'])))
+        raise SystemError("{:s} : Unable to start up plugin due to an error while loading its \"{:s}\" module.".format(__name__, 'hook'))
 
     # Now we can proceed to install our hooks that actually initialize and uninitialize
     # MINSC. We define two closures here (with documentation) because these are actually
@@ -914,8 +925,8 @@ def startup(namespace=None):
         dotfile(namespace)
         return result
 
-    # Before we attempt to use the hooks, though, we first check if we can access
-    # the hooks since they are pretty critical for all of our startup logic.
+    # Before we attempt to use the hooks, though, we first check if we can access their
+    # implementation since they are pretty critical for all of our startup logic.
     try:
         import internal
         internal.hooks
@@ -931,8 +942,8 @@ def startup(namespace=None):
     # initializing the plugin. If we were given a namespace, then we can register
     # our closure that loads the user's dotfile too.
     try:
-        notification.add(idaapi.NW_INITIDA, internal.hooks.make_ida_not_suck_cocks, -1000)
-        namespace and notification.add(idaapi.NW_INITIDA, execute_user_dotfile, 0)
+        hook.notification.add(idaapi.NW_INITIDA, internal.hooks.make_ida_not_suck_cocks, -1000)
+        namespace and hook.notification.add(idaapi.NW_INITIDA, execute_user_dotfile, 0)
 
     # If installing that hook failed, then check if we're running in batch mode. If
     # we are, then just immediately register things and load the user dotfile.
@@ -961,7 +972,7 @@ def startup(namespace=None):
     # If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
     else:
         try:
-            notification.add(idaapi.NW_TERMIDA, internal.hooks.make_ida_suck_cocks, +1000)
+            hook.notification.add(idaapi.NW_TERMIDA, internal.hooks.make_ida_suck_cocks, +1000)
 
         # Installing the termination hook failed, but it's not really too important...
         except Exception:
@@ -1078,7 +1089,7 @@ class MINSC(idaapi.plugin_t):
             ok = False
 
         try:
-            ok and internal.hooks
+            import hook
 
         except AttributeError:
             logging.warning("{:s} : One of the internal modules, \"{:s}\" was not properly loaded and may result in some missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
@@ -1089,15 +1100,6 @@ class MINSC(idaapi.plugin_t):
 
         except AttributeError:
             logging.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was unable to be loaded.".format(__name__, '.'.join(['internal', 'interface'])))
-
-        # Check to see if our notification instance was assigned into idaapi. If
-        # it wasn't then try to construct one and assign it for usage.
-        try:
-            if ok and not hasattr(idaapi, '__notification__'):
-                idaapi.__notification__ = notification = internal.interface.prioritynotification()
-
-        except Exception:
-            logging.warning("{:s} : An error occurred while trying to instantiate the notifications interface. Notifications will be left as disabled.".format(__name__))
 
         # Check to see if all is well, and if it is then we can proceed to install
         # the necessary hooks to kick everything off.
@@ -1128,23 +1130,28 @@ class MINSC(idaapi.plugin_t):
         # We were run locally, so we're only allowed to interact with the current
         # database. This means that we now will need to shut everything down.
         try:
-            import internal, hooks
+            import internal
+            internal.hooks
 
         except ImportError:
-            logging.critical("{:s} : An error occurred while trying to import the necessary modules \"{:s}\", and \"{:s}\" during plugin termination.".format(__name__, 'internal', 'hooks'), exc_info=True)
+            logging.critical("{:s} : An error occurred while trying to import the necessary module \"{:s}\" during plugin termination.".format(__name__, 'internal'), exc_info=True)
+            return
+
+        except AttributeError:
+            logging.critical("{:s} : An error occurred while trying to access the critical module \"{:s}\" during plugin termination.".format(__name__, '.'.join(['internal', 'hooks'])), exc_info=True)
             return
 
         # Now we can just remove our hooks and all should be well.
         try:
             logging.debug("{:s} : Detaching from the host application as requested.".format(__name__))
-            hooks.make_ida_suck_cocks(idaapi.NW_TERMIDA)
+            internal.hooks.make_ida_suck_cocks(idaapi.NW_TERMIDA)
 
         except Exception:
             logging.critical("{:s} : An error occurred while trying to detach from the host application during plugin termination. Application may become unstable.".format(__name__), exc_info=True)
         return
 
     def run(self, args):
-        import ui
+        import ui, hook
 
         # Shove some help down the user's throat.
         print("Python>{:<{:d}s} # Use `help({:s})` for usage".format('ui.keyboard.list()', 40, 'ui.keyboard'))
@@ -1155,11 +1162,11 @@ class MINSC(idaapi.plugin_t):
         print('')
 
         # Have some more...
-        hooks = [name for name in dir(ui.hook) if not name.startswith('__')]
+        hooks = [name for name in dir(hook) if not any([name.startswith('__'), callable(getattr(hook, name))])]
         print('The following hook types are locked and loaded:' if hooks else 'Currently no hooks have been initialized.')
         for name in hooks:
-            item = getattr(ui.hook, name)
-            fullname = '.'.join(['ui.hook', name])
+            item = getattr(hook, name)
+            fullname = '.'.join(['hook', name])
             print("Python>{:<{:d}s} # Use `help({:s})` for usage and `{:s}.list()` to see availability".format(fullname, 40, fullname, fullname))
             print(item)
             print('')
