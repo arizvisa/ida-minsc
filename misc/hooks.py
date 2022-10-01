@@ -2223,7 +2223,7 @@ class singleton_descriptor(object):
         self.__documentation__ = documentation_t()
 
     def __get__(self, obj, type=None):
-        if obj in self.__owner__:
+        if self.__owner__.get(obj, None) is not None:
             return self.__owner__[obj]
 
         # If obj is not actually an object (None), then our attribute is being fetched
@@ -2231,9 +2231,17 @@ class singleton_descriptor(object):
         elif obj is None:
             return self.__documentation__
 
+        # Pre-initialize some variables that we'll use to log information to the console.
         klass, count = obj.__class__, len(self.__owner__)
         owner = '.'.join(getattr(klass, attribute) for attribute in ['__module__', '__name__'] if hasattr(klass, attribute))
 
+        # If we've already cached a value (but still got this far), then that's because the
+        # property we're supposed to return has not been initialized yet. So remove it.
+        item = self.__owner__.pop(obj, None)
+        if item is not None:
+            logging.warning(u"{:s} : Removed unexpected instance that was attached to the {:s} object at {:#x} ({:d} reference{:s} currently exist{:s}).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's', 's' if count == 1 else ''))
+
+        # Now we can just create our instance and assign it into the cache of owners.
         logging.debug(u"{:s} : Creating a new instance to be attached to the {:s} object at {:#x} ({:d} reference{:s} currently exist{:s}).".format(self.__name__, owner, id(obj), count, '' if count == 1 else 's', 's' if count == 1 else ''))
         cons = self.__constructor__
         return self.__owner__.setdefault(obj, cons())
@@ -2283,9 +2291,9 @@ class module(object):
     ui  = singleton_descriptor(internal.interface.priorityhook, idaapi.UI_Hooks,  supermethods.UI_Hooks.mapping,    __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
 
     # Can't forget to create a descriptor for events related to the Hex-Rays decompiler...
-    hx = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityhxevent, __repr__=staticmethod(lambda: 'Hex-Rays (decompiler) callbacks currently attached to a callable.'))
-    if hasattr(idaapi, 'Hexrays_Hooks'):
-        hexrays = singleton_descriptor(internal.interface.priorityhook, idaapi.Hexrays_Hooks, __repr__=staticmethod(lambda item=idaapi.Hexrays_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+    hx = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityhxevent, __repr__=staticmethod(lambda: 'Events currently connected to the Hex-Rays (decompiler) callbacks.'))
+    if hasattr(idaapi, 'Hexrays_Hooks') and hasattr(idaapi, 'init_hexrays_plugin'):
+        hexrays = singleton_descriptor(lambda *args: internal.interface.priorityhook(*args) if idaapi.init_hexrays_plugin() else None, idaapi.Hexrays_Hooks, {}, __repr__=staticmethod(lambda item=idaapi.Hexrays_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
 
     def close(self):
         '''Disconnect all of the hook instances associated with this object.'''
