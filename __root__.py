@@ -30,6 +30,7 @@ if idaapi.__version__ >= 7.4:
 ### customize the root namespace
 import segment, database, function, instruction
 import structure, enumeration, ui
+import architecture
 
 ## some aliases for the base modules
 import database as db
@@ -38,6 +39,7 @@ import instruction as ins
 import structure as struc
 import enumeration as enum
 import segment as seg
+import architecture as arch
 
 ## default log setting for notifying the user
 # FIXME: actually use the logging module properly instead of assuming
@@ -45,7 +47,7 @@ import segment as seg
 #__import__('logging').root.setLevel(__import__('logging').INFO)
 
 ## shortcuts
-h, top, go, goof = database.h, func.top, database.go, database.go_offset
+h, top, go, goof = ui.current.address, function.address, database.go, database.go_offset
 
 def hex():
     import sys, builtins, operator
@@ -68,13 +70,6 @@ exceptions = __import__('internal').exceptions
 
 # snag the fake utilities module to share some things with the user...
 utils = __import__('internal').utils
-
-# construct some pattern matching types
-AnyRegister = utils.PatternAnyType(__import__('internal').interface.register_t)
-AnyInteger = utils.PatternAnyType(__import__('six').integer_types)
-AnyString = utils.PatternAnyType(__import__('six').string_types)
-AnyBytes = utils.PatternAnyType(bytes)
-Any = utils.PatternAny()
 
 # some types that the user might want to compare with
 register_t, symbol_t, bounds_t, location_t = (getattr(__import__('internal').interface, item) for item in ['register_t', 'symbol_t', 'bounds_t', 'location_t'])
