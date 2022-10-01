@@ -13,8 +13,296 @@ in a database in order to switch to the correct architecture if the processor
 has been properly registered and made available for usage.
 """
 
-import logging
+import functools, operator, itertools, logging, six, builtins
 import idaapi, internal
+from internal import interface, utils, types
+
+class map_t(object):
+    """
+    An object used for mapping attribute names to an object. This
+    is used for dynamically representing each of the registers
+    that available for a given architecture.
+    """
+    __slots__ = ('__state__',)
+    def __init__(self):
+        object.__setattr__(self, '__state__', {})
+
+    def __getattr__(self, name):
+        if name.startswith('__'):
+            return getattr(self.__class__, name)
+        res = self.__state__
+        if name in res:
+            return res[name]
+        raise AttributeError(name)
+
+    def __setattr__(self, name, register):
+        res = self.__state__
+        return res.__setitem__(name, register)
+
+    def __contains__(self, name):
+        return name in self.__state__
+
+    def __repr__(self):
+
+        # Given a register, traverse its parents until we get to a root node.
+        Froot = lambda item: Froot(item.__parent__) if item.__parent__ else item
+
+        # Gather all the children from a given root yielding each item
+        # along with it's height inside the tree.
+        def Fgather(root, height=0):
+            yield height, root
+            for position, type in sorted(root.__children__, key=operator.itemgetter(0)):
+                child = root.__children__[position, type]
+                for h, node in Fgather(child, height + 1):
+                    yield h, node
+                continue
+            return
+
+        # Build a sparse matrix and a height table for each member of a tree.
+        def Fheights(root):
+            matrix, heights = {}, {}
+            for height, node in Fgather(root):
+                row = matrix.setdefault(height, {})
+
+                assert not operator.contains(row, node.id)
+                row[node.__position__, node.__ptype__] = node
+
+                assert not operator.contains(heights, node.id)
+                heights[node] = height
+            return matrix, heights
+
+        # Given a list of the root registers, iterate through each one
+        # and yield the heights of each element in their tree so that
+        # we can sort and display them in some reasonable format.
+        def Fiterate(registers):
+            for root in map(Froot, registers):
+                matrix, items = Fheights(root)
+                yield root, matrix, items
+            return
+
+        # Needed some way to sort alphanumeric registers somehow.
+        def alphanumerickey(item):
+            if item.isalpha():
+                return (item,)
+            runs, iterable = [ch.isdigit() for ch in item], iter(item)
+            consumeguide = [(isnumeric, len([item for item in items])) for isnumeric, items in itertools.groupby(runs, bool)]
+            parts = []
+            for numeric, length in consumeguide:
+                part = ''.join(item for _, item in zip(range(length), iterable))
+                if numeric:
+                    parts.append(int(part))
+                else:
+                    parts.append(part)
+                continue
+            return tuple(parts)
+
+        # First we collect the unique roots of all our registers, and then
+        # we sort them by name before we group related registers together.
+        registers = {Froot(reg) for _, reg in self.__state__.items()}
+        roots = [reg for reg in sorted(registers, key=utils.fcompose(operator.attrgetter('name'), alphanumerickey))]
+
+        # Now we need to group our registers together, and then flatten
+        # them into essentially an euclidean coordinate to render it.
+        results = []
+        for root, matrix, regs in Fiterate(roots):
+            lines = []
+            for height in sorted(matrix):
+                items = [(position, reg) for (position, _), reg in matrix[height].items()]
+                items = [item for item in sorted(items, key=operator.itemgetter(0))]
+                grouped = (map(operator.itemgetter(1), items) for _, items in itertools.groupby(items, key=operator.itemgetter(0)))
+                iterable = ([(index, item) for item in items] for index, items in enumerate(grouped))
+                lines.extend((height, index, item) for index, item in itertools.chain(*iterable))
+
+            # Figure out the largest register name, and add padding along
+            # with other ascii-shit to make it look like it's aligned.
+            largest = max(map(len, map("{!s}".format, regs))) if regs else 0
+            for height, index, reg in lines:
+                reg_s = "{!s}".format(reg)
+                results.append(r"{:s} : {:>{:d}s}{:s}{!r}".format("{:>{:d}s}".format(reg_s, 1 + largest) if height else "{:<{:d}s}".format(reg_s, 1 + largest), '\\_' if height else '', 2 * height, '__' * index, reg))
+            continue
+        return '\n'.join(itertools.chain(["{!s}".format(self.__class__)], results))
+
+class architecture_t(object):
+    """
+    Base class to represent how IDA maps the registers and types
+    returned from an operand to a register that's uniquely
+    identifiable by the user.
+
+    This is necessary as for some architectures IDA will not include all
+    the register names in the processor resulting in the same register
+    index being used to represent two registers that are of different
+    types. As an example, on the Intel processor module both the `%al`
+    and `%ax` registers in an operand are actually returned as an index
+    to the "ax" string and it is up to us to figure out which one it is.
+
+    Similarly on the 64-bit version of the same processor module, all
+    of the registers `%ax`, `%eax`, and `%rax` use the very same index.
+    """
+    __slots__ = ('__register__', '__cache__',)
+
+    @property
+    def register(self):
+        '''A property that can be used to access any of the registers available for the architecture.'''
+        return self.__register__
+    reg = register
+
+    def __init__(self, **cache):
+        """Instantiate an ``architecture_t`` object which represents the registers available on an architecture.
+
+        If `cache` is defined, then use the specified dictionary to map
+        an IDA register's `(name, dtype)` to a string containing the
+        more commonly recognized register name.
+        """
+        self.__register__, self.__cache__ = map_t(), cache.get('cache', {})
+
+    def __getinitargs__(self): return
+    def __getstate__(self): return
+
+    def new(self, name, bits, idaname=None, **kwargs):
+        '''Add a new register to the current architecture's register cache.'''
+
+        # older
+        if idaapi.__version__ < 7.0:
+            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
+            dt_bitfield = idaapi.dt_bitfild
+        # newer
+        else:
+            dtype_by_size = idaapi.get_dtype_by_size
+            dt_bitfield = idaapi.dt_bitfild
+
+        #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
+        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
+
+        namespace = {key : value for key, value in interface.register_t.__dict__.items()}
+        namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits, '__ptype__':ptype})
+        namespace['realname'] = idaname
+        namespace['alias'] = kwargs.get('alias', {item for item in []})
+        namespace['architecture'] = self
+        res = type(name, (interface.register_t,), namespace)()
+        self.__register__.__state__[name] = res
+        key = name if idaname is None else idaname
+        self.__cache__[key, dtype] = self.__cache__[key] = name
+        return res
+
+    def child(self, parent, name, position, bits, idaname=None, **kwargs):
+        '''Add a new child register to the architecture's register cache.'''
+
+        # older
+        if idaapi.__version__ < 7.0:
+            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
+            dt_bitfield = idaapi.dt_bitfild
+        # newer
+        else:
+            dtype_by_size = idaapi.get_dtype_by_size
+            dt_bitfield = idaapi.dt_bitfild
+
+        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
+        ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
+
+        namespace = {key : value for key, value in interface.register_t.__dict__.items() }
+        namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits, '__ptype__':ptype})
+        namespace['realname'] = idaname
+        namespace['alias'] = kwargs.get('alias', {item for item in []})
+        namespace['architecture'] = self
+        res = type(name, (interface.register_t,), namespace)()
+        self.__register__.__state__[name] = res
+        key = name if idaname is None else idaname
+        self.__cache__[key, dtype] = self.__cache__[key] = name
+        parent.__children__[position, ptype] = res
+        return res
+
+    def by_index(self, index):
+        """Return a register from the given architecture by its `index`.
+
+        The default size is based on the architecture that IDA is using.
+        """
+        res = idaapi.ph.regnames[index]
+        return self.by_name(res)
+    byindex = internal.utils.alias(by_index)
+
+    def by_indextype(self, index, dtype):
+        """Return a register from the given architecture by its `index` and `dtype`.
+
+        Some examples of dtypes: idaapi.dt_byte, idaapi.dt_word, idaapi.dt_dword, idaapi.dt_qword
+        """
+        res = idaapi.ph.regnames[index]
+        name = self.__cache__[res, dtype]
+        return getattr(self.__register__, name)
+    byindextype = internal.utils.alias(by_indextype)
+
+    def by_name(self, name):
+        '''Return a register from the given architecture by its `name`.'''
+        key = name[1:].lower() if name.startswith(('%', '$', '@')) else name.lower()    # at&t, mips, windbg
+        if key in self.__register__ or hasattr(self.__register__, key):
+            name = key
+        elif key in self.__cache__:
+            name = self.__cache__[key]
+        else:
+            cls = self.__class__
+            raise internal.exceptions.RegisterNotFoundError(u"{:s}.by_name({!r}) : Unable to find a register with the given name \"{:s}\".".format('.'.join([cls.__module__, cls.__name__]), name, internal.utils.string.escape(name, '"')))
+        return getattr(self.__register__, name)
+    byname = internal.utils.alias(by_name)
+
+    def by_indexsize(self, index, size):
+        '''Return a register from the given architecture by its `index` and `size`.'''
+        dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+        dtype = dtype_by_size(size)
+        return self.by_indextype(index, dtype)
+    byindexsize = internal.utils.alias(by_indexsize)
+
+    @utils.multicase(name=types.string)
+    def by(self, name):
+        '''Return a register from the given architecture by its `name`.'''
+        return self.by_name(name)
+    @utils.multicase(index=types.integer)
+    def by(self, index):
+        '''Return a register from the given architecture by its `index`.'''
+        return self.by_index(index)
+    @utils.multicase(index=types.integer, size=types.integer)
+    def by(self, index, size):
+        '''Return a register from the given architecture by its `index` and `size`.'''
+        return self.by_indexsize(index, size)
+
+    @utils.multicase(name=types.string)
+    def has(self, name):
+        '''Return true if a register with the given `name` exists within the architecture.'''
+        key = name[1:].lower() if name.startswith(('%', '$', '@')) else name.lower()    # at&t, mips, windbg
+        return key in self.__cache__ or key in self.__register__ or hasattr(self.__register__, key)
+    @utils.multicase(index=types.integer)
+    def has(self, index):
+        '''Return true if a register at the given `index` exists within the architecture.'''
+        names = idaapi.ph.regnames
+        return 0 <= index < len(names)
+
+    def promote(self, register, bits=None):
+        '''Promote the specified `register` to its next larger size as specified by `bits`.'''
+        parent = internal.utils.fcompose(operator.attrgetter('__parent__'), (lambda *items: items), functools.partial(filter, None), iter, next)
+        try:
+            if bits is None:
+                return parent(register)
+            return register if register.bits == bits else self.promote(parent(register), bits=bits)
+        except StopIteration: pass
+        cls = self.__class__
+        if bits is None:
+            raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to promote the specified register ({!s}) to a size larger than {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register, register))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to promote {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
+
+    def demote(self, register, bits=None, type=None):
+        '''Demote the specified `register` to its next smaller size as specified by `bits`.'''
+        childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('items'))
+        firsttype = internal.utils.fcompose(childitems, lambda items: ((key, value) for key, value in items if key[1] == type), iter, next, operator.itemgetter(1))
+        firstchild = internal.utils.fcompose(childitems, functools.partial(sorted, key=internal.utils.fcompose(operator.itemgetter(0), operator.itemgetter(0))), iter, next, operator.itemgetter(1))
+        try:
+            if bits is None:
+                return firstchild(register)
+            return register if register.bits == bits else self.demote(firstchild(register), bits=bits)
+        except StopIteration: pass
+        cls = self.__class__
+        if bits is None:
+            raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to demote the specified register ({!s}) to a size smaller than {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register, register))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
 class operands(object):
     """
