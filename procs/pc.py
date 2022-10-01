@@ -12,7 +12,7 @@ from internal import interface, types
 
 import functools, operator, itertools, architecture
 
-class Intel(interface.architecture_t):
+class Intel(internal.architecture.architecture_t):
     """
     An implementation of all the registers available on the Intel architecture.
 
