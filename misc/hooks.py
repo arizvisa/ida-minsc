@@ -13,7 +13,7 @@ import functools, operator, itertools
 
 import database, function, ui
 import internal
-from internal import utils, interface, exceptions as E
+from internal import utils, interface, exceptions
 
 import idaapi
 
@@ -43,11 +43,11 @@ def greeting():
     load_state = sys.modules[module_name].MINSC.state if module_name and module_name in sys.modules else 'persistent'
 
     # now we iterate through all of the loaders that do not have a module name
-    # while ignoring the hooks module because that it should really be internal.
+    # while ignoring any dunder-prefixed modules because they're just state.
     items = itertools.chain(*(items for name, items in loaders.items() if name is None))
-    available = sorted(item for item in itertools.chain(*items) if item != 'hooks')
+    available = sorted(item for item in itertools.chain(*items) if not item.startswith('__'))
 
-    # hide the internal module from our display.
+    # hide the internal submodule from our display.
     loaders.pop('internal', None)
 
     # grab all the loaders that represent a submodule.
@@ -67,7 +67,7 @@ def greeting():
         six.print_("")
 
     if submodules:
-        six.print_("The following modules are available and may also be imported:")
+        six.print_("The following modules are available and may also be imported for additional functionality:")
         [six.print_("    {:s}".format(submodule)) for submodule in submodules]
         six.print_("")
 
@@ -183,7 +183,7 @@ class changingchanged(object):
         states = cls.__states__
         if ea in states:
             return states[ea]
-        raise E.AddressNotFoundError(u"{:s}.resume({:#x}) : Unable to locate a currently available state for address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        raise exceptions.AddressNotFoundError(u"{:s}.resume({:#x}) : Unable to locate a currently available state for address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
     @classmethod
     def updater(cls):
@@ -712,7 +712,7 @@ class typeinfo(changingchanged):
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
-        except E.OutOfBoundsError:
+        except exceptions.OutOfBoundsError:
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (not a valid address) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), utils.string.repr(new_type), new_fname, ea))
 
         # Extract the previous type information from the given address. If none
@@ -760,7 +760,7 @@ class typeinfo(changingchanged):
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
-        except E.OutOfBoundsError:
+        except exceptions.OutOfBoundsError:
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not a valid address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
 
         # Resume the state for the current address, and then take the data from
@@ -924,7 +924,7 @@ def __process_functions(percentage=0.10):
 
             # Confirm with the user that they really don't care for indexing.
             message = []
-            start, stop = database.config.bounds()
+            start, stop = interface.address.bounds()
             message.append(u"We are {:.02f}% complete at function {:#x} ({:d} of {:d}) having indexed only {:d} tag{:s} for the range {:#x}<>{:#x}.".format(100. * i / float(len(funcs)), fn, 1 + i, len(funcs),  total, '' if total == 1 else 's', start, stop))
             message.append(u"If you cancel now, some of the notations made by the application prior to this process will be non-queryable via select.")
             message.append(u'Are you sure?')
@@ -1089,7 +1089,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
         try:
             state = internal.comment.contents._read(target if moved else source, offset + old)
 
-        except E.FunctionNotFoundError:
+        except exceptions.FunctionNotFoundError:
             logging.fatal(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Unable to locate the original function address ({:#x}) while trying to transform to {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new), exc_info=True)
             state = None
 
@@ -1432,7 +1432,7 @@ class extra_cmt(changingchanged):
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
-        except E.OutOfBoundsError:
+        except exceptions.OutOfBoundsError:
             return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Determine whether we'll be updating the contents or a global.
@@ -1480,7 +1480,7 @@ class extra_cmt(changingchanged):
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
-        except E.OutOfBoundsError:
+        except exceptions.OutOfBoundsError:
             return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # XXX: this function is now busted in later versions of IDA because for some
@@ -1601,7 +1601,7 @@ def removing_func_tail(pfn, tail):
     # If the address is out of bounds, then IDA removed this tail completely from
     # the database and we need to manually delete the tail's contents. Since we
     # can't trust anything, we use the entire contents index filtered by bounds.
-    except E.OutOfBoundsError:
+    except exceptions.OutOfBoundsError:
         iterable = (ea for ea, _ in internal.comment.contents.iterate() if bounds.contains(ea))
 
         results = remove_contents(pfn, iterable)
@@ -1781,17 +1781,18 @@ def del_func(pfn):
 
     # If IDA told us a function was there, but it actually isn't, then this
     # function was completely removed out from underneath us.
-    except E.FunctionNotFoundError:
+    except exceptions.FunctionNotFoundError:
         exc_info = sys.exc_info()
 
         # We sanity check what we're being told by checking if it's outside
         # the bounds of the db. If it isn't, then reraise the exception.
         bounds = interface.range.bounds(pfn)
-        if any(map(database.within, bounds)):
+        left, right = interface.address.bounds()
+        if any(left <= ea < right for ea in bounds):
             six.reraise(*exc_info)
 
         # Okay, so our function bounds are not within the database whatsoever but
-        # we know which function it's in and we know it's boundaries. So at the
+        # we know which function it's in and we know its boundaries. So at the
         # very least we can manually remove its contents from our storage.
         fn, _ = bounds
         iterable = (ea for ea in internal.comment.contents.address(fn, target=fn) if bounds.contains(ea))
@@ -2252,21 +2253,24 @@ class module(object):
     """
     This object exposes the ability to hook different parts of IDA.
 
-    There are 4 different event types in IDA that can be hooked. These
+    There are a number of event types in IDA that can be hooked. These
     are available under the ``hook.idp``, ``hook.idb``, ``hook.ui``,
-    and ``hook.notification`` objects.
+    and ``hook.notification`` objects. If the Hex-Rays plugin (decompiler)
+    is installed, then there is also a ``hook.hx`` object that may be used
+    for decompiler callbacks and ``hook.hexrays`` for the hooking api.
 
-    To add a hook for any of these event types, one can use
+    To add a hook for any of the available event types, one can use
     the `add(target, callable, priority)` method to associate a python
     callable with the desired event. After the callable has been
     attached, the `enable(target)` or `disable(target)` methods can be
-    used to temporarily enable or disable the hook.
+    used to temporarily enable or disable the attached hook.
 
     Please refer to the documentation for the ``idaapi.IDP_Hooks``,
     ``idaapi.IDB_Hooks``, and ``idaapi.UI_Hooks`` classes for
     identifying what event targets are available to hook. Similarly,
     the documentation for ``idaapi.notify_when`` can be used to list
-    the targets available for notification hooks.
+    the targets available for notification hooks and the documentation
+    for ``idaapi.Hexrays_Hooks`` for the decompiler's hooks.
     """
 
     # Create a descriptor for the notifications which should always exist if we're loaded.
@@ -2278,12 +2282,27 @@ class module(object):
     idb = singleton_descriptor(internal.interface.priorityhook, idaapi.IDB_Hooks, supermethods.IDB_Hooks.mapping,   __repr__=staticmethod(lambda item=idaapi.IDB_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
     ui  = singleton_descriptor(internal.interface.priorityhook, idaapi.UI_Hooks,  supermethods.UI_Hooks.mapping,    __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
 
+    # Can't forget to create a descriptor for events related to the Hex-Rays decompiler...
+    hx = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityhxevent, __repr__=staticmethod(lambda: 'Hex-Rays (decompiler) callbacks currently attached to a callable.'))
+    if hasattr(idaapi, 'Hexrays_Hooks'):
+        hexrays = singleton_descriptor(internal.interface.priorityhook, idaapi.Hexrays_Hooks, __repr__=staticmethod(lambda item=idaapi.Hexrays_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+
     def close(self):
         '''Disconnect all of the hook instances associated with this object.'''
-        for phook in ['idp', 'idb', 'ui']:
+        try: hasattr(self, 'hx')
+        except Exception:
+            logging.info(u"{:s} : Unable to close the \"{:s}\" hook type due to an exception raised while trying to access it.".format(__name__, 'hx'), exc_info=True)
+        else: delattr(self, 'hx')
+
+        # Iterate through the other attributes and close those too.
+        for phook in ['idp', 'idb', 'ui', 'hexrays']:
             if hasattr(self, phook):
                 delattr(self, phook)
             continue
+
+        # The very last one that gets closed is the "notification" attribute. Technically
+        # there's no reason that one would need to close this, but our descriptor will
+        # end up reinstantiating it if it ends up still being needed.
         delattr(self, 'notification')
 
 # Now we just need to change the name of our class so that the documentation reads right.
