@@ -399,10 +399,26 @@ class object_proxy(object):
         """
         state = {}
         object = (yield state)
+        klass = object.__class__
+
+        # first define a closure so that returns all of the base classes for a class.
+        def get_bases(klass):
+            '''Return all of the base classes that the given `klass` inherits from.'''
+            for base in klass.__bases__:
+                for item in get_bases(base):
+                    yield item
+                continue
+            yield klass
+
+        # now we'll collect all of the attributes from each class belonging to our main
+        # class and flatten them into a dictionary so that we can access them easier.
+        # this has the side effect of destroying the hierarchy of the documentation.
+        available_attributes, iterable = {}, reversed(klass.__mro__) if hasattr(klass, '__mro__') else get_bases(klass)
+        [ available_attributes.update(base.__dict__) for base in iterable ]
 
         # collect all of the attributes from the class belonging to the object
         # we received while including any of our description-related attributes.
-        state.update({key : value for key, value in object.__class__.__dict__.items() if key not in cls.attributes.klass})
+        state.update({key : value for key, value in available_attributes.items() if key not in cls.attributes.klass})
         state.update({key : getattr(object.__class__, key, None) for key in cls.attributes.description})
 
         # FIXME: the attributes in `cls.attributes.required` may already be defined,
