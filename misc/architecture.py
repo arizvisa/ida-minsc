@@ -13,7 +13,8 @@ in a database in order to switch to the correct architecture if the processor
 has been properly registered and made available for usage.
 """
 
-import functools, operator, itertools, logging, six, builtins
+import functools, operator, itertools, logging, six
+import builtins, math, bisect
 import idaapi, internal
 from internal import interface, utils, types
 
@@ -303,6 +304,426 @@ class architecture_t(object):
         if bits is None:
             raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to demote the specified register ({!s}) to a size smaller than {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register, register))
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
+
+## Hex-Rays (decompiler) architecture
+try:
+    import ida_hexrays
+
+# If we couldn't import the "ida_hexrays" module, then we can only assume
+# that Hex-Rays isn't available for us to actually use.
+except ImportError:
+    logging.debug(u"{:s} : Ignoring the Hex-Rays (decompiler) microcode architecture due to a missing \"{:s}\" module.".format(__name__, 'ida_hexrays'))
+
+# Use the architecture_t class we defined as a base class for the ucode
+# architecture in order to support the micro-registers from Hex-Rays.
+else:
+    class uarchitecture_t(architecture_t):
+        """
+        An implementation of all the registers available for the Hex-Rays
+        microarchitecture that is part of its decompiler.
+
+        Similar to the generally available architectures, this class keeps track
+        of the relationships between registers allowing one to promote or demote
+        a register to the different sizes that may be available. The registers
+        within this class are typically represented by an index which is considered
+        a micro-index (midx). This allows the decompiler to better identify the
+        part of a register that is actually being modified by a micro-instruction.
+
+        The architecture that is created is actually based on the architecture
+        that is currently selected and can be changed by simply providing the
+        architecture instance as the first parameter to this class' constructor.
+
+        Some of the methods within this class may return a tuple that is of the
+        `partialregister_t` type. The semantics of this type is exactly how it
+        sounds and intends to represent a portion of a complete register.
+        """
+
+        # 0..7: condition codes
+        # 8..n: all processor registers (including fpu registers, if necessary) this range may also include temporary registers used during the initial microcode generation
+        # n.. : so called kernel registers; they are used during optimization see is_kreg()
+        prefix = ''
+
+        @utils.require_attribute(ida_hexrays, 'rlist_t')
+        @utils.multicase(rlist=getattr(ida_hexrays, 'rlist_t', object))
+        def by_rlist(self, rlist):
+            '''Yield each register (partial and complete) that is represented by the ``ida_hexrays.rlist_t`` specified in `rlist`.'''
+            return self.by_rlist([item for item in rlist])
+        @utils.multicase(bitset=types.ordered)
+        def by_rlist(self, bitset):
+            '''Yield each register (partial and complete) that is represented by the indices specified in `bitset`.'''
+            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+            byteset = [item for item in bitset]
+
+            # iterate through all of our contiguous points in the interval.
+            offset = 0
+            for _, points in itertools.groupby(enumerate(byteset), utils.funpack(operator.sub)):
+                points = [n for n in map(operator.itemgetter(1), points)]
+                logging.debug(u"bitset {:+d} : found {:d} contiguous points in rlist: {!s}".format(offset, len(points), points))
+
+                run = points[:]
+                while run:
+                    result = self.by_partial(run[0], len(run))
+                    size = result.size
+                    logging.debug(u"bitset {:+d} : decoded {:d} run as {!s} : {!r} : left {!r}".format(offset, size, result, run[:size], run[size:]))
+                    yield result
+                    slice, run[:] = run[:size], run[size:]
+                offset += len(points)
+            return
+        @utils.require_attribute(ida_hexrays, 'vivl_t')
+        @utils.multicase(vivl=getattr(ida_hexrays, 'vivl_t', object))
+        def by_interval(self, vivl):
+            '''Yield each register (partial and complete) that is represented by ``ida_hexrays.vivl_t`` specified as `vivl`.'''
+            voffset, vtype, vsize = vivl.off, vivl.type, vivl.size
+
+            # if we're a stack offset, then we simply return the location for our interval.
+            # we pretty much expect the caller to convert this to a location_t.
+            if vtype in {ida_hexrays.mop_S}:
+                yield interface.location_t(voffset, vsize)
+
+            # if it's not a register, then we bail since we don't know what type it is.
+            elif vtype not in {ida_hexrays.mop_r}:
+                cls = self.__class__
+                raise internal.exceptions.InvalidTypeOrValueError("{:s}.by_interval({!s}) : Unable to process an interval of an unknown type ({:d}) with the offset ({:d}) and size ({:+d}).".format('.'.join([__name__, cls.__name__]), vivl, vtype, voffset, vsize))
+
+            # otherwise, this is a value interval and we need to continue to yield registers
+            # until we meet the expected size.
+            else:
+                size = 0
+                while size < vsize:
+                    item = self.by_partial(voffset + size, vsize - size)
+                    yield item
+                    size += item.size
+                return
+            return
+
+        @utils.multicase(register=(types.string, interface.register_t), size=types.integer)
+        def by_partial(self, register, size):
+            '''Return a `register_t` or `partialregister_t` for the given `register` up to the maximum `size`.'''
+            reg = self.by(name)
+            return self.by_partial(reg.realname, size)
+        @utils.multicase(index=types.integer, size=types.integer)
+        def by_partial(self, index, size):
+            '''Return a `register_t` or `partialregister_t` for the register at the specified `index` up to the maximum `size`.'''
+            midx, maximum = index, size
+
+            # define a closure that yields all of the available promotions for a register.
+            def mreg_promotions(midx):
+                if not self.has(midx):
+                    return
+                mreg = self.by_index(midx)
+                while mreg.__parent__ and mreg.realname is not None:
+                    yield mreg
+                    mreg = mreg.__parent__
+                if mreg.realname:
+                    yield mreg
+                return
+
+            # return the size for each mreg within the architecture. these sizes are the
+            # candidates that we'll be trying to match with. specifically, we only return
+            # sizes for the correct mreg index.
+            def mreg_candidates(midx):
+                def verify(midx, promotions):
+                    name = None
+                    for mreg in promotions:
+                        res = ida_hexrays.get_mreg_name(midx, mreg.size)
+                        if res != name and '^' not in res:
+                            name = res
+                            yield mreg.size
+                        continue
+                    return
+                iterable = verify(midx, mreg_promotions(midx))
+                return [size for size in iterable]
+
+            # scan backwards until we get to a real register
+            def mreg_scan(midx):
+                Fpredicate = lambda string: '^' in string
+                shift = next(-idx for idx in itertools.count() if not Fpredicate(ida_hexrays.get_mreg_name(-idx + midx, 1)))
+                return midx + shift
+
+            # now we can begin the actual logic. we shortcut things here by checking if
+            # we got an exact match. if so, then we're good to go and can just return it.
+            candidates = [size for size in mreg_candidates(midx)]
+            if any(size == maximum for size in candidates):
+                try:
+                    result = self.by_indexsize(midx, maximum)
+                except (internal.exceptions.RegisterNotFoundError, KeyError):
+                    result = interface.partialregister_t(self.by_index(midx), 0, 8 * maximum)
+                return result
+
+            # otherwise, we need to seek backwards from our index to find the "real" register
+            # that the index is part of and that we're able to actually promote.
+            mregindex, res = mreg_scan(midx), midx
+            while any('^' in ida_hexrays.get_mreg_name(mregindex, mreg.size) for mreg in mreg_promotions(mregindex)):
+                if res == mregindex:
+                    mregindex, res = mreg_scan(res - 1), mregindex
+                else:
+                    mregindex, res = mreg_scan(res), mregindex
+                continue
+
+            # now we have the actual register (mregindex), we use it to calculate the offset
+            # into the register that we'll need to use and then figure out what's the largest
+            # possible size that we'll be able to promote to.
+            offset = midx - mregindex
+            candidates = [size for size in mreg_candidates(mregindex)]
+            selected = [size for size in candidates if size <= maximum]
+            if len(selected):
+                goal = offset + maximum
+                index = bisect.bisect_left(selected, goal)
+                size = selected[min(index, len(selected) - 1)]
+
+                try:
+                    result = self.by_indexsize(mregindex, size)
+                    assert result.size == size
+
+                # FIXME: we found a register, but couldn't find a size. the only time this happens
+                #        is because our register size from the architecture does not match hexrays
+                #        mreg size. so, we deal with this by treating as a partialregister_t.
+                except (internal.exceptions.RegisterNotFoundError, KeyError):
+                    result = self.by_index(mregindex)
+                    return result
+
+            # if we couldn't find any candidates to promote to, then there wasn't even a register
+            # that matched the desired size which makes this a partial register.
+            else:
+                result = self.by_index(mregindex)
+                assert maximum < result.size
+
+            # collect all of our available promotions looking for a register size that is larger
+            # than our offset that could fit it.
+            promotions = [mreg.size for mreg in mreg_promotions(mregindex) if offset < mreg.size and mreg.realname == mregindex and mreg.size <= max(candidates)]
+            if promotions and result.size < offset + maximum:
+                index = bisect.bisect_left(promotions, offset + maximum)
+                size = promotions[index] if index < len(promotions) else promotions[-1]
+                try:
+                    result = self.promote(result, 8 * size)
+
+                # if we couldn't promote the register to the desired size, then use whatever
+                # register index it was that we actually received.
+                except internal.exceptions.RegisterNotFoundError:
+                    return result
+
+            # finally we use the offset to calcuate the real size of the result and then return it.
+            realsize = min(result.size - offset, offset + maximum)
+            return interface.partialregister_t(result, 8 * offset, 8 * realsize) if any([offset, realsize < result.size]) else result
+
+        @utils.multicase(name=types.string)
+        def has(self, name):
+            '''Return whether the architecture contains a microregister with the specified `name`.'''
+            return super(uarchitecture_t, self).has(identifier)
+        @utils.multicase(index=types.integer)
+        def has(self, index):
+            '''Return whether the architecture contains a microregister with the specified `index`.'''
+            return index in self.__cache__
+
+        def by_index(self, index):
+            '''Return the (complete) microregister for the given `index`.'''
+            res = self.__cache__[index]
+            if hasattr(self.__register__, res):
+                return getattr(self.__register__, res)
+            return IndexError(index)
+        byindex = internal.utils.alias(by_index)
+
+        def by_indextype(self, index, dtype):
+            '''Return the (complete) microregister for the given `index` and `dtype`.'''
+            name = self.__cache__[index, dtype]
+            return self.by_name(name)
+        byindextype = internal.utils.alias(by_indextype)
+
+        def by_indexsize(self, index, size):
+            '''Return the (complete) microregister for the given `index` and `size`.'''
+            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+            dtype = dtype_by_size(size)
+            return self.by_indextype(index, dtype)
+        byindexsize = internal.utils.alias(by_indexsize)
+
+        def __init__(self, architecture, **cache):
+            self.__owner__ = owner = architecture
+            self.prefix = getattr(owner, 'prefix', '')
+            super(uarchitecture_t, self).__init__()
+            getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
+
+            # check to see if the hexrays microcode api is actually available.
+            if not all(hasattr(ida_hexrays, name) for name in ['reg2mreg', 'mreg2reg', 'get_mreg_name', 'is_kreg']):
+                cls = self.__class__
+                raise internal.exceptions.UnsupportedCapability("{:s} : Unable to instantiate architecture due to the microcode api for the Hex-Rays decompiler being unavailable.".format('.'.join([__name__, cls.__name__])))
+
+            # do some trickery to figure out what our largest contiguous register size is.
+            midx = ida_hexrays.reg2mreg(0)
+            bits = 32 if ida_hexrays.mreg2reg(midx, 8) < 0 else 64
+            # FIXME: is it safe to assume that the reg at index 0 is always sizable?
+
+            # some tools for dealing with a tree of registers on intel. i'm probably shooting
+            # myself in the foot here as i'm not sure if uregs are in an actual tree on all archs.
+            Froot = lambda item: Froot(item.__parent__) if item.__parent__ else item
+            def Fgather(root, height=0):
+                yield height, root
+                for position, type in sorted(root.__children__, key=operator.itemgetter(0)):
+                    child = root.__children__[position, type]
+                    for h, node in Fgather(child, height + 1):
+                        yield h, node
+                    continue
+                return
+
+            def Fheights(root):
+                matrix, heights = {}, {}
+                for height, node in Fgather(root):
+                    row = matrix.setdefault(height, {})
+
+                    assert not operator.contains(row, node.id)
+                    row[node.__position__, node.__ptype__] = node
+
+                    assert not operator.contains(heights, node.id)
+                    heights[node] = height
+                return matrix, heights
+
+            # start by counting exactly how many regs we have available which we
+            # can do by taking from an infinite range until is_kreg() is true.
+            iterable = itertools.dropwhile(utils.fcompose(ida_hexrays.is_kreg, operator.not_), itertools.count(0))
+            count = next(iterable)
+
+            # first we do the non-architecture registers like temporary and kregs. neither
+            # of these should need to be stored as a tree since they're only temporary and
+            # should only be used as an intermediary before storing to a concrete register.
+            powers = range(1 + math.trunc(math.log2(bits // 8)))
+            pow2 = utils.fcompose(functools.partial(pow, 2), math.trunc)
+
+            # grab the temporary registers and iterate through all of them to add each one.
+            mlist = idaapi.get_temp_regs()
+            assert mlist.mem.count() == 0
+
+            for midx in mlist.reg:
+                for width in map(pow2, powers):
+                    name = ida_hexrays.get_mreg_name(midx, width)
+                    mreg = self.new(name, 8 * width, idaname=midx, ptype=int)
+                    setitem(name, mreg)
+                continue
+
+            # now we just need to do a few kernel registers so that the user can access
+            # them if they actually need to.
+            for midx in map(functools.partial(operator.add, count), range(0x10)):
+                for width in map(pow2, powers):
+                    name = ida_hexrays.get_mreg_name(midx, width)
+                    mreg = self.new(name, 8 * width, idaname=midx, ptype=int)
+                    setitem(name, mreg)
+                continue
+
+            # now we need to build our index of all the mregs. we need to do the condition
+            # codes (1-8) first, because they're required to exist. these can overlap with
+            # concrete storage, so any logic that follows this should end up fixing it.
+            mregindex = {}
+            for midx in range(8):
+                name = idaapi.get_mreg_name(midx, 1)
+
+                # if our next mreg is part of ours (cc on intel), then scan for the size.
+                if idaapi.get_mreg_name(midx + 1, 1).startswith(name):
+                    size = next(idx for idx in itertools.count(1) if '^' not in ida_hexrays.get_mreg_name(+idx + midx, 1))
+                    setitem(name, self.new(name, 8 * size, idaname=midx, ptype=int))
+
+                # otherwise, each flag is just a byte in size and we can add it.
+                else:
+                    setitem(name, self.new(name, 8, idaname=midx, ptype=int))
+                continue
+            # XXX: should we ensure these _all_ become part of the flags register on intel?
+
+            # now we'll scan the entire mregspace for all other variable-byte registers
+            # that "we" know about, but hexrays doesn't. (heh)
+            iterable = ((ida_hexrays.get_mreg_name(midx, 1), midx) for midx in range(count))
+            iterable = ((name, midx) for name, midx in iterable if ida_hexrays.get_mreg_name(midx, bits // 8) == name)
+            iterable = ((owner.by_name(name), midx) for name, midx in iterable if owner.has(name))
+            mregindex.update({reg : midx for reg, midx in iterable if idaapi.reg2mreg(reg.id) < 0})
+
+            for reg, midx in mregindex.items():
+                logging.debug(u"seeded index for register {!r} with uregister {:d}".format(reg, midx))
+
+            # firstly, we iterate through all of the registers so we can use their
+            # realname in an index. afterwards, we then build another index of all
+            # of the concrete registers that are available for the architecture.
+            registers = {reg.name if reg.realname is None else reg.realname : reg for _, reg in architecture.register.__state__.items()}
+            for idx, name in enumerate(idaapi.ph.regnames):
+                reg, midx = registers[name], ida_hexrays.reg2mreg(idx)
+                if 0 > midx:
+                    logging.debug(u"skipping register {:d} during collection : {!r}".format(idx, reg))
+                else:
+                    mregindex[reg] = midx
+                continue
+
+            # now we need all of the roots for each mreg in mregindex
+            available = {reg for reg in mregindex}
+            results, roots = {}, {item for item in map(Froot, mregindex)}
+            for root in roots:
+                matrix, heights = Fheights(root)
+                assert (root,) == tuple(matrix[0].values())
+                common = available & {node for node in heights}
+                used = sorted({heights[reg] for reg in common})
+                assert used
+
+                # create all nodes that do not have an mreg. however, we still need to figure out
+                # which realname that these registers are associated with since hexrays wants a size.
+                midx = mregindex[root] if root in mregindex else mregindex.get(registers[root.realname or root.name], -1)
+                head = results[root] = self.new(root.name, root.bits, idaname=root.realname if midx < 0 else midx, ptype=root.__ptype__, dtype=root.__dtype__)
+                for hidx in range(1, used[0]):
+                    for (position, ptype), reg in matrix[hidx].items():
+                        assert reg not in mregindex
+                        midx = mregindex[registers[reg.realname]]
+
+                        assert 0 <= midx
+                        parent = results[reg.__parent__]
+                        results[reg] = self.child(parent, reg.name, position, reg.bits, idaname=midx, ptype=reg.__ptype__, dtype=reg.__dtype__)
+                    continue
+                used.pop(0) if used[0] in {0} else used
+
+                # that should give us all our dependencies, and now we just need to go
+                # through and assign the ones that actually have an mreg associated with them.
+                for hidx in used:
+                    for (position, ptype), reg in matrix[hidx].items():
+                        midx = mregindex[reg] if reg in mregindex else mregindex.get(registers[reg.name if reg.realname is None else reg.realname], -1)
+                        parent = results[reg.__parent__]
+                        if midx < 0:
+                            logging.debug(u"skipping register {!r} ({!s}) due to there being no corresponding uregister ({:d})".format(reg, ptype, midx))
+                        results[reg] = self.child(parent, reg.name, position, reg.bits, idaname=reg.realname if midx < 0 else midx, ptype=reg.__ptype__, dtype=reg.__dtype__)
+                    continue
+                continue
+
+            # that should be literally all of the registers we inherited from our owner,
+            # so the only thing left to really do is to attach them to our register state.
+            assert len({ureg.name for _, ureg in results.items()}) == len(results)
+            [ setitem(ureg.name, ureg) for _, ureg in results.items() ]
+
+        @utils.multicase(string=types.string)
+        def by(self, string):
+            '''Return the (complete) microregister identified by the name specified in `string`.'''
+            return self.by_name(string)
+        @utils.multicase(integer=types.integer)
+        def by(self, integer):
+            '''Return the (complete) microregister identified by the index specfied in `integer`.'''
+            return self.by_index(integer)
+        @utils.multicase(register=interface.register_t)
+        def by(self, register):
+            '''Return the (complete) microregister that represents the specified `register`.'''
+            return self.by(register, register.size)
+        @utils.multicase(register=interface.register_t, size=types.integer)
+        def by(self, register, size):
+            '''Return the (complete) microregister for the specified `size` based on the given `register`.'''
+            if isinstance(register.realname, types.string):
+                realname = ida_hexrays.reg2mreg(register.id)
+                return self.by_indexsize(realname, size)
+
+            # If we were given a uarchitecture register, then just scale it up
+            # according to whatever the requested size is.
+            elif isinstance(register.realname, types.integer):
+                ridx = ida_hexrays.mreg2reg(register.id, size)
+                realname = idaapi.ph.regnames[ridx]
+                basereg = self.by_name(realname)
+                realname = basereg.id
+                return self.by_indexsize(realname, size)
+
+            # If we're too small, then promote it as far as we can.
+            elif register.size < size:
+                return self.promote(register, 8 * size)
+
+            # Otherwise we have a matching register, or the smallest one available.
+            return register
+    logging.debug(u"{:s} : Successfully defined Hex-Rays (decompiler) microcode architecture.".format(__name__))
 
 class operands(object):
     """
