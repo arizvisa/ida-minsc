@@ -371,7 +371,14 @@ class multicase(object):
             # First we need to extract the function from whatever type it is
             # so that we can read any properties we need from it. We also extract
             # its "constructor" so that we can re-create it after we've processed it.
-            cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
+            try:
+                cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
+                if not callable(func):
+                    raise internal.exceptions.InvalidTypeOrValueError
+
+            except internal.exceptions.InvalidTypeOrValueError:
+                logging.warning("{:s}(...): Refusing to create a case for a non-callable object ({!s}).".format('.'.join([__name__, 'multicase']), wrapped))
+                return wrapped
 
             # Next we need to extract all of the argument information from it. We
             # also need to determine whether it's a special type of some sort so
@@ -397,7 +404,7 @@ class multicase(object):
                 ok = False
 
             # So if we found an already-existing wrapper, then we need to steal its cache.
-            res = ok and cls.ex_function(prev)
+            res = ok and prev and cls.ex_function(prev)
             if ok and hasattr(res, cls.cache_name):
                 cache = getattr(res, cls.cache_name)
 
@@ -738,9 +745,9 @@ class multicase(object):
             return lambda f: pycompat.method.new(f, pycompat.method.self(item), pycompat.method.type(item))
         if isinstance(item, internal.types.descriptor):
             return lambda f: type(item)(f)
-        if isinstance(item, internal.types.InstanceType):
+        if isinstance(item, internal.types.instance):
             return lambda f: internal.types.InstanceType(type(item), {key : value for key, value in f.__dict__.items()})
-        if isinstance(item, (internal.types.type, internal.types.ClassType)):
+        if isinstance(item, internal.types.class_t):
             return lambda f: type(item)(item.__name__, item.__bases__, {key : value for key, value in f.__dict__.items()})
         raise internal.exceptions.InvalidTypeOrValueError(type(item))
 
@@ -1997,6 +2004,22 @@ def transform(translate, *names):
     def result(F):
         return wrap(F, wrapper)
     return result
+
+def require_attribute(object, attribute):
+    """A function decorator that avoids defining the target function unless the given `object` has the specified `attribute`.
+
+    This decorator returns the symbol with the previous name of the decorated
+    target if one was found, or `None` if neither was found.
+    """
+    def ignored(wrapped):
+        func = multicase.ex_function(wrapped)
+        name = pycompat.function.name(func)
+        if name in sys._getframe().f_back.f_locals:
+            return sys._getframe().f_back.f_locals[name]
+        return
+    def available(wrapped):
+        return wrapped
+    return available if hasattr(object, attribute) else ignored
 
 def get_array_typecode(size, *default):
     '''Return the correct integer typecode for the given size.'''
