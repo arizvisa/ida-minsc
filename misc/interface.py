@@ -1278,7 +1278,8 @@ class address(object):
         return res
 
     @classmethod
-    def __bounds__(cls):
+    def bounds(cls):
+        '''Return the smallest and largest address within the database as a tuple.'''
         if idaapi.__version__ < 7.2:
             info = idaapi.get_inf_structure()
             min, max = info.minEA, info.maxEA
@@ -1288,7 +1289,7 @@ class address(object):
 
     @classmethod
     def __within__(cls, ea):
-        l, r = cls.__bounds__()
+        l, r = cls.bounds()
         return l <= ea < r
 
     @classmethod
@@ -1392,7 +1393,7 @@ class address(object):
             raise internal.exceptions.InvalidParameterError(u"{:s} : An invalid address {:#x} was specified.".format(entryframe.f_code.co_name, ea))
 
         if not cls.__within__(ea):
-            l, r = cls.__bounds__()
+            l, r = cls.bounds()
             raise internal.exceptions.OutOfBoundsError(u"{:s} : The specified address {:#x} is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, l, r))
         return ea
     @classmethod
@@ -1405,7 +1406,7 @@ class address(object):
 
         # If the start and end are matching, then we don't need to fit the bounds.
         if any(not cls.__within__(ea) for ea in [start, end if start == end else end - 1]):
-            l, r = cls.__bounds__()
+            l, r = cls.bounds()
             raise internal.exceptions.OutOfBoundsError(u"{:s} : The specified range ({:#x}<>{:#x}) is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, start, end, l, r))
         return start, end
     @classmethod
@@ -3001,8 +3002,11 @@ class integerish(namedtypedtuple):
         '''Return true if `other` is the same type and can be used as an operand.'''
         raise NotImplementedError
 
-    def __int__(self):
-        raise NotImplementedError
+    # XXX: hide the "__int__" attribute so that we can easily distinguish whether
+    #      something is coercible using the "hasattr" builtin.
+
+    #def __int__(self):
+    #    raise NotImplementedError
 
     def __operator__(self, operation, other):
         cls, transform = self.__class__, [F(item) for F, item in zip(self._operands, self)]
@@ -3354,11 +3358,11 @@ class reftype_t(object):
         }
     else:
         __mapper__ = {
-            idaapi.fl_CF : 'rx', idaapi.fl_CN : 'rx',
-            idaapi.fl_JF : 'rx', idaapi.fl_JN : 'rx',
-            idaapi.fl_F : 'rx',
-            idaapi.dr_O : '&r', idaapi.dr_I : '&r',
-            idaapi.dr_R : 'r', idaapi.dr_W : 'w',
+            idaapi.fl_CF : 'rx', idaapi.fl_CN : 'rx',   # call far, call near
+            idaapi.fl_JF : 'rx', idaapi.fl_JN : 'rx',   # jmp far, jmp near
+            idaapi.fl_F : 'rx',                         # single-step
+            idaapi.dr_O : '&r', idaapi.dr_I : '&r',     # offset, implicit
+            idaapi.dr_R : 'r', idaapi.dr_W : 'w',       # read, right
             getattr(idaapi, 'fl_U', 0) : '',
         }
     __mapper__[31] = '*'        # code 31 used internally by ida-minsc
@@ -3381,12 +3385,28 @@ class reftype_t(object):
         return self.__operator__(operator.and_, {item for item in other})
     def __xor__(self, other):
         return self.__operator__(operator.xor, {item for item in other})
-    def __eq__(self, other):
-        return self.__operator__(operator.eq, {item for item in other})
-    def __ne__(self, other):
-        return self.__operator__(operator.ne, {item for item in other})
     def __sub__(self, other):
         return self.__operator__(operator.sub, {item for item in other})
+
+    def __int__(self):
+        return idaapi.XREF_MASK & self.F
+    def __cmp__(self, other):
+        return cmp(*map(int, self))
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return operator.eq(*map(int, [self, other]))
+        return self.__operator__(operator.eq, {item for item in other})
+    def __ne__(self, other):
+        if isinstance(other, self.__class__):
+            return operator.ne(*map(int, [self, other]))
+        return self.__operator__(operator.ne, {item for item in other})
+    def __lt__(self, other):
+        return operator.lt(*map(int, [self, other]))
+    def __ge__(self, other):
+        return operator.ge(*map(int, [self, other]))
+    def __gt__(self, other):
+        return operator.gt(*map(int, [self, other]))
+
     def __contains__(self, type):
         if isinstance(type, internal.types.integer):
             res = self.F & type
@@ -3449,34 +3469,33 @@ class reftype_t(object):
 
 class ref_t(integerish):
     """
-    This tuple is used to represent references that include an operand number
-    and has the format `(address, opnum, reftype_t)`. The operand number is
-    optional as not all references will provide it.
+    This tuple is used to represent references to an address that is marked
+    as data and uses the format `(address, reftype_t)` to describe the reference.
     """
-    _fields = ('address', 'opnum', 'reftype')
-    _types = (internal.types.integer, (internal.types.integer, internal.types.none), reftype_t)
-    _operands = (internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant)
+    _fields = ('address', 'reftype')
+    _types = (internal.types.integer, reftype_t)
+    _operands = (internal.utils.fcurry, internal.utils.fconstant)
 
     @property
     def ea(self):
         '''Return the address field that is associated with the reference.'''
-        res, _, _ = self
+        res, _ = self
         return res
 
     def __int__(self):
-        address, _, _ = self
+        address, _ = self
         return address
 
     def __same__(self, other):
-        _, num, state = self
-        _, onum, ostate = other
-        return all(this == that for this, that in [(num, onum), (state, ostate)])
+        _, state = self
+        _, ostate = other
+        return state == ostate
 
     def __similar__(self, other):
         if isinstance(other, opref_t):
-            _, num, state = self
-            _, onum, ostate = other
-            return any([num is None, num == onum]) and state & ostate
+            _, state = self
+            _, _, ostate = other
+            return state & ostate
         return False
 
     def __repr__(self):
@@ -3649,13 +3668,149 @@ class switch_t(object):
     def __repr__(self):
         return u"{!s}".format(self)
 
-def xiterate(ea, start, next):
-    '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
-    addr = start(ea)
-    while addr != idaapi.BADADDR:
-        yield addr
-        addr = next(ea, addr)
-    return
+class xref(object):
+    """
+    This namespace provides tools for interacting with the different types of
+    cross-references provided by the disassembler. This includes the references
+    exposed via the ``idaapi.xrefblk_t`` type and includes both "crefs" and "drefs"
+    provided by the ``idaapi.get_first_cref_to`` and ``idaapi.get_first_dref_to``
+    apis (respectively).
+    """
+
+    @classmethod
+    def iterate(cls, ea, start, next):
+        '''Iterate through the cross-references at `ea` starting with the callable `start` and continuing until the callable `next` returns false.'''
+        addr = start(ea)
+        while addr != idaapi.BADADDR:
+            yield addr
+            addr = next(ea, addr)
+        return
+
+    @internal.utils.multicase(ea=internal.types.integer, mptr=idaapi.member_t)
+    @classmethod
+    def frame(cls, ea, mptr):
+        '''Yield each operand reference to the member `mptr` in the frame belonging to the function containing the address `ea`.'''
+        fn = idaapi.get_func(ea)
+        if not fn:
+            return
+        for opref in cls.frame(fn, mptr):
+            yield opref
+        return
+    @internal.utils.multicase(func=idaapi.func_t, mptr=idaapi.member_t)
+    @classmethod
+    def frame(cls, func, mptr):
+        '''Yield each operand reference to the frame member `mptr` belonging to the function `func`.'''
+        xl = idaapi.xreflist_t()
+        idaapi.build_stkvar_xrefs(xl, func, mptr)
+        for xr in xl:
+            yield xr.ea, int(xr.opnum), xr.type
+        return
+
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def to_code(cls, ea):
+        '''Iterate through all the code references that reference the address `ea`.'''
+        return cls.iterate(ea, idaapi.get_first_cref_to, idaapi.get_next_cref_to)
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def of_code(cls, ea):
+        '''Iterate through all the code references that originate from the address `ea`.'''
+        return cls.iterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
+
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def to_data(cls, ea):
+        '''Iterate through all the data references that reference the address `ea`.'''
+        return cls.iterate(ea, idaapi.get_first_dref_to, idaapi.get_next_dref_to)
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def of_data(cls, ea):
+        '''Iterate through all the data references that originate from the address `ea`.'''
+        return cls.iterate(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from)
+
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def to(cls, ea):
+        '''Iterate through the cross-references that reference the identifier `ea`.'''
+        return cls.to(ea, idaapi.XREF_ALL)
+    @internal.utils.multicase(ea=internal.types.integer, flags=internal.types.integer)
+    @classmethod
+    def to(cls, ea, flags):
+        '''Iterate through the cross-references of the type `flags` that reference the identifier `ea`.'''
+        X = idaapi.xrefblk_t()
+
+        # Check to see if we can find the first one and bail if we couldn't.
+        if not X.first_to(ea, flags):
+            return
+        yield (X.frm, X.iscode, X.type)
+
+        # Since we were able to find one, we just continue to iterate through the
+        # rest of the xrefblk_t while yielding the necessary properties.
+        while X.next_to():
+            yield (X.frm, X.iscode, X.type)
+        return
+
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def of(cls, ea):
+        '''Iterate through the cross-references that originate from the identifier `ea`.'''
+        return cls.of(ea, idaapi.XREF_ALL)
+    @internal.utils.multicase(ea=internal.types.integer, flags=internal.types.integer)
+    @classmethod
+    def of(cls, ea, flags):
+        '''Iterate through the cross-references of the type `flags` that originate from the identifier `ea`.'''
+        X = idaapi.xrefblk_t()
+
+        # Check to see if we can find the first one and bail if we couldn't.
+        if not X.first_from(ea, flags):
+            return
+        yield (X.to, X.iscode, X.type)
+
+        # Since we were able to find one, we just continue to iterate through the
+        # rest of whatever xrefblk_t returns while yielding the necessary properties.
+        while X.next_from():
+            yield (X.to, X.iscode, X.type)
+        return
+
+    @internal.utils.multicase(ea=internal.types.integer, target=internal.types.integer, flowtype=internal.types.integer)
+    @classmethod
+    def add_code(cls, ea, target, flowtype):
+        '''Add a code reference originating from `ea` to `target` of the specified `flowtype`.'''
+        void = idaapi.add_cref(ea, target, flowtype)
+        # XXX: there's really no way to verify this was added correctly
+        #      without iterating back through them.. so we have to assume.
+        return True
+
+    @internal.utils.multicase(ea=internal.types.integer, target=internal.types.integer, datatype=internal.types.integer)
+    @classmethod
+    def add_data(cls, ea, target, datatype):
+        '''Add a data reference originating from `ea` to `target` of the specified `datatype`.'''
+        void = idaapi.add_dref(ea, target, datatype)
+        # XXX: there's really no way to verify this was added correctly
+        #      without iterating back through them.. so we have to assume.
+        return True
+
+    @internal.utils.multicase(ea=internal.types.integer, target=internal.types.integer)
+    @classmethod
+    def remove_code(cls, ea, target, **expand):
+        """Remove a code reference originating from `ea` to `target`.
+
+        If the `expand` parameter is true, then also remove the instruction that is referenced by `target`.
+        """
+        void = idaapi.del_cref(ea, target, 1 if expand.get('expand', False) else 0)
+        # XXX: there's really no way to verify this was remove correctly
+        #      without iterating back through them.. so we have to assume.
+        return True
+
+    @internal.utils.multicase(ea=internal.types.integer, target=internal.types.integer)
+    @classmethod
+    def remove_data(cls, ea, target):
+        '''Remove a data reference originating from `ea` to `target`.'''
+        void = idaapi.del_dref(ea, target)
+        # XXX: there's really no way to verify this was remove correctly
+        #      without iterating back through them.. so we have to assume.
+        return True
+xiterate = internal.utils.alias(xref.iterate, 'xref')
 
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
