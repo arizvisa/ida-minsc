@@ -1012,7 +1012,7 @@ def op_structure(ea, opnum):
     # by their sptr id. This is because I can't figure out any other way
     # to get _exactly_ what's being displayed.
     displayed = {}
-    for mid in filter(interface.node.is_identifier, interface.xiterate(insn.ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from)):
+    for mid in filter(interface.node.is_identifier, interface.xref.of_data(insn.ea)):
 
         # Simple enough. If it's not a member identifier, then skip it.
         item = idaapi.get_member_by_id(mid)
@@ -1828,17 +1828,11 @@ def op_references(ea, opnum):
         if stkofs != stkofs_:
             logging.warning(u"{:s}.op_references({:#x}, {:d}) : The stack variable offset ({:#x}) for the instruction operand does not match what was expected ({:#x}).".format(__name__, ea, opnum, stkofs, stkofs_))
 
-        # Finally we can instantiate an idaapi.xreflist_t, and call directly
-        # into the IDAPython api in order to let it build all of the
-        # xrefs for the operand.
-        xl = idaapi.xreflist_t()
-        idaapi.build_stkvar_xrefs(xl, fn, member)
-
-        # That should've created our xref list, so we can simply transform
-        # it directly into a list of interface.opref_t and return it.
+        # Now we can collect all the operand references to the operand and we just
+        # need to transform it into a list of interface.opref_t before returning it.
         # FIXME: the type for an LEA instruction should include an '&' in the
         #        reftype_t, but in this case we explicitly trust the type.
-        return [ interface.opref_t(x.ea, int(x.opnum), interface.reftype_t.of(x.type)) for x in xl ]
+        return [ interface.opref_t(ea, opnum, interface.reftype_t.of(xtype)) for ea, opnum, xtype in interface.xref.frame(fn, member) ]
 
     # If we have xrefs and the operand has information associated with it, then
     # we need to check if the type-id is an enumeration. If so, then the user is
@@ -1849,19 +1843,12 @@ def op_references(ea, opnum):
         NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
 
         # Now we check to see if it has any xrefs that point directly to the id
-        # of the member. If not, then there's nothing to do here.
-        X = idaapi.xrefblk_t()
-        if not X.first_to(mid, idaapi.XREF_ALL):
+        # of the member. If there aren't any then there's nothing to do here.
+        refs = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mid, idaapi.XREF_ALL)]
+        if not refs:
             fullname = '.'.join([enumeration.name(eid), enumeration.member.name(mid)])
             logging.warning(u"{:s}.op_references({:#x}, {:d}) : No references were found for the enumeration member {:s} ({:#x}) at operand {:d} of the instruction at {:#x}.".format(__name__, ea, opnum, fullname, mid, opnum, insn.ea))
             return []
-
-        # As we were able to find one, we can just continue to iterate through
-        # the xrefblk_t while gathering all of the necessary properties into
-        # our list of references.
-        refs = [(X.frm, X.iscode, X.type)]
-        while X.next_to():
-            refs.append((X.frm, X.iscode, X.type))
 
         # After gathering all the xrefs into a list, we'll need to transform
         # it into a list of internal.opref_t. In order to do that, we need to
@@ -1936,17 +1923,11 @@ def op_references(ea, opnum):
             # the id of the member. If not, then there's nothing to do here.
             # First we need to check the first xref of the member. If there
             # isn't anything, then we continue onto the next one.
-            X = idaapi.xrefblk_t()
-            if not X.first_to(mptr.id, idaapi.XREF_ALL):
+            items = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mptr.id, idaapi.XREF_ALL)]
+            if not items:
                 fullname = idaapi.get_member_fullname(mptr.id)
                 logging.info(u"{:s}.op_references({:#x}, {:d}) : No references were found for structure member \"{:s}\".".format(__name__, ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
                 continue
-
-            # If we were able to get an xref, then we can gather the rest of
-            # them into our list which we'll verify later.
-            items = [(X.frm, X.iscode, X.type)]
-            while X.next_to():
-                items.append((X.frm, X.iscode, X.type))
 
             # Update our set with all of the references that we found for the
             # current member, and then continue onto the next one.
@@ -2095,16 +2076,10 @@ def op_references(ea, opnum):
     # Now we can try to get all the xrefs from the address or value that
     # we extracted. If we couldn't grab anything, then just warn the user
     # about it and return an empty list.
-    X = idaapi.xrefblk_t()
-    if not X.first_to(value, idaapi.XREF_ALL):
+    refs = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(value, idaapi.XREF_ALL)]
+    if not refs:
         logging.warning(u"{:s}.op_references({:#x}, {:d}) : The operand ({:d}) at the specified address ({:#x}) does not have any references.".format(__name__, insn.ea, opnum, opnum, insn.ea))
         return []
-
-    # However, if we were able to find the first value, then we can
-    # proceed to gather the rest of them into a list of references.
-    refs = [(X.frm, X.iscode, X.type)]
-    while X.next_to():
-        refs.append((X.frm, X.iscode, X.type))
 
     # After gathering all of the references into our list, we need
     # to iterate through all of them to figure out exactly what kind
@@ -2205,15 +2180,20 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_return(cls):
-        '''Returns true if the current instruction is a return-type instruction.'''
+        '''Returns true if the current instruction is a return-type instruction that exits its current frame.'''
         return cls.is_return(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
     def is_return(cls, ea):
-        '''Returns true if the instruction at `ea` is a return-type instruction.'''
+        '''Returns true if the instruction at `ea` is a return-type instruction that exits the current frame.'''
         ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
-        F, (Xci, Xdi) = cls.feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
+
+        # We check xrefs to make sure that IDA didn't detect that a constant
+        # address was loaded into the stack or link register prior to returning.
+        F, Xci, Xdi = (callable(ea) for callable in [cls.feature, interface.xref.of_code, interface.xref.of_data])
         Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
+
+        # If it's a sentinel instruction, not a branch, and has no refs, then we're good.
         return cls.is_sentinel(ea) and not any([F & idaapi.CF_JUMP, Xc, Xd])
     ret = isreturn = returnQ = retQ = utils.alias(is_return, 'type')
 
@@ -2240,8 +2220,14 @@ class type(object):
     def is_branch(cls, ea):
         '''Returns true if the instruction at `ea` is any kind of branch.'''
         ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
-        F, (Xci, Xdi) = cls.feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
+
+        # We check code xrefs in case IDA figured out that this instruction
+        # actually does branch to something and created a reference for it.
+        F, Xci, Xdi = (callable(ea) for callable in [cls.feature, interface.xref.of_code, interface.xref.of_data])
         Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
+
+        # If it's actual code, not a call or a shift (this flag is weird on intel), and is a jump
+        # or it has an actual code reference that IDA detected, then we're a branch instruction.
         return database.type.is_code(ea) and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc])])
     branch = isbranch = branchQ = utils.alias(is_branch, 'type')
 
