@@ -4860,21 +4860,21 @@ class type(object):
         # If we're code being referenced by data, then try all their
         # data refs to see if they're part of a table for a switch.
         elif cls.is_code(ea) and cls.is_referenced(ea):
-            drefs = (ref for ref in xref.data_up(ea) if not interface.node.is_identifier(ref) and cls.is_data(ref))
-            refs = (ref for ref in itertools.chain(*map(xref.data_up, drefs)) if cls.is_code(ref))
+            drefs = (ref for ref in xref.data(ea, descend=False) if not interface.node.is_identifier(ref) and cls.is_data(ref))
+            refs = (ref for ref in itertools.chain(*map(functools.partial(xref.data, descend=False), drefs)) if cls.is_code(ref))
 
         # Otherwise, if we're pointing at data and it's referencing something
         # as well as being referenced, then we need its upward refs to check.
         elif cls.is_data(ea) and cls.has_reference(ea) and cls.is_referenced(ea):
-            refs = (ref for ref in xref.data_up(ea) if not interace.node.is_identifier(ref) and cls.is_code(ref))
+            refs = (ref for ref in xref.data(ea, descend=False) if not interface.node.is_identifier(ref) and cls.is_code(ref))
 
         # Any other case means that it's code that's referencing an entry
         # into the switch. We can't do any instruction-based logic here, so
         # we literally follow the reference and then look for a dataref to it.
         elif cls.is_code(ea) and cls.is_reference(ea):
-            crefs = (ref for ref in xref.code_down(ea))
-            drefs = (ref for ref in itertools.chain(*map(xref.data_up, crefs)) if cls.is_data(ref))
-            refs = (ref for ref in itertools.chain(*map(xref.data_up, drefs)) if cls.is_code(ref))
+            crefs = (ref for ref in xref.code(ea, descend=True))
+            drefs = (ref for ref in itertools.chain(*map(functools.partial(xref.data, descend=False), crefs)) if cls.is_data(ref))
+            refs = (ref for ref in itertools.chain(*map(functools.partial(xref.data, descend=False), drefs)) if cls.is_code(ref))
 
         # Anything else, isn't a switch because it doesn't have enough references.
         else:
@@ -5787,277 +5787,264 @@ class xref(object):
 
     """
 
-    @utils.multicase()
-    @staticmethod
-    def code():
-        '''Return all of the code xrefs that refer to the current address.'''
-        return xref.code(ui.current.address(), False)
     @utils.multicase(descend=internal.types.bool)
-    @staticmethod
-    def code(descend):
-        return xref.code(ui.current.address(), descend)
-    @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def code(ea):
-        '''Return all of the code xrefs that refer to the address `ea`.'''
-        return xref.code(ea, False)
+    @classmethod
+    def code(cls, descend):
+        '''Return each address that references or refers to the current address as code.'''
+        return cls.code(ui.current.address(), descend)
     @utils.multicase(ea=internal.types.integer, descend=internal.types.bool)
-    @staticmethod
-    def code(ea, descend):
-        """Return all of the code xrefs that refer to the address `ea`.
+    @classmethod
+    def code(cls, ea, descend):
+        """Return each address that references or refers to the address `ea` as code.
 
-        If the bool `descend` is defined, then return only code refs that are referred by the specified address.
+        If the bool `descend` is defined, then return only addresses that are referred by the specified address.
         """
-        if descend:
-            start, next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
-        else:
-            start, next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
-
-        ea = interface.address.inside(ea)
-        for addr in interface.xiterate(ea, start, next):
-            yield addr
+        ea, xiterate = interface.address.inside(ea), interface.xref.of if descend else interface.xref.to
+        for xr, iscode, xrtype in xiterate(ea):
+            if iscode and xrtype != idaapi.fl_F:
+                yield xr
+            continue
         return
     c = utils.alias(code, 'xref')
 
-    @utils.multicase()
-    @staticmethod
-    def data():
-        '''Return all of the data xrefs that refer to the current address.'''
-        return xref.data(ui.current.address(), False)
     @utils.multicase(descend=internal.types.bool)
-    @staticmethod
-    def data(descend):
-        return xref.data(ui.current.address(), descend)
-    @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def data(ea):
-        '''Return all of the data xrefs that refer to the address `ea`.'''
-        return xref.data(ea, False)
+    @classmethod
+    def data(cls, descend):
+        '''Return each address that refers to or references to the current address as data.'''
+        return cls.data(ui.current.address(), descend)
     @utils.multicase(ea=internal.types.integer, descend=internal.types.bool)
-    @staticmethod
-    def data(ea, descend):
-        """Return all of the data xrefs that refer to the address `ea`.
+    @classmethod
+    def data(cls, ea, descend):
+        """Return each address that references the address `ea` as data.
 
-        If the bool `descend` is defined, then return only the data refs that are referred by the specified address.
+        If the bool `descend` is defined, then return the addresses that are referred by the specified address.
         """
-        if descend:
-            start, next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
-        else:
-            start, next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
-
-        ea = interface.address.inside(ea)
-        for addr in interface.xiterate(ea, start, next):
-            yield addr
+        ea, xiterate = interface.address.inside(ea), interface.xref.of if descend else interface.xref.to
+        for xr, iscode, xrtype in xiterate(ea):
+            if not iscode:
+                yield xr
+            continue
         return
     d = utils.alias(data, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def data_down():
-        '''Return all of the data xrefs that are referenced by the current address.'''
-        return xref.data_down(ui.current.address())
+    @classmethod
+    def data_down(cls):
+        '''Return all the ``ref_t`` that is referenced by the current address as data.'''
+        return cls.data_down(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def data_down(ea):
-        '''Return all of the data xrefs that are referenced by the address `ea`.'''
-        return sorted(xref.data(ea, True))
+    @classmethod
+    def data_down(cls, ea):
+        '''Return all the ``ref_t` that is referenced by the address `ea` as data.'''
+        results = []
+        for tgt, iscode, type in interface.xref.of(ea):
+            if not iscode:
+                results.append(interface.ref_t(tgt, interface.reftype_t.of(type)))
+            continue
+        return sorted(results)
     dd = utils.alias(data_down, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def data_up():
-        '''Return all of the data xrefs that refer to the current address.'''
-        return xref.data_up(ui.current.address())
+    @classmethod
+    def data_up(cls):
+        '''Return all the ``ref_t` that references to the current address as data.'''
+        return cls.data_up(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def data_up(ea):
-        '''Return all of the data xrefs that refer to the address `ea`.'''
-        return sorted(xref.data(ea, False))
+    @classmethod
+    def data_up(cls, ea):
+        '''Return all the ``ref_t` that references the address `ea` as data.'''
+        results = []
+        for frm, iscode, type in interface.xref.to(ea):
+            if not iscode:
+                results.append(interface.ref_t(frm, interface.reftype_t.of(type)))
+            continue
+        return sorted(results)
     du = utils.alias(data_up, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def code_down():
-        '''Return all of the code xrefs that are referenced by the current address.'''
-        return xref.code_down(ui.current.address())
+    @classmethod
+    def code_down(cls):
+        '''Return all the ``ref_t`` that is referenced by the current address as code.'''
+        return cls.code_down(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def code_down(ea):
-        '''Return all of the code xrefs that are referenced by the address `ea`.'''
-        res = {item for item in xref.code(ea, True)}
-
-        # if we're not pointing at code, then the logic that follows is irrelevant
-        if not type.is_code(ea):
-            return sorted(res)
-
-        try:
-            # try and grab the next instruction which might be referenced
-            next_ea = address.next(ea)
-
-            # if the current instruction is a non-"stop" instruction, then it will
-            # include a reference to the next instruction. so, we'll remove it.
-            if type.is_code(ea) and _instruction.type.feature(ea, idaapi.CF_STOP) != idaapi.CF_STOP:
-                res.discard(next_ea)
-
-        except E.OutOfBoundsError:
-            pass
-
-        return sorted(res)
+    @classmethod
+    def code_down(cls, ea):
+        '''Return all the ``ref_t`` that is referenced by the address `ea` as code.'''
+        results = []
+        for tgt, iscode, type in interface.xref.of(ea):
+            # only collect code and a reference that's not considered regular flow-control.
+            if iscode and type != idaapi.fl_F:
+                results.append(interface.ref_t(tgt, interface.reftype_t.of(type)))
+            continue
+        return sorted(results)
     cd = utils.alias(code_down, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def code_up():
-        '''Return all of the code xrefs that are referenced by the current address.'''
-        return xref.code_up(ui.current.address())
+    @classmethod
+    def code_up(cls):
+        '''Return all the ``ref_t` that references to the current address as code.'''
+        return cls.code_up(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def code_up(ea):
-        '''Return all of the code xrefs that refer to the address `ea`.'''
-        res = {item for item in xref.code(ea, False)}
-
-        # if we're not pointing at code, then the logic that follows is irrelevant
-        if not type.is_code(ea):
-            return sorted(res)
-
-        try:
-            # try and grab the previous instruction which be referenced
-            prev_ea = address.prev(ea)
-
-            # if the previous instruction is a non-"stop" instruction, then it will
-            # reference the current instruction which is a reason to remove it.
-            if type.is_code(prev_ea) and _instruction.type.feature(prev_ea, idaapi.CF_STOP) != idaapi.CF_STOP:
-                res.discard(prev_ea)
-
-        except E.OutOfBoundsError:
-            pass
-
-        return sorted(res)
+    @classmethod
+    def code_up(cls, ea):
+        '''Return all the ``ref_t` that references the address `ea` as code.'''
+        results = []
+        for frm, iscode, type in interface.xref.to(ea):
+            # only collect code and a reference that's not considered regular flow-control.
+            if iscode and type != idaapi.fl_F:
+                results.append(interface.ref_t(frm, interface.reftype_t.of(type)))
+            continue
+        return sorted(results)
     cu = utils.alias(code_up, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def up():
-        '''Return all of the references that refer to the current address.'''
-        return xref.up(ui.current.address())
+    @classmethod
+    def up(cls):
+        '''Return all of the addresses that reference the current address.'''
+        return cls.up(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def up(ea):
-        '''Return all of the references that refer to the address `ea`.'''
-        code, data = {item for item in xref.code_up(ea)}, {item for item in xref.data_up(ea)}
+    @classmethod
+    def up(cls, ea):
+        '''Return all of the addresses that reference the address `ea`.'''
+        code, data = {item for item in cls.code(ea, False)}, {item for item in cls.data(ea, False)}
         return sorted(code | data)
     u = utils.alias(up, 'xref')
 
     # All locations that are referenced by the specified address
     @utils.multicase()
-    @staticmethod
-    def down():
-        '''Return all of the references that are referred by the current address.'''
-        return xref.down(ui.current.address())
+    @classmethod
+    def down(cls):
+        '''Return all of the addresses that are referred by the current address.'''
+        return cls.down(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def down(ea):
-        '''Return all of the references that are referred by the address `ea`.'''
-        code, data = {item for item in xref.code_down(ea)}, {item for item in xref.data_down(ea)}
+    @classmethod
+    def down(cls, ea):
+        '''Return all of the addresses that are referred by the address `ea`.'''
+        code, data = {item for item in cls.code(ea, True)}, {item for item in cls.data(ea, True)}
         return sorted(code | data)
     d = utils.alias(down, 'xref')
 
     @utils.multicase(target=internal.types.integer)
-    @staticmethod
-    def add_code(target, **reftype):
+    @classmethod
+    def add_code(cls, target, **reftype):
         '''Add a code reference from the current address to `target`.'''
-        return xref.add_code(ui.current.address(), target, **reftype)
+        return cls.add_code(ui.current.address(), target, **reftype)
     @utils.multicase(ea=internal.types.integer, target=internal.types.integer)
-    @staticmethod
-    def add_code(ea, target, **reftype):
+    @classmethod
+    def add_code(cls, ea, target, **reftype):
         """Add a code reference from address `ea` to `target`.
 
-        If the reftype `call` is true, then specify this ref as a function call.
+        If the integer `reftype` is set, then use this value as the flow type.
         """
         ea, target = interface.address.head(ea, target)
+        near = segment.bounds(ea) == segment.bounds(target)
 
-        isCall = builtins.next((reftype[k] for k in ['call', 'is_call', 'isCall', 'iscall', 'callQ'] if k in reftype), None)
-        if abs(target - ea) > pow(2, config.bits() // 2):
-            flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
+        flowtype = reftype.get('flowtype', reftype.get('reftype', idaapi.XREF_USER))
+        if flowtype & idaapi.XREF_MASK:
+            pass
+        elif _instruction.type.feature(ea, idaapi.CF_CALL) == idaapi.CF_CALL:
+            flowtype |= idaapi.fl_CN if near else idaapi.fl_CF
         else:
-            flowtype = idaapi.fl_CN if isCall else idaapi.fl_JN
-        idaapi.add_cref(ea, target, flowtype | idaapi.XREF_USER)
-        return target in xref.code_down(ea)
+            flowtype |= idaapi.fl_JN if near else idaapi.fl_JF
+        return cls.add_code(ea, target, flowtype)
+    @utils.multicase(ea=internal.types.integer, target=internal.types.integer, flowtype=internal.types.integer)
+    @classmethod
+    def add_code(cls, ea, target, flowtype):
+        '''Add a code reference from address `ea` to `target` using the specified `flowtype`.'''
+        interface.xref.add_code(ea, target, flowtype)
+        return target in cls.code(ea, descend=True)
     ac = utils.alias(add_code, 'xref')
 
     @utils.multicase(target=internal.types.integer)
-    @staticmethod
-    def add_data(target, **reftype):
+    @classmethod
+    def add_data(cls, target, **reftype):
         '''Add a data reference from the current address to `target`.'''
-        return xref.add_data(ui.current.address(), target, **reftype)
+        return cls.add_data(ui.current.address(), target, **reftype)
     @utils.multicase(ea=internal.types.integer, target=internal.types.integer)
-    @staticmethod
-    def add_data(ea, target, **reftype):
+    @classmethod
+    def add_data(cls, ea, target, **reftype):
         """Add a data reference from the address `ea` to `target`.
 
-        If the reftype `write` is true, then specify that this ref is writing to the target.
+        If the boolean `reference`, `offset`, or both `read` and `write` is true, the specify that the reference is an address to the target.
+        If the boolean `write` is true, then specify that the reference is writing to the target.
+        If the integer `reftype` is set, then use this value as the data type.
         """
         ea, target = interface.address.head(ea, target)
-        isWrite = reftype.get('write', False)
-        flowtype = idaapi.dr_W if isWrite else idaapi.dr_R
-        idaapi.add_dref(ea, target, flowtype | idaapi.XREF_USER)
-        return target in xref.data_down(ea)
+        datatype = reftype.get('datatype', reftype.get('reftype', idaapi.XREF_USER))
+        if all(reftype.get(attribute, False) for attribute in ['read', 'write']) or any(reftype[attribute] for attribute in ['offset', 'ref', 'reference'] if attribute in reftype):
+            datatype = (datatype & ~idaapi.XREF_MASK) | idaapi.dr_O
+        elif reftype.get('write', False):
+            datatype = (datatype & ~idaapi.XREF_MASK) | idaapi.dr_W
+        elif reftype.get('read', False):
+            datatype = (datatype & ~idaapi.XREF_MASK) | idaapi.dr_R
+        else:   # informational
+            datatype = (datatype & ~idaapi.XREF_MASK) | idaapi.dr_I
+        datatype|= idaapi.dr_O if reftype.get('offset', reftype.get('ref', False)) else idaapi.dr_W if reftype.get('write', False) else idaapi.dr_R
+        return cls.add_data(ea, target, datatype)
+    @utils.multicase(ea=internal.types.integer, target=internal.types.integer, datatype=internal.types.integer)
+    @classmethod
+    def add_data(cls, ea, target, datatype):
+        '''Add a data reference from the address `ea` to `target` using the specified `datatype`.'''
+        interface.xref.add_data(ea, target, datatype)
+        return target in cls.data(ea, descend=True)
     ad = utils.alias(add_data, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def rm_code():
+    @classmethod
+    def rm_code(cls):
         '''Delete _all_ the code references at the current address.'''
-        return xref.rm_code(ui.current.address())
+        return cls.rm_code(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def rm_code(ea):
+    @classmethod
+    def rm_code(cls, ea):
         '''Delete _all_ the code references at `ea`.'''
         ea = interface.address.inside(ea)
-        [ idaapi.del_cref(ea, target, 0) for target in xref.code_down(ea) ]
-        return False if len(xref.code_down(ea)) > 0 else True
+        [ interface.xref.remove_code(ea, target, 0) for target in cls.code(ea, descend=True) ]
+        refs = [item for item in cls.code(ea, descend=True)]
+        return False if len(refs) > 0 else True
     @utils.multicase(ea=internal.types.integer, target=internal.types.integer)
-    @staticmethod
-    def rm_code(ea, target):
+    @classmethod
+    def rm_code(cls, ea, target):
         '''Delete any code references at `ea` that point to address `target`.'''
         ea = interface.address.inside(ea)
-        idaapi.del_cref(ea, target, 0)
-        return target not in xref.code_down(ea)
+        interface.xref.remove_code(ea, target, 0)
+        return target not in cls.code(ea, descend=True)
     rc = utils.alias(rm_code, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def rm_data():
+    @classmethod
+    def rm_data(cls):
         '''Delete _all_ the data references at the current address.'''
-        return xref.rm_data(ui.current.address())
+        return cls.rm_data(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def rm_data(ea):
+    @classmethod
+    def rm_data(cls, ea):
         '''Delete _all_ the data references at `ea`.'''
         ea = interface.address.inside(ea)
-        [ idaapi.del_dref(ea, target) for target in xref.data_down(ea) ]
-        return False if len(xref.data_down(ea)) > 0 else True
+        [ interface.xref.remove_data(ea, target) for target in cls.data(ea, descend=True) ]
+        refs = [item for item in cls.data(ea, descend=True)]
+        return False if len(refs) > 0 else True
     @utils.multicase(ea=internal.types.integer, target=internal.types.integer)
-    @staticmethod
-    def rm_data(ea, target):
+    @classmethod
+    def rm_data(cls, ea, target):
         '''Delete any data references at `ea` that point to address `target`.'''
         ea = interface.address.inside(ea)
-        idaapi.del_dref(ea, target)
-        return target not in xref.data_down(ea)
+        interface.xref.remove_data(ea, target)
+        return target not in cls.data(ea, descend=True)
     rd = utils.alias(rm_data, 'xref')
 
     @utils.multicase()
-    @staticmethod
-    def erase():
-        '''Clear all references at the current address.'''
-        return xref.erase(ui.current.address())
+    @classmethod
+    def erase(cls):
+        '''Clear all code and data references at the current address.'''
+        return cls.erase(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
-    @staticmethod
-    def erase(ea):
-        '''Clear all references at the address `ea`.'''
+    @classmethod
+    def erase(cls, ea):
+        '''Clear all code and data references at the address `ea`.'''
         ea = interface.address.inside(ea)
-        return all(ok for ok in [xref.rm_code(ea), xref.rm_data(ea)])
-    rx = utils.alias(rm_data, 'xref')
+        return all(ok for ok in [cls.rm_code(ea), cls.rm_data(ea)])
+    rx = utils.alias(erase, 'xref')
 
 x = xref    # XXX: ns alias
 
@@ -8382,11 +8369,11 @@ class get(object):
             # Technically a label for a switch is a code data type that is
             # referenced by by some data. We do this instead of checking the names.
             if type.is_code(ea) and type.is_referenced(ea):
-                drefs = (ref for ref in xref.data_up(ea) if type.is_data(ref))
+                drefs = (ref for ref in xref.data(ea, descend=False) if type.is_data(ref))
 
                 # With the data references, we need need to walk up one more step
                 # and grab any code references to it while looking for a switch.
-                refs = (ref for ref in itertools.chain(*map(xref.data_up, drefs)) if type.is_code(ref) and get_switch_info(ref) is not None)
+                refs = (ref for ref in itertools.chain(*map(functools.partial(xref.data, descend=False), drefs)) if type.is_code(ref) and get_switch_info(ref) is not None)
 
                 # Now we'll just grab the very first reference we found. If we
                 # got an address, then use it to grab the switch_info_t we want.
@@ -8410,7 +8397,7 @@ class get(object):
 
             # Grab all of the upward data references to the array at the given
             # address # that can give us an actual switch_info_t.
-            refs = (ea for ea in xref.data_up(ea) if get_switch_info(ea) is not None)
+            refs = (ea for ea in xref.data(ea, descend=False) if get_switch_info(ea) is not None)
 
             # Then we can grab the first one and use it. If we didn't get a valid
             # reference, then we're not going to get a valid switch.
@@ -8441,7 +8428,7 @@ class get(object):
 
             # Otherwise, we iterate through all of the address' downward
             # references to see if any valid candidates can be derived.
-            for ref in xref.code_down(ea):
+            for ref in xref.code(ea, descend=True):
                 found = not (get_switch_info(ref) is None)
 
                 if interface.node.is_identifier(ref):
@@ -8455,8 +8442,8 @@ class get(object):
                 # Otherwise if the reference is pointing to data, then treat
                 # it an array where we need to follow the downward references.
                 elif type.is_data(ref):
-                    items = (case for case in xref.code_down(ref))
-                    candidates = (label for label in itertools.chain(*map(xref.data_up, items)) if get_switch_info(label))
+                    items = (case for case in xref.code(ref, descend=True))
+                    candidates = (label for label in itertools.chain(*map(functools.partial(xref.data, descend=False), items)) if get_switch_info(label))
 
                 # Otherwise this must be code and so we'll check any of its
                 # upward references to derive the necessary candidates.
