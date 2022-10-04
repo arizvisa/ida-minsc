@@ -433,24 +433,14 @@ class structure_t(object):
 
         # First collect all of our identifiers referenced by this structure,
         # whilst making sure to include all the members too.
-        iterable = itertools.chain([self.id], map(Fnetnode, map(operator.attrgetter('id'), self.members)))
+        iterable = itertools.chain([self.id], map(operator.attrgetter('id'), self.members))
         items = [identifier for identifier in iterable]
 
-        # Now we need to iterate through all of our members and grab references
-        # to those identifiers too.
-        refs = []
-        for identifier in items:
-            X = idaapi.xrefblk_t()
-
-            # Grab the very first reference for the given identifier.
-            if not X.first_to(identifier, idaapi.XREF_ALL) or X.frm == idaapi.BADADDR:
-                continue
-            refs.append((X.frm, X.iscode, X.type))
-
-            # Continue and grab the rest of the references too.
-            while X.next_to():
-                refs.append((X.frm, X.iscode, X.type))
-            continue
+        # Now we need to iterate through all of our members and grab all references
+        # to absolutely everything. This is pretty much bypassing the "cross-reference depth"
+        # option since if the user is using the api, they probably want everything anywayz.
+        ichainable = (interface.xref.to(identifier, idaapi.XREF_ALL) for identifier in items)
+        refs = [packed_frm_iscode_type for packed_frm_iscode_type in itertools.chain(*ichainable)]
 
         # That should've given us absolutely every reference related to this
         # structure, so the last thing to do is to filter our list for references
@@ -463,143 +453,130 @@ class structure_t(object):
             if interface.node.is_identifier(xrfrom):
                 continue
 
-            # We need to figure out whether this is code or not, because if so
-            # then this'll be ref'd by an operand and we'll need to figure it out.
-            if database.type.is_code(xrfrom):
+            # If the reference is not pointing to code, then we skip this because
+            # there's no way it can actually be pointing to an operand.
+            if not database.type.is_code(xrfrom):
+                cls = self.__class__
+                logging.debug(u"{:s}({:#x}).refs() : Skipping {:s}({:d}) reference at {:#x} with the type ({:d}) due to the reference address not marked as code.".format('.'.join([__name__, cls.__name__]), self.id, 'code' if xriscode else 'data', xriscode, xrfrom, xrtype))
+                continue
 
-                # Iterate through all of its operands and only care about the
-                # ones that have operand information for it. We also keep track
-                # of any operands that have a refinfo_t so we can add those too.
-                references = {item for item in []}
-                for opnum, _ in enumerate(instruction.operands(xrfrom)):
+            # Iterate through all of its operands and only care about the
+            # ones that have operand information for it. We also keep track
+            # of any operands that have a refinfo_t so we can add those too.
+            references = {item for item in []}
+            for opnum in range(instruction.ops_count(xrfrom)):
 
-                    # Collect the operand information into a proper path in case
-                    # the opinfo_t is damaged...which happens sometimes.
-                    ofs, path = interface.node.get_stroff_path(xrfrom, opnum)
+                # Collect the operand information into a proper path in case
+                # the opinfo_t is damaged...which happens sometimes.
+                ofs, path = interface.node.get_stroff_path(xrfrom, opnum)
 
-                    # If we grabbed a path, then we can use it to grab the
-                    # structure and all of its member identifiers.
-                    if path:
-                        _, members = interface.node.calculate_stroff_path(ofs, path)
+                # If we grabbed a path, then we can use it to grab the
+                # structure and all of its member identifiers.
+                if path:
+                    _, members = interface.node.calculate_stroff_path(ofs, path)
 
-                        # Now we need to convert these pairs into a set so that we can
-                        # test their membership.
-                        iterable = itertools.chain(*(map(operator.attrgetter('id'), pair) for pair in members))
-                        candidates = {identifier for identifier in iterable}
+                    # Now we need to convert these pairs into a set so that we can
+                    # test their membership.
+                    iterable = itertools.chain(*(map(operator.attrgetter('id'), pair) for pair in members))
+                    candidates = {identifier for identifier in iterable}
 
-                        # Verify that one of our ids is contained within it.
-                        if candidates & matches:
-                            state = instruction.op_state(xrfrom, opnum)
-                            item = interface.opref_t(xrfrom, opnum, interface.reftype_t.of_action(state))
-                            results.add(item)
-                        continue
-
-                    # Otherwise this is likely a refinfo, and we need to follow
-                    # the reference in order to grab _all_ of its references.
-                    drefs = [ea for ea in database.xref.down(xrfrom) if not interface.node.is_identifier(ea)]
-                    references |= {ea for ea in itertools.chain(*map(database.xref.up, drefs))}
-
-                # Last thing to do is to add the references that we collected while
-                # searching through the operands.
-                for ea in references:
-                    for opnum in range(instruction.ops_count(ea)):
-                        if interface.address.refinfo(ea, opnum):
-                            state = instruction.op_state(ea, opnum)
-                            results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
-                            continue
-
-                        # Do a final check to see if we can resolve a structure member.
-                        try:
-                            instruction.op_structure(ea, opnum)
-                        except Exception:
-                            pass
-
-                        # And if so, then we can add the opref_t.
-                        else:
-                            state = instruction.op_state(ea, opnum)
-                            results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
-                        continue
+                    # Verify that one of our ids is contained within it.
+                    if candidates & matches:
+                        state = instruction.op_state(xrfrom, opnum)
+                        results.add(interface.opref_t(xrfrom, opnum, interface.reftype_t.of_action(state)))
                     continue
 
-            # Anything else is data which doesn't have an operand associated with
-            # it, so we can just use the regular ref_t for this case. We use '*'
-            # for the reference type since this is being applied to an address.
-            else:
-                item = interface.ref_t(xrfrom, None, interface.reftype_t.of_action('*'))
-                results.add(item)
+                # Otherwise this is likely a refinfo, and we need to follow
+                # the reference in order to grab _all_ of its references.
+                drefs = [ea for ea in database.xref.down(xrfrom) if not interface.node.is_identifier(ea)]
+                references |= {ea for ea in itertools.chain(*map(database.xref.up, drefs))}
+
+            # Last thing to do is to iterate through the references that we collected
+            # in order to determine which operand was referencing the structure.
+            for ea in references:
+                if not database.type.is_code(ea): continue
+
+                # FIXME: figure out which operand is the correct one for our reference.
+                for opnum in range(instruction.ops_count(ea)):
+                    fl, state = database.type.flags(ea), instruction.op_state(ea, opnum)
+
+                    # Do a final check to see if the operand is referencing a stroff
+                    # or a stkvar because then we're definitely pointing to a member.
+                    if any(F(fl, opnum) for F in [idaapi.is_stkvar, idaapi.is_stroff]):
+                        results.add(interface.opref_t(ea, opnum, interface.reftype_t.of_action(state)))
+                    continue
+                continue
             continue
         return sorted(results)
 
     def up(self):
         '''Return all structure or frame members within the database that reference this particular structure.'''
-        X, sid = idaapi.xrefblk_t(), self.id
-
-        # Grab the first reference to the structure.
-        if not X.first_to(sid, idaapi.XREF_ALL):
-            return []
-
-        # Continue to grab all the rest of its references.
-        refs = [(X.frm, X.iscode, X.type)]
-        while X.next_to():
-            refs.append((X.frm, X.iscode, X.type))
-
-        # Iterate through each reference figuring out if our structure's id is
-        # applied to another structure type.
         res = []
-        for ref, _, _ in refs:
 
-            # If the reference is not an identifier, then we don't care about it because
-            # it's pointing to code and the structure_t.refs method is for those refs.
-            if not interface.node.is_identifier(ref):
-                continue
+        # Iterate through each reference figuring out what exactly our
+        # structure id was actually applied to.
+        for xrfrom, xriscode, xrtype in interface.xref.to(self.id, idaapi.XREF_ALL):
 
-            # Get mptr, full member name, and sptr for the reference (which should
-            # totally be an identifier due to the previous conditional).
-            mpack = idaapi.get_member_by_id(ref)
-            if mpack is None:
-                cls = self.__class__
-                raise E.MemberNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, ref))
+            # If the reference is an identifier, then we need to the mptr, full member name,
+            # and the sptr for what it's referencing so that we can yield what the ref is.
+            if interface.node.is_identifier(xrfrom):
+                mpack = idaapi.get_member_by_id(xrfrom)
+                if mpack is None:
+                    cls = self.__class__
+                    raise E.MemberNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, xrfrom))
 
-            mptr, name, sptr = mpack
-            if not interface.node.is_identifier(sptr.id):
-                sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
+                mptr, name, sptr = mpack
+                if not interface.node.is_identifier(sptr.id):
+                    sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
 
-            # Validate that the type of the mptr is what we're expecting.
-            if not isinstance(mptr, idaapi.member_t):
-                cls, name = self.__class__, idaapi.get_member_fullname(ref)
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).refs() : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mptr.__class__, internal.utils.string.escape(name, '"')))
+                # Validate that the type of the mptr is what we're expecting.
+                if not isinstance(mptr, idaapi.member_t):
+                    cls, name = self.__class__, idaapi.get_member_fullname(xrfrom)
+                    raise E.InvalidTypeOrValueError(u"{:s}({:#x}).refs() : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mptr.__class__, internal.utils.string.escape(name, '"')))
 
-            # Figure out from mptr identifier if we're referencing a function frame.
-            frname, _ = name.split('.', 1)
-            frid = internal.netnode.get(frname)
-            ea = idaapi.get_func_by_frame(frid)
+                # Figure out from mptr identifier if we're referencing a function frame.
+                frname, _ = name.split('.', 1)
+                frid = internal.netnode.get(frname)
+                ea = idaapi.get_func_by_frame(frid)
 
-            # If we were unable to get the function frame, then we must be
-            # referencing the member of another structure.
-            if ea == idaapi.BADADDR:
-                st = by_identifier(sptr.id)
+                # If we were unable to get the function frame, then we must be
+                # referencing the member of another structure.
+                if ea == idaapi.BADADDR:
+                    st = by_identifier(sptr.id)
+                    mem = st.members.by_identifier(mptr.id)
+                    res.append(mem)
+                    continue
+
+                # Otherwise we're referencing a frame member, and we need to grab
+                # the frame for that function.
+                fr = idaapi.get_frame(ea)
+                if fr is None:
+                    cls = self.__class__
+                    raise E.MissingTypeOrAttribute(u"{:s}({:#x}).refs() : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), self.id, ea, mptr.id))
+
+                # We'll also need the idaapi.func_t for the function.
+                f = idaapi.get_func(ea)
+                if f is None:
+                    cls = self.__class__
+                    raise E.FunctionNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, mptr.id, ea))
+
+                # So we can instantiate the structure with the correct offset
+                # and then grab the member that was being referenced.
+                st = by_identifier(fr.id, offset=-idaapi.frame_off_args(f))
                 mem = st.members.by_identifier(mptr.id)
                 res.append(mem)
-                continue
 
-            # Otherwise we're referencing a frame member, and we need to grab
-            # the frame for that function.
-            fr = idaapi.get_frame(ea)
-            if fr is None:
+            # If it's not code, then we're just a reference to an address and so we
+            # need to yield the address it's for along with its type.
+            elif not database.type.is_code(xrfrom):
+                res.append(interface.ref_t(xrfrom, interface.reftype_t.of(xrtype)))
+
+            # If it's code, then we skip this because structure_t.up only returns
+            # data references to the structure and operands are for structure_t.refs.
+            else:
                 cls = self.__class__
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}).refs() : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), self.id, ea, mptr.id))
-
-            # We'll also need the idaapi.func_t for the function.
-            f = idaapi.get_func(ea)
-            if f is None:
-                cls = self.__class__
-                raise E.FunctionNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, mptr.id, ea))
-
-            # So we can instantiate the structure with the correct offset
-            # and then grab the member that was being referenced.
-            st = by_identifier(fr.id, offset=-idaapi.frame_off_args(f))
-            mem = st.members.by_identifier(mptr.id)
-            res.append(mem)
+                logging.debug(u"{:s}({:#x}).up() : Skipping {:s}({:d}) reference at {:#x} with the type ({:d}) due to the reference address not marked as data.".format('.'.join([__name__, cls.__name__]), self.id, 'code' if xriscode else 'data', xriscode, xrfrom, xrtype))
+            continue
         return res
 
     ### Properties
