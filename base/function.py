@@ -4280,7 +4280,7 @@ class type(object):
         @classmethod
         def locations(cls, ea):
             '''Return the address of each of the parameters being passed to the function referenced at address `ea`.'''
-            if not database.xref.code_down(ea):
+            if not database.xref.code(ea, descend=True):
                 raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.is_call(ea) else 'is not a call instruction with'))
             items = idaapi.get_arg_addrs(ea)
             return [] if items is None else [ea for ea in items]
@@ -4320,7 +4320,7 @@ class xref(object):
     Some ways to utilize this namespace can be::
 
         > print( function.xref.up() )
-        > for ea in function.xref.down(): ...
+        > for ref in function.xref.down(): ...
 
     """
 
@@ -4328,14 +4328,14 @@ class xref(object):
     @utils.multicase()
     @classmethod
     def down(cls, **references):
-        '''Return all of the addresses that are referenced by a branch instruction from the current function.'''
+        '''Return all of the ``ref_t`` that are referenced by a branch instruction from the current function.'''
         return down(ui.current.function(), **references)
     @utils.multicase()
     @classmethod
     def down(cls, func, **references):
-        """Return all of the addresses that are referenced by a branch instruction from the function `func`.
+        """Return all of the ``ref_t`` that are referenced by a branch instruction from the function `func`.
 
-        If the boolean `references` is true, then include the reference address of each instruction along with its.
+        If the boolean `references` is true, then include the address of each instruction along with its reference.
         """
         get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
@@ -4355,18 +4355,20 @@ class xref(object):
 
                 # now we need to check which code xrefs are actually going to be something we care
                 # about by checking to see if there's an xref pointing outside our function.
-                for xref in filter(database.within, database.xref.code_down(ea)):
+                crefs = (ref for ref in database.xref.code_down(ea) if database.within(ref.address))
+                for ref in crefs:
+                    xref = ref.ea
                     if not contains(fn, xref):
-                        yield ea, xref
+                        yield ea, ref
 
                     # if it's a branching or call-type instruction, but referencing non-code, then we care about it.
                     elif not database.type.is_code(xref) and any(F(ea) for F in branches):
-                        yield ea, xref
+                        yield ea, ref
 
                     # if we're recursive and there's a code xref that's referencing our entrypoint,
                     # then we're going to want that too.
                     elif interface.range.start(fn) == xref:
-                        yield ea, xref
+                        yield ea, ref
                     continue
 
                 # if we're at a switch branch, then we don't need to follow any
@@ -4376,20 +4378,22 @@ class xref(object):
 
                 # last thing we need to determine is which data xrefs are relevant
                 # which only includes things that reference code outside of us.
-                for xref in filter(database.within, database.xref.data_down(ea)):
+                drefs = (ref for ref in database.xref.data_down(ea) if database.within(ref.address))
+                for ref in drefs:
+                    xref = ref.address
                     if database.type.is_code(xref) and not contains(fn, xref):
-                        yield ea, xref
+                        yield ea, ref
 
                     # if it's referencing an external, then yeah...this is definitely an xref we want.
                     elif idaapi.segtype(xref) in {idaapi.SEG_XTRN}:
                         # FIXME: technically an external could also be a non-callable address, but we
                         #        don't care because the user is gonna wanna know about it anyways.
-                        yield ea, xref
+                        yield ea, ref
 
                     # otherwise if it's a branch, but not referencing any code
                     # then this is probably a global containing a code pointer.
                     elif not database.type.is_code(xref) and any(F(ea) for F in branches):
-                        yield ea, xref
+                        yield ea, ref
                     continue
                 continue
             return
@@ -4400,10 +4404,10 @@ class xref(object):
 
         # now we need to figure out if we're just going to return the referenced addresses.
         if not builtins.next((references[k] for k in ['reference', 'references', 'refs'] if k in references), False):
-            return sorted({d for _, d in iterable})
+            return sorted({ref for _, ref in iterable})
 
         # otherwise we're being asked to return the source with its target reference for each one.
-        results = {ea : d for ea, d in iterable}
+        results = {ea : ref for ea, ref in iterable}
         return [(ea, results[ea]) for ea in sorted(results)]
 
     @utils.multicase()
