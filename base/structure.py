@@ -2416,6 +2416,7 @@ class member_t(object):
         cls, FF_STRUCT = self.__class__, idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
         FF_STROFF = idaapi.stroff_flag() if hasattr(idaapi, 'stroff_flag') else idaapi.stroffflag()
+        FF_STKVAR = idaapi.stkvar_flag() if hasattr(idaapi, 'stkvar_flag') else idaapi.stkvarflag()
 
         # if structure is a frame..
         if interface.node.is_identifier(self.parent.id) and internal.netnode.name.get(Fnetnode(self.parent.id)).startswith('$ '):
@@ -2426,29 +2427,16 @@ class member_t(object):
             frname, _ = name.split('.', 1)
             frid = Fidentifier(internal.netnode.get(frname))
             ea = idaapi.get_func_by_frame(frid)
-            f = idaapi.get_func(ea)
 
-            # now find all xrefs to member within function
-            xl = idaapi.xreflist_t()
-            idaapi.build_stkvar_xrefs(xl, f, mptr)
-
-            # now we can add it
+            # now we can collect all the xrefs to the member within the function
             res = []
-            for xr in xl:
-                ea, opnum = xr.ea, int(xr.opnum)
-                ref = interface.opref_t(ea, opnum, interface.reftype_t(xr.type, instruction.op_state(ea, opnum)))
+            for ea, opnum, type in interface.xref.frame(ea, mptr):
+                ref = interface.opref_t(ea, opnum, interface.reftype_t(type, instruction.op_state(ea, opnum)))
                 res.append(ref)
             return res
 
         # otherwise, it's a structure..which means we need to specify the member to get refs for
-        X, mid = idaapi.xrefblk_t(), self.id
-        if not X.first_to(mid, idaapi.XREF_ALL):
-            return []
-
-        # collect all references available
-        refs = [(X.frm, X.iscode, X.type)]
-        while X.next_to():
-            refs.append((X.frm, X.iscode, X.type))
+        refs = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(self.id, idaapi.XREF_ALL)]
 
         # collect the identifiers of all of the members that can possibly
         # refer to this same one which means we track unions as well. this
@@ -2462,6 +2450,8 @@ class member_t(object):
             # need to check if our parent is a union so that we can descend through
             # its members for ones at the same offset of our referring member.
             for item in itertools.chain(*map(operator.methodcaller('up'), queue)):
+                if isinstance(item, interface.ref_t) or item.parent.ptr.props & idaapi.SF_FRAME:
+                    continue
                 if is_union(item.parent):
                     members |= {member for member in item.parent.members if member.realbounds.contains(item.realoffset)}
                     work |= {member.type for member in item.parent.members if isinstance(member.type, structure_t)}
@@ -2484,39 +2474,47 @@ class member_t(object):
             flags = database.type.flags(ea, idaapi.MS_0TYPE|idaapi.MS_1TYPE)
             listable = [(opnum, instruction.opinfo(ea, opnum)) for opnum in range(instruction.ops_count(ea)) if instruction.opinfo(ea, opnum)]
 
-            # If our list of operand information is empty, then we can skip this reference.
-            if not listable:
-                cls = self.__class__
-                logging.info(u"{:s}.refs() : Skipping reference to member ({:#x}) at {:#x} with flags ({:#x}) due to no operand information.".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
+            # If we have any stack operands, then figure out which ones contain it. Fortunately,
+            # we don't have to filter it through our candidates because IDA seems to get this right.
+            if flags & FF_STKVAR in {FF_STKVAR, idaapi.FF_0STK, idaapi.FF_1STK}:
+                logging.debug(u"{:s}.refs() : Found stkvar_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
+                masks = [(idaapi.MS_0TYPE, idaapi.FF_0STK), (idaapi.MS_1TYPE, idaapi.FF_1STK)]
+                results.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum, (mask, ff) in enumerate(masks) if flags & mask == ff)
+
+            # Otherwise, we can skip this reference because there's no way to process it.
+            elif not listable:
+                logging.debug(u"{:s}.refs() : Skipping reference to member ({:#x}) at {:#x} with flags ({:#x}) due to no operand information.".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
 
             # If our flags mention a structure offset, then we can just get the structure path.
-            elif flags & FF_STROFF:
-                logging.info(u"{:s}.refs() : Found strpath_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
+            elif flags & FF_STROFF in {FF_STROFF, idaapi.FF_0STRO, idaapi.FF_1STRO}:
+                logging.debug(u"{:s}.refs() : Found strpath_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
                 iterable = [(opnum, {identifier for identifier in interface.node.get_stroff_path(ea, opnum)[1]}) for opnum, _ in listable]
-                iterable = (opnum for opnum, identifiers in iterable if operator.contains(identifiers, self.parent.id))
+                iterable = (opnum for opnum, identifiers in iterable if identifiers & candidates)
                 results.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in iterable)
 
             # Otherwise, we need to extract the information from the operand's refinfo_t. We
             # filter these by only taking the ones which we can use to calculate the target.
             else:
-                logging.info(u"{:s}.refs() : Found refinfo_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
+                logging.debug(u"{:s}.refs() : Found refinfo_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, database.type.flags(ea)))
                 iterable = ((opnum, info.ri, instruction.op(ea, opnum)) for opnum, info in listable if info.ri.is_target_optional())
 
-                # now we can do some math to determine if the operands really
-                # are pointing to our structure member.
+                # now we can do some math to determine if the operands really are pointing
+                # to our structure member by coercing it to an integer and bailing if not.
+                left, right = interface.address.bounds()
                 for opnum, ri, value in iterable:
-                    offset = value if isinstance(value, types.integer) else types.next((getattr(value, attribute) for attribute in {'offset', 'address'} if hasattr(value, attribute)), None)
+                    try: integer = int(value)
+                    except Exception: continue
+                    else: offset = interface.address.head(integer, silent=True)
+                    if not (left <= offset < right): continue
 
-                    # check if we got a valid offset and align it if so, because if
-                    # not then we can't calculate the target and need to move on.
-                    if offset is None or not database.within(offset):
-                        continue
+                    # if our operand address wasn't valid, then we've bailed. so we just
+                    # need to align the operand address to the head of the reference.
                     offset = interface.address.head(offset, silent=True)
 
-                    # all that's left to do is verify that the structure is in our
-                    # list of candidates. although we could do a better job and
-                    # check that the offset is actually pointing at the right
-                    # member after calculating the base address of the structure.
+                    # all that's left to do is verify that the structure is in our list of
+                    # candidates that we collected earlier. although, we can totally do a
+                    # better job here and calculate the boundaries of the exact member to
+                    # confirm that the offset we resolved actually points at it.
                     if database.type.flags(offset, idaapi.DT_TYPE) == FF_STRUCT and database.type.structure.id(offset) in candidates:
                         results.append(interface.opref_t(ea, opnum, interface.reftype_t.of(t)))
                     continue
