@@ -985,15 +985,20 @@ def by(**type):
         raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
-@utils.multicase()
+@utils.multicase(id=types.integer)
 def name(id):
     '''Return the name of the structure identified by `id`.'''
     res = idaapi.get_struc_name(id)
     return utils.string.of(res)
+@utils.multicase(sptr=idaapi.struc_t)
+def name(sptr):
+    '''Return the name of the structure from the given `sptr`.'''
+    return name(sptr.id)
 @utils.multicase(structure=structure_t)
 def name(structure):
+    '''Return the name of the given `structure`.'''
     return name(structure.id)
-@utils.multicase(string=types.string)
+@utils.multicase(id=types.integer, string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(id, string, *suffix):
     '''Set the name of the structure identified by `id` to `string`.'''
@@ -1011,6 +1016,11 @@ def name(id, string, *suffix):
 
     # now we can set the name of the structure
     return idaapi.set_struc_name(id, ida_string)
+@utils.multicase(sptr=idaapi.struc_t, string=types.string)
+@utils.string.decorate_arguments('string', 'suffix')
+def name(sptr, string, *suffix):
+    '''Set the name of the structure in `sptr` to `string`.'''
+    return name(sptr.id, string, *suffix)
 @utils.multicase(structure=structure_t, string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(structure, string, *suffix):
@@ -1106,22 +1116,22 @@ def is_frame(structure):
     return True if sptr.props & SF_FRAME else False
 frameQ = isframe = utils.alias(is_frame)
 
-@utils.multicase()
+@utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.string, types.integer))
 def members(structure, **base):
     '''Yield each member of the given `structure` as a tuple containing its attributes.'''
     st = by(structure)
-    return members(st.id, **base)
-@utils.multicase(id=types.integer)
-def members(id, **base):
-    """Yield each member of the structure with the specified `id` as a tuple of containing its `(offset, size, tags)`.
+    return members(st.ptr, **base)
+@utils.multicase(sptr=idaapi.struc_t)
+def members(sptr, **base):
+    """Yield each member of the structure in `sptr` as a tuple of containing its `(offset, size, tags)`.
 
     If the integer `base` is defined, then the offset of each member will be translated by the given value.
     """
-    st, struc = (F(id) for F in [idaapi.get_struc, by])
+    st, struc = (F(sptr.id) for F in [idaapi.get_struc, by])
 
     # If we couldn't get the structure, then blow up in the user's face.
     if st is None:
-        raise E.StructureNotFoundError(u"{:s}.members({:#x}) : Unable to find the requested structure ({:#x}).".format(__name__, id, id))
+        raise E.StructureNotFoundError(u"{:s}.members({:#x}) : Unable to find the requested structure ({:#x}).".format(__name__, sptr.id, sptr.id))
 
     # Grab some attributes like the structure's size, and whether or not
     # it's a union so that we can figure out each member's offset.
@@ -1135,54 +1145,48 @@ def members(id, **base):
         # Grab the member and its properties.
         msize, munionQ = idaapi.get_member_size(m), m.props & idaapi.MF_UNIMEM
 
-        # Figure out the boundaries of the member. If our structure is a union,
-        # then the starting offset never changes since IDA dual-uses it as the
-        # member index.
+        # Figure out the boundaries of the member. If our structure is a union, then
+        # the starting offset never changes since IDA dual-uses it as the member index.
         left, right = offset if unionQ else m.soff, m.eoff
 
-        # If our current offset does not match the member's starting offset,
-        # then this is an empty field, or undefined. We yield this to the caller
-        # so that they know that there's some padding they need to know about.
+        # If our current offset does not match the member's starting offset, then this
+        # is an empty field, or undefined. We yield this to the caller so that they
+        # know that there's some padding they need to know about.
         if offset < left:
             yield translated + offset, left - offset, {}
             offset = left
 
-        # Grab the attributes about the member that we plan on yielding.
-        # However, we need to force any critical implicit tags (like the name).
+        # Grab the attributes about the member that we plan on yielding and make sure
+        # that we force any critical implicit tags for identification (like the name).
         items = mem.tag()
         items.setdefault('__name__', idaapi.get_member_name(m.id))
 
-        # That was everything that our caller should care about, so we can
-        # just yield it and continue onto the next member.
+        # That was everything that our caller should likely care about, so we can
+        # just yield our item and proceed onto the next member.
         yield translated + offset, msize, items
 
-        # If we're a union, then the offset just never changes. Continue onto
-        # the next member without updating it.
-        if unionQ:
-            continue
-
-        # Otherwise we're a regular member and we need to move onto the next
-        # offset in our structure.
-        offset += msize
+        # If we're a union, then the offset just never changes and thus we don't need
+        # to adjust the offset like we have to do for a regular member.
+        offset += 0 if unionQ else msize
     return
 
-@utils.multicase(offset=types.integer)
+@utils.multicase(structure=(idaapi.struc_t, idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer)
 def fragment(structure, offset, **base):
     '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
     st = by(structure)
-    return fragment(st.id, offset, st.size, **base)
-@utils.multicase(offset=types.integer, size=types.integer)
+    return fragment(st.ptr, offset, st.size, **base)
+@utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer, size=types.integer)
 def fragment(structure, offset, size, **base):
     '''Yield each member of the given `structure` from the specified `offset` up to `size` as a tuple containing its attributes.'''
     st = by(structure)
-    return fragment(st.id, offset, size, **base)
-@utils.multicase(id=types.integer, offset=types.integer, size=types.integer)
-def fragment(id, offset, size, **base):
-    """Yield each member of the structure with the specified `id` from the given `offset` up to `size` as a tuple containing its `(offset, size, tags)`.
+    return fragment(st.ptr, offset, size, **base)
+@utils.multicase(sptr=idaapi.struc_t, offset=types.integer, size=types.integer)
+def fragment(sptr, offset, size, **base):
+    """Yield each member of the structure in `sptr` from the given `offset` up to `size` as a tuple containing its `(offset, size, tags)`.
 
     If the integer `base` is defined, then the offset of each member will be translated by the given value.
     """
-    iterable, unionQ = members(id, **base), is_union(id)
+    iterable, unionQ = members(sptr.id, **base), is_union(sptr.id)
 
     # seek
     for item in iterable:
