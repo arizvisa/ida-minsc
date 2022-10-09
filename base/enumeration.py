@@ -46,21 +46,23 @@ def has(enum):
     ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL = -1, -3, -5, -8
     return interface.node.is_identifier(enum) and idaapi.get_enum_idx(enum) != idaapi.BADADDR
 @utils.multicase(name=types.string)
-def has(name):
+@utils.string.decorate_arguments('name', 'suffix')
+def has(name, *suffix):
     '''Return truth if an enumeration with the specified `name` exists within the database.'''
-    string = utils.string.to(name)
-    return idaapi.get_enum(string) != idaapi.BADADDR
+    res = (name,) + suffix
+    string = interface.tuplename(*res)
+    return idaapi.get_enum(utils.string.to(string)) != idaapi.BADADDR
 
 def count():
     '''Return the total number of enumerations in the database.'''
     return idaapi.get_enum_qty()
 
-@utils.multicase()
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def flags(enum):
     '''Return the flags for the enumeration identified by `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_flag(eid)
-@utils.multicase(flags=types.integer)
+@utils.multicase(enum=(types.integer, types.string, types.tuple), flags=types.integer)
 def flags(enum, flags):
     '''Set the flags for the enumeration `enum` to the value specified by `flags`.'''
     eid = by(enum)
@@ -75,12 +77,12 @@ def flags(enum, flags):
         raise E.DisassemblerError(u"{:s}.flags({!r}, {:#x}) : Unable to set the flags for the specified enumeration ({:#x}) to {:#x}.".format(__name__, enum, flags, eid, flags))
     return res
 
-@utils.multicase()
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def index(enum):
     '''Return the index in the enumeration list for the enumeration identified by `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_idx(eid)
-@utils.multicase(index=types.integer)
+@utils.multicase(enum=(types.integer, types.string, types.tuple), index=types.integer)
 def index(enum, index):
     '''Set the position in the enumeration list for the enumeration `enum` to the specified `index`.'''
     eid = by(enum)
@@ -89,29 +91,33 @@ def index(enum, index):
         raise E.DisassemblerError(u"{:s}.index({!r}, {:d}) : Unable to set the index for the specified enumeration ({:#x}) to {:#x}.".format(__name__, enum, index, eid, index))
     return res
 
-@utils.string.decorate_arguments('name')
-def by_name(name):
+@utils.multicase(name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def by_name(name, *suffix):
     '''Return the identifier for the enumeration with the given `name`.'''
-    string = utils.string.to(name)
-    res = idaapi.get_enum(string)
+    res = (name,) + suffix
+    string = interface.tuplename(*res)
+    res = idaapi.get_enum(utils.string.to(string))
     if res == idaapi.BADADDR:
-        raise E.EnumerationNotFoundError(u"{:s}.by_name({!s}) : Unable to locate the enumeration with the specified name ({!s}).".format(__name__, utils.string.repr(name), utils.string.repr(name)))
+        raise E.EnumerationNotFoundError(u"{:s}.by_name({!r}) : Unable to find an enumeration with the specified name ({!s}).".format(__name__, res if suffix else string, utils.string.repr(string)))
     return res
 byname = utils.alias(by_name)
 
+@utils.multicase(index=types.integer)
 def by_index(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
     res = idaapi.getn_enum(index)
     if res == idaapi.BADADDR:
-        raise E.EnumerationNotFoundError(u"{:s}.by_index({:#x}) : Unable to locate the enumeration at index {:d}.".format(__name__, index, index))
+        raise E.EnumerationNotFoundError(u"{:s}.by_index({:#x}) : Unable to find an enumeration at the specified index ({:d}).".format(__name__, index, index))
     return res
 byindex = utils.alias(by_index)
 
+@utils.multicase(eid=types.integer)
 def by_identifier(eid):
     '''Return the identifier for the enumeration using the specified `eid`.'''
-    if not has(eid):
-        raise E.EnumerationNotFoundError(u"{:s}.by_identifier({!s}) : Unable to locate the enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
-    return eid
+    if has(eid):
+        return eid
+    raise E.EnumerationNotFoundError(u"{:s}.by_identifier({!s}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
 byidentifier = utils.alias(by_identifier)
 
 @utils.multicase(index=types.integer)
@@ -119,10 +125,14 @@ def by(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
     return by_identifier(index) if interface.node.is_identifier(index) else by_index(index)
 @utils.multicase(name=types.string)
-@utils.string.decorate_arguments('name')
-def by(name):
+@utils.string.decorate_arguments('name', 'suffix')
+def by(name, *suffix):
     '''Return the identifier for the enumeration with the specified `name`.'''
-    return by_name(name)
+    return by_name(name, *suffix)
+@utils.multicase(fullname=types.tuple)
+def by(fullname):
+    '''Return the identifier for the enumeration with the packed `fullname`.'''
+    return by_name(*fullname)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
@@ -143,34 +153,50 @@ def by(**type):
 
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string')
-def search(string):
+def search(string, *suffix):
     '''Return the identifier of the first enumeration that matches the glob `string`.'''
-    return by(like=string)
+    res = (string,) + suffix
+    return by(like=interface.tuplename(*res))
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def search(**type):
     '''Return the identifier of the first enumeration that matches the keyword specified by `type`.'''
     return by(**type)
 
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def names(enum):
     '''Return a set of all of the names belonging to the enumeration `enum`.'''
     return {item for item in members.names(enum)}
 keys = utils.alias(names)
 
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def values(enum):
     '''Return a set of all of the values belonging to the enumeration `enum`.'''
     return {item for item in members.values(enum)}
 
 ## creation/deletion
-@utils.string.decorate_arguments('name')
-def new(name, flags=0):
+@utils.multicase(name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def new(name, *suffix, **flags):
     '''Create an enumeration with the specified `name` and `flags` using ``idaapi.add_enum``.'''
-    idx, string = count(), utils.string.to(name)
-    res = idaapi.add_enum(idx, string, flags)
+    res = (name,) + suffix
+    idx, string = count(), interface.tuplename(*res)
+    return new(idx, string, flags.get('flags', 0))
+@utils.multicase(index=types.integer, name=(types.string, types.tuple), flags=types.integer)
+@utils.string.decorate_arguments('name')
+def new(index, name, flags):
+    '''Create an enumeration at the specified `index` with the given `name` and `flags`.'''
+    idx, string = count(), interface.tuplename(*name) if isinstance(name, tuple) else name
+
+    # On older versions of IDA, there were actual flags which described the width, display
+    # type, if it was a bitfield, etc. Nowadays, though, it seems to be just the number
+    # format and hence it seems completely irrelevant to expose this to someone.
+    res = idaapi.add_enum(index, utils.string.to(name), flags)
     if res == idaapi.BADADDR:
-        raise E.DisassemblerError(u"{:s}.new({!s}, flags={:d}) : Unable to create an enumeration with the specified name ({!s}).".format(__name__, utils.string.repr(name), flags, utils.string.repr(name)))
+        raise E.DisassemblerError(u"{:s}.new({:d}, {!r}, flags={:d}) : Unable to create an enumeration with the specified name ({!s}).".format(__name__, index, name, flags, utils.string.repr(string)))
     return res
 
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def delete(enum):
     '''Delete the enumeration `enum`.'''
     eid = by(enum)
@@ -178,23 +204,24 @@ def delete(enum):
 create, remove = utils.alias(new), utils.alias(delete)
 
 ## setting enum options
-@utils.multicase()
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def name(enum):
     '''Return the name of the enumeration `enum`.'''
     eid = by(enum)
     res = idaapi.get_enum_name(eid)
     return utils.string.of(res)
-@utils.multicase(name=types.string)
-@utils.string.decorate_arguments('name')
-def name(enum, name):
+@utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def name(enum, name, *suffix):
     '''Rename the enumeration `enum` to the string `name`.'''
-    eid, string = by(enum), utils.string.to(name)
-    res, ok = idaapi.get_enum_name(eid), idaapi.set_enum_name(eid, string)
+    packed = (name,) + suffix
+    eid, string = by(enum), interface.tuplename(*packed)
+    res, ok = idaapi.get_enum_name(eid), idaapi.set_enum_name(eid, utils.string.to(string))
     if not ok:
-        raise E.DisassemblerError(u"{:s}.name({!r}, {!s}) : Unable to set the name for the specified enumeration ({:#x}) to {!s}.".format(__name__, enum, utils.string.repr(name), eid, utils.string.repr(name)))
+        raise E.DisassemblerError(u"{:s}.name({!r}, {!r}) : Unable to set the name for the specified enumeration ({:#x}) to {!s}.".format(__name__, enum, packed if suffix else string, eid, utils.string.repr(string)))
     return utils.string.of(res)
 
-@utils.multicase()
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def comment(enum, **repeatable):
     """Return the comment for the enumeration `enum`.
 
@@ -203,7 +230,7 @@ def comment(enum, **repeatable):
     eid = by(enum)
     res = idaapi.get_enum_cmt(eid, repeatable.get('repeatable', True))
     return utils.string.of(res)
-@utils.multicase(comment=types.string)
+@utils.multicase(enum=(types.integer, types.string, types.tuple), comment=types.string)
 @utils.string.decorate_arguments('comment')
 def comment(enum, comment, **repeatable):
     """Set the comment for the enumeration `enum` to `comment`.
@@ -216,17 +243,17 @@ def comment(enum, comment, **repeatable):
         adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
         raise E.DisassemblerError(u"{:s}.comment({!r}, {!s}{:s}) : Unable to set the {:s}comment for the specified enumeration ({:#x}) to {!s}.".format(__name__, enum, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', eid, utils.string.repr(comment)))
     return utils.string.of(res)
-@utils.multicase(none=types.none)
+@utils.multicase(enum=(types.integer, types.string, types.tuple), none=types.none)
 def comment(enum, none, **repeatable):
     '''Remove the comment from the enumeration `enum`.'''
     return comment(enum, none or u'', **repeatable)
 
-@utils.multicase()
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def size(enum):
     '''Return the number of bytes for the enumeration `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_width(eid)
-@utils.multicase(width=types.integer)
+@utils.multicase(enum=(types.integer, types.string, types.tuple), width=types.integer)
 def size(enum, width):
     '''Set the number of bytes for the enumeration `enum` to `width`.'''
     eid = by(enum)
@@ -235,28 +262,29 @@ def size(enum, width):
         raise E.DisassemblerError(u"{:s}.size({!r}, {:#x}) : Unable to set the width for the specified enumeration ({:#x}) to {:d}.".format(__name__, enum, width, eid, width))
     return res
 
-@utils.multicase()
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def bits(enum):
     '''Return the number of bits for the enumeration `enum`.'''
     return 8 * size(enum)
-@utils.multicase(width=types.integer)
+@utils.multicase(enum=(types.integer, types.string, types.tuple), width=types.integer)
 def bits(enum, width):
     '''Set the number of bits for the enumeration `enum` to `width`.'''
     res = math.trunc(math.ceil(width / 8.0))
     return size(enum, math.trunc(res))
 
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def mask(enum):
     '''Return the bitmask for the enumeration `enum`.'''
     eid = by(enum)
     res = bits(eid)
     return pow(2, res) - 1
 
-@utils.multicase()
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def bitfield(enum):
     '''Return whether the enumeration identified by `enum` is a bitfield or not.'''
     eid = by(enum)
     return idaapi.is_bf(eid)
-@utils.multicase(boolean=(types.integer, types.bool))
+@utils.multicase(enum=(types.integer, types.string, types.tuple), boolean=(types.integer, types.bool))
 def bitfield(enum, boolean):
     '''Toggle the bitfield setting of the enumeration `enum` depending on the value of `boolean`.'''
     eid = by(enum)
@@ -266,12 +294,13 @@ def bitfield(enum, boolean):
     return res
 bitflag = utils.alias(bitfield)
 
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def up(enum):
     '''Return all structure or frame members within the database that reference the specified `enum`.'''
     X, eid = idaapi.xrefblk_t(), by(enum)
 
     # IDA does not seem to create xrefs to enumeration identifiers.
-    raise E.UnsupportedCapability(u"{:s}.up({:#x}) : Unable to locate any cross-references for the specified enumeration due to the disassembler not keeping track of them.".format(__name__, eid))
+    raise E.UnsupportedCapability(u"{:s}.up({:#x}) : Unable to find any cross-references for the specified enumeration due to the disassembler not keeping track of them.".format(__name__, eid))
 
     # Grab the first reference to the enumeration.
     if not X.first_to(eid, idaapi.XREF_ALL):
@@ -297,7 +326,7 @@ def up(enum):
         mpack = idaapi.get_member_by_id(ref)
         if mpack is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}.up({:#x}) : Unable to locate the member identified by {:#x}.".format(__name__, eid, ref))
+            raise E.MemberNotFoundError(u"{:s}.up({:#x}) : Unable to find the member identified by {:#x}.".format(__name__, eid, ref))
 
         mptr, name, sptr = mpack
         if not interface.node.is_identifier(sptr.id):
@@ -332,7 +361,7 @@ def up(enum):
         f = idaapi.get_func(ea)
         if f is None:
             cls = self.__class__
-            raise E.FunctionNotFoundError(u"{:s}.up({:#x}) : Unable to locate the function for frame member {:#x} by address {:#x}.".format(__name__, eid, mptr.id, ea))
+            raise E.FunctionNotFoundError(u"{:s}.up({:#x}) : Unable to find the function for frame member {:#x} with address {:#x}.".format(__name__, eid, mptr.id, ea))
 
         # Now that we have everything we need, we use the structure
         # module and the idaapi.func_t we fetched to instantiate the
@@ -343,6 +372,7 @@ def up(enum):
         res.append(mem)
     return res
 
+@utils.multicase(enum=(types.integer, types.string, types.tuple))
 def repr(enum):
     '''Return a printable summary of the enumeration `enum`.'''
     eid = by(enum)
@@ -454,6 +484,7 @@ class members(object):
 
     """
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     def __new__(cls, enum):
         """Yield the name, and value of each member from the enumeration `enum`.
 
@@ -473,18 +504,18 @@ class members(object):
             continue
         return
 
-    @utils.multicase(name=types.string)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def has(cls, enum, name):
+    @utils.string.decorate_arguments('name', 'suffix')
+    def has(cls, enum, name, *suffix):
         '''Return whether the enumeration `enum` contains a member with the specified `name`.'''
         eid = by(enum)
         try:
-            cls.by_name(eid, name)
+            cls.by_name(eid, name, *suffix)
         except E.MemberNotFoundError:
             return False
         return True
-    @utils.multicase(value=types.integer)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), value=types.integer)
     @classmethod
     def has(cls, enum, value, **bitmask):
         """Return whether the enumeration `enum` contains a member with the specified `value`.
@@ -503,34 +534,43 @@ class members(object):
         return False
 
     ## scope
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=(types.string, types.tuple), value=types.integer)
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, enum, name, value, **bitmask):
-        """Add an enumeration member `name` with the specified `value` to the enumeration `enum`.
+        """Add a member `name` to the enumeration `enum` with the specified `value`.
 
         If the integral, `bitmask`, is specified then use it as the bitmask for the enumeration.
         """
-        eid = by(enum)
-        bmask = bitmask.get('bitmask', idaapi.DEFMASK)
-
-        fullname = interface.tuplename(name) if isinstance(name, types.tuple) else name
-        string = utils.string.to(fullname)
-        ok = idaapi.add_enum_member(eid, string, value, bmask)
-
-        err = {getattr(idaapi, item) : item for item in ['ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV']}
-        if ok in err.keys():
-            raise E.DisassemblerError(u"{:s}.add({!r}, {!s}, {:#x}{:s}) : Unable to add a member to the enumeration ({:#x}) with the specified name ({!s}) and value ({:#x}) due to error {:s}({:d}).".format('.'.join([__name__, cls.__name__]), enum, utils.string.repr(name), value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', eid, utils.string.repr(fullname), value, err[ok], ok))
+        bmask = bitmask.get('mask', bitmask.get('bitmask', idaapi.DEFMASK))
+        return cls.add(enum, name, value, bmask)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), fullname=types.tuple, value=types.integer, mask=types.integer)
+    @classmethod
+    @utils.string.decorate_arguments('fullname')
+    def add(cls, enum, fullname, value, mask):
+        '''Add a member with the given `fullname` to the enumeration `enum` with the specified `value`.'''
+        eid, string = by(enum), interface.tuplename(*fullname)
+        return cls.add(eid, string, value, mask)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string, value=types.integer, mask=types.integer)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def add(cls, enum, name, value, mask):
+        '''Add a member `name` for the given `mask` to the enumeration `enum` with the specified `value`.'''
+        eid, err = by(enum), {getattr(idaapi, item) : item for item in ['ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV']}
+        rc = idaapi.add_enum_member(eid, utils.string.to(name), value, mask)
+        if rc in err:
+            raise E.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:#x}, {:#x}) : Unable to add a member to the enumeration ({:#x}) with the specified name ({!s}) and value ({:#x}) due to error {:s}({:d}).".format('.'.join([__name__, cls.__name__]), eid, utils.string.repr(name), value, mask, eid, utils.string.repr(name), value, err[rc], rc))
         return eid
     new = create = utils.alias(add, 'members')
 
-    @classmethod
     @utils.multicase(mid=types.integer)
+    @classmethod
     def remove(cls, mid):
         '''Remove the member identified by `mid` from the enumeration that owns it.'''
         eid = member.parent(mid)
         return member.remove(mid)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
-    @utils.multicase()
     def remove(cls, enum, member):
         '''Remove the specified `member` of the enumeration `enum`.'''
         eid = by(enum)
@@ -538,17 +578,19 @@ class members(object):
         value, serial, mask = idaapi.get_enum_member_value(mid), idaapi.get_enum_member_serial(mid), idaapi.get_enum_member_bmask(mid)
         ok = idaapi.del_enum_member(eid, value, serial, mask)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.remove({!r}, {!r}) : Unable to remove the specified member ({:#x}) having the value {:d} from the enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, member, mid, value, eid))
+            raise E.DisassemblerError(u"{:s}.remove({:#x}, {!r}) : Unable to remove the specified member ({:#x}) having the value {:d} from the enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), eid, member, mid, value, eid))
         return ok
     delete = destroy = utils.alias(remove, 'members')
 
     ## aggregations
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def names(cls, enum):
         '''Return a set of all the names belonging to the enumeration `enum`.'''
         eid = by(enum)
         return { member.name(mid) for mid in cls.iterate(eid) }
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def values(cls, enum):
         """Return a set of all the values belonging to the enumeration `enum`.
@@ -560,6 +602,7 @@ class members(object):
             return { (member.value(mid), member.mask(mid)) for mid in cls.iterate(eid) }
         return { member.value(mid) for mid in cls.iterate(eid) }
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def mapping(cls, enum):
         '''Return a dictionary mapping all the values values to their names for the enumeration `enum`.'''
@@ -567,6 +610,7 @@ class members(object):
         return { member.value(mid) : member.name(mid) for mid in cls.iterate(eid) }
 
     ## searching
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), index=types.integer)
     @classmethod
     def by_index(cls, enum, index):
         '''Return the member identifier for the member of the enumeration `enum` at the specified `index`.'''
@@ -574,17 +618,19 @@ class members(object):
         try:
             res = next(mid for i, mid in enumerate(cls.iterate(eid)) if i == index)
         except StopIteration:
-            raise E.MemberNotFoundError(u"{:s}.by_index({!r}, {:d}) : Unable to locate the member at index {:d} of the specified enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, index, index, eid))
+            raise E.MemberNotFoundError(u"{:s}.by_index({:#x}, {:d}) : Unable to find the member at index {:d} of the specified enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), eid, index, index, eid))
         return res
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), mid=types.integer)
     @classmethod
     def by_identifier(cls, enum, mid):
         '''Return the member of the enumeration specified by `enum` and its `mid`.'''
         eid = by(enum)
         if member.parent(mid) != eid:
-            raise E.MemberNotFoundError(u"{:s}.by_identifier({!r}, {:#x}) : Unable to locate a member in the enumeration ({:#x}) with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, mid, eid, mid))
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({:#x}, {:#x}) : Unable to find a member in the enumeration ({:#x}) with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), eid, mid, eid, mid))
         return mid
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), value=types.integer)
     @classmethod
     def by_value(cls, enum, value, **filters):
         """Return the member identifier for the member of the enumeration `enum` with the specified `value`.
@@ -659,7 +705,7 @@ class members(object):
         # If our results are empty, then we were unable to find what the user
         # was looking for and thus we need to let them know what's up.
         if not results:
-            raise E.MemberNotFoundError(u"{:s}.by_value({!r}, {:#x}{:s}) : Unable to locate a member in the enumeration ({:#x}) with the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+            raise E.MemberNotFoundError(u"{:s}.by_value({:#x}, {:#x}{:s}) : Unable to find a member in the enumeration ({:#x}) with the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
 
         # If we found more than one result, then we need to grab all the fields
         # that we plan on emitting so that we can just let the user know what
@@ -669,11 +715,11 @@ class members(object):
             spec = u"[{serial:d}] {name!s} {value:#0{:d}x} & {mask:s}".format if bitfieldQ else u"[{serial:d}] {name!s} {value:#0{:d}x}".format
             formatter = utils.fpartial(spec, 2 + 2 * size(eid))
             messages = (formatter(serial=cid, name=name, mask=u"{:s}({:#0{:d}x})".format(maskname, mask, 2 + 2 * size(eid)) if maskname else u"{:#0{:d}x}".format(mask, 2 + 2 * size(eid)), value=idaapi.get_enum_member_value(mid)) for mid, mask, cid, maskname, name in iterable)
-            logging.fatal(u"{:s}.by_value({!r}, {:#x}{:s}) : Multiple members with varying bitmask or serial were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+            logging.fatal(u"{:s}.by_value({:#x}, {:#x}{:s}) : Multiple members with varying bitmask or serial were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), eid, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
             [ logging.warning(msg) for msg in messages ]
             if bitfieldQ:
-                raise E.MemberNotFoundError(u"{:s}.by_value({!r}, {:#x}{:s}) : Multiple members with varying bitmask or serial were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
-            raise E.MemberNotFoundError(u"{:s}.by_value({!r}, {:#x}{:s}) : Multiple members with different serial numbers were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+                raise E.MemberNotFoundError(u"{:s}.by_value({:#x}, {:#x}{:s}) : Multiple members with varying bitmask or serial were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), eid, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+            raise E.MemberNotFoundError(u"{:s}.by_value({:#x}, {:#x}{:s}) : Multiple members with different serial numbers were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), eid, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
 
         # Otherwise there was only one item found, so we just need to unpack it.
         res, = results
@@ -681,29 +727,31 @@ class members(object):
         return mid
     byvalue = utils.alias(by_value, 'members')
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def by_name(cls, enum, name):
+    @utils.string.decorate_arguments('name', 'suffix')
+    def by_name(cls, enum, name, *suffix):
         '''Return the member identifier for the member of the enumeration `enum` with the specified `name`.'''
-        eid = by(enum)
+        res = (name,) + suffix
+        eid, string = by(enum), interface.tuplename(*res)
         for mid in cls.iterate(eid):
-            if name == member.name(mid):
+            if string == member.name(mid):
                 return mid
             continue
-        raise E.MemberNotFoundError(u"{:s}.by_name({!r}, {!s}) : Unable to locate a member in the enumeration ({:#x}) with the specified name ({!s}).".format('.'.join([__name__, cls.__name__]), enum, utils.string.repr(name), eid, utils.string.repr(name)))
+        raise E.MemberNotFoundError(u"{:s}.by_name({:#x}, {!s}) : Unable to find a member in the enumeration ({:#x}) with the specified name ({!s}).".format('.'.join([__name__, cls.__name__]), eid, utils.string.repr(name), eid, utils.string.repr(name)))
     byname = utils.alias(by_name, 'members')
 
-    @utils.multicase(n=types.integer)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), n=types.integer)
     @classmethod
     def by(cls, enum, n):
         '''Return the member belonging to `enum` identified by its index or id in `n`.'''
         return cls.by_identifier(enum, n) if interface.node.is_identifier(n) else cls.by_index(enum, n)
-    @utils.multicase(name=types.string)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
     @classmethod
-    @utils.string.decorate_arguments('name')
-    def by(cls, enum, name):
+    @utils.string.decorate_arguments('name', 'suffix')
+    def by(cls, enum, name, *suffix):
         '''Return the member of the enumeration `enum` with the given `name`.'''
-        return cls.by_name(enum, name)
+        return cls.by_name(enum, name, *suffix)
 
     # FIXME: Implement a matcher class for enumeration members that can be used with .iterate and .list below.
     __member_matcher = utils.matcher()
@@ -757,6 +805,7 @@ class members(object):
             continue
         return
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def iterate(cls, enum):
         '''Iterate through all ids of each member associated with the enumeration `enum`.'''
@@ -765,6 +814,7 @@ class members(object):
             yield item
         return
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def list(cls, enum):
         '''List all the members belonging to the enumeration identified by `enum`.'''
@@ -809,6 +859,7 @@ class member(object):
         > ok = enum.member.remove(mid)
 
     """
+    @utils.multicase(mid=types.integer)
     @classmethod
     def parent(cls, mid):
         '''Return the id of the enumeration that owns the member `mid`.'''
@@ -816,11 +867,12 @@ class member(object):
         return idaapi.get_enum_member_enum(mid)
     owner = utils.alias(parent, 'member')
 
+    @utils.multicase(mid=types.integer)
     @classmethod
     def by(cls, mid):
         '''Return the enumeration member as specified by the provided `mid`.'''
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.by({!s}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            raise E.MemberNotFoundError(u"{:s}.by({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         eid = cls.parent(mid)
         return members.by_identifier(eid, mid)
 
@@ -833,7 +885,7 @@ class member(object):
         if not ok:
             raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the specified member ({:#x}) having the value {:d} from the enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid, value, eid))
         return ok
-    @utils.multicase()
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def remove(cls, enum, member):
         '''Remove the specified `member` of the enumeration `enum`.'''
@@ -847,10 +899,10 @@ class member(object):
     def name(cls, mid):
         '''Return the name of the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.name({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            raise E.MemberNotFoundError(u"{:s}.name({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         res = idaapi.get_enum_member_name(mid)
         return utils.string.of(res)
-    @utils.multicase()
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def name(cls, enum, member):
         '''Return the name of the enumeration `member` belonging to `enum`.'''
@@ -868,7 +920,7 @@ class member(object):
         if not ok:
             raise E.DisassemblerError(u"{:s}.name({:#x}, {!s}) : Unable to set the name for the specified member ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(name), mid, utils.string.repr(fullname)))
         return utils.string.of(res)
-    @utils.multicase(name=types.string)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
     @classmethod
     @utils.string.decorate_arguments('name', 'suffix')
     def name(cls, enum, member, name, *suffix):
@@ -886,10 +938,10 @@ class member(object):
         If the bool `repeatable` is specified, then return the repeatable comment.
         """
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.comment({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            raise E.MemberNotFoundError(u"{:s}.comment({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         res = idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True))
         return utils.string.of(res)
-    @utils.multicase()
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def comment(cls, enum, member, **repeatable):
         '''Return the comment for the enumeration `member` belonging to `enum`.'''
@@ -905,14 +957,14 @@ class member(object):
         If the bool `repeatable` is specified, then set the repeatable comment.
         """
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.comment({:#x}, {!s}{:s}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', mid))
+            raise E.MemberNotFoundError(u"{:s}.comment({:#x}, {!s}{:s}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', mid))
         string = utils.string.to(comment)
         res, ok = idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True)), idaapi.set_enum_member_cmt(mid, string, repeatable.get('repeatable', True))
         if not ok:
             adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
             raise E.DisassemblerError(u"{:s}.comment({:#x}, {!s}{:s})) : Unable to set the {:s}comment for the specified member ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', mid, utils.string.repr(comment)))
         return utils.string.of(res)
-    @utils.multicase(comment=types.string)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), comment=types.string)
     @classmethod
     @utils.string.decorate_arguments('comment')
     def comment(cls, enum, member, comment, **repeatable):
@@ -920,7 +972,7 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.comment(mid, comment, **repeatable)
-    @utils.multicase(none=types.none)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), none=types.none)
     @classmethod
     def comment(cls, enum, member, none, **repeatable):
         '''Remove the comment from the `member` belonging to the enumeration `enum`.'''
@@ -931,9 +983,9 @@ class member(object):
     def value(cls, mid):
         '''Return the value of the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.value({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            raise E.MemberNotFoundError(u"{:s}.value({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         return idaapi.get_enum_member_value(mid)
-    @utils.multicase()
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def value(cls, enum, member):
         '''Return the value of the specified `member` belonging to the enumeration `enum`.'''
@@ -945,7 +997,7 @@ class member(object):
     def value(cls, mid, value):
         '''Assign the integer specified by `value` to the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid))
+            raise E.MemberNotFoundError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid))
         eid = cls.parent(mid)
 
         # Figure out the actual altval index that contains the value we want to modify
@@ -965,7 +1017,7 @@ class member(object):
         if not ok:
             raise E.DisassemblerError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to set the value for the specified member ({:#x}) to {:#x}{:s}.".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid, value, u" & {:#x}".format(bmask) if bmask else u''))
         return res
-    @utils.multicase(value=types.integer)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), value=types.integer)
     @classmethod
     def value(cls, enum, member, value, **bitmask):
         '''Set the `value` for the enumeration `member` belonging to `enum`.'''
@@ -978,10 +1030,10 @@ class member(object):
     def serial(cls, mid):
         '''Return the serial of the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.serial({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            raise E.MemberNotFoundError(u"{:s}.serial({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         CONST_SERIAL = -7
         return idaapi.get_enum_member_serial(mid)
-    @utils.multicase()
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def serial(cls, enum, member):
         '''Return the serial of the enumeration `member` belonging to `enum`.'''
@@ -994,10 +1046,10 @@ class member(object):
     def mask(cls, mid):
         '''Return the bitmask for the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         CONST_BMASK = -6
         return idaapi.get_enum_member_bmask(mid)
-    @utils.multicase()
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def mask(cls, enum, member):
         '''Return the bitmask for the enumeration `member` belonging to `enum`.'''
@@ -1005,12 +1057,12 @@ class member(object):
         mid = members.by(eid, member)
         return cls.mask(mid)
 
-    @utils.multicase()
+    @utils.multicase(mid=types.integer)
     @classmethod
     def refs(cls, mid):
         '''Return the `(address, opnum, type)` of all the instructions that reference the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
-            raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         eid = cls.parent(mid)
 
         # Assign some constants that we'll use for verifying the references
@@ -1018,19 +1070,12 @@ class member(object):
         NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
         Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
 
-        # Check if there's an xref that points to the enumeration member
-        # identifier. If there isn't one, then we return an empty list.
-        X = idaapi.xrefblk_t()
-        if not X.first_to(mid, idaapi.XREF_ALL):
+        # Collect all of the references for the enumeration member id.
+        refs = [(Xfrm, Xiscode, Xtype) for Xfrm, Xiscode, Xtype in interface.xref.to(mid)]
+        if not refs:
             fullname = '.'.join([name(eid), cls.name(mid)])
             logging.warning(u"{:s}.refs({:#x}) : No references found to enumeration member {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, fullname, mid))
             return []
-
-        # As we were able to find at least one, iterate through any others
-        # that we found whilst gathering the 3 attributes that we care about.
-        refs = [(X.frm, X.iscode, X.type)]
-        while X.next_to():
-            refs.append((X.frm, X.iscode, X.type))
 
         # Now that we have a list of xrefs, we need to convert each element
         # into an internal.opref_t. We do this by figuring out which operand
@@ -1043,7 +1088,7 @@ class member(object):
             res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
         return res
 
-    @utils.multicase()
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def refs(cls, enum, member):
         '''Returns the `(address, opnum, type)` of all the instructions that reference the enumeration `member` belonging to `enum`.'''
@@ -1066,6 +1111,7 @@ class masks(object):
         > mask = enum.masks.by(eid, 0x1234)
 
     """
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     def __new__(cls, enum):
         '''Iterate through all of the masks belonging to the enumeration `enum` and yield their name and value.'''
         eid = by(enum)
@@ -1073,6 +1119,7 @@ class masks(object):
             yield cls.name(eid, mask), mask
         return
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def has(cls, enum, mask):
         '''Return whether the enumeration `enum` uses the specified `mask`.'''
@@ -1092,6 +1139,7 @@ class masks(object):
             yield bmask
         return
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def iterate(cls, enum):
         '''Iterate through all of the masks belonging to the enumeration `enum`.'''
@@ -1100,14 +1148,14 @@ class masks(object):
             yield item
         return
 
-    @utils.multicase(mask=types.integer)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), mask=types.integer)
     @classmethod
     def name(cls, enum, mask):
         '''Return the name for the given `mask` belonging to the enumeration `enum`.'''
         eid = by(enum)
         res = idaapi.get_bmask_name(eid, mask)
         return utils.string.of(res) or ''
-    @utils.multicase(mask=types.integer, name=(types.string, types.tuple))
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), mask=types.integer, name=(types.string, types.tuple))
     @classmethod
     @utils.string.decorate_arguments('name')
     def name(cls, enum, mask, name):
@@ -1117,9 +1165,9 @@ class masks(object):
         string = utils.string.to(fullname)
         res, ok = idaapi.get_bmask_name(eid, mask), idaapi.set_bmask_name(eid, mask, string)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.name({!r}, {:#x}, {!s}) : Unable to rename the mask ({:#x}) for the specified enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), enum, mask, utils.string.repr(name), 2 + 2 * size(eid), eid, utils.string.repr(fullname)))
+            raise E.DisassemblerError(u"{:s}.name({:#x}, {:#x}, {!s}) : Unable to rename the mask ({:#x}) for the specified enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), eid, mask, utils.string.repr(name), 2 + 2 * size(eid), eid, utils.string.repr(fullname)))
         return utils.string.of(res)
-    @utils.multicase(mask=types.integer, name=types.string)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), mask=types.integer, name=types.string)
     @classmethod
     @utils.string.decorate_arguments('name', 'suffix')
     def name(cls, enum, mask, name, *suffix):
@@ -1128,7 +1176,7 @@ class masks(object):
         fullname = (name,) + suffix
         return cls.name(eid, mask, fullname)
 
-    @utils.multicase(mask=types.integer)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), mask=types.integer)
     @classmethod
     def comment(cls, enum, mask, **repeatable):
         """Return the comment for the `mask` belonging to the enumeration `enum`.
@@ -1138,7 +1186,7 @@ class masks(object):
         eid = by(enum)
         res = idaapi.get_bmask_cmt(eid, mask, repeatable.get('repeatable', True))
         return utils.string.of(res)
-    @utils.multicase(mask=types.integer, comment=types.string)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), mask=types.integer, comment=types.string)
     @classmethod
     @utils.string.decorate_arguments('comment')
     def comment(cls, enum, mask, comment, **repeatable):
@@ -1151,14 +1199,15 @@ class masks(object):
         res, ok = idaapi.get_bmask_cmt(eid, mask, repeatable.get('repeatable', True)), idaapi.set_bmask_cmt(eid, mask, string, repeatable.get('repeatable', True))
         if not ok:
             adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
-            raise E.DisassemblerError(u"{:s}.comment({!r}, {:#x}, {!s}, {:s}) : Unable to set the {:s}comment for the specified mask ({:#0{:d}x}) from the enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), enum, mask, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', mask, 2 + 2 * size(eid), eid, utils.string.repr(comment)))
+            raise E.DisassemblerError(u"{:s}.comment({:#x}, {:#x}, {!s}, {:s}) : Unable to set the {:s}comment for the specified mask ({:#0{:d}x}) from the enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), eid, mask, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', mask, 2 + 2 * size(eid), eid, utils.string.repr(comment)))
         return utils.string.of(res)
-    @utils.multicase(mask=types.integer, none=types.none)
+    @utils.multicase(enum=(types.integer, types.string, types.tuple), mask=types.integer, none=types.none)
     @classmethod
     def comment(cls, enum, mask, none, **repeatable):
         '''Remove the comment for the `mask` belonging to the enumeration `enum`.'''
         return cls.comment(enum, mask, none or u'', **repeatable)
 
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def list(cls, enum):
         '''List all the masks belonging to the enumeration identified by `enum`.'''
