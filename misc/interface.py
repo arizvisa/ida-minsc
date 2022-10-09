@@ -10,7 +10,7 @@ individuals to attempt to understand this craziness.
 import six, builtins
 import sys, logging, contextlib
 import functools, operator, itertools
-import collections, heapq, traceback, ctypes, math
+import collections, heapq, traceback, ctypes, math, codecs
 import unicodedata as _unicodedata, string as _string, array as _array
 
 import idaapi, internal
@@ -423,6 +423,194 @@ class typemap(object):
     def update_refinfo(cls, identifier, flag):
         '''This updates the refinfo for the given `identifer` according to the provided `flag`.'''
         return address.update_refinfo(identifier, flag)
+
+class string(object):
+    """
+    This namespace provides basic utilities for interacting with the string
+    type within the disassembler. A string type is an encoded 32-bit integer
+    that consists of the string encoding, two terminal characters, and the
+    width and prefix length which is interpreted as a bitmask in newer versions
+    of the disassembler and an enumeration in older versions.
+    """
+
+    # tables for determining the width and length for each string type. these
+    # tables are pre-shifted so that only a mask is needed to look things up.
+    if idaapi.__version__ < 7.0:
+        width = {
+            idaapi.ASCSTR_TERMCHR: 1, idaapi.ASCSTR_PASCAL: 1, idaapi.ASCSTR_LEN2: 1, idaapi.ASCSTR_LEN4: 1,
+            idaapi.ASCSTR_UNICODE: 2, idaapi.ASCSTR_ULEN2: 2, idaapi.ASCSTR_ULEN4: 2,
+        }
+        width_mask, width_shift = bytearray([idaapi.get_str_type_code(0xff), 0])
+
+        length = {
+            idaapi.ASCSTR_TERMCHR: 0, idaapi.ASCSTR_UNICODE: 0,
+            idaapi.ASCSTR_PASCAL: 1,
+            idaapi.ASCSTR_LEN2: 2, idaapi.ASCSTR_ULEN2: 2,
+            idaapi.ASCSTR_LEN4: 4, idaapi.ASCSTR_ULEN4: 4,
+        }
+        length_mask, length_shift = bytearray([idaapi.get_str_type_code(0xff), 0])
+
+        typecode = {
+            (1, 0): idaapi.ASCSTR_TERMCHR,  (2, 0): idaapi.ASCSTR_UNICODE,
+            (1, 1): idaapi.ASCSTR_PASCAL,
+            (1, 2): idaapi.ASCSTR_LEN2,     (2, 2): idaapi.ASCSTR_ULEN2,
+            (1, 4): idaapi.ASCSTR_LEN4,     (2, 4): idaapi.ASCSTR_ULEN4,
+        }
+
+    else:
+        width = {
+            idaapi.STRWIDTH_1B: 1,
+            idaapi.STRWIDTH_2B: 2,
+            idaapi.STRWIDTH_4B: 4,
+        }
+        width_mask, width_shift = getattr(idaapi, 'STRWIDTH_MASK', 0x03), 0
+
+        length = {
+            idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT: 0,
+            idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT: 1,
+            idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT: 2,
+            idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT: 4,
+        }
+        length_mask, length_shift = getattr(idaapi, 'STRLYT_MASK', 0xfc), getattr(idaapi, 'STRLYT_SHIFT', 2)
+
+        typecode = {
+            (1, 0): idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B,
+            (1, 1): idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B,
+            (1, 2): idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B,
+            (1, 4): idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_1B,
+
+            (2, 0): idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B,
+            (2, 1): idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B,
+            (2, 2): idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B,
+            (2, 4): idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_2B,
+
+            (4, 0): idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B,
+            (4, 1): idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B,
+            (4, 2): idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B,
+            (4, 4): idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT | idaapi.STRWIDTH_4B,
+        }
+
+    # mask and shifts for the other parts of a string (same on both versions)
+    strterm1 = 0x0000ff00, 8
+    strterm2 = 0x00ff0000, 16
+    strencoding = 0xff000000, 24
+
+    # general functions for interacting with a strtype.
+    @classmethod
+    def unpack(cls, strtype):
+        '''Unpack the string type into its different parts as a tuple of `(width, length, terminals, encoding)`.'''
+        mask, shift = cls.strterm1
+        term1 = (strtype & mask) >> shift
+        mask, shift = cls.strterm2
+        term2 = (strtype & mask) >> shift
+        mask, shift = cls.strencoding
+        encoding = (strtype & mask) >> shift
+
+        # combine our terminator characters into some bytes and then return what we've got.
+        terminals = bytearray([term1, term2] if term2 else [term1]) # XXX: if term2 is '\0' then it is unused.
+        return cls.width[strtype & cls.width_mask], cls.length[strtype & cls.length_mask], bytes(terminals), encoding
+
+    @classmethod
+    def pack(cls, width, length, terminals, encoding):
+        '''Pack the string `width`, `length`, the `terminals`, and the `encoding` index into an integer representing the string type.'''
+        STRENC_DEFAULT, STRENC_NONE = getattr(idaapi, 'STRENC_DEFAULT', 0), getattr(idaapi, 'STRENC_NONE', 0xFF)
+
+        # figure out whether we were given the default encoding (None) or no
+        # encoding (<0), and then encode it to the right place in the strtype.
+        mask, shift = cls.strencoding
+        index = STRENC_DEFAULT if encoding is None else STRENC_NONE if encoding < 0 else encoding
+        encoding_idx = (index << shift) & mask
+
+        # convert our terminal characters back into integers so that we can
+        # encode them to the correct position in the strtype.
+        term1, term2 = bytearray(itertools.islice(itertools.chain(terminals or b'', b'\0\0'), 2))
+        mask, shift = cls.strterm1
+        term1_idx = (term1 << shift) & mask
+        mask, shift = cls.strterm1
+        term2_idx = (term2 << shift) & mask
+
+        # ...and then or what we were given back together.
+        return functools.reduce(operator.or_, [encoding_idx, term1_idx, term2_idx], cls.typecode[width, length])
+
+    @classmethod
+    def check(cls, width, length):
+        '''Return whether the given `width` and `length` are actually supported by the disassembler.'''
+        return (width, length) in cls.typecode
+
+    @classmethod
+    def encoding(cls, name):
+        '''Return the index for the encoding with the specified `name`.'''
+        Fencoding_count = idaapi.get_encoding_qty if hasattr(idaapi, 'get_encoding_qty') else idaapi.get_encodings_count if hasattr(idaapi, 'get_encodings_count') else internal.utils.fconstant(0)
+
+        # First look up the name to make sure that there's a codec for it.
+        try: expected = codecs.lookup(name).name
+        except LookupError: return -1
+
+        # Iterate through all of the known encoding from the database and check
+        # to see if they're one of our registered codecs. If so, then we can
+        # verify that it matches the actual codec name that we're looking for.
+        for idx in builtins.range(Fencoding_count()):
+            name = idaapi.get_encoding_name(idx)
+            if not name:
+                continue
+
+            # Trust that the codecs module will normalize the codec name.
+            try: codec = codecs.lookup(name)
+            except LookupError: continue
+
+            # Do a case-insensitive comparison and return the index if it matches.
+            if codec.name.upper() == expected.upper():
+                return idx
+            continue
+        return -1
+
+    @classmethod
+    def codec(cls, width, index):
+        '''Return the codec used for encoding or decoding a string of the specified `width` and encoding `index`.'''
+        STRENC_DEFAULT, STRENC_NONE = getattr(idaapi, 'STRENC_DEFAULT', 0), getattr(idaapi, 'STRENC_NONE', 0xFF)
+        Fencoding_count = idaapi.get_encoding_qty if hasattr(idaapi, 'get_encoding_qty') else idaapi.get_encodings_count if hasattr(idaapi, 'get_encodings_count') else internal.utils.fconstant(0)
+        index = STRENC_DEFAULT if index is None else index
+
+        # If there's no way to determine the encoding name, or we were given a default
+        # encoding with no way to look up the index, then we need to bail.
+        if not hasattr(idaapi, 'get_encoding_name') or (index == STRENC_DEFAULT and not hasattr(idaapi, 'get_default_encoding_idx')) or (isinstance(index, internal.types.string) and not hasattr(idaapi, 'add_encoding')):
+            return None
+
+        # If our index is actually a string (not an index), then we use it as a sign to
+        # create the new encoding and recurse with our new index. Before we do this, however,
+        # we need to verify that the encoding exists and bail if it doesn't.
+        if isinstance(index, internal.types.string):
+            upcased = index.upper()
+            try: codecs.lookup(upcased)
+            except LookupError: return None
+
+            # Add the requested encoding to the database and recurse if it didn't error.
+            index = idaapi.add_encoding(upcased)
+            return None if index < 0 else cls.codec(width, index)
+
+        # If we were given a default encoding, then we can use the width to figure out
+        # the encoding. Otherwise we can just explicitly trust whatever name we were given.
+        if index == STRENC_DEFAULT:
+            encoding = idaapi.get_default_encoding_idx(width)
+
+        # If it's not set, or the index is larger than the number of encodings, then
+        # we bail because there's no way to figure out the encoding name here.
+        elif index == STRENC_NONE or Fencoding_count() <= index:
+            return None
+
+        # Otherwise, it's trustable...but sorta, since get_encoding_name can still
+        # return None, an empty string, or anything else that might be crazy.
+        else:
+            encoding = index
+
+        # Now we should be able to get the encoding name from our index, so we can grab
+        # it and then try to look up the encoding. If we failed, then we return none.
+        name = idaapi.get_encoding_name(encoding)
+        try:
+            result = codecs.lookup(name or '')
+        except LookupError:
+            result = None
+        return result
 
 class prioritybase(object):
     result = type('result', (object,), {})
