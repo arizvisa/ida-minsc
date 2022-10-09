@@ -268,6 +268,8 @@ class typemap(object):
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
+        Fstring_encoding = idaapi.set_str_encoding_idx if hasattr(idaapi, 'set_str_encoding_idx') else lambda strtype, encoding_idx: (strtype & 0xffffff) | (encoding_idx << 24)
+        strtype = typeid if typeid is None else typeid & Fstring_encoding(0xfffffff, 0)
 
         # Check if the dtype's size field (dsize) is describing a structure and
         # verify that our type-id is an integer so that we know that we need to
@@ -283,15 +285,21 @@ class typemap(object):
             return t if sz == size else (t, size) if variableQ else [t, size // sz]
 
         # Verify that we actually have the datatype mapped and that we can look it up.
-        if all(item not in cls.inverted for item in [dsize, dtype, (dtype, typeid)]):
+        if all(item not in cls.inverted for item in [dsize, dtype, (dtype, typeid), (dtype, strtype)]):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dtype, typeid, size))
 
         # Now that we know the datatype exists, extract the actual type (dtype)
         # and the type's size (dsize) from the inverted map while giving priority
         # to the type. This way we're checking the dtype for pointers (references)
         # and then only afterwards do we fall back to depending on the size.
-        item = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dtype,typeid] if (dtype, typeid) in cls.inverted else cls.inverted[dsize]
-        if len(item) == 2:
+        item = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dtype, typeid] if (dtype, typeid) in cls.inverted else cls.inverted[dtype, strtype] if (dtype, strtype) in cls.inverted else cls.inverted[dsize]
+
+        # If it's not a tuple, then it's not a "real" type and we only need the size.
+        if not isinstance(item, tuple):
+            return [item, size]
+
+        # If it's got a length, then we can just use it.
+        elif len(item) == 2:
             t, sz = item
 
         # If our tuple contains extra information (a string), then hack that in.
@@ -307,7 +315,7 @@ class typemap(object):
 
             #count = max(0, size - length) // width
             count = size // width
-            return [reduced, count] if count > 1 else reduced if length > 0 or width > 1 else str
+            return [reduced, count] if any([count > 1, size == 0]) else reduced if length > 0 or width > 1 else str
 
         # If the datatype size is not an integer, then we need to calculate the
         # size ourselves using the size parameter we were given and the element
