@@ -112,13 +112,35 @@ def list(**type):
     return
 
 ## searching
-@utils.string.decorate_arguments('name')
-def by_name(name):
+@utils.multicase()
+def has():
+    '''Returns true if the current address is within any segment.'''
+    return has(ui.current.address())
+@utils.multicase(ea=types.integer)
+def has(ea):
+    '''Returns true if the address `ea` is within any segment.'''
+    return any(interface.range.within(ea, seg) for seg in __iterate__())
+@utils.multicase(name=types.string)
+def has(name, *suffix):
+    '''Returns true if the segment with the given `name` exists.'''
+    res = (name,) + suffix
+    return has(res)
+@utils.multicase(fullname=types.tuple)
+def has(fullname):
+    '''Returns true if the segment with the packed `fullname` exists.'''
+    string = interface.tuplename(*fullname)
+    return idaapi.get_segm_by_name(utils.string.to(string)) is not None
+within = utils.alias(has)
+
+@utils.multicase(name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def by_name(name, *suffix):
     '''Return the segment with the given `name`.'''
-    res = utils.string.to(name)
-    seg = idaapi.get_segm_by_name(res)
+    res = (name,) + suffix
+    string = interface.tuplename(*res)
+    seg = idaapi.get_segm_by_name(utils.string.to(string))
     if seg is None:
-        raise E.SegmentNotFoundError(u"{:s}.by_name({!r}) : Unable to locate the segment with the specified name.".format(__name__, name))
+        raise E.SegmentNotFoundError(u"{:s}.by_name({!r}) : Unable to find the segment with the specified name.".format(__name__, res if suffix else string))
     return seg
 byname = utils.alias(by_name)
 def by_selector(selector):
@@ -128,6 +150,7 @@ def by_selector(selector):
         raise E.SegmentNotFoundError(u"{:s}.by_selector({:#x}) : Unable to locate the segment with the specified selector.".format(__name__, selector))
     return seg
 byselector = utils.alias(by_selector)
+@utils.multicase(ea=types.integer)
 def by_address(ea):
     '''Return the segment that contains the specified `ea`.'''
     seg = idaapi.getseg(interface.address.within(ea))
@@ -138,12 +161,17 @@ byaddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
 def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
-    return segment
+    ea, _ = interface.range.bounds(seg)
+    return by_address(ea)
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
-def by(name):
+def by(name, *suffix):
     '''Return the segment by its `name`.'''
-    return by_name(name)
+    return by_name(name, *suffix)
+@utils.multicase(fullname=types.tuple)
+def by(fullname):
+    '''Return the segment by its packed `fullname`.'''
+    return by_name(*fullname)
 @utils.multicase(ea=types.integer)
 def by(ea):
     '''Return the segment containing the address `ea`.'''
@@ -174,10 +202,12 @@ def by(**type):
     return res
 
 @utils.multicase(name=types.string)
-@utils.string.decorate_arguments('name')
-def search(name):
+@utils.string.decorate_arguments('name', 'suffix')
+def search(name, *suffix):
     '''Search through all the segments and return the first one matching the glob `name`.'''
-    return by(like=name)
+    res = (name,) + suffix
+    string = interface.tuplename(*res)
+    return by(like=string)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def search(**type):
@@ -192,7 +222,7 @@ def bounds():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.bounds() : Unable to locate the current segment.".format(__name__))
     return interface.range.bounds(seg)
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def bounds(segment):
     '''Return the bounds of the segment specified by `segment`.'''
     seg = by(segment)
@@ -206,7 +236,7 @@ def iterate():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.iterate() : Unable to locate the current segment.".format(__name__))
     return iterate(seg)
-@utils.multicase()
+@utils.multicase(segment=(types.integer, types.string, types.tuple))
 def iterate(segment):
     '''Iterate through all of the addresses within the specified `segment`.'''
     seg = by(segment)
@@ -226,7 +256,7 @@ def size():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.size() : Unable to locate the current segment.".format(__name__))
     return interface.range.size(seg)
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def size(segment):
     '''Return the size of the segment specified by `segment`.'''
     seg = by(segment)
@@ -240,7 +270,7 @@ def offset():
 def offset(ea):
     '''Return the offset of the address `ea` from the beginning of the current segment.'''
     return offset(ui.current.segment(), ea)
-@utils.multicase(ea=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), ea=types.integer)
 def offset(segment, ea):
     '''Return the offset of the address `ea` from the beginning of `segment`.'''
     seg = by(segment)
@@ -250,7 +280,7 @@ def offset(segment, ea):
 def by_offset(offset):
     '''Return the specified `offset` translated to the beginning of the current segment.'''
     return by_offset(ui.current.segment(), offset)
-@utils.multicase(offset=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), offset=types.integer)
 def by_offset(segment, offset):
     '''Return the specified `offset` translated to the beginning of `segment`.'''
     seg = by(segment)
@@ -261,7 +291,7 @@ byoffset = utils.alias(by_offset)
 def go_offset(offset):
     '''Go to the `offset` of the current segment.'''
     return go_offset(ui.current.segment(), offset)
-@utils.multicase(offset=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), offset=types.integer)
 def go_offset(segment, offset):
     '''Go to the `offset` of the specified `segment`.'''
     seg = by(segment)
@@ -277,7 +307,7 @@ def read():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.read() : Unable to locate the current segment.".format(__name__))
     return get_bytes(interface.range.start(seg), interface.range.size(seg))
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def read(segment):
     '''Return the contents of the segment identified by `segment`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
@@ -293,7 +323,7 @@ def repr():
     if segment is None:
         raise E.SegmentNotFoundError(u"{:s}.repr() : Unable to locate the current segment.".format(__name__))
     return repr(segment)
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def repr(segment):
     '''Return the specified `segment` in a printable form.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -308,7 +338,7 @@ def top():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.top() : Unable to locate the current segment.".format(__name__))
     return interface.range.start(seg)
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def top(segment):
     '''Return the top address of the segment identified by `segment`.'''
     seg = by(segment)
@@ -321,7 +351,7 @@ def bottom():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.bottom() : Unable to locate the current segment.".format(__name__))
     return interface.range.end(seg)
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def bottom(segment):
     '''Return the bottom address of the segment identified by `segment`.'''
     seg = by(segment)
@@ -337,7 +367,7 @@ def name():
         raise E.SegmentNotFoundError(u"{:s}.name() : Unable to locate the current segment.".format(__name__))
     res = get_segment_name(seg)
     return utils.string.of(res)
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def name(segment):
     '''Return the name of the segment identified by `segment`.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -354,7 +384,7 @@ def color():
         raise E.SegmentNotFoundError(u"{:s}.color() : Unable to locate the current segment.".format(__name__))
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
-@utils.multicase()
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def color(segment):
     '''Return the color of the segment identified by `segment`.'''
     seg = by(segment)
@@ -364,28 +394,19 @@ def color(segment):
 def color(none):
     '''Clear the color of the current segment.'''
     return color(ui.current.segment(), None)
-@utils.multicase(none=types.none)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), none=types.none)
 def color(segment, none):
     '''Clear the color of the segment identified by `segment`.'''
     seg = by(segment)
     seg.color = 0xffffffff
     return bool(seg.update())
-@utils.multicase(rgb=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), rgb=types.integer)
 def color(segment, rgb):
     '''Sets the color of the segment identified by `segment` to `rgb`.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
     seg = by(segment)
     seg.color = (b<<16)|(rgb&0x00ff00)|r
     return bool(seg.update())
-
-@utils.multicase()
-def within():
-    '''Returns true if the current address is within any segment.'''
-    return within(ui.current.address())
-@utils.multicase(ea=types.integer)
-def within(ea):
-    '''Returns true if the address `ea` is within any segment.'''
-    return any(interface.range.within(ea, seg) for seg in __iterate__())
 
 @utils.multicase(ea=types.integer)
 def contains(ea):
@@ -397,10 +418,14 @@ def contains(address, ea):
     seg = by_address(address)
     return contains(seg, ea)
 @utils.multicase(name=types.string, ea=types.integer)
-@utils.string.decorate_arguments('name')
 def contains(name, ea):
     '''Returns true if the address `ea` is contained within the segment with the specified `name`.'''
     seg = by_name(name)
+    return contains(seg, ea)
+@utils.multicase(fullname=types.tuple, ea=types.integer)
+def contains(fullname, ea):
+    '''Returns true if the address `ea` is contained within the segment with the packed `fullname`.'''
+    seg = by_name(*fullname)
     return contains(seg, ea)
 @utils.multicase(segment=idaapi.segment_t, ea=types.integer)
 def contains(segment, ea):
@@ -415,9 +440,10 @@ def type():
 def type(ea):
     '''Return the type of the segment containing the address `ea`.'''
     result = idaapi.segtype(ea)
-    if result == idaapi.SEG_UNDF and not database.within(ea):
-        bounds, results = "{:#x}<>{:#x}".format(*database.config.bounds()), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('SEG_')}
-        logging.warning(u"{:s}.type({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, bounds))
+    left, right = interface.address.bounds()
+    if result == idaapi.SEG_UNDF and not (left <= ea < right):
+        description, results = "{:#x}<>{:#x}".format(left, right), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('SEG_')}
+        logging.warning(u"{:s}.type({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, description))
     return result
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
@@ -425,45 +451,22 @@ def type(name):
     '''Return the type of the segment with the specified `name`.'''
     seg = by_name(name)
     return type(seg)
+@utils.multicase(fullname=types.tuple)
+@utils.string.decorate_arguments('fullname')
+def type(fullname):
+    '''Return the type of the segment with the packed `fullname`.'''
+    seg = by_name(*fullname)
+    return type(seg)
 @utils.multicase(segment=idaapi.segment_t)
 def type(segment):
     '''Return the type of the ``idaapi.segment_t`` specified by `segment`.'''
     return segment.type
-@utils.multicase(segtype=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), segtype=types.integer)
 def type(segment, segtype):
     '''Return whether the given `segment` is of the provided `segtype`.'''
     return type(segment) == segtype
 
 ## functions
-# shamefully ripped from idc.py
-def __load_file(filename, ea, size, offset=0):
-    path = os.path.abspath(filename)
-
-    # use IDA to open up the file contents
-    # XXX: does IDA support unicode file paths?
-    res = idaapi.open_linput(path, False)
-    if not res:
-        raise E.DisassemblerError(u"{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create an `idaapi.loader_input_t` from path \"{:s}\".".format(__name__, filename, ea, size, path))
-
-    # now we can write the file into the specified address as a segment
-    ok = idaapi.file2base(res, offset, ea, ea+size, False)
-    idaapi.close_linput(res)
-    return ok
-
-def __save_file(filename, ea, size, offset=0):
-    path = os.path.abspath(filename)
-
-    # use IDA to open up a file to write to
-    # XXX: does IDA support unicode file paths?
-    of = idaapi.fopenWB(path)
-    if not of:
-        raise E.DisassemblerError(u"{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file \"{:s}\".".format(__name__, filename, ea, size, utils.string.escape(path, '"')))
-
-    # now we can write the segment into the file we opened
-    res = idaapi.base2file(of, offset, ea, ea+size)
-    idaapi.eclose(of)
-    return res
-
 @utils.string.decorate_arguments('filename')
 def load(filename, ea, size=None, offset=0, **kwds):
     """Load the specified `filename` to the address `ea` as a segment.
@@ -474,33 +477,52 @@ def load(filename, ea, size=None, offset=0, **kwds):
     """
     filesize = os.stat(filename).st_size
 
+    # shamefully ripped from idc.py
+    def __load_file(filename, ea, size, offset=0):
+        path = os.path.abspath(filename)
+
+        # use IDA to open up the file contents
+        # XXX: does IDA support unicode file paths?
+        res = idaapi.open_linput(path, False)
+        if not res:
+            raise E.DisassemblerError(u"{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create an `idaapi.loader_input_t` from path \"{:s}\".".format(__name__, filename, ea, size, path))
+
+        # now we can write the file into the specified address as a segment
+        ok = idaapi.file2base(res, offset, ea, ea+size, False)
+        idaapi.close_linput(res)
+        return ok
+
     cb = filesize - offset if size is None else size
     res = __load_file(utils.string.to(filename), ea, cb, offset)
     if not res:
         raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}{:s}) : Unable to load file into {:#x}{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', ea, cb, utils.string.escape(os.path.relpath(filename), '"')))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
 
-def map(ea, size, newea, **kwds):
-    """Map `size` bytes of data from `ea` into a new segment at `newea`.
-
-    The keyword `name` can be used to name the segment.
-    """
+@utils.multicase(ea=types.integer, size=types.integer, new=types.integer)
+def map(ea, size, new):
+    '''Map `size` bytes of data from `ea` into a new segment at the address specified by `new`.'''
+    return map(ea, size, new, "map_{:x}".format(ea))
+@utils.multicase(ea=types.integer, size=types.integer, new=types.integer)
+@utils.string.decorate_arguments('name')
+def map(ea, size, new, name):
+    '''Map `size` bytes of data from `ea` into a new segment at the address specified by `new` with the given `name`.'''
 
     # grab the file offset and the data we want
     fpos, data = idaapi.get_fileregion_offset(ea), database.read(ea, size)
     if len(data) != size:
-        raise E.ReadOrWriteError(u"{:s}.map({:#x}, {:+#x}, {:#x}{:s}) : Unable to read {:#x} bytes from {:#x}.".format(__name__, ea, size, newea, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', size, ea))
+        raise E.ReadOrWriteError(u"{:s}.map({:#x}, {:+#x}, {:#x}{:s}) : Unable to read {:#x} bytes from {:#x}.".format(__name__, ea, size, new, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', size, ea))
 
     # rebase the data to the new address
-    res = idaapi.mem2base(data, newea, fpos)
+    res = idaapi.mem2base(data, new, fpos)
     if not res:
-        raise E.DisassemblerError(u"{:s}.map({:#x}, {:+#x}, {:#x}{:s}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, newea, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', ea, size, newea))
+        raise E.DisassemblerError(u"{:s}.map({:#x}, {:+#x}, {:#x}{:s}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, new, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', ea, size, new))
 
     # now we can create the new segment
-    return new(newea, size, kwds.get("name", "map_{:x}".format(ea)))
-    #return create(newea, size, kwds.get("name", "map_{:s}".format(newea>>4)))
+    return new(new, size, name)
+    #return create(new, size, kwds.get("name", "map_{:s}".format(new>>4)))
 
 # creation/destruction
+@utils.multicase(offset=types.integer, size=types.integer, name=types.string)
 @utils.string.decorate_arguments('name')
 def new(offset, size, name, **kwds):
     """Create a segment at `offset` with `size` and name it according to `name`.
@@ -575,6 +597,7 @@ def new(offset, size, name, **kwds):
     return seg
 create = utils.alias(new)
 
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
 def remove(segment, contents=False):
     """Remove the specified `segment`.
 
@@ -596,15 +619,37 @@ def remove(segment, contents=False):
     return res
 delete = utils.alias(remove)
 
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), filename=types.string)
 @utils.string.decorate_arguments('filename')
-def save(filename, segment, offset=0):
-    """Export the segment identified by `segment` to the file named `filename`.
+def save(segment, filename):
+    '''Export the segment identified by `segment` to the file named `filename`.'''
+    return save(segment, filename, 0)
+@utils.multicase(segment=(types.integer, types.string, types.tuple), filename=types.string, offset=types.integer)
+@utils.string.decorate_arguments('filename')
+def save(segment, filename, offset):
+    '''Export the segment identified by `segment` to the file named `filename` starting at the given `offset`.'''
+    seg = by(segment)
+    return save(seg, filename, offset)
+@utils.multicase(segment=idaapi.segment_t, filename=types.string, offset=types.integer)
+@utils.string.decorate_arguments('filename')
+def save(segment, filename, offset):
+    '''Export the segment identified by `segment` to the file named `filename` starting at the given `offset`.'''
 
-    If the int `offset` is specified, then begin writing into the file at the specified offset.
-    """
-    if isinstance(segment, idaapi.segment_t):
-        return __save_file(utils.string.to(filename), interface.range.start(segment), size(segment), offset)
-    return save(filename, by(segment))
+    # shamefully ripped from idc.py
+    def __save_file(filename, ea, size, offset=0):
+        path = os.path.abspath(filename)
+
+        # use IDA to open up a file to write to
+        # XXX: does IDA support unicode file paths?
+        of = idaapi.fopenWB(path)
+        if not of:
+            raise E.DisassemblerError(u"{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file \"{:s}\".".format(__name__, filename, ea, size, utils.string.escape(path, '"')))
+
+        # now we can write the segment into the file we opened
+        res = idaapi.base2file(of, offset, ea, ea+size)
+        idaapi.eclose(of)
+        return res
+    return __save_file(utils.string.to(filename), interface.range.start(segment), size(segment), offset)
 export = utils.alias(save)
 
 #res = idaapi.add_segment_translation(ea, selector)
