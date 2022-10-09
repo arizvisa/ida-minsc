@@ -130,7 +130,7 @@ class ask(object):
 
         # Grab the bounds that we'll need to compare the address to from
         # the parameters or the database configuration.
-        bounds = next((default[k] for k in ['bounds'] if k in default), _database.config.bounds())
+        bounds = next((default[k] for k in ['bounds'] if k in default), internal.interface.address.bounds())
 
         # If we were asked to verify the address, or we were given some
         # boundaries to check it against..then do that here.
@@ -908,12 +908,14 @@ class window(object):
     def __new__(cls):
         '''Return the currently active window.'''
         # FIXME: should probably traverse the application windows to figure out the
-        #        exact one that is in use so that we can cast it to a QWindow.
+        #        exact one that was in use last since it's likely that the currently
+        #        active window is the Python input control which is not really useful.
         return application.window()
 
     @internal.utils.multicase(xy=internal.types.tuple)
+    @classmethod
     def at(cls, xy):
-        '''Return the widget at the specified (`x`, `y`) coordinate within the `xy` tuple.'''
+        '''Return the widget at the specified `(x, y)` coordinate within the `xy` tuple.'''
         x, y = xy
         return application.window(x, y)
 
