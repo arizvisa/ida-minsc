@@ -22,7 +22,7 @@ import six, builtins
 
 import functools, operator, itertools
 import sys, os, logging, bisect
-import math, codecs, array as _array, fnmatch, re, ctypes
+import math, array as _array, fnmatch, re, ctypes
 
 import function, segment, ui
 import structure as _structure, instruction as _instruction
@@ -6879,7 +6879,7 @@ class set(object):
     @utils.multicase()
     @classmethod
     def string(cls, **strtype):
-        '''Set the data at the current selection or address to a string with the specified `strtype`.'''
+        '''Set the data at the current selection or address to a string with the specified `strtype` and `encoding`.'''
         address, selection = ui.current.address(), ui.current.selection()
         if 'length' in strtype or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.string(address, **strtype)
@@ -6887,98 +6887,158 @@ class set(object):
     @utils.multicase(bounds=internal.types.tuple)
     @classmethod
     def string(cls, bounds, **strtype):
-        '''Set the data within the provided `bounds` to a string with the specified `strtype`.'''
-        widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
-        lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
+        '''Set the data within the provided `bounds` to a string with the specified `strtype` and `encoding`.'''
+        inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+        width, layout, terminals, encoding = interface.string.unpack(inf)
 
-        # Before we do anything, we're going to need to figure out what the string
-        # type so that we can calculate what the actual string length will be.
+        # If we received any explicit string type, then update our defaults.
         if any(item in strtype for item in ['strtype', 'type']):
             res = builtins.next(strtype[item] for item in ['strtype', 'type'] if item in strtype)
-            width_t, length_t = res if isinstance(res, internal.types.ordered) else (res, 0)
+            width, layout = res if isinstance(res, internal.types.ordered) else (res, 0)
 
-        # If we didn't get one, then we need to use the default one from the database.
-        else:
-            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-            width, layout = ((inf >> shift) & mask for shift, mask in [(0, idaapi.STRWIDTH_MASK), (idaapi.STRLYT_SHIFT, idaapi.STRLYT_MASK)])
-            match_width = (item for item, value in widthtype.items() if value == width)
-            match_layout = (item for item, value in lengthtype.items() if value == layout)
-            width_t, length_t = builtins.next(match_width, 1), builtins.next(match_layout, 0)
+        # If we received a character width, then we can also use it.
+        elif 'width' in strtype:
+            width = strtype['width']
 
-        # Now we have the character width and the length prefix size. So to start out, we
-        # take the difference between our bounds and subtract the layout length from it.
-        distance = operator.sub(*reversed(sorted(bounds)))
-        if length_t > distance:
-            logging.warning("{:s}.string({!s}{:s}) : Attempting to apply a string with a prefix length ({:d}) that is larger than the given boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', length_t, bounds))
-        leftover = distance - length_t if distance > length_t else 0
-
-        # Next we can just take our total number of leftover bytes and divide it by the
-        # character width to get the real string length that we'll use. We round it up
-        # to ensure that the bounds the user gave us covers everything they selected.
-        ea, _ = bounds
-        return cls.string(ea, math.trunc(math.ceil(leftover / width_t)), **strtype)
+        # We were given an exact bounds for the string which means that we're
+        # being asked to do exactly what the user wants and we can skip ahead
+        # to the actual function that is responsible for making the string.
+        return cls.string(bounds, width, layout, strtype.get('encoding', encoding))
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def string(cls, ea, **strtype):
-        '''Set the data at address `ea` to a string with the specified `strtype`.'''
-        return cls.string(ea, strtype.pop('length', 0), **strtype)
-    @utils.multicase(ea=internal.types.integer, length=internal.types.integer)
-    @classmethod
-    def string(cls, ea, length, **strtype):
-        """Set the data at address `ea` to a string with the specified `length`.
+        """Set the data at address `ea` to a string with the specified `strtype` and `encoding`.
 
-        If the integer `strtype` is specified, then apply a string of the specified character width.
-        If the tuple `strtype` is specified, the first item is the string's character width and the second item is the size of the length prefix.
+        The integer or tuple `strtype` contains the character width and the length prefix (or desired terminator) for the bytes representing the string.
         """
-        widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
-        lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
+        inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+        width, layout, terminals, encoding = interface.string.unpack(inf)
 
-        # First try grab the type that the user gave us from the parameters. If it wasn't a tuple,
-        # then convert it into one with a null-terminator, as the user might've just given us the
-        # character width.
+        # First check if we received any explicit string type information.
         if any(item in strtype for item in ['strtype', 'type']):
             res = builtins.next(strtype[item] for item in ['strtype', 'type'] if item in strtype)
-            width_t, length_t = res if isinstance(res, internal.types.ordered) else (res, 0)
+            width, layout = res if isinstance(res, internal.types.ordered) else (res, 0)
 
-        # Otherwise, we need to unpack the default one from the database into the width and layout.
-        else:
+        # If we received a character width, then we can use it as-is.
+        elif 'width' in strtype:
+            width = strtype['width']
+
+        # Next check if we were given terminal chars as the layout. If so, then
+        # our layout should be assigned to our terminals with its new value as 0.
+        layout, terminals = (0, terminals) if isinstance(layout, internal.types.bytes) else (layout, terminals)
+
+        # If we were given an explicit string length, then we need to adjust our
+        # boundaries to include the layout size when making the string.
+        if 'length' in strtype:
+            return cls.string((ea, ea + layout + width * strtype['length']), width, layout, strtype.get('encoding', encoding))
+        return cls.string(ea, width, layout if layout > 0 else terminals, strtype.get('encoding', encoding))
+
+    # The following implementations are responsible for figuring out the correct
+    # string length before handing their parameters to the correct function.
+
+    @utils.multicase(ea=internal.types.integer, width=internal.types.integer, length=internal.types.integer, encoding=(internal.types.integer, internal.types.string, internal.types.none))
+    @classmethod
+    def string(cls, ea, width, length, encoding):
+        '''Set data at the address `ea` to a string of the given `encoding` using the provided character `width` and `length` prefix size.'''
+
+        # If we were given a length of 0, then use the default string type
+        # to figure out what our terminal characters should be.
+        if length == 0:
             inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-            width, layout = ((inf >> shift) & mask for shift, mask in [(0, idaapi.STRWIDTH_MASK), (idaapi.STRLYT_SHIFT, idaapi.STRLYT_MASK)])
-            match_width = (item for item, value in widthtype.items() if value == width)
-            match_layout = (item for item, value in lengthtype.items() if value == layout)
-            width_t, length_t = builtins.next(match_width, 1), builtins.next(match_layout, 0)
+            _, _, terminals, _ = interface.string.unpack(inf)
+            return cls.string(ea, width, terminals, encoding)
 
-        # Now we can just validate the width and the length size.
-        if not operator.contains(widthtype, width_t):
-            raise E.InvalidTypeOrValueError("{:s}.string({:#x}, {:d}{:s}) : The requested character width ({:d}) is unsupported.".format('.'.join([__name__, cls.__name__]), ea, length, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', width_t))
-        if not operator.contains(lengthtype, length_t):
-            raise E.InvalidTypeOrValueError("{:s}.string({:#x}, {:d}{:s}) : An invalid size ({:d}) was provided for the string length prefix.".format('.'.join([__name__, cls.__name__]), ea, length, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', length_t))
+        # Now we can read the length prefix and use it to calculate the boundaries
+        # of our string. Since we're setting it, we start at the length prefix.
+        left, right = ea, ea + length + width * get.unsigned(ea, length)
+        return cls.string((left, right), width, length, encoding)
+    @utils.multicase(ea=internal.types.integer, width=internal.types.integer, terminal=internal.types.bytes, encoding=(internal.types.integer, internal.types.string, internal.types.none))
+    @classmethod
+    def string(cls, ea, width, terminal, encoding):
+        '''Set data at the address `ea` to a string terminated by `terminal` using the given `encoding` and character `width`.'''
+        _, _, default, _ = interface.string.unpack(config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype())
 
-        # Convert the width and length into an actual size.
-        size = width_t * length
+        # Tests used to terminate reading if our current address ends up being out
+        # of bounds or is pointing at an uninitialized value that we can't read.
+        _, bottom = segment.bounds(ea)
+        Fwithin_bounds = utils.fcompose(functools.partial(operator.sub, bottom), functools.partial(functools.partial, operator.gt))
+        Finitialized = utils.fcompose(functools.partial(type.flags, mask=idaapi.FF_IVL), operator.truth)
 
-        # Now we can combine them into the string type that IDA actually understands.
-        res = (lengthtype[length_t] << idaapi.STRLYT_SHIFT) & idaapi.STRLYT_MASK
-        res|= widthtype[width_t] & idaapi.STRWIDTH_MASK
+        # Figure out our terminal characters that we'll use for the string length.
+        sentinel = bytearray(itertools.islice(itertools.chain(terminal or b'', default * width), width))
+        Fis_terminator = utils.fcompose(functools.partial(read, size=width), functools.partial(operator.eq, builtins.bytes(sentinel)))
 
-        # If the size is larger than 0, then the user knows what they want and we
-        # need to undefine that number of bytes first. The value of length_t is
-        # added because we need to undefine the length prefix as well.
-        if size > 0 and not type.is_unknown(ea):
-            cb = cls.unknown(ea, length_t + size)
-            if cb != length_t + size:
-                raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the requested string.".format('.'.join([__name__, cls.__name__]), ea, length, u", {:s}".format(utils.string.kwargs(strtype)) if strtype else '', length_t + size))
+        # Now we have everything we need to read bytes from the database until
+        # we encounter our terminator characters. Start at the address we were
+        # given and read "width" bytes until we've stopped or can't proceed.
+        iterable = itertools.count(ea, width)
+        takewhile = utils.fcompose(utils.fmap(Fwithin_bounds(width), Finitialized, utils.fnot(Fis_terminator)), all)
+        right = width + functools.reduce(utils.fpack(operator.itemgetter(1)), itertools.takewhile(takewhile, iterable), ea)
 
-        # Make a string at the specified address of the suggested size with
-        # the desired string type.
-        ok = idaapi.make_ascii_string(ea, size and (size + length_t), res) if idaapi.__version__ < 7.0 else idaapi.create_strlit(ea, size and (size + length_t), res)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to define the specified address as a string of the requested strtype {:#04x}.".format('.'.join([__name__, cls.__name__]), ea, length, u", {:s}".format(utils.string.kwargs(strtype)) if strtype else '', res))
+        # Finally that gives us the actual string size but without the terminator
+        # characters.. so, we need to add the terminal character size and then we
+        # can dispatch to the right function to create the desired string.
+        return cls.string((ea, right + width), width, 0, encoding)
 
-        # In order to determine the correct length, we need to subtract the
-        # length prefix the size, and divide the total by the character width.
-        res = idaapi.get_item_size(ea) - length_t
-        return get.string(ea, length=res // width_t)
+    # Each of the implementations that follow are the only ones that are actually
+    # responsible for marking the string within the database. This implies that
+    # everything prior is just sugar that figures out the parameters to use them.
+
+    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, length=internal.types.integer, encoding=internal.types.string)
+    @classmethod
+    def string(cls, bounds, width, length, encoding):
+        '''Set data at the specified `bounds` to a string of the given `encoding` with the provided character `width` and `length` prefix size.'''
+        bounds = interface.bounds_t(*bounds)
+
+        # If the codec doesn't exist, then try and add it to the database.
+        if interface.string.codec(width, encoding) is None:
+            raise E.UnsupportedCapability(u"{:s}.string({:s}, {:d}, {:d}, {!r}) : The requested string encoding ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, utils.string.escape(encoding, '"')))
+
+        # Grab its index and then recurse with the correct encoding index.
+        index = interface.string.encoding(encoding)
+        if index < 0:
+            raise E.ItemNotFoundError(u"{:s}.string({:s}, {:d}, {:d}, {!r}) : The requested string encoding ({:s}) could not be found in the database.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, utils.string.escape(encoding, '"')))
+        return cls.string(bounds, width, length, index)
+    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, length=internal.types.integer, encoding=(internal.types.integer, internal.types.none))
+    @classmethod
+    def string(cls, bounds, width, length, encoding):
+        '''Set data at the specified `bounds` to a string of the given `encoding` with the provided character `width` and `length` prefix size.'''
+        Fcreate_string = idaapi.make_ascii_string if idaapi.__version__ < 7.0 else idaapi.create_strlit
+
+        # First we need the string size from the boundaries we we were given.
+        ea, _ = sorted(bounds)
+        bounds, size = interface.bounds_t(*bounds), operator.sub(*reversed(sorted(bounds)))
+
+        # Next verify that the parameters we were given are for a valid string type.
+        if not interface.string.check(width, length):
+            raise E.UnsupportedCapability(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : Unable to create a string with an unsupported character width ({:d}) and length prefix ({:d}).".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, width, length))
+        res = interface.string.pack(width, length, b'\0\0', encoding)
+
+        # Before we actually start to undefine anything, we need to make sure that the
+        # length prefix size fits within the suggestdd boundaries so that the user knows.
+        if size < length:
+            raise E.InvalidTypeOrValueError(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : The size of the length prefix ({:d}) is larger than the maximum size ({:d}) of the requested boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, length, size, bounds))
+
+        # Next, check that the number of bytes after the length prefix is divisible
+        # by the string character width and adjust the total size if it isn't.
+        elif (size - length) % width:
+            characters = max(0, size - length)
+            adjustment = characters % -width
+            fmt_characters = "{:d}{:+d}".format(length, characters) if length else "{:d}".format(characters)
+            fmt_new = "{:d}{:+d}".format(length, characters + adjustment) if length else "{:d}".format(characters + adjustment)
+            logging.warning(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : The chosen boundaries ({:s}) have a size ({:s}) that is not divisible by the character width ({:d}) and will be adjusted by {:+d} byte{:s} to result in the size of {:s} byte{:s}.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, bounds, fmt_characters, width, adjustment, '' if abs(adjustment) == 1 else 's', fmt_new, '' if characters + adjustment == 1 else 's'))
+            size = length + characters + adjustment
+
+        # If the data at the starting address is defined, then we need to undefine it.
+        cb = size if type.is_unknown(ea) else cls.unknown(ea, size)
+        if cb != size:
+            raise E.DisassemblerError(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : Unable to undefine {:d} bytes at the requested address ({:#x}) for the string.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, size, ea))
+
+        # Now we can make a string at the undefined address and decode the string
+        # that we just made if we were successful. Otherwise, we bail (of course).
+        if Fcreate_string(ea, size, res):
+            return get.string((ea + length, ea + length + size), width, encoding)
+        raise E.DisassemblerError(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : Unable to define the specified address ({:#x}) as a string of the requested strtype {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, ea, res, 2 + 8))
 
     class integer(object):
         """
@@ -8080,185 +8140,205 @@ class get(object):
 
     @utils.multicase()
     @classmethod
-    def string(cls, **length):
-        '''Return the array at the current selection or address as a string.'''
+    def string(cls, **strtype):
+        '''Return the data at the current selection or address as a string with the specified `strtype` and `encoding`.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if 'length' in length or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
-            return cls.string(address, **length)
-        return cls.string(selection, **length)
+        if 'length' in strtype or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.string(address, **strtype)
+        return cls.string(selection, **strtype)
     @utils.multicase(bounds=internal.types.tuple)
     @classmethod
-    def string(cls, bounds, **length):
-        '''Return the array described by the specified `bounds` as a string.'''
-        widthtype = {idaapi.STRWIDTH_1B: 1, idaapi.STRWIDTH_2B: 2, idaapi.STRWIDTH_4B: 4}
+    def string(cls, bounds, **strtype):
+        '''Return the data within the provided `bounds` as a string with the specified `strtype` and `encoding`.'''
+        ea, _ = sorted(bounds)
+        bounds, distance = interface.bounds_t(*bounds), operator.sub(*reversed(sorted(bounds)))
 
-        # Similar to the get.string function, we're need to figure out the string
-        # type to calculate what the string length means for the given bounds.
-        if any(item in length for item in ['strtype', 'type']):
-            res = builtins.next(length[item] for item in ['strtype', 'type'] if item in length)
-            width_t, length_t = res if isinstance(res, internal.types.ordered) else (res, 0)
+        # For older versions of IDA, we get the strtype from the opinfo
+        if idaapi.__version__ < 7.0:
+            res = address.head(ea)
+            ti, F = idaapi.opinfo_t(), type.flags(res)
+            res = ti.strtype if idaapi.get_opinfo(res, 0, F, ti) else idaapi.BADADDR
 
-        # If we didn't get one, then we actually figure it out by applying the
-        # default string character width from the database. We're explicitly
-        # ignoring the prefix here so the user has to explicitly specify it.
+        # Fetch the string type at the given address using the newer API
         else:
-            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-            width_t, length_t = widthtype.get(inf & idaapi.STRWIDTH_MASK, 1), 0
+            res = idaapi.get_str_type(address.head(ea))
 
-        # Now we have the character width and the size of the length prefix size. So we
-        # take the difference between our bounds and subtract the layout length from it.
-        distance = operator.sub(*reversed(sorted(bounds)))
-        if length_t > distance:
-            logging.warning("{:s}.string({!s}{:s}) : Attempting to apply a string with a prefix length ({:d}) that is larger than the given boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, u", {!s}".format(utils.string.kwargs(length)) if length else '', length_t, bounds))
-        leftover = distance - length_t if distance > length_t else 0
+        # Figure out our defaults using either what we found or what the database says.
+        default = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+        strtypeinfo, is_string = (default, False) if res in {idaapi.BADADDR, 0xffffffff, -1} else (res, True)
+        width, layout, terminals, encoding = interface.string.unpack(strtypeinfo)
 
-        # That was it, we can now just use the leftover bytes to calculate our length,
-        # assigned it into our kwargs, and chain to the real get.string functionality.
-        ea, _ = bounds
-        length.setdefault('length', math.trunc(math.ceil(leftover / width_t)))
-        return cls.string(ea, **length)
+        # We first need to figure out the string type to calculate what the string
+        # length means within the context of the bounds we were given as a parameter.
+        if any(item in strtype for item in ['strtype', 'type']):
+            res = builtins.next(strtype[item] for item in ['strtype', 'type'] if item in strtype)
+            width, layout = res if isinstance(res, internal.types.ordered) else (res, 0)
+
+        # If we were given a character width, then we might as well snag it and use it.
+        elif 'width' in strtype:
+            width = strtype['width']
+
+        # Similar to the other cases that we've implemented, swap the layout with the
+        # terminals if the layout was specified as terminal bytes.
+        layout, terminals = (0, terminals) if isinstance(layout, internal.types.bytes) else (layout, terminals)
+
+        # Now we have the character width and the size of the length prefix. So we take
+        # the distance between our bounds and subtract the layout length from it.
+        if layout > distance:
+            logging.warning(u"{:s}.string({:s}{:s}) : Attempting to apply a string with a prefix length ({:d}) that is larger than the given boundaries ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', layout, bounds))
+        leftover = distance - layout if distance > layout else 0
+
+        # That was it, so we can now use the leftover bytes to calculate our new
+        # bounds, and hand it off with the character width and string encoding.
+        return cls.string((ea + layout, ea + layout + leftover), width, strtype.get('encoding', encoding))
     @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def string(cls, ea, **length):
-        """Return the array at the address specified by `ea` as a string.
+    def string(cls, ea, **strtype):
+        """Return the data at the address specified by `ea` as a string with the specified `strtype` and `encoding`.
 
-        If an integer `length` is provided, then use it explicitly as the string's length when reading.
-        If an integer `strtype` is provided, then use it as the string's character width when reading.
-        If a tuple `strtype` is specified, then the first item is the character width and the second is the size of the length prefix when reading.
+        The integer or tuple `strtype` contains the character width and the length prefix (or desired terminator) for the bytes representing the string.
         """
 
         # For older versions of IDA, we get the strtype from the opinfo
         if idaapi.__version__ < 7.0:
             res = address.head(ea)
             ti, F = idaapi.opinfo_t(), type.flags(res)
-            strtype = ti.strtype if idaapi.get_opinfo(res, 0, F, ti) else idaapi.BADADDR
-
-            # and cast the result from idaapi.get_str_type_code to an integer
-            get_str_type_code = utils.fcompose(idaapi.get_str_type_code, six.byte2int)
+            res = ti.strtype if idaapi.get_opinfo(res, 0, F, ti) else idaapi.BADADDR
 
         # Fetch the string type at the given address using the newer API
         else:
-            strtype = idaapi.get_str_type(address.head(ea))
-            get_str_type_code = idaapi.get_str_type_code
+            res = idaapi.get_str_type(address.head(ea))
 
-        # Define some lookup tables that we'll use to figure out the lengths.
-        widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
-        lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
+        # Figure out our defaults using either what we found or what the database says.
+        default = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+        strtypeinfo, is_string = (default, False) if res in {idaapi.BADADDR, 0xffffffff, -1} else (res, True)
+        width, layout, terminals, encoding = interface.string.unpack(strtypeinfo)
 
-        # If a strtype was provided in the parameters, then convert it into a proper
-        # string typecode so that the logic which follows will still work.
-        if any(item in length for item in ['strtype', 'type']):
+        # If we were given any keywords, then use them to update our strtype so that we
+        # can force decode the string as what the user requests. We ensure we remove them
+        # out of the parameters in case we hand them off to the `get.array` function.
+        if any(kwd in strtype for kwd in ['type', 'strtype']):
+            res = builtins.next((strtype.pop(item) for item in ['strtype', 'type'] if item in strtype))
+            width, layout = res if isinstance(res, internal.types.ordered) else (res, 0)
 
-            # Extract the strtype that the user gave us whilst ensuring that we remove
-            # the items out of the parameters since we later pass them to `get.array`.
-            res = builtins.next((length.pop(item) for item in ['strtype', 'type'] if item in length))
-            width_t, length_t = res if isinstance(res, internal.types.ordered) else (res, 0)
+        # If the user specified a character width, then use it instead of the default.
+        elif 'width' in strtype:
+            width = strtype['width']
 
-            # Now that we've unpacked the string width and length prefix size from the
-            # parameter, we can recombine them into a strtype code.
-            strtype = (lengthtype[length_t] << idaapi.STRLYT_SHIFT) & idaapi.STRLYT_MASK
-            strtype|= widthtype[width_t] & idaapi.STRWIDTH_MASK
+        # Now we just need to check if we were given terminal characters for that layout,
+        # because then those characters should be assigned to terminals with the layout
+        # size being set to the value 0 which allows them to be used.
+        layout, terminals = (0, terminals) if isinstance(layout, internal.types.bytes) else (layout, terminals)
 
-            # Since the user gave us an explicit type, we need to update the keywords
-            # which get passed to `get.array` so that each element is of the correct width.
-            length['type'] = int, width_t
+        # That should be it as we have enough information and should be able to decode it.
+        if 'length' in strtype:
+            return cls.string((ea + layout, ea + layout + width * strtype['length']), width, strtype.get('encoding', encoding))
 
-        # If we weren't given a strtype, then we still need to figure out what the default
-        # is that was set in the database. This way we can actually fall back to something.
-        else:
+        # If we're supposed to trust the layout (length prefix) but it's already marked as
+        # a string, then we ignore it and trust the string size from the database. If the
+        # layout includes a terminator, then we need to subtract the width to crop it.
+        if is_string:
+            leftover = idaapi.get_item_size(ea) - (layout or width)
+            return cls.string((ea + layout, ea + layout + leftover), width, strtype.get('encoding', encoding))
+
+        # Otherwise they explicitly want it as a string and we do it as we're told.
+        return cls.string(ea, width, layout if layout > 0 else terminals, strtype.get('encoding', encoding))
+
+    # The following definitions for "get.string" explicitly trust their parameters
+    # and do not infer any of their strtype information from the database. The only
+    # thing they do is attempt to calculate the string length and adjust the address
+    # so that it points at the correct location of the string (past the length prefix).
+
+    @utils.multicase(ea=internal.types.integer, width=internal.types.integer, length=internal.types.integer, encoding=(internal.types.integer, internal.types.string, internal.types.none))
+    @classmethod
+    def string(cls, ea, width, length, encoding):
+        '''Return the data at the address `ea` as a string with the given character `width`, `length` prefix, and string `encoding`.'''
+
+        # If we were given a length of 0, then use the default string type
+        # to figure out what our terminal characters should be.
+        if length == 0:
             inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-            strwidth_t = inf & idaapi.STRWIDTH_MASK
-            default_width = builtins.next((item for item, value in widthtype.items() if value == strwidth_t), 1)
+            _, _, terminals, _ = interface.string.unpack(inf)
+            return cls.string(ea, width, terminals, encoding)
 
-        # If no string was found, then try to treat it as a plain old array
-        # XXX: idaapi.get_str_type() seems to return 0xffffffff on failure instead of idaapi.BADADDR
-        if strtype in {idaapi.BADADDR, 0xffffffff}:
-            res = cls.array(ea, **length)
+        # Now we can read the length prefix from our address and use it to
+        # calculate the actual boundaries that are occupied by our string.
+        left, right = ea + length, ea + length + width * cls.unsigned(ea, length)
+        return cls.string((left, right), width, encoding)
+    @utils.multicase(ea=internal.types.integer, width=internal.types.integer, terminal=internal.types.bytes, encoding=(internal.types.integer, internal.types.string, internal.types.none))
+    @classmethod
+    def string(cls, ea, width, terminal, encoding):
+        '''Return the data at the address `ea` as a string with the given character `width` and string `encoding` that is terminated by the bytes in `terminal`.'''
+        _, _, default, _ = interface.string.unpack(config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype())
 
-            # Warn the user what we're doing before we start figuring out
-            # the element size of the string.
-            if isinstance(res, _array.array):
-                logging.warning(u"{:s}.string({:#x}{:s}) : Unable to guess the string type for address {:#x}. Reading it as an array of {:d}-byte sized integers and converting it to a string instead.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.itemsize))
+        # Some tests that are used to terminate reading if our current address
+        # ends up being out of bounds or is not pointing to an initialized value.
+        _, bottom = segment.bounds(ea)
+        Fwithin_bounds = utils.fcompose(functools.partial(operator.sub, bottom), functools.partial(functools.partial, operator.gt))
+        Finitialized = utils.fcompose(functools.partial(type.flags, mask=idaapi.FF_IVL), operator.truth)
 
-            # If we were unable to retrieve an _array.array, then it's likely because the address
-            # is defined as a structure or a weird size. To fix it, we will set the type to the
-            # default character width, warn the user that we're ignoring IDA, and try it again.
-            else:
-                logging.warning(u"{:s}.string({:#x}{:s}) : The data at address {:#x} is using a non-integral type and will be treated as an array of {:d}-byte sized characters.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, default_width))
-                length['type'] = int, default_width
-                res = cls.array(ea, **length)
+        # Use the terminal characters we were given or the default terminals from
+        # the database in order to create a test that stops when they're encountered.
+        sentinel = bytearray(itertools.islice(itertools.chain(terminal or b'', default * width), width))
+        Fis_terminator = utils.fcompose(functools.partial(read, size=width), functools.partial(operator.eq, builtins.bytes(sentinel)))
 
-            # This really should be an assertion error or really a "unit-test" for cls.array,
-            # because we _absolutely_ should have gotten an _array.array from cls.array.
-            if not isinstance(res, _array.array):
-                raise E.DisassemblerError(u"{:s}.string({:#x}{:s}) : There was a failure while trying to read the data at address {:#x} as an array of integers ({!s}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.__class__))
+        # Now we have everything we need to read bytes from the database until we
+        # encounter our terminator characters. Start at the address we were given
+        # and read "width" bytes until we've stopped or can't proceed.
+        iterable = itertools.count(ea, width)
+        takewhile = utils.fcompose(utils.fmap(Fwithin_bounds(width), Finitialized, utils.fnot(Fis_terminator)), all)
+        right = width + functools.reduce(utils.fpack(operator.itemgetter(1)), itertools.takewhile(takewhile, iterable), ea)
 
-            # We can't figure out the shift.. So, since that's a dead end we have to assume that
-            # the terminator is a null byte. Since we're already guessing, use the widthtype
-            # that corresponds to our array itemsize whilst falling back to the default.
-            sentinels, sl = '\0', idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT
-            sw = widthtype[res.itemsize if res.itemsize in widthtype else default_width]
+        # That should give us our very last valid address. Since we're returning just
+        # the string, we don't need to add the width to include the terminator.
+        return cls.string((ea, right), width, encoding)
 
-            # FIXME: We should probably figure out the default codec for the character width here.
-            encoding = idaapi.encoding_from_strtype(idaapi.STRENC_DEFAULT)
-            decoder = None
+    # The functions that follow are actually responsible for reading and
+    # decoding the string using the data from the database. The string
+    # length is calculated from their first parameter so that it's up to
+    # the caller to figure out which boundary contains the wanted string.
 
-        # Otherwise we can extract the string's characteristics directly from the strtype code.
-        else:
-            # Get the terminal characters that can terminate the string.
-            sentinels = idaapi.get_str_term1(strtype) + idaapi.get_str_term2(strtype)
+    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, encoding=internal.types.string)
+    @classmethod
+    def string(cls, bounds, width, encoding):
+        '''Return the data at the specified `bounds` as a string with the given character `width` and string `encoding`.'''
+        bounds = interface.bounds_t(*bounds)
 
-            # Extract the fields out of the string type code.
-            res = get_str_type_code(strtype)
-            sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
+        # If the codec doesn't exist, then try and add it to the database.
+        if interface.string.codec(width, encoding) is None:
+            raise E.UnsupportedCapability(u"{:s}.string({:s}, {:d}, {!r}) : The requested string encoding ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), bounds, width, encoding, utils.string.escape(encoding, '"')))
 
-            # Get the string encoding and look it up in our available codecs. If we can't find
-            # it, then that's okay because we'll fall-back to one of the UTF-XX encodings.
-            encoding = idaapi.encoding_from_strtype(strtype)
+        # Grab its index and then recurse with the correct encoding index.
+        index = interface.string.encoding(encoding)
+        if index < 0:
+            raise E.ItemNotFoundError(u"{:s}.string({:s}, {:d}, {!r}) : The requested string encoding ({:s}) could not be found in the database.".format('.'.join([__name__, cls.__name__]), bounds, width, encoding, utils.string.escape(encoding, '"')))
+        return cls.string(bounds, width, index)
+    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, encoding=(internal.types.integer, internal.types.none))
+    @classmethod
+    def string(cls, bounds, width, encoding):
+        '''Return the data at the specified `bounds` as a string with the given character `width` and string `encoding`.'''
+        ea, _ = sorted(bounds)
+        bounds, distance = interface.bounds_t(*bounds), operator.sub(*reversed(sorted(bounds)))
 
-            try:
-                decoder = functools.partial(codecs.lookup(encoding).decode, errors='replace')
-            except LookupError:
-                decoder = None
-            finally:
-                if not decoder:
-                    logging.warning(u"{:s}.string({:#x}{:s}) : Due to the string at {:#x} being encoded with an unknown encoding ({:s}), the encoding will be determined based on the character size ({:d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, encoding, {idaapi.STRWIDTH_1B: 1, idaapi.STRWIDTH_2B: 2, idaapi.STRWIDTH_4B: 4}.get(sw, -1)))
+        # Now we know the width of the array we'll be reading, we need
+        # to check that the boundaries directly fit inside of it.
+        extra = distance % width
+        if extra:
+            logging.warning(u"{:s}.string({:s}, {:d}, {:d}) : Adjusting the given boundaries ({:s}) as the desired character width ({:d}) would result in {:+d} extra byte{:s}.".format('.'.join([__name__, cls.__name__]), bounds, width, encoding, bounds, width, extra, '' if extra == 1 else 's'))
 
-        # Figure out how the STRLYT field shifts and terminates the string.
-        if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
-            shift, fterminate = 0, operator.methodcaller('rstrip', sentinels)
-        elif sl == idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT:
-            shift, fterminate = 1, utils.fidentity
-        elif sl == idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT:
-            shift, fterminate = 2, utils.fidentity
-        elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
-            shift, fterminate = 4, utils.fidentity
-        else:
-            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sl, ea))
+        # Read the bytes that we need to decode and use the character
+        # width to create an array that we'll use to decode our bytes.
+        data = read(ea, distance - extra)
+        res = _array.array(utils.get_array_typecode(width, 1), data)
 
-        # Figure out how the STRWIDTH field affects the string.
-        if sw == idaapi.STRWIDTH_1B:
-            cb, fdecode = 1, utils.fcompose(decoder, operator.itemgetter(0)) if decoder else operator.methodcaller('decode', 'utf-8', 'replace')
-        elif sw == idaapi.STRWIDTH_2B:
-            cb, fdecode = 2, utils.fcompose(decoder, operator.itemgetter(0)) if decoder else operator.methodcaller('decode', 'utf-16', 'replace')
-        elif sw == idaapi.STRWIDTH_4B:
-            cb, fdecode = 4, utils.fcompose(decoder, operator.itemgetter(0)) if decoder else operator.methodcaller('decode', 'utf-32', 'replace')
-        else:
-            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sw, ea))
-
-        # If we don't need to shift our address, then just trust get.array.
-        if not shift:
-            res = cls.array(ea + shift, **length)
-
-        # Otherwise use our length and the string width to figure out the
-        # boundaries of the array and then we can read it.
-        else:
-            left, right = ea + shift, ea + shift + cb * cls.unsigned(ea, shift)
-            res = cls.array((left, right), (int, cb))
-
-        # Convert it to a string and then process it with the callables we determined.
+        # Next thing to do is to figure out which decoder to use, turn our
+        # array into a string, and then decode it with the callable we got.
+        codec = interface.string.codec(width, encoding)
+        Fdecode = utils.fmap(utils.fidentity, len) if codec is None else functools.partial(codec.decode, errors='replace')
         data = res.tostring() if sys.version_info.major < 3 else res.tobytes()
-        return fterminate(fdecode(data))
+        string, count = Fdecode(data)
+        return string
+
     @utils.multicase()
     @classmethod
     def structure(cls):
