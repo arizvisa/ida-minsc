@@ -3453,7 +3453,7 @@ class type(object):
         '''Return if the function `func` has been decompiled.'''
         AFL_HR_DETERMINED = getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000)
         _, ea = interface.addressOfRuntimeOrStatic(func)
-        return interface.node.aflags(ea, AFL_HR_DETERMINED)
+        return True if interface.node.aflags(ea, AFL_HR_DETERMINED) else False
     decompiled = decompiledQ = utils.alias(is_decompiled, 'type')
 
     @utils.multicase()
