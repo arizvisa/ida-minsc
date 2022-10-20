@@ -21,11 +21,11 @@ which point the user can then request it by passing an identifier
 to ``enumeration.by(...)``. The types that can be used to filter are
 as follows:
 
-    `name` - Match according to the enumeration name
+    `name` - Filter the enumerations by a name or a list of names
     `like` - Filter the enumeration names according to a glob
     `regex` - Filter the enumeration names according to a regular-expression
     `index` - Match the enumeration by its index
-    `identifier` or `id` - Match the enumeration by its identifier
+    `identifier` or `id` - Filter the enumerations by an identifier or a list of identifers
     `predicate` - Filter the enumerations by passing their identifier to a callable
 
 """
@@ -411,12 +411,10 @@ __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
 __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
-__matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_enum_name, utils.string.of)
-__matcher__.boolean('bitfield', operator.eq, bitfield)
-__matcher__.attribute('id')
-__matcher__.attribute('identifier')
-__matcher__.predicate('pred')
-__matcher__.predicate('predicate')
+__matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_name, utils.string.of, operator.methodcaller('lower'))
+__matcher__.boolean('bitfield', operator.eq, idaapi.is_bf, operator.truth)
+__matcher__.attribute('identifier'), __matcher__.alias('id', 'identifier')
+__matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
 def __iterate__():
     '''Yield the identifier of each enumeration within the database.'''
@@ -472,6 +470,17 @@ class members(object):
     By default this namespace will yield the names of all of the
     members of an enumeration.
 
+    The different types that one can list members with are the following:
+
+        `name` - Match the members by their name or a list of names
+        `like` - Filter the member names according to a glob
+        `regex` - Filter the member names according to a regular-expression
+        `comment` - Filter the members with a comment or by applying a glob to its comment
+        `repeatable` - Filter the members with a repeatable comment or by applying a glob
+        `value` - Match members that have a specific value or a list of values
+        `mask` - Match members within a specific bitmask
+        `predicate` - Filter the members by passing their id (``idaapi.uval_t``) to a callable
+
     Some examples of using this namespace are::
 
         > eid = enum.by('example_enumeration')
@@ -479,8 +488,8 @@ class members(object):
         > ok = enum.members.remove(eid, mid)
         > mid = enum.members.by_name(eid, 'name')
         > mid = enum.members.by_value(eid, 0x1000)
-        > for mid in enum.members.iterate(eid): ...
-        > enum.members.list(e)
+        > for mid in enum.members.iterate(eid, like='*ERROR*'): ...
+        > enum.members.list(eid, value=range(10))
 
     """
 
@@ -754,7 +763,15 @@ class members(object):
         return cls.by_name(enum, name, *suffix)
 
     # FIXME: Implement a matcher class for enumeration members that can be used with .iterate and .list below.
-    __member_matcher = utils.matcher()
+    __members_matcher = utils.matcher()
+    __members_matcher.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_member_name, utils.string.of, operator.methodcaller('lower'))
+    __members_matcher.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
+    __members_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
+    __members_matcher.combinator('comment', utils.fcondition(utils.finstance(types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcondition(operator.truth)(utils.fconstant(operator.truth), utils.fconstant(operator.not_))), utils.frpartial(idaapi.get_enum_member_cmt, False), utils.string.of, utils.fdefault(''))
+    __members_matcher.combinator('repeatable', utils.fcondition(utils.finstance(types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcondition(operator.truth)(utils.fconstant(operator.truth), utils.fconstant(operator.not_))), utils.frpartial(idaapi.get_enum_member_cmt, True), utils.string.of, utils.fdefault(''))
+    __members_matcher.combinator('value', utils.fcondition(utils.finstance(types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_enum_member_value)
+    __members_matcher.combinator('mask', utils.fcondition(utils.finstance(types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_enum_member_bmask)
+    __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
 
     @classmethod
     def __iterate__(cls, eid):
@@ -807,20 +824,21 @@ class members(object):
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
-    def iterate(cls, enum):
+    def iterate(cls, enum, **type):
         '''Iterate through all ids of each member associated with the enumeration `enum`.'''
         eid = by(enum)
-        for item in cls.__iterate__(eid):
-            yield item
-        return
+        iterable = cls.__iterate__(eid)
+        for key, value in (type or {'predicate': utils.fconstant(True)}).items():
+            iterable = cls.__members_matcher.match(key, value, iterable)
+        for item in iterable: yield item
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
-    def list(cls, enum):
+    def list(cls, enum, **type):
         '''List all the members belonging to the enumeration identified by `enum`.'''
         # FIXME: make this consistent with every other .list using the matcher class
         eid = by(enum)
-        listable = [item for item in cls.iterate(eid)]
+        listable = [item for item in cls.iterate(eid, **type)]
         maxindex = max(len("[{:d}]".format(index)) for index, _ in enumerate(listable)) if listable else 1
         maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), listable) if listable else [1])
         maxname = max(builtins.map(utils.fcompose(member.name, len), listable) if listable else [0])
