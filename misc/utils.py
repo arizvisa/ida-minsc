@@ -840,7 +840,8 @@ class matcher(object):
         return fcompose(*res) if len(res) > 1 else res[0]
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda target: fcompose(attr, functools.partial(functools.partial(operator.eq, target)))
+        Funsortable = finstance(internal.types.string, internal.types.integer, internal.types.float, internal.types.bytes, internal.types.bool, internal.types.none)
+        self.__predicate__[type] = lambda target: fcompose(attr, fcondition(Funsortable)(functools.partial(functools.partial, operator.eq), functools.partial(functools.partial, operator.contains))(target))
     def mapping(self, type, function, *attribute):
         attr = self.__attrib__(*attribute)
         mapper = fcompose(attr, function)
