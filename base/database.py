@@ -497,8 +497,8 @@ class functions(object):
 
     The different types that one can match functions with are the following:
 
-        `address` or `ea` - Match according to the function's address
-        `name` - Match according to the exact name
+        `address` or `ea` - Filter the functions by an address or a list of addresses
+        `name` - Filter the functions by a name or a list of names
         `like` - Filter the function names according to a glob
         `regex` - Filter the function names according to a regular-expression
         `typed` - Filter the functions for any that have type information applied to them
@@ -520,10 +520,11 @@ class functions(object):
 
     """
     __matcher__ = utils.matcher()
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), function.by, function.name)
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), function.by, function.name, operator.methodcaller('lower'))
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
-    __matcher__.boolean('address', function.contains), __matcher__.boolean('ea', function.contains)
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
+    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
     __matcher__.mapping('typed', operator.truth, function.top, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.mapping('decompiled', operator.truth, function.type.is_decompiled)
     __matcher__.mapping('frame', operator.truth, function.type.has_frame)
@@ -945,12 +946,12 @@ class names(object):
 
     The available types that one can filter the symbols with are as follows:
 
-        `address` - Match according to the address of the symbol
-        `name` - Match according to the name of the unmangled symbol
+        `address` or `ea` - Filter the symbols by an address or a list of addresses
+        `name` - Filter the symbols by unmangled name or a list of unmangled names
         `unmangled` - Filter the unmangled symbol names according to a regular-expression
         `like` - Filter the symbol names according to a glob
         `regex` - Filter the symbol names according to a regular-expression
-        `index` - Match the symbol according to its index
+        `index` - Filter the symbol according to an index or a list of indices
         `function` - Filter the symbol names for any that are referring to a function
         `imports` - Filter the symbol names for any that are imports
         `typed` - Filter the symbol names for any that have type information applied to them
@@ -966,8 +967,9 @@ class names(object):
 
     """
     __matcher__ = utils.matcher()
-    __matcher__.mapping('address', idaapi.get_nlist_ea), __matcher__.mapping('ea', idaapi.get_nlist_ea)
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_nlist_name, internal.declaration.demangle)
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_nlist_ea)
+    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_nlist_ea)
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('unmangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
@@ -1819,12 +1821,12 @@ class entries(object):
 
     The different types that one can match entrypoints with are the following:
 
-        `address` or `ea` - Match according to the entrypoint's address
-        `name` - Match according to the exact name
+        `address` or `ea` - Filter the entrypoints by an address or a list of addresses
+        `name` - Filter the entrypoints by a name or a list of names
         `like` - Filter the entrypoint names according to a glob
         `regex` - Filter the entrypoint names according to a regular-expression
-        `index` - Match according to the entrypoint's index
-        `ordinal` - Match according to the entrypoint's ordinal
+        `index` - Filter the entrypoints by an index or a list of indices
+        `ordinal` - Filter the entrypoint by an ordinal or a list of ordinals
         `greater` or `ge` - Filter the entrypoints for any after the specified address (inclusive)
         `gt` - Filter the entrypoints for any after the specified address (exclusive)
         `less` or `le` - Filter the entrypoints for any before the specified address (inclusive)
@@ -1843,15 +1845,15 @@ class entries(object):
     """
 
     __matcher__ = utils.matcher()
-    __matcher__.boolean('address', operator.eq, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('ea', operator.eq, idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('greater', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('ge', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('gt', operator.lt, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('less', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('le', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('lt', operator.gt, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.mapping('function', function.within, idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -1859,8 +1861,8 @@ class entries(object):
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if function.within(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal),
     __matcher__.predicate('pred', idaapi.get_entry_ordinal)
-    __matcher__.boolean('ordinal', operator.eq, idaapi.get_entry_ordinal)
-    __matcher__.boolean('index', operator.eq)
+    __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal)
+    __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
 
     def __new__(cls):
         '''Yield the address of each entry point defined within the database.'''
@@ -2547,14 +2549,13 @@ class imports(object):
 
     The different types that one can match imports with are the following:
 
-        `address` or `ea` - Match according to the import's address
-        `name` - Match according to the import's symbol name
+        `address` or `ea` - Filter the imports by an address or a list of addresses
+        `name` - Filter the imports by a name or a list of names
         `module` - Filter the imports according to the specified module name
-        `fullname` - Match according to the full symbol name (module + symbol)
+        `fullname` - Filter the full name (module + symbol) of each import with a glob
         `like` - Filter the symbol names of all the imports according to a glob
         `regex` - Filter the symbol names of all the imports according to a regular-expression
-        `ordinal` - Match according to the import's hint (ordinal)
-        `index` - Match according index of the import
+        `ordinal` - Filter the imports by the import hint (ordinal) or a list of hints
         `typed` - Filter all of the imports based on whether they have a type applied to them
         `tagged` - Filter the imports for any that use the specified tag(s)
         `predicate` Filter the imports by passing the above (default) tuple to a callable
@@ -2595,18 +2596,18 @@ class imports(object):
     __format__ = __formatl__
 
     __matcher__ = utils.matcher()
-    __matcher__.mapping('address', operator.itemgetter(0)), __matcher__.mapping('ea', operator.itemgetter(0))
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), operator.itemgetter(1), __formats__.__func__)
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
+    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1), __formats__.__func__, operator.methodcaller('lower'))
     __matcher__.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __formatl__.__func__)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __formats__.__func__)
-    __matcher__.combinator('module', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), operator.itemgetter(0))
-    __matcher__.mapping('ordinal', utils.fcompose(operator.itemgetter(1), operator.itemgetter(-1)))
+    __matcher__.combinator('module', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1), operator.itemgetter(0), operator.methodcaller('lower'))
+    __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(1), operator.itemgetter(-1))
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __format__.__func__)
     __matcher__.mapping('typed', operator.truth, operator.itemgetter(0), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), tag, operator.methodcaller('keys'), internal.types.set)
-    __matcher__.predicate('predicate', lambda item: item)
-    __matcher__.predicate('pred', lambda item: item)
-    __matcher__.mapping('index', operator.itemgetter(0))
+    __matcher__.predicate('predicate')
+    __matcher__.predicate('pred')
 
     @classmethod
     def __iterate__(cls):
@@ -5009,8 +5010,8 @@ class types(object):
 
     The available types that one can filter the local types with are as follows:
 
-        `ordinal` - Match according to the ordinal of the local type.
-        `name` - Match according to the name of the local type.
+        `ordinal` - Filter the local types by an ordinal or a list of ordinals
+        `name` - Filter the local types by a name or a list of names
         `like` - Filter the names of the local types according to a glob.
         `definition` - Filter the local types by applying a glob to their definition.
         `regex` - Filter the local types by applying a regular-expression to their definition.
@@ -5061,10 +5062,11 @@ class types(object):
         return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lcls.__module__, lcls.__name__]), "{:d}".format(ordinal) if ordinal else '???', name)
 
     __matcher__ = utils.matcher()
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), operator.itemgetter(1))
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1), operator.methodcaller('lower'))
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1))
     __matcher__.predicate('predicate'), __matcher__.predicate('pred')
-    __matcher__.boolean('ordinal', operator.eq, operator.itemgetter(0)), __matcher__.boolean('index', operator.eq, operator.itemgetter(0))
+    __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
+    __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
     __matcher__.combinator('definition', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref'))
