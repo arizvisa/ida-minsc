@@ -1852,9 +1852,9 @@ class entries(object):
     __matcher__.boolean('less', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('le', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('lt', operator.gt, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.mapping('function', function.within, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, bool) else operator.contains(keys, parameter) if isinstance(parameter, six.string_types) else keys&parameter, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if function.within(ea) else tag(ea), operator.methodcaller('keys'), builtins.set)
@@ -1923,7 +1923,7 @@ class entries(object):
         return None if res == idaapi.BADADDR else res
 
     # Return the name of the entry point at the specified `index`.
-    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of))
+    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of))
     # Return the ordinal of the entry point at the specified `index`.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
