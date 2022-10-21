@@ -19,12 +19,12 @@ list all of the available structures at which point the user can then
 request it by passing an identifer to ``structure.by``. The chosen
 methods of filtering are:
 
-    `name` - Match the structures to a structure name
+    `name` - Filter the structures by a name or a list of names
     `like` - Filter the structure names according to a glob
     `regex` - Filter the structure names according to a regular-expression
-    `index` - Match the structures by its index
-    `identifier` or `id` - Match the structure by its id which is a ``idaapi.uval_t``
-    `size` - Filter the structures for any matching the specified size
+    `index` - Filter the structures by an index or a list of indices
+    `identifier` or `id` - Match the structure by its id which is an ``idaapi.uval_t``
+    `size` - Filter the structures for any matching a size or a list of sizes
     `greater` or `ge` - Match structures that are larger (inclusive) than the specified size
     `gt` - Match structures that are larger (exclusive) than the specified size
     `less` or `le` - Match structures that are smaller (inclusive) than the specified size
@@ -52,10 +52,10 @@ def __instance__(identifier, **options):
 
 __matcher__ = utils.matcher()
 __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
-__matcher__.mapping('index', idaapi.get_struc_idx, 'id')
+__matcher__.attribute('index', 'id', idaapi.get_struc_idx)
 __matcher__.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
-__matcher__.boolean('name', lambda name, item: item.lower() == name.lower(), 'name')
+__matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
 __matcher__.attribute('size', 'size')
 __matcher__.boolean('greater', operator.le, 'size'), __matcher__.boolean('ge', operator.le, 'size')
 __matcher__.boolean('gt', operator.lt, 'size')
@@ -1246,14 +1246,14 @@ class members_t(object):
     list all of the available members that match the keyword that they
     specified. The keywords that are available to filter members are:
 
-        `name` - Match the structure member by a name
+        `name` - Filter the structure members by a name or a list of names
         `offset` - Match the structure member by its offset
         `like` - Filter the structure members according to a glob
         `regex` - Filter the structure members according to a regular-expression
-        `index` - Match the structure member by its index
+        `index` - Filter the structure members by an index or a list of indices
         `fullname` - Filter the structure members by matching its full name according to a glob
         `comment` or `comments` - Filter the structure members by applying a glob to its comment
-        `identifier` or `id` - Match the structure member by its identifier
+        `identifier` or `id` - Filter the structure members by an identifier or a list of identifiers
         `greater` or `ge` - Filter the structure members for any after the specified offset (inclusive)
         `gt` - Filter the structure members for any after the specified offset (exclusive)
         `less` or `le` - Filter the structure members for any before the specified offset (inclusive)
@@ -2046,7 +2046,7 @@ class members_t(object):
     __members_matcher.attribute('index', 'index')
     __members_matcher.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
     __members_matcher.attribute('offset', 'offset')
-    __members_matcher.boolean('name', lambda name, item: item.lower() == name.lower(), 'name')
+    __members_matcher.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
     __members_matcher.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
     __members_matcher.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'fullname')
     __members_matcher.combinator('comment', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, utils.fdefault(''))), 'comment')
