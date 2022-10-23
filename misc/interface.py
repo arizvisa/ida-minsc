@@ -3656,7 +3656,11 @@ class reftype_t(object):
         items = cls.__mapper__.get(xrtype, '')
         iterable = (item for item in items)
         return cls(xrtype, iterable)
-    of = of_type
+
+    @staticmethod
+    def of(xrtype):
+        '''Convert an IDA reference type in `xrtype` to an ``access_t``.'''
+        return access_t(xrtype)
 
     @classmethod
     def of_action(cls, state):
@@ -3682,14 +3686,190 @@ class reftype_t(object):
         resP = str().join(sorted(res))
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a valid cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), resP, resP, cls.__name__))
 
+    @staticmethod
+    def of_action(state):
+        '''Convert a ``reftype_t`` in `state` back into an IDA reference type.'''
+        if '&' in state:
+            xrtype = idaapi.dr_I
+        elif 'w' in state:
+            xrtype = idaapi.dr_W
+        elif 'r' in state:
+            xrtype = idaapi.dr_R
+        return access_t(xrtype, 1)
+
+class access_t(object):
+    """
+    This class represents the type of access for a given reference and
+    aims to simplify discovering the semantics of the access using membership
+    operators. To meet this need, the class uses the more familiar "rwx"
+    syntax that is commonly associated with posix file permissions. There
+    are two additional characters that have been added to this which are
+    the "&" character representing that the access is an indirect reference
+    and "?" which represents an unsupported or unknown access type.
+
+    Object instantiated form this class are mergable with each other in order
+    to allow combining the accesses from two completely different reference
+    types but still retain their original meaning after merge. There are two
+    classes of references which are either code or data and these are kept
+    track of by this class in order to determine how it may be modified.
+
+    When comparing instances of these class, the original reference type
+    is maintained. Thus when comparing its equality with another instance
+    of the same class, it is only the type that is compared. Every other
+    set operation will interact with the flags of the particular class.
+    """
+    __xrflags__ = {8: '&', 4: 'r', 2: 'w', 1: 'x'}
+    __xrflags__[16] = '?'
+
+    # This is the table containing the flags for each of the xrtypes. If
+    # we're asked to merge with another xrtype, we should only have to
+    # set the required bits and do nothing more.
+    __xrtable__ = {
+        idaapi.fl_F : 1,    # single-step
+
+        # call far, call near
+        idaapi.fl_CF : 1, idaapi.fl_CN : 1,
+
+        # jmp far, jmp near
+        idaapi.fl_JF : 1, idaapi.fl_JN : 1,
+
+        # offset, implicit
+        idaapi.dr_O : 8, idaapi.dr_I : 8,
+
+        # read, write
+        idaapi.dr_R : 4, idaapi.dr_W : 2,
+
+        # any unknowns that we know about set the highest bit
+        # so that we can track it through the references.
+        getattr(idaapi, 'fl_U', 0) : 0x10,
+        31 : 0x10
+    }
+    __xftypes__ = {idaapi.fl_F, idaapi.fl_CF, idaapi.fl_CN, idaapi.fl_JF, idaapi.fl_JN}
+
+    def __init__(self, xrtype, iscode=False):
+        '''Create a new ``access_t`` from the flags specified by `xrtype` and the boolean `iscode`.'''
+        XREF_MASK = getattr(idaapi, 'XREF_MASK', 0x1f)
+        self.__xrtype = xrtype
+        self.__xrcode = True if iscode else False
+        self.__xrflag = self.__xrtable__.get(xrtype & XREF_MASK, 0)
+
+    # If we're code, then 'x' (1) will always be set.
+    # If we're not code and neither '&' (8), 'r' (4), or 'w' (2) is set, it's actually '&' (8).
+    @classmethod
+    def __adjust_flags__(cls, xrtype, iscode, flag):
+        ignore_mask, required_set = (14, 8) if not iscode else (0, 1) if xrtype in cls.__xftypes__ else (0, 0)
+        return flag if flag & ignore_mask else flag | required_set
+
+    def __iter__(self):
+        flag = self.__adjust_flags__(self.__xrtype, self.__xrcode, self.__xrflag)
+        bits = {bit for bit in self.__xrflags__ if flag & bit}
+        return (self.__xrflags__[bit] for bit in reversed(sorted(bits)))
+
+    def __get_flags__(self):
+        flag = self.__adjust_flags__(self.__xrtype, self.__xrcode, self.__xrflag)
+        iterable = (bit for bit in self.__xrflags__ if flag & bit)
+        return functools.reduce(operator.or_, iterable)
+
+    def __get_type__(self):
+        return self.__xrtype, self.__xrcode
+
+    def __merge_flags__(self, flags):
+        self.__xrflag |= flags & 0xf
+        return self
+
+    def __format__(self, spec):
+        xr, flag = self.__xrtype, self.__adjust_flags__(self.__xrtype, self.__xrcode, self.__xrflag)
+
+        if spec == 's':
+            bits = {bit for bit in self.__xrflags__ if flag & bit}
+            iterable = (self.__xrflags__[bit] for bit in reversed(sorted(bits)))
+            result = ''.join(iterable)
+
+        elif spec == 'ch':
+            result = idaapi.xrefchar(xr)
+
+        else:
+            cls = self.__class__
+            raise internal.exceptions.InvalidFormatError(u"{:s}.__format__({!r}) : An unsupported format string ({!s}) was used.".format('.'.join([cls.__name__, '__format__']), spec, spec))
+        return result.decode('latin1') if isinstance(result, internal.types.bytes) else result
+
+    def __hash__(self):
+        res = self.__get_flags__()
+        return hash((self.__class__, res))
+
+    def __merge__(self, operation, other):
+        cls, available = self.__class__, {character for bit, character in self.__xrflags__.items() if bit & 0xf}
+        if not isinstance(other, (cls, internal.types.unordered, internal.types.string)):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.__merge__({!s}, {!r}) : Unable to perform {:s} operation with unsupported type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, operation.__name__, other.__class__.__name__))
+        op1, op2 = ({item for item in op} for op in [self, other])
+        flags = [flag for flag in operation(op1, op2)]
+        table = {character : index for index, character in enumerate(reversed(sorted(available)))}
+        bits = (table[character] for character in flags)
+        res = functools.reduce(operator.or_, map(functools.partial(pow, 2), bits), 0)
+        return cls(self.__xrtype, self.__xrcode).__merge_flags__(res)
+
+    def __operator__(self, operation, other):
+        cls = self.__class__
+        if isinstance(other, cls):
+            left, right = map(operator.methodcaller('__get_type__'), [self, other])
+        elif isinstance(other, internal.types.integer):
+            (left, _), right = self.__get_type__(), other
+        elif isinstance(other, internal.types.tuple):
+            left, right = self.__get_type__(), other
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.__operator__({!s}, {!r}) : Unable to perform {:s} operation with unsupported type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, operation.__name__, other.__class__.__name__))
+        return operation(left, right)
+
+    def __and__(self, other):
+        return self.__merge__(operator.and_, other)
+    def __or__(self, other):
+        return self.__merge__(operator.or_, other)
+    def __xor__(self, other):
+        return self.__merge__(operator.xor, other)
+    def __sub__(self, other):
+        return self.__merge__(operator.sub, other)
+
+    # equality comparison is explicitly for checking the type of the access
+    def __cmp__(self, other):
+        return self.__operator__(cmp, other)
+    def __eq__(self, other):
+        return self.__operator__(operator.eq, other)
+    def __ne__(self, other):
+        return self.__operator__(operator.ne, other)
+    def __lt__(self, other):
+        return self.__operator__(operator.lt, other)
+    def __ge__(self, other):
+        return self.__operator__(operator.ge, other)
+    def __gt__(self, other):
+        return self.__operator__(operator.gt, other)
+
+    def __invert__(self):
+        cls, available = self.__class__, {character for bit, character in self.__xrflags__.items() if bit & 0xf}
+        return self.__merge__(operator.xor, available)
+
+    def __getitem__(self, other):
+        operation = operator.eq
+        if isinstance(other, internal.types.integer):
+            (left, _), right = self.__get_type__(), other
+        elif isinstance(other, (internal.types.unordered, internal.types.string)):
+            left, right = {item for item in self}, {item for item in right}
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.__getitem__({!s}, {!r}) : Unable to perform {:s} operation with unsupported type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, operation.__name__, other.__class__.__name__))
+        return operation(let, right)
+
+    def __repr__(self):
+        cls = self.__class__
+        return "{:s}({:s})".format(cls.__name__, self)
+
 class ref_t(integerish):
     """
     This tuple is used to represent references to an address that is marked
-    as data and uses the format `(address, reftype_t)` to describe the reference.
+    as data and uses the format `(address, access_t)` to describe the reference.
     """
-    _fields = ('address', 'reftype')
-    _types = (internal.types.integer, reftype_t)
+    _fields = ('address', 'access')
+    _types = (internal.types.integer, (access_t, reftype_t))
     _operands = (internal.utils.fcurry, internal.utils.fconstant)
+    _formats = "{:#x}".format, "{!s}".format
 
     @property
     def ea(self):
@@ -3721,10 +3901,10 @@ class ref_t(integerish):
 class opref_t(integerish):
     """
     This tuple is used to represent references that include an operand number
-    and has the format `(address, opnum, reftype_t)`.
+    and has the format `(address, opnum, access)`.
     """
-    _fields = ('address', 'opnum', 'reftype')
-    _types = (internal.types.integer, internal.types.integer, reftype_t)
+    _fields = ('address', 'opnum', 'access')
+    _types = (internal.types.integer, internal.types.integer, (access_t, reftype_t))
     _operands = (internal.utils.fcurry, internal.utils.fconstant, internal.utils.fconstant)
     _formats = "{:#x}".format, "{!s}".format, "{!s}".format
 
