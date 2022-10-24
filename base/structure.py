@@ -919,14 +919,25 @@ def has(structure):
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def has(tinfo):
     '''Return whether the database includes a structure for the specified `tinfo`.'''
-    if tinfo.is_struct():
+    if any([tinfo.is_struct(), tinfo.is_union()]):
         return has(tinfo.get_type_name())
+
+    # If there's no details, then just bail because there nowhere to go
+    # if we want to proceed to find a structure type.
+    elif not tinfo.has_details():
+        return False
 
     # If the type information we were given is a pointer, then dereference it
     # and recurse until we get to a structure type of some sort.
     pi = idaapi.ptr_type_data_t()
-    if tinfo.is_ptr() and tinfo.has_details() and tinfo.get_ptr_details(pi):
+    if tinfo.is_ptr() and tinfo.get_ptr_details(pi):
         return has(pi.obj_type)
+
+    # If the type information we were given is an array, then get its element
+    # type and recurse until we get to a structure type of some sort.
+    ai = idaapi.array_type_data_t()
+    if tinfo.is_array() and tinfo.get_array_details(ai):
+        return has(ai.elem_type)
     return False
 
 @utils.multicase(name=types.string)
@@ -947,26 +958,35 @@ def by(sptr, **options):
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def by(tinfo, **options):
     '''Return the structure for the specified `tinfo`.'''
-    if tinfo.is_struct():
+    if any([tinfo.is_struct(), tinfo.is_union()]):
         return by_name(tinfo.get_type_name(), **options)
 
-    # If the type information is not a pointer, then we really don't know what
-    # to do with this and so we raise an exception.
-    elif not tinfo.is_ptr():
-        raise E.InvalidTypeOrValueError(u"{:s}.by(\"{:s}\"{:s}) : Unable to locate structure for the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
-
     # If there are no details, then raise an exception because we need to
-    # dereference the pointer to get the real name.
-    if not tinfo.has_details():
+    # some sort of details in order to figure out the real name.
+    elif not tinfo.has_details():
         raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : The provided type information ({!r}) does not contain any details.".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
 
-    # Now we can grab our pointer and extract the object from it, At this
-    # point we continue by recursing back into ourselves. This way we can
-    # repeatedly dereference a pointer until we get to a structure.
-    pi = idaapi.ptr_type_data_t()
-    if not tinfo.get_ptr_details(pi):
-        raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : Unable to get the pointer target from the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
-    return by(pi.obj_type, **options)
+    # If our type is a pointer, then we need to extract the pointer details
+    # from it so that we can dereference the type and recurse into ourselves.
+    if tinfo.is_ptr():
+        pi = idaapi.ptr_type_data_t()
+        if not tinfo.get_ptr_details(pi):
+            raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : Unable to get the pointer target from the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+        recurse_tinfo = pi.obj_type
+
+    # If our type is an array, then we need to extract the array details so
+    # that we can figure out the element type and recurse into ourselves.
+    elif tinfo.is_array():
+        ai = idaapi.array_type_data_t()
+        if not tinfo.get_array_details(ai):
+            raise E.DisassemblerError(u"{:s}.by(\"{:s}\"{:s}) : Unable to get the array element from the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+        recurse_tinfo = ai.elem_type
+
+    # Any other type is pretty much unknown and so we just bail the search.
+    else:
+        raise E.InvalidTypeOrValueError(u"{:s}.by(\"{:s}\"{:s}) : Unable to determine the structure for the provided type information ({!r}).".format(__name__, utils.string.escape("{!s}".format(tinfo), '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', "{!s}".format(tinfo)))
+    return by(recurse_tinfo, **options)
+
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
