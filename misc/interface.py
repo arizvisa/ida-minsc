@@ -2018,7 +2018,6 @@ class node(object):
     @classmethod
     def get_stroff_path(cls, ea, opnum):
         '''Given an address at `ea` and the operand number, return a tuple of the delta and a list of the encoded structure/field identifiers.'''
-        import instruction
 
         # If there's no get_stroff_path, then call the old implementation that decodes
         # the path from the supval of the related netnode.
@@ -3481,6 +3480,131 @@ class register_t(symbol_t):
             raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the bytes for the associated register name ({:s}).".format(self, rname))
         return rv.bytes()
 
+class instruction(object):
+    """
+    This namespace provides some basic utilities to extract an instruction
+    from the database. Some other utilities are provided to interact with
+    the operands for an instruction as we all counting them.
+    """
+    @classmethod
+    def at(cls, ea):
+        '''Disassemble the address `ea` and return the ``idaapi.insn_t`` that is associated with it.'''
+        ea = int(ea)
+
+        # If we're using backwards-compatiblity mode (which means decode_insn takes
+        # different parameters, then manage the result using idaapi.cmd
+        if hasattr(idaapi, 'cmd'):
+            length = idaapi.decode_insn(ea)
+            if idaapi.__version__ < 7.0:
+                return idaapi.cmd.copy()
+
+            tmp = idaapi.insn_t()
+            tmp.assign(idaapi.cmd)
+            return tmp
+
+        # Otherwise we can just use the API as we see fit
+        res = idaapi.insn_t()
+        length = idaapi.decode_insn(res, ea)
+        return res
+
+    @classmethod
+    def mnemonic(cls, ea):
+        '''Return the mnemonic of the instruction that is at the address `ea`.'''
+        res = (idaapi.ua_mnem(int(ea)) or '').lower()
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def feature(cls, ea):
+        '''Return the feature bitmask for the instruction at the address `ea`.'''
+        insn = cls.at(ea)
+        res = insn.get_canon_feature()
+        return idaapi.as_uint32(res)
+
+    @classmethod
+    def count(cls, ea):
+        '''Returns the number of available operands for the instruction at the address `ea`.'''
+        insn = cls.at(ea)
+        operands = insn.Operands if hasattr(idaapi, 'cmd') else [insn.ops[index] for index in builtins.range(idaapi.UA_MAXOP)]
+        iterable = itertools.takewhile(internal.utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), operands)
+        return sum(1 for operand in iterable)
+
+    uses_bits = [getattr(idaapi, "CF_USE{:d}".format(1 + idx), 1 << (7 + idx)) for idx in builtins.range(idaapi.UA_MAXOP)]
+    @classmethod
+    def uses_operand(cls, ea, opnum):
+        '''Return whether the instruction at address `ea` uses the operand `opnum` without changing it.'''
+        feature = cls.feature(ea)
+        return True if feature & cls.uses_bits[opnum] else False
+
+    @classmethod
+    def uses(cls, ea):
+        '''Return the index of each operand that is used by the instruction at the address `ea` but not changed.'''
+        feature = cls.feature(ea)
+        return [index for index, cf in enumerate(cls.uses_bits) if feature & cf]
+
+    changes_bits = [getattr(idaapi, "CF_CHG{:d}".format(1 + idx), 1 << (7 + idx)) for idx in builtins.range(idaapi.UA_MAXOP)]
+    @classmethod
+    def changes_operand(cls, ea, opnum):
+        '''Return whether the instruction at address `ea` changes the operand `opnum`.'''
+        feature = cls.feature(ea)
+        return feature & cls.changes_bits[opnum]
+
+    @classmethod
+    def changes(cls, ea):
+        '''Return the index of each operand that is changed by the instruction at the address `ea`.'''
+        feature = cls.feature(ea)
+        return [index for index, cf in enumerate(cls.changes_bits) if feature & cf]
+
+    @classmethod
+    def operands(cls, ea):
+        '''Returns all of the ``idaapi.op_t`` instances for the instruction at the address `ea`.'''
+        insn = cls.at(ea)
+
+        # if we're in compatibility mode, then old-fashioned IDA requires us to copy
+        # our operands into our new types.
+        if hasattr(idaapi, 'cmd'):
+
+            # take operands until we encounter an idaapi.o_void
+            iterable = itertools.takewhile(internal.utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), insn.Operands)
+
+            # if we're using IDA < 7.0, then make copies of each instruction and return it
+            if idaapi.__version__ < 7.0:
+                return [op.copy() for op in iterable]
+
+            # otherwise, we need to make an instance of it and then assign to make a copy
+            iterable = ((idaapi.op_t(), op) for op in iterable)
+            return [[n.assign(op), n][1] for n, op in iterable]
+
+        # apparently idaapi is not increasing a reference count for our operands, so we
+        # need to make a copy of them quickly before we access them.
+        operands = [idaapi.op_t() for index in builtins.range(idaapi.UA_MAXOP)]
+        [ op.assign(insn.ops[index]) for index, op in enumerate(operands)]
+
+        # now we can just fetch them until idaapi.o_void and return it as a list.
+        iterable = itertools.takewhile(internal.utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), operands)
+        return [op for op in iterable]
+
+    @classmethod
+    def operand(cls, ea, opnum):
+        '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
+        insn = cls.at(ea)
+
+        # If we're using backwards-compatiblity mode then we need to assign the
+        # operand into our op_t.
+        if hasattr(idaapi, 'cmd'):
+            # IDA < 7.0 means we can just call .copy() to duplicate it
+            if idaapi.__version__ < 7.0:
+                return insn.Operands[opnum].copy()
+
+            # Otherwise we'll need to instantiate it, and then .assign() into it
+            res = idaapi.op_t()
+            res.assign(insn.Operands[opnum])
+            return res
+
+        # Otherwise we need to make a copy of it because IDA will crash if we don't
+        res = idaapi.op_t()
+        res.assign(insn.ops[opnum])
+        return res
+
 class regmatch(object):
     """
     This namespace is used to assist with doing register matching
@@ -3502,17 +3626,17 @@ class regmatch(object):
     @classmethod
     def use(cls, regs):
         '''Return a closure that checks if an address and opnum uses the specified `regs`.'''
-        _instruction = sys.modules.get('instruction', __import__('instruction'))
+        import instruction, architecture
 
         # convert any regs that are strings into their correct object type
-        regs = { _instruction.architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in regs }
+        regs = { architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in regs }
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
         match = lambda r, regs=regs: any(map(r.relatedQ, regs))
 
         # returns true if the operand at the specified address is related to one of the registers in `regs`.
         def uses_register(ea, opnum):
-            val = _instruction.op(ea, opnum)
+            val = instruction.op(ea, opnum)
             if isinstance(val, symbol_t):
                 return any(map(match, val.symbols))
             return False
@@ -3522,18 +3646,18 @@ class regmatch(object):
     @classmethod
     def modifier(cls, **modifiers):
         '''Return a closure iterates through all the operands in an address that use the specified `modifiers`.'''
-        _instruction = sys.modules.get('instruction', __import__('instruction'))
+        import instruction
 
         # by default, grab all operand indexes
-        iterops = internal.utils.fcompose(_instruction.ops_count, builtins.range, sorted)
+        iterops = internal.utils.fcompose(instruction.ops_count, builtins.range, sorted)
 
         # if `read` is specified, then only grab operand indexes that are read from
         if modifiers.get('read', False):
-            iterops = _instruction.opsi_read
+            iterops = instruction.opsi_read
 
         # if `write` is specified that only grab operand indexes that are written to
         if modifiers.get('write', False):
-            iterops = _instruction.opsi_write
+            iterops = instruction.opsi_write
         return iterops
 
 ## figure out the boundaries of sval_t
@@ -3965,7 +4089,7 @@ class switch_t(object):
     @property
     def branch(self):
         '''Return the contents of the branch table.'''
-        import database, instruction
+        import database
 
         # if we're an indirect switch, then we can grab our length from
         # the jcases property.
@@ -4009,9 +4133,9 @@ class switch_t(object):
     @property
     def register(self):
         '''Return the register that the switch is based on.'''
-        import instruction
+        import architecture
         ri, rt = (self.object.regnum, self.object.regdtyp) if idaapi.__version__ < 7.0 else (self.object.regnum, self.object.regdtype)
-        return instruction.architecture.by_indextype(ri, rt)
+        return architecture.by_indextype(ri, rt)
     @property
     def base(self):
         '''Return the base value (lowest index of cases) of the switch.'''
