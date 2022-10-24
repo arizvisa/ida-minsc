@@ -1493,6 +1493,59 @@ class address(object):
         return res
 
     @classmethod
+    def size(cls, ea):
+        '''Return the size of the item at the address `ea`.'''
+        return idaapi.get_item_size(ea)
+
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def element(cls, ea):
+        '''Return the size of the type belonging to the item at the address `ea`.'''
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        return get_data_elsize(ea, cls.flags(ea))
+    @internal.utils.multicase(ea=internal.types.integer, flags=internal.types.integer)
+    @classmethod
+    def element(cls, ea, flags):
+        '''Return the size of the type belonging to the item at the address `ea` with the given `flags`.'''
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        return get_data_elsize(ea, flags)
+    @internal.utils.multicase(flags=internal.types.integer, info=(idaapi.opinfo_t, internal.types.none))
+    @classmethod
+    def element(cls, flags, info):
+        '''Return the size of the type with the given `flags` and operand information in `info`.'''
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        return get_data_elsize(idaapi.BADADDR, flags) if info is None else get_data_elsize(idaapi.BADADDR, flags, info)
+
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def flags(cls, ea):
+        '''Return the flags of the item at the address `ea`.'''
+        getflagsex = idaapi.get_flags_ex if hasattr(idaapi, 'get_flags_ex') else (lambda ea, _: idaapi.get_full_flags(ea)) if hasattr(idaapi, 'get_full_flags') else (lambda ea, _: idaapi.getFlags(ea))
+        return idaapi.as_uint32(getflagsex(ea, getattr(idaapi, 'GFE_VALUE', 0)))
+    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer)
+    @classmethod
+    def flags(cls, ea, mask):
+        '''Return the flags at the address `ea` masked with `mask`.'''
+        getflagsex = idaapi.get_flags_ex if hasattr(idaapi, 'get_flags_ex') else (lambda ea, _: idaapi.get_full_flags(ea)) if hasattr(idaapi, 'get_full_flags') else (lambda ea, _: idaapi.getFlags(ea))
+        return getflagsex(ea, getattr(idaapi, 'GFE_VALUE', 0)) & idaapi.as_uint32(mask)
+    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer, value=internal.types.integer)
+    @classmethod
+    def flags(cls, ea, mask, value):
+        '''Sets the flags at the address `ea` masked with `mask` to the specified `value`.'''
+        getflagsex = idaapi.get_flags_ex if hasattr(idaapi, 'get_flags_ex') else (lambda ea, _: idaapi.get_full_flags(ea)) if hasattr(idaapi, 'get_full_flags') else (lambda ea, _: idaapi.getFlags(ea))
+        if hasattr(idaapi, 'setFlags'):
+            res = getflagsex(ea, getattr(idaapi, 'GFE_VALUE', 0))
+            idaapi.setFlags(ea, (res & ~mask) | value)
+            return res & mask
+        raise internal.exceptions.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA has deprecated the ability to modify the flags for an address.".format('.'.join([__name__, cls.__name__]), ea, mask, value))
+
+    @classmethod
+    def references(cls, ea):
+        '''Return each address within the item at address `ea` that has a reference to it.'''
+        getflagsex = idaapi.get_flags_ex if hasattr(idaapi, 'get_flags_ex') else (lambda ea, _: idaapi.get_full_flags(ea)) if hasattr(idaapi, 'get_full_flags') else (lambda ea, _: idaapi.getFlags(ea))
+        return [ea for ea in builtins.range(ea, ea + idaapi.get_item_size(ea)) if getflagsex(ea, 0) & idaapi.FF_REF]
+
+    @classmethod
     def bounds(cls):
         '''Return the smallest and largest address within the database as a tuple.'''
         if idaapi.__version__ < 7.2:
