@@ -507,6 +507,7 @@ class functions(object):
         `problems` - Filter the functions for any that contain problems with their stack
         `library` - Filter the functions that any which were detected as a library function
         `wrapper` - Filter the functions that are flagged as wrappers (thunks)
+        `lumina` - Filter the functions that were detected by Lumina
         `exceptions` Filter the functions for any that either handles an exception or sets up a handler
         `tagged` - Filter the functions for any that use the specified tag(s)
         `predicate` - Filter the functions by passing their ``idaapi.func_t`` to a callable
@@ -530,6 +531,7 @@ class functions(object):
     __matcher__.mapping('frame', operator.truth, function.type.has_frame)
     __matcher__.mapping('library', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_LIB))
     __matcher__.mapping('wrapper', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
+    __matcher__.mapping('lumina', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, function.tag, operator.methodcaller('keys'), internal.types.set)
     __matcher__.predicate('predicate', function.by)
     __matcher__.predicate('pred', function.by)
