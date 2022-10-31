@@ -2840,7 +2840,9 @@ class member_t(object):
     @typeinfo.setter
     def typeinfo(self, info):
         '''Set the type information of the current member to `info`.'''
+        get_member_tinfo = idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
         set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
+        tinfo_equals_to = idaapi.equal_types if idaapi.__version__ < 6.8 else lambda til, t1, t2: t1.equals_to(t2)
 
         # Type safety is fucking valuable, and anything that doesn't match gives you an exception.
         if not isinstance(info, (idaapi.tinfo_t, types.none, types.string)):
@@ -2869,9 +2871,20 @@ class member_t(object):
         elif isinstance(info, idaapi.tinfo_t):
             ti, info_description = info, "{!s}".format(info)
 
-        # Now we can pass our tinfo_t along with the member information to IDA.
+        # We want to detect type changes, so we need to get the previous type information of
+        # the member so that we can distinguish between an actual SMT_KEEP error or an error
+        # that occurred because the previous member type is the same as the new requested type.
+        prevti = idaapi.tinfo_t()
+        if not get_member_tinfo(prevti, self.ptr):
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).typeinfo({!s}) : Unable to get the previous type information for the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info_description), utils.string.repr(self.name)))
+
+        # Now we can pass our tinfo_t along with the member information to the api.
         res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, idaapi.SET_MEMTI_COMPATIBLE)
-        if res == idaapi.SMT_OK:
+
+        # If we got an SMT_OK or we received SMT_KEEP with the previous member type and new
+        # member type being the same, then this request was successful and we can return.
+        if res == idaapi.SMT_OK or res == idaapi.SMT_KEEP and tinfo_equals_to(idaapi.get_idati(), ti, prevti):
             return
 
         # We failed, so just raise an exception for the user to handle.
