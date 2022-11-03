@@ -16,7 +16,7 @@ import sys, codecs, heapq, collections, array, math
 import internal
 import idaapi, ida, ctypes
 
-__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
+__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget', 'nth', 'islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
 
 ### functional programming combinators (FIXME: probably better to document these with examples)
 
@@ -50,8 +50,6 @@ fconstant = fconst = falways = lambda object: lambda *a, **k: object
 fidentity = lambda object: object
 # a closure that returns a default value if its object is false-y
 fdefault = lambda default: lambda object: object or default
-# return the first, second, or third item of a box.
-first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right.
 fcompose = lambda *Fa: functools.reduce(lambda F1, F2: lambda *a: F1(F2(*a)), builtins.reversed(Fa))
 # return a closure that executes function `F` whilst discarding any arguments passed to it.
@@ -93,9 +91,12 @@ ilist, liter = fcompose(builtins.iter, builtins.list), fcompose(builtins.list, b
 # converts a tuple to an iterator, or an iterator to a tuple
 ituple, titer = fcompose(builtins.iter, builtins.tuple), fcompose(builtins.tuple, builtins.iter)
 # take `count` number of elements from an iterator
-itake = lambda count: fcompose(builtins.iter, fmap(*[builtins.next] * count), builtins.tuple)
-# get the `nth` element from an iterator
-iget = lambda count: fcompose(builtins.iter, fmap(*[builtins.next] * count), builtins.tuple, operator.itemgetter(-1))
+itake = lambda count: fcompose(builtins.iter, frpartial(itertools.islice, count), builtins.tuple)
+# get the `nth` element from a thing.
+iget = lambda count: fcompose(builtins.iter, frpartial(itertools.islice, count), builtins.tuple, operator.itemgetter(-1))
+nth = lambda count: fcompose(builtins.iter, frpartial(itertools.islice, 1 + count), builtins.tuple, operator.itemgetter(-1))
+# return the first, second, or third item of a thing.
+first, second, third, last = nth(0), nth(1), nth(2), operator.itemgetter(-1)
 # copy from itertools
 islice, imap, ifilter, ichain, izip = itertools.islice, fcompose(builtins.map, builtins.iter), fcompose(builtins.filter, builtins.iter), itertools.chain, fcompose(builtins.zip, builtins.iter)
 # restoration of the Py2-compatible list types
