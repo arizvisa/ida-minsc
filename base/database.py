@@ -1509,10 +1509,10 @@ def name(ea, **flags):
 
     # return the name at the specified address or not
     return utils.string.of(aname) or None
-@utils.multicase(packed=internal.types.tuple)
-def name(packed, **flags):
-    '''Renames the current address to the given `packed` name.'''
-    return name(ui.current.address(), *packed, **flags)
+@utils.multicase(fullname=internal.types.tuple)
+def name(fullname, **flags):
+    '''Renames the current address to the packed `fullname`.'''
+    return name(ui.current.address(), *fullname, **flags)
 @utils.multicase(string=internal.types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
@@ -1522,10 +1522,10 @@ def name(string, *suffix, **flags):
 def name(none, **flags):
     '''Removes the name at the current address.'''
     return name(ui.current.address(), none or '', **flags)
-@utils.multicase(packed=internal.types.tuple)
-def name(ea, packed, **flags):
-    '''Renames the address specifed by `ea` to the given `packed` name.'''
-    return name(ea, *packed, **flags)
+@utils.multicase(ea=internal.types.integer, fullname=internal.types.tuple)
+def name(ea, fullname, **flags):
+    '''Renames the address specifed by `ea` to the given packed `fullname`.'''
+    return name(ea, *fullname, **flags)
 @utils.multicase(ea=internal.types.integer, string=internal.types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(ea, string, *suffix, **flags):
@@ -2810,7 +2810,7 @@ class imports(object):
     def fullname(cls):
         '''Return the full name of the import at the current address.'''
         return cls.fullname(ui.current.address())
-    @utils.multicase()
+    @utils.multicase(ea=internal.types.integer)
     @classmethod
     def fullname(cls, ea):
         '''Return the full name of the import at address `ea`.'''
@@ -2821,7 +2821,7 @@ class imports(object):
     def name(cls):
         '''Return the name of the import at the current address.'''
         return cls.name(ui.current.address())
-    @utils.multicase()
+    @utils.multicase(ea=internal.types.integer)
     @classmethod
     def name(cls, ea):
         '''Return the name of the import at address `ea`.'''
@@ -2832,7 +2832,7 @@ class imports(object):
     def ordinal(cls):
         '''Return the ordinal of the import at the current address.'''
         return cls.ordinal(ui.current.address())
-    @utils.multicase()
+    @utils.multicase(ea=internal.types.integer)
     @classmethod
     def ordinal(cls, ea):
         '''Return the ordinal of the import at the address `ea`.'''
@@ -4365,7 +4365,7 @@ class type(object):
         if builtins.next((guessed[kwd] for kwd in ['guess', 'guessed'] if kwd in guessed), False):
             interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
         return result
-    @utils.multicase(none=internal.types.none)
+    @utils.multicase(ea=internal.types.integer, none=internal.types.none)
     def __new__(cls, ea, none):
         '''Remove the type information from the address `ea`.'''
         del_tinfo = idaapi.del_tinfo2 if idaapi.__version__ < 7.0 else idaapi.del_tinfo
