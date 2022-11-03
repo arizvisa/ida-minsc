@@ -1886,6 +1886,44 @@ class entries(object):
             listable = [item for item in cls.__matcher__.match(key, value, listable)]
         for item in listable: yield item
 
+    @utils.multicase()
+    @classmethod
+    def at(cls):
+        '''Return the address of the entry point at the current address.'''
+        return cls.at(ui.current.address())
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def at(cls, ea):
+        '''Return the address of the entry point at the address specified by `ea`.'''
+        if not function.has(ea):
+            address = interface.address.inside(ea)
+
+        # If we're within a function then adjust our address to its entrypoint.
+        else:
+            fn = idaapi.get_func(ea)
+            address, _ = interface.range.bounds(fn)
+
+        # Now we should be able to get its index and use it to return the address.
+        res = cls.__index__(address)
+        if res is None:
+            raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : No entry point was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, address))
+        return cls.__address__(res)
+
+    @utils.multicase(ordinal=internal.types.integer)
+    @classmethod
+    def by(cls, ordinal):
+        '''Return the address of the entry point at the given `ordinal`.'''
+        ea = idaapi.get_entry(ordinal)
+        if ea == idaapi.BADADDR:
+            raise E.ItemNotFoundError(u"{:s}.by_ordinal({:d}) : No entry point was found with the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        return ea
+    @utils.multicase()
+    @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
+    def by(cls, **type):
+        '''Return the address of the first entry point that matches the keyword specified by `type`.'''
+        return cls.search(**type)
+
     @utils.multicase(string=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('string')
@@ -1907,7 +1945,7 @@ class entries(object):
         f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
 
         # Iterate through each entry point, and yield a tuple containing its address and index.
-        Ftransform = utils.fcompose(utils.fmap(f, lambda item: item), tuple)
+        Ftransform = utils.fcompose(utils.fmap(f, utils.fidentity), tuple)
         iterable = (Ftransform(item) for item in builtins.range(idaapi.get_entry_qty()))
 
         # Iterate through each (address, index) looking for the matching address.
@@ -1926,7 +1964,7 @@ class entries(object):
         return None if res == idaapi.BADADDR else res
 
     # Return the name of the entry point at the specified `index`.
-    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.within)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of))
+    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of))
     # Return the ordinal of the entry point at the specified `index`.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
@@ -1939,10 +1977,19 @@ class entries(object):
     @classmethod
     def ordinal(cls, ea):
         '''Return the ordinal of the entry point at the address `ea`.'''
-        res = cls.__index__(ea)
-        if res is not None:
-            return cls.__entryordinal__(res)
-        raise E.MissingTypeOrAttribute(u"{:s}.ordinal({:#x}) : No entry point at specified address.".format('.'.join([__name__, cls.__name__]), ea))
+        if not function.has(ea):
+            address = interface.address.inside(ea)
+
+        # If we're within a function then adjust our address to its entrypoint.
+        else:
+            fn = idaapi.get_func(ea)
+            address, _ = interface.range.bounds(fn)
+
+        # Now we can use our determined address to get the index and then its ordinal.
+        res = cls.__index__(address)
+        if res is None:
+            raise E.MissingTypeOrAttribute(u"{:s}.ordinal({:#x}) : No entry point was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, address))
+        return cls.__entryordinal__(res)
 
     @utils.multicase()
     @classmethod
@@ -1953,10 +2000,19 @@ class entries(object):
     @classmethod
     def name(cls, ea):
         '''Return the name of the entry point at the address `ea`.'''
-        res = cls.__index__(ea)
-        if res is not None:
-            return cls.__entryname__(res)
-        raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}) : No entry point at specified address.".format('.'.join([__name__, cls.__name__]), ea))
+        if not function.has(ea):
+            address = interface.address.inside(ea)
+
+        # If we're within a function then adjust our address to its entrypoint.
+        else:
+            fn = idaapi.get_func(ea)
+            address, _ = interface.range.bounds(fn)
+
+        # Now we can use the address to determine the index and then return its name.
+        res = cls.__index__(address)
+        if res is None:
+            raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}) : No entry point was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, address))
+        return cls.__entryname__(res)
 
     @utils.multicase(string=internal.types.string)
     @classmethod
@@ -2662,7 +2718,7 @@ class imports(object):
             return item
         except StopIteration:
             pass
-        raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : Unable to determine import at specified address.".format('.'.join([__name__, cls.__name__]), ea))
+        raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : No import was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
 
     @utils.multicase()
     @classmethod
@@ -2678,7 +2734,7 @@ class imports(object):
             if addr == ea:
                 return module
             continue
-        raise E.MissingTypeOrAttribute(u"{:s}.module({:#x}) : Unable to determine import module name at specified address.".format('.'.join([__name__, cls.__name__]), ea))
+        raise E.MissingTypeOrAttribute(u"{:s}.module({:#x}) : No import was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
 
     # specific parts of the import
     @utils.multicase()
