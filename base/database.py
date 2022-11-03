@@ -36,15 +36,22 @@ def here():
 h = utils.alias(here)
 
 @utils.multicase()
-def within():
-    '''Should always return true.'''
-    return within(ui.current.address())
+def has():
+    '''Return true if the current address is within the bounds of the database.'''
+    return has(ui.current.address())
 @utils.multicase(ea=internal.types.integer)
-def within(ea):
+def has(ea):
     '''Return true if address `ea` is within the bounds of the database.'''
     left, right = config.bounds()
     return left <= ea < right
-contains = utils.alias(within)
+@utils.multicase(name=internal.types.string)
+def has(name, *suffix):
+    '''Return true if a symbol with the specified `name` is defined within the database.'''
+    res = (name,) + suffix
+    string = interface.tuplename(*res)
+    ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+    return ea != idaapi.BADADDR
+contains = within = utils.alias(has)
 
 def top():
     '''Return the very lowest address within the database.'''
@@ -333,6 +340,8 @@ class config(object):
         '''Return the name of the processor used by the database.'''
         if idaapi.__version__ < 7.0:
             raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        elif hasattr(cls.info, 'procname'):
+            result = cls.info.procname
         elif hasattr(cls.info, 'procName'):
             result = cls.info.procName
         else:
@@ -1445,18 +1454,31 @@ class search(object):
 
 byname = by_name = utils.alias(search.by_name, 'search')
 
+@utils.multicase(ea=internal.types.integer)
 def go(ea):
     '''Jump to the specified address at `ea`.'''
-    if isinstance(ea, internal.types.string):
-        ea = search.by_name(None, ea)
-    idaapi.jumpto(interface.address.inside(ea))
-    return ea
+    res = ui.current.address()
+    if not idaapi.jumpto(interface.address.inside(ea)):
+        raise E.DisassemblerError(u"{:s}.go({:#x}) : Unable to jump from the current address ({:#x}) to the specified address ({:#x}).".format(__name__, ea, res, ea))
+    return res
+@utils.multicase(name=internal.types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def go(name, *suffix):
+    '''Jump to the address of the symbol with the specified `name`.'''
+    res = (name,) + suffix
+    string = interface.tuplename(*res)
+    ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+    if ea == idaapi.BADADDR:
+        raise E.AddressNotFoundError(u"{:s}.go({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format(__name__, ea, res if suffix else string, utils.string.escape(string, '"')))
+    return go(ea)
 jump = jump_to = jumpto = utils.alias(go)
 
 def go_offset(offset):
     '''Jump to the specified `offset` within the database.'''
-    res, ea = address.offset(ui.current.address()), address.by_offset(offset)
-    idaapi.jumpto(interface.address.inside(ea))
+    current, target = ui.current.address(), address.by_offset(offset)
+    res = address.offset(current)
+    if not idaapi.jumpto(interface.address.inside(target)):
+        raise E.DisassemblerError(u"{:s}.go_offset({:#x}) : Unable to jump from the current offset ({:+#x}) at {:#x} to the specified offset ({:+#x}) at {:#x}.".format(__name__, offset, res, current, offset, target))
     return res
 goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
 
