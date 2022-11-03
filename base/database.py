@@ -1909,6 +1909,35 @@ class entries(object):
             raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : No entry point was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, address))
         return cls.__address__(res)
 
+    @utils.multicase()
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def has(cls, **type):
+        '''Return whether the current address is referencing an entry point.'''
+        if 'ordinal' in type:
+            ea = idaapi.get_entry(type['ordinal'])
+            return ea != idaapi.BADADDR
+        elif 'index' in type:
+            return cls.__entryordinal__(type['index']) > 0
+        elif type:
+            raise E.InvalidParameterError(u"{:s}.has({:s}) : The given keyword parameter{:s} not supported.".format('.'.join([__name__, cls.__name__]), utils.string.kwargs(type), ' is' if len(type) == 1 else 's are'))
+        return cls.has(ui.current.address())
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def has(cls, ea):
+        '''Return whether the address in `ea` is referencing an entry point.'''
+        if not function.has(ea):
+            address = interface.address.inside(ea)
+
+        # If the address is a function, then translate it to the function address.
+        else:
+            fn = idaapi.get_func(ea)
+            address, _ = interface.range.bounds(fn)
+
+        # Now we'll just try to gets its index, and if we got one then it's an export.
+        res = cls.__index__(address)
+        return res is not None
+
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def by(cls, ordinal):
@@ -2719,6 +2748,23 @@ class imports(object):
         except StopIteration:
             pass
         raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : No import was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+    @utils.multicase()
+    @classmethod
+    @utils.string.decorate_arguments('name', 'module', 'fullname')
+    def has(cls, **type):
+        '''Return whether the current address is referring to an import.'''
+        if 'module' in type:
+            module, iterable = type['module'].lower(), (idaapi.get_import_module_name(index) for index in builtins.range(idaapi.get_import_module_qty()))
+            return any(utils.string.of(item).lower() == module for item in iterable if name is not None)
+        elif type:
+            raise E.InvalidParameterError(u"{:s}.has({:s}) : The given keyword parameter{:s} not supported.".format('.'.join([__name__, cls.__name__]), utils.string.kwargs(type), ' is' if len(type) == 1 else 's are'))
+        return cls.has(ui.current.address())
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def has(cls, ea):
+        '''Return whether the address `ea` is referring to an import.'''
+        return idaapi.segtype(ea) == idaapi.SEG_XTRN and any(address == ea for address, _ in cls.__iterate__())
 
     @utils.multicase()
     @classmethod
