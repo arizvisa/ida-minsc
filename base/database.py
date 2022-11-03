@@ -4423,24 +4423,17 @@ class type(object):
     @classmethod
     def flags(cls, ea):
         '''Return the flags of the item at the address `ea`.'''
-        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
-        return getflags(interface.address.within(ea))
+        return interface.address.flags(interface.address.within(ea))
     @utils.multicase(ea=internal.types.integer, mask=internal.types.integer)
     @classmethod
     def flags(cls, ea, mask):
         '''Return the flags at the address `ea` masked with `mask`.'''
-        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
-        return getflags(interface.address.within(ea)) & idaapi.as_uint32(mask)
+        return interface.address.flags(interface.address.within(ea), mask)
     @utils.multicase(ea=internal.types.integer, mask=internal.types.integer, value=internal.types.integer)
     @classmethod
     def flags(cls, ea, mask, value):
         '''Sets the flags at the address `ea` masked with `mask` set to `value`.'''
-        if idaapi.__version__ < 7.0:
-            ea = interface.address.within(ea)
-            res = idaapi.getFlags(ea)
-            idaapi.setFlags(ea, (res & ~mask) | value)
-            return res & mask
-        raise E.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated `idaapi.setFlags(...)`.".format('.'.join([__name__, cls.__name__]), ea, mask, value))
+        return interface.address.flags(interface.address.within(ea), mask, value)
 
     @utils.multicase()
     @classmethod
@@ -7487,7 +7480,7 @@ class set(object):
         def __new__(cls):
             '''Sets the data at the current address to an IEEE-754 floating-point number based on its size.'''
             return cls(ui.current.address())
-        @utils.multicase()
+        @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea):
             '''Sets the data at address `ea` to an IEEE-754 floating-point number based on its size.'''
             size = type.size(ea)
@@ -7505,7 +7498,7 @@ class set(object):
         def single(cls):
             '''Set the data at the current address to an IEEE-754 single'''
             return cls.single(ui.current.address())
-        @utils.multicase()
+        @utils.multicase(ea=internal.types.integer)
         @classmethod
         def single(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 single.'''
@@ -7526,7 +7519,7 @@ class set(object):
         def double(cls):
             '''Set the data at the current address to an IEEE-754 double'''
             return cls.double(ui.current.address())
-        @utils.multicase()
+        @utils.multicase(ea=internal.types.integer)
         @classmethod
         def double(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 double.'''
@@ -7996,7 +7989,7 @@ class get(object):
         def half(cls, **byteorder):
             '''Read a half from the current address.'''
             return cls.half(ui.current.address(), **byteorder)
-        @utils.multicase()
+        @utils.multicase(ea=internal.types.integer)
         @classmethod
         def half(cls, ea, **byteorder):
             '''Read a half from the address `ea`.'''
@@ -8008,7 +8001,7 @@ class get(object):
         def single(cls, **byteorder):
             '''Read a single from the current address.'''
             return cls.single(ui.current.address(), **byteorder)
-        @utils.multicase()
+        @utils.multicase(ea=internal.types.integer)
         @classmethod
         def single(cls, ea, **byteorder):
             '''Read a single from the address `ea`.'''
@@ -8020,7 +8013,7 @@ class get(object):
         def double(cls, **byteorder):
             '''Read a double from the current address.'''
             return cls.double(ui.current.address(), **byteorder)
-        @utils.multicase()
+        @utils.multicase(ea=internal.types.integer)
         @classmethod
         def double(cls, ea, **byteorder):
             '''Read a double from the address `ea`.'''
