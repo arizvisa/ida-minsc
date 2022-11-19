@@ -46,30 +46,15 @@ from internal import utils, interface, types, exceptions as E
 ## general functions
 @utils.multicase()
 def at():
-    '''Returns the ``idaapi.insn_t`` instance at the current address.'''
+    '''Return the ``idaapi.insn_t`` of the current instruction.'''
     return at(ui.current.address())
 @utils.multicase(ea=types.integer)
 def at(ea):
-    '''Returns the ``idaapi.insn_t`` instance at the address `ea`.'''
+    '''Return the ``idaapi.insn_t`` of the instruction at address `ea`.'''
     ea = interface.address.inside(ea)
-    if not database.type.is_code(ea):
+    if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
         raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at the specified address ({:#x}).".format(__name__, ea, ea))
-
-    # If we're using backwards-compatiblity mode (which means decode_insn takes
-    # different parameters, then manage the result using idaapi.cmd
-    if hasattr(idaapi, 'cmd'):
-        length = idaapi.decode_insn(ea)
-        if idaapi.__version__ < 7.0:
-            return idaapi.cmd.copy()
-
-        tmp = idaapi.insn_t()
-        tmp.assign(idaapi.cmd)
-        return tmp
-
-    # Otherwise we can just use the API as we see fit
-    res = idaapi.insn_t()
-    length = idaapi.decode_insn(res, ea)
-    return res
+    return interface.instruction.at(ea)
 
 @utils.multicase()
 def size():
@@ -116,67 +101,41 @@ def opinfo(ea, opnum, info, **flags):
 
 @utils.multicase()
 def mnemonic():
-    '''Returns the mnemonic of the instruction at the current address.'''
+    '''Return the mnemonic of the current instruction.'''
     return mnemonic(ui.current.address())
 @utils.multicase(ea=types.integer)
 def mnemonic(ea):
-    '''Returns the mnemonic of the instruction at the address `ea`.'''
+    '''Return the mnemonic of the instruction at address `ea`.'''
     ea = interface.address.inside(ea)
-    if not database.type.is_code(ea):
+    if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
         raise E.InvalidTypeOrValueError(u"{:s}.mnemonic({:#x}) : Unable to get the mnemonic for a non-instruction at the specified address ({:#x}).".format(__name__, ea, ea))
-
-    res = (idaapi.ua_mnem(ea) or '').lower()
-    return utils.string.of(res)
+    return interface.instruction.mnemonic(ea)
 mnem = utils.alias(mnemonic)
 
 ## functions that return an ``idaapi.op_t`` for an operand
 @utils.multicase()
 def operands():
-    '''Returns all of the ``idaapi.op_t`` instances for the instruction at the current address.'''
+    '''Return the ``idaapi.op_t`` of the operands for the current instruction.'''
     return operands(ui.current.address())
 @utils.multicase(ea=types.integer)
 def operands(ea):
-    '''Returns all of the ``idaapi.op_t`` instances for the instruction at the address `ea`.'''
-    insn = at(ea)
-
-    # if we're in compatibility mode, then old-fashioned IDA requires us to copy
-    # our operands into our new types.
-    if hasattr(idaapi, 'cmd'):
-
-        # take operands until we encounter an idaapi.o_void
-        iterable = itertools.takewhile(utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), insn.Operands)
-
-        # if we're using IDA < 7.0, then make copies of each instruction and return it
-        if idaapi.__version__ < 7.0:
-            return tuple(op.copy() for op in iterable)
-
-        # otherwise, we need to make an instance of it and then assign to make a copy
-        iterable = ((idaapi.op_t(), op) for op in iterable)
-        return tuple([n.assign(op), n][1] for n, op in iterable)
-
-    # apparently idaapi is not increasing a reference count for our operands, so we
-    # need to make a copy of them quickly before we access them.
-    operands = [idaapi.op_t() for index in range(idaapi.UA_MAXOP)]
-    [ op.assign(insn.ops[index]) for index, op in enumerate(operands)]
-
-    # now we can just fetch them until idaapi.o_void
-    iterable = itertools.takewhile(utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), operands)
-
-    # and return it as a tuple
-    return tuple(iterable)
+    '''Return the ``idaapi.op_t`` of the operands for the instruction at address `ea`.'''
+    ea = interface.address.inside(ea)
+    operands = interface.instruction.operands(ea)
+    return tuple(operands)
 
 @utils.multicase(opnum=types.integer)
 def operand(opnum):
-    '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the current address.'''
+    '''Return the ``idaapi.op_t`` of the operand `opnum` for the current instruction.'''
     return operand(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
 def operand(reference):
-    '''Returns the ``idaapi.op_t`` for the operand pointed to by `reference`.'''
+    '''Return the ``idaapi.op_t`` of the given operand `reference`.'''
     address, opnum, _ = reference
     return operand(address, opnum)
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def operand(ea, opnum):
-    '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
+    '''Return the ``idaapi.op_t`` of the operand `opnum` for the instruction at address `ea`.'''
     insn = at(ea)
     if opnum >= len(operands(ea)):
         raise E.InvalidTypeOrValueError(u"{:s}.operand({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
@@ -899,7 +858,7 @@ def op_stackvar(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_stackvar(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a stack variable and return it.'''
-    if not function.within(ea):
+    if not function.has(ea):
         raise E.FunctionNotFoundError(u"{:s}.op_stackvar({:#x}, {:d}) : The specified address ({:#x}) is not within a function.".format(__name__, ea, opnum, ea))
 
     ok = idaapi.op_stkvar(ea, opnum)
@@ -926,7 +885,7 @@ def op_structure(ea, opnum):
 
     # Start out by checking if the operand is a stack variable, because
     # we'll need to handle it differently if so.
-    if idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
+    if idaapi.is_stkvar(F, opnum) and function.has(insn.ea):
         fn = function.by(insn.ea)
 
         # Now we can ask IDA what's up with it.
@@ -1242,7 +1201,7 @@ def op_structurepath(ea, opnum):
 
     # If it's a stack variable, then this is also the wrong API and we should be
     # using the op_structure function. Log it and continue onto the right one.
-    if idaapi.is_stkvar(F, opnum) and function.within(insn.ea):
+    if idaapi.is_stkvar(F, opnum) and function.has(insn.ea):
         logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a stack variable operand.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
         return op_structure(ea, opnum)
 
