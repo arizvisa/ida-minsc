@@ -5493,24 +5493,12 @@ class types(object):
             raise E.DisassemblerError(u"{:s}.get({:d}, {:s}) : Unable to create a type that references the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
         return ti
 
-    @utils.multicase(info=idaapi.tinfo_t)
-    @classmethod
-    def name(cls, info):
-        '''Return the name of the type from the current type library that matches the given type `info`.'''
-        til = idaapi.get_idati()
-        return cls.name(info, til)
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def name(cls, ordinal):
         '''Return the name of the type from the current type library at the specified `ordinal`.'''
         til = idaapi.get_idati()
         return cls.name(ordinal, til)
-    @utils.multicase(info=idaapi.tinfo_t, library=idaapi.til_t)
-    @classmethod
-    def name(cls, info, library):
-        '''Return the name of the type from the specified type `library` that matches the given type `info`.'''
-        # FIXME: i seriously doubt that this is actually possible
-        raise NotImplementedError
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def name(cls, ordinal, library):
@@ -5546,6 +5534,23 @@ class types(object):
         if ti.serialize() != res.serialize():
             logging.warning(u"{:s}.name({:d}, {!r}, {:s}{:s}) : The type information for the given ordinal ({:d}) applied the type library has changed during the assignment of the new name ({!r}).".format('.'.join([__name__, cls.__name__]), ordinal, string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, utils.string.of(string)))
         return name
+
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def ordinal(cls, name):
+        '''Return the ordinal number for the type with the specified `name`.'''
+        til = idaapi.get_idati()
+        return cls.ordinal(name, til)
+    @utils.multicase(name=internal.types.string, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def ordinal(cls, name, library):
+        '''Return the ordinal number for the type from the given `library` with the specified `name`.'''
+        res = idaapi.get_type_ordinal(library, utils.string.to(name))
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.ordinal({!r}, {:s}) : Could not find a type with the specified name (\"{:s}\") within the type library.".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), utils.string.escape(name, '"')))
+        return res
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
@@ -5838,26 +5843,29 @@ class types(object):
     @utils.multicase(string=internal.types.string)
     @classmethod
     def declare(cls, string, **flags):
-        '''Parse the given `string` into an ``idaapi.tinfo_t`` using the current type library and return it.'''
-        til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
-        return cls.parse(string, til, **flags)
-    @utils.multicase(string=internal.types.string, library=idaapi.til_t)
-    @classmethod
-    def declare(cls, string, library, **flags):
-        """Parse the given `string` into an ``idaapi.tinfo_t`` using the specified type `library` and return it.
+        """Parse the given `string` into an ``idaapi.tinfo_t`` using the current type library and return it.
 
         If the integer `flags` is provided, then use the specified flags (``idaapi.PT_*``) when parsing the `string`.
         """
-        ti, flag = idaapi.tinfo_t(), flags.get('flags', idaapi.PT_SIL | idaapi.PT_TYP)
+        til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
+        return cls.declare(string, til, **flags)
+    @utils.multicase(string=internal.types.string, library=idaapi.til_t)
+    @classmethod
+    def declare(cls, string, library):
+        '''Parse the given `string` into an ``idaapi.tinfo_t`` using the specified type `library` and return it.'''
+        return cls.declare(string, library, idaapi.PT_TYP)
+    @utils.multicase(string=internal.types.string, library=idaapi.til_t)
+    @classmethod
+    def declare(cls, string, library, flags):
+        '''Parse the given `string` into an ``idaapi.tinfo_t`` for the specified type `library` with `flags` and return it.'''
+        ti, flag = idaapi.tinfo_t(), flags | idaapi.PT_SIL
 
         # Firstly we need to ';'-terminate the type the user provided in order
         # for IDA's parser to understand it.
-        terminated = string if string.endswith(';') else "{:s};".format(string)
+        terminated = string if string.rstrip().endswith(';') else "{:s};".format(string)
 
-        # Ask IDA to parse this into a tinfo_t for us. We default to the silent flag
-        # so that we're responsible for handling it if there's a parsing error of
-        # some sort. If it succeeds, then we can return our typeinfo otherwise we'll
-        # return None to avoid returning a completely invalid type.
+        # Ask IDA to parse this into a tinfo_t for us. We default to the silent flag so
+        # that we're responsible for handling it if there's a parsing error of some sort.
         if idaapi.__version__ < 6.9:
             ok, name = idaapi.parse_decl2(library, terminated, None, ti, flag), None
         elif idaapi.__version__ < 7.0:
@@ -5866,14 +5874,99 @@ class types(object):
             name = idaapi.parse_decl(ti, library, terminated, flag)
             ok = name is not None
 
+        # If we were explicitly asked to be silent (using the "flags" parameter),
+        # then we avoid raising an exception entirely and return None on failure.
+        if not ok and flags & idaapi.PT_SIL:
+            return None
+
         # If we couldn't parse the type we were given, then simply bail.
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}{:s}) : Unable to parse the provided string into a valid type.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(flags)) if flags else ''))
+        elif not ok:
+            raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}, {:#x}) : Unable to parse the provided string into a valid type.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags))
 
         # If we were given the idaapi.PT_VAR flag, then we return the parsed name too.
-        logging.info(u"{:s}.declare({!r}, {:s}{:s}) : Successfully parsed the given string into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', " ({:s})".format(name) if name else ''))
-        return (name, ti) if flag & idaapi.PT_VAR else ti
-    parse = decl = utils.alias(declare, 'types')
+        string = utils.string.of(name)
+        logging.info(u"{:s}.declare({!r}, {:s}, {:#x}) : Successfully parsed the given string into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, " ({:s})".format(string) if string else ''))
+        return (string or u'', ti) if flag & idaapi.PT_VAR else ti
+    parse = utils.alias(declare, 'types')
+
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def dereference(cls, info):
+        '''Return the target type of the pointer that is specified by `info`.'''
+        if not info.has_details():
+            raise E.MissingTypeOrAttribute(u"{:s}.dereference(\"{:s}\") : The provided type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        if not info.is_ptr():
+            raise E.InvalidTypeOrValueError(u"{:s}.dereference(\"{:s}\") : The provided type information ({!r}) is not a pointer.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        pi = idaapi.ptr_type_data_t()
+        if not info.get_ptr_details(pi):
+            raise E.DisassemblerError(u"{:s}.dereference(\"{:s}\") : Unable to get the pointer type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+        return pi.obj_type
+
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def pointer(cls, info):
+        '''Create a pointer that references the type specified by `info`.'''
+        return cls.pointer(info, 0, 0)
+    @utils.multicase(info=idaapi.tinfo_t, size=internal.types.integer)
+    @classmethod
+    def pointer(cls, info, size):
+        '''Create a pointer of `size` bytes that references the type specified by `info`.'''
+        return cls.pointer(info, size, 0)
+    @utils.multicase(info=idaapi.tinfo_t, size=internal.types.integer, attributes=internal.types.integer)
+    @classmethod
+    def pointer(cls, info, size, attributes, **fields):
+        '''Create a pointer of `size` bytes that references the type specified by `info` with the given extended `attributes`.'''
+        pi = idaapi.ptr_type_data_t()
+        pi.obj_type = info
+        pi.based_ptr_size = size
+        pi.taptr_bits = idaapi.TAH_HASATTRS | attributes if attributes else 0
+
+        # Verify that all of the fields that we were given are actually part of the ptr_type_data_t
+        if any(not hasattr(pi, name) for name in fields):
+            missing = {name for name in fields if not hasattr(pi, name)}
+            raise E.InvalidParameterError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to assign to the field{:s} ({:s}) of the pointer type data because {:s} not exist.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', '' if len(missing) == 1 else 's', ', '.join(sorted(missing)), 'it does' if len(missing) == 1 else 'they do'))
+        [setattr(pi, name, value) for name, value in fields.items()]
+
+        # Use the ptr_type_data_t to create a pointer and return it.
+        ti = idaapi.tinfo_t()
+        if not ti.create_ptr(pi):
+            raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to create a pointer for the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', "{!s}".format(info)))
+        return ti
+
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def array(cls, info):
+        '''Return a tuple containing the element type and length of the array specified by `info`.'''
+        if not info.has_details():
+            raise E.MissingTypeOrAttrbute(u"{:s}.array(\"{:s}\") : The provided type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        if not info.is_array():
+            raise E.InvalidTypeOrValueError(u"{:s}.array(\"{:s}\") : The provided type information ({!r}) is not an array.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        ai = idaapi.array_type_data_t()
+        if not info.get_array_details(ai):
+            raise E.DisassemblerError(u"{:s}.array(\"{:s}\") : Unable to get the array type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+        return ai.elem_type, ai.nelems
+    @utils.multicase(element=idaapi.tinfo_t, length=internal.types.integer)
+    @classmethod
+    def array(cls, element, length):
+        '''Create an array of the the given `element` with the specified `length`.'''
+        return cls.array(element, length, 0)
+    @utils.multicase(element=idaapi.tinfo_t, length=internal.types.integer, base=internal.types.integer)
+    @classmethod
+    def array(cls, element, length, base):
+        '''Create an array of the the given `element` with the specified `length` and `base`.'''
+        ai = idaapi.array_type_data_t()
+        ai.elem_type = element
+        ai.nelems = length
+        ai.base = base
+
+        ti = idaapi.tinfo_t()
+        if not ti.create_array(ai):
+            raise E.DisassemblerError(u"{:s}.array(\"{:s}\", {:d}, {:d}) : Unable to create an array using the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(element), '"'), length, base, "{!s}".format(element)))
+        return ti
 
 class xref(object):
     """
