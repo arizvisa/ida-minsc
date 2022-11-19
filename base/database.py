@@ -1267,7 +1267,7 @@ class search(object):
     @utils.multicase(string=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('string')
-    def by_regex(string, **options):
+    def by_regex(cls, string, **options):
         '''Search through the database at the current address for the regex matched by `string`.'''
         return cls.by_regex(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=six.string_types)
@@ -1294,7 +1294,7 @@ class search(object):
     @utils.multicase(string=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('string')
-    def by_text(string, **options):
+    def by_text(cls, string, **options):
         '''Search through the database at the current address for the text matched by `string`.'''
         return cls.by_text(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=six.string_types)
@@ -1321,13 +1321,13 @@ class search(object):
     @utils.multicase(name=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def by_name(name, **options):
+    def by_name(cls, name, **options):
         '''Search through the database at the current address for the symbol `name`.'''
         return cls.by_name(ui.current.address(), name, **options)
     @utils.multicase(ea=six.integer_types, name=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def by_name(ea, name, **options):
+    def by_name(cls, ea, name, **options):
         """Search through the database at address `ea` for the symbol `name`.
 
         If `reverse` is specified as a bool, then search backwards from the given address.
