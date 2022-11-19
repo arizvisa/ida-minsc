@@ -2847,16 +2847,20 @@ class member_t(object):
         # Type safety is fucking valuable, and anything that doesn't match gives you an exception.
         if not isinstance(info, (idaapi.tinfo_t, types.none, types.string)):
             cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), info.__class__))
+            raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), info.__class__))
 
-        # If our parameter is empty, then we need to re-assign an empty type to clear it.
-        if not info:
+        # If we're being asked to assign None to the type information, then we need to remove it.
+        if not info and hasattr(idaapi, 'del_member_tinfo') and idaapi.del_member_tinfo(self.parent.ptr, self.ptr):
+            return
+
+        # Otherwise the best we can do is to re-assign an empty type to clear it.
+        elif not info:
             ti = idaapi.tinfo_t()
 
-            # FIXME: clearing the type is probably not the semantics the user would expect,
-            #        and so we should probably transform the current type to remove any
-            #        array or other weird attributes as long as it retains the same size.
-            ti.clear()
+            # Create an unknown type...since it's the best we can do without the api.
+            if not ti.create_simple_type(idaapi.BTF_UNK):
+                logging.warning(u"{:s}({:#x}).typeinfo({!s}) : Unable to create an unknown ({:s}) type to assign to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), 'BTF_UNK', utils.string.repr(self.name)))
+            info_description = "{!s}".format(info)
 
         # Otherwise if it's a string, then we'll need to parse our info parameter into a
         # tinfo_t, so that we can assign it to the typeinfo for the member.
@@ -2864,12 +2868,17 @@ class member_t(object):
             ti = internal.declaration.parse(info)
             if ti is None:
                 cls = self.__class__
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info)))
-            info_description = info
+                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), utils.string.repr(info)))
+            info_description = utils.string.repr(info)
 
         # If it's a tinfo_t, then we can just use it as-is.
         elif isinstance(info, idaapi.tinfo_t):
-            ti, info_description = info, "{!s}".format(info)
+            ti, info_description = info, utils.string.repr("{!s}".format(info))
+
+        # We have no idea what kind of type this is, so we need to bitch and complain about it.
+        else:
+            cls = self.__class__
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign an unsupported type ({!s}) ot type type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), info.__class__()))
 
         # We want to detect type changes, so we need to get the previous type information of
         # the member so that we can distinguish between an actual SMT_KEEP error or an error
@@ -2877,7 +2886,7 @@ class member_t(object):
         prevti = idaapi.tinfo_t()
         if not get_member_tinfo(prevti, self.ptr):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).typeinfo({!s}) : Unable to get the previous type information for the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info_description), utils.string.repr(self.name)))
+            logging.info(u"{:s}({:#x}).typeinfo({!s}) : Unable to get the previous type information for the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, info_description, utils.string.repr(self.name)))
 
         # Now we can pass our tinfo_t along with the member information to the api.
         res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, idaapi.SET_MEMTI_COMPATIBLE)
@@ -2890,7 +2899,7 @@ class member_t(object):
         # We failed, so just raise an exception for the user to handle.
         elif res == idaapi.SMT_FAILED:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info_description), utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, info_description, utils.string.repr(self.name)))
 
         # If we received an alternative return code, then build a relevant
         # message that we can raise with our exception.
@@ -2913,7 +2922,7 @@ class member_t(object):
 
         # Finally we can raise our exception so that the user knows whats up.
         cls = self.__class__
-        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info_description), utils.string.repr(self.name), message))
+        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, info_description, utils.string.repr(self.name), message))
 
     ### Private methods
     def __str__(self):
