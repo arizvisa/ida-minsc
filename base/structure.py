@@ -1373,6 +1373,81 @@ class members_t(object):
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.by({!s}) : The member ({:s}) at the given location ({:#x}<->{:#x}) {:s}.".format('.'.join([__name__, cls.__name__]), self.owner.ptr.id, location, member.name, member.left, member.right, message))
         return member
 
+    @utils.multicase(name=types.string)
+    @utils.string.decorate_arguments('name', 'suffix')
+    def has(self, name, *suffix):
+        '''Return whether a member with the specified `name` exists.'''
+        string = name if isinstance(name, types.tuple) else (name,)
+        owner, res = self.owner, utils.string.to(interface.tuplename(*(string + suffix)))
+        return idaapi.get_member_by_name(owner.ptr, res) is not None
+    @utils.multicase(location=types.tuple)
+    def has(self, location):
+        '''Return whether a member exists at the specified `location`.'''
+        offset, size = location
+        if isinstance(offset, interface.symbol_t):
+            offset, = (int(item) for item in offset.symbols)
+        return self.has(offset, offset + size)
+    @utils.multicase(offset=types.integer)
+    def has(self, offset):
+        '''Return whether a member exists at the specified `offset`.'''
+        owner = self.owner
+        base, size, unionQ = self.baseoffset, idaapi.get_struc_size(owner.ptr), is_union(owner.ptr)
+
+        # Calculate the realoffset so that we can verify the offset is within some valid boundaries.
+        realoffset = offset - base
+
+        # If we're a variable-length structure, then our bounds are technically from 0 to infinity.
+        if owner.ptr.props & idaapi.SF_VAR and 0 <= realoffset and size <= realoffset:
+            pass
+
+        # Otherwise, we can check that the offset is within our valid boundaries.
+        elif not (0 <= realoffset < size):
+            return False
+
+        # Iterate through all of our members and figure out which one contains us.
+        for member in self.__iterate__():
+            mptr = member.ptr
+            mleft, mright = 0 if unionQ else mptr.soff, mptr.eoff
+
+            # If our member has no size and we're using a variable-length structure,
+            # then the realoffset is "within" the member if it comes after it.
+            if owner.ptr.props & idaapi.SF_VAR and mleft == mright and mleft <= realoffset:
+                return True
+
+            # Otherwise, we just check its boundaries like normal.
+            elif mleft <= realoffset < mright:
+                return True
+            continue
+        return False
+    @utils.multicase(start=internal.types.integer, end=internal.types.integer)
+    def has(self, start, end):
+        '''Return whether any members exist from the offset `start` to the offset `end`.'''
+        owner = self.owner
+        base, size, unionQ = self.baseoffset, idaapi.get_struc_size(owner.ptr), is_union(owner.ptr)
+
+        # We mostly copy the member_t.has(int) implementation.
+        left, right = map(functools.partial(operator.add, -base), sorted([start, end]))
+
+        # If we're a variable-length structure, then our bounds are technically from 0 to infinity.
+        if owner.ptr.props & idaapi.SF_VAR and 0 <= realoffset and size <= realoffset:
+            pass
+
+        # Iterate through all of our members and figure out which one contains us.
+        for member in self.__iterate__():
+            mptr = member.ptr
+            mleft, mright = 0 if unionQ else mptr.soff, mptr.eoff
+
+            # If our member has no size and we're using a variable-length structure,
+            # then the realoffset is "within" the member if it comes after it.
+            if owner.ptr.props & idaapi.SF_VAR and mleft == mright and mleft <= left:
+                return True
+
+            # Otherwise, check if the segment overlaps with the member.
+            elif left < mright and right > mleft:
+                return True
+            continue
+        return False
+
     @utils.string.decorate_arguments('name', 'suffix')
     def by_name(self, name, *suffix):
         '''Return the member with the specified `name`.'''
