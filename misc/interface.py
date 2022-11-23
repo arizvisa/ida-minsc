@@ -3292,7 +3292,8 @@ class integerish(namedtypedtuple):
 
     def __operation__(self, operation):
         cls, transform = self.__class__, [F(item) for F, item in zip(self._operands, self)]
-        result = [item if Fitem(operation) is None else Fitem(operation) for Fitem in transform]
+        iterable = (Fitem(operation) for Fitem in transform)
+        result = [item if result is None else result for result, item in zip(iterable, self)]
         return self.__class__(*result)
 
     # general arithmetic
@@ -3305,7 +3306,7 @@ class integerish(namedtypedtuple):
     def __or__(self, other):
         return self.__operator__(operator.or_, other)
     def __xor__(self, other):
-        return self.__operator__(operator.xor_, other)
+        return self.__operator__(operator.xor, other)
     def __lshift__(self, other):
         return self.__operator__(operator.lshift, other)
     def __rshift__(self, other):
@@ -3351,7 +3352,9 @@ class integerish(namedtypedtuple):
 
     # ...and finally opposites.
     __radd__ = __add__
-    __rsub__ = __sub__
+    def __rsub__(self, other):
+        this = operator.neg(self)
+        return this.__operator__(operator.add, other)
     __rand__ = __and__
     __ror__ = __or__
     __rxor__ = __xor__
@@ -4485,7 +4488,7 @@ class collect_t(object):
 class bounds_t(integerish):
     """
     This tuple is used to represent references that describe a bounds
-    and has the format `(left, right)`.
+    and has the format `(left, right)` where `right` is exclusive.
     """
     _fields = ('left', 'right')
     _types = (internal.types.integer, internal.types.integer)
@@ -4561,12 +4564,12 @@ class bounds_t(integerish):
         '''Return if the address `ea` is contained by the current boundary.'''
         left, right = sorted(self)
         if isinstance(ea, internal.types.integer):
-            return left <= ea <= right
+            return left <= ea < right
 
         # compare against another boundary
         elif isinstance(ea, internal.types.tuple):
             other_left, other_right = ea
-            return all([left <= other_left, right >= other_right])
+            return self.contains(other_left) if other_left == other_right else all([left <= other_left, right >= other_right])
 
         # anything else is an invalid type
         raise internal.exceptions.InvalidTypeOrValueError(u"{!s}.contains({!s}) : Unable to check containment with the provided type ({!s}).".format(self, ea, ea.__class__))
@@ -4576,22 +4579,34 @@ class bounds_t(integerish):
         '''Return if the boundary `bounds` overlaps with the current boundary.'''
         left, right = sorted(self)
         if isinstance(bounds, internal.types.integer):
-            return left <= bounds <= right
+            return left <= bounds < right
 
         other_left, other_right = sorted(bounds)
-        return all([left <= other_right, right >= other_left])
+        return self.overlaps(other_left) if other_left == other_right else all([left < other_right, right > other_left])
 
     def union(self, other):
         '''Return a union of the current boundary with `other`.'''
-        if not isinstance(other, internal.types.tuple):
+        if isinstance(other, internal.types.integer):
+            other = self.__class__(other, other)
+
+        # if it's not a tuple, then fall-back to whatever our parent decides.
+        elif not isinstance(other, internal.types.tuple):
             return super(bounds_t, self).__or__(other)
+
         (left, right), (other_left, other_right) = map(sorted, [self, other])
         return self.__class__(min(left, other_left), max(right, other_right))
-    __or__ = union
+
+    def __or__(self, other):
+        '''Return a union of the current boundary with `other` unless it is an integer which will result in a binary-or with its values.'''
+        return super(bounds_t, self).__or__(other) if isinstance(other, internal.types.integer) else self.union(other)
 
     def intersection(self, other):
         '''Return an intersection of the current boundary with `other`.'''
-        if not isinstance(other, internal.types.tuple):
+        if isinstance(other, internal.types.integer):
+            other = self.__class__(other, other)
+
+        # if it's not a tuple, then fall-back to whatever our parent decides.
+        elif not isinstance(other, internal.types.tuple):
             return super(bounds_t, self).__and__(other)
 
         # if they don't overlap, then we can't intersect and so we bail.
@@ -4600,7 +4615,10 @@ class bounds_t(integerish):
 
         (left, right), (other_left, other_right) = map(sorted, [self, other])
         return self.__class__(max(left, other_left), min(right, other_right))
-    __and__ = intersection
+
+    def __and__(self, other):
+        '''Return an intersection of the current boundary with `other` unless it is an integer which will result in a binary-and with its values.'''
+        return super(bounds_t, self).__and__(other) if isinstance(other, internal.types.integer) else self.intersection(other)
 
     def __format__(self, spec):
         '''Return the current boundary as a string containing only the components that are inclusive to the range.'''
@@ -4611,6 +4629,24 @@ class bounds_t(integerish):
         if left < right - 1:
             return "{:#x}..{:#x}".format(left, right - 1)
         return "{:#x}".format(left)
+
+    def __mul__(self, count):
+        '''Grow the boundary `count` times in the specified direction.'''
+        left, right = self
+        sign, size = -1 if count < 0 else +1, right - left if left < right else left - right
+        translate = (size * count, size * sign) if count < 0 else (0, -size + size * count)
+        return self.__class__(*itertools.starmap(operator.add, zip(self, translate)))
+    __rmul__ = __mul__
+
+    def __pow__(self, index):
+        '''Return the boundary translated to the specified `index` of an array.'''
+        left, right = self
+        size = right - left if left < right else left - right
+        translate = functools.partial(operator.add, self.size * index)
+        return self.__class__(*sorted(map(translate, self)))
+
+    def __invert__(self):
+        return operator.neg(self)
 
 # FIXME: should probably be a register_t, but with the different attributes
 class partialregister_t(namedtypedtuple, symbol_t):
@@ -4735,6 +4771,32 @@ class location_t(integerish):
         '''Return if the given `offset` is contained by the current location.'''
         return self.bounds.contains(offset)
     __contains__ = contains
+
+    def __neg__(self):
+        offset, size = self
+        res = int(offset)
+        bounds = map(functools.partial(operator.mul, -1), [res, res + size])
+        left, right = sorted(bounds)
+        return self.__class__(left, right - left)
+
+    def __invert__(self):
+        offset, size = self
+        return self.__class__(int(offset) * -1, size)
+
+    def __mul__(self, count):
+        '''Grow the location `count` times in the specified direction.'''
+        offset, size = self
+        translate = size * count
+        if count < 0:
+            offset, res = int(offset), size * count
+            return self.__class__(offset + res, abs(res))
+        res = size * count
+        return self.__class__(offset, res)
+
+    def __pow__(self, index):
+        '''Return the boundary translated to the specified `index` of an array.'''
+        offset, size = self
+        return self.__class__(int(offset) + size * index, size)
 
 class phrase_t(integerish, symbol_t):
     """
