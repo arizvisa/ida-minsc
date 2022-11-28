@@ -407,7 +407,7 @@ class multicase(object):
         '''Decorate a case of a function with the specified types.'''
 
         # Output some useful information to help the user if there's nothing that satisfies their parameters.
-        def missing(packed_parameters, tree, table, documentation={}):
+        def missing(packed_parameters, tree, table, documentation={}, ignored_parameter_count=0):
             '''Output the candidates for the callable that the user is attempting to use.'''
             args, kwds = packed_parameters
             Fcallable, Fhelp, Fprototype = "`{:s}`".format, "`help({:s})`".format, "{:s}".format
@@ -421,7 +421,7 @@ class multicase(object):
             sorted_functions = [F for F in cls.sorted_documentation(documentation)]
 
             # Collect all parameter names, keywords, and documentation for describing what happened.
-            description_arguments = [item.__class__.__name__ for item in args]
+            description_arguments = [item.__class__.__name__ for item in args[ignored_parameter_count:]]
             description_keywords = ["{:s}={!s}".format(name, kwds[name].__class__.__name__) for name in kwds]
 
             iterable = ((F, documentation[F]) for F in sorted_functions)
@@ -431,7 +431,7 @@ class multicase(object):
             available_names = sorted({'.'.join([module, name]) if module else name for _, (_, module, name) in description_functions.items()})
             conjunctioned = Fconjunction_and([Fcallable(item) for item in available_names])
             description = Fconjunction_or(["{:s}({:s})".format(name, ', '.join(itertools.chain(description_arguments, description_keywords))) for name in available_names])
-            message = u"{:s}: The given parameter type{:s} not match any of the cases for {:s}.".format(description, ' does' if sum(map(len, [description_arguments, description_keywords])) == 1 else 's do', conjunctioned)
+            message = u"{:s}: The given parameter type{:s} not match any of the available cases for the definition of {:s}.".format(description, ' does' if sum(map(len, [description_arguments, description_keywords])) == 1 else 's do', conjunctioned)
 
             # Build the list of candidates that the user will need to choose from.
             listing_message = "The functions that are available for {:s} are:".format(Fconjunction_and([Fhelp(item) for item in available_names]))
@@ -446,6 +446,30 @@ class multicase(object):
 
             # Now we have a message and a listing that we can just join together with a newline.
             raise internal.exceptions.UnknownPrototypeError('\n'.join(itertools.chain([message, '', listing_message], listing)))
+
+        # These are just utility closures that can be attached to the entrypoint closure.
+        def fetch_matches(cache, *arguments, **keywords):
+            '''Return a list of the callables and their (transformed) parameters that correspond to the given `arguments` and `keywords`.'''
+            tree, table = cache
+            packed_parameters = arguments, keywords
+            candidates = cls.match(packed_parameters, tree, table)
+            iterable = cls.preordered(packed_parameters, candidates, tree, table)
+            return [item for item in iterable]
+
+        def fetch_callable(cache, *arguments, **keywords):
+            '''Return the first callable that matches the constraints for the given `arguments` and `keywords`.'''
+            tree, table = cache
+            packed_parameters = arguments, keywords
+            candidates = cls.match(packed_parameters, tree, table)
+            iterable = cls.preordered(packed_parameters, candidates, tree, table)
+            packed = next(iterable)
+            F, _ = packed
+            return F
+
+        def fetch_prototype(documentation, callable):
+            '''Return the documentation prototype for the given `callable`.'''
+            prototype, _, _ = documentation[callable]
+            return prototype
 
         # This is the entry-point closure that gets used to update the actual wrapper with a new candidate.
         def result(wrapped):
@@ -495,13 +519,19 @@ class multicase(object):
             # Otherwise, we simply need to create a new cache entirely.
             else:
                 owner, cache, documentation = func, ({}, {}), {}
-                res = cls.new_wrapper(func, cache, Fmissing=functools.partial(missing, documentation=documentation))
+                res = cls.new_wrapper(func, cache, Fmissing=functools.partial(missing, documentation=documentation, ignored_parameter_count=s_args))
                 res.__module__ = getattr(wrapped, '__module__', getattr(func, '__module__', '__main__'))
 
                 # Update our new wrapper with our cache (tree and table) and our
                 # documentation state so that it not only works but it reads too.
                 setattr(res, cls.cache_name, cache)
                 setattr(res, cls.documentation_name, documentation)
+
+                # Attach a few hardcoded utilities to the closure that we return. We add
+                # some empty namespaces as the first argument if it's a classmethod or __new__.
+                setattr(res, 'match', functools.partial(fetch_matches, cache, *s_args * [object]))
+                setattr(res, 'fetch', functools.partial(fetch_callable, cache, *s_args * [object]))
+                setattr(res, 'describe', functools.partial(fetch_prototype, documentation))
 
             # Now we need to add the function we extracted to our tree of candidate functions.
             constraints = {name : types for name, types in flattened_constraints.items()}
@@ -807,27 +837,82 @@ class multicase(object):
     # use a single decorator and explicitly transform the type with these.
 
     @classmethod
-    def parameter_critique(cls, type):
-        '''Return a callable that critiques its parameter for the given type.'''
-        instance = lambda item, type=type: isinstance(item, type)
-        integer = lambda item, type=type: isinstance(item, type) or hasattr(item, '__int__')
-        string = lambda item, type=type: isinstance(item, type) or hasattr(item, '__str__')
-        function = callable
-        if type == int:
-            return integer
-        return function if type == callable else instance
+    def parameter_critique(cls, *types):
+        '''Return a callable that critiques its parameter for any of the given `types`.'''
+        unsorted_types = {item for item in types}
+
+        # Filter our types for things that are not actual types. This is okay since we
+        # should be using unsorted_types to check whether to include our conditions and
+        # we need this so that we can use the types we were given with isinstance().
+        filtered = tuple(item for item in unsorted_types if isinstance(item, type))
+        if 1 < operator.sub(*reversed(sorted(map(len, [unsorted_types, filtered])))):
+            invalid = unsorted_types - {item for item in itertools.chain(filtered, [callable])}
+            parameters = [item.__name__ if isinstance(item, type) else item.__name__ if item in {callable} else "{!r}".format(item) for item in types]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.parameter_critique({:s}) : Refusing to critique a parameter using {:s} other than a type ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), 'an object' if len(invalid) == 1 else 'objects', ', '.join(map("{!r}".format, invalid))))
+        types = filtered
+
+        # Add our default condition that ensures that the parameter is a concrete type.
+        Finstance = lambda item, types=types: isinstance(item, types)
+        conditions = [Finstance]
+
+        # Add other conditions in case the type can be transformed to the correct one.
+        if {item for item in internal.types.integer} & unsorted_types:
+            conditions.append(lambda item: hasattr(item, '__int__'))
+
+        if {item for item in internal.types.string} & unsorted_types:
+            conditions.append(lambda item: hasattr(item, '__str__'))
+
+        if callable in unsorted_types:
+            conditions.append(callable)
+
+        # Now we need to determine whether we combine our tests or only need the first one.
+        Fany = lambda item, conditions=conditions: any(F(item) for F in conditions)
+        return Fany if len(conditions) > 1 else Finstance
 
     @classmethod
-    def parameter_transform(cls, type):
-        '''Return a callable that transforms its parameter to the given type.'''
+    def parameter_transform(cls, *types):
+        '''Return a callable that transforms its parameter to any of the given `types`.'''
+        unsorted_types = {item for item in types}
 
-        identity = lambda item: item
-        integer = lambda item: int(item) if hasattr(item, '__int__') else item
-        string = lambda item: str(item) if hasattr(item, '__str__') else item
+        # Filter our types so that we can use them with isinstance() as we'll be
+        # using the unsorted_types set to check for type membership.
+        filtered = tuple(item for item in unsorted_types if isinstance(item, type))
+        if 1 < operator.sub(*reversed(sorted(map(len, [unsorted_types, filtered])))):
+            invalid = unsorted_types - {item for item in itertools.chain(filtered, [callable])}
+            parameters = [item.__name__ if isinstance(item, type) else item.__name__ if item in {callable} else "{!r}".format(item) for item in types]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.parameter_tranform({:s}) : Refusing to transform a parameter using {:s} other than a type ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), 'an object' if len(invalid) == 1 else 'objects', ', '.join(map("{!r}".format, invalid))))
+        types = filtered
 
-        if type == int:
-            return integer
-        return identity
+        # Create a list that includes the condition for a transformation and the
+        # transformation itself. If it's not one of these, then we leave it alone.
+        transformers = []
+
+        # Figure out the conditions that require us to avoid transforming the item.
+        Fidentity = lambda item: item
+        if callable in unsorted_types and len(unsorted_types) == 1:
+            transformers.append((Fidentity, callable))
+
+        # If there's no callables in our unsorted_types, then we can just use isinstance.
+        elif callable not in unsorted_types:
+            transformers.append((Fidentity, lambda item, types=types: isinstance(item, types)))
+
+        # Otherwise there's some types and a callable that we need to split into two transformations.
+        else:
+            transformers.append((Fidentity, lambda item, types=types: isinstance(item, types)))
+            transformers.append((Fidentity, callable))
+
+        # Figure out whether we need to add additional transformations...just in case.
+        if {item for item in internal.types.integer} & unsorted_types:
+            transformers.append((int, lambda item: hasattr(item, '__int__')))
+
+        if {item for item in internal.types.string} & unsorted_types:
+            transformers.append((unicode if str == bytes else str, lambda item: hasattr(item, '__str__')))
+
+        # Now we figure out if we need to do any actual transformations by checking whether the
+        # number of transformers we collected is larger than 1. This is because the first transformer
+        # will always be the identity function when the item type is correct.
+        Ftransform = lambda item, transformers=transformers: next((F(item) for F, condition in transformers if condition(item)), item)
+        return Ftransform if len(transformers) > 1 else Fidentity
 
     # XXX: Our main decorator that is responsible for updating the decorated function.
     @classmethod
@@ -841,8 +926,8 @@ class multicase(object):
         # transform and critique the value that determines its validity.
         critique_and_transform = []
         for name in args:
-            t = constraints.pop(name, object)
-            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            t = constraints.pop(name, (object,))
+            Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform.append((Fcritique, Ftransform))
 
         # Generate two sets that are used to determine what parameter names
@@ -884,8 +969,8 @@ class multicase(object):
 
         # If both are selected, then we need to do some connections here.
         if varargs and wildargs:
-            t = constraints.pop(wildargs, object)
-            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            t = constraints.pop(wildargs, (object,))
+            Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform = Fcritique, Ftransform
 
             # Since this callable is variable-length'd, we create a loop in our tree
@@ -900,8 +985,8 @@ class multicase(object):
 
         # If there's variable-length parameters, then we simply need to create a loop.
         elif varargs:
-            t = constraints.pop(varargs, object)
-            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            t = constraints.pop(varargs, (object,))
+            Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform = Fcritique, Ftransform
 
             # We can't really match against the parameter name with variable-length
@@ -911,8 +996,8 @@ class multicase(object):
 
         # Pop out the wild (keyword) parameter type from our decorator parameters.
         elif wildargs:
-            t = constraints.pop(wildargs, object)
-            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            t = constraints.pop(wildargs, (object,))
+            Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform = Fcritique, Ftransform
 
             # We need to go through our type parameters and update our table
