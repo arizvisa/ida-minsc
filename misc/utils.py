@@ -248,6 +248,13 @@ class pycompat(object):
         def varnames(cls, object):
             return object.co_varnames
 
+        @classmethod
+        def filename(cls, object):
+            return object.co_filename
+        @classmethod
+        def linenumber(cls, object):
+            return object.co_firstlineno
+
         cons = collections.namedtuple('code_t', ['co_argcount', 'co_nlocals', 'co_stacksize', 'co_flags', 'co_code', 'co_consts', 'co_names', 'co_varnames', 'co_filename', 'co_name', 'co_firstlineno', 'co_lnotab', 'co_freevars', 'co_cellvars'])
         @classmethod
         def unpack(cls, object):
@@ -394,10 +401,56 @@ class multicase(object):
     for a single function.
     """
     cache_name = '__multicase_cache__'
+    documentation_name = '__multicase_documentation__'
 
     def __new__(cls, *other, **t_args):
         '''Decorate a case of a function with the specified types.'''
+
+        # Output some useful information to help the user if there's nothing that satisfies their parameters.
+        def missing(packed_parameters, tree, table, documentation={}):
+            '''Output the candidates for the callable that the user is attempting to use.'''
+            args, kwds = packed_parameters
+            Fcallable, Fhelp, Fprototype = "`{:s}`".format, "`help({:s})`".format, "{:s}".format
+
+            # Basic configuration
+            arrow, indent = ' -> ', 4
+
+            # Some useful utilities for speaking english at our users.
+            Fconjunction_or = lambda items: ', '.join(items[:-1]) + ", or {:s}".format(*items[-1:]) if len(items) > 1 else items[0]
+            Fconjunction_and = lambda items: ', '.join(items[:-1]) + ", and {:s}".format(*items[-1:]) if len(items) > 1 else items[0]
+            sorted_functions = [F for F in cls.sorted_documentation(documentation)]
+
+            # Collect all parameter names, keywords, and documentation for describing what happened.
+            description_arguments = [item.__class__.__name__ for item in args]
+            description_keywords = ["{:s}={!s}".format(name, kwds[name].__class__.__name__) for name in kwds]
+
+            iterable = ((F, documentation[F]) for F in sorted_functions)
+            description_functions = {F : (prototype, F.__module__ if hasattr(F, '__module__') else None, fattribute('__qualname__', pycompat.code.name(pycompat.function.code(F)))(F)) for F, (prototype, _, _) in iterable}
+
+            # Build the error message that is displayed as part of the exception.
+            available_names = sorted({'.'.join([module, name]) if module else name for _, (_, module, name) in description_functions.items()})
+            conjunctioned = Fconjunction_and([Fcallable(item) for item in available_names])
+            description = Fconjunction_or(["{:s}({:s})".format(name, ', '.join(itertools.chain(description_arguments, description_keywords))) for name in available_names])
+            message = u"{:s}: The given parameter type{:s} not match any of the cases for {:s}.".format(description, ' does' if sum(map(len, [description_arguments, description_keywords])) == 1 else 's do', conjunctioned)
+
+            # Build the list of candidates that the user will need to choose from.
+            listing_message = "The functions that are available for {:s} are:".format(Fconjunction_and([Fhelp(item) for item in available_names]))
+            iterable = ((F, description_functions[F]) for F in sorted_functions)
+            prototypes = [(Fprototype('.'.join([module, item]) if module else item if module else item), documentation[F]) for F, (item, module, _) in iterable]
+
+            # Calculate some lengths and use them to format our output in some meaningful way.
+            maximum = max(len(prototype) for prototype, _ in prototypes) if prototypes else 0
+            components = [(prototype, "{:s}{:s}".format(arrow, lines[0]) if len(lines) else '') for prototype, (_, lines, _) in prototypes]
+            iterable = ("{: <{:d}s}{:s}".format(prototype, maximum, description) for prototype, description in components)
+            listing = ["{: <{:d}s}{:s}".format('', indent, item) for item in iterable]
+
+            # Now we have a message and a listing that we can just join together with a newline.
+            raise internal.exceptions.UnknownPrototypeError('\n'.join(itertools.chain([message, '', listing_message], listing)))
+
+        # This is the entry-point closure that gets used to update the actual wrapper with a new candidate.
         def result(wrapped):
+            '''Return a function that will call the given `wrapped` function if the parameters meet the required type constraints.'''
+            flattened_constraints = {argname : tuple(item for item in cls.flatten(types if isinstance(types, internal.types.unordered) else [types])) for argname, types in t_args.items()}
 
             # First we need to extract the function from whatever type it is
             # so that we can read any properties we need from it. We also extract
@@ -408,14 +461,14 @@ class multicase(object):
                     raise internal.exceptions.InvalidTypeOrValueError
 
             except internal.exceptions.InvalidTypeOrValueError:
-                logging.warning("{:s}(...): Refusing to create a case for a non-callable object ({!s}).".format('.'.join([__name__, 'multicase']), wrapped))
+                logging.warning(u"{:s}(...): Refusing to create a case for a non-callable object ({!s}).".format('.'.join([__name__, cls.__name__]), wrapped))
                 return wrapped
 
-            # Next we need to extract all of the argument information from it. We
-            # also need to determine whether it's a special type of some sort so
-            # that we know that its first argument is irrelevant to our needs. We
-            # also check to see if it's using the magic name "__new__" which takes
-            # an implicit parameter that gets passed to it.
+            # Next we need to extract all of the argument information from it. We also need to
+            # determine whether it's a special type of some sort so that we know that its first
+            # argument is irrelevant for our needs. With regards to this, we can't do anything
+            # for methods since we see them before they get attached. However, we can explicitly
+            # check if it's using the magic name "__new__" which uses an implicit parameter.
             args, defaults, (star, starstar) = cls.ex_args(func)
             s_args = 1 if isinstance(wrapped, (internal.types.classmethod, internal.types.method)) or func.__name__ in {'__new__'} else 0
 
@@ -437,50 +490,49 @@ class multicase(object):
             # So if we found an already-existing wrapper, then we need to steal its cache.
             res = ok and prev and cls.ex_function(prev)
             if ok and hasattr(res, cls.cache_name):
-                cache = getattr(res, cls.cache_name)
+                owner, cache, documentation = res, getattr(res, cls.cache_name), getattr(res, cls.documentation_name)
 
             # Otherwise, we simply need to create a new cache entirely.
             else:
-                cache = []
-                res = cls.new_wrapper(func, cache)
+                owner, cache, documentation = func, ({}, {}), {}
+                res = cls.new_wrapper(func, cache, Fmissing=functools.partial(missing, documentation=documentation))
                 res.__module__ = getattr(wrapped, '__module__', getattr(func, '__module__', '__main__'))
 
-            # We calculate the priority of this case by trying to match against the
-            # most complex definition first.
-            argtuple = s_args, args, defaults, (star, starstar)
-            priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i, a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for item in [star, starstar] if item)
+                # Update our new wrapper with our cache (tree and table) and our
+                # documentation state so that it not only works but it reads too.
+                setattr(res, cls.cache_name, cache)
+                setattr(res, cls.documentation_name, documentation)
 
-            # Iterate through our cache whilst checking to see if our decorated
-            # function is already inside of it.
-            current = tuple(t_args.get(_, None) for _ in args), (star, starstar)
-            for i, (p, (_, t, a)) in enumerate(cache):
-                if p != priority: continue
+            # Now we need to add the function we extracted to our tree of candidate functions.
+            constraints = {name : types for name, types in flattened_constraints.items()}
+            tree, table = cache
+            F = cls.add(func, constraints, tree, table)
+            assert(F is func)
 
-                # Verify that the function actually matches our current entry. If
-                # it does, then we can update the entry and its documentation.
-                if current == (tuple(t.get(_, None) for _ in a[1]), a[3]):
-                    cache[i] = priority_tuple(priority, (func, t_args, argtuple))
-                    res.__doc__ = cls.document(func.__name__, [item for _, item in cache])
-                    return cons(res)
-                continue
+            # Verify that we constrained all of the available types. If any are left, then
+            # we need to complain about it since we just added the case to our tree.
+            if constraints:
+                co = pycompat.function.code(func)
+                description = '.'.join(getattr(func, attribute) for attribute in ['__module__', '__name__'] if hasattr(func, attribute))
+                location = "{:s}:{:d}".format(pycompat.code.filename(co), pycompat.code.linenumber(co))
+                error_constraints = {name : "{:s}={!s}".format(name, types.__name__ if isinstance(types, internal.types.type) or types in {internal.types.callable} else '|'.join(sorted(t_.__name__ for t_ in types)) if hasattr(types, '__iter__') else "{!r}".format(types)) for name, types in flattened_constraints.items()}
+                logging.warning(u"@{:s}(...) : Unable to constrain {:d} parameter{:s} ({:s}) for prototype \"{:s}({:s})\" at {:s}.".format('.'.join([__name__, cls.__name__]), len(constraints), '' if len(constraints) == 1 else 's', ', '.join(constraints), description, ', '.join(error_constraints.get(name, name) for name in args[s_args:]), location))
 
-            # That means we should be good to go, so it should be okay to push
-            # our new entry into our heap that will be searched upon using the function.
-            heapq.heappush(cache, priority_tuple(priority, (func, t_args, argtuple)))
-            #heapq.heappush(cache, (priority, (func, t_args, argtuple)))
-
-            # Completely regenerate the documentation using what we have in the cache.
-            res.__doc__ = cls.document(func.__name__, [item for _, item in cache])
+            # Now we can use the information we collected about the function to
+            # generate a documentation entry. Once we do this, then we completely
+            # regenerate the documentation so that it's always up to date.
+            documentation[func] = cls.render_documentation(func, flattened_constraints, args[:s_args])
+            res.__doc__ = cls.document(documentation)
 
             # ..and then we can restore the original wrapper in all of its former glory.
             return cons(res)
 
         # Validate the types of all of our arguments and raise an exception if it used
         # an unsupported type.
-        for name, type in t_args.items():
-            if not isinstance(type, (internal.types.type, internal.types.tuple)) and type not in {internal.types.callable}:
-                error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, internal.types.type) or type in {internal.types.callable} else '|'.join(t_.__name__ for t_ in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
-                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), type, string.escape(name, '"')))
+        for name, types in t_args.items():
+            if not isinstance(types, (internal.types.type, internal.types.tuple)) and types not in {internal.types.callable}:
+                error_keywords = ("{:s}={!s}".format(name, types.__name__ if isinstance(types, internal.types.type) or types in {internal.types.callable} else '|'.join(t_.__name__ for t_ in types) if hasattr(types, '__iter__') else "{!r}".format(types)) for name, types in t_args.items())
+                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), types, string.escape(name, '"')))
             continue
 
         # Validate the types of our arguments that we were asked to decorate with, this
@@ -489,36 +541,391 @@ class multicase(object):
         try:
             [cls.ex_function(item) for item in other]
         except Exception:
-            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, internal.types.type) or type in {internal.types.callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
+            error_keywords = ("{:s}={!s}".format(name, types.__name__ if isinstance(types, internal.types.type) or types in {internal.types.callable} else '|'.join(item.__name__ for item in types) if hasattr(types, '__iter__') else "{!r}".format(types)) for name, types in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
 
         # If we were given an unexpected number of arguments to decorate with, then
         # raise an exception. This is strictly done to assist with debugging.
         if len(other) > 1:
-            error_keywords = ("{:s}={!s}".format(name, type.__name__ if isinstance(type, internal.types.type) or type in {internal.types.callable} else '|'.join(item.__name__ for item in type) if hasattr(type, '__iter__') else "{!r}".format(type)) for name, type in t_args.items())
+            error_keywords = ("{:s}={!s}".format(name, types.__name__ if isinstance(types, internal.types.type) or types in {internal.types.callable} else '|'.join(item.__name__ for item in types) if hasattr(types, '__iter__') else "{!r}".format(types)) for name, type in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(pycompat.code.name(c) if isinstance(c, internal.types.code) else c.__name__, '"')) for c in other)))
         return result
 
     @classmethod
-    def document(cls, name, cache):
-        '''Generate documentation for a multicased function.'''
+    def document(cls, descriptions):
+        '''Generate the documentation for a multicased function using the given `descriptions`.'''
         result = []
 
-        # Iterate through every item in our cache, and generate the prototype for it.
-        for function, constraints, (ignore_count, parameter_names, _, _) in cache:
-            prototype = cls.prototype(function, constraints, parameter_names[:ignore_count])
+        # Configure how we plan on joining each component of the documentation.
+        arrow, indent = ' -> ', 4
+        maximum = max(len(prototype) for F, (prototype, _, _) in descriptions.items()) if descriptions else 0
 
-            # Now that we have the prototype, we need to figure out where we need to
-            # add the documentation for the individual case.
-            doc = (function.__doc__ or '').split('\n')
-            if len(doc) > 1:
-                item, lines = "{:s} -> ".format(prototype), (item for item in doc)
-                result.append("{:s}{:s}".format(item, next(lines)))
-                result.extend("{: >{padding:d}s}".format(line, padding=len(item) + len(line)) for line in map(operator.methodcaller('strip'), lines))
-            elif len(doc) == 1:
-                result.append("{:s}{:s}".format(prototype, " -> {:s}".format(doc[0]) if len(doc[0]) else ''))
-            continue
+        # Collect each prototype and lines that compose each description.
+        for F in cls.sorted_documentation(descriptions):
+            prototype, lines, _ = descriptions[F]
+            pointed = "{: <{:d}s}{:s}".format(prototype, maximum, arrow)
+            iterable = (item for item in lines)
+            result.append(''.join([pointed, next(iterable)]) if len(lines) else prototype)
+            result.extend("{: >{padding:d}s}".format(item, padding=indent + len(pointed) + len(item)) for item in iterable)
         return '\n'.join(result)
+
+    @classmethod
+    def filter_candidates(cls, candidates, packed_parameters, tree, table):
+        '''Critique the arguments in `packed_parameters` against the branch that is given in `candidates`.'''
+        args, _ = packed_parameters
+        parameters = (arg for arg in args)
+
+        # First we need a closure that's driven simply by the parameter value. This gets
+        # priority and will just descend through the tree until nothing is left.
+        def critique_unnamed(parameter, branch):
+            results = []
+            for F, node in branch:
+                parameter_name, index, _ = node
+                discard_and_required, critique_and_transform, _ = table[F, index]
+                parameter_critique, parameter_transform = critique_and_transform
+
+                # Now we take the parameter value, transform it, and then critique it.
+                value = parameter_transform(parameter)
+                if parameter_critique(value):
+                    results.append((F, node))
+                continue
+            return results
+
+        # This function is only needed for processing arguments, because if there aren't any
+        # then all the nodes at a 0-height in our tree need to be checked for termination.
+        assert(args)
+
+        # Iterate through all of our parameters until we're finished or out of parameters.
+        iterable = ((F, tree[index][F]) for F, index in candidates)
+        branch = [(F, (name, index, next)) for F, (name, index, next) in iterable if index >= 0]
+        for index, parameter in enumerate(parameters):
+            candidates = critique_unnamed(parameter, branch)
+            branch = [(F, tree[next][F]) for F, (_, _, next) in candidates if next >= 0 and (F, next) in table]
+        return [(F, index) for F, (_, index, next) in candidates if index == next or next >= 0]
+
+    @classmethod
+    def filter_args(cls, packed_parameters, tree, table):
+        '''Critique the arguments from `packed_parameters` using the provided `tree` and `table`.'''
+        args, _ = packed_parameters
+
+        # If there are some parameters, then start out by only considering functions
+        # which support the number of args we were given as candidates.
+        if args:
+            count = len(args)
+            results = {F for F in tree.get(count - 1, [])}
+
+            # Next, we go through all of the available functions to grab only the ones
+            # which can take varargs and are smaller than our arg count.
+            iterable = ((F, pycompat.function.code(F)) for F in tree.get(0, []))
+            unknowns = {F for F, c in iterable if pycompat.code.flags(c) & pycompat.co_flags.CO_VARARGS and pycompat.code.argcount(c) <= count}
+
+            # Now we turn them into a branch and then we can process the arguments.
+            candidates = [(F, 0) for F in results | unknowns]
+            return cls.filter_candidates(candidates, packed_parameters, tree, table)
+
+        # If there are no parameters, then return everything. This really should only be done
+        # by multicase.match, but we're doing this here for the sake of the unit-tests.
+        branch = tree[0].items()
+        return [(F, index) for F, (_, index, next) in branch if index == next or index >= 0]
+
+    @classmethod
+    def filter_keywords(cls, candidates, packed_parameters, tree, table):
+        '''Critique the keywords from the `packed_parameters` against the branch given in `candidates`.'''
+        args, kwds = packed_parameters
+
+        def critique_names(kwds, branch):
+            results, keys = [], {name for name in kwds}
+            for F, node in branch:
+                parameter_name, index, _ = node
+                discard_and_required, critique_and_transform, wildargs = table[F, index]
+
+                # Extract our sets that are required for the callable to be
+                # considered a candidate and filter our keywords depending
+                # on whether we're processing named parameters or wild ones.
+                discard, required = discard_and_required
+                available = keys - discard if wildargs else keys & required
+
+                # If we still have any parameters available and their names
+                # don't matter (wild), then critique and what we just consumed.
+                if available and wildargs:
+                    parameter_critique, parameter_transform = critique_and_transform
+                    parameters = (kwds[name] for name in available)
+                    transformed = map(parameter_transform, parameters)
+                    results.append((F, node)) if all(parameter_critique(parameter) for parameter in transformed) else None
+
+                # If our parameter name is available, then we can critique it.
+                elif available and parameter_name in available:
+                    parameter_critique, parameter_transform = critique_and_transform
+                    parameter = parameter_transform(kwds[parameter_name])
+                    results.append((F, node)) if parameter_critique(parameter) else None
+
+                # Otherwise this parameter doesn't exist which makes it not a candidate.
+                else:
+                    continue
+                continue
+            return results
+
+        # Process as many keywords as we have left...
+        branch = [(F, tree[index][F]) for F, index in candidates if (F, index) in table]
+        for count in range(len(kwds)):
+            critiqued = critique_names(kwds, branch)
+
+            # If processing this keyword resulted in a loop (varargs), then
+            # promote it to a wildargs so we can check the rest of the kwargs.
+            candidates = [(F, -1 if index == next else index) for F, (_, index, next) in critiqued]
+            branch = [(F, tree[-1 if index == next else next][F]) for F, (_, index, next) in critiqued if (F, -1 if index == next else next) in table]
+        return candidates
+
+    @classmethod
+    def critique_and_transform(cls, F, packed_parameters, tree, table):
+        '''Critique and transform the `packed_parameters` for the function `F` returning the resolved parameters and a bias for the number of parameters we needed to transform.'''
+        args, kwds = packed_parameters
+        results, keywords = [], {name : value for name, value in kwds.items()}
+        counter = 0
+
+        # First process each of the arguments and add them to our results.
+        _, index, _ = tree[0][F]
+        for arg in args:
+            _, critique_and_transform, _ = table[F, index]
+            parameter_critique, parameter_transform = critique_and_transform
+            parameter = parameter_transform(arg)
+            assert(parameter_critique(parameter))
+            #counter = counter if arg is parameter else counter + 1
+            counter = counter if arg == parameter else counter + 1
+            results.append(parameter)
+            _, _, index = tree[index][F]
+
+        # First check if we have any other parameters we need to process
+        # because if we don't, then we can just quit while we're ahead.
+        if not keywords and (F, index) not in table:
+            return results, keywords, counter
+        assert((F, index) in table)
+
+        # Now since we have keywords left to process, we need to ensure
+        # that we still have parameters to complete or we need to promote
+        # ourselves to -1 so that we can critique the keywords leftover.
+        _, index, next = tree[index][F]
+        index = -1 if index == next else index if (F, next) in table else index
+
+        # Now we can process the rest of our function arguments using whatever
+        # keywords that are available until our index becomes less than 0.
+        while index >= 0 and (F, index) in table:
+            name, index, next = tree[index][F]
+            _, critique_and_transform, wild = table[F, index]
+            parameter_critique, parameter_transform = critique_and_transform
+            if index >= 0 and name and not wild:
+                arg = keywords.pop(name)
+                parameter = parameter_transform(arg)
+                assert(parameter_critique(parameter))
+                #counter = counter if arg is parameter else counter + 1
+                counter = counter if arg == parameter else counter + 1
+                results.append(parameter)
+            index = next
+
+        # Despite this assertion not being exhaustive, if we ended up with some
+        # keywords leftover then our function and index should be in the table.
+        assert((F, index) in table if keywords else True)
+
+        # That should be all of our named arguments, so whatever is left should
+        # be the keyword arguments that belong to the wildargs candidates.
+        return results, keywords, counter
+
+    @classmethod
+    def ordered(cls, candidates, tree, table):
+        '''Yield the given `candidates` in the correct order using `tree` and `table`.'''
+        iterable = reversed(sorted(candidates, key=operator.itemgetter(1)))
+        items = [ item for item in iterable ]
+
+        # First we yield all of the items that have successfully terminated.
+        iterable = ( item for item in items if item not in table )
+        for F, index in iterable:
+            yield F, index
+
+        # Now we can yield the callable that we resolved the most parameters with.
+        count, items = 0, [item for item in items if item in table]
+        for F, index in items[count:]:
+            yield F, index
+            count += 1
+
+        # Afterwards, we just yield the rest which should all be wildarg parameters.
+        for F, index in items[count:]:
+            yield F, index
+        return
+
+    @classmethod
+    def preordered(cls, packed_parameters, candidates, tree, table):
+        '''Yield the callable and transformed `packed_parameters` from `candidates` using `tree` and `table` in the correct order.'''
+        results = {}
+        [ results.setdefault(index, []).append(F) for F, index in candidates ]
+
+        order = [index for index in reversed(sorted(results))]
+        for index in order:
+            items = [ F for F in results[index] if (F, index) not in table ]
+
+            # If we have more than one match, then we need to pre-sort this
+            # by whatever their bias is so that we choose the right one.
+            if len(items) > 1:
+                iterable = (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
+                biased = {bias : (F, (args, kwds)) for F, (args, kwds, bias) in zip(items, iterable) }
+                ordered = (biased[key] for key in sorted(biased))
+
+            # Otherwise, we don't need to sort and can take the first one.
+            else:
+                iterable = (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
+                ordered = ((F, (args, kwds)) for F, (args, kwds, _) in zip(items, iterable))
+
+            # Now we have the biased order and the parameters to use, so yield
+            # them to the caller so that it can actually be executed.
+            for F, packed in ordered:
+                yield F, packed
+
+            # Now we iterate through the results that actually do exist
+            # because they're either variable-length parameters or wild.
+            items = [ F for F in results[index] if (F, index) in table ]
+
+            # Similarly, if we have more than one match here, then we need
+            # to critique_and_transform the parameters and sort by bias.
+            if len(items) > 1:
+                iterable = (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
+                biased = {bias : (F, (args, kargs)) for F, (args, kargs, bias) in zip(items, iterable) }
+                ordered = (biased[key] for key in sorted(biased))
+
+            # There's only one match, so that's exactly what we'll return.
+            else:
+                iterable = (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
+                ordered = ((F, (args, kwds)) for F, (args, kwds, _) in zip(items, iterable))
+
+            # Yield what we found and continue to the next match.
+            for F, packed in ordered:
+                yield F, packed
+            continue
+        return
+
+    # For the following methods, we could expose another decorator that allows
+    # one to specifically update the critique_and_transform field inside the
+    # parameter table, but for simpliciy (and backwards compatibility) we only
+    # use a single decorator and explicitly transform the type with these.
+
+    @classmethod
+    def parameter_critique(cls, type):
+        '''Return a callable that critiques its parameter for the given type.'''
+        instance = lambda item, type=type: isinstance(item, type)
+        integer = lambda item, type=type: isinstance(item, type) or hasattr(item, '__int__')
+        string = lambda item, type=type: isinstance(item, type) or hasattr(item, '__str__')
+        function = callable
+        if type == int:
+            return integer
+        return function if type == callable else instance
+
+    @classmethod
+    def parameter_transform(cls, type):
+        '''Return a callable that transforms its parameter to the given type.'''
+
+        identity = lambda item: item
+        integer = lambda item: int(item) if hasattr(item, '__int__') else item
+        string = lambda item: str(item) if hasattr(item, '__str__') else item
+
+        if type == int:
+            return integer
+        return identity
+
+    # XXX: Our main decorator that is responsible for updating the decorated function.
+    @classmethod
+    def add(cls, callable, constraints, tree, table):
+        '''Add the `callable` with the specified type `constraints` to both the `tree` and `table`.'''
+        args, kwargs, packed = cls.ex_args(callable)
+        varargs, wildargs = packed
+
+        # Extract the parameter names and the types that the callable was
+        # decorated with so that we can generate the functions used to
+        # transform and critique the value that determines its validity.
+        critique_and_transform = []
+        for name in args:
+            t = constraints.pop(name, object)
+            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            critique_and_transform.append((Fcritique, Ftransform))
+
+        # Generate two sets that are used to determine what parameter names
+        # are required for this wrapped function to still be considered.
+        discard_and_required = []
+        for index, name in enumerate(args):
+            discard = {item for item in args[:index]}
+            required = {item for item in args[index:]}
+            discard_and_required.append((discard, required))
+
+        # Zip up our parameters with both our critique_and_transform and
+        # discard_and_required lists so we can build a tree for each parameter.
+        items = [packed for packed in zip(enumerate(args), discard_and_required, critique_and_transform)]
+        for index_name, discard_and_required, critique_and_transform in items:
+            index, name = index_name
+            assert(index_name not in table)
+            table[callable, index] = discard_and_required, critique_and_transform, wildargs if wildargs == name else ''
+            tree.setdefault(index, {})[callable] = name, index, 1 + index
+
+        # We should be done, but in case there's var args or wild args (keywords), then
+        # we'll need to create some cycles within our tree and table. None of these entries
+        # hold anything of value, but they need to hold something.. So we create some defaults.
+        discard_and_required = {name for name in args}, {name for name in []}
+        critique_and_explode = (operator.truth, lambda item: False)
+        critique_and_continue = (operator.truth, lambda item: True)
+
+        # If there are no parameters whatsoever, then we need a special case
+        # which gets used at the first pass of our parameter checks. Essentially
+        # we treat this as a vararg, but without the loop. This way if it does
+        # turn out to be a vararg or wildarg, it will get fixed to add the loop.
+        if not args:
+            discard_and_impossible = {name for name in args}, {None}
+
+            # If we don't have any parameters, then our first parameter should
+            # immediately fail. If we're variable-length'd or wild, then the
+            # conditionals that follow this will overwrite this with a loop.
+            table[callable, len(args)] = discard_and_impossible, critique_and_explode, ''
+            tree.setdefault(len(args), {})[callable] = '', 0, -1
+
+        # If both are selected, then we need to do some connections here.
+        if varargs and wildargs:
+            t = constraints.pop(wildargs, object)
+            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            critique_and_transform = Fcritique, Ftransform
+
+            # Since this callable is variable-length'd, we create a loop in our tree
+            # and table so that we can consume any number of parameters.
+            table[callable, len(args)] = discard_and_required, critique_and_transform, wildargs
+            tree.setdefault(len(args), {})[callable] = varargs, len(args), len(args)
+
+            # Since the callable is also wild, we need to create a loop outside the
+            # count of parameters (-1). This way we can promote a loop to this path.
+            tree.setdefault(-1, {})[callable] = wildargs, -1, -1
+            table[callable, -1] = discard_and_required, critique_and_transform, wildargs
+
+        # If there's variable-length parameters, then we simply need to create a loop.
+        elif varargs:
+            t = constraints.pop(varargs, object)
+            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            critique_and_transform = Fcritique, Ftransform
+
+            # We can't really match against the parameter name with variable-length
+            # parameters, so we add it as a loop for an empty string (unnamed).
+            tree.setdefault(len(args), {})[callable] = varargs, len(args), len(args)
+            table[callable, len(args)] = discard_and_required, critique_and_transform, ''
+
+        # Pop out the wild (keyword) parameter type from our decorator parameters.
+        elif wildargs:
+            t = constraints.pop(wildargs, object)
+            Fcritique, Ftransform = cls.parameter_critique(t), cls.parameter_transform(t)
+            critique_and_transform = Fcritique, Ftransform
+
+            # We need to go through our type parameters and update our table
+            # so that it includes any wild keyword parameters.
+            tree.setdefault(-1, {})[callable] = wildargs, -1, -1
+            table[callable, -1] = discard_and_required, critique_and_transform, wildargs
+
+            # Create our sentinel entry in the tree so that when we run out
+            # of args, we transfer to the keyword parameters (-1) to continue.
+            tree.setdefault(len(args), {})[callable] = '', len(args), -1
+            table[callable, len(args)] = discard_and_required, critique_and_continue, wildargs
+
+        return callable
 
     @classmethod
     def flatten(cls, iterable):
@@ -539,8 +946,43 @@ class multicase(object):
         return
 
     @classmethod
+    def render_documentation(cls, function, constraints, ignored):
+        '''Render the documentation for a `function` using the given `constraints` while skipping over any `ignored` parameters.'''
+        args, defaults, (star, starstar) = cls.ex_args(function)
+        parameters = [name for name in itertools.chain(args, [star, starstar]) if name]
+        prototype = cls.prototype(function, constraints, ignored)
+        documentation = function.__doc__ or ''
+        lines = documentation.split('\n')
+        constraint_order = [constraints.get(arg, (object,)) for arg in parameters]
+        return prototype, [item.strip() for item in lines] if documentation.strip() else [], (lambda *args: args)(*constraint_order)
+
+    # Create a dictionary to bias the order of our documentation so that
+    # custom or more complicated types tend to come first.
+    documentation_bias = {constraint : 1 for constraint in itertools.chain(internal.types.ordered, internal.types.unordered)}
+    documentation_bias.update({constraint : 2 for constraint in itertools.chain(internal.types.integer, internal.types.string)})
+
+    @classmethod
+    def sorted_documentation(cls, descriptions):
+        '''Return the provided `descriptions` in the order that was used to generate their documentation.'''
+
+        # First we need to look at the documentation and extract the number of lines.
+        iterable = ((F, pycompat.function.documentation(F) or '') for F in descriptions)
+        stripped = ((F, string.strip()) for F, string in iterable)
+        newlines = {F : string.count('\n') for F, string in stripped}
+
+        # Now we extract the constraints for each parameter so that we can calculate the
+        # number of parameters along with a bias based on the constraints.
+        items = [(F, constraints) for F, (_, _, constraints) in descriptions.items()]
+        counts = {F : len(constraints) for F, constraints in items}
+        bias = {F : sum(max(cls.documentation_bias.get(item, 0) for item in items) for items in constraints) for F, constraints in items}
+
+        # Afterwards we can sort by number of lines, number of parameters, and then constraint bias.
+        items = [((newlines[F], counts[F], bias[F]), F) for F in descriptions]
+        return [F for _, F in sorted(items, key=operator.itemgetter(0))]
+
+    @classmethod
     def prototype(cls, function, constraints={}, ignored={item for item in []}):
-        '''Generate a prototype for an instance of a `function`.'''
+        '''Generate a prototype for the given `function` and `constraints` while skipping over the `ignored` argument names.'''
         args, defaults, (star, starstar) = cls.ex_args(function)
 
         def Femit_arguments(names, constraints, ignored):
@@ -578,158 +1020,84 @@ class multicase(object):
             co_fullname, co_filename, co_lineno = '.'.join([function.__module__, function.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
             proto_s = "{:s}({:s}{:s}{:s})".format(co_fullname, ', '.join(args) if args else '', ", *{:s}".format(star) if star and args else "*{:s}".format(star) if star else '', ", **{:s}".format(starstar) if starstar and (star or args) else "**{:s}".format(starstar) if starstar else '')
             path_s = "{:s}:{:d}".format(co_filename, co_lineno)
-            logging.warning("{:s}({:s}): Unable to constrain the type in {:s} for parameter{:s} ({:s}) at {:s}.".format('.'.join([__name__, 'multicase']), co_fullname, proto_s, '' if len(unavailable) == 1 else 's', ', '.join(unavailable), path_s))
+            logging.warning(u"{:s}({:s}): Unable to constrain the type in {:s} for parameter{:s} ({:s}) at {:s}.".format('.'.join([__name__, cls.__name__]), co_fullname, proto_s, '' if len(unavailable) == 1 else 's', ', '.join(unavailable), path_s))
 
         # Return the prototype for the current function with the provided parameter constraints.
         iterable = (item if parameter is None else "{:s}={:s}".format(item, parameter) for item, parameter in Femit_arguments(args, constraints, ignored))
         items = iterable, ["*{:s}".format(star)] if star else [], ["**{:s}".format(starstar)] if starstar else []
-        return "{:s}({:s})".format(pycompat.function.name(function), ', '.join(itertools.chain(*items)))
+        return "{:s}({:s})".format(fattribute('__qualname__', pycompat.function.name(function))(function), ', '.join(itertools.chain(*items)))
 
     @classmethod
-    def match(cls, packed_parameters, heap):
-        '''Given the (`args`, `kwds`) stored in the `packed_parameters`, find the correct function according to the constraints of each member in the `heap`.'''
-        args, kwds = packed_parameters
+    def match(cls, packed_parameters, tree, table):
+        '''Use the provided `packed_parameters` to find a matching callable in both `tree` and `table`.'''
+        args, kwargs = packed_parameters
+        candidates = cls.filter_args(packed_parameters, tree, table)
 
-        # Iterate through all the available functions/cases within the heap that
-        # we were given. This is being done in O(n) time which can be significantly
-        # improved because we should be being sorted by complexity and count. This
-        # really should allow use to start searching closer to the item in the list
-        # that matches our parameters that we're searching with.
-        for F, constraints, (parameter_ignore_count, parameter_names, parameter_defaults, (parameter_wildargs, parameter_wildkeywords)) in heap:
+        # If there's no other filters, then we filter our candidates
+        # by culling out everything that can still take parameters.
+        if not kwargs:
+            assert(all(index >= 0 for F, index in candidates))
+            iterable = ((F, tree[index][F]) for F, index in candidates)
+            branch = [(F, (name, index, next)) for F, (name, index, next) in iterable if next <= len(args)]
 
-            # Grab our values that we're going to match with.
-            parameter_iterator, parameter_keywords = (item for item in args), {kwparam : kwvalue for kwparam, kwvalue in kwds.items()}
+            # Now we have a branch containing everything that we care about. So, all we really
+            # need to do here is collect our results if we have any that are available.
+            results = [(F, next) for F, (name, index, next) in branch if (F, next) not in table]
 
-            # Skip the ignored argument values within our parameters.
-            [next(item) for item in [parameter_iterator] * parameter_ignore_count]
+            # In case we didn't get any results, then we move onto the next branch so that we
+            # can grab the next varargs or wildargs candidates that are still available.
+            nextbranch = [(F, tree[next][F]) for F, (name, index, next) in branch if (F, next) in table]
+            vars = [(F, next) for F, (name, index, next) in nextbranch if index == next and index <= len(args)]
+            wild = [(F, next) for F, (name, index, next) in nextbranch if index != next and next < 0]
 
-            # Build the argument tuple that contains the actual parameters that
-            # will be passed to the matched function. When we collect the arguments,
-            # we need to ensure that any keywords parameters and default parameters
-            # will be inserted into the correct place within the tuple.
-            parameter_values = []
-            for name in parameter_names[parameter_ignore_count:]:
-                try:
-                    value = next(parameter_iterator)
+            # That was everything, so we just need to return them in the correct order.
+            return results + vars + wild
 
-                # If there were no parameters left within our iterator, then we
-                # need to apply any keywords that we were given.
-                except StopIteration:
-                    if name in parameter_keywords:
-                        value = parameter_keywords.pop(name)
+        # If we had some args that we ended up processing, then we need to shift them if there's
+        # still some parameters or promote them to keywords to do the final filtering pass.
+        elif args:
+            iterable = [(F, tree[index][F]) for F, index in candidates if (F, index) in table]
+            candidates = [(F, -1 if index == next else next) for F, (_, index, next) in iterable]
+            #candidates = [(F, -1 if index == next else index) for F, (_, index, next) in iterable]
 
-                    # If there weren't any keywords with our parameter name, then
-                    # we need to check to see if there's a default parameter to use.
-                    elif name in parameter_defaults:
-                        value = parameter_defaults.pop(name)
+        # Now each candidate should be at the right place in their tree and we can filter keywords.
+        results = cls.filter_keywords(candidates, packed_parameters, tree, table)
 
-                    # If there were no default parameters, then we need to leave
-                    # because we don't have a way to grab any more parameters.
-                    else:
-                        break
-
-                    # We were able to get a keyword or default parameter, so we can
-                    # add it to our arguments to match with.
-                    parameter_values.append(value)
-
-                # We consumed a parameter value, so we can now append it to our arguments
-                # that we will match against.
-                else:
-                    parameter_values.append(value)
-                continue
-
-            # Now that we have our parameter values, we need to convert it into a tuple
-            # so that we can process and use it. Any parameters left in parameter_iterator
-            # or parameter_keywords are considered part of the wildcard parameters.
-            argument_values = builtins.tuple(parameter_values)
-            argument_wildcard, argument_keywords = [item for item in parameter_iterator], {kwparam : kwvalue for kwparam, kwvalue in parameter_keywords.items()}
-
-            # First check if we have any extra parameters. If we do, but there's no wildcards
-            # available in our current match, then it doesn't fit and we move onto the next one.
-            if not parameter_wildargs and len(argument_wildcard):
-                continue
-
-            # If we have any extra keywords, then we need to ensure that there's a keyword
-            # parameter in our current match. Otherwise, it doesn't fit and we need to move on.
-            elif not parameter_wildkeywords and argument_keywords:
-                continue
-
-            # Second, we need to check that our argument length actually matches. To accomplish
-            # this, we need to check if our function can take a wildcard parameter. If so, then
-            # we need to ensure that the number of parameters that we were given are larger than
-            # what was required.
-            if parameter_wildargs and parameter_ignore_count + len(argument_values) < len(parameter_names):
-                continue
-
-            # If our function doesn't take a wildcard parameter, then our number of arguments
-            # should match what we were given. If they don't, then skip onto the next one.
-            elif not parameter_wildargs and parameter_ignore_count + len(argument_values) != len(parameter_names):
-                continue
-
-            # Third, we need to actually check our type constraints that our current match was
-            # decorated with. If our constraint is a builtins.callable, then we just need to
-            # ensure that the parameter can be called. Otherwise our constraint should be an
-            # iterable of types that we can simply pass long to the isinstance() function.
-            critiqueF = lambda constraint: builtins.callable if constraint == builtins.callable else frpartial(builtins.isinstance, constraint)
-
-            # Zip our parameter names along with our argument values so that we can extract
-            # the constraint, and check the value against it. If any of these checks fail,
-            # then it's not a match and we need to move on to the next iteration.
-            parameter_names_and_values = zip(parameter_names[parameter_ignore_count:], argument_values)
-            if not all(critiqueF(constraints[name])(value) for name, value in parameter_names_and_values if name in constraints):
-                continue
-
-            # We should now have a match. So now that we've figured out all of our individual
-            # parameters and their positions, we need to put them all together so that we can
-            # return them to the caller so that they can actually call it.
-            result_arguments = builtins.tuple(itertools.chain(args[:parameter_ignore_count], argument_values))
-            return F, (result_arguments, argument_wildcard, argument_keywords)
-
-        # If we iterated through everything in our heap, then we couldn't find a match for the
-        # types the user gave us. So we need to raise an exception to inform the user that the
-        # types we were given did not match any of the constraints that we know about.
-        ignored = min(ignore_count for _, _, (ignore_count, _, _, _) in heap) if heap else 0
-        error_arguments = [item.__class__.__name__ for item in args[ignored:]]
-        error_keywords = ["{:s}={!s}".format(name, kwds[name].__class__.__name__) for name in kwds]
-
-        # Here we extract all of the possible cases so that we can present a descriptive error
-        # message. We also need to do something incredibly dirty here which involves re-splitting
-        # the name from the prototypes to avoid re-calculating the name returned by cls.prototype.
-        prototypes = ((F.__module__ if hasattr(F, '__module__') else None, cls.prototype(F, constraints)) for F, constraints, _ in heap)
-        error_prototypes = ['.'.join([module, name]) if module else name for module, name in prototypes]
-        error_names = sorted({prototype.split('(', 1)[0] for prototype in error_prototypes})
-
-        # Now we can collect all of our components into individual lists of availability,
-        # and then format them as a proper fucking sentence because we "love" our users.
-        Fnames, Fhelp, Fprototype = "`{:s}`".format, "`help({:s})`".format, "{:s}".format
-        available_names      = ', '.join(map(Fnames,     error_names[:-1]))      + (", and {:s}".format(*map(Fnames,     error_names[-1:]))      if len(error_names) > 1      else Fnames(error_names[0]))
-        available_help       = ', '.join(map(Fhelp,      error_names[:-1]))      + (", and {:s}".format(*map(Fhelp,      error_names[-1:]))      if len(error_names) > 1      else Fhelp(error_names[0]))
-        available_prototypes = ', '.join(map(Fprototype, error_prototypes[:-1])) + (", or {:s}".format( *map(Fprototype, error_prototypes[-1:])) if len(error_prototypes) > 1 else Fprototype(error_prototypes[0]))
-
-        # Now we can format our description, create our exception, and finally raise it.
-        description = ', '.join("{:s}({:s}{:s})".format(name, ', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '') for name in error_names)
-        raise internal.exceptions.UnknownPrototypeError(u"{:s}: The given parameter{:s} not match any of the available prototypes for {:s}. The prototypes which are available via {:s} are: {:s}".format(description, ' does' if sum(map(len, [error_arguments, error_keywords])) == 1 else 's do', available_names, available_help, available_prototypes))
+        # Last thing to do is to take our results, filter their matches, sort them by their
+        # and then we can return them to the caller to actually use them.
+        iterable = ((F, tree[index][F]) for F, index in results)
+        return [(F, next) for F, (_, index, next) in iterable if next < 0 or (F, next) not in table]
 
     @classmethod
-    def new_wrapper(cls, func, cache):
+    def new_wrapper(cls, func, cache, Fmissing=None, Fdebug_candidates=None):
         '''Create a new wrapper that will determine the correct function to call.'''
+        tree, table = cache
 
-        # Define the wrapper for the function that we're decorating. This way whenever the
-        # decorated function gets called, we can search for one that matches the correct
-        # constraints and dispatch into it with the original parameters in the correct order.
+        ## Define the wrapper for the function that we're decorating. This way whenever the
+        ## decorated function gets called, we can search for one that matches the correct
+        ## constraints and dispatch into it with the correctly transformed parameters.
         def F(*arguments, **keywords):
-            heap = [item for _, item in heapq.nsmallest(len(cache), cache, key=operator.attrgetter('priority'))]
-
-            # Pack our parameters, and then hand them off to our matching function. This
-            # should then return the correct callable that matches the argument types we
-            # were given so that we can dispatch to it.
             packed_parameters = arguments, keywords
-            result_callable, result_parameters = cls.match(packed_parameters, heap)
+            candidates = cls.match(packed_parameters, tree, table)
+            iterable = cls.preordered(packed_parameters, candidates, tree, table)
 
-            # Now we have a matching callable for the user's parameters, and we just need
-            # to unpack our individual parameters and dispatch to the callable with them.
-            parameters, wild_parameters, keyword_parameters = result_parameters
-            return result_callable(*itertools.chain(parameters, wild_parameters), **keyword_parameters)
+            # Extract our first match if we were able to find one. If not, then pass what
+            # we tried to match to the missing-hook to complain about it.
+            result = next(iterable, None)
+            if result is None:
+                if Fmissing is not None:
+                    return Fmissing(packed_parameters, tree, table)
+                raise RuntimeError(packed_parameters, tree, table)
+
+            # If our debug-hook is defined, then pass our matches to it so that it can be
+            # dumped to the screen or stashed somewhere to assist debugging.
+            if Fdebug_candidates is not None:
+                res = Fdebug_candidates(itertools.chain([result], iterable), packed_parameters, tree, table)
+                assert(res is None)
+
+            # We got a callable, so we just need to call it with our parameters.
+            F, (args, kwds) = result
+            return F(*args, **kwds)
 
         # First, we need to swap out the original code object with the one from the closure
         # that we defined. In order to preserve information within the backtrace, we just
@@ -741,16 +1109,11 @@ class multicase(object):
                 c.co_firstlineno, c.co_lnotab, c.co_freevars, c.co_cellvars
         newcode = pycompat.code.new(cargs, pycompat.code.unpack_extra(c))
 
-        # Now we can use the new code object that we created in order to create a function
-        # and assign the previous name and documentation into it.
+        # Now we can use the new code object that we created in order to create a function,
+        # assign the previous name and documentation into it, and return it.
         result = pycompat.function.new(newcode, pycompat.function.globals(f), pycompat.function.name(f), pycompat.function.defaults(f), pycompat.function.closure(f))
         pycompat.function.set_name(result, pycompat.function.name(func)),
         pycompat.function.set_documentation(result, pycompat.function.documentation(func))
-
-        # The last two things to do is to copy our cache that we were given into the function
-        # that we're going to return. This way people can debug it if they feel they need to.
-        setattr(result, cls.cache_name, cache)
-        setattr(result, '__doc__', '')
         return result
 
     @classmethod
@@ -794,13 +1157,6 @@ class multicase(object):
         try: kwdargs = next(varnames_iter) if pycompat.code.flags(c) & pycompat.co_flags.CO_VARKEYWORDS else ""
         except StopIteration: kwdargs = ""
         return args, res, (starargs, kwdargs)
-
-    @classmethod
-    def generatorQ(cls, func):
-        '''Returns true if `func` is a generator.'''
-        func = cls.ex_function(func)
-        code = pycompat.function.code(func)
-        return bool(pycompat.code.flags(code) & CO_VARGEN)
 
 class alias(object):
     def __new__(cls, other, klass=None):
