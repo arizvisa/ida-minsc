@@ -859,8 +859,9 @@ class multicase(object):
         if {item for item in internal.types.integer} & unsorted_types:
             conditions.append(lambda item: hasattr(item, '__int__'))
 
-        if {item for item in internal.types.string} & unsorted_types:
-            conditions.append(lambda item: hasattr(item, '__str__'))
+        # XXX: there's literally no reason to detect parameters that can be coerced to a string.
+        #if {item for item in internal.types.string} & unsorted_types:
+        #    conditions.append(lambda item: hasattr(item, '__str__'))
 
         if callable in unsorted_types:
             conditions.append(callable)
@@ -905,8 +906,9 @@ class multicase(object):
         if {item for item in internal.types.integer} & unsorted_types:
             transformers.append((int, lambda item: hasattr(item, '__int__')))
 
-        if {item for item in internal.types.string} & unsorted_types:
-            transformers.append((unicode if str == bytes else str, lambda item: hasattr(item, '__str__')))
+        # XXX: i'm pretty much just showing off here, as there's literally no reason to attempt string coercion.
+        #if {item for item in internal.types.string} & unsorted_types:
+        #    transformers.append((unicode if str == bytes else str, lambda item: hasattr(item, '__str__')))
 
         # Now we figure out if we need to do any actual transformations by checking whether the
         # number of transformers we collected is larger than 1. This is because the first transformer
