@@ -1411,7 +1411,7 @@ class blocks(object):
         if not boolean:
             for ea in ordered:
                 ui.navigation.analyze(ea)
-                address = database.tag(ea)
+                address = block.tag(ea)
                 if address: yield interface.range.bounds(results[ea]), address
             return
 
@@ -1421,7 +1421,7 @@ class blocks(object):
         # Walk through every tagged address and cross-check it against the query.
         for ea in ordered:
             ui.navigation.analyze(ea)
-            collected, address = {}, database.tag(ea)
+            collected, address = {}, block.tag(ea)
 
             # Or(|) includes any of the tagnames that were selected.
             collected.update({key : value for key, value in address.items() if key in Or})
