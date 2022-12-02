@@ -900,6 +900,83 @@ class structure_t(object):
         self.__members__ = members
         return
 
+    ## operators
+    def __operator__(self, operation, other):
+        cls, sptr, offset = self.__class__, self.ptr, self.members.baseoffset
+        if isinstance(other, internal.types.integer):
+            res = operation(offset, other)
+        elif isinstance(other, member_t):
+            res = operation(offset, other.offset)
+        elif isinstance(other, cls):
+            res = operation(offset, other.size)
+        elif hasattr(other, '__int__'):
+            res = operation(offset, int(other))
+        else:
+            raise TypeError(u"{:s}({:#x}).__operator__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+        return cls(sptr, offset=res)
+
+    # general arithmetic (adjusts base offset)
+    def __add__(self, other):
+        '''Add `other` to the base offset of the structure.'''
+        return self.__operator__(operator.add, other)
+    def __sub__(self, other):
+        '''Subtract `other` from the base offset of the structure.'''
+        return self.__operator__(operator.sub, other)
+    def __and__(self, other):
+        return self.__operator__(operator.and_, other)
+    def __or__(self, other):
+        return self.__operator__(operator.or_, other)
+    def __xor__(self, other):
+        return self.__operator__(operator.xor, other)
+
+    # repetition and multiplication
+    def __mul__(self, count):
+        '''Return a list of structures with each member arranged contiguously as an array of `count` elements.'''
+        cls, sptr = self.__class__, self.ptr
+        if not isinstance(count, internal.types.integer):
+            other, operation = count, operator.mul
+            raise TypeError(u"{:s}({:#x}).__mul__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+
+        offset, size = self.members.baseoffset, self.size
+        start, stop = sorted([size * count, 0])
+        return [ cls(sptr, offset=offset + relative) for relative in range(start, stop, size) ]
+
+    def __pow__(self, index):
+        '''Return an instance of the structure with its offset adjusted similar to an array element at the specified `index`.'''
+        cls, sptr = self.__class__, self.ptr
+        if not isinstance(index, internal.types.integer):
+            other, operation = index, operator.pow
+            raise TypeError(u"{:s}({:#x}).__pow__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+
+        offset, relative = self.members.baseoffset, self.size * index
+        return cls(sptr, offset=offset + relative)
+
+    # reverse operators (adjusts base offset)
+    __radd__ = __add__
+    def __rsub__(self, other):
+        return self.__operator__(operator.add, operator.neg(other))
+    __rand__ = __and__
+    __ror__ = __or__
+    __rxor__ = __xor__
+    __rmul__ = __mul__
+    #__rpow__ = __pow__
+
+    # operations
+    def __abs__(self):
+        '''Return an instance of the structure without an offset.'''
+        cls, sptr = self.__class__, self.ptr
+        return cls(sptr)
+    def __neg__(self):
+        '''Return an instance of the structure with its offset negated.'''
+        cls, sptr, offset = self.__class__, self.ptr, self.members.baseoffset
+        return cls(sptr, -offset)
+    def __invert__(self):
+        '''Return an instance of the structure with its offset inverted.'''
+        cls, sptr = self.__class__, self.ptr
+        offset, size = self.members.baseoffset, self.size
+        res = offset + size
+        return cls(sptr, -res)
+
 ### Functions that are related to finding and using a structure_t.
 @utils.multicase(id=types.integer)
 def has(id):
@@ -2328,6 +2405,52 @@ class members_t(object):
         self.baseoffset = baseoffset
         self.__owner__ = __instance__(identifier, offset=baseoffset)
         return
+
+    ## operators
+    def __operator__(self, operation, other):
+        result = operation(self.__owner__, other)
+        return result.members
+    def __operation__(self, operation):
+        result = operation(self.__owner__)
+        return result.members
+
+    # general arithmetic (adjusts base offset)
+    def __add__(self, other):
+        '''Add `other` to the base offset for the members.'''
+        return self.__operator__(operator.add, other)
+    def __sub__(self, other):
+        '''Subtract `other` from the base offset of the members.'''
+        return self.__operator__(operator.sub, other)
+    def __and__(self, other):
+        return self.__operator__(operator.and_, other)
+    def __or__(self, other):
+        return self.__operator__(operator.or_, other)
+    def __xor__(self, other):
+        return self.__operator__(operator.xor, other)
+    def __mul__(self, other):
+        return self.__operator__(operator.mul, other)
+    def __pow__(self, other):
+        return self.__operator__(operator.pow, other)
+
+    # reverse operators (adjusts base offset)
+    __radd__ = __add__
+    def __rsub__(self, other):
+        return self.__operator__(operator.add, operator.neg(other))
+    __rand__ = __and__
+    __ror__ = __or__
+    __rxor__ = __xor__
+    __rmul__ = __mul__
+
+    # operations
+    def __abs__(self):
+        '''Return the structure members without an offset.'''
+        return self.__operation__(operator.abs)
+    def __neg__(self):
+        '''Return the structure members with their offset negated.'''
+        return self.__operation__(operator.neg)
+    def __invert__(self):
+        '''Return the structure members with their offset inverted.'''
+        return self.__operation__(operator.invert)
 
 class member_t(object):
     """
