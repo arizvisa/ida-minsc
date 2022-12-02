@@ -708,8 +708,20 @@ class DisplayHook(object):
     def __init__(self, output, displayhook):
         self.orig_displayhook = displayhook or sys.displayhook
 
-        # Save our output callable so we can use it to write raw
-        # and unprocessed information to it.
+        # Traverse our current frames so that we can grabout the very first frame
+        # and save it in case we need to interact with the interpreter frame.
+        frame = sys._getframe()
+        while frame.f_back:
+            frame = frame.f_back
+        self.parent_frame = frame
+
+        # Now we can grab the builtins module from the first frame's namespace, and
+        # then preserve it so that we'll always be able to update the "_" (default)
+        # variable with whatever the result of the current evaluation is.
+        builtins = frame.f_globals['__builtins__']
+        self.injectable_builtins = builtins if isinstance(builtins, dict) else builtins.__dict__
+
+        # Save our output callable so we can write raw and unprocessed information to it.
         self.output = output
 
     def format_seq(self, num_printer, storage, item, open, close):
@@ -784,7 +796,7 @@ class DisplayHook(object):
         return "{:#x}".format(x)
 
     def displayhook(self, item):
-        builtins._ = item
+        self.injectable_builtins['_'] = item
         if item is None or not hasattr(item, '__class__') or item.__class__ is bool:
             self.orig_displayhook(item)
             return
