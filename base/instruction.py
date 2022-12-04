@@ -1791,7 +1791,7 @@ def op_references(ea, opnum):
         # need to transform it into a list of interface.opref_t before returning it.
         # FIXME: the type for an LEA instruction should include an '&' in the
         #        reftype_t, but in this case we explicitly trust the type.
-        return [ interface.opref_t(ea, opnum, interface.reftype_t.of(xtype)) for ea, opnum, xtype in interface.xref.frame(fn, member) ]
+        return [ interface.opref_t(ea, opnum, interface.access_t(xtype, 0)) for ea, opnum, xtype in interface.xref.frame(fn, member) ]
 
     # If we have xrefs and the operand has information associated with it, then
     # we need to check if the type-id is an enumeration. If so, then the user is
@@ -1815,10 +1815,10 @@ def op_references(ea, opnum):
         # this process, we also verify that the member is actually owned by
         # the enumeration we extracted from our original operand information.
         res, Fnetnode = [], idaapi.ea2node if hasattr(idaapi, 'ea2node') else utils.fidentity
-        for ea, _, t in refs:
+        for ea, xiscode, xr in refs:
             ops = ((opnum, internal.netnode.alt.get(Fnetnode(ea), altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(Fnetnode(ea), altidx))
             ops = (opnum for opnum, mid in ops if enumeration.member.parent(mid) == eid)
-            res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
+            res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xr, xiscode)) for opnum in ops)
         return res
 
     # If the operand adds xrefs, there's operand information, and the operand's
@@ -1902,7 +1902,7 @@ def op_references(ea, opnum):
         # Now we can iterate through all our references and gather any operands
         # as potential candidates that we'll filter later.
         result, Fnetnode = [], idaapi.ea2node if hasattr(idaapi, 'ea2node') else utils.fidentity
-        for ea, _, t in sorted(refs, key=operator.itemgetter(0)):
+        for ea, xiscode, xr in sorted(refs, key=operator.itemgetter(0)):
             candidates = []
 
             # Start by gathering any structure candidates that may be referenced
@@ -2004,7 +2004,7 @@ def op_references(ea, opnum):
                 if ids & required == required:
                     filtered.append(refopnum)
                 continue
-            result.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
+            result.extend(interface.opref_t(ea, int(op), interface.access_t(xr, xiscode)) for op in filtered)
         return result
 
     # Anything else should be just a regular global reference or an immediate,
@@ -2044,7 +2044,7 @@ def op_references(ea, opnum):
     # to iterate through all of them to figure out exactly what kind
     # of data each reference is targetting.
     res = []
-    for ea, _, t in refs:
+    for ea, xiscode, xr in refs:
 
         # If we got a bad address, then simply skip over it because
         # it's entirely not relevant.
@@ -2065,13 +2065,13 @@ def op_references(ea, opnum):
 
             # As that's been confirmed, we can now create the interface.opref_t
             # with any of the instruction operands that we've determined.
-            iterable = (interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
+            iterable = (interface.opref_t(ea, int(op), interface.access_t(xr, xiscode)) for op in ops)
 
         # If the address of the reference wasn't actually a code
         # type, then this is a data global which doesn't have an
         # operand for us to search through.
         else:
-            ref = interface.ref_t(ea, None, interface.reftype_t.of(t))
+            ref = interface.ref_t(ea, interface.access_t(xr, xiscode))
             iterable = (item for item in [ref])
         res.extend(iterable)
     return res
