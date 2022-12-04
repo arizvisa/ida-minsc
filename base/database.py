@@ -6051,7 +6051,7 @@ class xref(object):
         results = []
         for tgt, iscode, type in interface.xref.of(ea):
             if not iscode:
-                results.append(interface.ref_t(tgt, interface.reftype_t.of(type)))
+                results.append(interface.ref_t(tgt, interface.access_t(type, iscode)))
             continue
         return sorted(results)
     dd = utils.alias(data_down, 'xref')
@@ -6068,7 +6068,7 @@ class xref(object):
         results = []
         for frm, iscode, type in interface.xref.to(ea):
             if not iscode:
-                results.append(interface.ref_t(frm, interface.reftype_t.of(type)))
+                results.append(interface.ref_t(frm, interface.access_t(type, iscode)))
             continue
         return sorted(results)
     du = utils.alias(data_up, 'xref')
@@ -6086,7 +6086,7 @@ class xref(object):
         for tgt, iscode, type in interface.xref.of(ea):
             # only collect code and a reference that's not considered regular flow-control.
             if iscode and type != idaapi.fl_F:
-                results.append(interface.ref_t(tgt, interface.reftype_t.of(type)))
+                results.append(interface.ref_t(tgt, interface.access_t(type, iscode)))
             continue
         return sorted(results)
     cd = utils.alias(code_down, 'xref')
@@ -6104,7 +6104,7 @@ class xref(object):
         for frm, iscode, type in interface.xref.to(ea):
             # only collect code and a reference that's not considered regular flow-control.
             if iscode and type != idaapi.fl_F:
-                results.append(interface.ref_t(frm, interface.reftype_t.of(type)))
+                results.append(interface.ref_t(frm, interface.access_t(type, iscode)))
             continue
         return sorted(results)
     cu = utils.alias(code_up, 'xref')
