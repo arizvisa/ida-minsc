@@ -4041,7 +4041,50 @@ class access_t(object):
         cls = self.__class__
         return "{:s}({:s})".format(cls.__name__, self)
 
-class ref_t(integerish):
+class refbase_t(integerish):
+    """
+    This is a base class for dealing with references that use an `access_t`. This
+    class intents to allow the user to merge references together in a couple of
+    ways that can influence the `access_t` that is used by each reference.
+    """
+
+    def __get_mergable_access(self, operation, other):
+        '''Return the `access_t` for the `other` parameter if the current reference can be merged with it.'''
+        cls = self.__class__
+
+        # If it's an access_t, then we're good and can just merge it.
+        if isinstance(other, (access_t, internal.types.string)):
+            return other
+
+        # Otherwise we just need to verify that the addresses are the same.
+        address, oaddress = map(int, [self, other])
+        if address != oaddress:
+            raise TypeError(u"{:s}.__{:s}__({!r}) : Unable to perform {:s} operation with type `{:s}` due to being located at a diferent address ({:#x}) from {:#x}.".format('.'.join([__name__, cls.__name__]), operation.__name__, other, operation.__name__, other.__class__.__name__, oaddress, address))
+
+        # Now we can just blindly fetch the access_t from somewhere within.
+        return next(item for item in other if isinstance(item, access_t))
+
+    def __merge_with(self, operation, other):
+        cls, state = self.__class__, [item for item in self]
+
+        # If it's not something we can merge with the access_t, then it's another operation.
+        if not isinstance(other, (refbase_t, access_t, internal.types.string)):
+            return self.__operator__(operation, other)
+
+        # Otherwise just extract the access_t merge it with ours, and reconstruct our instance.
+        access = self.__get_mergable_access(operation, other)
+        index = next(index for index, item in enumerate(state) if isinstance(item, access_t))
+        args = state[:index] + [operation(state[index], access)] + state[1 + index:]
+        return cls(*args)
+
+    def __and__(self, other):
+        return self.__merge_with(operator.and_, other)
+    def __or__(self, other):
+        return self.__merge_with(operator.or_, other)
+    def __xor__(self, other):
+        return self.__merge_with(operator.xor, other)
+
+class ref_t(refbase_t):
     """
     This tuple is used to represent references to an address that is marked
     as data and uses the format `(address, access_t)` to describe the reference.
@@ -4078,7 +4121,7 @@ class ref_t(integerish):
         res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
-class opref_t(integerish):
+class opref_t(refbase_t):
     """
     This tuple is used to represent references that include an operand number
     and has the format `(address, opnum, access)`.
@@ -4106,8 +4149,8 @@ class opref_t(integerish):
     def __similar__(self, other):
         if isinstance(other, ref_t):
             _, num, state = self
-            _, onum, ostate = other
-            return any([onum is None, num == onum]) and state & ostate
+            _, ostate = other
+            return state & ostate
         return False
 
 # XXX: is .startea always guaranteed to point to an instruction that modifies
