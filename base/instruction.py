@@ -2113,14 +2113,14 @@ class type(object):
     def feature(cls, ea):
         '''Return the feature bitmask for the instruction at the address `ea`.'''
         if database.type.is_code(ea):
-            return at(ea).get_canon_feature()
+            return interface.instruction.feature(ea)
         return None
     @utils.multicase(ea=types.integer, mask=types.integer)
     @classmethod
     def feature(cls, ea, mask):
         '''Return the feature bitmask for the instruction at the address `ea` masked with `mask`.'''
         if database.type.is_code(ea):
-            return at(ea).get_canon_feature() & idaapi.as_uint32(mask)
+            return interface.instruction.feature(ea) & idaapi.as_uint32(mask)
         return None
 
     @utils.multicase()
