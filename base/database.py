@@ -7676,38 +7676,36 @@ class set(object):
     @classmethod
     def array(cls):
         '''Set the data at the current selection to an array of the type at the current address.'''
-        ea, item = ui.current.address(), type.array()
+        address, selection = ui.current.address(), ui.current.selection()
 
-        # Extract the type from the current address and use it to get its size.
-        original_type, original_length = item
+        # If we were given an explicit address, then we just chain to the right case.
+        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            return cls.array(address)
+
+        # Otherwise we unpack the selection, grab the type, and use them to
+        # calculate the new length so that we can warn the user if necessary.
+        start, stop = sorted(selection)
+        original_type, original_length = type.array(start)
+
         _, _, nbytes = interface.typemap.resolve(original_type)
-
-        # If the length at the current address is irrelevant, then we can just
-        # chain to the other selection code using the type that we snagged.
-        if original_length <= 1:
-            return cls.array(original_type)
-
-        # Otherwise we grab the selection and unpack it in order to calculate
-        # the new length and determine if we need to warn the user about it.
-        start, stop = ui.current.selection()
         result = math.ceil((stop - start) / nbytes)
 
-        # Now we compare if the user is asking us to change the length in some way.
+        # Now we warn if the user is asking us to change the length in some way.
         length = math.trunc(result)
         if original_length > 1 and length != original_length:
             logging.warning(u"{:s}.array() : Modifying the number of elements ({:d}) for the array at the current selection ({:#x}<>{:#x}) to {:d}.".format('.'.join([__name__, cls.__name__]), original_length, start, stop, length))
-        return cls.array(original_type, length)
-    @utils.multicase(length=internal.types.integer)
+        return cls.array(start, original_type, length)
+    @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def array(cls, length):
-        '''Set the data at the current selection to an array of the specified `length` using the type at the current address.'''
-        ea, item = ui.current.address(), type.array()
-        original_type, original_length = item
+    def array(cls, ea):
+        '''Set the data at the address `ea` to an array by scanning for continguous types and values.'''
+        original_type, original_length = type.array(ea)
 
-        # If the length is being changed, then warn the user about it.
-        if original_length > 1 and original_length != length:
-            logging.warning(u"{:s}.array({:d}) : Modifying the number of elements ({:d}) for the array at the current address ({:#x}) to {:d}.".format('.'.join([__name__, cls.__name__]), length, original_length, ea, length))
-        return cls.array(ea, original_type, length)
+        # If the array already has a length, then there really isn't anything to do without
+        # explicitly changing the already defined array.. So in essence, we're done here.
+        if original_length > 1:
+            return get.array(ea, type=original_type, length=original_length)
+        return cls.array(ea, original_type)
     @utils.multicase()
     @classmethod
     def array(cls, type, **length):
@@ -7733,14 +7731,67 @@ class set(object):
     @classmethod
     def array(cls, ea, type):
         '''Set the data at the address `ea` to an array of the given `type`.'''
-        type, length = type if isinstance(type, internal.types.list) else (type, 1)
-        return cls.array(ea, type, length)
+        type, length = type if isinstance(type, internal.types.list) else (type, 0)
+
+        # If we were already given a length, then we can simply comply.
+        if length > 0:
+            return cls.array(ea, type, length)
+
+        # Grab our desired size and the original type so that we can determine if
+        # we're going to be updating or changing the array.
+        info, size, flags = idaapi.opinfo_t(), interface.typemap.size(type), interface.address.flags(ea)
+        addresses = [ea + address for address in builtins.range(size)]
+
+        # XXX: We could probably use `can_define_item(ea_t, asize_t, flags_t)`, but I'm not sure
+        #      how it works and if it can be used to scan for the maximum possible size for a type.
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        tid = info.tid if ok else idaapi.BADADDR
+        original_type = interface.typemap.dissolve(flags, tid, interface.address.size(ea))
+        type_being_changed = flags & idaapi.MS_CLS == idaapi.FF_DATA and original_type != type
+
+        # Now we need to create our conditions to scan from our start address until we encounter
+        # a boundary that is worth stopping at (label, reference, invalid ^ valid).
+        while_conditions = {}
+        while_conditions[idaapi.MS_CLS] = functools.partial(operator.contains, {idaapi.FF_UNK})
+        while_conditions[idaapi.DT_TYPE] = functools.partial(operator.eq, 0)
+        while_conditions[idaapi.FF_TAIL] = functools.partial(operator.eq, 0)
+
+        has_value = flags & idaapi.FF_IVL
+        while_conditions[idaapi.FF_IVL] = functools.partial(operator.contains, {idaapi.FF_IVL if has_value else 0})
+
+        conditions = functools.reduce(operator.or_, {idaapi.FF_REF, idaapi.FF_NAME, idaapi.FF_LABL})
+        while_conditions[idaapi.MS_COMM] = utils.fcompose(functools.partial(operator.and_, conditions), operator.not_)
+
+        # First check if the type at the starting address is defined and verify that the
+        # size matches. If so, then we need to skip past the first element when scanning.
+        iterable = ((address, interface.address.flags(address, idaapi.MS_CLS|idaapi.FF_TAIL)) for address in addresses[:1])
+        items = [address for address, flag in iterable if flag & idaapi.MS_CLS == idaapi.FF_DATA]
+        items.extend(address for address in addresses[1:] if interface.address.flags(address, idaapi.FF_TAIL))
+        base = 1 if len(items) == size and original_type == type else 0
+
+        # Now we can use an iterator to scan for bytes that we can overwrite. However, we
+        # need to adjust this iterator in case we need to skip the first byte due to a label.
+        Fwhile = utils.fcompose(interface.address.flags, utils.fmap(*itertools.starmap(utils.fcompose, ([functools.partial(operator.and_, mask), condition] for mask, condition in while_conditions.items()))), all)
+        counter = itertools.count(ea + base * size) if Fwhile(ea) or base else itertools.count(ea)
+        iterable = counter if flags & idaapi.FF_TAIL or type_being_changed else itertools.chain([1 + builtins.next(counter)], counter)
+        scanner = itertools.takewhile(Fwhile, iterable)
+
+        # Finally we can just take our sum of elements, add the base, and then hand it off
+        # to the correct case for setting the array if the length is defined.
+        length = base + sum(1 for address in zip(*[scanner] * size))
+        if length > 0:
+            return cls.array(ea, type, length)
+
+        # Otherwise to create this array, we'd have to explicitly change its type. Since this case
+        # actually guesses that length, we don't want to explicitly destroy anything. If the user
+        # really wants to, though, they can specify the length themselves to forcefully overwrite it.
+        raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Refusing to change the array at address ({:#x}) due it being of a different type {!r}.".format('.'.join([__name__, cls.__name__]), ea, type, ea, original_type))
     @utils.multicase(bounds=internal.types.tuple)
     @classmethod
     def array(cls, bounds, type):
         '''Set the data at the provided `bounds` to an array of the given `type`.'''
         if isinstance(type, internal.types.list):
-            raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Unable to set the provided boundary ({!r}) to the specified type ({!s}) due to it resulting in another array.".format('.'.join([__name__, cls.__name__]), bounds, type, bounds, type))
+            raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Unable to define the provided boundary ({!r}) as an array of the given element type ({!s}).".format('.'.join([__name__, cls.__name__]), bounds, type, bounds, type))
         start, stop = sorted(bounds)
 
         # Calculate the size of the type that we were given.
@@ -7754,6 +7805,9 @@ class set(object):
     @classmethod
     def array(cls, ea, type, length):
         '''Set the data at the address `ea` to an array with the given `length` and `type`.'''
+
+        if length <= 0:
+            raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}, {:d}) : Refusing to create an array of length {:d} at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, type, length, length, ea))
 
         # if the type is already specifying a list, then combine it with
         # the specified length
@@ -7769,7 +7823,7 @@ class set(object):
         # that, though, we need to update its refinfo before we leave.
         flags, typeid, nbytes = interface.typemap.resolve(realtype)
         if not idaapi.create_data(ea, flags, nbytes, typeid):
-            raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join([__name__, cls.__name__]), ea, type, length))
+            raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address ({:#x}) as an array of the requested length ({:d}).".format('.'.join([__name__, cls.__name__]), ea, type, length, ea, length))
         interface.address.update_refinfo(ea, flags)
 
         # return the array that we just created.
