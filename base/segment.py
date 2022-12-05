@@ -62,6 +62,13 @@ else:
     __matcher__.boolean('lt', operator.gt, 'start_ea')
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 
+@utils.multicase(string=types.string)
+@utils.string.decorate_arguments('string')
+def __iterate__(string):
+    '''Iterate through each segment whose name matches the glob specified by `string`.'''
+    string = interface.tuplename(*fullname)
+    return __iterate__(like=string)
+@utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def __iterate__(**type):
     '''Iterate through each segment defined in the database that match the keywords specified by `type`.'''
