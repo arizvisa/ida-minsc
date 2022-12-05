@@ -244,6 +244,16 @@ def ops_state(ea):
 ops_state.read, ops_state.write = zip(*((getattr(idaapi, "CF_USE{:d}".format(1 + idx), 1 << (7 + idx)), getattr(idaapi, "CF_CHG{:d}".format(1 + idx), 1 << (1 + idx))) for idx in range(idaapi.UA_MAXOP)))
 
 @utils.multicase()
+def ops_access():
+    '''Return a tuple containing how each operand belonging to the instruction at the current address is accessed.'''
+    return ops_access(ui.current.address())
+@utils.multicase(ea=types.integer)
+def ops_access(ea):
+    '''Return a tuple containing how each operand belonging to the instruction at address `ea` is accessed.'''
+    ea, ops = interface.address.inside(ea), interface.instruction.access(ea)
+    return tuple(ref.access for ref in ops)
+
+@utils.multicase()
 def opsi_read():
     '''Returns the indices of any operands that are being read from by the instruction at the current address.'''
     return opsi_read(ui.current.address())
@@ -395,6 +405,27 @@ def op_state(ea, opnum):
     # Make a reftype_t from the state we determined. If we couldn't figure it out,
     # then fallback to "r" as the operand still exists and it must be doing something.
     return interface.reftype_t.of_action(res or 'r')
+
+@utils.multicase(opnum=types.integer)
+def op_access(opnum):
+    '''Return the access type of the operand `opnum` for the current instruction.'''
+    return op_access(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_access(reference):
+    '''Return the access type for the given operand `reference`.'''
+    address, opnum, _ = reference
+    return op_access(address, opnum)
+@utils.multicase(ea=types.integer, opnum=types.integer)
+def op_access(ea, opnum):
+    """Return the access type of the operand `opnum` for the instruction at address `ea`.
+
+    The returned state is composed of "&", "r", "w", or "x" depending on whether
+    the operand is being used as an address, read from, written to, or executed.
+    """
+    ops = ops_access(ea)
+    if opnum >= len(ops):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_access({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(ops), ea))
+    return ops[opnum]
 
 # we needed an adjective, but "read" is a verb and a noun. this should be thought of in its noun form.
 @utils.multicase(opnum=types.integer)
@@ -1785,9 +1816,10 @@ def op_references(ea, opnum):
 
         # Now we can collect all the operand references to the operand and we just
         # need to transform it into a list of interface.opref_t before returning it.
-        # FIXME: the type for an LEA instruction should include an '&' in the
-        #        reftype_t, but in this case we explicitly trust the type.
-        return [ interface.opref_t(ea, opnum, interface.access_t(xtype, 0)) for ea, opnum, xtype in interface.xref.frame(fn, member) ]
+        # FIXME: the access for an LEA instruction should include an '&', but if we
+        #        trust insn_t.itype instead of op_t.type, then we'd probably need to
+        #        maintain their semantics in the processor module instead of interface.
+        return [ interface.opref_t(ea, opnum, op_access(ea, opnum)) for ea, opnum, xtype in interface.xref.frame(fn, member) ]
 
     # If we have xrefs and the operand has information associated with it, then
     # we need to check if the type-id is an enumeration. If so, then the user is
@@ -1983,7 +2015,7 @@ def op_references(ea, opnum):
                     # against our required ids before adding them to our results.
                     ids = {item.ptr.id for item in items}
                     if ids & required == required:
-                        result.append(interface.opref_t(ea, int(refopnum), op_state(ea, refopnum)))
+                        result.append(interface.opref_t(ea, int(refopnum), op_access(ea, refopnum)))
                     continue
                 continue
 
