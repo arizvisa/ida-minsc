@@ -5910,20 +5910,40 @@ class types(object):
             raise E.DisassemblerError(u"{:s}.dereference(\"{:s}\") : Unable to get the pointer type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
         return pi.obj_type
 
-    @utils.multicase(info=idaapi.tinfo_t)
+    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, _structure.structure_t, internal.types.string))
     @classmethod
-    def pointer(cls, info):
-        '''Create a pointer that references the type specified by `info`.'''
-        return cls.pointer(info, 0, 0)
-    @utils.multicase(info=idaapi.tinfo_t, size=internal.types.integer)
+    def pointer(cls, type):
+        '''Create a pointer that references the specified `type`.'''
+        return cls.pointer(type, 0, 0)
+    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, _structure.structure_t, internal.types.string), size=internal.types.integer)
     @classmethod
-    def pointer(cls, info, size):
-        '''Create a pointer of `size` bytes that references the type specified by `info`.'''
-        return cls.pointer(info, size, 0)
+    def pointer(cls, type, size):
+        '''Create a pointer of `size` bytes that references the specified `type`.'''
+        return cls.pointer(type, size, 0)
+    @utils.multicase(type=_structure.structure_t, size=internal.types.integer, attributes=internal.types.integer)
+    @classmethod
+    def pointer(cls, type, size, attributes, **fields):
+        '''Create a pointer of `size` bytes that references the specified structure `type` with the given `size` and extended `attributes`.'''
+        return cls.pointer(type.ptr, size, attributes, **fields)
+    @utils.multicase(sptr=idaapi.struc_t, size=internal.types.integer, attributes=internal.types.integer)
+    @classmethod
+    def pointer(cls, sptr, size, attributes, **fields):
+        '''Create a pointer of `size` bytes that references the structure specified by `sptr` with the given `size` and extended `attributes`.'''
+        ti = type(sptr.id)
+        return cls.pointer(ti, size, attributes, **fields)
+    @utils.multicase(string=internal.types.string, size=internal.types.integer, attributes=internal.types.integer)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def pointer(cls, string, size, attributes, **fields):
+        '''Create a pointer of `size` bytes that references the type specified by `string` with the given `size` and extended `attributes`.'''
+        ti = internal.declaration.parse(string)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.pointer({!r}, {:d}, {:#x}{:s}) : Unable to parse the given type declaration (\"{!s}\") for the pointer target.".format('.'.join([__name__, cls.__name__]), string, size, attributes, ", {:s}".format(utils.string.kwargs(fields)) if fields else '', utils.string.escape(string, '"')))
+        return cls.pointer(ti, size, attributes, **fields)
     @utils.multicase(info=idaapi.tinfo_t, size=internal.types.integer, attributes=internal.types.integer)
     @classmethod
     def pointer(cls, info, size, attributes, **fields):
-        '''Create a pointer of `size` bytes that references the type specified by `info` with the given extended `attributes`.'''
+        '''Create a pointer of `size` bytes that references the type specified by `info` with the given `size` and extended `attributes`.'''
         pi = idaapi.ptr_type_data_t()
         pi.obj_type = info
         pi.based_ptr_size = size
@@ -5955,15 +5975,35 @@ class types(object):
         if not info.get_array_details(ai):
             raise E.DisassemblerError(u"{:s}.array(\"{:s}\") : Unable to get the array type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
         return ai.elem_type, ai.nelems
-    @utils.multicase(element=idaapi.tinfo_t, length=internal.types.integer)
+    @utils.multicase(element=(idaapi.tinfo_t, idaapi.struc_t, _structure.structure_t, internal.types.string), length=internal.types.integer)
     @classmethod
     def array(cls, element, length):
-        '''Create an array of the the given `element` with the specified `length`.'''
+        '''Create an array of the given `element` with the specified `length`.'''
         return cls.array(element, length, 0)
+    @utils.multicase(type=_structure.structure_t, length=internal.types.integer, base=internal.types.integer)
+    @classmethod
+    def array(cls, type, length, base):
+        '''Create an array of the specified structure `type` with the given `length` and `base`.'''
+        return cls.array(type.ptr, length, base)
+    @utils.multicase(sptr=idaapi.struc_t, length=internal.types.integer, base=internal.types.integer)
+    @classmethod
+    def array(cls, sptr, length, base):
+        '''Create an array of the structure specified by `sptr` with the given `length` and `base`.'''
+        ti = type(sptr.id)
+        return cls.array(ti, length, base)
+    @utils.multicase(string=internal.types.string, length=internal.types.integer, base=internal.types.integer)
+    @classmethod
+    @utils.string.decorate_arguments('string')
+    def array(cls, string, length, base):
+        '''Create an array of the element specified by `string` with the given `length` and `base`.'''
+        ti = internal.declaration.parse(string)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.array({!r}, {:d}, {:d}) : Unable to parse the given type declaration (\"{!s}\") for the array element.".format('.'.join([__name__, cls.__name__]), string, length, base, utils.string.escape(string, '"')))
+        return cls.array(ti, length, base)
     @utils.multicase(element=idaapi.tinfo_t, length=internal.types.integer, base=internal.types.integer)
     @classmethod
     def array(cls, element, length, base):
-        '''Create an array of the the given `element` with the specified `length` and `base`.'''
+        '''Create an array of the given `element` with the specified `length` and `base`.'''
         ai = idaapi.array_type_data_t()
         ai.elem_type = element
         ai.nelems = length
