@@ -362,12 +362,8 @@ def op_repr(ea, opnum):
     '''Return the string representation of the operand `opnum` for the instruction at address `ea`.'''
     insn = at(ea)
     oppr = idaapi.ua_outop2 if idaapi.__version__ < 7.0 else idaapi.print_operand
-    outop = utils.fcompose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.fcompose(idaapi.print_operand, idaapi.tag_remove)
-    try:
-        res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
-    except:
-        logging.warning(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand \"{:s}\". Returning the result from {:s} instead.".format('.'.join([__name__, 'op_repr']), ea, opnum, utils.string.escape(oppr(insn.ea, opnum), '"'), '.'.join([__name__, 'op'])))
-        return u"{!s}".format(op(insn.ea, opnum))
+    outop = utils.fcompose(idaapi.ua_outop2, utils.fdefault(''), idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.fcompose(idaapi.print_operand, utils.fdefault(''), idaapi.tag_remove)
+    res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     return utils.string.of(res)
 
 @utils.multicase(opnum=types.integer)
