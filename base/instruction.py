@@ -1444,6 +1444,10 @@ def op_structurepath(ea, opnum, path):
         raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {!r}) : Unable to determine the structure from the provided path due to the first item being of an unsupported type ({!s}).".format(__name__, ea, opnum, path, member.__class__))
     return op_structurepath(ea, opnum, sptr, [item for item in fullpath])
 
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=structure.structure_t, path=(builtins.tuple, builtins.list))
+def op_structurepath(ea, opnum, structure, path):
+    '''Apply the specified `structure` along with the members in `path` to the to the instruction operand `opnum` at the address `ea`.'''
+    return op_structurepath(ea, opnum, structure.ptr, path)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, sptr=idaapi.struc_t, path=(builtins.tuple, builtins.list))
 def op_structurepath(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
@@ -1517,8 +1521,8 @@ def op_structurepath(ea, opnum, sptr, path):
     if usergoal != goaldelta:
         Flogging = logging.debug if usergoal < goaldelta else logging.warning
         Fdescription = "incomplete ({:#x} < {:#x})".format if usergoal < goaldelta else "incorrect ({:#x} > {:#x})".format
-        action = 'of members were added' if usergoal < goaldelta else 'of the last members were discarded'
-        Flogging(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : The suggested path was {:s} and {:+#x} bytes {:s} before applying it to the operand.".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), Fdescription(usergoal, goaldelta), goaldelta - usergoal, action))
+        action = 'of members were added' if usergoal < goaldelta else 'of the last members were temporarily removed'
+        Flogging(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : The suggested path was {:s} and {:+#x} bytes {:s} before calculating the real path.".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), Fdescription(usergoal, goaldelta), goaldelta - usergoal, action))
 
     # Finally we can really flail for the exact member the user wanted using the
     # delta that we're using as our goal and then choose the defaults for the rest.
@@ -1552,8 +1556,21 @@ def op_structurepath(ea, opnum, sptr, path):
         realdelta = builtins.next(calculator)
         calculator.close()
 
+    # If there was no path that we were able to calculate, then the user gave us
+    # a single-element path that doesn't point to the first member they requested.
+    # So, we deal by using the busted path that they gave us because it should have
+    # a structure with the member + offset that they're aiming for anyways.
+    if not realpath and len(userpath) == 1:
+        realpath[:] = userpath
+
+    # If we hit this case, then the logic described in the previous comment is
+    # completely busted and I have no idea what this is supposed to be doing.
+    elif not realpath:
+        raise E.InvalidParameterError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : Unable to apply the path to the operand ({:d}) of the specified address ({:#x}) as the given path does not point to a specific member.".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), opnum, insn.ea))
+
     # Very last thing to do is to calculate the delta for the path with our
     # value, and then we can apply the whole thing to the operand.
+    base = usergoal - goaldelta
     delta = realdelta - idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr)
     items = interface.strpath.to_tids(realpath)
     tid, length = idaapi.tid_array(len(items)), len(items)
@@ -1562,8 +1579,8 @@ def op_structurepath(ea, opnum, sptr, path):
 
     # Only thing that's left to do is apply the tids that we collected along with
     # the delta that we calculated from the user's input to the desired operand.
-    if not idaapi.op_stroff(insn.ea if idaapi.__version__ < 7.0 else insn, opnum, tid.cast(), length, delta):
-        raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : Unable to apply the resolved structure path ({:s}) and delta ({:+#x}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), ', '.join(map("{:#x}".format, items)), delta, opnum, insn.ea))
+    if not idaapi.op_stroff(insn.ea if idaapi.__version__ < 7.0 else insn, opnum, tid.cast(), length, base + delta):
+        raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : Unable to apply the resolved structure path ({:s}) and delta ({:+#x}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), ', '.join(map("{:#x}".format, items)), base + delta, opnum, insn.ea))
 
     # And then we can call into our other case to return what we just applied.
     return op_structurepath(insn.ea, opnum)
