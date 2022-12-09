@@ -721,7 +721,8 @@ class multicase(object):
             parameter = parameter_transform(arg)
             assert(parameter_critique(parameter))
             #counter = counter if arg is parameter else counter + 1
-            counter = counter if arg == parameter else counter + 1
+            #counter = counter if arg == parameter else counter + 1
+            counter = counter if id(arg) == id(parameter) else counter + 1
             results.append(parameter)
             _, _, index = tree[index][F]
 
@@ -748,7 +749,8 @@ class multicase(object):
                 parameter = parameter_transform(arg)
                 assert(parameter_critique(parameter))
                 #counter = counter if arg is parameter else counter + 1
-                counter = counter if arg == parameter else counter + 1
+                #counter = counter if arg == parameter else counter + 1
+                counter = counter if id(arg) == id(parameter) else counter + 1
                 results.append(parameter)
             index = next
 
@@ -795,9 +797,10 @@ class multicase(object):
             # If we have more than one match, then we need to pre-sort this
             # by whatever their bias is so that we choose the right one.
             if len(items) > 1:
-                iterable = (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
-                biased = {bias : (F, (args, kwds)) for F, (args, kwds, bias) in zip(items, iterable) }
-                ordered = (biased[key] for key in sorted(biased))
+                biased, iterable = {}, (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
+                #biased = {bias : (F, (args, kwds)) for F, (args, kwds, bias) in zip(items, iterable) }
+                [ biased.setdefault(bias, []).append((F, (args, kwds))) for F, (args, kwds, bias) in zip(items, iterable) ]
+                ordered = itertools.chain(*(biased[key] for key in sorted(biased)))
 
             # Otherwise, we don't need to sort and can take the first one.
             else:
@@ -816,9 +819,10 @@ class multicase(object):
             # Similarly, if we have more than one match here, then we need
             # to critique_and_transform the parameters and sort by bias.
             if len(items) > 1:
-                iterable = (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
-                biased = {bias : (F, (args, kargs)) for F, (args, kargs, bias) in zip(items, iterable) }
-                ordered = (biased[key] for key in sorted(biased))
+                biased, iterable = {}, (cls.critique_and_transform(F, packed_parameters, tree, table) for F in items)
+                #biased = {bias : (F, (args, kargs)) for F, (args, kargs, bias) in zip(items, iterable) }
+                [ biased.setdefault(bias, []).append((F, (args, kwds))) for F, (args, kwds, bias) in zip(items, iterable) ]
+                ordered = itertools.chain(*(biased[key] for key in sorted(biased)))
 
             # There's only one match, so that's exactly what we'll return.
             else:
