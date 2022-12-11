@@ -4036,15 +4036,32 @@ class access_t(object):
         cls, available = self.__class__, {character for bit, character in self.__xrflags__.items() if bit & 0xf}
         return self.__merge__(operator.xor, available)
 
+    def __contains__(self, flags):
+        operation = operator.contains
+        if not isinstance(flags, (internal.types.unordered, internal.types.string)):
+            cls = self.__class__
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.__contains__({!s}, {!r}) : Unable to perform {:s} operation with unsupported type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, flags, operation.__name__, flags.__class__.__name__))
+
+        # Iterate through all of our required parameters and check for their existence.
+        items, required = {item for item in self}, {item for item in flags}
+        return all(operation(items, item) for item in required)
+
     def __getitem__(self, other):
-        operation = operator.eq
+        operation = operator.contains
+
+        # If it's an integer, then we're checking for the exact reference type.
         if isinstance(other, internal.types.integer):
             (left, _), right = self.__get_type__(), other
-        elif isinstance(other, (internal.types.unordered, internal.types.string)):
-            left, right = {item for item in self}, {item for item in right}
-        else:
+            return operator.eq(left, right)
+
+        # Our parameter needs to be something we can turn into a set. Anything
+        # else is not a thing since that makes it impossible to check membership.
+        if not isinstance(other, (internal.types.unordered, internal.types.string)):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.__getitem__({!s}, {!r}) : Unable to perform {:s} operation with unsupported type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, operation.__name__, other.__class__.__name__))
-        return operation(let, right)
+
+        # Iterate through all of our required parameters and check for their existence.
+        items, required = {item for item in self}, {item for item in other}
+        return all(operation(items, item) for item in required)
 
     def __repr__(self):
         cls = self.__class__
