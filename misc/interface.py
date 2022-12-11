@@ -3919,12 +3919,20 @@ class access_t(object):
         # read, write
         idaapi.dr_R : 4, idaapi.dr_W : 2,
 
-        # any unknowns that we know about set the highest bit
-        # so that we can track it through the references.
-        getattr(idaapi, 'fl_U', 0) : 0x10,
+        # neither, using a deprecated (obsolete) flag from IDA. this is used as a
+        # backdoor to disable enforcing flags based on the xref type (code or data).
+        idaapi.fl_USobsolete : 0,
+
+        # any unknowns that we know about set the highest bit so that we can track it
+        # through the references. both fl_U and dr_U are the same values, but whatev.
+        getattr(idaapi, 'fl_U', 0) : 0x10, getattr(idaapi, 'dr_U', 0) : 0x10,
+
+        # this bit is unused, but we keep it for compatibility since it was used in older
+        # versions of this plugin to represent not-yet-determined reference types.
         31 : 0x10
     }
     __xftypes__ = {idaapi.fl_F, idaapi.fl_CF, idaapi.fl_CN, idaapi.fl_JF, idaapi.fl_JN}
+    __unktypes__ = {idaapi.fl_USobsolete, getattr(idaapi, 'fl_U', 0), getattr(idaapi, 'dr_U', 0), 31}
 
     def __init__(self, xrtype, iscode=False):
         '''Create a new ``access_t`` from the flags specified by `xrtype` and the boolean `iscode`.'''
@@ -3935,10 +3943,11 @@ class access_t(object):
 
     # If we're code, then 'x' (1) will always be set.
     # If we're not code and neither '&' (8), 'r' (4), or 'w' (2) is set, it's actually '&' (8).
+    # If the reftype is the fl_USobsolete backdoor, then we ignore all enforcement.
     @classmethod
     def __adjust_flags__(cls, xrtype, iscode, flag):
         ignore_mask, required_set = (14, 8) if not iscode else (0, 1) if xrtype in cls.__xftypes__ else (0, 0)
-        return flag if flag & ignore_mask else flag | required_set
+        return flag if flag & ignore_mask else flag if xrtype in cls.__unktypes__ else flag | required_set
 
     def __iter__(self):
         flag = self.__adjust_flags__(self.__xrtype, self.__xrcode, self.__xrflag)
