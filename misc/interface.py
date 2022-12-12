@@ -3777,14 +3777,33 @@ class regmatch(object):
         # by default, grab all operand indexes
         iterops = internal.utils.fcompose(instruction.ops_count, builtins.range, sorted)
 
+        # now we can collect our required conditions to yield an operand index.
+        conditions = []
+
         # if `read` is specified, then only grab operand indexes that are read from
-        if modifiers.get('read', False):
-            iterops = instruction.opsi_read
+        read_args = ['read', 'r']
+        if any(item in modifiers for item in read_args):
+            read = next(modifiers[item] for item in read_args if item in modifiers)
+            Fread = (lambda _, access: 'r' in access) if read else (lambda _, access: 'r' not in access)
+            conditions.append(Fread)
 
         # if `write` is specified that only grab operand indexes that are written to
-        if modifiers.get('write', False):
-            iterops = instruction.opsi_write
-        return iterops
+        write_args = ['write', 'w']
+        if any(item in modifiers for item in write_args):
+            write = next(modifiers[item] for item in write_args if item in modifiers)
+            Fwrite = (lambda _, access: 'w' in access) if write else (lambda _, access: 'w' not in access)
+            conditions.append(Fwrite)
+
+        # if `execute` is specified that only grab operand indexes that are executed
+        execute_args = ['execute', 'exec', 'x']
+        if any(item in modifiers for item in execute_args):
+            execute = next(modifiers[item] for item in execute_args if item in modifiers)
+            Fexec = (lambda _, access: 'x' in access) if execute else (lambda _, access: 'x' not in access)
+            conditions.append(Fexec)
+
+        # now we just need to stack our conditions and enumerate the operands while only yielding their index.
+        Fconditions = internal.utils.fcompose(internal.utils.funpack(internal.utils.fmap(*conditions)), all) if conditions else internal.utils.fconstant(True)
+        return internal.utils.fcompose(instruction.ops_access, enumerate, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(internal.utils.imap, operator.itemgetter(0)), sorted)
 
 ## figure out the boundaries of sval_t
 if idaapi.BADADDR == 0xffffffff:
