@@ -427,36 +427,33 @@ def op_access(ea, opnum):
         raise E.InvalidTypeOrValueError(u"{:s}.op_access({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(ops), ea))
     return ops[opnum]
 
-# we needed an adjective, but "read" is a verb and a noun. this should be thought of in its noun form.
 @utils.multicase(opnum=types.integer)
-def op_read(opnum):
-    '''Return whether the operand `opnum` belonging to the current instruction is only being read from.'''
-    return op_read(ui.current.address(), opnum)
+def op_used(opnum):
+    '''Return true if the operand `opnum` for the current instruction is being used (non-modified).'''
+    return op_used(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
-def op_read(reference):
-    '''Return whether the operand pointed to by `reference` is only being read from.'''
+def op_used(reference):
+    '''Return true if the given operand `reference` is being used (non-modified).'''
     address, opnum, _ = reference
-    return op_read(address, opnum)
+    return op_used(address, opnum)
 @utils.multicase(ea=types.integer, opnum=types.integer)
-def op_read(ea, opnum):
-    '''Return whether the operand `opnum` belonging to the instruction at the address `ea` is only being read from.'''
-    return 'r' in op_state(ea, opnum)
-op_used = utils.alias(op_read)          # XXX: read/modified or used/modified?
+def op_used(ea, opnum):
+    '''Return true if the operand `opnum` for the instruction at address `ea` is being used (non-modified).'''
+    return True if interface.instruction.uses_operand(ea, opnum) else False
 
 @utils.multicase(opnum=types.integer)
 def op_modified(opnum):
-    '''Return whether the operand `opnum` belonging to the current instruction is being modified (written to).'''
+    '''Return true if operand `opnum` for the current instruction is being changed (modified).'''
     return op_modified(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
 def op_modified(reference):
-    '''Return whether the operand pointed to by `reference` is being modified (written to).'''
+    '''Return true if the given operand `reference` is being changed (modified).'''
     address, opnum, _ = reference
     return op_modified(address, opnum)
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_modified(ea, opnum):
-    '''Return whether the operand `opnum` belonging to the instruction at the address `ea` is being modified (written to).'''
-    return 'w' in op_state(ea, opnum)
-op_written = op_write = utils.alias(op_modified)        # XXX: these aliases are needed because our opposite is `op_read`
+    '''Return true if the operand `opnum` for the instruction at address `ea` is being changed (modiied).'''
+    return True if interface.instruction.changes_operand(ea, opnum) else False
 
 @utils.multicase(opnum=types.integer)
 def op_size(opnum):
