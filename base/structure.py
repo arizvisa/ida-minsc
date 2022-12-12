@@ -482,7 +482,7 @@ class structure_t(object):
 
                     # Verify that one of our ids is contained within it.
                     if candidates & matches:
-                        state = instruction.op_state(xrfrom, opnum)
+                        state = instruction.op_access(xrfrom, opnum)
                         results.add(interface.opref_t(xrfrom, opnum, interface.reftype_t.of_action(state)))
                     continue
 
@@ -498,7 +498,7 @@ class structure_t(object):
 
                 # FIXME: figure out which operand is the correct one for our reference.
                 for opnum in range(instruction.ops_count(ea)):
-                    fl, state = database.type.flags(ea), instruction.op_state(ea, opnum)
+                    fl, state = database.type.flags(ea), instruction.op_access(ea, opnum)
 
                     # Do a final check to see if the operand is referencing a stroff
                     # or a stkvar because then we're definitely pointing to a member.
@@ -2653,7 +2653,7 @@ class member_t(object):
             # now we can collect all the xrefs to the member within the function
             res = []
             for ea, opnum, type in interface.xref.frame(ea, mptr):
-                ref = interface.opref_t(ea, opnum, interface.reftype_t(type, instruction.op_state(ea, opnum)))
+                ref = interface.opref_t(ea, opnum, interface.reftype_t(type, instruction.op_access(ea, opnum)))
                 res.append(ref)
             return res
 
