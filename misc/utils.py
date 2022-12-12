@@ -615,7 +615,8 @@ class multicase(object):
                 parameter_critique, parameter_transform = critique_and_transform
 
                 # Now we take the parameter value, transform it, and then critique it.
-                value = parameter_transform(parameter)
+                try: value = parameter_transform(parameter)
+                except Exception: continue
                 if parameter_critique(value):
                     results.append((F, node))
                 continue
@@ -686,7 +687,8 @@ class multicase(object):
                 # If our parameter name is available, then we can critique it.
                 elif available and parameter_name in available:
                     parameter_critique, parameter_transform = critique_and_transform
-                    parameter = parameter_transform(kwds[parameter_name])
+                    try: parameter = parameter_transform(kwds[parameter_name])
+                    except Exception: continue
                     results.append((F, node)) if parameter_critique(parameter) else None
 
                 # Otherwise this parameter doesn't exist which makes it not a candidate.
