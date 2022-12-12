@@ -561,7 +561,9 @@ class chunks(object):
     def register(cls, func, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the function `func` that uses `reg` or any one of the registers in `regs`.
 
-        If the keyword `write` is True, then only return the result if it's writing to the register.
+        If the keyword `write` is true, then only return the result if it's writing to the register.
+        If the keyword `read` is true, then only return the result if it's reading from the register.
+        If the keyword `execute` is true, then only return the result if it's executing with the register.
         """
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use( (reg,) + regs )
@@ -569,7 +571,7 @@ class chunks(object):
         for ea in cls.iterate(func):
             for opnum in iterops(ea):
                 if uses_register(ea, opnum):
-                    items = ea, opnum, instruction.op_state(ea, opnum)
+                    items = ea, opnum, instruction.op_access(ea, opnum)
                     yield interface.opref_t(*items)
             continue
         return
@@ -751,14 +753,16 @@ class chunk(object):
     def register(cls, ea, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the function chunk containing the address `ea` which uses `reg` or any one of the registers in `regs`.
 
-        If the keyword `write` is True, then only return the result if it's writing to the register.
+        If the keyword `write` is true, then only return the result if it's writing to the register.
+        If the keyword `read` is true, then only return the result if it's reading from the register.
+        If the keyword `execute` is true, then only return the result if it's executing with the register.
         """
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use( (reg,) + regs )
 
         for ea in cls.iterate(ea):
             for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
-                items = ea, opnum, instruction.op_state(ea, opnum)
+                items = ea, opnum, instruction.op_access(ea, opnum)
                 yield interface.opref_t(*items)
             continue
         return
@@ -2188,7 +2192,7 @@ class block(object):
         for ea in database.address.iterate(bounds):
             for opnum in iterops(ea):
                 if uses_register(ea, opnum):
-                    items = ea, opnum, instruction.op_state(ea, opnum)
+                    items = ea, opnum, instruction.op_access(ea, opnum)
                     yield interface.opref_t(*items)
                 continue
             continue
@@ -2199,6 +2203,8 @@ class block(object):
         """Yield each `(address, opnum, state)` within the block `bb` that uses `reg` or any one of the registers in `regs`.
 
         If the keyword `write` is true, then only return the result if it's writing to the register.
+        If the keyword `read` is true, then only return the result if it's reading from the register.
+        If the keyword `execute` is true, then only return the result if it's executing with the register.
         """
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use( (reg,) + regs )
@@ -2206,7 +2212,7 @@ class block(object):
         for ea in cls.iterate(bb):
             for opnum in iterops(ea):
                 if uses_register(ea, opnum):
-                    items = ea, opnum, instruction.op_state(ea, opnum)
+                    items = ea, opnum, instruction.op_access(ea, opnum)
                     yield interface.opref_t(*items)
                 continue
             continue
