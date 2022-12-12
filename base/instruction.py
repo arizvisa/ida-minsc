@@ -250,7 +250,7 @@ def ops_access():
 @utils.multicase(ea=types.integer)
 def ops_access(ea):
     '''Return a tuple containing how each operand belonging to the instruction at address `ea` is accessed.'''
-    ea, ops = interface.address.inside(ea), interface.instruction.access(ea)
+    ops = interface.instruction.access(interface.address.inside(ea))
     return tuple(ref.access for ref in ops)
 
 @utils.multicase()
@@ -261,7 +261,7 @@ def opsi_read():
 def opsi_read(ea):
     '''Returns the indices of any operands that are being read from by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
-    return tuple(opnum for opnum, state in enumerate(ops_state(ea)) if 'r' in state)
+    return tuple(index for index, ref in enumerate(interface.instruction.access(ea)) if 'r' in ref.access)
 @utils.multicase()
 def ops_read():
     '''Return the operands that are being read from by the instruction at the current address.'''
@@ -279,7 +279,7 @@ def opsi_write():
 def opsi_write(ea):
     '''Returns the indices of the operands that are being written to by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
-    return tuple(opnum for opnum, state in enumerate(ops_state(ea)) if 'w' in state)
+    return tuple(index for index, ref in enumerate(interface.instruction.access(ea)) if 'w' in ref.access)
 @utils.multicase()
 def ops_write():
     '''Return the operands that are being written to by the instruction at the current address.'''
@@ -297,7 +297,7 @@ def opsi_constant():
 def opsi_constant(ea):
     '''Return the indices of any operands in the instruction at `ea` that are constants.'''
     ea = interface.address.inside(ea)
-    return tuple(opnum for opnum, value in enumerate(ops_value(ea)) if isinstance(value, types.integer))
+    return tuple(index for index, ref in enumerate(interface.instruction.access(ea)) if not any(bit in ref.access for bit in 'rw'))
 opsi_const = utils.alias(opsi_constant)
 @utils.multicase()
 def ops_constant():
@@ -329,6 +329,8 @@ def opsi_register(ea, reg, *regs, **modifiers):
     """Returns the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
 
     If the keyword `write` is true, then only return the result if it's writing to the register.
+    If the keyword `read` is true, then only return the result if it's reading from the register.
+    If the keyword `execute` is true, then only return the result if it's executing with the register.
     """
     ea = interface.address.inside(ea)
     iterops = interface.regmatch.modifier(**modifiers)
@@ -353,6 +355,8 @@ def ops_register(ea, reg, *regs, **modifiers):
     """Returns each register operand in the instruction at the address `ea` that is `reg` or any one of the registers in `regs`.'''
 
     If the keyword `write` is true, then only return the result if it's writing to the register.
+    If the keyword `read` is true, then only return the result if it's reading from the register.
+    If the keyword `execute` is true, then only return the result if it's executing with the register.
     """
     return tuple(op(ea, index) for index in opsi_register(ea, reg, *regs, **modifiers))
 ops_reg = ops_regs = ops_registers = utils.alias(ops_register)
@@ -422,10 +426,11 @@ def op_access(ea, opnum):
     The returned state is composed of "&", "r", "w", or "x" depending on whether
     the operand is being used as an address, read from, written to, or executed.
     """
-    ops = ops_access(ea)
+    ops = tuple(interface.instruction.access(interface.address.inside(ea)))
     if opnum >= len(ops):
         raise E.InvalidTypeOrValueError(u"{:s}.op_access({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(ops), ea))
-    return ops[opnum]
+    _, _, access = ops[opnum]
+    return access
 
 @utils.multicase(opnum=types.integer)
 def op_used(opnum):
@@ -1779,7 +1784,7 @@ def op_references(ea, opnum):
     # This way we can distinguish structure members, enumeration members,
     # locals, globals, etc.
     F = database.type.flags(insn.ea)
-    info, has_xrefs = opinfo(insn.ea, opnum), idaapi.op_adds_xrefs(F, opnum)
+    info, has_xrefs, accesses = opinfo(insn.ea, opnum), idaapi.op_adds_xrefs(F, opnum), tuple(ref.access for ref in interface.instruction.access(insn.ea))
 
     # If we have xrefs but no type information, then this operand has to
     # be pointing to a local stack variable that is stored in the frame.
@@ -1816,7 +1821,7 @@ def op_references(ea, opnum):
         # FIXME: the access for an LEA instruction should include an '&', but if we
         #        trust insn_t.itype instead of op_t.type, then we'd probably need to
         #        maintain their semantics in the processor module instead of interface.
-        return [ interface.opref_t(ea, opnum, op_access(ea, opnum)) for ea, opnum, xtype in interface.xref.frame(fn, member) ]
+        return [ interface.opref_t(ea, opnum, accesses[opnum]) for ea, opnum, xtype in interface.xref.frame(fn, member) ]
 
     # If we have xrefs and the operand has information associated with it, then
     # we need to check if the type-id is an enumeration. If so, then the user is
@@ -2012,7 +2017,7 @@ def op_references(ea, opnum):
                     # against our required ids before adding them to our results.
                     ids = {item.ptr.id for item in items}
                     if ids & required == required:
-                        result.append(interface.opref_t(ea, int(refopnum), op_access(ea, refopnum)))
+                        result.append(interface.opref_t(ea, int(refopnum), accesses[refopnum]))
                     continue
                 continue
 
