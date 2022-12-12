@@ -3584,7 +3584,7 @@ class instruction(object):
         iterable = itertools.takewhile(internal.utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), operands)
         return sum(1 for operand in iterable)
 
-    uses_bits = [getattr(idaapi, "CF_USE{:d}".format(1 + idx), 1 << (7 + idx)) for idx in builtins.range(idaapi.UA_MAXOP)]
+    uses_bits = [getattr(idaapi, "CF_USE{:d}".format(1 + idx)) if hasattr(idaapi, "CF_USE{:d}".format(1 + idx)) else pow(2, bit) for bit, idx in zip(itertools.chain(builtins.range(8, 8 + 6), builtins.range(19, 19 + 2)), builtins.range(idaapi.UA_MAXOP))]
     @classmethod
     def uses_operand(cls, ea, opnum):
         '''Return whether the instruction at address `ea` uses the operand `opnum` without changing it.'''
@@ -3597,7 +3597,7 @@ class instruction(object):
         feature = cls.feature(ea)
         return [index for index, cf in enumerate(cls.uses_bits) if feature & cf]
 
-    changes_bits = [getattr(idaapi, "CF_CHG{:d}".format(1 + idx), 1 << (7 + idx)) for idx in builtins.range(idaapi.UA_MAXOP)]
+    changes_bits = [getattr(idaapi, "CF_CHG{:d}".format(1 + idx)) if hasattr(idaapi, "CF_CHG{:d}".format(1 + idx)) else pow(2, bit) for bit, idx in zip(itertools.chain(builtins.range(2, 2 + 6), builtins.range(17, 17 + 2)), builtins.range(idaapi.UA_MAXOP))]
     @classmethod
     def changes_operand(cls, ea, opnum):
         '''Return whether the instruction at address `ea` changes the operand `opnum`.'''
@@ -3660,6 +3660,76 @@ class instruction(object):
         res = idaapi.op_t()
         res.assign(insn.ops[opnum])
         return res
+
+    @classmethod
+    def access(cls, ea):
+        '''Yield the ``opref_t`` for each operand belonging to the instruction at the address `ea`.'''
+        ea, fn, insn = int(ea), idaapi.get_func(int(ea)), cls.at(int(ea))
+
+        # Just some basic utilities for getting the features of the instruction and the flags of the address.
+        features, flags = cls.feature(ea), address.flags(ea)
+        Ffeature, Fflag = map(functools.partial(functools.partial, operator.and_), [features, flags])
+
+        # Get all the instruction-specific attributes that are relevant to the access_t of each operand.
+        is_call, is_jump, is_shift = map(Ffeature, [idaapi.CF_CALL, idaapi.CF_JUMP, idaapi.CF_SHFT])
+        operands, MS_XTYPE = cls.operands(ea), Fflag(idaapi.MS_0TYPE | idaapi.MS_1TYPE)
+
+        # Now because we have no way to determine conditional branches, we need to enumerate the references
+        # from this instruction. Not all of them, though, just any that are code references and not idaapi.fl_F.
+        has_code_references = next((True for _, xiscode, xrtype in xref.of(ea) if xiscode and xrtype != idaapi.fl_F), False)
+
+        # Assign the base access types that we'll choose from using the operand type and whether the
+        # operand is being read from or written to. These get modified depending on other characteristics.
+        if is_call:
+            xrefcode, xreftype, xrefdefault = True, {
+                idaapi.o_near: [idaapi.fl_CN, idaapi.fl_U],
+                idaapi.o_far: [idaapi.fl_CF, idaapi.fl_U],
+                idaapi.o_mem: [idaapi.dr_R, idaapi.fl_U],
+                idaapi.o_displ: [idaapi.dr_R, idaapi.fl_U],
+            }, [idaapi.fl_F, idaapi.fl_F]
+
+        # Then we'll do the jump instructions which is pretty much the same other than a different reftype.
+        elif is_jump or has_code_references:
+            xrefcode, xreftype, xrefdefault = True, {
+                idaapi.o_near: [idaapi.fl_JN, idaapi.fl_JN],
+                idaapi.o_far: [idaapi.fl_JF, idaapi.fl_JF],
+                idaapi.o_mem: [idaapi.dr_R, idaapi.dr_W],
+                idaapi.o_displ: [idaapi.dr_R, idaapi.dr_W],
+            }, [idaapi.fl_F, idaapi.fl_F]
+
+        # Anything else is just a regular instruction which can either read or write to its operand.
+        else:
+            xrefcode, xreftype, xrefdefault = False, {
+                idaapi.o_imm: [idaapi.fl_USobsolete, idaapi.dr_U],
+            }, [idaapi.dr_R, idaapi.dr_W]
+
+        # Iterate through all of the operands and yield their access_t.
+        for opnum, op in enumerate(operands):
+            used, modified = Ffeature(cls.uses_bits[opnum]), Ffeature(cls.changes_bits[opnum])
+            ri, has_xrefs = address.refinfo(ea, opnum), idaapi.op_adds_xrefs(flags, opnum)
+
+            # If the operand is not used or modified, then our access_t is empty. We can use
+            # the USobsolete flag here since it's used-specified..but deprecated.
+            if not (used or modified):
+                yield opref_t(ea, opnum, access_t(idaapi.fl_USobsolete, xrefcode))
+                continue
+
+            # Now we need to figure out the base type which comes from the operand type, the
+            # used/modified flag, and whether the instruction is a branch instruction or not.
+            read, write = (access_t(item, xrefcode) for item in xreftype.get(op.type, xrefdefault))
+            access = write | read if used and modified else write if modified else read
+
+            # We now need to figure out how we're supposed to modify the access_t. If it's a
+            # branch and the operand references memory, then we include 'r' to represent a load.
+            if xrefcode:
+                access = access | 'x'
+                access = access | 'r' if op.type in {idaapi.o_mem, idaapi.o_displ} else access
+
+            # If it's data and it references memory, then we need to update the access with '&'.
+            elif op.type in {idaapi.o_imm} and has_xrefs:
+                access = access | '&'
+            yield opref_t(ea, opnum, access)
+        return
 
 class regmatch(object):
     """
