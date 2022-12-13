@@ -2909,14 +2909,14 @@ class address(object):
         return interface.bounds_t(ea, ea + type.size(ea))
 
     @staticmethod
-    def __walk__(ea, next, match):
-        '''Return the first address from `ea` using `next` for stepping until the provided callable doesn't `match`.'''
+    def __walk__(ea, next, predicate):
+        '''Return the first address from `ea` using `next` for stepping while the callable in `predicate` returns true.'''
         res = interface.address.inside(ea)
 
         # Now that we know we're a valid address in the database,
         # we simply need to keeping calling next() while match()
         # continuously allows us to.
-        while res not in {None, idaapi.BADADDR} and match(res):
+        while res not in {None, idaapi.BADADDR} and predicate(res):
             ea = ui.navigation.analyze(res)
             res = next(ea)
         return res
@@ -3394,8 +3394,7 @@ class address(object):
 
         # define a predicate for cls.walk to continue looping when true
         Freg = lambda ea: fwithin(ea) and not builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
-        Fnot = utils.fcompose(predicate, operator.not_)
-        F = utils.fcompose(utils.fmap(Freg, Fnot), builtins.any)
+        F = utils.fcompose(utils.fmap(Freg, predicate), builtins.all)
 
         ## skip the current address
         prevea = cls.prev(ea)
@@ -3460,8 +3459,7 @@ class address(object):
 
         # define a predicate for cls.walk to continue looping when true
         Freg = lambda ea: fwithin(ea) and not builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
-        Fnot = utils.fcompose(predicate, operator.not_)
-        F = utils.fcompose(utils.fmap(Freg, Fnot), builtins.any)
+        F = utils.fcompose(utils.fmap(Freg, predicate), builtins.all)
 
         # skip the current address
         nextea = cls.next(ea)
