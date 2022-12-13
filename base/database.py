@@ -3002,6 +3002,16 @@ class address(object):
     def __new__(cls, ea):
         '''Return the address of the item containing the address `ea`.'''
         return cls.head(ea)
+    @utils.multicase(name=internal.types.string)
+    @utils.string.decorate_arguments('name', 'suffix')
+    def __new__(cls, name, *suffix):
+        '''Return the address of the item with the specified `name`.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
+        return ea
     @utils.multicase(start=internal.types.integer, end=internal.types.integer)
     def __new__(cls, start, end):
         '''Return a list containing each of the addresses from `start` to `end`.'''
