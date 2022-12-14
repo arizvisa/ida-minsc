@@ -3738,24 +3738,24 @@ class regmatch(object):
     matching so that one can specify whether any number of registers
     are written to or read from.
     """
-    def __new__(cls, *regs, **modifiers):
-        '''Construct a closure that can be used for matching instruction using the specified `regs` and `modifiers`.'''
-        if not regs:
-            args = ', '.join(map(internal.utils.string.escape, regs))
+    def __new__(cls, *registers, **modifiers):
+        '''Construct a closure that can be used for matching instruction using the specified `registers` and `modifiers`.'''
+        if not registers:
+            args = ', '.join(map(internal.utils.string.escape, registers))
             mods = internal.utils.string.kwargs(modifiers)
             raise internal.exceptions.InvalidParameterError(u"{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join([__name__, cls.__name__]), args, (', '+mods) if mods else ''))
-        use, iterops = cls.use(regs), cls.modifier(**modifiers)
+        use, iterops = cls.use(registers), cls.modifier(**modifiers)
         def match(ea):
             return any(map(functools.partial(use, ea), iterops(ea)))
         return match
 
     @classmethod
-    def use(cls, regs):
-        '''Return a closure that checks if an address and opnum uses the specified `regs`.'''
+    def use(cls, registers):
+        '''Return a closure that checks if an address and opnum uses either of the specified `registers`.'''
         import instruction, architecture
 
         # convert any regs that are strings into their correct object type
-        regs = { architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in regs }
+        regs = { architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in registers }
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
         match = lambda r, regs=regs: any(map(r.relatedQ, regs))
@@ -3771,11 +3771,11 @@ class regmatch(object):
 
     @classmethod
     def modifier(cls, **modifiers):
-        '''Return a closure iterates through all the operands in an address that use the specified `modifiers`.'''
-        import instruction
+        '''Return a closure that iterates through all the operands in an address that use either of the specified `modifiers`.'''
+        ops_count = internal.utils.fcompose(instruction.operands, tuple, len)
 
         # by default, grab all operand indexes
-        iterops = internal.utils.fcompose(instruction.ops_count, builtins.range, sorted)
+        iterops = internal.utils.fcompose(ops_count, builtins.range, sorted)
 
         # now we can collect our required conditions to yield an operand index.
         conditions = []
@@ -3784,26 +3784,40 @@ class regmatch(object):
         read_args = ['read', 'r']
         if any(item in modifiers for item in read_args):
             read = next(modifiers[item] for item in read_args if item in modifiers)
-            Fread = (lambda _, access: 'r' in access) if read else (lambda _, access: 'r' not in access)
+            Fread = (lambda ref: 'r' in ref.access) if read else (lambda ref: 'r' not in ref.access)
             conditions.append(Fread)
 
         # if `write` is specified that only grab operand indexes that are written to
-        write_args = ['write', 'w']
+        write_args = ['written', 'write', 'w']
         if any(item in modifiers for item in write_args):
             write = next(modifiers[item] for item in write_args if item in modifiers)
-            Fwrite = (lambda _, access: 'w' in access) if write else (lambda _, access: 'w' not in access)
+            Fwrite = (lambda ref: 'w' in ref.access) if write else (lambda ref: 'w' not in ref.access)
             conditions.append(Fwrite)
 
         # if `execute` is specified that only grab operand indexes that are executed
-        execute_args = ['execute', 'exec', 'x']
+        execute_args = ['executed', 'execute', 'exec', 'x']
         if any(item in modifiers for item in execute_args):
             execute = next(modifiers[item] for item in execute_args if item in modifiers)
-            Fexec = (lambda _, access: 'x' in access) if execute else (lambda _, access: 'x' not in access)
+            Fexec = (lambda ref: 'x' in ref.access) if execute else (lambda ref: 'x' not in ref.access)
+            conditions.append(Fexec)
+
+        # if `readwrite` is specified that only grab operand indexes that are modified
+        readwrite_args = ['modify', 'modified', 'changed', 'readwrite', 'rw']
+        if any(item in modifiers for item in readwrite_args):
+            write = next(modifiers[item] for item in readwrite_args if item in modifiers)
+            Fwrite = (lambda ref: 'rw' in ref.access) if write else (lambda ref: 'rw' not in ref.access)
+            conditions.append(Fwrite)
+
+        # if `readexecute` is specified that only grab operand indexes that are loaded before being used to execute
+        execute_args = ['readexecute', 'readexec', 'rx']
+        if any(item in modifiers for item in execute_args):
+            execute = next(modifiers[item] for item in execute_args if item in modifiers)
+            Fexec = (lambda ref: 'rx' in ref.access) if execute else (lambda ref: 'rx' not in ref.access)
             conditions.append(Fexec)
 
         # now we just need to stack our conditions and enumerate the operands while only yielding their index.
-        Fconditions = internal.utils.fcompose(internal.utils.funpack(internal.utils.fmap(*conditions)), all) if conditions else internal.utils.fconstant(True)
-        return internal.utils.fcompose(instruction.ops_access, enumerate, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(internal.utils.imap, operator.itemgetter(0)), sorted)
+        Fconditions = internal.utils.fcompose(internal.utils.fthrough(*conditions), any) if conditions else internal.utils.fconstant(True)
+        return internal.utils.fcompose(instruction.access, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(internal.utils.imap, operator.attrgetter('opnum')), sorted)
 
 ## figure out the boundaries of sval_t
 if idaapi.BADADDR == 0xffffffff:
