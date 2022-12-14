@@ -615,9 +615,9 @@ class multicase(object):
                 parameter_critique, parameter_transform = critique_and_transform
 
                 # Now we take the parameter value, transform it, and then critique it.
-                try: value = parameter_transform(parameter)
+                try: value = parameter_transform(parameter) if parameter_transform else parameter
                 except Exception: continue
-                if parameter_critique(value):
+                if parameter_critique(value) if parameter_critique else True:
                     results.append((F, node))
                 continue
             return results
@@ -681,15 +681,17 @@ class multicase(object):
                 if available and wildargs:
                     parameter_critique, parameter_transform = critique_and_transform
                     parameters = (kwds[name] for name in available)
-                    transformed = map(parameter_transform, parameters)
-                    results.append((F, node)) if all(parameter_critique(parameter) for parameter in transformed) else None
+                    transformed = map(parameter_transform, parameters) if parameter_transform else parameters
+                    critique = parameter_critique if parameter_critique else lambda parameter: True
+                    results.append((F, node)) if all(critique(parameter) for parameter in transformed) else None
 
                 # If our parameter name is available, then we can critique it.
                 elif available and parameter_name in available:
                     parameter_critique, parameter_transform = critique_and_transform
-                    try: parameter = parameter_transform(kwds[parameter_name])
+                    try: parameter = parameter_transform(kwds[parameter_name]) if parameter_transform else kwds[parameter_name]
                     except Exception: continue
-                    results.append((F, node)) if parameter_critique(parameter) else None
+                    critique = parameter_critique if parameter_critique else lambda parameter: True
+                    results.append((F, node)) if critique(parameter) else None
 
                 # Otherwise this parameter doesn't exist which makes it not a candidate.
                 else:
@@ -720,11 +722,11 @@ class multicase(object):
         for arg in args:
             _, critique_and_transform, _ = table[F, index]
             parameter_critique, parameter_transform = critique_and_transform
-            parameter = parameter_transform(arg)
-            assert(parameter_critique(parameter))
+            parameter = parameter_transform(arg) if parameter_transform else arg
+            assert(parameter_critique(parameter) if parameter_critique else True)
             #counter = counter if arg is parameter else counter + 1
             #counter = counter if arg == parameter else counter + 1
-            counter = counter if id(arg) == id(parameter) else counter + 1
+            counter = counter if id(arg) == id(parameter) and parameter_critique else counter + 1 if parameter_critique else counter + 2
             results.append(parameter)
             _, _, index = tree[index][F]
 
@@ -748,11 +750,11 @@ class multicase(object):
             parameter_critique, parameter_transform = critique_and_transform
             if index >= 0 and name and not wild:
                 arg = keywords.pop(name)
-                parameter = parameter_transform(arg)
-                assert(parameter_critique(parameter))
+                parameter = parameter_transform(arg) if parameter_transform else arg
+                assert(parameter_critique(parameter) if parameter_critique else True)
                 #counter = counter if arg is parameter else counter + 1
                 #counter = counter if arg == parameter else counter + 1
-                counter = counter if id(arg) == id(parameter) else counter + 1
+                counter = counter if id(arg) == id(parameter) and parameter_critique else counter + 1 if parameter_critique else counter + 2
                 results.append(parameter)
             index = next
 
@@ -847,6 +849,10 @@ class multicase(object):
         '''Return a callable that critiques its parameter for any of the given `types`.'''
         unsorted_types = {item for item in types}
 
+        # If there are no types, then we can bail here because critique should always succeed.
+        if not unsorted_types:
+            return None
+
         # Filter our types for things that are not actual types. This is okay since we
         # should be using unsorted_types to check whether to include our conditions and
         # we need this so that we can use the types we were given with isinstance().
@@ -881,13 +887,17 @@ class multicase(object):
         '''Return a callable that transforms its parameter to any of the given `types`.'''
         unsorted_types = {item for item in types}
 
+        # If there are no types, then we can bail here because there's no transform required.
+        if not unsorted_types:
+            return None
+
         # Filter our types so that we can use them with isinstance() as we'll be
         # using the unsorted_types set to check for type membership.
         filtered = tuple(item for item in unsorted_types if isinstance(item, type))
         if 1 < operator.sub(*reversed(sorted(map(len, [unsorted_types, filtered])))):
             invalid = unsorted_types - {item for item in itertools.chain(filtered, [callable])}
             parameters = [item.__name__ if isinstance(item, type) else item.__name__ if item in {callable} else "{!r}".format(item) for item in types]
-            raise internal.exceptions.InvalidParameterError(u"{:s}.parameter_tranform({:s}) : Refusing to transform a parameter using {:s} other than a type ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), 'an object' if len(invalid) == 1 else 'objects', ', '.join(map("{!r}".format, invalid))))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.parameter_transform({:s}) : Refusing to transform a parameter using {:s} other than a type ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(parameters), 'an object' if len(invalid) == 1 else 'objects', ', '.join(map("{!r}".format, invalid))))
         types = filtered
 
         # Create a list that includes the condition for a transformation and the
@@ -934,7 +944,7 @@ class multicase(object):
         # transform and critique the value that determines its validity.
         critique_and_transform = []
         for name in args:
-            t = constraints.pop(name, (object,))
+            t = constraints.pop(name, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform.append((Fcritique, Ftransform))
 
@@ -977,7 +987,7 @@ class multicase(object):
 
         # If both are selected, then we need to do some connections here.
         if varargs and wildargs:
-            t = constraints.pop(wildargs, (object,))
+            t = constraints.pop(wildargs, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform = Fcritique, Ftransform
 
@@ -993,7 +1003,7 @@ class multicase(object):
 
         # If there's variable-length parameters, then we simply need to create a loop.
         elif varargs:
-            t = constraints.pop(varargs, (object,))
+            t = constraints.pop(varargs, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform = Fcritique, Ftransform
 
@@ -1004,7 +1014,7 @@ class multicase(object):
 
         # Pop out the wild (keyword) parameter type from our decorator parameters.
         elif wildargs:
-            t = constraints.pop(wildargs, (object,))
+            t = constraints.pop(wildargs, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
             critique_and_transform = Fcritique, Ftransform
 
@@ -1046,7 +1056,7 @@ class multicase(object):
         prototype = cls.prototype(function, constraints, ignored)
         documentation = function.__doc__ or ''
         lines = documentation.split('\n')
-        constraint_order = [constraints.get(arg, (object,)) for arg in parameters]
+        constraint_order = [constraints.get(arg, ()) for arg in parameters]
         return prototype, [item.strip() for item in lines] if documentation.strip() else [], (lambda *args: args)(*constraint_order)
 
     # Create a dictionary to bias the order of our documentation so that
@@ -1067,7 +1077,7 @@ class multicase(object):
         # number of parameters along with a bias based on the constraints.
         items = [(F, constraints) for F, (_, _, constraints) in descriptions.items()]
         counts = {F : len(constraints) for F, constraints in items}
-        bias = {F : sum(max(cls.documentation_bias.get(item, 0) for item in items) for items in constraints) for F, constraints in items}
+        bias = {F : sum(max((cls.documentation_bias.get(item, 0) for item in items) if items else [0]) for items in constraints) for F, constraints in items}
 
         # Afterwards we can sort by number of lines, number of parameters, and then constraint bias.
         items = [((newlines[F], counts[F], bias[F]), F) for F in descriptions]
