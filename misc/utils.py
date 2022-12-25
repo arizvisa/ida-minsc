@@ -448,13 +448,15 @@ class multicase(object):
             raise internal.exceptions.UnknownPrototypeError('\n'.join(itertools.chain([message, '', listing_message], listing)))
 
         # These are just utility closures that can be attached to the entrypoint closure.
-        def fetch_matches(cache, *arguments, **keywords):
-            '''Return a list of the callables and their (transformed) parameters that correspond to the given `arguments` and `keywords`.'''
+        def fetch_score(cache, *arguments, **keywords):
+            '''Return a list of all the callables, their (transformed) parameters, and their score for the given `arguments` and `keywords`.'''
             tree, table = cache
             packed_parameters = arguments, keywords
             candidates = cls.match(packed_parameters, tree, table)
+            scores = {F : cls.critique_and_transform(F, packed_parameters, tree, table) for F, _ in candidates}
             iterable = cls.preordered(packed_parameters, candidates, tree, table)
-            return [item for item in iterable]
+            ordered = ((F, scores[F]) for F, _ in iterable)
+            return [(F, score, args, kwargs) for F, (args, kwargs, score) in ordered]
 
         def fetch_callable(cache, *arguments, **keywords):
             '''Return the first callable that matches the constraints for the given `arguments` and `keywords`.'''
@@ -529,7 +531,7 @@ class multicase(object):
 
                 # Attach a few hardcoded utilities to the closure that we return. We add
                 # some empty namespaces as the first argument if it's a classmethod or __new__.
-                setattr(res, 'match', functools.partial(fetch_matches, cache, *s_args * [object]))
+                setattr(res, 'score', functools.partial(fetch_score, cache, *s_args * [object]))
                 setattr(res, 'fetch', functools.partial(fetch_callable, cache, *s_args * [object]))
                 setattr(res, 'describe', functools.partial(fetch_prototype, documentation))
 
