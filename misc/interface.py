@@ -1561,64 +1561,69 @@ class address(object):
         return l <= ea < r
 
     @classmethod
-    def __head1__(cls, ea, **silent):
+    def __head1__(cls, ea, **warn):
         '''Adjusts `ea` so that it is pointing to the beginning of an item.'''
         entryframe = cls.pframe()
-        logF = logging.warning if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if warn.get('warn', False) else logging.debug
 
         res = idaapi.get_item_head(ea)
         if ea != res:
-            logF("{:s} : Specified address {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, ea, res))
+            logF(u"{:s}({:#x}) : Specified address {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, ea, ea, res))
         return res
     @classmethod
-    def __head2__(cls, start, end, **silent):
+    def __head2__(cls, start, end, **warn):
         '''Adjusts both `start` and `end` so that each are pointing to the beginning of their respective items.'''
         entryframe = cls.pframe()
-        logF = logging.warning if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if warn.get('warn', False) else logging.debug
 
-        res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
+        res_start, res_end = sorted([start, end])
+        if idaapi.get_item_head(res_start) == idaapi.get_item_head(res_end):
+            left, right = idaapi.get_item_head(res_start), idaapi.get_item_end(res_end)
+        else:
+            left, right = idaapi.get_item_head(res_start), res_end if idaapi.get_item_head(res_end) == res_end else idaapi.get_item_end(res_end)
+
         # FIXME: off-by-one here, as end can be the size of the db.
         if res_start != start:
-            logF("{:s} : Starting address of {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
+            logF(u"{:s}({:#x}, {:#x}) : Starting address of {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, end, res_start, left))
         if res_end != end:
-            logF("{:s} : Ending address of {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
-        return res_start, res_end
+            logF(u"{:s}({:#x}, {:#x}) : Ending address of {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, end, res_end, right))
+        return left, right
     @classmethod
-    def head(cls, *args, **silent):
+    def head(cls, *args, **warn):
         '''Adjusts the specified addresses so that they point to the beginning of their specified items.'''
         if len(args) > 1:
-            return cls.__head2__(*args, **silent)
-        return cls.__head1__(*args, **silent)
+            return cls.__head2__(*args, **warn)
+        return cls.__head1__(*args, **warn)
 
     @classmethod
-    def __tail1__(cls, ea, **silent):
+    def __tail1__(cls, ea, **warn):
         '''Adjusts `ea` so that it is pointing to the end of an item.'''
         entryframe = cls.pframe()
-        logF = logging.warning if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if warn.get('warn', False) else logging.debug
 
         res = idaapi.get_item_end(ea)
         if ea != res:
-            logF("{:s} : Specified address {:#x} not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, ea, res))
+            logF(u"{:s}({:#x}) : Specified address {:#x} not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, ea, ea, res))
         return res
     @classmethod
-    def __tail2__(cls, start, end, **silent):
+    def __tail2__(cls, start, end, **warn):
         '''Adjusts both `start` and `end` so that each are pointing to the end of their respective items.'''
         entryframe = cls.pframe()
-        logF = logging.warning if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if warn.get('warn', False) else logging.debug
 
         res_start, res_end = idaapi.get_item_end(start), idaapi.get_item_end(end)
         # FIXME: off-by-one here, as end can be the size of the db.
         if res_start != start:
-            logF("{:s} : Starting address of {:#x} is not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
+            logF(u"{:s}({:#x}, {:#x}) : Starting address of {:#x} is not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, end, start, res_start))
         if res_end != end:
-            logF("{:s} : Ending address of {:#x} is not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
+            logF(u"{:s}({:#x}, {:#x}) : Ending address of {:#x} is not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, end, end, res_end))
         return res_start, res_end
     @classmethod
-    def tail(cls, *args, **silent):
+    def tail(cls, *args, **warn):
         '''Adjusts the specified addresses so that they point to the end of their specified items.'''
         if len(args) > 1:
-            return cls.__tail2__(*args, **silent)
-        return cls.__tail1__(*args, **silent)
+            return cls.__tail2__(*args, **warn)
+        return cls.__tail1__(*args, **warn)
 
     @classmethod
     def __inside1__(cls, ea):
@@ -1626,13 +1631,13 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(ea, internal.types.integer):
-            raise internal.exceptions.InvalidParameterError(u"{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}) : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
-            raise internal.exceptions.InvalidParameterError(u"{:s} : An invalid address ({:#x}) was specified.".format(entryframe.f_code.co_name, ea))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}) : An invalid address ({:#x}) was specified.".format(entryframe.f_code.co_name, ea, ea))
 
         res = cls.within(ea)
-        return cls.head(res, silent=True)
+        return cls.head(res, warn=False)
     @classmethod
     def __inside2__(cls, start, end):
         '''Check that both `start` and `end` are within the database and adjust them to point at their specified range.'''
@@ -1640,8 +1645,12 @@ class address(object):
         entryframe = cls.pframe()
         start, end = cls.within(start, end)
         if not isinstance(start, internal.types.integer) or not isinstance(end, internal.types.integer):
-            raise internal.exceptions.InvalidParameterError(u"{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
-        return cls.head(start, silent=True), cls.tail(end, silent=True) - 1
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {:#x}) : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start, end, start.__class__, end.__class__))
+
+        left, right = sorted([start, end])
+        if idaapi.get_item_head(left) == idaapi.get_item_head(right):
+            return idaapi.get_item_head(start), idaapi.get_item_end(end) - 1
+        return idaapi.get_item_head(start), idaapi.get_item_head(end) - 1
     @classmethod
     def inside(cls, *args):
         '''Check the specified addresses are within the database and adjust so that they point to their item or range.'''
@@ -1655,14 +1664,14 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(ea, internal.types.integer):
-            raise internal.exceptions.InvalidParameterError(u"{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}) : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
-            raise internal.exceptions.InvalidParameterError(u"{:s} : An invalid address {:#x} was specified.".format(entryframe.f_code.co_name, ea))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}) : An invalid address {:#x} was specified.".format(entryframe.f_code.co_name, ea, ea))
 
         if not cls.__within__(ea):
             l, r = cls.bounds()
-            raise internal.exceptions.OutOfBoundsError(u"{:s} : The specified address {:#x} is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, l, r))
+            raise internal.exceptions.OutOfBoundsError(u"{:s}({:#x}) : The specified address {:#x} is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, ea, l, r))
         return ea
     @classmethod
     def __within2__(cls, start, end):
@@ -1675,7 +1684,7 @@ class address(object):
         # If the start and end are matching, then we don't need to fit the bounds.
         if any(not cls.__within__(ea) for ea in [start, end if start == end else end - 1]):
             l, r = cls.bounds()
-            raise internal.exceptions.OutOfBoundsError(u"{:s} : The specified range ({:#x}<>{:#x}) is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, start, end, l, r))
+            raise internal.exceptions.OutOfBoundsError(u"{:s}({:#x}, {:#x}) : The specified range ({:#x}<>{:#x}) is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, start, end, start, end, l, r))
         return start, end
     @classmethod
     def within(cls, *args):
