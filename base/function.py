@@ -1675,8 +1675,6 @@ class blocks(object):
     # XXX: Implement .search for filtering blocks
 flowchart = utils.alias(blocks.flowchart, 'blocks')
 digraph = graph = utils.alias(blocks.digraph, 'blocks')
-calls = utils.alias(blocks.calls, 'blocks')
-branches = utils.alias(blocks.branches, 'blocks')
 
 class block(object):
     """
@@ -4488,6 +4486,71 @@ class xref(object):
         # regular
         return database.xref.up(ea)
 
+    @utils.multicase()
+    @classmethod
+    def calls(cls):
+        '''Return the address of each call instruction and its ``ref_t`` that is referenced from the current function.'''
+        return cls.calls(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def calls(cls, func):
+        '''Return the address of each call instruction and its ``ref_t`` that is referenced from the function `func`.'''
+        fn, results = by(func), []
+        for _, right in blocks.calls(fn):
+            ea = interface.address.head(right - 1)
+            crefs, drefs = (F(ea) for F in [database.xref.code_down, database.xref.data_down])
+
+            # Group all of the references for the current address.
+            grouped, references = {}, [ref for ref in itertools.chain(crefs, drefs)]
+            [grouped.setdefault(ref.address, []).append(ref) for ref in references]
+
+            # If there were some references, then merge them together and then add them into our results.
+            if references:
+                merged = {ea : functools.reduce(operator.or_, items) for ea, items in grouped.items() if items}
+                [ results.append((ea, merged.pop(ref.address))) for ref in references if ref.address in merged ]
+
+            # If there weren't any references for this basic block, then warn the user about it.
+            else:
+                logging.warning(u"{:s}.calls({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolvable.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
+            continue
+        return results
+
+    @utils.multicase()
+    @classmethod
+    def branches(cls):
+        '''Return the address of each branch instruction and its ``ref_t`` that is referenced within the current function.'''
+        return cls.branches(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def branches(cls, func):
+        '''Return the address of each call instruction and its ``ref_t`` that is referenced within the function `func`.'''
+        get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+        fn, results = by(func), []
+        for _, right in blocks.branches(fn):
+            ea = interface.address.head(right - 1)
+            crefs, drefs = (F(ea) for F in [database.xref.code_down, database.xref.data_down])
+
+            # If the current address is a switch, then we need to handle this specially to avoid all of
+            # the unmergable code references. We ignore them and instead use an executable data reference.
+            if get_switch_info(ea):
+                [ results.append((ea, ref | 'x')) for ref in drefs ]
+                continue
+
+            # Group all of the references for the current address.
+            grouped, references = {}, [ref for ref in itertools.chain(crefs, drefs)]
+            [grouped.setdefault(ref.address, []).append(ref) for ref in references]
+
+            # If there were some references, then merge them together and then add them into our results.
+            if references:
+                merged = {ea : functools.reduce(operator.or_, items) for ea, items in grouped.items() if items}
+                [ results.append((ea, merged.pop(ref.address))) for ref in references if ref.address in merged ]
+
+            # If there weren't any references for this basic block, then warn the user about it.
+            else:
+                logging.warning(u"{:s}.branches({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolvable.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
+            continue
+        return results
+
     @utils.multicase(index=types.integer)
     @classmethod
     def argument(cls, index):
@@ -4533,3 +4596,4 @@ class xref(object):
 
 x = xref    # XXX: ns alias
 up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
+calls, branches = utils.alias(xref.calls, 'xref'), utils.alias(xref.branches, 'xref')
