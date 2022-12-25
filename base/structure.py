@@ -2383,7 +2383,7 @@ class members_t(object):
     def by(self, offset):
         '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
-    @utils.multicase(location=types.tuple)
+    @utils.multicase(location=interface.location_t)
     def by(self, location):
         '''Return the member at the specified `location`.'''
         offset, size = location
@@ -2403,7 +2403,7 @@ class members_t(object):
         string = name if isinstance(name, types.tuple) else (name,)
         owner, res = self.owner, utils.string.to(interface.tuplename(*(string + suffix)))
         return idaapi.get_member_by_name(owner.ptr, res) is not None
-    @utils.multicase(location=types.tuple)
+    @utils.multicase(location=interface.location_t)
     def has(self, location):
         '''Return whether a member exists at the specified `location`.'''
         offset, size = location
