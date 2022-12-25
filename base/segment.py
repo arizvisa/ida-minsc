@@ -131,11 +131,7 @@ def has(ea):
 @utils.multicase(name=types.string)
 def has(name, *suffix):
     '''Returns true if the segment with the given `name` exists.'''
-    res = (name,) + suffix
-    return has(res)
-@utils.multicase(fullname=types.tuple)
-def has(fullname):
-    '''Returns true if the segment with the packed `fullname` exists.'''
+    fullname = (name,) + suffix
     string = interface.tuplename(*fullname)
     return idaapi.get_segm_by_name(utils.string.to(string)) is not None
 within = utils.alias(has)
@@ -176,10 +172,6 @@ def by(segment):
 def by(name, *suffix):
     '''Return the segment by its `name`.'''
     return by_name(name, *suffix)
-@utils.multicase(fullname=types.tuple)
-def by(fullname):
-    '''Return the segment by its packed `fullname`.'''
-    return by_name(*fullname)
 @utils.multicase(ea=types.integer)
 def by(ea):
     '''Return the segment containing the address `ea`.'''
@@ -430,11 +422,6 @@ def contains(name, ea):
     '''Returns true if the address `ea` is contained within the segment with the specified `name`.'''
     seg = by_name(name)
     return contains(seg, ea)
-@utils.multicase(fullname=types.tuple, ea=types.integer)
-def contains(fullname, ea):
-    '''Returns true if the address `ea` is contained within the segment with the packed `fullname`.'''
-    seg = by_name(*fullname)
-    return contains(seg, ea)
 @utils.multicase(segment=idaapi.segment_t, ea=types.integer)
 def contains(segment, ea):
     '''Returns true if the address `ea` is contained within the ``idaapi.segment_t`` specified by `segment`.'''
@@ -454,16 +441,10 @@ def type(ea):
         logging.warning(u"{:s}.type({:#x}) : Returning {:s}({:d}) for the segment type due to the given address ({:#x}) not being within the boundaries of the database ({:s}).".format(__name__, ea, results[result], result, ea, description))
     return result
 @utils.multicase(name=types.string)
-@utils.string.decorate_arguments('name')
-def type(name):
+@utils.string.decorate_arguments('name', 'suffix')
+def type(name, *suffix):
     '''Return the type of the segment with the specified `name`.'''
-    seg = by_name(name)
-    return type(seg)
-@utils.multicase(fullname=types.tuple)
-@utils.string.decorate_arguments('fullname')
-def type(fullname):
-    '''Return the type of the segment with the packed `fullname`.'''
-    seg = by_name(*fullname)
+    seg = by_name(name, *suffix)
     return type(seg)
 @utils.multicase(segment=idaapi.segment_t)
 def type(segment):
