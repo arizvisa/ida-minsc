@@ -4390,14 +4390,31 @@ class xref(object):
     ## referencing
     @utils.multicase()
     @classmethod
-    def down(cls, **references):
+    def down(cls):
         '''Return each address and its ``ref_t`` that is referenced by the instructions from the current function.'''
-        return down(ui.current.function(), **references)
+        return down(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def down(cls, func, **references):
+    def down(cls, func):
         '''Return each address and its ``ref_t`` that is referenced by the instructions from the function `func`.'''
         get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+
+        # define a closure that will be used to merge multiple references for the same address.
+        def Fmerge_references(refs):
+            grouped = {}
+            [grouped.setdefault(ref.address, []).append(ref) for ref in refs]
+
+            # now we just need to take our dictionary of references and merge them.
+            merged = {ea : functools.reduce(operator.or_, items) for ea, items in grouped.items() if items}
+
+            # then we can go back through our list of refs and attempt to yield them in the
+            # exact order that we received them.
+            for ref in refs:
+                ea = ref.ea
+                if ea in merged:
+                    yield merged.pop(ea)
+                continue
+            return
 
         # define a closure that will get us all of the related references so that we can process them.
         def Freferences(fn):
@@ -4410,40 +4427,43 @@ class xref(object):
 
                 # if it's a branching or call-type instruction that has no xrefs, then log a warning for the user.
                 elif not len(database.xref.down(ea)) and any(F(ea) for F in branches):
-                    logging.warning(u"{:s}.down({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolved.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
+                    logging.warning(u"{:s}.down({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolvable.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
                     continue
 
                 # now we need to check which code xrefs are actually going to be something we care
                 # about by checking to see if there's an xref pointing outside our function.
+                refs = []
                 for ref in database.xref.code_down(ea):
                     xref = ref.ea
                     if interface.node.is_identifier(xref):
                         pass
 
                     elif not contains(fn, xref):
-                        yield ea, ref
+                        refs.append(ref)
 
                     # if it's a branching or call-type instruction, but referencing non-code, then we care about it.
                     elif not database.type.is_code(xref) and any(F(ea) for F in branches):
-                        yield ea, ref
+                        refs.append(ref)
 
                     # if we're recursive and there's a code xref that's referencing our entrypoint,
                     # then we're going to want that too.
                     elif interface.range.start(fn) == xref:
-                        yield ea, ref
+                        refs.append(ref)
                     continue
 
-                # if we're at a switch branch, then we don't need to follow any data references for
-                # this address and we can just skip the rest of our logic since it's part of the function.
+                # if we're at a branch related to the switch, then we need to ignore all of the code references that
+                # we just collected. this is because the branch doesn't actually connect to them directly and instead
+                # we need to modify the access of the data reference to union it with the executable flag.
                 if get_switch_info(ea):
-                    continue
+                    refs[:] = [ ref | 'x' for ref in database.xref.data_down(ea) if not interface.node.is_identifier(ref.address) ]
 
-                # last thing we need to determine is which data xrefs are relevant..
-                # which only includes things that reference code outside of us.
-                for ref in database.xref.data_down(ea):
-                    if not interface.node.is_identifier(ref.address):
-                        yield ea, ref
-                    continue
+                # otherwise we can simply add the data references to our current result for the current address.
+                else:
+                    [ refs.append(ref) for ref in database.xref.data_down(ea) if not interface.node.is_identifier(ref.address) ]
+
+                # now we can just take our collected references, merge them, and then yield them to the caller.
+                for ref in Fmerge_references(refs):
+                    yield ea, ref
                 continue
             return
 
