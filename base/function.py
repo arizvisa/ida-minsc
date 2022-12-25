@@ -1357,6 +1357,42 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
+    def calls(cls):
+        '''Return the basic blocks from the current function that can call another function.'''
+        return cls.calls(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def calls(cls, func):
+        '''Return the basic blocks from the function `func` that can call another function.'''
+        FC_CALL_ENDS, FC_NOPREDS = (getattr(idaapi, attribute, value) for attribute, value in [('FC_CALL_ENDS', 0x20), ('FC_NOPREDS', 0x40)])
+        results = []
+        for bb in cls.iterate(func, FC_CALL_ENDS | FC_NOPREDS):
+            bounds = interface.range.bounds(bb)
+            left, right = sorted(bounds)
+            ea = interface.address.head(right - 1) if right > left else right
+            results.append(bounds) if instruction.type.is_call(ea) else None
+        return results
+
+    @utils.multicase()
+    @classmethod
+    def branches(cls):
+        '''Return the basic blocks from the current function that can branch to another address.'''
+        return cls.branches(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def branches(cls, func):
+        '''Return the basic blocks from the function `func` that can branch to another address.'''
+        FC_CALL_ENDS, FC_NOPREDS = (getattr(idaapi, attribute, value) for attribute, value in [('FC_CALL_ENDS', 0x20), ('FC_NOPREDS', 0x40)])
+        results = []
+        for bb in cls.iterate(func, FC_CALL_ENDS | FC_NOPREDS):
+            bounds = interface.range.bounds(bb)
+            left, right = sorted(bounds)
+            ea = interface.address.head(right - 1) if right > left else right
+            results.append(bounds) if instruction.type.is_branch(ea) else None
+        return results
+
+    @utils.multicase()
+    @classmethod
     @utils.string.decorate_arguments('And', 'Or')
     def select(cls, **boolean):
         '''Query the basic blocks of the current function for any tags specified by `boolean`'''
@@ -1639,6 +1675,8 @@ class blocks(object):
     # XXX: Implement .search for filtering blocks
 flowchart = utils.alias(blocks.flowchart, 'blocks')
 digraph = graph = utils.alias(blocks.digraph, 'blocks')
+calls = utils.alias(blocks.calls, 'blocks')
+branches = utils.alias(blocks.branches, 'blocks')
 
 class block(object):
     """
