@@ -438,11 +438,8 @@ class config(object):
     @classmethod
     def bounds(cls):
         '''Return the bounds of the current database in a tuple formatted as `(left, right)`.'''
-        if idaapi.__version__ < 7.2:
-            min, max = cls.info.minEA, cls.info.maxEA
-        else:
-            min, max = idaapi.inf_get_min_ea(), idaapi.inf_get_max_ea()
-        return interface.bounds_t(min, max)
+        start, stop = interface.address.bounds()
+        return interface.bounds_t(start, stop)
 
     class register(object):
         """
@@ -476,7 +473,7 @@ class config(object):
             '''Return the segment register size for the database.'''
             return 8 * idaapi.ph_get_segreg_size()
 
-range = bounds = utils.alias(config.bounds, 'config')
+range = utils.alias(config.bounds, 'config')
 filename, idb, module, path = utils.alias(config.filename, 'config'), utils.alias(config.idb, 'config'), utils.alias(config.module, 'config'), utils.alias(config.path, 'config')
 path = utils.alias(config.path, 'config')
 baseaddress = base = utils.alias(config.baseaddress, 'config')
@@ -902,7 +899,7 @@ disasm = utils.alias(disassemble)
 def read():
     '''Return the bytes defined at the current selection or address.'''
     address, selection = ui.current.address(), ui.current.selection()
-    if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+    if operator.eq(*(interface.address.head(ea) for ea in selection)):
         return read(address, interface.address.size(address))
     return read(selection)
 @utils.multicase(ea=internal.types.integer)
@@ -2994,7 +2991,7 @@ class address(object):
     def __new__(cls):
         '''Return the current address or a list of addresses for the current selection.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.head(address)
         start, stop = selection
         return [ea for ea in cls.iterate(start, stop)]
@@ -3034,7 +3031,7 @@ class address(object):
     def bounds(cls):
         '''Return the bounds of the current address or selection in a tuple formatted as `(left, right)`.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.bounds(address)
         start, stop = selection
         return interface.bounds_t(start, cls.next(stop))
@@ -3134,7 +3131,7 @@ class address(object):
     @classmethod
     def blocks(cls, start, end):
         '''Yields the boundaries of each block between the addresses `start` and `end`.'''
-        block, _ = start, end = interface.address.head(start), address.tail(end) + 1
+        block, _ = start, end = interface.address.head(start, warn=True), interface.address.tail(end, warn=False) + 1
         for ea in cls.iterate(start, end):
             nextea = cls.next(ea)
 
@@ -4739,19 +4736,19 @@ class type(object):
     def has_relocation(cls):
         '''Return if the current address was relocated by a relocation during load.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.has_relocation(address)
         return cls.has_relocation(selection)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def has_relocation(cls, ea):
         '''Return if the address at `ea` was relocated by a relocation during load.'''
-        return True if internal.interface.address.refinfo(ea) else False
+        return True if interface.address.refinfo(ea) else False
     @utils.multicase(bounds=internal.types.tuple)
     @classmethod
     def has_relocation(cls, bounds):
         '''Return if an address within the specified `bounds` was relocated by a relocation during load.'''
-        return any(internal.interface.address.refinfo(ea) for ea in address.iterate(bounds))
+        return any(interface.address.refinfo(ea) for ea in address.iterate(bounds))
     relocation = relocated = is_relocation = is_relocated = relocationQ = relocatedQ = utils.alias(has_relocation, 'type')
 
     class array(object):
@@ -4774,7 +4771,7 @@ class type(object):
         def __new__(cls):
             '''Return the `[type, length]` of the array at the current selection or address.'''
             address, selection = ui.current.address(), ui.current.selection()
-            if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+            if operator.eq(*(interface.address.head(ea) for ea in selection)):
                 return cls(address)
             return cls(selection)
         @utils.multicase(ea=internal.types.integer)
@@ -4789,7 +4786,7 @@ class type(object):
         @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea, size):
             '''Return the `[type, length]` of the address `ea` if it was an array using the specified `size` (in bytes).'''
-            ea = interface.address.head(ea)
+            ea = interface.address.head(ea, warn=True)
             info, flags, cb = idaapi.opinfo_t(), interface.address.flags(ea), abs(size)
 
             # get the opinfo at the current address to verify if there's a structure or not
@@ -4853,7 +4850,7 @@ class type(object):
         @classmethod
         def size(cls, ea):
             '''Return the size of a member in the array at the address specified by `ea`.'''
-            ea, flags = interface.address.head(ea), interface.address.flags(ea)
+            ea, flags = interface.address.head(ea, warn=True), interface.address.flags(ea)
             return interface.address.element(ea, flags)
 
         @utils.multicase()
@@ -4865,7 +4862,7 @@ class type(object):
         @classmethod
         def length(cls, ea):
             '''Return the number of members in the array at the address specified by `ea`.'''
-            ea = interface.address.head(ea)
+            ea = interface.address.head(ea, warn=True)
             sz, ele = interface.address.size(ea), interface.address.element(ea)
             return sz // ele
 
@@ -4889,7 +4886,7 @@ class type(object):
         @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea):
             '''Return the structure type at address `ea`.'''
-            ea = interface.address.head(ea)
+            ea = interface.address.head(ea, warn=True)
             res = cls.id(ea)
             return _structure.by(res, offset=ea)
 
@@ -4904,7 +4901,7 @@ class type(object):
             '''Return the identifier of the structure at address `ea`.'''
             FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
-            info, ea, flags = idaapi.opinfo_t(), interface.address.head(ea), interface.address.flags(ea)
+            info, ea, flags = idaapi.opinfo_t(), interface.address.head(ea, warn=True), interface.address.flags(ea)
             if flags & idaapi.DT_TYPE != FF_STRUCT:
                 raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, FF_STRUCT, flags & idaapi.DT_TYPE))
 
@@ -5017,7 +5014,7 @@ class type(object):
     def is_exception(cls, **flags):
         '''Return if the current selection or address is guarded by an exception or part of an exception handler.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.is_exception(address, **flags)
         return cls.is_exception(address, **flags)
     @utils.multicase(ea=(internal.types.integer, internal.types.tuple))
@@ -6204,7 +6201,7 @@ class xref(object):
 
         If the integer `reftype` is set, then use this value as the flow type.
         """
-        ea, target = interface.address.head(ea, target)
+        ea, target = interface.address.head(ea, target, warn=True)
         near = segment.bounds(ea) == segment.bounds(target)
 
         flowtype = reftype.get('flowtype', reftype.get('reftype', idaapi.XREF_USER))
@@ -6237,7 +6234,7 @@ class xref(object):
         If the boolean `write` is true, then specify that the reference is writing to the target.
         If the integer `reftype` is set, then use this value as the data type.
         """
-        ea, target = interface.address.head(ea, target)
+        ea, target = interface.address.head(ea, target, warn=True)
         datatype = reftype.get('datatype', reftype.get('reftype', idaapi.XREF_USER))
         if all(reftype.get(attribute, False) for attribute in ['read', 'write']) or any(reftype[attribute] for attribute in ['offset', 'ref', 'reference'] if attribute in reftype):
             datatype = (datatype & ~idaapi.XREF_MASK) | idaapi.dr_O
@@ -6479,7 +6476,7 @@ class marks(object):
             res = loc.markedpos(intp)
             if res == idaapi.BADADDR:
                 raise E.AddressNotFoundError(u"{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join([__name__, cls.__name__]), index))
-            return address.head(res)
+            return interface.address.head(res, warn=True)
 
     ## Internal functions depending on which version of IDA is being used (>= 7.0)
     else:
@@ -6526,7 +6523,7 @@ class marks(object):
             res = idaapi.get_marked_pos(index)
             if res == idaapi.BADADDR:
                 raise E.AddressNotFoundError(u"{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join([__name__, cls.__name__]), index))
-            return address.head(res)
+            return interface.address.head(res, warn=True)
 
 @utils.multicase()
 def mark():
@@ -6958,7 +6955,7 @@ class set(object):
     def unknown(cls):
         '''Set the data at the current selection or address to undefined.'''
         selection = ui.current.selection()
-        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.unknown(ui.current.address())
         start, stop = sorted(selection)
         return cls.unknown(start, stop - start)
@@ -7147,7 +7144,7 @@ class set(object):
     def string(cls, **strtype):
         '''Set the data at the current selection or address to a string with the specified `strtype` and `encoding`.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if 'length' in strtype or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if 'length' in strtype or operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.string(address, **strtype)
         return cls.string(selection, **strtype)
     @utils.multicase(bounds=internal.types.tuple)
@@ -7733,7 +7730,7 @@ class set(object):
         address, selection = ui.current.address(), ui.current.selection()
 
         # If we were given an explicit address, then we just chain to the right case.
-        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.array(address)
 
         # Otherwise we unpack the selection, grab the type, and use them to
@@ -7777,7 +7774,7 @@ class set(object):
 
         # If no length was specified, then we'll check the current selection.
         selection = ui.current.selection()
-        if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.array(ui.current.address(), type)
         start, stop = selection
         return cls.array((start, address.next(stop)), type)
@@ -8226,7 +8223,7 @@ class get(object):
     def array(cls, **length):
         '''Return the values of the array at the current selection or address.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if 'length' in length or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if 'length' in length or operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.array(address, **length)
         return cls.array(selection)
     @utils.multicase(bounds=internal.types.tuple)
@@ -8463,7 +8460,7 @@ class get(object):
     def string(cls, **strtype):
         '''Return the data at the current selection or address as a string with the specified `strtype` and `encoding`.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if 'length' in strtype or operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
+        if 'length' in strtype or operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.string(address, **strtype)
         return cls.string(selection, **strtype)
     @utils.multicase(bounds=internal.types.tuple)
@@ -8475,14 +8472,14 @@ class get(object):
 
         # For older versions of IDA, we get the strtype from the opinfo
         if idaapi.__version__ < 7.0:
-            res = address.head(ea)
+            res = interface.address.head(ea, warn=True)
             info, flags = idaapi.opinfo_t(), interface.address.flags(res)
             ok = idaapi.get_opinfo(res, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
             res = info.strtype if ok else idaapi.BADADDR
 
         # Fetch the string type at the given address using the newer API
         else:
-            res = idaapi.get_str_type(address.head(ea))
+            res = idaapi.get_str_type(interface.address.head(ea, warn=True))
 
         # Figure out our defaults using either what we found or what the database says.
         default = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
@@ -8522,14 +8519,14 @@ class get(object):
 
         # For older versions of IDA, we get the strtype from the opinfo
         if idaapi.__version__ < 7.0:
-            res = address.head(ea)
+            res = interface.address.head(ea, warn=True)
             info, flags = idaapi.opinfo_t(), interface.address.flags(res)
             ok = idaapi.get_opinfo(res, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
             res = info.strtype if ok else idaapi.BADADDR
 
         # Fetch the string type at the given address using the newer API
         else:
-            res = idaapi.get_str_type(address.head(ea))
+            res = idaapi.get_str_type(interface.address.head(ea, warn=True))
 
         # Figure out our defaults using either what we found or what the database says.
         default = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
