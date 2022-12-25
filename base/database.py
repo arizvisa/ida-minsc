@@ -1501,10 +1501,6 @@ def name(ea, **flags):
 
     # return the name at the specified address or not
     return utils.string.of(aname) or None
-@utils.multicase(fullname=internal.types.tuple)
-def name(fullname, **flags):
-    '''Renames the current address to the packed `fullname`.'''
-    return name(ui.current.address(), *fullname, **flags)
 @utils.multicase(string=internal.types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
