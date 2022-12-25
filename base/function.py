@@ -224,10 +224,6 @@ def name(none, **flags):
     # in case the user might be hovering over an import table
     # function and wanting to rename that instead.
     return name(ui.current.address(), none or '', **flags)
-@utils.multicase(fullname=types.tuple)
-def name(fullname, **flags):
-    '''Set the name of the current function to the given packed `fullname`.'''
-    return name(ui.current.address(), *fullname, **flags)
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
