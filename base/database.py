@@ -3083,7 +3083,7 @@ class address(object):
         # good reason for this, but i'm pretty sure that this is how this had always
         # worked as the positions we get should be thought of like a cursor.
         op = operator.lt if start <= end else operator.ge
-        ea, stop = interface.address.within(start, end) if start <= end else reversed(sorted(interface.address.inside(end, start - 1)))
+        ea, stop = interface.address.within(start, end) if start <= end else reversed(sorted(interface.address.within(end, idaapi.get_item_head(start))))
 
         # loop continuosly until we terminate or we run out of bounds.
         try:
@@ -3093,6 +3093,18 @@ class address(object):
         except E.OutOfBoundsError:
             pass
         return
+    @utils.multicase(location=interface.location_t)
+    @classmethod
+    def iterate(cls, location):
+        '''Iterate through all of the addresses defined within the specified `location`.'''
+        bounds = location.bounds
+        return cls.iterate(bounds)
+    @utils.multicase(location=interface.location_t, step=internal.types.callable)
+    @classmethod
+    def iterate(cls, location, step):
+        '''Iterate through all of the addresses defined within the specified `location`.'''
+        bounds = location.bounds
+        return cls.iterate(bounds, step)
     @utils.multicase(bounds=internal.types.tuple)
     @classmethod
     def iterate(cls, bounds):
