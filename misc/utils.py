@@ -614,7 +614,7 @@ class multicase(object):
             for F, node in branch:
                 parameter_name, index, _ = node
                 discard_and_required, critique_and_transform, _ = table[F, index]
-                parameter_critique, parameter_transform = critique_and_transform
+                parameter_critique, parameter_transform, _ = critique_and_transform
 
                 # Now we take the parameter value, transform it, and then critique it.
                 try: value = parameter_transform(parameter) if parameter_transform else parameter
@@ -681,7 +681,7 @@ class multicase(object):
                 # If we still have any parameters available and their names
                 # don't matter (wild), then critique and what we just consumed.
                 if available and wildargs:
-                    parameter_critique, parameter_transform = critique_and_transform
+                    parameter_critique, parameter_transform, _ = critique_and_transform
                     parameters = (kwds[name] for name in available)
                     transformed = map(parameter_transform, parameters) if parameter_transform else parameters
                     critique = parameter_critique if parameter_critique else lambda parameter: True
@@ -689,7 +689,7 @@ class multicase(object):
 
                 # If our parameter name is available, then we can critique it.
                 elif available and parameter_name in available:
-                    parameter_critique, parameter_transform = critique_and_transform
+                    parameter_critique, parameter_transform, _ = critique_and_transform
                     try: parameter = parameter_transform(kwds[parameter_name]) if parameter_transform else kwds[parameter_name]
                     except Exception: continue
                     critique = parameter_critique if parameter_critique else lambda parameter: True
@@ -723,12 +723,16 @@ class multicase(object):
         _, index, _ = tree[0][F]
         for arg in args:
             _, critique_and_transform, _ = table[F, index]
-            parameter_critique, parameter_transform = critique_and_transform
+            parameter_critique, parameter_transform, parameter_constraints = critique_and_transform
             parameter = parameter_transform(arg) if parameter_transform else arg
             assert(parameter_critique(parameter) if parameter_critique else True)
             #counter = counter if arg is parameter else counter + 1
             #counter = counter if arg == parameter else counter + 1
-            counter = counter if id(arg) == id(parameter) and parameter_critique else counter + 1 if parameter_critique else counter + 2
+            #counter = counter if id(arg) == id(parameter) and parameter_critique else counter + 1 if parameter_critique else counter + 2
+            if parameter_critique:
+                counter = counter + 2 if id(arg) != id(parameter) else counter if arg.__class__ in parameter_constraints else counter + 1
+            else:
+                counter = counter + 3
             results.append(parameter)
             _, _, index = tree[index][F]
 
@@ -749,14 +753,18 @@ class multicase(object):
         while index >= 0 and (F, index) in table:
             name, index, next = tree[index][F]
             _, critique_and_transform, wild = table[F, index]
-            parameter_critique, parameter_transform = critique_and_transform
+            parameter_critique, parameter_transform, parameter_constraints = critique_and_transform
             if index >= 0 and name and not wild:
                 arg = keywords.pop(name)
                 parameter = parameter_transform(arg) if parameter_transform else arg
                 assert(parameter_critique(parameter) if parameter_critique else True)
                 #counter = counter if arg is parameter else counter + 1
                 #counter = counter if arg == parameter else counter + 1
-                counter = counter if id(arg) == id(parameter) and parameter_critique else counter + 1 if parameter_critique else counter + 2
+                #counter = counter if id(arg) == id(parameter) and parameter_critique else counter + 1 if parameter_critique else counter + 2
+                if parameter_critique:
+                    counter = counter + 2 if id(arg) != id(parameter) else counter if arg.__class__ in parameter_constraints else counter + 1
+                else:
+                    counter = counter + 3
                 results.append(parameter)
             index = next
 
@@ -941,6 +949,8 @@ class multicase(object):
         args, kwargs, packed = cls.ex_args(callable)
         varargs, wildargs = packed
 
+        Fflattened_constraints = lambda types: {item for item in cls.flatten(types if isinstance(types, internal.types.unordered) else [types])}
+
         # Extract the parameter names and the types that the callable was
         # decorated with so that we can generate the functions used to
         # transform and critique the value that determines its validity.
@@ -948,7 +958,7 @@ class multicase(object):
         for name in args:
             t = constraints.pop(name, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
-            critique_and_transform.append((Fcritique, Ftransform))
+            critique_and_transform.append((Fcritique, Ftransform, Fflattened_constraints(t)))
 
         # Generate two sets that are used to determine what parameter names
         # are required for this wrapped function to still be considered.
@@ -971,8 +981,8 @@ class multicase(object):
         # we'll need to create some cycles within our tree and table. None of these entries
         # hold anything of value, but they need to hold something.. So we create some defaults.
         discard_and_required = {name for name in args}, {name for name in []}
-        critique_and_explode = (operator.truth, lambda item: False)
-        critique_and_continue = (operator.truth, lambda item: True)
+        critique_and_explode = operator.truth, lambda item: False, ()
+        critique_and_continue = operator.truth, lambda item: True, ()
 
         # If there are no parameters whatsoever, then we need a special case
         # which gets used at the first pass of our parameter checks. Essentially
@@ -991,7 +1001,7 @@ class multicase(object):
         if varargs and wildargs:
             t = constraints.pop(wildargs, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
-            critique_and_transform = Fcritique, Ftransform
+            critique_and_transform = Fcritique, Ftransform, Fflattened_constraints(t)
 
             # Since this callable is variable-length'd, we create a loop in our tree
             # and table so that we can consume any number of parameters.
@@ -1007,7 +1017,7 @@ class multicase(object):
         elif varargs:
             t = constraints.pop(varargs, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
-            critique_and_transform = Fcritique, Ftransform
+            critique_and_transform = Fcritique, Ftransform, Fflattened_constraints(t)
 
             # We can't really match against the parameter name with variable-length
             # parameters, so we add it as a loop for an empty string (unnamed).
@@ -1018,7 +1028,7 @@ class multicase(object):
         elif wildargs:
             t = constraints.pop(wildargs, ())
             Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
-            critique_and_transform = Fcritique, Ftransform
+            critique_and_transform = Fcritique, Ftransform, Fflattened_constraints(t)
 
             # We need to go through our type parameters and update our table
             # so that it includes any wild keyword parameters.
