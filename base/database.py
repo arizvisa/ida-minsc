@@ -3140,6 +3140,8 @@ class address(object):
     def blocks(cls, start, end):
         '''Yields the boundaries of each block between the addresses `start` and `end`.'''
         block, _ = start, end = interface.address.head(start, warn=True), interface.address.tail(end, warn=False) + 1
+
+        results = []
         for ea in cls.iterate(start, end):
             nextea = cls.next(ea)
 
@@ -3150,26 +3152,17 @@ class address(object):
             #     yield block, nextea
             ## XXX: in later versions of ida, is_basic_block_end takes two args (ea, bool call_insn_stops_block)
 
-            # skip call instructions
-            if _instruction.type.is_call(ea):
-                continue
-
-            # halting instructions terminate a block
-            if _instruction.type.is_return(ea):
-                yield interface.bounds_t(block, nextea)
-                block = ea
-
-            # branch instructions will terminate a block
-            elif cxdown(ea):
-                yield interface.bounds_t(block, nextea)
+            # call and halting instructions will terminate a block
+            if _instruction.type.is_call(ea) or _instruction.type.is_return(ea):
+                results.append(interface.bounds_t(block, nextea))
                 block = nextea
 
-            # a branch target will also terminate a block
-            elif cxup(ea) and block != ea:
-                yield interface.bounds_t(block, ea)
-                block = ea
+            # branch instructions will terminate a block
+            elif _instruction.type.is_branch(ea):
+                results.append(interface.bounds_t(block, nextea))
+                block = nextea
             continue
-        return
+        return results
 
     @utils.multicase()
     @classmethod
