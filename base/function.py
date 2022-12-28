@@ -67,7 +67,7 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
-        raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate function by address.".format(__name__, ea))
+        raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to find a function at the specified address ({:#x}).".format(__name__, ea, ea))
     return res
 byaddress = utils.alias(by_address)
 
@@ -174,7 +174,7 @@ def comment(func, string, **repeatable):
 
     res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, utils.string.to(string), repeatable.get('repeatable', True))
     if not ok:
-        raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.to(string), repeatable.get('repeatable', True)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `{:s}({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', utils.pycompat.fullname(idaapi.set_func_cmt), ea, utils.string.to(string), repeatable.get('repeatable', True)))
     return res
 @utils.multicase(func=(idaapi.func_t, types.integer), none=types.none)
 def comment(func, none, **repeatable):
@@ -268,28 +268,6 @@ def name(func, string, *suffix, **flags):
 
     # FIXME: mangle the name and shuffle it into the prototype if possible
     return database.name(ea, string, **flags)
-
-# XXX: this function is deprecated in favor of the entire "type" namespace or the "__typeinfo__" tag
-@utils.multicase()
-def prototype():
-    '''Return the prototype of the current function if it has one.'''
-    # use ui.current.address() instead of ui.current.function() to deal with import table entries
-    return prototype(ui.current.address())
-@utils.multicase(func=(idaapi.func_t, types.integer))
-def prototype(func):
-    '''Return the prototype of the function `func` if it has one.'''
-    rt, ea = interface.addressOfRuntimeOrStatic(func)
-    funcname = database.name(ea) or name(ea)
-    try:
-        decl = internal.declaration.function(ea)
-        idx = decl.find('(')
-        res = "{result:s} {name:s}{parameters:s}".format(result=decl[:idx], name=funcname, parameters=decl[idx:])
-
-    except E.MissingTypeOrAttribute:
-        if not internal.declaration.mangledQ(funcname):
-            raise
-        return internal.declaration.demangle(funcname)
-    return res
 
 @utils.multicase()
 def bounds():
@@ -468,7 +446,7 @@ class chunks(object):
         fn = by(func)
         fci = idaapi.func_tail_iterator_t(fn, interface.range.start(fn))
         if not fci.main():
-            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `idaapi.func_tail_iterator_t`.".format(__name__, interface.range.start(fn)))
+            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `{:s}` to iterate through the chunks for the given function.".format(__name__, interface.range.start(fn), utils.pycompat.fullname(idaapi.func_tail_iterator_t)))
 
         results = []
         while True:
@@ -865,7 +843,7 @@ class chunk(object):
 
         # Otherwise we got an error code and we need to raise an exception.
         errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('MOVE_FUNC_')}
-        raise E.DisassemblerError(u"{:s}.top({:#x}, {:#x}) : Unable to modify the top of the specified chunk with `idaapi.set_func_start({:#x}, {:#x})` due to error ({:s}).".format('.'.join([__name__, cls.__name__]), ea, address, left, address, errors.get(result, "{:#x}".format(result))))
+        raise E.DisassemblerError(u"{:s}.top({:#x}, {:#x}) : Unable to modify the top of the specified chunk with `{:s}({:#x}, {:#x})` due to error ({:s}).".format('.'.join([__name__, cls.__name__]), ea, address, utils.pycompat.fullname(idaapi.set_func_start), left, address, errors.get(result, "{:#x}".format(result))))
 
     @utils.multicase()
     @classmethod
@@ -886,7 +864,7 @@ class chunk(object):
         bounds = cls(ea)
         left, right = bounds
         if not idaapi.set_func_end(left, address):
-            raise E.DisassemblerError(u"{:s}.bottom({:#x}, {:#x}) : Unable to modify the bottom of the specified chunk with `idaapi.set_func_end({:#x}, {:#x})`.".format('.'.join([__name__, cls.__name__]), ea, address, left, address))
+            raise E.DisassemblerError(u"{:s}.bottom({:#x}, {:#x}) : Unable to modify the bottom of the specified chunk with `{:s}({:#x}, {:#x})`.".format('.'.join([__name__, cls.__name__]), ea, address, utils.pycompat.fullname(idaapi.set_func_end), left, address))
         return right
 
     @utils.multicase()
@@ -1266,7 +1244,7 @@ class blocks(object):
             if interface.range.within(ea, bb):
                 return bb
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `{:s}` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, utils.pycompat.fullname(idaapi.BasicBlock), ea, interface.range.start(fn)))
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def at(cls, bb):
@@ -1282,7 +1260,7 @@ class blocks(object):
         # BasicBlock's address to find the function it's a part of.
         except AttributeError:
             fn = func.by(bounds.left)
-            logging.warning(u"{:s}.at({!s}) : Unable to determine the flowchart from the provided `idaapi.BasicBlock` ({:s}) for function {:#x}.".format('.'.join([__name__, cls.__name__]), bounds, bounds, interface.range.start(fn)))
+            logging.warning(u"{:s}.at({!s}) : Unable to determine the flowchart from the provided `{:s}` ({:s}) for function {:#x}.".format('.'.join([__name__, cls.__name__]), bounds, utils.pycompat.fullname(idaapi.BasicBlock), bounds, interface.range.start(fn)))
             return cls.at(fn, bb)
 
         # now we can extract the function and its flags to regenerate the flowchart.
@@ -1293,7 +1271,7 @@ class blocks(object):
         iterable = (item for item in cls.iterate(fn, flags) if bounds.left == interface.range.start(item) or bounds.contains(interface.range.start(item)))
         result = builtins.next(iterable, None)
         if result is None:
-            raise E.ItemNotFoundError(u"{:s}.at({!s}) : Unable to locate the `idaapi.BasicBlock` for the given bounds ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bounds, bounds, interface.range.start(fn)))
+            raise E.ItemNotFoundError(u"{:s}.at({!s}) : Unable to locate the `{:s}` for the given bounds ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bounds, utils.pycompat.fullname(idaapi.BasicBlock), bounds, interface.range.start(fn)))
         return result
     @utils.multicase(func=(idaapi.func_t, types.integer), bb=idaapi.BasicBlock)
     @classmethod
@@ -1309,14 +1287,14 @@ class blocks(object):
         # warn the user about not being able to figure it out.
         except AttributeError:
             flags = idaapi.FC_PREDS | idaapi.FC_NOEXT
-            logging.warning(u"{:s}.at({:#x}, {!s}) : Unable to determine the original flags for the `idaapi.BasicBlock` ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), interface.range.bounds(bb), interface.range.start(fn)))
+            logging.warning(u"{:s}.at({:#x}, {!s}) : Unable to determine the original flags for the `{:s}` ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.pycompat.fullname(idaapi.BasicBlock), interface.range.bounds(bb), interface.range.start(fn)))
 
         # regenerate the flowchart, and generate an iterator that gives
         # us matching blocks. then we can return the first one and be good.
         iterable = (item for item in cls.iterate(fn, flags) if bounds.left == interface.range.start(item) or bounds.contains(interface.range.start(item)))
         result = builtins.next(iterable, None)
         if result is None:
-            raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate the `idaapi.BasicBlock` for the given bounds ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bounds, bounds, interface.range.start(fn)))
+            raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate the `{:s}` for the given bounds ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bounds, utils.pycompat.fullname(idaapi.BasicBlock), bounds, interface.range.start(fn)))
         return result
 
     @utils.multicase()
@@ -1348,7 +1326,7 @@ class blocks(object):
         # if we couldn't get the flowchart, then there's nothing we can do.
         except AttributeError:
             bounds = interface.range.bounds(bb)
-            raise E.InvalidTypeOrValueError(u"{:s}.at({!s}) : Unable to determine the flowchart from the provided `idaapi.BasicBlock` ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, bounds))
+            raise E.InvalidTypeOrValueError(u"{:s}.at({!s}) : Unable to determine the flowchart from the provided `{:s}` ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, utils.pycompat.fullname(idaapi.BasicBlock), bounds))
         return fc
 
     @utils.multicase()
@@ -2382,7 +2360,7 @@ class frame(object):
         _r = idaapi.get_frame_retsize(fn)
         ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), lvars, regs - _r, args, interface.range.start(fn), lvars, regs - _r, args))
+            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `{:s}({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), lvars, regs - _r, args, utils.pycompat.fullname(idaapi.add_frame), interface.range.start(fn), lvars, regs - _r, args))
         return cls(fn)
 
     @utils.multicase()
@@ -4315,6 +4293,7 @@ class type(object):
     args = parameters = arguments
 
 t = type # XXX: ns alias
+prototype = utils.alias(type, 'type')
 convention = cc = utils.alias(type.convention, 'type')
 result = type.result # XXX: ns alias
 arguments = args = type.arguments   # XXX: ns alias
