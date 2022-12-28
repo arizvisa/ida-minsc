@@ -488,7 +488,7 @@ class chunks(object):
         '''Iterate through all the instructions for each chunk in the function `func`.'''
         for start, end in cls(func):
             for ea in database.address.iterate(start, end):
-                if database.type.is_code(ea):
+                if database.type.code(ea):
                     yield ea
                 continue
             continue
@@ -734,7 +734,7 @@ class chunk(object):
         '''Iterate through all the instructions for the function chunk containing the address ``ea``.'''
         start, end = cls(ea)
         for ea in database.address.iterate(start, end):
-            if database.type.is_code(ea):
+            if database.type.code(ea):
                 yield ea
             continue
         return
@@ -1089,7 +1089,7 @@ class blocks(object):
             # if we're unable to split up calls, then we need to traverse this
             # block so that we can figure out where we need to split.
             if not has_calls and flags & FC_CALL_ENDS:
-                start, stop, locations = left, right, [ea for ea in block.iterate(bb) if instruction.type.is_call(ea)]
+                start, stop, locations = left, right, [ea for ea in block.iterate(bb) if instruction.type.enter(ea)]
                 for item in locations:
                     left, right = start, database.address.next(item)
                     yield idaapi.BasicBlock(bb.id, interface.range.pack(left, right), bb._fc)
@@ -1366,7 +1366,7 @@ class blocks(object):
             bounds = interface.range.bounds(bb)
             left, right = sorted(bounds)
             ea = interface.address.head(right - 1) if right > left else right
-            results.append(bounds) if instruction.type.is_call(ea) else None
+            results.append(bounds) if instruction.type.enter(ea) else None
         return results
 
     @utils.multicase()
@@ -1384,7 +1384,7 @@ class blocks(object):
             bounds = interface.range.bounds(bb)
             left, right = sorted(bounds)
             ea = interface.address.head(right - 1) if right > left else right
-            results.append(bounds) if instruction.type.is_branch(ea) else None
+            results.append(bounds) if instruction.type.branch(ea) else None
         return results
 
     @utils.multicase()
@@ -1547,10 +1547,10 @@ class blocks(object):
             attrs.setdefault('__size__', getattr(bounds, 'size', bounds.right - bounds.left))
 
             attrs.setdefault('__entry__', bounds.left == ea or not any(B.preds()))
-            attrs.setdefault('__sentinel__', instruction.type.is_sentinel(last) or not any(B.succs()))
-            attrs.setdefault('__conditional__', instruction.type.is_jxx(last))
-            attrs.setdefault('__unconditional__', any(F(last) for F in [instruction.type.is_jmp, instruction.type.is_jmpi]))
-            attrs.setdefault('__calls__', [ea for ea in items if instruction.type.is_call(ea)])
+            attrs.setdefault('__sentinel__', instruction.type.sentinel(last) or not any(B.succs()))
+            attrs.setdefault('__conditional__', instruction.type.conditional(last))
+            attrs.setdefault('__unconditional__', any(F(last) for F in [instruction.type.unconditional, instruction.type.unconditionali]))
+            attrs.setdefault('__calls__', [ea for ea in items if instruction.type.enter(ea)])
 
             attrs.setdefault('__chunk_index__', next((idx for idx, ch in enumerate(availableChunks) if ch.left <= bounds.left < ch.right), None))
             attrs.setdefault('__chunk_start__', bounds.left in {item.left for item in availableChunks})
@@ -1598,12 +1598,12 @@ class blocks(object):
                 attrs = {}
                 if interface.range.end(Bp) == target:
                     operator.setitem(attrs, '__contiguous__', interface.range.end(Bp) == target)
-                elif instruction.type.is_jxx(source):
+                elif instruction.type.conditional(source):
                     operator.setitem(attrs, '__conditional__', True)
-                elif instruction.type.is_jmp(source) or instruction.type.is_jmpi(source):
+                elif instruction.type.unconditional(source) or instruction.type.unconditionali(source):
                     operator.setitem(attrs, '__unconditional__', True)
                 else:
-                    operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
+                    operator.setitem(attrs, '__branch__', instruction.type.branch(source))
 
                 # add the dot attributes for the edge
                 operator.setitem(attrs, 'dir', 'forward')
@@ -1622,12 +1622,12 @@ class blocks(object):
                 attrs = {}
                 if interface.range.end(B) == target:
                     operator.setitem(attrs, '__contiguous__', interface.range.end(B) == target)
-                elif instruction.type.is_jxx(source):
+                elif instruction.type.conditional(source):
                     operator.setitem(attrs, '__conditional__', True)
-                elif instruction.type.is_jmp(source) or instruction.type.is_jmpi(source):
+                elif instruction.type.unconditional(source) or instruction.type.unconditionali(source):
                     operator.setitem(attrs, '__unconditional__', True)
                 else:
-                    operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
+                    operator.setitem(attrs, '__branch__', instruction.type.branch(source))
 
                 # add the dot attributes for the edge
                 operator.setitem(attrs, 'dir', 'forward')
@@ -2441,7 +2441,7 @@ class frame(object):
 
             # first we'll need to check if there's a tinfo_t for the address to
             # give it priority over the frame. then we can grab its details.
-            if database.type.has_typeinfo(ea):
+            if type.has(ea):
                 tinfo = type(ea)
                 _, ftd = interface.tinfo.function_details(ea, tinfo)
 
@@ -2563,7 +2563,7 @@ class frame(object):
         @classmethod
         def location(cls, ea):
             '''Return the list of address locations for each of the parameters that are passed to the function call at `ea`.'''
-            if not any(Finstruction(ea) for Finstruction in [instruction.type.is_call, instruction.type.is_branch]):
+            if not any(Finstruction(ea) for Finstruction in [instruction.type.enter, instruction.type.branch]):
                 raise E.MissingTypeOrAttribute(u"{:s}.location({:#x}) : The instruction at the specified address ({:#x}) is not a function call.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
             items = idaapi.get_arg_addrs(ea)
@@ -2590,7 +2590,7 @@ class frame(object):
         def iterate(cls, func):
             '''Yield the `(member, type, name)` associated with the arguments for the function `func`.'''
             rt, ea = interface.addressOfRuntimeOrStatic(func)
-            fn, has_tinfo = None if rt else by(ea), type.has_typeinfo(ea)
+            fn, has_tinfo = None if rt else by(ea), type.has(ea)
 
             # We need our frame to be correct, so we confirm it by checking the problem queue.
             Fproblem = builtins.next((getattr(idaapi, candidate) for candidate in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, candidate)), utils.fconstant(False))
@@ -2939,7 +2939,7 @@ def tag(func):
 
     # Add any of the implicit tags for the given function into our results.
     fname = fname
-    if fname and database.type.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', realname)
+    if fname and interface.address.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', realname)
     fcolor = color(fn)
     if fcolor is not None: res.setdefault('__color__', fcolor)
 
@@ -2947,7 +2947,7 @@ def tag(func):
     # tag, we'll need to extract the prototype and the function's name. This
     # is so that we can use the name to emit a proper function prototype.
     try:
-        if type.has_prototype(fn):
+        if type.has(fn):
             ti = type(fn)
 
             # Filter the name we're going to render with so that it can be parsed properly.
@@ -3235,8 +3235,8 @@ class type(object):
 
     Some simple ways of getting information about a function::
 
-        > print( function.type.has_noframe() )
-        > for ea in filter(function.type.is_library, database.functions()): ...
+        > print( function.type.frame() )
+        > for ea in filter(function.type.library, database.functions()): ...
 
     """
     @utils.multicase()
@@ -3254,38 +3254,31 @@ class type(object):
     @utils.multicase(func=(types.integer, idaapi.func_t))
     def __new__(cls, func):
         '''Return the type information for the function `func` as an ``idaapi.tinfo_t``.'''
-        _, ea = interface.addressOfRuntimeOrStatic(func)
-        fn = idaapi.get_func(ea)
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        guess_tinfo = (lambda ti, ea: idaapi.guess_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo
 
-        # Start out by pre-creating a manual function type just in case
-        # we're not able to snag one for the specified function address.
-        missing, ftd = idaapi.tinfo_t(), idaapi.func_type_data_t()
-        ftd.rettype = idaapi.tinfo_t(idaapi.BT_VOID if fn and fn.flags & idaapi.FUNC_NORET else idaapi.BT_INT)
-        ftd.cc = idaapi.CM_CC_UNKNOWN | idaapi.BFA_NORET if fn and fn.flags & idaapi.FUNC_NORET else idaapi.CM_CC_UNKNOWN
-        missing = missing if missing.create_func(ftd) else None
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-        # Then we'll grab the type for the address. Prior to this we were guessing
-        # the function type, but issue #175 demonstrated that there's a condition
-        # which results in both the guess_tinfo and get_tinfo functions failing.
-        guessed, nsupped = idaapi.tinfo_t(), database.type(ea)
+        # Try to get the type information for the function or guess it if we couldn't.
+        ti = idaapi.tinfo_t()
+        res = get_tinfo(ti, ea) or guess_tinfo(ti, ea)
 
-        # Now we'll take a guess at the type in case there's a situation
-        # where there's no type available for the given address.
-        error = idaapi.guess_tinfo2(ea, guessed) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(guessed, ea)
-        guessed = None if error == idaapi.GUESS_FUNC_FAILED else guessed
+        # If our result is not equal to GUESS_FUNC_FAILED (get_tinfo returns True, then we're good.
+        if res != idaapi.GUESS_FUNC_FAILED:
+            return ti
 
-        # Then we'll return each type that we fetched while prioritizing the one that is
-        # stored in NSUP_, then the guessed one, and then falling back to the missing one.
-        if nsupped or guessed:
-            return nsupped or guessed
+        # If that didn't work, then we lie about it, because we should always be able to return a type.
+        logging.debug(u"{:s}({:#x}) : Ignoring failure code ({:d}) when trying to guess the `{:s}` for the specified function.".format('.'.join([__name__, cls.__name__]), ea, res, ti.__class__.__name__))
+        int = idaapi.tinfo_t()
+        int.create_simple_type(idaapi.BT_INT)
 
-        # If we weren't able to create the missing type, then we need to abort. This shouldn't
-        # be possible at all whatsoever, but perhaps some database state is preventing us.
-        if not missing:
-            raise E.DisassemblerError(u"{:s}({:#x}) : Unable to create a dummy function type to return for the for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-        logging.warning(u"{:s}({:#x}) : Unable to guess the missing type for the function at {:#x} due to error ({:d}) which will result in an empty function type (\"{:s}\") being returned.".format('.'.join([__name__, cls.__name__]), ea, ea, idaapi.GUESS_FUNC_FAILED, utils.string.escape("{!s}".format(missing), '"')))
-        return missing
+        # Instead of assuming stdcall for rt-linked and cdecl for in-module functions (which isn't always
+        # true), use the unknown calling convention which seems to appear as the compiler default.
+        ftd = idaapi.func_type_data_t()
+        ftd.rettype, ftd.cc = int, functools.reduce(operator.or_, [getattr(idaapi, attribute, value) for attribute, value in [('CM_CC_UNKNOWN', 0x10), ('CM_M_NN', 0), ('CM_UNKNOWN', 0)]])
+        if not ti.create_func(ftd):
+            raise E.DisassemblerError(u"{:s}({:#x}) : Unable to create a function type to return for the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+        return ti
     @utils.multicase(func=(idaapi.func_t, types.integer), info=idaapi.tinfo_t)
     def __new__(cls, func, info, **guessed):
         '''Apply the ``idaapi.tinfo_t`` in `info` to the function `func`.'''
@@ -3433,12 +3426,12 @@ class type(object):
 
     @utils.multicase()
     @classmethod
-    def has_problem(cls):
+    def problem(cls):
         '''Return if the current function has a problem associated with it.'''
-        return cls.has_problem(ui.current.address())
+        return cls.problem(ui.current.address())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def has_problem(cls, func):
+    def problem(cls, func):
         '''Return if the function `func` has a problem associated with it.'''
         PR_END = getattr(idaapi, 'PR_END', 17)
         iterable = (getattr(idaapi, attribute) for attribute in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, attribute))
@@ -3454,7 +3447,7 @@ class type(object):
         return any(Fproblem(problem, ea) for problem in problems)
     @utils.multicase(func=(idaapi.func_t, types.integer), problem=types.integer)
     @classmethod
-    def has_problem(cls, func, problem):
+    def problem(cls, func, problem):
         '''Return if the function `func` has the specified `problem` associated with it.'''
         PR_END = getattr(idaapi, 'PR_END', 17)
         iterable = (getattr(idaapi, attribute) for attribute in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, attribute))
@@ -3463,7 +3456,7 @@ class type(object):
         # Now we can just ask if the specified problem exists for the function.
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return Fproblem(problem, ea)
-    problem = problemQ = utils.alias(has_problem, 'type')
+    has_problem = utils.alias(problem, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3482,209 +3475,177 @@ class type(object):
 
     @utils.multicase()
     @classmethod
-    def is_decompiled(cls):
+    def decompiled(cls):
         '''Return if the current function has been decompiled.'''
-        return cls.is_decompiled(ui.current.address())
+        return cls.decompiled(ui.current.address())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def is_decompiled(cls, func):
+    def decompiled(cls, func):
         '''Return if the function `func` has been decompiled.'''
         AFL_HR_DETERMINED = getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000)
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return True if interface.node.aflags(ea, AFL_HR_DETERMINED) else False
-    decompiled = decompiledQ = utils.alias(is_decompiled, 'type')
+    is_decompiled = utils.alias(decompiled, 'type')
 
     @utils.multicase()
     @classmethod
-    def has_frame(cls):
+    def frame(cls):
         '''Return if the current function has a frame allocated to it.'''
-        return cls.has_frame(ui.current.function())
+        return cls.frame(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def has_frame(cls, func):
+    def frame(cls, func):
         '''Return if the function `func` has a frame allocated to it.'''
         fn = by(func)
         return fn.frame != idaapi.BADADDR
-    frame = frameQ = utils.alias(has_frame, 'type')
+    has_frame = utils.alias(frame, 'type')
 
     @utils.multicase()
     @classmethod
-    def has_frameptr(cls):
+    def frameptr(cls):
         '''Return if the current function uses a frame pointer (register).'''
-        return cls.has_frameptr(ui.current.function())
+        return cls.frameptr(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def has_frameptr(cls, func):
+    def frameptr(cls, func):
         '''Return if the function `func` uses a frame pointer (register).'''
-        return True if cls.flags(func, idaapi.FUNC_FRAME) else False
-    frameptr = frameptrQ = utils.alias(has_frameptr, 'type')
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        return True if ok and cls.flags(func, idaapi.FUNC_FRAME) else False
+    has_frameptr = utils.alias(frameptr, 'type')
 
     @utils.multicase()
     @classmethod
-    def has_name(cls):
+    def name(cls):
         '''Return if the current function has a user-defined name.'''
-        return cls.has_name(ui.current.address())
+        return cls.name(ui.current.address())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def has_name(cls, func):
+    def name(cls, func):
         '''Return if the function `func` has a user-defined name.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
-        return database.type.has_customname(ea)
-    named = nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
+        return interface.address.flags(ea, idaapi.FF_NAME) == idaapi.FF_NAME
+    named = has_name = utils.alias(name, 'type')
 
     @utils.multicase()
     @classmethod
-    def has_return(cls):
+    def leave(cls):
         '''Return if the current function returns.'''
-        return cls.has_return(ui.current.function())
+        return cls.leave(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def has_return(cls, func):
+    def leave(cls, func):
         '''Return if the function `func` returns.'''
         fn = by(func)
         if fn.flags & idaapi.FUNC_NORET_PENDING == idaapi.FUNC_NORET_PENDING:
-            logging.warning(u"{:s}.has_return({:s}) : Analysis for function return is still pending. The flag (`idaapi.FUNC_NORET_PENDING`) is still set.".format('.'.join([__name__, cls.__name__]), ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func)))
+            logging.warning(u"{:s}.leave({:s}) : Analysis for function return is still pending due to the `{:s}` flag being set.".format('.'.join([__name__, cls.__name__]), ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), '.'.join(['idaapi', 'FUNC_NORET_PENDING'])))
         return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
-    returns = returnQ = utils.alias(has_return, 'type')
-
-    @utils.multicase()
-    @classmethod
-    def is_library(cls):
-        '''Return a boolean describing whether the current function is considered a library function.'''
-        return cls.is_library(ui.current.function())
-    @utils.multicase(func=(idaapi.func_t, types.integer))
-    @classmethod
-    def is_library(cls, func):
-        '''Return a boolean describing whether the function `func` is considered a library function.'''
-        return True if cls.flags(func, idaapi.FUNC_LIB) else False
-    libraryQ = utils.alias(is_library, 'type')
+    has_return = returns = utils.alias(leave, 'type')
 
     @utils.multicase()
     @classmethod
     def library(cls):
         '''Return a boolean describing whether the current function is considered a library function.'''
-        return cls.is_library(ui.current.function())
+        return cls.library(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def library(cls, func):
         '''Return a boolean describing whether the function `func` is considered a library function.'''
-        return cls.is_library(func)
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        return True if ok and cls.flags(func, idaapi.FUNC_LIB) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def library(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a library function depending on the value of `boolean`.'''
         return cls.flags(func, idaapi.FUNC_LIB, -1 if boolean else 0) == idaapi.FUNC_LIB
-
-    @utils.multicase()
-    @classmethod
-    def is_thunk(cls):
-        '''Return a boolean describing whether the current function was determined to be a code thunk.'''
-        return cls.is_thunk(ui.current.function())
-    @utils.multicase(func=(idaapi.func_t, types.integer))
-    @classmethod
-    def is_thunk(cls, func):
-        '''Return a boolean describing whether the function `func` was determined to be a code thunk.'''
-        return True if cls.flags(func, idaapi.FUNC_THUNK) else False
-    thunkQ = utils.alias(is_thunk, 'type')
+    is_library = utils.alias(library, 'type')
 
     @utils.multicase()
     @classmethod
     def thunk(cls):
         '''Return a boolean describing whether the current function was determined to be a code thunk.'''
-        return cls.is_thunk(ui.current.function())
+        return cls.thunk(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def thunk(cls, func):
         '''Return a boolean describing whether the function `func` was determined to be a code thunk.'''
-        return cls.is_thunk(func)
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        return True if ok and cls.flags(func, idaapi.FUNC_THUNK) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def thunk(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a code thunk depending on the value of `boolean`.'''
         return cls.flags(func, idaapi.FUNC_THUNK, -1 if boolean else 0) == idaapi.FUNC_THUNK
+    is_thunk = utils.alias(thunk, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_far(cls):
+    def far(cls):
         '''Return a boolean describing whether the current function is considered a "far" function by IDA or the user.'''
-        return cls.is_far(ui.current.function())
+        return cls.far(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def is_far(cls, func):
+    def far(cls, func):
         '''Return a boolean describing whether the function `func` is considered a "far" function by IDA or the user.'''
-        return True if cls.flags(func, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
-    far = farQ = utils.alias(is_far, 'type')
-
-    @utils.multicase()
-    @classmethod
-    def is_static(cls):
-        '''Return a boolean describing whether the current function is defined as a static function.'''
-        return cls.is_static(ui.current.function())
-    @utils.multicase(func=(idaapi.func_t, types.integer))
-    @classmethod
-    def is_static(cls, func):
-        '''Return a boolean describing whether the function `func` is defined as a static function.'''
-        FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
-        return True if cls.flags(func, FUNC_STATICDEF) else False
-    staticQ = utils.alias(is_static, 'type')
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        return True if ok and cls.flags(func, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
+    is_far = utils.alias(far, 'type')
 
     @utils.multicase()
     @classmethod
     def static(cls):
         '''Return a boolean describing whether the current function is defined as a static function.'''
-        return cls.is_static(ui.current.function())
+        return cls.static(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def static(cls, func):
         '''Return a boolean describing whether the function `func` is defined as a static function.'''
-        return cls.is_static(func)
+        FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        return True if ok and cls.flags(func, FUNC_STATICDEF) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def static(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a static function depending on the value of `boolean`.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
         return cls.flags(func, FUNC_STATICDEF, -1 if boolean else 0) == FUNC_STATICDEF
-
-    @utils.multicase()
-    @classmethod
-    def is_hidden(cls):
-        '''Return a boolean describing whether the current function is hidden.'''
-        return cls.is_hidden(ui.current.function())
-    @utils.multicase(func=(idaapi.func_t, types.integer))
-    @classmethod
-    def is_hidden(cls, func):
-        '''Return a boolean describing whether the function `func` is hidden.'''
-        return True if cls.flags(func, idaapi.FUNC_HIDDEN) else False
-    hiddenQ = utils.alias(is_hidden, 'type')
+    is_static = utils.alias(static, 'type')
 
     @utils.multicase()
     @classmethod
     def hidden(cls):
         '''Return a boolean describing whether the current function is hidden.'''
-        return cls.is_hidden(ui.current.function())
+        return cls.hidden(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def hidden(cls, func):
         '''Return a boolean describing whether the function `func` is hidden.'''
-        return cls.is_hidden(func)
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        return True if ok and cls.flags(func, idaapi.FUNC_HIDDEN) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def hidden(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a hidden function depending on the value of `boolean`.'''
         return cls.flags(func, idaapi.FUNC_HIDDEN, -1 if boolean else 0) == idaapi.FUNC_HIDDEN
+    is_hidden = utils.alias(hidden, 'type')
 
     @utils.multicase()
     @classmethod
-    def has_prototype(cls):
+    def has(cls):
         '''Return a boolean describing whether the current function has a prototype associated with it.'''
-        return cls.has_prototype(ui.current.address())
+        return cls.has(ui.current.address())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def has_prototype(cls, func):
+    def has(cls, func):
         '''Return a boolean describing whether the function `func` has a prototype associated with it.'''
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        guess_tinfo = (lambda ti, ea: idaapi.guess_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo
         _, ea = interface.addressOfRuntimeOrStatic(func)
-        return database.type.has_typeinfo(ea)
-    prototype = prototypeQ = has_typeinfo = typeinfoQ = utils.alias(has_prototype, 'type')
+
+        # If we're able to straight-up get the type information for a function or guess it, then we're good.
+        ti = idaapi.tinfo_t()
+        ok = get_tinfo(ti, ea) or guess_tinfo(ti, ea) == idaapi.GUESS_FUNC_OK
+        return True if ok else False
+    has_prototype = prototype = has_typeinfo = utils.alias(has, 'type')
 
     @utils.multicase()
     @classmethod
@@ -3825,7 +3786,7 @@ class type(object):
             # FIXME: figure out the proper way to parse a type instead of as a declaration
             tinfo = internal.declaration.parse(info)
             if tinfo is None:
-                raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r})".format('.'.join([__name__, cls.__name__]), func, info, info))
+                raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), func, info, info))
             return cls(func, tinfo)
         @utils.multicase(func=(idaapi.func_t, types.integer), info=idaapi.tinfo_t)
         def __new__(cls, func, info):
@@ -4338,7 +4299,7 @@ class type(object):
         def locations(cls, ea):
             '''Return the address of each of the parameters being passed to the function referenced at address `ea`.'''
             if not database.xref.code(ea, descend=True):
-                raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.is_call(ea) else 'is not a call instruction with'))
+                raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.enter(ea) else 'is not a call instruction with'))
             items = idaapi.get_arg_addrs(ea)
             return [] if items is None else [ea for ea in items]
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), ea=internal.types.integer)
@@ -4416,7 +4377,7 @@ class xref(object):
             for ea in iterate(fn):
 
                 # if it isn't code, then we skip it.
-                if not database.type.is_code(ea):
+                if not database.type.code(ea):
                     continue
 
                 # if it's a branching or call-type instruction that has no xrefs, then log a warning for the user.
@@ -4429,14 +4390,14 @@ class xref(object):
                 refs = []
                 for ref in database.xref.code_down(ea):
                     xref = ref.ea
-                    if interface.node.is_identifier(xref):
+                    if interface.node.identifier(xref):
                         pass
 
                     elif not contains(fn, xref):
                         refs.append(ref)
 
                     # if it's a branching or call-type instruction, but referencing non-code, then we care about it.
-                    elif not database.type.is_code(xref) and any(F(ea) for F in branches):
+                    elif not database.type.code(xref) and any(F(ea) for F in branches):
                         refs.append(ref)
 
                     # if we're recursive and there's a code xref that's referencing our entrypoint,
@@ -4449,11 +4410,11 @@ class xref(object):
                 # we just collected. this is because the branch doesn't actually connect to them directly and instead
                 # we need to modify the access of the data reference to union it with the executable flag.
                 if get_switch_info(ea):
-                    refs[:] = [ ref | 'x' for ref in database.xref.data_down(ea) if not interface.node.is_identifier(ref.address) ]
+                    refs[:] = [ ref | 'x' for ref in database.xref.data_down(ea) if not interface.node.identifier(ref.address) ]
 
                 # otherwise we can simply add the data references to our current result for the current address.
                 else:
-                    [ refs.append(ref) for ref in database.xref.data_down(ea) if not interface.node.is_identifier(ref.address) ]
+                    [ refs.append(ref) for ref in database.xref.data_down(ea) if not interface.node.identifier(ref.address) ]
 
                 # now we can just take our collected references, merge them, and then yield them to the caller.
                 for ref in Fmerge_references(refs):
@@ -4577,7 +4538,7 @@ class xref(object):
     def arguments(cls, ea):
         '''Return the address of each of the parameters being passed to the function reference at address `ea`.'''
         if not database.xref.code_down(ea):
-            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.is_call(ea) else 'is not a call instruction with'))
+            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.enter(ea) else 'is not a call instruction with'))
         items = idaapi.get_arg_addrs(ea)
         return [] if items is None else [ea for ea in items]
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
