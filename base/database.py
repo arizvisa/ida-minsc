@@ -3029,8 +3029,7 @@ class address(object):
         address, selection = ui.current.address(), ui.current.selection()
         if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.bounds(address)
-        start, stop = selection
-        return interface.bounds_t(start, cls.next(stop))
+        return interface.bounds_t(*selection)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def bounds(cls, ea):
