@@ -168,6 +168,19 @@ class PatternAnyType(Pattern):
 
 ### compatibility namespace
 class pycompat(object):
+    """
+    This namespace provides tools for interacting with some of the core
+    callable types that are available from Python in a way that is compatible
+    between all the supported versions. This allows one to interact with
+    the names and attributes for a code or a function object in a generic way.
+    """
+
+    @classmethod
+    def fullname(cls, object):
+        '''Return the fully qualified name for the specified `object` as a string if possible.'''
+        Fqualified_name = fattribute('__qualname__') if hasattr(object, '__qualname__') else cls.function.name if isinstance(object, internal.types.function) else cls.code.name if isinstance(object, internal.types.code) else fattribute('__name__', object.__name__)
+        return '.'.join([object.__module__, Fqualified_name(object)] if hasattr(object, '__module__') else [Fqualified_name(object)])
+
     class function_2x(object):
         @classmethod
         def new(cls, code, globals, name, argdefs, closure):
@@ -322,16 +335,17 @@ class pycompat(object):
             return internal.types.method(function, instance)
 
         @classmethod
-        def self(cls, object):
-            return object.__self__
+        def self(cls, method):
+            return method.__self__
 
         @classmethod
-        def type(cls, object):
-            return object.__self__.__class__
+        def type(cls, method):
+            self = method.__self__
+            return self.__class__ if isinstance(self, object) else self
 
         @classmethod
-        def function(cls, object):
-            return object.__func__
+        def function(cls, method):
+            return method.__func__
 
     method = method_2x if sys.version_info.major < 3 else method_3x
 
@@ -1274,23 +1288,71 @@ class multicase(object):
         return args, res, (starargs, kwdargs)
 
 class alias(object):
+    """
+    This class is used to generate a function that will be replaced with a
+    reference to another function. This has the effect of returning an alias
+    to the target function. The returned function will have its documentation
+    updated to inform the caller the function that it is an alias of.
+    """
     def __new__(cls, other, klass=None):
+        if isinstance(other, type):
+            return cls.namespace_wrapper(other, klass)
+
         cons, func = multicase.reconstructor(other), multicase.ex_function(other)
-        if isinstance(other, internal.types.method) or klass:
-            module = (func.__module__, klass or pycompat.method.type(other).__name__)
+        qualname = fattribute('__qualname__', None)(func)
+        if klass:
+            module = [func.__module__, klass]
+        elif isinstance(other, (staticmethod, classmethod)):
+            stripped = qualname[:-len(pycompat.function.name(func))].rstrip('.') if qualname else None
+            module = [func.__module__, stripped] if stripped else [func.__module__]
+        elif isinstance(other, internal.types.method):
+            method_klass = pycompat.method.type(func)
+            module = [func.__module__, klass if klass else fattribute('__qualname__', method_klass.__name__)(method_klass)]
         else:
-            module = (func.__module__,)
-        document = "Alias for `{:s}`.".format('.'.join(module + (pycompat.function.name(func),)))
+            stripped = qualname[:-len(pycompat.function.name(func))].rstrip('.') if qualname else None
+            module = [func.__module__, stripped] if stripped else [func.__module__]
+
+        document = "Alias for `{:s}`.".format('.'.join(module + [pycompat.function.name(func)]))
         res = cls.new_wrapper(func, document)
         return cons(res)
 
     @classmethod
     def new_wrapper(cls, func, document):
-        # build the wrapper...
-        def fn(*arguments, **keywords):
-            return func(*arguments, **keywords)
-        res = functools.update_wrapper(fn, func)
-        res.__doc__ = document
+        wrapper = lambda *arguments, **keywords: func(*arguments, **keywords)
+
+        # functools.update_wrapper doesn't actually update any of the things
+        # we wanted it to, so we pretty much have to do it all ourselves.
+        pycompat.function.set_name(wrapper, pycompat.function.name(func))
+        if hasattr(func, '__module__'):
+            wrapper.__module__ = func.__module__
+
+        res = functools.update_wrapper(wrapper, func)
+        pycompat.function.set_documentation(res, document)
+        return res
+
+    @classmethod
+    def namespace_wrapper(cls, other, klass):
+        func = other.__new__
+        qualname = fattribute('__qualname__', None)(other)
+
+        # allocate a closure that calls our original "func" so that we
+        # can udpate its attributes to ensure that it looks the same.
+        wrapper = lambda *arguments, **keywords: func(other, *arguments, **keywords)
+
+        if klass:
+            module = [func.__module__, klass]
+        else:
+            assert(not isinstance(func, internal.types.method))
+            module = [func.__module__, qualname] if qualname else [func.__module__, other.__name__]
+        document = "Alias for `{:s}`.".format('.'.join(module + [pycompat.function.name(func)]))
+
+        # copy-pasta
+        pycompat.function.set_name(wrapper, pycompat.function.name(func))
+        if hasattr(func, '__module__'):
+            wrapper.__module__ = func.__module__
+
+        res = functools.update_wrapper(wrapper, func)
+        pycompat.function.set_documentation(res, document)
         return res
 
 ### matcher class helper
