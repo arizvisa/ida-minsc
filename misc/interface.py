@@ -3740,6 +3740,52 @@ class instruction(object):
             yield opref_t(ea, opnum, access)
         return
 
+    @classmethod
+    def reference(cls, ea, opnum, refinfo=None):
+        '''Return the address being referenced for operand `opnum` at instruction address `ea` using the specified `refinfo` if it is available.'''
+        insn = instruction.at(ea)
+        ops = instruction.operands(insn.ea)
+
+        # Grab the operand and its reference if it it actually has one. We'll use this
+        # to figure out exactly what address is being referenced by the operand.
+        op = ops[opnum]
+        if refinfo:
+            target, base, value = idaapi.ea_pointer(), idaapi.ea_pointer(), op.value if op.type in {idaapi.o_imm} else op.addr
+
+            # Try and calculate the reference for the operand value. If we couldn't, then we simply treat the value as-is.
+            if not idaapi.calc_reference_data(target.cast(), base.cast(), insn.ea, refinfo, value):
+                logging.debug(u"{:s}.reference({:#x}, {:d}) : The disassembler could not calculate the target for the reference ({:d}) at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, opnum, refinfo.flags & idaapi.REFINFO_TYPE, insn.ea))
+                return value
+            return target.value()
+
+            # If we actually wanted to, we could use the reference information to figure
+            # out the actual offset to the data that is being referenced.
+            base, target = (item.value() for item in [base, target])
+            if base:
+                base, offset = base, target - base
+                return base + offset
+
+            # If we weren't given the base address, then we're supposed to figure it out ourselves.
+            seg = idaapi.getseg(ea)
+            if seg is None:
+                raise internal.exceptions.SegmentNotFoundError(u"{:s}.reference({:#x}, {:d}) : Unable to locate segment containing the specified instruction address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, insn.ea))
+
+            imagebase, segbase = idaapi.get_imagebase(), idaapi.get_segm_base(seg)
+            base, offset = imagebase, seg.start_ea - imagebase
+            return base + offset
+
+        # Otherwise, we need to use the default reference type. Unless the user changed
+        # the default reference type, this should always result in returning the immediate.
+        refinfo = idaapi.refinfo_t()
+        _, refinfo.target, refinfo.base = refinfo.set_type(idaapi.get_default_reftype(insn.ea)), idaapi.BADADDR, 0
+        if op.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far, idaapi.o_imm}:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reference({:#x}, {:d}) : Unable to determine the reference type for the instruction at address {:#x} due to its operand ({:d}) being an unsupported type ({:d}).".format('.'.join([__name__, cls.__name__]), ea, opnum, insn.ea, opnum, op.type))
+
+        # If the target base can't be calculated, then we need to use the imagebase.
+        target = op.value if op.type in {idaapi.o_imm} else op.addr
+        res = idaapi.calc_target(insn.ea, target, refinfo)
+        return target if res == idaapi.BADADDR else res
+
 class regmatch(object):
     """
     This namespace is used to assist with doing register matching
