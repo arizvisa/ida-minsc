@@ -264,7 +264,6 @@ class typemap(object):
     @classmethod
     def dissolve(cls, flag, typeid, size, offset=None):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type at the optional `offset`.'''
-        structure = sys.modules.get('structure', __import__('structure'))
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         dtype, dsize = flag & cls.FF_MASK, flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
@@ -276,9 +275,8 @@ class typemap(object):
         # figure out the structure's size. We also do an explicit check if the type-id
         # is a structure because in some cases, IDA will forget to set the FF_STRUCT
         # flag but still assign the structure type-id to a union member.
-        if (dsize == FF_STRUCT and isinstance(typeid, internal.types.integer)) or (typeid is not None and structure.has(typeid)):
-            # FIXME: figure out how to fix this recursive module dependency
-            t = structure.by_identifier(typeid) if offset is None else structure.by_identifier(typeid, offset=offset)
+        if (dsize == FF_STRUCT and isinstance(typeid, internal.types.integer)) or (typeid is not None and internal.structure.has(typeid)):
+            t = internal.structure.new(typeid, 0 if offset is None else offset)
 
             # grab the size, and check it it's a variable-length struct so we can size it.
             sz, variableQ = t.size, t.ptr.props & getattr(idaapi, 'SF_VAR', 1)
@@ -339,7 +337,6 @@ class typemap(object):
     @classmethod
     def resolve(cls, pythonType):
         '''Convert the provided `pythonType` into IDA's `(flag, typeid, size)`.'''
-        structure = sys.modules.get('structure', __import__('structure'))
         struc_flag = idaapi.struflag if idaapi.__version__ < 7.0 else idaapi.stru_flag
 
         sz, count = None, 1
@@ -349,7 +346,7 @@ class typemap(object):
         # first use the type the user gave us to find the actual table containg
         # the sizes we want to look up, and then we extract the flag and typeid
         # from the table that we determined.
-        if isinstance(pythonType, ().__class__) and not isinstance(next(iter(pythonType)), (idaapi.struc_t, structure.structure_t)):
+        if isinstance(pythonType, ().__class__) and not isinstance(next(iter(pythonType)), (idaapi.struc_t, internal.structure.structure_t)):
             table = cls.typemap[builtins.next(item for item in pythonType)]
 
             #t, sz = pythonType
@@ -376,7 +373,7 @@ class typemap(object):
         # type is representing a structure. We know how to create the structure
         # flag, but we'll need to extract the type-id and the structure's size
         # from the properties of the structure that we were given.
-        elif isinstance(pythonType, structure.structure_t):
+        elif isinstance(pythonType, internal.structure.structure_t):
             flag, typeid, sz = struc_flag(), pythonType.id, pythonType.size
 
         # If our pythonic-type is an idaapi.struc_t, then we need to do
@@ -389,7 +386,7 @@ class typemap(object):
         # structure...which really means the size is forced.
         elif isinstance(pythonType, internal.types.tuple):
             t, sz = pythonType
-            sptr = t.ptr if isinstance(t, structure.structure_t) else t
+            sptr = t.ptr if isinstance(t, internal.structure.structure_t) else t
             flag, typeid = struc_flag(), sptr.id
 
             # if we're not a variable-length structure, then this pythonic type isn't
@@ -1841,7 +1838,7 @@ class node(object):
     XXX: Hopefully these are correct!
     """
     @staticmethod
-    def is_identifier(identifier):
+    def identifier(identifier):
         '''Return whether the provided `identifier` is actually valid or not.'''
 
         # First use the latest official api to get the private range of identifiers.
@@ -1882,6 +1879,7 @@ class node(object):
         if start <= stop:
             return start <= identifier < stop
         return start <= identifier or identifier < stop
+    is_identifier = internal.utils.alias(identifier, 'node')
 
     @internal.utils.multicase(sup=internal.types.bytes)
     @classmethod
@@ -2037,10 +2035,9 @@ class node(object):
         # compose the path that we will match against later. We grab
         # the first member (which is the structure id) and convert it
         # to a structure we that we have some place to start.
-        import structure
-        st = structure.by_identifier(items.pop(0))
+        st = internal.structure.new(items.pop(0), 0)
         members = [idaapi.get_member_by_id(item) for item in items]
-        items = [(sptr if cls.is_identifier(sptr.id) else idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id)), mptr) for mptr, _, sptr in members]
+        items = [(sptr if cls.identifier(sptr.id) else idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id)), mptr) for mptr, _, sptr in members]
 
         # Now we have a list of members, we format it into a dictionary
         # so that we can look up the correct member for any given structure.
