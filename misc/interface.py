@@ -13,7 +13,7 @@ import functools, operator, itertools
 import collections, heapq, traceback, ctypes, math, codecs
 import unicodedata as _unicodedata, string as _string, array as _array
 
-import idaapi, internal
+import idaapi, internal, architecture
 
 class typemap(object):
     """
@@ -2932,7 +2932,7 @@ class tinfo(object):
         idaapi.ALOC_STATIC: operator.methodcaller('get_ea'),
         idaapi.ALOC_REG1: operator.methodcaller('get_reginfo'),
         idaapi.ALOC_REG2: operator.methodcaller('get_reginfo'),
-        idaapi.ALOC_RREL: internal.utils.fcompose(operator.methodcaller('get_rrel'), internal.utils.fmap(operator.attrgetter('reg'), operator.attrgetter('off'))),
+        idaapi.ALOC_RREL: internal.utils.fcompose(operator.methodcaller('get_rrel'), internal.utils.fthrough(operator.attrgetter('reg'), operator.attrgetter('off'))),
     }
 
     # Define a throwaway closure that we use for entering and recursing
@@ -3803,7 +3803,7 @@ class regmatch(object):
     @classmethod
     def use(cls, registers):
         '''Return a closure that checks if an address and opnum uses either of the specified `registers`.'''
-        import instruction, architecture
+        import instruction
 
         # convert any regs that are strings into their correct object type
         regs = { architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in registers }
@@ -4412,7 +4412,6 @@ class switch_t(object):
     @property
     def register(self):
         '''Return the register that the switch is based on.'''
-        import architecture
         ri, rt = (self.object.regnum, self.object.regdtyp) if idaapi.__version__ < 7.0 else (self.object.regnum, self.object.regdtype)
         return architecture.by_indextype(ri, rt)
     @property
@@ -4622,15 +4621,14 @@ def addressOfRuntimeOrStatic(func):
         fn = function.by(func)
 
     # otherwise, maybe it's an rtld symbol
-    except internal.exceptions.FunctionNotFoundError as e:
-        import database
+    except internal.exceptions.FunctionNotFoundError as E:
         exc_info = sys.exc_info()
 
         # if func is not an address, then there ain't shit we can do
         if not isinstance(func, internal.types.integer): six.reraise(*exc_info)
 
         # make sure that we're actually data
-        if not database.type.is_data(func): six.reraise(*exc_info)
+        if address.flags(func, idaapi.MS_CLS) != idaapi.FF_DATA: six.reraise(*exc_info)
 
         # ensure that we're an import, otherwise throw original exception
         if idaapi.segtype(func) != idaapi.SEG_XTRN:
@@ -4645,7 +4643,6 @@ def addressOfRuntimeOrStatic(func):
     # them just completely fucks up everything...hence we need to explicitly check for it.
     ea = range.start(fn)
     if not function.within(ea):
-        import database
 
         # if we're in a SEG_XTRN, then we're an import and this is a runtime-func.
         if idaapi.segtype(ea) != idaapi.SEG_XTRN:
