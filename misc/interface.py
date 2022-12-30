@@ -4609,6 +4609,96 @@ class xref(object):
         return True
 xiterate = internal.utils.alias(xref.iterate, 'xref')
 
+class function(object):
+    '''
+    This namespace provides basic tools for locating a function and returning
+    an address. It is primarily for supporting the `addressOfRuntimeOrStatic`
+    function which is necessary to differentiate between actual local functions
+    that that are referenced by an ``idaapi.func_t``, and external functions that
+    reside in an external segment where the bytes are undefined or relocated.
+
+    These two separate distintions are needed because the disassembler can create
+    an ``idaapi.func_t`` in an external segment.. but since their contents are
+    undefined there really isn't anything we can personally do with them. So, in
+    order for us to handle functions consistently, we internally reference them as
+    an address and convert them to a ``idaapi.func_t`` whenever needed. Despite our
+    special handling, we don't do anything to prevent the user from getting an
+    ``idaapi.func_t`` for these externals if they want to. Thus our distinction
+    of these is really only for influencing the type of side-effect to apply.
+    '''
+    @classmethod
+    def has(cls, ea):
+        '''Return if the address `ea` is within a function and not an external.'''
+        return idaapi.get_func(int(ea)) is not None and idaapi.segtype(int(ea)) != idaapi.SEG_XTRN
+
+    @classmethod
+    def by_address(cls, ea):
+        '''Return the ``idaapi.func_t`` that contains the address `ea`.'''
+        return idaapi.get_func(int(ea))
+
+    @classmethod
+    @internal.utils.string.decorate_arguments('name')
+    def by_name(cls, name):
+        '''Return the ``idaapi.func_t`` for the function using the specified `name`.'''
+        ea = idaapi.get_name_ea(idaapi.BADADDR, internal.utils.string.to(name))
+        return None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+
+    @classmethod
+    def by_frame(cls, sptr):
+        '''Return the ``idaapi.func_t`` for the function that owns the frame specified in `sptr`.'''
+        if sptr.props & idaapi.SF_FRAME:
+            ea = idaapi.get_func_by_frame(sptr.id)
+            return None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        return None
+
+    @internal.utils.multicase(func=idaapi.func_t)
+    @classmethod
+    def by(cls, func):
+        '''Return the function identified by `func`.'''
+        return func
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def by(cls, ea):
+        '''Return the function at the address `ea`.'''
+        return cls.by_address(ea)
+    @internal.utils.multicase(name=internal.types.string)
+    @classmethod
+    def by(cls, name):
+        '''Return the function with the specified `name`.'''
+        return cls.by_name(name)
+    @internal.utils.multicase(frame=idaapi.struc_t)
+    @classmethod
+    def by(cls, frame):
+        '''Return the function that owns the specified `frame`.'''
+        return cls.by_frame(frame)
+    @internal.utils.multicase()
+    @classmethod
+    def by(cls, unsupported):
+        '''Raise an exception due to receiving an `unsupported` type.'''
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join([cls.__name__]), unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
+
+    @internal.utils.multicase(name=internal.types.string)
+    @classmethod
+    def missing(cls, name):
+        '''Raise an exception related to the `name` not being found.'''
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({!r}) : Unable to locate a function with the specified name ({!s}).".format('.'.join([cls.__name__]), name, internal.utils.string.repr(name)))
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def missing(cls, ea):
+        '''Raise an exception related to the address in `ea` not pointing to a function.'''
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join([cls.__name__]), ea, ea))
+    @internal.utils.multicase(frame=idaapi.struc_t)
+    @classmethod
+    def missing(cls, frame):
+        '''Raise an exception related to the structure in `frame` not being part of a function.'''
+        name = utils.string.of(idaapi.get_struc_name(frame.id))
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate a function using a structure ({!s}) that is not a frame.".format('.'.join([cls.__name__]), frame.id, internal.utils.string.repr(name)))
+    @internal.utils.multicase()
+    @classmethod
+    def missing(cls, unsupported):
+        '''Raise an exception due to receiving an `unsupported` type.'''
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join([cls.__name__]), unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
+
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
@@ -4616,43 +4706,35 @@ def addressOfRuntimeOrStatic(func):
     `runtimeQ` is a boolean returning true if the symbol is linked
     during runtime and `address` is the address of the entrypoint.
     """
-    import function
-    try:
-        fn = function.by(func)
+    fn = function.by_address(int(func)) if isinstance(func, internal.types.integer) or hasattr(func, '__int__') else function.by_name(func) if isinstance(func, internal.types.string) else function.by_frame(func) if isinstance(func, idaapi.struc_t) else func if isinstance(func, idaapi.func_t) else function.by(func)
 
-    # otherwise, maybe it's an rtld symbol
-    except internal.exceptions.FunctionNotFoundError as E:
-        exc_info = sys.exc_info()
+    # If we were able to get the function, then we need to check if it was because
+    # the function is external. We extract its address and make sure it exists.
+    if fn:
+        ea = range.start(fn)
 
-        # if func is not an address, then there ain't shit we can do
-        if not isinstance(func, internal.types.integer): six.reraise(*exc_info)
+        # If the function address is an external, then we found a mis-defined
+        # import (thx ida). Otherwise, this is a regular function and we're good.
+        return (True, ea) if idaapi.segtype(ea) == idaapi.SEG_XTRN else (False, ea)
 
-        # make sure that we're actually data
-        if address.flags(func, idaapi.MS_CLS) != idaapi.FF_DATA: six.reraise(*exc_info)
+    # If we couldn't find a function, then we need to do some checks before we
+    # confirm that this is a runtime-linked function. We first check that we
+    # were given an integer. Although the disassembler can reference imports by
+    # name, we choose not to in order to distinguish actual functions from them.
+    if not isinstance(func, internal.types.integer):
+        raise function.missing(func)
 
-        # ensure that we're an import, otherwise throw original exception
-        if idaapi.segtype(func) != idaapi.SEG_XTRN:
-            six.reraise(*exc_info)
+    # Next we check the flags to ensure that we're only referencing data or code.
+    # This is because on ELF, it's registered as code and PECOFF as data.
+    if address.flags(func, idaapi.MS_CLS) not in {idaapi.FF_DATA, idaapi.FF_CODE}:
+        raise function.missing(func)
 
-        # yep, we're an import
-        return True, func
+    # Now our final check is to verify this is defined in an external segment.
+    if idaapi.segtype(func) != idaapi.SEG_XTRN:
+        raise function.missing(func)
 
-    # check if we're _not_ within a function. this is because in elf IDBs, IDA will
-    # create a func_t over each import in the database. since we're trying to identify
-    # code and trust FF_CODE for it, imports being considered functions with code in
-    # them just completely fucks up everything...hence we need to explicitly check for it.
-    ea = range.start(fn)
-    if not function.within(ea):
-
-        # if we're in a SEG_XTRN, then we're an import and this is a runtime-func.
-        if idaapi.segtype(ea) != idaapi.SEG_XTRN:
-            raise internal.exceptions.FunctionNotFoundError(u"addressOfRuntimeOrStatic({:#x}) : Unable to locate function by address.".format(ea))
-
-        # ok, we found a mis-defined import (thx ida)
-        return True, ea
-
-    # nope, we're just a function with real executable code inside
-    return False, ea
+    # Yep, now we should be pretty sure that this references an external function.
+    return True, func
 
 ## internal enumerations that idapython missed
 class fc_block_type_t(object):
