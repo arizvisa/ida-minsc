@@ -28,32 +28,28 @@ from internal import utils, interface, types, exceptions as E
 @utils.multicase()
 def has():
     '''Return if the current address is within a function.'''
-    return has(ui.current.address())
+    return interface.function.has(ui.current.address())
 @utils.multicase(ea=types.integer)
 def has(ea):
     '''Return if the address `ea` is within a function.'''
-    return idaapi.get_func(ea) is not None and idaapi.segtype(ea) != idaapi.SEG_XTRN
+    return interface.function.has(ea)
 @utils.multicase(func=idaapi.func_t)
 def has(func):
     '''Return if the function `func` is a valid function.'''
     ea, _ = interface.range.bounds(fn)
-    return has(ea)
+    return interface.function.has(ea)
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def has(name, *suffix):
     '''Return if the symbol with the specified `name` is within a function.'''
     res = (name,) + suffix
     string = interface.tuplename(*res)
-    ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
-    return False if ea == idaapi.BADADDR else has(ea)
-@utils.multicase(frame=idaapi.struc_t)
+    return True if interface.function.by_name(string) else False
+@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
 def has(frame):
-    '''Return if the structure provided by `frame` belongs to a function.'''
-    return has(idaapi.get_func_by_frame(frame.id)) if frame.props & idaapi.SF_FRAME else False
-@utils.multicase(frame=structure.structure_t)
-def has(frame):
-    '''Return if the function provided by `frame` belongs to a function.'''
-    return has(frame.ptr)
+    '''Return if the structure in `frame` belongs to a function.'''
+    sptr = frame if isinstance(frame, idaapi.struc_t) else frame.ptr
+    return True if interface.function.by_frame(sptr) else False
 within = utils.alias(has)
 
 ## searching
@@ -65,7 +61,7 @@ def by_address():
 def by_address(ea):
     '''Return the function containing the address `ea`.'''
     ea = interface.address.within(ea)
-    res = idaapi.get_func(ea)
+    res = interface.function.by_address(ea)
     if res is None:
         raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to find a function at the specified address ({:#x}).".format(__name__, ea, ea))
     return res
@@ -75,18 +71,11 @@ byaddress = utils.alias(by_address)
 @utils.string.decorate_arguments('name', 'suffix')
 def by_name(name, *suffix):
     '''Return the function with the specified `name` appended with any of the elements of `suffix`.'''
-    res = (name,) + suffix
-    string = interface.tuplename(*res)
-
-    # ask IDA to get its address
-    ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
-    if ea == idaapi.BADADDR:
-        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to find a function with the specified name ({!s}).".format(__name__, res if suffix else string, utils.string.repr(string)))
-
-    # now that we have its address, return the func_t
-    res = idaapi.get_func(ea)
+    packed = (name,) + suffix
+    string = interface.tuplename(*packed)
+    res = interface.function.by_name(string)
     if res is None:
-        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to return a function for the resolved address ({:#x}).".format(__name__, res if suffix else string, ea))
+        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to find a function with the specified name ({!s}).".format(__name__, res if suffix else string, utils.string.repr(string)))
     return res
 byname = utils.alias(by_name)
 
@@ -107,17 +96,14 @@ def by(ea):
 def by(name, *suffix):
     '''Return the function with the specified `name`.'''
     return by_name(name, *suffix)
-@utils.multicase(frame=idaapi.struc_t)
+@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
 def by(frame):
     '''Return the function that owns the specified `frame`.'''
-    if frame.props & idaapi.SF_FRAME:
-        ea = idaapi.get_func_by_frame(frame.id)
-        return by(ea)
-    raise E.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate function using a structure that is not a frame.".format(__name__, frame.id))
-@utils.multicase(frame=structure.structure_t)
-def by(frame):
-    '''Return the function that owns the specified `frame`.'''
-    return by(frame.ptr)
+    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    if res is None:
+        name = structure.name(frame)
+        raise E.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate function using a structure ({!s}) that is not a frame.".format(__name__, frame.id, utils.string.repr(name)))
+    return res
 
 # FIXME: implement a matcher class for func_t
 
