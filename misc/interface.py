@@ -3094,10 +3094,10 @@ class tinfo(object):
         return tinfo, ftd
 
     @classmethod
-    def update_function_details(cls, func, ti):
-        '''Given a function location in `func` and its type information as `ti`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the function with the ``idaapi.func_type_data_t`` that is sent back.'''
+    def update_function_details(cls, func, ti, *flags):
+        '''Given a function location in `func` and its type information as `ti`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the function with the `flags` and ``idaapi.func_type_data_t`` that is sent back.'''
         rt, ea = addressOfRuntimeOrStatic(func)
-        set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
+        apply_tinfo = idaapi.apply_tinfo2 if idaapi.__version__ < 7.0 else idaapi.apply_tinfo
 
         # Similar to function_details, we first need to figure out if our type is a
         # function so that we can dereference it to get the information that we yield.
@@ -3154,7 +3154,7 @@ class tinfo(object):
 
         # Finally we have a proper idaapi.tinfo_t that we can apply. After we apply it,
         # all we need to do is return the previous one to the caller and we're good.
-        if not set_tinfo(ea, newinfo):
+        if not apply_tinfo(ea, newinfo, *itertools.chain(flags if flags else [idaapi.TINFO_DEFINITE])):
             raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(newinfo), ea))
 
         # Spinning on that dizzy edge.. I kissed her face and kissed her head..
