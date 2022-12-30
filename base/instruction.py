@@ -865,7 +865,7 @@ def op_structure(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
-    F, insn, op, ri = database.type.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
+    F, insn, op, ri = interface.address.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
 
     # Start out by checking if the operand is a stack variable, because
     # we'll need to handle it differently if so.
@@ -875,7 +875,7 @@ def op_structure(ea, opnum):
         # Now we can ask IDA what's up with it.
         res = idaapi.get_stkvar(insn, op, op.addr)
         if not res:
-            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, value))
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, op.addr))
         mptr, actval = res
 
         # First we grab our frame, and then find the starting member by its id.
@@ -903,7 +903,7 @@ def op_structure(ea, opnum):
     # being referenced by calculating the offset into structure ourselves.
     elif not idaapi.is_stroff(F, opnum) and ri:
         value = op_reference(ea, opnum)
-        address = database.address.head(value)
+        address = interface.address.head(value)
         t, count = database.type.array(address)
         offset = value - address
 
@@ -948,8 +948,8 @@ def op_structure(ea, opnum):
 
     # If we're a single tid, and the sum of the offset and the delta is
     # the same as the size, then the operand is using sizeof and we can leave.
-    if len(tids) == 1 and sum([value, delta]) == structure.__instance__(tids[0]).size:
-        return structure.__instance__(tids[0])
+    if len(tids) == 1 and sum([value, delta]) == structure.size(tids[0]):
+        return structure.by_identifier(tids[0])
 
     # Next we'll gather the data references for the operand and key them
     # by their sptr id. This is because I can't figure out any other way
@@ -982,7 +982,7 @@ def op_structure(ea, opnum):
 
         # Start out by finding the exact structure that was resolved,
         # and then use it to find the exact member being referenced.
-        st = structure.__instance__(sptr.id, offset=position)
+        st = structure.by_identifier(sptr.id, offset=position)
         if mptr:
             member = st.members.by_identifier(mptr.id)
             offset = member.realoffset
@@ -1083,7 +1083,7 @@ def op_structure(ea, opnum, path):
 def op_structure(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
     ea = interface.address.inside(ea)
-    if not database.type.is_code(ea):
+    if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
         raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, sptr.id, path, ea))
 
     # Convert the path to a list, and then validate it before we use it.
@@ -1115,7 +1115,7 @@ def op_structure(ea, opnum, sptr, path):
 
     # First we use the path the user gave us to figure out the suggested path. This
     # should give us the suggestion and its expected delta that we can use for warnings.
-    st = structure.__instance__(sptr.id)
+    st = structure.by_identifier(sptr.id)
     userdelta, userpath = interface.strpath.suggest(sptr, path)
 
     # Precalculate a description of the path to make our error messages look good.
@@ -1181,7 +1181,7 @@ def op_structurepath(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_structurepath(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
-    F, insn, op, ri = database.type.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
+    F, insn, op, ri = interface.address.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
 
     # If it's a stack variable, then this is also the wrong API and we should be
     # using the op_structure function. Log it and continue onto the right one.
@@ -1243,7 +1243,7 @@ def op_structurepath(ea, opnum):
     calculator = interface.strpath.calculate(value + (carry - target))
     result, position = [], builtins.next(calculator)
     for sptr, mptr, offset in path:
-        st = structure.__instance__(sptr.id, offset=position)
+        st = structure.by_identifier(sptr.id, offset=position)
         item = st.members.by_identifier(mptr.id) if mptr else st
         result.append(item)
         position = calculator.send((sptr, mptr, offset))
@@ -1251,7 +1251,7 @@ def op_structurepath(ea, opnum):
     # If we did not figure out any path, then this is likely a sizeof(structure)
     # operand. So, we return the structure and whatever value was carried.
     if not result:
-        return structure.__instance__(sptr.id), carry
+        return structure.by_identifier(sptr.id), carry
 
     # Just like the op_structure implementation, we need to figure out if
     # there's an array being referenced to convert our result to a list.
@@ -1337,7 +1337,7 @@ def op_structurepath(ea, opnum, structure, path):
 def op_structurepath(ea, opnum, sptr, path):
     '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
     ea = interface.address.inside(ea)
-    if not database.type.is_code(ea):
+    if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
         raise E.InvalidTypeOrValueError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, {!r}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, sptr.id, path, ea))
 
     # Convert the path to a list, and then validate it before we use it.
@@ -1357,7 +1357,7 @@ def op_structurepath(ea, opnum, sptr, path):
 
     # Similar to op_structure, we first need to figure out the path that the user
     # has suggested to us to apply to the operand and we calculate our goal.
-    st = structure.__instance__(sptr.id)
+    st = structure.by_identifier(sptr.id)
     usergoal, userpath = interface.strpath.suggest(st.ptr, path)
 
     # Precalculate a description of the path to make our logging events look good.
@@ -1496,7 +1496,7 @@ def op_enumeration(ea, opnum):
 
     # Check the flags for the given address to ensure there's actually an
     # enumeration defined as one of the operands.
-    F = database.type.flags(ea)
+    F = interface.address.flags(ea)
     if all(F & item == 0 for item in [idaapi.FF_0ENUM, idaapi.FF_1ENUM]):
         raise E.MissingTypeOrAttribute(u"{:s}.op_enumeration({:#x}, {:d}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
@@ -1905,7 +1905,7 @@ def op_references(ea, opnum):
                 # Instantiate a structure_t in order to grab its members_t. From
                 # this we can then use the actual value to carve a path straight
                 # through the member.
-                st = structure.__instance__(msptr.id)
+                st = structure.by_identifier(msptr.id)
                 path, delta = st.members.__walk_to_realoffset__(offset)
                 ids = [msptr.id] + [member.ptr.id for member in path]
                 candidates.append((refopnum, {id for id in ids}))
@@ -2003,7 +2003,7 @@ def op_references(ea, opnum):
         # out everything but its type. If it's type tells us that
         # it's pointing to something defined as code, then we'll
         # need to figure out what operand is referencing it.
-        if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
+        if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
 
             # We iterate through all of the operands in order to extract
             # the value from each operand. This way we can verify that it's
