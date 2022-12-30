@@ -472,39 +472,98 @@ def size(tinfo):
     structure = by(tinfo)
     return size(structure.ptr)
 
-@utils.multicase(id=types.integer)
-def is_union(id):
-    '''Return whether the structure identified by `id` is a union or not.'''
-    sptr = idaapi.get_struc(id)
-    if not sptr:
-        raise E.StructureNotFoundError(u"{:s}.is_union({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
-    return is_union(sptr)
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
-def is_union(structure):
-    '''Return whether the provided `structure` is defined as a union.'''
-    sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
-    return internal.structure.is_union(sptr)
-@utils.multicase(tinfo=idaapi.tinfo_t)
-def is_union(tinfo):
-    '''Return whether the structure represented by `tinfo` is defined as a union.'''
-    structure = by(tinfo)
-    return is_union(structure.ptr)
-union = utils.alias(is_union)
+class type(object):
+    """
+    This namespace is for determining information about the type of
+    a structure. The functions within this namespace allow one to
+    determine certain attributes of a structure such as whether it's
+    a union, used as the frame of a function, or a variable-length
+    structure definition.
 
-@utils.multicase(id=types.integer)
-def is_frame(id):
-    '''Return whether the structure identified by `id` is a frame or not.'''
-    sptr = idaapi.get_struc(id)
-    if not sptr:
-        raise E.StructureNotFoundError(u"{:s}.is_frame({!r}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
-    return is_frame(sptr)
-@utils.multicase(structure=(idaapi.struc_t, structure_t))
-def is_frame(structure):
-    '''Return whether the provided `structure` is a frame or not.'''
-    SF_FRAME = getattr(idaapi, 'SF_FRAME', 0x40)
-    sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
-    return True if sptr.props & SF_FRAME else False
-frame = utils.alias(is_frame)
+    This namespace is also aliased as ``database.t``.
+
+    Some examples of using this namespace can be::
+
+        > st = structure.by('some-structure-name')
+        > print( structure.type.union(st) )
+        > print( structure.type.frame(st) )
+        > print( structure.type.listed(st) )
+
+    """
+
+    @utils.multicase(id=types.integer)
+    @classmethod
+    def union(cls, id):
+        '''Return whether the structure identified by `id` is a union or not.'''
+        sptr = idaapi.get_struc(id)
+        if not sptr:
+            raise E.StructureNotFoundError(u"{:s}.union({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+        return cls.union(sptr)
+    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    @classmethod
+    def union(cls, structure):
+        '''Return whether the provided `structure` is defined as a union.'''
+        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        return internal.structure.union(sptr)
+    @utils.multicase(tinfo=idaapi.tinfo_t)
+    @classmethod
+    def union(cls, tinfo):
+        '''Return whether the structure represented by `tinfo` is defined as a union.'''
+        structure = by(tinfo)
+        return cls.union(structure.ptr)
+    is_union = utils.alias(union, 'type')
+
+    @utils.multicase(id=types.integer)
+    @classmethod
+    def frame(cls, id):
+        '''Return whether the structure identified by `id` is a frame or not.'''
+        sptr = idaapi.get_struc(id)
+        if not sptr:
+            raise E.StructureNotFoundError(u"{:s}.frame({!r}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+        return cls.frame(sptr)
+    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    @classmethod
+    def frame(cls, structure):
+        '''Return whether the provided `structure` is a frame or not.'''
+        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        return internal.structure.frame(sptr)
+    is_frame = utils.alias(frame, 'type')
+
+    @utils.multicase(id=types.integer)
+    @classmethod
+    def listed(cls, id):
+        '''Return whether the structure identified by `id` is listed.'''
+        sptr = idaapi.get_struc(id)
+        if not sptr:
+            raise E.StructureNotFoundError(u"{:s}.listed({:#x}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+        return cls.listed(sptr)
+    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    @classmethod
+    def listed(cls, structure):
+        '''Return whether the provided `structure` is listed.'''
+        SF_NOLIST = getattr(idaapi, 'SF_NOLIST', 0x8)
+        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        return False if sptr.props & SF_NOLIST else True
+    @utils.multicase(tinfo=idaapi.tinfo_t)
+    @classmethod
+    def listed(cls, tinfo):
+        '''Return whether the structure represented by `tinfo` is listed.'''
+        structure = by(tinfo)
+        return cls.listed(structure.ptr)
+    @utils.multicase(structure=(structure_t, types.integer, idaapi.tinfo_t))
+    @classmethod
+    def listed(cls, structure, boolean):
+        '''Update the specified `structure` so that it is listed if the given `boolean` is true.'''
+        st = by(structure)
+        return cls.listed(st.ptr, boolean)
+    @utils.multicase(sptr=idaapi.struc_t)
+    @classmethod
+    def listed(cls, sptr, boolean):
+        '''Update the structure in `sptr` so that it is listed if the given `boolean` is true.'''
+        result, _ = cls.listed(spr), idaapi.set_struc_listed(sptr, boolean)
+        return result
+    is_listed = utils.alias(listed, 'type')
+is_union, is_frame, is_listed = utils.alias(type.union, 'type'), utils.alias(type.frame, 'type'), utils.alias(type.listed, 'type')
 
 @utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.string, types.integer))
 def members(structure, **base):
@@ -525,7 +584,7 @@ def members(sptr, **base):
 
     # Grab some attributes like the structure's size, and whether or not
     # it's a union so that we can figure out each member's offset.
-    size, unionQ = idaapi.get_struc_size(st), is_union(st)
+    size, unionQ = idaapi.get_struc_size(st), type.union(st)
 
     # Iterate through all of the member in the structure.
     offset, translated = 0, next((base[key] for key in ['offset', 'base', 'baseoffset'] if key in base), 0)
@@ -576,7 +635,7 @@ def fragment(sptr, offset, size, **base):
 
     If the integer `base` is defined, then the offset of each member will be translated by the given value.
     """
-    iterable, unionQ = members(sptr.id, **base), is_union(sptr.id)
+    iterable, unionQ = members(sptr.id, **base), type.union(sptr.id)
 
     # seek
     for item in iterable:
