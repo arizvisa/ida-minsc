@@ -58,46 +58,47 @@ def at(ea):
 
 @utils.multicase()
 def size():
-    '''Returns the length of the instruction at the current address.'''
+    '''Return the length of the current instruction.'''
     return size(ui.current.address())
 @utils.multicase(ea=types.integer)
 def size(ea):
-    '''Returns the length of the instruction at the address `ea`.'''
+    '''Return the length of the instruction at address `ea`.'''
     return at(ea).size
 
 @utils.multicase(opnum=types.integer)
 def opinfo(opnum):
-    '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
+    '''Return the ``idaapi.opinfo_t`` of the operand `opnum` for the current instruction.'''
     return opinfo(ui.current.address(), opnum)
 @utils.multicase(opnum=types.integer, info=idaapi.opinfo_t)
 def opinfo(opnum, info, **flags):
-    '''Set the opinfo for the operand `opnum` at the current address to the ``idaapi.opinfo_t`` provided by `info`.'''
+    '''Set the operand information of the operand `opnum` for the current instruction to the ``idaapi.opinfo_t`` in `info`.'''
     return opinfo(ui.current.address(), opnum, info, **flags)
 @utils.multicase(reference=interface.opref_t)
 def opinfo(reference):
-    '''Returns the ``idaapi.opinfo_t`` for the operand pointed to by the provided `reference`.'''
+    '''Return the ``idaapi.opinfo_t`` for the given operand `reference`.'''
     address, opnum, _ = reference
     return opinfo(address, opnum)
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def opinfo(ea, opnum):
-    '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
-    ti, flags = idaapi.opinfo_t(), database.type.flags(ea)
-    return idaapi.get_opinfo(ea, opnum, flags, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, flags)
+    '''Return the ``idaapi.opinfo_t`` of the operand `opnum` for the instruction at address `ea`.'''
+    info, flags = idaapi.opinfo_t(), interface.address.flags(ea)
+    ok = idaapi.get_opinfo(ea, opnum, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, opnum, flags)
+    return info if ok else None
 @utils.multicase(reference=interface.opref_t, info=idaapi.opinfo_t)
 def opinfo(reference, info, **flags):
-    '''Set the operand info for the operand specified by `reference` to the ``idaapi.opinfo_t`` provided by `info`.'''
+    '''Set the operand information for the given operand `reference` to the ``idaapi.opinfo_t`` in `info`.'''
     address, opnum, _ = reference
     return opinfo(address, opnum, info, **flags)
 @utils.multicase(ea=types.integer, opnum=types.integer, info=idaapi.opinfo_t)
 def opinfo(ea, opnum, info, **flags):
-    """Set the operand info for the operand `opnum` at the address `ea` to the ``idaapi.opinfo_t`` provided by `info`.
+    """Set the operand information of the operand `opnum` for the instruction at address `ea` to the ``idaapi.opinfo_t`` in `info`.
 
     If any `flags` have been specified, then also set the operand's flags to the provided value.
     """
-    ok = idaapi.set_opinfo(ea, opnum, flags.get('flags', database.type.flags(ea)), info)
-    if not ok:
+    res, flags = opinfo(ea, opnum), flags['flags'] if 'flags' in flags else interface.address.flags(ea)
+    if not idaapi.set_opinfo(ea, opnum, flags, info):
         raise E.DisassemblerError(u"{:s}.opinfo({:#x}, {:d}, {!s}) : Unable to set the operand info for operand {:d}.".format(__name__, ea, opnum, info, opnum))
-    return opinfo(ea, opnum)
+    return res
 
 @utils.multicase()
 def mnemonic():
@@ -561,7 +562,7 @@ def op_number(reference):
 def op_number(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a number and return it.'''
     t = idaapi.num_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_number({:#x}, {:d}) : Unable to restore the type of operand {:d} to a number.".format(__name__, ea, opnum, opnum))
 
@@ -597,7 +598,7 @@ def op_character(reference):
 def op_character(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a character and return it.'''
     t = idaapi.char_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_character({:#x}, {:d}) : Unable to set the type of operand {:d} to a character.".format(__name__, ea, opnum, opnum))
 
@@ -649,7 +650,7 @@ def op_binary(reference):
 def op_binary(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to binary and return it.'''
     t = idaapi.bin_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_binary({:#x}, {:d}) : Unable to set the type of operand {:d} to binary.".format(__name__, ea, opnum, opnum))
 
@@ -685,7 +686,7 @@ def op_octal(reference):
 def op_octal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to octal and return it.'''
     t = idaapi.oct_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_octal({:#x}, {:d}) : Unable to set the type of operand {:d} to octal.".format(__name__, ea, opnum, opnum))
 
@@ -721,7 +722,7 @@ def op_decimal(reference):
 def op_decimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to decimal and return it.'''
     t = idaapi.dec_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_decimal({:#x}, {:d}) : Unable to set the type of operand {:d} to decimal.".format(__name__, ea, opnum, opnum))
 
@@ -757,7 +758,7 @@ def op_hexadecimal(reference):
 def op_hexadecimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to hexadecimal and return it.'''
     t = idaapi.hex_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_hexadecimal({:#x}, {:d}) : Unable to set the type of operand {:d} to hexadecimal.".format(__name__, ea, opnum, opnum))
 
@@ -955,7 +956,7 @@ def op_structure(ea, opnum):
     # by their sptr id. This is because I can't figure out any other way
     # to get _exactly_ what's being displayed.
     displayed = {}
-    for mid in filter(interface.node.is_identifier, interface.xref.of_data(insn.ea)):
+    for mid in filter(interface.node.identifier, interface.xref.of_data(insn.ea)):
 
         # Simple enough. If it's not a member identifier, then skip it.
         item = idaapi.get_member_by_id(mid)
@@ -1071,7 +1072,7 @@ def op_structure(ea, opnum, path):
         sptr, fullpath = member.ptr, items
     elif isinstance(member, idaapi.member_t):
         _,_, sptr = idaapi.get_member_by_id(member.id)
-        if not interface.node.is_identifier(sptr.id):
+        if not interface.node.identifier(sptr.id):
             sptr = idaapi.get_member_struc(idaapi.get_member_fullname(member.id))
         fullpath = itertools.chain([member], items)
     elif isinstance(member, structure.member_t):
@@ -1320,7 +1321,7 @@ def op_structurepath(ea, opnum, path):
         sptr, fullpath = member.ptr, items
     elif isinstance(member, idaapi.member_t):
         _,_, sptr = idaapi.get_member_by_id(member.id)
-        if not interface.node.is_identifier(sptr.id):
+        if not interface.node.identifier(sptr.id):
             sptr = idaapi.get_member_struc(idaapi.get_member_fullname(member.id))
         fullpath = itertools.chain([member], items)
     elif isinstance(member, structure.member_t):
@@ -1609,7 +1610,7 @@ def op_string(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
-    F = database.type.flags(ea)
+    F = interface.address.flags(ea)
     if F & (idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI) == 0:
         raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:d}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
@@ -1626,7 +1627,7 @@ def op_string(reference, strtype):
 @utils.multicase(ea=types.integer, opnum=types.integer, strtype=types.integer)
 def op_string(ea, opnum, strtype):
     '''Set the string type used by operand `opnum` for the instruction at `ea` to `strtype`.'''
-    info, F = idaapi.opinfo_t(), database.type.flags(ea)
+    info, F = idaapi.opinfo_t(), interface.address.flags(ea)
 
     # Update our flags for the instruction to include the string definition.
     F |= idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
@@ -1701,7 +1702,7 @@ def op_references(ea, opnum):
     # distinguish the "type" of xrefs that are associated with an operand.
     # This way we can distinguish structure members, enumeration members,
     # locals, globals, etc.
-    F = database.type.flags(insn.ea)
+    F = interface.address.flags(insn.ea)
     info, has_xrefs, accesses = opinfo(insn.ea, opnum), idaapi.op_adds_xrefs(F, opnum), tuple(ref.access for ref in interface.instruction.access(insn.ea))
 
     # If we have xrefs but no type information, then this operand has to
@@ -1882,7 +1883,7 @@ def op_references(ea, opnum):
             # point to stack variables so we can figure out their path and
             # add them to our candidates list if necessary.
             for refopnum, op in enumerate(operands(ea)):
-                if not idaapi.is_stkvar(database.type.flags(ea), refopnum):
+                if not idaapi.is_stkvar(interface.address.flags(ea), refopnum):
                     continue
 
                 # Use the instruction and the operand to figure out the
@@ -1921,7 +1922,7 @@ def op_references(ea, opnum):
                     # Make sure that the operand is actually pointing to a
                     # structure. If it isn't, then this operand is not anything
                     # that we really care about.
-                    if not database.type.is_structure(database.address.head(op.addr)):
+                    if interface.address.flags(interface.address.head(op.addr), idaapi.DT_TYPE) != (idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU):
                         continue
 
                     # Now we can trust the op_structure function to get all the
@@ -2046,7 +2047,7 @@ class type(object):
     Some examples of using this namespace are::
 
         > print( instruction.type.is_return(ea) )
-        > print( instruction.type.is_jxx(ea) )
+        > print( instruction.type.is_jcc(ea) )
         > print( instruction.type.is_call(ea) )
         > print( instruction.type.is_branch(ea) )
 
@@ -2054,45 +2055,45 @@ class type(object):
     @utils.multicase()
     @classmethod
     def feature(cls):
-        '''Returns the feature bitmask of the instruction at the current address.'''
+        '''Return the feature bitmask of the current instruction.'''
         return cls.feature(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
     def feature(cls, ea):
         '''Return the feature bitmask for the instruction at the address `ea`.'''
-        if database.type.is_code(ea):
+        if database.type.code(ea):
             return interface.instruction.feature(ea)
         return None
     @utils.multicase(ea=types.integer, mask=types.integer)
     @classmethod
     def feature(cls, ea, mask):
         '''Return the feature bitmask for the instruction at the address `ea` masked with `mask`.'''
-        if database.type.is_code(ea):
+        if database.type.code(ea):
             return interface.instruction.feature(ea) & idaapi.as_uint32(mask)
         return None
 
     @utils.multicase()
     @classmethod
-    def is_sentinel(cls):
-        '''Returns true if the current instruction is a sentinel-type instruction.'''
-        return cls.is_sentinel(ui.current.address())
+    def sentinel(cls):
+        '''Return true if the current instruction is a sentinel instruction.'''
+        return cls.sentinel(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_sentinel(cls, ea):
-        '''Returns true if the instruction at `ea` is a sentinel-type instruction.'''
+    def sentinel(cls, ea):
+        '''Return true if the instruction at address `ea` is a sentinel instruction.'''
         ea = interface.address.inside(ea)
-        return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
-    sentinel = issentinel = sentinelQ = utils.alias(is_sentinel, 'type')
+        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([cls.feature(ea, idaapi.CF_STOP)])
+    is_sentinel = utils.alias(sentinel, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_return(cls):
-        '''Returns true if the current instruction is a return-type instruction that exits its current frame.'''
-        return cls.is_return(ui.current.address())
+    def leave(cls):
+        '''Return true if the current instruction will return from a function when executed.'''
+        return cls.leave(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_return(cls, ea):
-        '''Returns true if the instruction at `ea` is a return-type instruction that exits the current frame.'''
+    def leave(cls, ea):
+        '''Return true if the instruction at address `ea` will return from a function when executed.'''
         ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
 
         # We check xrefs to make sure that IDA didn't detect that a constant
@@ -2101,31 +2102,31 @@ class type(object):
         Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
 
         # If it's a sentinel instruction, not a branch, and has no refs, then we're good.
-        return cls.is_sentinel(ea) and not any([F & idaapi.CF_JUMP, Xc, Xd])
-    ret = isreturn = returnQ = retQ = utils.alias(is_return, 'type')
+        return cls.sentinel(ea) and not any([F & idaapi.CF_JUMP, Xc, Xd])
+    is_return = exit = utils.alias(leave, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_shift(cls):
-        '''Returns true if the current instruction is a bit-shifting instruction.'''
-        return cls.is_shift(ui.current.address())
+    def shift(cls):
+        '''Return true if the current instruction is a bit-shifting instruction.'''
+        return cls.shift(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_shift(cls, ea):
-        '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
+    def shift(cls, ea):
+        '''Return true if the instruction at address `ea` is a bit-shifting instruction.'''
         ea = interface.address.inside(ea)
-        return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_SHFT)])
-    shift = isshift = shiftQ = utils.alias(is_shift, 'type')
+        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([cls.feature(ea, idaapi.CF_SHFT)])
+    is_shift = utils.alias(shift, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_branch(cls):
-        '''Returns true if the current instruction is any kind of branch.'''
-        return cls.is_branch(ui.current.address())
+    def branch(cls):
+        '''Return true if the current instruction is a type of branch.'''
+        return cls.branch(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_branch(cls, ea):
-        '''Returns true if the instruction at `ea` is any kind of branch.'''
+    def branch(cls, ea):
+        '''Return true if the instruction at address `ea` is a type of branch.'''
         ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
 
         # We check code xrefs in case IDA figured out that this instruction
@@ -2135,86 +2136,86 @@ class type(object):
 
         # If it's actual code, not a call or a shift (this flag is weird on intel), and is a jump
         # or it has an actual code reference that IDA detected, then we're a branch instruction.
-        return database.type.is_code(ea) and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc])])
-    branch = isbranch = branchQ = utils.alias(is_branch, 'type')
+        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc])])
+    is_branch = utils.alias(branch, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_jmp(cls):
-        '''Returns true if the current instruction is an immediate and indirect branch.'''
-        return cls.is_jmp(ui.current.address())
+    def unconditional(cls):
+        '''Return true if the current instruction is an unconditional branch.'''
+        return cls.unconditional(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_jmp(cls, ea):
-        '''Returns true if the instruction at `ea` is an immediate and indirect branch.'''
+    def unconditional(cls, ea):
+        '''Return true if the instruction at address `ea` is an unconditional branch.'''
         ea = interface.address.inside(ea)
-        return cls.is_branch(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
-    jmp = isjmp = jmpQ = utils.alias(is_jmp, 'type')
+        return cls.branch(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
+    is_jmp = jmp = utils.alias(unconditional, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_jxx(cls):
-        '''Returns true if the current instruction is a conditional branch.'''
-        return cls.is_jxx(ui.current.address())
+    def conditional(cls):
+        '''Return true if the current instruction is a conditional branch.'''
+        return cls.conditional(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_jxx(cls, ea):
-        '''Returns true if the instruction at `ea` is a conditional branch.'''
+    def conditional(cls, ea):
+        '''Return true if the instruction at address `ea` is a conditional branch.'''
         ea = interface.address.inside(ea)
-        return cls.is_branch(ea) and not all([cls.feature(ea, idaapi.CF_STOP)])
-    jxx = isjxx = jxxQ = utils.alias(is_jxx, 'type')
+        return cls.branch(ea) and not all([cls.feature(ea, idaapi.CF_STOP)])
+    jcc = is_jcc = is_jxx = utils.alias(conditional, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_jmpi(cls):
-        '''Returns true if the instruction at the current address is an indirect branch.'''
-        return cls.is_jmpi(ui.current.address())
+    def unconditionali(cls):
+        '''Return true if the current instruction is an unconditional (indirect) branch.'''
+        return cls.unconditionali(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_jmpi(cls, ea):
-        '''Returns true if the instruction at `ea` is an indirect branch.'''
+    def unconditionali(cls, ea):
+        '''Return true if the instruction at address `ea` is an unconditional (indirect) branch.'''
         ea = interface.address.inside(ea)
-        return cls.is_branch(ea) and all([cls.feature(ea, idaapi.CF_JUMP)])
-    jmpi = isjmpi = jmpiQ = utils.alias(is_jmpi, 'type')
+        return cls.branch(ea) and all([cls.feature(ea, idaapi.CF_JUMP)])
+    jmpi = is_jmpi = utils.alias(unconditionali, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_call(cls):
-        '''Returns true if the current instruction is a call.'''
-        return cls.is_call(ui.current.address())
+    def enter(cls):
+        '''Return true if the current instruction will enter a function (direct) when executed.'''
+        return cls.enter(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_call(cls, ea):
-        '''Returns true if the instruction at `ea` is a call.'''
+    def enter(cls, ea):
+        '''Return true if the instruction at address `ea` will enter a function (direct) when executed.'''
         ea = interface.address.inside(ea)
         if idaapi.__version__ < 7.0 and hasattr(idaapi, 'is_call_insn'):
             idaapi.decode_insn(ea)
             return idaapi.is_call_insn(ea)
-        return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_CALL)])
-    call = iscall = callQ = utils.alias(is_call, 'type')
+        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([cls.feature(ea, idaapi.CF_CALL)])
+    is_call = call = link = is_link = utils.alias(enter, 'type')
 
     @utils.multicase()
     @classmethod
-    def is_calli(cls):
-        '''Return true if the current instruction is an indirect call.'''
-        return cls.is_calli(ui.current.address())
+    def enteri(cls):
+        '''Return true if the current instruction will enter a function (indirect) when executed.'''
+        return cls.enteri(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
-    def is_calli(cls, ea):
-        '''Returns true if the instruction at `ea` is an indirect call.'''
+    def enteri(cls, ea):
+        '''Return true if the instruction at address `ea` will enter a function (indirect) when executed.'''
         ea = interface.address.inside(ea)
         F = cls.feature(ea)
-        return database.type.is_code(ea) and all([F & idaapi.CF_CALL, F & idaapi.CF_JUMP])
-    calli = iscalli = calliQ = utils.alias(is_calli, 'type')
+        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([F & idaapi.CF_CALL, F & idaapi.CF_JUMP])
+    is_calli = calli = linki = is_linki = utils.alias(enteri, 'type')
 
 t = type    # XXX: ns alias
 
 feature = utils.alias(type.feature, 'type')
-is_return = returnQ = retQ = utils.alias(type.is_return, 'type')
-is_shift = shiftQ = utils.alias(type.is_shift, 'type')
-is_branch = branchQ = utils.alias(type.is_branch, 'type')
-is_jmp = jmpQ = utils.alias(type.is_jmp, 'type')
-is_jxx = jxxQ = utils.alias(type.is_jxx, 'type')
-is_jmpi = jmpiQ = utils.alias(type.is_jmpi, 'type')
-is_call = callQ = utils.alias(type.is_call, 'type')
-is_calli = calliQ = utils.alias(type.is_calli, 'type')
+is_return = returns = utils.alias(type.leave, 'type')
+is_shift = utils.alias(type.shift, 'type')
+is_branch = utils.alias(type.branch, 'type')
+is_jmp = utils.alias(type.unconditional, 'type')
+is_jxx = is_jcc = utils.alias(type.conditional, 'type')
+is_jmpi = utils.alias(type.unconditionali, 'type')
+is_call = utils.alias(type.link, 'type')
+is_calli = utils.alias(type.linki, 'type')
