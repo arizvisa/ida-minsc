@@ -316,7 +316,7 @@ class address(changingchanged):
     def changing(cls, ea, repeatable_cmt, newcmt):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Construct our new state, and then grab our old comment. This is because
@@ -349,7 +349,7 @@ class address(changingchanged):
     def changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Resume the state that was created by the changing event, and then grab
@@ -383,7 +383,7 @@ class address(changingchanged):
     def old_changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
             return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # first we'll grab our comment that the user updated
@@ -524,7 +524,7 @@ class globals(changingchanged):
     def changing(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
-        if interface.node.is_identifier(interface.range.start(a)):
+        if interface.node.identifier(interface.range.start(a)):
             return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
@@ -564,7 +564,7 @@ class globals(changingchanged):
     def changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
-        if interface.node.is_identifier(interface.range.start(a)):
+        if interface.node.identifier(interface.range.start(a)):
             return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
@@ -607,7 +607,7 @@ class globals(changingchanged):
     def old_changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
             return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
-        if interface.node.is_identifier(interface.range.start(a)):
+        if interface.node.identifier(interface.range.start(a)):
             return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # first thing to do is to identify whether we're in a function or not,
@@ -705,7 +705,7 @@ class typeinfo(changingchanged):
     def changing(cls, ea, new_type, new_fname):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (database not ready) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), utils.string.repr(new_type), new_fname, ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (not an address) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), utils.string.repr(new_type), new_fname, ea))
 
         # Verify that the address is within our database boundaries because IDA
@@ -753,7 +753,7 @@ class typeinfo(changingchanged):
     def changed(cls, ea, type, fnames):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (database not ready) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
 
         # Verify that the address is within our database boundaries because IDA
@@ -1323,7 +1323,7 @@ class naming(changingchanged):
     def changing(cls, ea, new_name):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring naming.changing event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring naming.changing event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
 
         # If we're not an identifier, then construct our new state.
@@ -1338,7 +1338,7 @@ class naming(changingchanged):
     def changed(cls, ea, new_name, local_name):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({:#x}, {!r}, {!s}) : Ignoring naming.changed event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {!r}, {!s}) : Ignoring naming.changed event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea))
 
         # If we're not changing an identifier, then resume where we left off.
@@ -1361,7 +1361,7 @@ class naming(changingchanged):
         """
         if not cls.is_ready():
             return logging.debug(u"{:s}.rename({:#x}, {!r}) : Ignoring rename event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.rename({:#x}, {!r}) : Ignoring rename event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
 
         fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
@@ -1425,7 +1425,7 @@ class extra_cmt(changingchanged):
     def changed(cls, ea, line_idx, cmt):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (database not ready) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (not an address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Verify that the address is within our database boundaries because IDA
@@ -1473,7 +1473,7 @@ class extra_cmt(changingchanged):
 
         # First check that we're not an identifier, because we don't care about
         # caching these.
-        if interface.node.is_identifier(ea):
+        if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not an address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Verify that the address is within our database boundaries because IDA
@@ -1516,7 +1516,7 @@ def item_color_changed(ea, color):
     # First make sure it's not an identifier, as if it is then we
     # need to terminate early because the tag cache doesn't care
     # about this stuff.
-    if interface.node.is_identifier(ea):
+    if interface.node.identifier(ea):
         return
 
     # Now we need to distinguish between a content or global tag so
