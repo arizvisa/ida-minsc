@@ -3489,7 +3489,7 @@ class register_t(symbol_t):
         viewvalues = {item for item in self.__children__.values()}
         return other in viewvalues
 
-    def subsetQ(self, other):
+    def subset(self, other):
         '''Return true if the `other` register is a component of the current register.'''
         def collect(node):
             res = {node}
@@ -3497,7 +3497,7 @@ class register_t(symbol_t):
             return res
         return other in self.alias or other in collect(self)
 
-    def supersetQ(self, other):
+    def superset(self, other):
         '''Return true if the `other` register uses the current register as a component.'''
         res, pos = {item for item in []}, self
         while pos is not None:
@@ -3505,9 +3505,9 @@ class register_t(symbol_t):
             pos = pos.__parent__
         return other in self.alias or other in res
 
-    def relatedQ(self, other):
+    def related(self, other):
         '''Return true if the `other` register may overlap with the current one and thus might be affected when one is modified.'''
-        return self.supersetQ(other) or self.subsetQ(other)
+        return self.superset(other) or self.subset(other)
 
     def __int__(self):
         '''Return the integer value of the current register.'''
@@ -3876,7 +3876,7 @@ class regmatch(object):
         regs = { architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in registers }
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
-        match = lambda r, regs=regs: any(map(r.relatedQ, regs))
+        match = lambda r, regs=regs: any(map(r.related, regs))
 
         # returns true if the operand at the specified address is related to one of the registers in `regs`.
         def uses_register(ea, opnum):
@@ -4440,7 +4440,7 @@ class switch_t(object):
 
         # if we're an indirect switch, then we can grab our length from
         # the jcases property.
-        if self.indirectQ():
+        if self.indirect():
             ea, count = self.object.jumps, self.object.jcases
             items = database.get.array(ea, length=count)
 
@@ -4471,7 +4471,7 @@ class switch_t(object):
         import database
 
         # if we're not an indirect switch, then the index table is empty.
-        if not self.indirectQ():
+        if not self.indirect():
             return database.get.array(self.object.jumps, length=0)
 
         # otherwise, we can simply read the array and return it.
@@ -4490,10 +4490,10 @@ class switch_t(object):
     def count(self):
         '''Return the number of cases in the switch.'''
         return self.object.ncases
-    def indirectQ(self):
+    def indirect(self):
         '''Return whether the switch is using an indirection table or not.'''
         return self.object.is_indirect()
-    def subtractQ(self):
+    def subtract(self):
         '''Return whether the switch performs a translation (subtract) on the index.'''
         return self.object.is_subtract()
     def case(self, case):
@@ -4504,7 +4504,7 @@ class switch_t(object):
             cls = self.__class__
             raise internal.exceptions.IndexOutOfBoundsError(u"{:s}.case({:d}) : The specified case ({:d}) was out of bounds ({:#x}<>{:#x}).".format(cls.__name__, case, case, self.base, self.base+self.count - 1))
         idx = case - self.base
-        if self.indirectQ():
+        if self.indirect():
             idx = self.index[idx]
         return self.branch[idx]
     def handler(self, ea):
@@ -4521,12 +4521,12 @@ class switch_t(object):
         return tuple(builtins.range(self.base, self.base + self.count))
     def __str__(self):
         cls = self.__class__
-        if self.indirectQ():
+        if self.indirect():
             return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
         return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
     def __unicode__(self):
         cls = self.__class__
-        if self.indirectQ():
+        if self.indirect():
             return u"<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
         return u"<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
     def __repr__(self):
@@ -4769,8 +4769,8 @@ class function(object):
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
-    This returns a tuple of the format `(runtimeQ, address)` where
-    `runtimeQ` is a boolean returning true if the symbol is linked
+    This returns a tuple of the format `(runtime, address)` where
+    `runtime` is a boolean returning true if the symbol is linked
     during runtime and `address` is the address of the entrypoint.
     """
     fn = function.by_address(int(func)) if isinstance(func, internal.types.integer) or hasattr(func, '__int__') else function.by_name(func) if isinstance(func, internal.types.string) else function.by_frame(func) if isinstance(func, idaapi.struc_t) else func if isinstance(func, idaapi.func_t) else function.by(func)
