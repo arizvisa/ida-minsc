@@ -174,30 +174,30 @@ class config(object):
         return idaapi.get_imagebase()
 
     @classmethod
-    def is_readonly(cls):
+    def readonly(cls):
         '''Return whether the database is read-only or not.'''
         if idaapi.__version__ < 7.0:
             raise E.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
         elif idaapi.__version__ < 7.2:
             return cls.info.readonly_idb()
         return idaapi.inf_readonly_idb()
-    readonlyQ = utils.alias(is_readonly, 'config')
+    is_readonly = utils.alias(readonly, 'config')
 
     @classmethod
-    def is_sharedobject(cls):
+    def shared(cls):
         '''Return whether the database is a shared-object or not.'''
         if idaapi.__version__ < 7.0:
-            raise E.UnsupportedVersion(u"{:s}.is_sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+            raise E.UnsupportedVersion(u"{:s}.shared() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
         return True if cls.lflags(idaapi.LFLG_IS_DLL) else False
-    sharedobject = is_shared = is_dll = sharedQ = utils.alias(is_sharedobject, 'config')
+    is_sharedobject = is_shared = is_dll = utils.alias(shared, 'config')
 
     @classmethod
-    def is_kernelspace(cls):
+    def kernel(cls):
         '''Return whether the database is using a kernelmode address space or not.'''
         if idaapi.__version__ < 7.0:
-            raise E.UnsupportedVersion(u"{:s}.is_kernelspace() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+            raise E.UnsupportedVersion(u"{:s}.kernel() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
         return True if cls.lflags(idaapi.LFLG_KERNMODE) else False
-    kernelspaceQ = kernelQ = utils.alias(is_kernelspace, 'config')
+    is_kernelspace = is_kernel = utils.alias(kernel, 'config')
 
     @utils.multicase()
     @classmethod
@@ -6696,7 +6696,6 @@ class extra(object):
     def has_suffix(cls, ea):
         '''Return true if there are any extra comments that suffix the item at the address `ea`.'''
         return cls.__has_extra__(ea, idaapi.E_NEXT)
-    prefixQ, suffixQ = utils.alias(has_prefix, 'extra'), utils.alias(has_suffix, 'extra')
 
     @classmethod
     def __count__(cls, ea, base):
