@@ -2060,17 +2060,15 @@ class type(object):
     @utils.multicase(ea=types.integer)
     @classmethod
     def feature(cls, ea):
-        '''Return the feature bitmask for the instruction at the address `ea`.'''
-        if database.type.code(ea):
-            return interface.instruction.feature(ea)
-        return None
+        '''Return the feature bitmask of the instruction at address `ea`.'''
+        ea = interface.address.inside(ea)
+        return interface.instruction.feature(ea) if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE else None
     @utils.multicase(ea=types.integer, mask=types.integer)
     @classmethod
     def feature(cls, ea, mask):
-        '''Return the feature bitmask for the instruction at the address `ea` masked with `mask`.'''
-        if database.type.code(ea):
-            return interface.instruction.feature(ea) & idaapi.as_uint32(mask)
-        return None
+        '''Return the feature bitmask of the instruction at the address `ea` masked with `mask`.'''
+        ea = interface.address.inside(ea)
+        return interface.instruction.feature(ea) & idaapi.as_uint32(mask) if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE else None
 
     @utils.multicase()
     @classmethod
@@ -2082,7 +2080,7 @@ class type(object):
     def sentinel(cls, ea):
         '''Return true if the instruction at address `ea` is a sentinel instruction.'''
         ea = interface.address.inside(ea)
-        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([cls.feature(ea, idaapi.CF_STOP)])
+        return interface.instruction.is_sentinel(ea)
     is_sentinel = utils.alias(sentinel, 'type')
 
     @utils.multicase()
@@ -2094,15 +2092,8 @@ class type(object):
     @classmethod
     def leave(cls, ea):
         '''Return true if the instruction at address `ea` will return from a function when executed.'''
-        ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
-
-        # We check xrefs to make sure that IDA didn't detect that a constant
-        # address was loaded into the stack or link register prior to returning.
-        F, Xci, Xdi = (callable(ea) for callable in [cls.feature, interface.xref.of_code, interface.xref.of_data])
-        Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
-
-        # If it's a sentinel instruction, not a branch, and has no refs, then we're good.
-        return cls.sentinel(ea) and not any([F & idaapi.CF_JUMP, Xc, Xd])
+        ea = interface.address.inside(ea)
+        return interface.instruction.is_return(ea)
     is_return = exit = utils.alias(leave, 'type')
 
     @utils.multicase()
@@ -2115,7 +2106,7 @@ class type(object):
     def shift(cls, ea):
         '''Return true if the instruction at address `ea` is a bit-shifting instruction.'''
         ea = interface.address.inside(ea)
-        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([cls.feature(ea, idaapi.CF_SHFT)])
+        return interface.instruction.is_shift(ea)
     is_shift = utils.alias(shift, 'type')
 
     @utils.multicase()
@@ -2127,16 +2118,8 @@ class type(object):
     @classmethod
     def branch(cls, ea):
         '''Return true if the instruction at address `ea` is a type of branch.'''
-        ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
-
-        # We check code xrefs in case IDA figured out that this instruction
-        # actually does branch to something and created a reference for it.
-        F, Xci, Xdi = (callable(ea) for callable in [cls.feature, interface.xref.of_code, interface.xref.of_data])
-        Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
-
-        # If it's actual code, not a call or a shift (this flag is weird on intel), and is a jump
-        # or it has an actual code reference that IDA detected, then we're a branch instruction.
-        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc])])
+        ea = interface.address.inside(ea)
+        return interface.instruction.is_branch(ea)
     is_branch = utils.alias(branch, 'type')
 
     @utils.multicase()
@@ -2149,7 +2132,7 @@ class type(object):
     def unconditional(cls, ea):
         '''Return true if the instruction at address `ea` is an unconditional branch.'''
         ea = interface.address.inside(ea)
-        return cls.branch(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
+        return interface.instruction.is_unconditional(ea)
     is_jmp = jmp = utils.alias(unconditional, 'type')
 
     @utils.multicase()
@@ -2162,7 +2145,7 @@ class type(object):
     def conditional(cls, ea):
         '''Return true if the instruction at address `ea` is a conditional branch.'''
         ea = interface.address.inside(ea)
-        return cls.branch(ea) and not all([cls.feature(ea, idaapi.CF_STOP)])
+        return interface.instruction.is_conditional(ea)
     jcc = is_jcc = is_jxx = utils.alias(conditional, 'type')
 
     @utils.multicase()
@@ -2175,7 +2158,7 @@ class type(object):
     def unconditionali(cls, ea):
         '''Return true if the instruction at address `ea` is an unconditional (indirect) branch.'''
         ea = interface.address.inside(ea)
-        return cls.branch(ea) and all([cls.feature(ea, idaapi.CF_JUMP)])
+        return interface.instruction.is_indirect(ea)
     jmpi = is_jmpi = utils.alias(unconditionali, 'type')
 
     @utils.multicase()
@@ -2188,10 +2171,7 @@ class type(object):
     def enter(cls, ea):
         '''Return true if the instruction at address `ea` will enter a function (direct) when executed.'''
         ea = interface.address.inside(ea)
-        if idaapi.__version__ < 7.0 and hasattr(idaapi, 'is_call_insn'):
-            idaapi.decode_insn(ea)
-            return idaapi.is_call_insn(ea)
-        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([cls.feature(ea, idaapi.CF_CALL)])
+        return interface.instruction.is_call(ea)
     is_call = call = link = is_link = utils.alias(enter, 'type')
 
     @utils.multicase()
@@ -2204,8 +2184,7 @@ class type(object):
     def enteri(cls, ea):
         '''Return true if the instruction at address `ea` will enter a function (indirect) when executed.'''
         ea = interface.address.inside(ea)
-        F = cls.feature(ea)
-        return interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and all([F & idaapi.CF_CALL, F & idaapi.CF_JUMP])
+        return interface.instruction.is_calli(ea)
     is_calli = calli = linki = is_linki = utils.alias(enteri, 'type')
 
 t = type    # XXX: ns alias
@@ -2217,5 +2196,5 @@ is_branch = utils.alias(type.branch, 'type')
 is_jmp = utils.alias(type.unconditional, 'type')
 is_jxx = is_jcc = utils.alias(type.conditional, 'type')
 is_jmpi = utils.alias(type.unconditionali, 'type')
-is_call = utils.alias(type.link, 'type')
-is_calli = utils.alias(type.linki, 'type')
+is_call = utils.alias(type.enter, 'type')
+is_calli = utils.alias(type.enteri, 'type')
