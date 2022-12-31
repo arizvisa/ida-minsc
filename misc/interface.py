@@ -3870,7 +3870,7 @@ class regmatch(object):
     @classmethod
     def use(cls, registers):
         '''Return a closure that checks if an address and opnum uses either of the specified `registers`.'''
-        import instruction
+        import __catalog__ as catalog
 
         # convert any regs that are strings into their correct object type
         regs = { architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in registers }
@@ -3880,7 +3880,8 @@ class regmatch(object):
 
         # returns true if the operand at the specified address is related to one of the registers in `regs`.
         def uses_register(ea, opnum):
-            val = instruction.op(ea, opnum)
+            insn, operand = instruction.at(ea), instruction.operand(ea, opnum)
+            val = catalog.operand.decode(insn, operand)
             if isinstance(val, symbol_t):
                 return any(map(match, val.symbols))
             return False
@@ -4512,8 +4513,7 @@ class switch_t(object):
     @property
     def cases(self):
         '''Return all of the non-default cases in the switch.'''
-        import instruction
-        F = lambda ea, dflt=self.default: (ea == dflt) or (instruction.type.is_jmp(ea) and instruction.op(ea, 0) == dflt)
+        F = lambda ea, dflt=self.default: (ea == dflt) or (instruction.is_unconditional(ea) and not instruction.is_indirect(ea) and instruction.reference(ea, 0) == dflt)
         return tuple(idx for idx in builtins.range(self.base, self.base + self.count) if not F(self.case(idx)))
     @property
     def range(self):
