@@ -4662,37 +4662,58 @@ class type(object):
     @utils.multicase()
     @classmethod
     def auto(cls):
-        '''Return if the current address was automatically named.'''
+        '''Return if the name for the current address was named automatically.'''
         return cls.auto(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def auto(cls, ea):
-        '''Return if the address `ea` was automatically named.'''
+        '''Return if the name for the address `ea` was named automatically.'''
         return idaapi.has_auto_name(interface.address.flags(ea))
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def auto(cls, ea, boolean):
+        '''Specify whether the name for the address at `ea` was named automatically depending on the value of `boolean`.'''
+        ea = interface.address.within(ea)
+        res, _ = idaapi.has_auto_name(ea), idaapi.make_name_auto(ea) if boolean else idaapi.make_name_user(ea)
+        return res
     has_autoname = is_auto = utils.alias(auto, 'type')
 
     @utils.multicase()
     @classmethod
     def public(cls):
-        '''Return if the current address has a public name.'''
+        '''Return if the name for the current address is public scoped.'''
         return cls.public(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def public(cls, ea):
-        '''Return if the address at `ea` has a public name.'''
+        '''Return if the name for the address at `ea` is public scoped.'''
         return idaapi.is_public_name(interface.address.within(ea))
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def public(cls, ea, boolean):
+        '''Update the scope of the name for the address at `ea` to public depending on the value of `boolean`.'''
+        ea = interface.address.within(ea)
+        res, _ = idaapi.is_public_name(ea), idaapi.make_name_public(ea) if boolean else idaapi.make_name_non_public(ea)
+        return res
     has_publicname = is_public = utils.alias(public, 'type')
 
     @utils.multicase()
     @classmethod
     def weak(cls):
-        '''Return if the current address has a weakly-typed name.'''
+        '''Return if the name for the current address is weak scoped.'''
         return cls.weak(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def weak(cls, ea):
-        '''Return if the address at `ea` has a weakly-typed name.'''
+        '''Return if the name for the address at `ea` is weak scoped.'''
         return idaapi.is_weak_name(interface.address.within(ea))
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def weak(cls, ea, boolean):
+        '''Update the scope of the name for the address at `ea` to weak depending on the value of `boolean`.'''
+        ea = interface.address.within(ea)
+        res, _ = idaapi.is_weak_name(ea), idaapi.make_name_weak(ea) if boolean else idaapi.make_name_non_weak(ea)
+        return res
     has_weakname = is_weak = utils.alias(weak, 'type')
 
     @utils.multicase()
@@ -4705,6 +4726,13 @@ class type(object):
     def listed(cls, ea):
         '''Return if the address at `ea` has a name that is listed.'''
         return idaapi.is_in_nlist(interface.address.within(ea))
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def listed(cls, ea, boolean):
+        '''Include the name of the address at `ea` in the names list depending on the value of `boolean`.'''
+        ea = interface.address.within(ea)
+        res, _ = idaapi.is_in_nlist(), idaapi.show_name(ea) if boolean else idaapi.hide_name(ea)
+        return res
     has_listedname = is_listedname = utils.alias(listed, 'type')
 
     @utils.multicase()
