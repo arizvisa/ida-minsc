@@ -3677,7 +3677,7 @@ class instruction(object):
         Ffeature, Fflag = map(functools.partial(functools.partial, operator.and_), [features, flags])
 
         # Get all the instruction-specific attributes that are relevant to the access_t of each operand.
-        is_call, is_jump, is_shift = map(Ffeature, [idaapi.CF_CALL, idaapi.CF_JUMP, idaapi.CF_SHFT])
+        is_call, is_jump, is_shift = cls.is_call(ea), cls.is_branch(ea), cls.is_shift(ea)
         operands, MS_XTYPE = cls.operands(ea), Fflag(idaapi.MS_0TYPE | idaapi.MS_1TYPE)
 
         # Now because we have no way to determine conditional branches, we need to enumerate the references
@@ -3781,6 +3781,73 @@ class instruction(object):
         signed, unsigned = (value - maximum, value) if avalue > 0 else (avalue, value & (maximum - 1))
         result = signed if inverted else unsigned
         return target if target != idaapi.BADADDR else result if operand.type == idaapi.o_imm else value
+
+    @classmethod
+    def is_sentinel(cls, ea):
+        '''Return whether the instruction at the address `ea` is a sentinel instruction that does not execute the instruction that immediately follows it.'''
+        ok = address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and cls.feature(ea) & idaapi.CF_STOP
+        return True if ok else False
+
+    @classmethod
+    def is_shift(cls, ea):
+        '''Return whether the instruction at the address `ea` is a shift instruction.'''
+        ok = address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and cls.feature(ea) & idaapi.CF_SHFT
+        return True if ok else False
+
+    @classmethod
+    def is_branch(cls, ea):
+        '''Return whether the instruction at the address `ea` is a branch instruction.'''
+        xiterable = (True for _, xiscode, xrtype in xref.of(ea) if xiscode and xrtype != idaapi.fl_F)
+        target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
+        either = idaapi.is_indirect_jump_insn(target) or next(xiterable, False)
+        return idaapi.is_basic_block_end(target, *bbargs) and not idaapi.is_call_insn(target) and either
+
+    @classmethod
+    def is_call(cls, ea):
+        '''Return whether the instruction at the address `ea` is a call (direct or indirect) instruction.'''
+        feature, target = cls.feature(ea), ea if idaapi.__version__ < 7.0 else cls.at(ea)
+        ok = idaapi.is_call_insn(target) if hasattr(idaapi, 'is_call_insn') else address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and feature & idaapi.CF_CALL
+        return True if ok else False
+
+    @classmethod
+    def is_calli(cls, ea):
+        '''Return whether the instruction at the address `ea` is a call (indirect) instruction.'''
+        feature, target = cls.feature(ea), ea if idaapi.__version__ < 7.0 else cls.at(ea)
+        ok = idaapi.is_call_insn(target) if hasattr(idaapi, 'is_call_insn') else address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE and feature & idaapi.CF_CALL
+        return True if ok and feature & idaapi.CF_JUMP else False
+
+    @classmethod
+    def is_return(cls, ea):
+        '''Return whether the instruction at the address `ea` is a return instruction.'''
+        target = ea if idaapi.__version__ < 7.0 else cls.at(ea)
+        return True if idaapi.is_ret_insn(target) else False
+
+    @classmethod
+    def is_indirect(cls, ea):
+        '''Return whether the instruction at the address `ea` is an unconditional (indirect) branch instruction.'''
+        target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
+        if hasattr(idaapi, 'is_indirect_jump_insn'):
+            return True if idaapi.is_indirect_jump_insn(target) else False
+        features, invalid, expected = cls.feature(ea), any([idaapi.is_call_insn(target), idaapi.is_ret_insn(target)]), idaapi.CF_STOP | idaapi.CF_JUMP
+        ok = idaapi.is_basic_block_end(target, *bbargs) and not invalid and features & expected == expected
+        return True if ok else False
+
+    @classmethod
+    def is_unconditional(cls, ea):
+        '''Return whether the instruction at the address `ea` is an unconditional (direct and indirect) branch instruction.'''
+        features, expected = cls.feature(ea), idaapi.CF_STOP | idaapi.CF_HLL
+        target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
+        ok = idaapi.is_basic_block_end(target, *bbargs) and not idaapi.is_ret_insn(target) and features & expected == expected
+        return True if ok else False
+
+    @classmethod
+    def is_conditional(cls, ea):
+        '''Return whether the instruction at the address `ea` is an conditional branch instruction.'''
+        target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
+        feature, invalid = cls.feature(ea), any([idaapi.is_call_insn(target), idaapi.is_ret_insn(target)])
+        xiterable = (True for _, xiscode, xrtype in xref.of(ea) if xiscode and xrtype != idaapi.fl_F)
+        ok = idaapi.is_basic_block_end(target, *bbargs) and not invalid and not feature & idaapi.CF_STOP and next(xiterable, False)
+        return True if ok else False
 
 class regmatch(object):
     """
