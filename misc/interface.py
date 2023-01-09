@@ -5199,3 +5199,399 @@ class phrase_t(integerish, symbol_t):
         register, _ = self
         oregister, _ = other
         return any([register is None, oregister is None, register == oregister])
+
+class decode(object):
+    """
+    This namespace is directly responsible for mapping the disassembler's
+    types directly to lengths, Python typecodes, or Python's ctypes so
+    that the database contents can be decoded and acted upon.
+    """
+
+    # This numerics table is responsible for mapping an idaapi.DT_TYPE
+    # type to a typecode that is used by Python's array module. We can
+    # dual-use this since we only need to change the case for signedness.
+    integer_typecode = {
+        idaapi.FF_BYTE : internal.utils.get_array_typecode(1), idaapi.FF_ALIGN : internal.utils.get_array_typecode(1),
+        idaapi.FF_WORD : internal.utils.get_array_typecode(2),
+        idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : internal.utils.get_array_typecode(4),
+        idaapi.FF_FLOAT : 'f',
+        idaapi.FF_DOUBLE : 'd',
+    }
+
+    # Some 32-bit versions of python might not have array.array('Q')
+    # and some versions of IDA also might not have FF_QWORD..
+    try:
+        _array.array(internal.utils.get_array_typecode(8))
+        integer_typecode[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = internal.utils.get_array_typecode(8)
+    except (AttributeError, ValueError):
+        pass
+
+    # This table is a mapping-type for converting an idaapi.DT_TYPE to
+    # a length. This way we can manually read the elements of the array
+    # into a list that we can return to the user.
+    length_table = {
+        idaapi.FF_BYTE : 1, idaapi.FF_ALIGN : 1,
+        idaapi.FF_WORD : 2,
+        idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : 4,
+        idaapi.FF_FLOAT : 4,
+        idaapi.FF_DOUBLE : 8,
+    }
+
+    # Define a temporary closure that will be used to update the length table
+    # with the correct size for FF_QWORD if it's available in the disassembler.
+    def update_length_table(table):
+        '''This function will try to update the given `table` with the correct size for an ``idaapi.FF_QWORD``.'''
+        attribute = builtins.next(attribute for attribute in {'FF_QWRD', 'FF_QWORD'} if hasattr(idaapi, attribute))
+        value = getattr(idaapi, attribute)
+        if value not in table:
+            table[value] = 8
+        return
+
+    # If we have FF_QWORD defined but it cannot be represented by the
+    # _array class, then we'll need to add its size to our length-table
+    # so that we can still read its elements manually.
+    if hasattr(idaapi, 'FF_QWRD') or hasattr(idaapi, 'FF_QWORD'):
+        update_length_table(length_table)
+    del(update_length_table)
+
+    # FF_OWORD, FF_YWORD and FF_ZWORD might not exist in older versions
+    # of IDA, so try to add them softly to our length-table and bail if
+    # we received an exception due to any of them not being available.
+    try:
+        length_table[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = 8
+        length_table[idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD] = 16
+        length_table[idaapi.FF_YWORD if hasattr(idaapi, 'FF_YWORD') else idaapi.FF_YWRD] = 32
+        length_table[idaapi.FF_ZWORD if hasattr(idaapi, 'FF_ZWORD') else idaapi.FF_ZWRD] = 64
+    except AttributeError:
+        pass
+
+    # Depending on the version of IDAPython, some of IDA's flags (FF_*) can
+    # be signed or unsigned. Since we're explicitly testing for them by using
+    # container membership, we'll need to ensure that they're unsigned when
+    # storing them into their lookup tables. This way our membership tests
+    # will actually work when determining the types to use.
+    integer_typecode = { idaapi.as_uint32(ff) : typecode for ff, typecode in integer_typecode.items() }
+    length_table = { idaapi.as_uint32(ff) : length for ff, length in length_table.items() }
+
+    # Py's "u" typecode for their _array can actually change size depending
+    # on the platform. So we need to figure it out ourselves and then just
+    # fall back to the integer typecode if the character ones don't exist.
+    string_typecode = {
+        1: 'c' if sys.version_info.major < 3 else internal.utils.get_array_typecode(1),
+        2: 'u' if _array.array('u').itemsize == 2 else internal.utils.get_array_typecode(2),
+        4: 'u' if _array.array('u').itemsize == 4 else internal.utils.get_array_typecode(4),
+    }
+
+    @classmethod
+    def unsigned(cls, bytes):
+        '''Decode the provided `bytes` into an unsigned integer.'''
+        data = bytearray(bytes)
+        return functools.reduce(lambda agg, byte: agg << 8 | byte, data, 0)
+
+    @classmethod
+    def signed(cls, bytes):
+        '''Decode the provided `bytes` into a signed integer.'''
+        bits = 8 * len(bytes)
+        result, signflag = cls.unsigned(bytes), pow(2, bits) // 2
+        return (result - pow(2, bits)) if result & signflag else result
+
+    binary_float_table = {
+        16 : (11, 5),
+        32 : (24, 8),
+        64 : (53, 11),
+        128 : (113, 15),
+        256 : (237, 19),
+        # FIXME: we could probably add the base-10 formats too.
+    }
+
+    @classmethod
+    def float(cls, bytes):
+        '''Decode the provided `bytes` into an IEEE754 half, single, or double depending on its size.'''
+        integer, bits = cls.unsigned(bytes), 8 * len(bytes)
+        mantissa, exponent = cls.binary_float_table[bits if bits in cls.binary_float_table else next(item for item in sorted(cls.binary_float_table) if bits <= item)]
+        return internal.utils.float_of_integer(integer, mantissa - 1, exponent, 1)
+
+    @classmethod
+    def element(cls, dtype):
+        '''Return the element size for the given `dtype` if it is supported and can be decoded into an array.'''
+        return cls.length_table.get(dtype & idaapi.DT_TYPE, 0)
+
+    @classmethod
+    def integers(cls, dtype, bytes):
+        '''Decode `bytes` into an array of integers that are of the specified `dtype`.'''
+        typecode = cls.integer_typecode[dtype & idaapi.DT_TYPE]
+
+        # Create an _array using the typecode that we determined so that it can
+        # be decoded and then returned to the caller.
+        Ftranslate = operator.methodcaller('lower' if dtype & idaapi.FF_SIGN else 'upper')
+        result = _array.array(typecode if typecode in 'fd' else Ftranslate(typecode))
+
+        # If our _array's itemsize doesn't match the element size that we expected,
+        # then we need to warn the user that something fucked up and that we're
+        # hijacking the array decoding with our own hardcoded unsigned length.
+        cb = cls.length_table[dtype & idaapi.DT_TYPE]
+        if result.itemsize != cb:
+            logging.warning(u"{:s}.integers({:#x}, {!s}, signed={!s}) : Refusing to decode array at address {:#x} using the array size ({:+d}) identified for DT_TYPE ({:#x}) due to the size of the DT_TYPE ({:#x}) not corresponding to the desired element size ({:+d}).".format('.'.join([__name__, cls.__name__]), dtype, '...', True if signed else False, ea, result.itemsize, dtype, dtype, cb))
+
+            # Reconstruct the array but with the expected element size.
+            try:
+                result = _array.array(internal.utils.get_array_typecode(cb, 1))
+
+            # If we can't use the typecode determined by the element size, then
+            # just assume that the elements are just individual bytes.
+            except ValueError:
+                result = _array.array(internal.utils.get_array_typecode(1))
+
+        # Now we can use the bytes we were given to initialize the _array
+        # that we're going to return to the user.
+        result.fromstring(builtins.bytes(bytes)) if sys.version_info.major < 3 else result.frombytes(bytes)
+        return result
+
+    @classmethod
+    def string(cls, width, bytes):
+        '''Decode the provided `bytes` as an array containing characters of the specified `width`.'''
+        typecode = cls.string_typecode[width]
+        result = _array.array(typecode)
+        result.fromstring(builtins.bytes(bytes)) if sys.version_info.major < 3 else result.frombytes(bytes)
+        return result
+
+    @classmethod
+    def list(cls, width, bytes):
+        '''Decode the provided `bytes` as a list where each element is the specified `width`.'''
+        iterable = iter(bytearray(bytes))
+        items = zip(*[iterable] * width)
+        return [bytearray(item) for item in items]
+
+    # This table is just used for converting a pythonic-type into
+    # a ctype. We use ctypes because an instance of a ctype has the
+    # added effect of giving us a size and a few other features which
+    # allows us to avoid implementing a complete and proper typesystem.
+    ctype_table = {
+        (int, -1) : ctypes.c_int8,   (int, 1) : ctypes.c_uint8,
+        (int, -2) : ctypes.c_int16,  (int, 2) : ctypes.c_uint16,
+        (int, -4) : ctypes.c_int32,  (int, 4) : ctypes.c_uint32,
+        (int, -8) : ctypes.c_int64,  (int, 8) : ctypes.c_uint64,
+        (float, 4) : ctypes.c_float, (float, 8) : ctypes.c_double,
+
+        # pointer types, would be cool if we could have variable-sized pointers..but we don't.
+        (builtins.type, -1) : ctypes.c_int8,    (builtins.type, 1) : ctypes.c_uint8,
+        (builtins.type, -2) : ctypes.c_int16,   (builtins.type, 2) : ctypes.c_uint16,
+        (builtins.type, -4) : ctypes.c_int32,   (builtins.type, 4) : ctypes.c_uint32,
+        (builtins.type, -8) : ctypes.c_int64,   (builtins.type, 8) : ctypes.c_uint64,
+    }
+
+    @classmethod
+    def union_bytes(cls, sptr, bytes):
+        '''Use the union specified by `sptr` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
+        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
+        if not (sptr.props & SF_UNION):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.union_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is not a `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id, 'SF_UNION'))
+
+        result, data = {}, bytearray(bytes)
+        for m in internal.structure.new(sptr.id, 0).members:
+            name, mptr, size = m.name, m.ptr, m.size
+            result[name] = data[:size]
+        return result
+
+    @classmethod
+    def fragment_bytes(cls, sptr, bytes):
+        '''Use the structure specified by `sptr` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
+        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
+        if sptr.props & SF_UNION:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fragment_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is a `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id, 'SF_UNION'))
+
+        offset, result, data = 0, {}, bytearray(bytes)
+        for m in internal.structure.new(sptr.id, 0).members:
+            name, mptr = m.name, m.ptr
+            left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
+
+            # First check our current offset against the member boundaries
+            # in case we need to grab any padding to get to the field.
+            if offset < left:
+                result[offset, left], offset = data[offset : left], left
+
+            # If this is a variable-length structure and the size is 0, then we just stash everything.
+            if sptr.props & SF_VAR and left == right:
+                result[name] = data[left:]
+
+            # Otherwise, we just grab the bounds that we know of and we can use it later.
+            else:
+                result[name] = data[left : right]
+            offset = right
+        return result
+
+    @classmethod
+    def structure_bytes(cls, identifier, bytes):
+        '''Use the structure specified by `identifier` with the specified `bytes` to return a dictionary of the individual fields and the bytes that compose them.'''
+        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
+
+        sptr = idaapi.get_struc(identifier)
+        if not sptr:
+            raise internal.exceptions.StructureNotFoundError(u"{:s}.structure_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) was not found.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id))
+        return cls.union_bytes(sptr, bytes) if sptr.props & SF_UNION else cls.fragment_bytes(sptr, bytes)
+
+    @classmethod
+    def structure(cls, identifier, fields, **byteorder):
+        '''Use the structure specified by `identifier` with the bytes in `fields` to return a dictionary of the decoded fields.'''
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+        FF_FLOAT, FF_DOUBLE = (idaapi.as_uint32(ff) for ff in [idaapi.FF_FLOAT, idaapi.FF_DOUBLE])
+        SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
+
+        # If we were given a byteorder, then just use it.
+        args = ['order', 'byteorder']
+        if any(arg in byteorder for arg in args):
+            iterable = (byteorder[arg] for arg in args if arg in byteorder and byteorder[arg] in {'big','little'})
+            order = next(iterable, None)
+
+        # Otherwise, we just take the default order from the database.
+        else:
+            information = idaapi.get_inf_structure()
+            mf = idaapi.cvar.inf.mf if idaapi.__version__ < 7.0 else information.lflags & idaapi.LFLG_MSF
+            order = 'big' if mf else 'little'
+
+        # Verify the byteorder is a valid choice and use it to generate two callables for flipping the order.
+        if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.structure({:#x}, ...{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
+        Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
+        Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
+
+        # Iterate through all of the members in the structure.
+        result = {}
+        for m in internal.structure.new(identifier, 0).members:
+            name, mptr, mtype, mdata = m.name, m.ptr, m.type, fields[m.name]
+            dtype, dsize = (mptr.flag & mask for mask in [typemap.FF_MASK, typemap.FF_MASKSIZE])
+
+            # Get any information about the member in case we need to extract
+            # a structure identifier, string type, etc.
+            opinfo = idaapi.opinfo_t()
+            info = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+
+            # If it's a structure and our size matches exactly, then this is a nested dictionary.
+            if info and dsize == FF_STRUCT and idaapi.get_struc_size(info.tid) == len(mdata):
+                result[name] = mdata if info.tid == idaapi.BADADDR else cls.structure(info.tid, cls.structure_bytes(info.tid, mdata), order=order)
+
+            # If it's a structure and the size is different, then this is either an array or SF_VAR structure.
+            elif info and dsize == FF_STRUCT and idaapi.get_struc_size(info.tid) != len(mdata):
+                sptr = idaapi.get_struc(info.tid)
+                if sptr and sptr.props & SF_VAR:
+                    decoded = cls.structure(info.tid, cls.structure_bytes(info.tid, mdata), order=order)
+
+                # Take our element size, slice up the mdata, and then decode each structure as a list.
+                elif sptr:
+                    sliced = cls.list(idaapi.get_struc_size(sptr), mdata)
+                    decoded = [cls.structure(sptr.id, cls.structure_bytes(sptr.id, item), order=order) for item in sliced]
+
+                # Otherwise, we leave it as-is because we can't figure out what the structure is.
+                else:
+                    decoded = mdata
+                result[name] = decoded
+
+            # Just a string that we need to decode. We don't need to care about SF_VAR, or need
+            # to check the string length since we use the entirely of the field to decode.
+            elif info and dsize == FF_STRLIT:
+                width, length, _, encoding = string.unpack(info.strtype)
+                codec = string.codec(width, encoding)
+                Fdecode = internal.utils.fidentity if codec is None else functools.partial(codec.decode, errors='replace')
+                ldata, strdata = mdata[:length], mdata[length:]
+                prefix = cls.unsigned(Fordered(length, ldata))
+                decoded, _ = Fdecode(strdata)
+                result[name] = decoded
+
+            # Just an IEEE float that we need to decode to something that python is able to understand.
+            elif dsize in {FF_FLOAT, FF_DOUBLE}:
+                length = cls.length_table[dsize]
+                result[name] = cls.float(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(dtype, mdata))
+
+            # Decoding references which could be an arbitrary size, but still need to be resolvable to an address.
+            elif info and dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
+                offsets = cls.array(mptr.flag, info, mdata, order=order)
+                result[name] = offsets if len(offsets) > 1 else offsets[0]
+
+            # Otherwise, we can just decode everything using whatever flags were assigned to it.
+            else:
+                length = cls.length_table[dsize]
+                result[name] = cls.unsigned(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(mptr.flag, mdata))
+            continue
+
+        # Add everything else that we missed, and then return it to the caller.
+        result.update({key : fields[key] for key in fields if key not in result})
+        return result
+
+    @classmethod
+    def array(cls, flags, info, bytes, **byteorder):
+        '''Return the specified `bytes` as an array of the type specified by `flags` and the ``idaapi.opinfo_t`` given by `info`.'''
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+
+        # If we were given a byteorder, then just use it.
+        args = ['order', 'byteorder']
+        if any(arg in byteorder for arg in args):
+            iterable = (byteorder[arg] for arg in args if arg in byteorder and byteorder[arg] in {'big','little'})
+            order = next(iterable, None)
+
+        # Otherwise, we just take the default order from the database.
+        else:
+            information = idaapi.get_inf_structure()
+            mf = idaapi.cvar.inf.mf if idaapi.__version__ < 7.0 else information.lflags & idaapi.LFLG_MSF
+            order = 'big' if mf else 'little'
+
+        # Verify the byteorder is a valid choice and use it to generate two callables for flipping the order.
+        if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.array({:#x}, {!s}, ...{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), flags, "{:#x}".format(info.tid) if info else info, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
+        Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
+
+        Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
+
+        # Now we need to check the opinfo and flags to figure out how to decode this.
+        dtype, dsize = (flags & mask for mask in [typemap.FF_MASK, typemap.FF_MASKSIZE])
+        if info and dsize == FF_STRUCT:
+            # FIXME: if the structure is an SF_VAR, then this shouldn't be an array...but the
+            #        user is explicitly asking for an array...so do we ignore them?
+            sliced = cls.list(idaapi.get_struc_size(info.tid), bytes)
+            return [cls.structure(info.tid, cls.structure_bytes(info.tid, item), order=order) for item in sliced]
+
+        # Just a string that we need to decode as an array. Since we're just returning
+        # an array, we don't need to decode it and can completely ignore the encoding.
+        elif info and dsize == FF_STRLIT:
+            width, length, _, _ = string.unpack(info.strtype)
+            #codec = string.codec(width, encoding)
+            #Fdecode = internal.utils.fidentity if codec is None else functools.partial(codec.decode, errors='replace')
+            ldata, strdata = bytes[:length], bytes[length:]
+            prefix, array = cls.unsigned(Fordered(length, ldata)), Freorder(cls.string(width, strdata))
+            if length and prefix != len(array):
+                logging.warning(u"{:s}.array({:#x}, ...{:s}) : The string that was decoded had a length ({:d}) that did not match the length stored as the prefix ({:d}).".format('.'.join([__name__, cls.__name__]), dtype, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', length, prefix))
+            return array
+
+        # Decoding references which can be of an arbitrary size, but need to be converted to an address.
+        elif dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
+            length, items = cls.length_table[dsize], cls.integers(dtype, bytes)
+            reordered = Freorder(items)
+
+            # FIXME: We should be determining the length from the reference type and figuring out the
+            #        mask to apply to each value so that we can support REF_LOW8, REF_LOW16, REF_HIGH8,
+            #        and REF_HIGH16, but I'm not sure about the correct way to do this. So, instead we'll
+            #        use the element size (length) from the flags.. ignoring the reference type entirely.
+            ritype, riflags = info.ri.flags & idaapi.REFINFO_TYPE, info.ri.flags
+
+            # If the reference info is signed, then take our items and convert them to fit within
+            # the reference type size. Unfortunately, the idaapi.as_signed function doesn't clamp
+            # its integer unless it has its signed bit set, so we need to clamp that ourselves.
+            if riflags & idaapi.REFINFO_SIGNEDOP and ritype in {idaapi.REF_OFF8, idaapi.REF_OFF16, idaapi.REF_OFF32, idaapi.REF_OFF64}:
+                mask, signed = pow(2, 8 * length) - 1, (idaapi.as_signed(item, 8 * length) for item in reordered)
+                clamped = (item if item < 0 else item & mask for item in signed)
+
+            # Otherwise, we use the items in their unsigned form and clamp them to the reference type.
+            else:
+                mask = pow(2, 8 * length) - 1
+                clamped = (item & mask for item in reordered)
+
+            # Now we can translate each item according to the reference info and return it.
+            ribase = 0 if info.ri.base == idaapi.BADADDR else info.ri.base
+            op = functools.partial(operator.sub, ribase) if riflags & idaapi.REFINFO_SUBTRACT and ribase == info.ri.base else functools.partial(operator.add, ribase)
+            translated = (op(item + info.ri.tdelta) for item in clamped)
+            return [ea for ea in translated]
+
+        # Otherwise, we can just decode everything using whatever flags we got for it.
+        length = cls.length_table[dsize]
+        return Freorder(cls.integers(flags, bytes))
