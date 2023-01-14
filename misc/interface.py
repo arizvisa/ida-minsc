@@ -5331,7 +5331,7 @@ class decode(object):
         # hijacking the array decoding with our own hardcoded unsigned length.
         cb = cls.length_table[dtype & idaapi.DT_TYPE]
         if result.itemsize != cb:
-            logging.warning(u"{:s}.integers({:#x}, {!s}, signed={!s}) : Refusing to decode array at address {:#x} using the array size ({:+d}) identified for DT_TYPE ({:#x}) due to the size of the DT_TYPE ({:#x}) not corresponding to the desired element size ({:+d}).".format('.'.join([__name__, cls.__name__]), dtype, '...', True if signed else False, ea, result.itemsize, dtype, dtype, cb))
+            element = result.itemsize
 
             # Reconstruct the array but with the expected element size.
             try:
@@ -5341,6 +5341,15 @@ class decode(object):
             # just assume that the elements are just individual bytes.
             except ValueError:
                 result = _array.array(internal.utils.get_array_typecode(1))
+            logging.warning(u"{:s}.integers({:#x}, {!s}) : Using a different element size ({:+d}) due to the size ({:+d}) detected for the given flags ({:#x}) not matching the array item size ({:+d}).".format('.'.join([__name__, cls.__name__]), dtype, '...', result.itemsize, cb, dtype, element))
+
+        # Check to see that the number of bytes we're decoding from corresponds
+        # to the length of each individual array element.
+        mask = result.itemsize - 1
+        if result.itemsize and len(bytes) % result.itemsize:
+            extra = len(bytes) & mask
+            logging.info(u"{:s}.integers({:#x}, {!s}) : The amount of data available ({:#x}) for decoding is not a multiple of the element size ({:d}) and will result in discarding {:+d} byte{:s} when decoding.".format('.'.join([__name__, cls.__name__]), dtype, '...', len(bytes), result.itemsize, extra, '' if extra == 1 else 's'))
+            bytes = bytes[:-extra] if extra else bytes
 
         # Now we can use the bytes we were given to initialize the _array
         # that we're going to return to the user.
@@ -5352,6 +5361,11 @@ class decode(object):
         '''Decode the provided `bytes` as an array containing characters of the specified `width`.'''
         typecode = cls.string_typecode[width]
         result = _array.array(typecode)
+        mask = result.itemsize - 1
+        if result.itemsize and len(bytes) % result.itemsize:
+            extra = len(bytes) & mask
+            logging.warning(u"{:s}.string({:d}, ...) : The amount of data available ({:#x}) for decoding is not a multiple of the requested character width ({:d}) and will result in discarding {:+d} byte{:s} when decoding the string.".format('.'.join([__name__, cls.__name__]), width, len(bytes), result.itemsize, extra, '' if extra == 1 else 's'))
+            bytes = bytes[:-extra] if extra else bytes
         result.fromstring(builtins.bytes(bytes)) if sys.version_info.major < 3 else result.frombytes(bytes)
         return result
 
@@ -5390,6 +5404,8 @@ class decode(object):
         result, data = {}, bytearray(bytes)
         for m in internal.structure.new(sptr.id, 0).members:
             name, mptr, size = m.name, m.ptr, m.size
+            if len(data) < size:
+                logging.warning(u"{:s}.union_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at index {:d} of the union due to there being only {:+#x} byte{:s} worth of data available.".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, name, mptr.soff, len(bytes), '' if len(bytes) == 1 else 's'))
             result[name] = data[:size]
         return result
 
@@ -5417,6 +5433,9 @@ class decode(object):
             # Otherwise, we just grab the bounds that we know of and we can use it later.
             else:
                 result[name] = data[left : right]
+
+            if len(result[name]) < right - left:
+                logging.warning(u"{:s}.fragment_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at offset {:#x}..{:#x} of structure due to there being only {:+#x} byte{:s} worth of data available (expected {:+d} byte{:s} more).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, name, left, right, len(bytes), '' if len(bytes) == 1 else 's', right - len(bytes), '' if right - len(bytes) == 1 else 's'))
             offset = right
         return result
 
@@ -5479,11 +5498,16 @@ class decode(object):
 
                 # Take our element size, slice up the mdata, and then decode each structure as a list.
                 elif sptr:
-                    sliced = cls.list(idaapi.get_struc_size(sptr), mdata)
+                    element = idaapi.get_struc_size(sptr)
+                    sliced = cls.list(element, mdata)
+                    available, used = len(mdata), sum(len(item) for item in sliced)
+                    if available != used:
+                        logging.warning(u"{:s}.structure({:#x}, ...{:s}) : The amount of data available ({:#x}) for decoding the \"{:s}\" member is not a multiple of the size ({:d}) of the member ({:#x}) and will result in ignoring {:+d} byte{:s} during decoding.".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, name, element, mptr.id, available - used, '' if available - used == 1 else 's'))
                     decoded = [cls.structure(sptr.id, cls.structure_bytes(sptr.id, item), order=order) for item in sliced]
 
                 # Otherwise, we leave it as-is because we can't figure out what the structure is.
                 else:
+                    logging.warning(u"{:s}.structure({:#x}, ...{:s}) : Unable to decode the structure for member \"{:s}\" due to its identifier ({:#x}) referencing an unknown structure.".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', name, info.tid))
                     decoded = mdata
                 result[name] = decoded
 
@@ -5492,26 +5516,30 @@ class decode(object):
             elif info and dsize == FF_STRLIT:
                 width, length, _, encoding = string.unpack(info.strtype)
                 codec = string.codec(width, encoding)
-                Fdecode = internal.utils.fidentity if codec is None else functools.partial(codec.decode, errors='replace')
+                Fdecode = functools.partial(codec.decode, errors='replace') if codec else internal.utils.fthrough(bytes, len)
                 ldata, strdata = mdata[:length], mdata[length:]
                 prefix = cls.unsigned(Fordered(length, ldata))
-                decoded, _ = Fdecode(strdata)
+                decoded, used = Fdecode(strdata)
+                if length and prefix != len(decoded):
+                    logging.warning(u"{:s}.structure({:#x}, ...{:s}) : The string that was decoded for field \"{:s}\" had a length ({:d}) that did not match the length stored as the prefix ({:d}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', name, length, prefix))
+                elif used != len(strdata):
+                    logging.warning(u"{:s}.structure({:#x}, ...{:s}) : Decoding the string for field \"{:s}\" consumed a length ({:+d}) that did not match the expected length ({:+d}).".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', name, used, len(strdata)))
                 result[name] = decoded
 
             # Just an IEEE float that we need to decode to something that python is able to understand.
             elif dsize in {FF_FLOAT, FF_DOUBLE}:
                 length = cls.length_table[dsize]
-                result[name] = cls.float(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(dtype, mdata))
+                result[name] = cls.float(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(dtype, mdata)) or bytes(mdata)
 
             # Decoding references which could be an arbitrary size, but still need to be resolvable to an address.
             elif info and dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
                 offsets = cls.array(mptr.flag, info, mdata, order=order)
-                result[name] = offsets if len(offsets) > 1 else offsets[0]
+                result[name] = offsets if len(offsets) > 1 else offsets[0] if offsets else bytes(mdata)
 
             # Otherwise, we can just decode everything using whatever flags were assigned to it.
             else:
                 length = cls.length_table[dsize]
-                result[name] = cls.unsigned(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(mptr.flag, mdata))
+                result[name] = cls.unsigned(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(mptr.flag, mdata)) or bytes(mdata)
             continue
 
         # Add everything else that we missed, and then return it to the caller.
@@ -5540,7 +5568,6 @@ class decode(object):
         if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
             raise internal.exceptions.InvalidParameterError(u"{:s}.array({:#x}, {!s}, ...{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), flags, "{:#x}".format(info.tid) if info else info, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
         Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
-
         Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
 
         # Now we need to check the opinfo and flags to figure out how to decode this.
@@ -5548,7 +5575,11 @@ class decode(object):
         if info and dsize == FF_STRUCT:
             # FIXME: if the structure is an SF_VAR, then this shouldn't be an array...but the
             #        user is explicitly asking for an array...so do we ignore them?
-            sliced = cls.list(idaapi.get_struc_size(info.tid), bytes)
+            element = idaapi.get_struc_size(info.tid)
+            sliced = cls.list(element, bytes)
+            available, used = len(bytes), sum(len(item) for item in sliced)
+            if available != used:
+                logging.warning(u"{:s}.array({:#x}, {!s}, ...{:s}) : The amount of data available ({:#x}) for decoding is not a multiple of the structure size ({:#x}) and will result in discarding {:+d} byte{:s} when attempting to decode the array.".format('.'.join([__name__, cls.__name__]), flags, "{:#x}".format(info.tid) if info else info, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, element, available - used, '' if available - used == 1 else 's'))
             return [cls.structure(info.tid, cls.structure_bytes(info.tid, item), order=order) for item in sliced]
 
         # Just a string that we need to decode as an array. Since we're just returning
@@ -5560,11 +5591,11 @@ class decode(object):
             ldata, strdata = bytes[:length], bytes[length:]
             prefix, array = cls.unsigned(Fordered(length, ldata)), Freorder(cls.string(width, strdata))
             if length and prefix != len(array):
-                logging.warning(u"{:s}.array({:#x}, ...{:s}) : The string that was decoded had a length ({:d}) that did not match the length stored as the prefix ({:d}).".format('.'.join([__name__, cls.__name__]), dtype, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', length, prefix))
+                logging.warning(u"{:s}.array({:#x}, {!s}, ...{:s}) : The string that was decoded had a length ({:d}) that did not match the length stored as the prefix ({:d}).".format('.'.join([__name__, cls.__name__]), flags, "{:#x}".format(info.strtype) if info else info, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', length, prefix))
             return array
 
         # Decoding references which can be of an arbitrary size, but need to be converted to an address.
-        elif dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
+        elif info and dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
             length, items = cls.length_table[dsize], cls.integers(dtype, bytes)
             reordered = Freorder(items)
 
