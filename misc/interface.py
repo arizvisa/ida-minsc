@@ -5376,6 +5376,15 @@ class decode(object):
         items = zip(*[iterable] * width)
         return [bytearray(item) for item in items]
 
+    @classmethod
+    def partial(cls, width, bytes):
+        '''Decode the provided `bytes` into a list where each element is the specified `width` leaving any extra bytes that did not fit as the last element.'''
+        size, padding, extra = max(0, width), width - 1, len(bytes) % width if width > 0 else 0
+        iterable = itertools.chain(bytes, b'\0' * padding)
+        items = zip(*[iter(bytearray(iterable))] * size)
+        result = [bytearray(item) for item in items]
+        return [item for item in itertools.chain(result[:-1], [result[-1][:extra]])] if extra else result
+
     # This table is just used for converting a pythonic-type into
     # a ctype. We use ctypes because an instance of a ctype has the
     # added effect of giving us a size and a few other features which
