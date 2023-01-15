@@ -905,12 +905,12 @@ def read():
     '''Return the bytes defined at the current selection or address.'''
     address, selection = ui.current.address(), ui.current.selection()
     if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
-        return read(address, type.size(address))
+        return read(address, interface.address.size(address))
     return read(selection)
 @utils.multicase(ea=internal.types.integer)
 def read(ea):
     '''Return the number of bytes associated with the address `ea`.'''
-    return read(ea, type.size(ea))
+    return read(ea, interface.address.size(ea))
 @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
 def read(ea, size):
     '''Return `size` number of bytes from address `ea`.'''
@@ -1541,7 +1541,7 @@ def name(ea, string, *suffix, **flags):
 
     # validate the address, and get the original flags
     ea = interface.address.inside(ea)
-    ofl = type.flags(ea)
+    ofl = interface.address.flags(ea)
 
     ## define some closures that perform the different tasks necessary to
     ## apply a name to a given address
@@ -1552,7 +1552,7 @@ def name(ea, string, *suffix, **flags):
         ida_string = utils.string.to(string)
 
         # validate the name
-        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_VISIBLE)
+        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
         if ida_string and ida_string != res:
             logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
@@ -2268,7 +2268,7 @@ def tag(ea):
         realname = aname or ''
 
     # Add any of the implicit tags for the specified address to our results.
-    if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', realname)
+    if aname and interface.address.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', realname)
     eprefix = extra.__get_prefix__(ea)
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
     esuffix = extra.__get_suffix__(ea)
@@ -3030,7 +3030,7 @@ class address(object):
     @classmethod
     def bounds(cls, ea):
         '''Return the bounds of the specified address `ea` in a tuple formatted as `(left, right)`.'''
-        return interface.bounds_t(ea, ea + type.size(ea))
+        return interface.bounds_t(ea, ea + interface.address.size(ea))
 
     @staticmethod
     def __walk__(ea, next, predicate):
@@ -4412,13 +4412,13 @@ class type(object):
     def size(cls, ea):
         '''Return the size of the item at the address `ea`.'''
         ea = interface.address.within(ea)
-        return idaapi.get_item_size(ea)
+        return interface.address.size(ea)
 
     @utils.multicase()
     @classmethod
     def flags(cls):
         '''Return the flags of the item at the current address.'''
-        return cls.flags(ui.current.address())
+        return interface.address.flags(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def flags(cls, ea):
@@ -4444,13 +4444,13 @@ class type(object):
     @classmethod
     def is_initialized(cls, ea):
         '''Return if the address specified by `ea` is initialized.'''
-        return cls.flags(interface.address.within(ea), idaapi.FF_IVL) == idaapi.FF_IVL
+        return interface.address.flags(interface.address.within(ea), idaapi.FF_IVL) == idaapi.FF_IVL
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def is_initialized(cls, ea, size):
         '''Return if the address specified by `ea` up to `size` bytes is initialized.'''
         ea = interface.address.within(ea)
-        return all(cls.flags(ea + offset, idaapi.FF_IVL) == idaapi.FF_IVL for offset in builtins.range(size))
+        return all(interface.address.flags(ea + offset, idaapi.FF_IVL) == idaapi.FF_IVL for offset in builtins.range(size))
     initialize = initialized = initializedQ = utils.alias(is_initialized, 'type')
 
     @utils.multicase()
@@ -4462,13 +4462,13 @@ class type(object):
     @classmethod
     def is_code(cls, ea):
         '''Return if the address specified by `ea` is marked as code.'''
-        return cls.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE
+        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def is_code(cls, ea, size):
         '''Return if the address specified by `ea` up to `size` bytes is marked as code.'''
         ea = interface.address.within(ea)
-        return all(cls.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_CODE for offset in builtins.range(size))
+        return all(interface.address.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_CODE for offset in builtins.range(size))
     code = codeQ = utils.alias(is_code, 'type')
 
     @utils.multicase()
@@ -4480,13 +4480,13 @@ class type(object):
     @classmethod
     def is_data(cls, ea):
         '''Return if the address specified by `ea` is marked as data.'''
-        return cls.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_DATA
+        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_DATA
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def is_data(cls, ea, size):
         '''Return if the address specified by `ea` up to `size` bytes is marked as data.'''
         ea = interface.address.within(ea)
-        return all(cls.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_DATA for offset in builtins.range(size))
+        return all(interface.address.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_DATA for offset in builtins.range(size))
     data = dataQ = utils.alias(is_data, 'type')
 
     # True if ea marked unknown
@@ -4499,13 +4499,13 @@ class type(object):
     @classmethod
     def is_unknown(cls, ea):
         '''Return if the address specified by `ea` is marked as unknown.'''
-        return cls.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
+        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def is_unknown(cls, ea, size):
         '''Return if the address specified by `ea` up to `size` bytes is marked as unknown.'''
         ea = interface.address.within(ea)
-        return all(cls.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_UNK for offset in builtins.range(size))
+        return all(interface.address.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_UNK for offset in builtins.range(size))
     unknown = unknownQ = is_undefined = undefinedQ = utils.alias(is_unknown, 'type')
 
     @utils.multicase()
@@ -4517,7 +4517,7 @@ class type(object):
     @classmethod
     def is_head(cls, ea):
         '''Return if the address `ea` is aligned to a definition in the database.'''
-        return cls.flags(interface.address.within(ea), idaapi.FF_DATA) != 0
+        return interface.address.flags(interface.address.within(ea), idaapi.FF_DATA) != 0
     head = headQ = utils.alias(is_head, 'type')
 
     @utils.multicase()
@@ -4529,7 +4529,7 @@ class type(object):
     @classmethod
     def is_tail(cls, ea):
         '''Return if the address `ea` is not aligned to a definition in the database.'''
-        return cls.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_TAIL
+        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_TAIL
     tail = tailQ = utils.alias(is_tail, 'type')
 
     @utils.multicase()
@@ -4542,7 +4542,7 @@ class type(object):
     def is_align(cls, ea):
         '''Return if the address at `ea` is defined as an alignment.'''
         is_align = idaapi.isAlign if idaapi.__version__ < 7.0 else idaapi.is_align
-        return is_align(cls.flags(ea))
+        return is_align(interface.address.flags(ea))
     align = aligned = alignQ = utils.alias(is_align, 'type')
 
     @utils.multicase()
@@ -4554,7 +4554,7 @@ class type(object):
     @classmethod
     def has_comment(cls, ea):
         '''Return if the address at `ea` is commented.'''
-        return cls.flags(interface.address.within(ea), idaapi.FF_COMM) == idaapi.FF_COMM
+        return True if interface.address.flags(interface.address.within(ea), idaapi.MS_COMM) & idaapi.FF_COMM else False
     comment = commented = commentQ = utils.alias(has_comment, 'type')
 
     @utils.multicase()
@@ -4566,7 +4566,7 @@ class type(object):
     @classmethod
     def has_reference(cls, ea):
         '''Return if the data at the address `ea` is referenced by another address.'''
-        return cls.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF
+        return True if interface.address.flags(interface.address.within(ea), idaapi.MS_COMM) & idaapi.FF_REF else False
     referenced = referencedQ = is_referenced = utils.alias(has_reference, 'type')
 
     @utils.multicase()
@@ -4578,7 +4578,7 @@ class type(object):
     @classmethod
     def has_label(cls, ea):
         '''Return if the address at `ea` has a label.'''
-        return idaapi.has_any_name(cls.flags(ea)) or cls.has_dummyname(ea) or cls.has_customname(ea)
+        return idaapi.has_any_name(interface.address.flags(ea)) or cls.has_dummyname(ea) or cls.has_customname(ea)
     label = labeled = labelQ = nameQ = has_name = utils.alias(has_label, 'type')
 
     @utils.multicase()
@@ -4590,7 +4590,7 @@ class type(object):
     @classmethod
     def has_customname(cls, ea):
         '''Return if the address at `ea` has a custom name.'''
-        return cls.flags(interface.address.within(ea), idaapi.FF_NAME) == idaapi.FF_NAME
+        return True if interface.address.flags(interface.address.within(ea), idaapi.MS_COMM) & idaapi.FF_NAME else False
     customname = customnamed = customnameQ = utils.alias(has_customname, 'type')
 
     @utils.multicase()
@@ -4602,7 +4602,7 @@ class type(object):
     @classmethod
     def has_dummyname(cls, ea):
         '''Return if the address at `ea` has a dummy name.'''
-        return cls.flags(ea, idaapi.FF_LABL) == idaapi.FF_LABL
+        return True if interface.address.flags(interface.address.within(ea), idaapi.MS_COMM) & idaapi.FF_LABL else False
     dummyname = dummynamed = dummynameQ = utils.alias(has_dummyname, 'type')
 
     @utils.multicase()
@@ -4614,7 +4614,7 @@ class type(object):
     @classmethod
     def has_autoname(cls, ea):
         '''Return if the address `ea` was automatically named.'''
-        return idaapi.has_auto_name(cls.flags(ea))
+        return idaapi.has_auto_name(interface.address.flags(ea))
     autoname = autonamed = autonameQ = utils.alias(has_autoname, 'type')
 
     @utils.multicase()
@@ -4685,7 +4685,7 @@ class type(object):
     def is_string(cls, ea):
         '''Return if the address at `ea` is defined as a string.'''
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
-        return cls.flags(ea, idaapi.DT_TYPE) == FF_STRLIT
+        return interface.address.flags(ea, idaapi.DT_TYPE) == FF_STRLIT
     string = stringQ = utils.alias(is_string, 'type')
 
     @utils.multicase()
@@ -4698,7 +4698,7 @@ class type(object):
     def is_structure(cls, ea):
         '''Return if the address at `ea` is defined as a structure.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-        return cls.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
+        return interface.address.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
     struct = structure = structQ = structureQ = is_struc = is_struct = utils.alias(is_structure, 'type')
 
     @utils.multicase()
@@ -4768,7 +4768,7 @@ class type(object):
         @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea):
             '''Return the `[type, length]` of the array at the address specified by `ea`.'''
-            return cls(ea, idaapi.get_item_size(ea))
+            return cls(ea, interface.address.size(ea))
         @utils.multicase(bounds=internal.types.tuple)
         def __new__(cls, bounds):
             '''Return the `[type, length]` of the specified `bounds` as an array.'''
@@ -4778,14 +4778,14 @@ class type(object):
         def __new__(cls, ea, size):
             '''Return the `[type, length]` of the address `ea` if it was an array using the specified `size` (in bytes).'''
             ea = interface.address.head(ea)
-            F, ti, cb = type.flags(ea), idaapi.opinfo_t(), abs(size)
+            info, flags, cb = idaapi.opinfo_t(), interface.address.flags(ea), abs(size)
 
             # get the opinfo at the current address to verify if there's a structure or not
-            ok = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
-            tid = ti.tid if ok else idaapi.BADADDR
+            ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+            tid = info.tid if ok else idaapi.BADADDR
 
             # convert it to a pythonic type using the address we were given.
-            res = interface.typemap.dissolve(F, tid, cb, offset=min(ea, ea + size))
+            res = interface.typemap.dissolve(flags, tid, cb, offset=min(ea, ea + size))
 
             # if it's a list, then validate the result and return it
             if isinstance(res, internal.types.list):
@@ -4841,9 +4841,8 @@ class type(object):
         @classmethod
         def size(cls, ea):
             '''Return the size of a member in the array at the address specified by `ea`.'''
-            ea, FF_STRUCT = interface.address.head(ea), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-            F, T = type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
-            return _structure.size(type.structure.id(ea)) if T == FF_STRUCT else idaapi.get_full_data_elsize(ea, F)
+            ea, flags = interface.address.head(ea), interface.address.flags(ea)
+            return interface.address.element(ea, flags)
 
         @utils.multicase()
         @classmethod
@@ -4855,7 +4854,7 @@ class type(object):
         def length(cls, ea):
             '''Return the number of members in the array at the address specified by `ea`.'''
             ea = interface.address.head(ea)
-            sz, ele = idaapi.get_item_size(ea), idaapi.get_full_data_elsize(ea, type.flags(ea))
+            sz, ele = interface.address.size(ea), interface.address.element(ea)
             return sz // ele
 
     class structure(object):
@@ -4891,17 +4890,16 @@ class type(object):
         @classmethod
         def id(cls, ea):
             '''Return the identifier of the structure at address `ea`.'''
-            ea, FF_STRUCT = interface.address.head(ea), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+            FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
-            res = type.flags(ea, idaapi.DT_TYPE)
-            if res != FF_STRUCT:
-                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, FF_STRUCT, res))
+            info, ea, flags = idaapi.opinfo_t(), interface.address.head(ea), interface.address.flags(ea)
+            if flags & idaapi.DT_TYPE != FF_STRUCT:
+                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, FF_STRUCT, flags & idaapi.DT_TYPE))
 
-            ti, F = idaapi.opinfo_t(), type.flags(ea)
-            res = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
-            if not res:
+            ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+            if not ok:
                 raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to `idaapi.get_opinfo()` failed at {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, ea))
-            return ti.tid
+            return info.tid
 
         @utils.multicase()
         @classmethod
@@ -4970,7 +4968,7 @@ class type(object):
     @classmethod
     def switch(cls, ea):
         '''Return whether the address `ea` is part of a switch_t.'''
-        F, get_switch_info = cls.flags(ea), idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+        get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
         # First check if the address is already part of the switch. This
         # is technically the fast path.
@@ -6475,16 +6473,16 @@ class extra(object):
         @classmethod
         def __hide__(cls, ea):
             '''Hide the extra comments at the address `ea`.'''
-            if type.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
-                type.flags(ea, idaapi.FF_LINE, 0)
+            if interface.address.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
+                interface.address.flags(ea, idaapi.FF_LINE, 0)
                 return True
             return False
 
         @classmethod
         def __show__(cls, ea):
             '''Show the extra comments at the address `ea`.'''
-            if type.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
-                type.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE)  # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
+            if interface.address.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
+                interface.address.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE) # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
                 return True
             return False
 
@@ -6815,18 +6813,18 @@ class set(object):
         selection = ui.current.selection()
         if operator.eq(*(internal.interface.address.head(ea, silent=True) for ea in selection)):
             return cls.unknown(ui.current.address())
-        start, stop = selection
-        return cls.unknown(start, address.next(stop) - start)
+        start, stop = sorted(selection)
+        return cls.unknown(start, stop - start)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def unknown(cls, ea):
         '''Set the data at address `ea` to undefined.'''
-        size = idaapi.get_item_size(ea)
+        size = interface.address.size(ea)
         if idaapi.__version__ < 7.0:
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok and type.is_unknown(ea, size) else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
+        return size if ok and type.is_unknown(ea, size) else interface.address.size(ea) if type.is_unknown(ea) else 0
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def unknown(cls, ea, size):
@@ -6835,7 +6833,7 @@ class set(object):
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok and type.is_unknown(ea, size) else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
+        return size if ok and type.is_unknown(ea, size) else interface.address.size(ea) if type.is_unknown(ea) else 0
     undef = undefine = undefined = utils.alias(unknown, 'set')
 
     @utils.multicase()
@@ -6923,7 +6921,7 @@ class set(object):
             ok = idaapi.create_data(ea, res, size, 0)
 
         # Return our new size if we were successful
-        return idaapi.get_item_size(ea) if ok else 0
+        return interface.address.size(ea) if ok else 0
 
     @utils.multicase()
     @classmethod
@@ -6994,7 +6992,7 @@ class set(object):
         # now we should be good to go and can return the new size or 0 on failure.
         if not idaapi.create_align(ea, size, e):
             return 0
-        return idaapi.get_item_size(ea)
+        return interface.address.size(ea)
     align = aligned = utils.alias(alignment, 'set')
 
     @utils.multicase()
@@ -7083,7 +7081,7 @@ class set(object):
         # of bounds or is pointing at an uninitialized value that we can't read.
         _, bottom = segment.bounds(ea)
         Fwithin_bounds = utils.fcompose(functools.partial(operator.sub, bottom), functools.partial(functools.partial, operator.gt))
-        Finitialized = utils.fcompose(functools.partial(type.flags, mask=idaapi.FF_IVL), operator.truth)
+        Finitialized = utils.fcompose(utils.frpartial(interface.address.flags, idaapi.FF_IVL), operator.truth)
 
         # Figure out our terminal characters that we'll use for the string length.
         sentinel = bytearray(itertools.islice(itertools.chain(terminal or b'', default * width), width))
@@ -8035,7 +8033,7 @@ class get(object):
     def array(cls, bounds):
         '''Return the values within the provided `bounds` as an array.'''
         start, stop = sorted(bounds)
-        length = (stop - start) / idaapi.get_item_size(start)
+        length = (stop - start) / interface.address.size(start)
         return cls.array(start, length=math.trunc(math.ceil(length)))
     @utils.multicase(bounds=internal.types.tuple)
     @classmethod
@@ -8198,7 +8196,7 @@ class get(object):
 
         # Otherwise we extract the flags and DT_TYPE directly from the address.
         else:
-            F, total = type.flags(ea), idaapi.get_item_size(ea)
+            F, total = type.flags(ea), interface.address.size(ea)
             tid = type.structure.id(ea) if type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT else idaapi.BADADDR
 
         # Set the array's length if it hasn't been determined yet.
@@ -8247,7 +8245,7 @@ class get(object):
         # that to figure out the element size, and read each integer as a list
         # due there being no native _array type.
         elif T in lnumerics:
-            cb, total = lnumerics[T], idaapi.get_item_size(ea)
+            cb, total = lnumerics[T], interface.address.size(ea)
             # FIXME: Instead of returning the signed version of an integer, we
             #        need to return IDA's signed representation of the integer
             #        so that it directly corresponds to the user's view.
@@ -8277,8 +8275,9 @@ class get(object):
         # For older versions of IDA, we get the strtype from the opinfo
         if idaapi.__version__ < 7.0:
             res = address.head(ea)
-            ti, F = idaapi.opinfo_t(), type.flags(res)
-            res = ti.strtype if idaapi.get_opinfo(res, 0, F, ti) else idaapi.BADADDR
+            info, flags = idaapi.opinfo_t(), interface.address.flags(res)
+            ok = idaapi.get_opinfo(res, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+            res = info.strtype if ok else idaapi.BADADDR
 
         # Fetch the string type at the given address using the newer API
         else:
@@ -8323,8 +8322,9 @@ class get(object):
         # For older versions of IDA, we get the strtype from the opinfo
         if idaapi.__version__ < 7.0:
             res = address.head(ea)
-            ti, F = idaapi.opinfo_t(), type.flags(res)
-            res = ti.strtype if idaapi.get_opinfo(res, 0, F, ti) else idaapi.BADADDR
+            info, flags = idaapi.opinfo_t(), interface.address.flags(res)
+            ok = idaapi.get_opinfo(res, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+            res = info.strtype if ok else idaapi.BADADDR
 
         # Fetch the string type at the given address using the newer API
         else:
@@ -8359,7 +8359,7 @@ class get(object):
         # a string, then we ignore it and trust the string size from the database. If the
         # layout includes a terminator, then we need to subtract the width to crop it.
         if is_string:
-            leftover = idaapi.get_item_size(ea) - (layout or width)
+            leftover = interface.address.size(ea) - (layout or width)
             return cls.string((ea + layout, ea + layout + leftover), width, strtype.get('encoding', encoding))
 
         # Otherwise they explicitly want it as a string and we do it as we're told.
@@ -8396,7 +8396,7 @@ class get(object):
         # ends up being out of bounds or is not pointing to an initialized value.
         _, bottom = segment.bounds(ea)
         Fwithin_bounds = utils.fcompose(functools.partial(operator.sub, bottom), functools.partial(functools.partial, operator.gt))
-        Finitialized = utils.fcompose(functools.partial(type.flags, mask=idaapi.FF_IVL), operator.truth)
+        Finitialized = utils.fcompose(utils.frpartial(interface.address.flags, idaapi.FF_IVL), operator.truth)
 
         # Use the terminal characters we were given or the default terminals from
         # the database in order to create a test that stops when they're encountered.
@@ -8565,16 +8565,17 @@ class get(object):
         """
         @classmethod
         def __of_label__(cls, ea):
-            F, get_switch_info = type.flags(ea), idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+            get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
             # Technically a label for a switch is a code data type that is
             # referenced by by some data. We do this instead of checking the names.
-            if type.is_code(ea) and type.is_referenced(ea):
-                drefs = (ref for ref in xref.data(ea, descend=False) if type.is_data(ref))
+            flags = interface.address.flags(ea)
+            if flags & idaapi.MS_CLS == idaapi.FF_CODE and flags & idaapi.FF_REF:
+                drefs = (ref for ref in xref.data(ea, descend=False) if interface.address.flags(ref, idaapi.MS_CLS) == idaapi.FF_DATA)
 
                 # With the data references, we need need to walk up one more step
                 # and grab any code references to it while looking for a switch.
-                refs = (ref for ref in itertools.chain(*map(functools.partial(xref.data, descend=False), drefs)) if type.is_code(ref) and get_switch_info(ref) is not None)
+                refs = (ref for ref in itertools.chain(*map(functools.partial(xref.data, descend=False), drefs)) if interface.address.flags(ref, idaapi.MS_CLS) == idaapi.FF_CODE and get_switch_info(ref) is not None)
 
                 # Now we'll just grab the very first reference we found. If we
                 # got an address, then use it to grab the switch_info_t we want.
@@ -8642,7 +8643,7 @@ class get(object):
 
                 # Otherwise if the reference is pointing to data, then treat
                 # it an array where we need to follow the downward references.
-                elif type.is_data(ref):
+                elif interface.address.flags(ref, idaapi.MS_CLS) == idaapi.FF_DATA:
                     items = (case for case in xref.code(ref, descend=True))
                     candidates = (label for label in itertools.chain(*map(functools.partial(xref.data, descend=False), items)) if get_switch_info(label))
 
@@ -8711,4 +8712,3 @@ class get(object):
             # Nope. Absolutely nothing we tried actually worked and we need to give up.
             switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to determine how to instantiate a `{:s}` using the information at the given address ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
-
