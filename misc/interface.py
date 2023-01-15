@@ -4418,120 +4418,144 @@ class switch_t(object):
     def __init__(self, switch_info_ex):
         self.object = switch_info_ex
     def __len__(self):
-        '''Return the total number of cases (including any default) handled by the switch.'''
+        '''Return the total number of cases (including any default) that are handled by the switch.'''
         return len(self.range)
+    def has(self, ea):
+        '''Return true if the switch uses the address `ea` as one of its handlers.'''
+        ea, _ = ea if isinstance(ea, tuple) else (ea, None)
+        handlers = {ea for ea in self.branch} | {self.object.defjump}
+        return ea in handlers
     @property
     def ea(self):
         '''Return the address at the beginning of the switch.'''
         return self.object.startea
     @property
     def branch_ea(self):
-        '''Return the address of the branch table.'''
+        '''Return the address of the branch table containing the address of each handler.'''
         return self.object.jumps
     @property
-    def table_ea(self):
-        '''Return the address of the case or index table.'''
-        return self.object.lowcase
+    def indirect_ea(self):
+        '''Return the address of the indirection table containing the indices for each handler.'''
+        if self.object.is_indirect():
+            return self.object.values
+        cls = self.__class__
+        clsname = "{:s}({:#x})".format(internal.utils.pycompat.fullname(cls), self.object.startea)
+        raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.indirect_ea() : Unable to return the indirection table for the `{:s}` at {:#x}, as it does not contain one.".format(clsname, cls.__name__, self.object.startea))
     @property
     def default(self):
-        '''Return the address that handles the default case.'''
+        '''Return the address of the default handler for the switch.'''
         return self.object.defjump
     @property
     def branch(self):
-        '''Return the contents of the branch table.'''
-        import database
+        '''Return the contents of the branch table as a list of addresses.'''
+        info, ea, count = idaapi.opinfo_t(), self.object.jumps, self.object.jcases if self.object.is_indirect() else self.object.ncases
+        flags, element, ri = address.flags(ea), address.element(ea), address.refinfo(ea)
+        bytes = idaapi.get_many_bytes(ea, count * element) if idaapi.__version__ < 7.0 else idaapi.get_bytes(ea, count * element)
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        info = info if ok else None
 
-        # if we're an indirect switch, then we can grab our length from
-        # the jcases property.
-        if self.indirect():
-            ea, count = self.object.jumps, self.object.jcases
-            items = database.get.array(ea, length=count)
+        # Now we can decode the array. We mask out any reference information because
+        # we're going to be translating each address we get out of it anyways.
+        result = decode.array(flags & ~(idaapi.MS_0TYPE|idaapi.MS_1TYPE), info, bytes)
+        if len(result) != count:
+            cls = self.__class__
+            clsname = "{:s}({:#x})".format(internal.utils.pycompat.fullname(cls), self.object.startea)
+            logging.warning(u"{:s}.branch() : Decoding [:d} byte{:s} for the branch table at {:#x} resulted in a different number of elements ({:d}) than expected ({:d}).".format(clsname, len(bytes), '' if len(bytes) == 1 else 's', ea, len(result), count))
 
-        # otherwise, we'll need to use the ncases property for the count.
-        else:
-            ea, count = self.object.jumps, self.object.ncases
-            items = database.get.array(ea, length=count)
-
-        # check that the result is a proper array with a typecode.
-        if not hasattr(items, 'typecode'):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.branch() : An invalid type ({!s}) was returned from the switch table at address {:#x}.".format(cls.__name__, items.__class__, ea))
-
-        # last thing to do is to adjust each element from our items to
-        # correspond to what's described by its refinfo_t.
-        ri = address.refinfo(ea)
-
-        # the refinfo_t's flags determine whether we need to subtract or
-        # add the value from the refinfo_t.base.
-        f = operator.sub if ri.is_subtract() else operator.add
-
-        # now that we know what type of operation the refinfo_t is, use
-        # it to translate the array's values into database addresses, and
-        # then we can return them to the caller.
-        return [f(ri.base, item) for item in items]
+        # Now we can use switch_info_ex_t.elbase that we extract from our switch and use
+        # it to translate the list of addresses that we decode out of our branch table.
+        Ftranslate = functools.partial(operator.sub if self.object.is_subtract() else operator.add, self.object.elbase)
+        return [ea for ea in map(Ftranslate, result)]
     @property
-    def index(self):
-        '''Return the contents of the case or index table.'''
-        import database
+    def indirection(self):
+        '''Return the contents of the indirection table as a list.'''
+        info, ea, count = idaapi.opinfo_t(), self.object.lowcase if self.object.is_indirect() else self.object.jumps, self.object.ncases
+        flags, element, ri = address.flags(ea), address.element(ea), address.refinfo(ea)
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        info = info if ok else None
 
-        # if we're not an indirect switch, then the index table is empty.
-        if not self.indirect():
-            return database.get.array(self.object.jumps, length=0)
+        # if we're not an indirect switch, then the index table is a list
+        # of all of the available cases that the switch uses.
+        if not self.object.is_indirect():
+            return decode.array(flags, info, b'') or [index for index in builtins.range(count)]
 
         # otherwise, we can simply read the array and return it.
-        ea, count = self.object.lowcase, self.object.ncases
-        return database.get.array(ea, length=count)
+        bytes = idaapi.get_many_bytes(ea, count * element) if idaapi.__version__ < 7.0 else idaapi.get_bytes(ea, count * element)
+        result = decode.array(flags, info, bytes)
+        if len(result) != count:
+            cls = self.__class__
+            clsname = "{:s}({:#x})".format(internal.utils.pycompat.fullname(cls), self.object.startea)
+            logging.warning(u"{:s}.indirection() : Decoding [:d} byte{:s} for the indirection table at {:#x} resulted in a different number of elements ({:d}) than expected ({:d}).".format(clsname, len(bytes), '' if len(bytes) == 1 else 's', ea, len(result), count))
+        return result
     @property
     def register(self):
-        '''Return the register that the switch is based on.'''
+        '''Return the register that contains the case used by the switch.'''
         ri, rt = (self.object.regnum, self.object.regdtyp) if idaapi.__version__ < 7.0 else (self.object.regnum, self.object.regdtype)
         return architecture.by_indextype(ri, rt)
     @property
     def base(self):
-        '''Return the base value (lowest index of cases) of the switch.'''
-        return self.object.ind_lowcase if self.object.is_indirect() else 0
+        '''Return the lowest case that can be handled by the switch.'''
+        res = self.object.ind_lowcase if self.object.is_indirect() else self.object.lowcase
+
+        # assume the base case number is always signed despite ind_lowcase
+        # being an sval_t and lowcase being a uval_t.
+        return idaapi.as_signed(res)
     @property
     def count(self):
-        '''Return the number of cases in the switch.'''
+        '''Return the total number of cases available for the switch.'''
         return self.object.ncases
     def indirect(self):
-        '''Return whether the switch is using an indirection table or not.'''
+        '''Return whether the switch references its handlers indirectly using an indirection table.'''
         return self.object.is_indirect()
     def subtract(self):
-        '''Return whether the switch performs a translation (subtract) on the index.'''
+        '''Return whether the switch translates its branch table using a subtraction from the element base.'''
         return self.object.is_subtract()
     def case(self, case):
-        '''Return the handler for a particular `case`.'''
-        # return the ea of the specified case number
-        # FIXME: check that this works with a different .ind_lowcase
-        if case < self.base or case >= self.count + self.base:
+        '''Return the address for the handler belonging to the specified `case`.'''
+        if not (self.base <= case < self.count + self.base):
             cls = self.__class__
-            raise internal.exceptions.IndexOutOfBoundsError(u"{:s}.case({:d}) : The specified case ({:d}) was out of bounds ({:#x}<>{:#x}).".format(cls.__name__, case, case, self.base, self.base+self.count - 1))
-        idx = case - self.base
-        if self.indirect():
-            idx = self.index[idx]
-        return self.branch[idx]
+            clsname = "{:s}({:#x})".format(internal.utils.pycompat.fullname(cls), self.object.startea)
+            raise internal.exceptions.IndexOutOfBoundsError(u"{:s}.case({:d}) : The specified case ({:d}) was out of bounds ({:#x}..{:#x}).".format(clsname, case, case, self.base, self.base + self.count - 1))
+
+        # Translate the case number to the index that we're supposed to use for either table.
+        translated = case - self.base
+        index = self.indirection[translated]
+        return self.branch[index]
     def handler(self, ea):
-        '''Return all the cases that are handled by the address `ea` as a tuple.'''
-        return tuple(case for case in self.range if self.case(case) == ea)
+        '''Return all of the cases that are handled by the address `ea`.'''
+        ea, _ = ea if isinstance(ea, tuple) else (ea, None)
+        cases = builtins.range(self.base, self.base + self.count)
+        return tuple(case for case in cases if self.case(case) == ea)
     @property
-    def cases(self):
-        '''Return all of the non-default cases in the switch.'''
-        F = lambda ea, dflt=self.default: (ea == dflt) or (instruction.is_unconditional(ea) and not instruction.is_indirect(ea) and instruction.reference(ea, 0) == dflt)
-        return tuple(idx for idx in builtins.range(self.base, self.base + self.count) if not F(self.case(idx)))
+    def handlers(self):
+        '''Return all of the available handlers within the switch.'''
+        ignored = {ea for ea in []}
+        return tuple(ea for ea in self.branch if [ea not in ignored, ignored.add(ea)][0])
     @property
     def range(self):
-        '''Return all of the possible cases for the switch.'''
+        '''Return all of the cases that can be handled by the switch.'''
         return tuple(builtins.range(self.base, self.base + self.count))
+    @property
+    def cases(self):
+        '''Return all of the cases in the switch that are not handled by the default handler.'''
+        cases = builtins.range(self.base, self.base + self.count)
+
+        # Define some closures that return true if an instruction branches to or references a specific address
+        branches_to = lambda ea, target: instruction.is_unconditional(ea) and not instruction.is_indirect(ea) and instruction.reference(ea, 0) == target
+        references_default = lambda ea, target: operator.eq(ea, target) or branches_to(ea, target)
+
+        # And then return all cases that don't reference or immediately branch to the default case.
+        return tuple(case for case in cases if not references_default(self.case(case), self.object.defjump))
     def __str__(self):
         cls = self.__class__
-        if self.indirect():
-            return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
-        return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
+        if self.object.is_indirect():
+            return "<class '{:s}{{{:d}}}' at {:#x}> default:{:#x} branch[{:d}]:{:#x} indirect[{:d}]:{:#x} register:{!s}".format(cls.__name__, self.count, self.object.startea, self.object.defjump, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
+        return "<class '{:s}{{{:d}}}' at {:#x}> default:{:#x} branch[{:d}]:{:#x} register:{!s}".format(cls.__name__, self.count, self.object.startea, self.object.defjump, self.object.ncases, self.object.jumps, self.register)
     def __unicode__(self):
         cls = self.__class__
-        if self.indirect():
-            return u"<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
-        return u"<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{!s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
+        if self.object.is_indirect():
+            return u"<class '{:s}{{{:d}}}' at {:#x}> default:{:#x} branch[{:d}]:{:#x} indirect[{:d}]:{:#x} register:{!s}".format(cls.__name__, self.count, self.object.startea, self.object.defjump, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
+        return u"<class '{:s}{{{:d}}}' at {:#x}> default:{:#x} branch[{:d}]:{:#x} register:{!s}".format(cls.__name__, self.count, self.object.startea, self.object.defjump, self.object.ncases, self.object.jumps, self.register)
     def __repr__(self):
         return u"{!s}".format(self)
 
