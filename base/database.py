@@ -5122,7 +5122,7 @@ class type(object):
         If `filter` or `finally` is true, then return if the address is part of an SEH filter or SEH finalizer (respectively).
         """
         if not hasattr(idaapi, 'TBEA_ANY'):
-            logging.fatal(u"{:s}.exception({:s}{:s}) : Support for interacting with exceptions is not available in your version ({:.1f}) of the IDA Pro disassembler (requires {:.1f}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ea) if isinstance(ea, internal.types.integer) else ea, u", {:s}".format(utils.string.kwargs(flags)) if flags else '', idaapi.__version__, 7.7))
+            logging.fatal(u"{:s}.exception({:s}{:s}) : Support for interacting with exceptions is not available in your version ({:.1f}) of the IDA Pro disassembler (requires {:.1f}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ea) if isinstance(ea, internal.types.integer) else interace.bounds_t(*ea), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', idaapi.__version__, 7.7))
             return cls.exception(ea, 0)
 
         tryflags = flags.pop('flags', 0) if flags else idaapi.TBEA_ANY
@@ -5175,7 +5175,7 @@ class type(object):
         # figure out if there were any flags that we couldn't interpret and warn the user about it.
         if userflags:
             leftover = sorted(userflags)
-            logging.warning(u"{:s}.exception({:s}{:s}) : Ignored {:d} unknown parameter{:s} that {:s} passed as flags ({:s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ea) if isinstance(ea, internal.types.integer) else ea, ", {:s}".format(utils.string.kwargs(flags)) if flags else '', len(leftover), '' if len(leftover) == 1 else 's', 'was' if len(leftover) == 1 else 'were', ', '.join(leftover)))
+            logging.warning(u"{:s}.exception({:s}{:s}) : Ignored {:d} unknown parameter{:s} that {:s} passed as flags ({:s}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ea) if isinstance(ea, internal.types.integer) else interface.bounds_t(*ea), ", {:s}".format(utils.string.kwargs(flags)) if flags else '', len(leftover), '' if len(leftover) == 1 else 's', 'was' if len(leftover) == 1 else 'were', ', '.join(leftover)))
 
         # now we can get to the actual api.
         return cls.exception(ea, tryflags)
@@ -7923,7 +7923,7 @@ class set(object):
     def array(cls, bounds, type):
         '''Set the data at the provided `bounds` to an array of the given `type`.'''
         if isinstance(type, internal.types.list):
-            raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Unable to define the provided boundary ({!r}) as an array of the given element type ({!s}).".format('.'.join([__name__, cls.__name__]), bounds, type, bounds, type))
+            raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Unable to define the provided boundary ({!r}) as an array of the given element type ({!s}).".format('.'.join([__name__, cls.__name__]), interface.bounds_t(*bounds), type, bounds, type))
         start, stop = sorted(bounds)
 
         # Calculate the size of the type that we were given.
