@@ -206,9 +206,12 @@ class typemap(object):
     if hasattr(builtins, 'unicode'): typemap.setdefault(builtins.unicode, stringmap)
     if hasattr(builtins, 'unichr'): typemap.setdefault(builtins.unichr, stringmap)
 
-    # Invert our lookup tables so that we can find the correct python types for
-    # the IDAPython flags that are defined.
-    inverted = {}
+    # Invert our lookup tables so that we can find the correct python types for the
+    # IDAPython flags that are defined. We define s, f, and _ so that we can guarantee
+    # their deletion later. Although this isn't the case here since we've already
+    # assigned the iterators for each loop, the variables won't be scoped if their
+    # loop doesn't iterate.. resulting in an exception if we try to delete them.
+    inverted, s = _, f = _, _ = {}, None
     for s, (f, _) in integermap.items():
         inverted[f & FF_MASKSIZE] = s
     for s, (f, _) in decimalmap.items():
@@ -225,7 +228,7 @@ class typemap(object):
         inverted[f & FF_MASK] = s
         inverted[f & FF_MASK & ~MS_0TYPE] = s
         inverted[f & FF_MASK & ~MS_1TYPE] = s
-    del f
+    del s, (f, [[[[_]]]]) # let's pick the worst possible syntax
 
     # FIXME: this is a hack for dealing with structures that
     #        have the flag set but aren't actually structures..
