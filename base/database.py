@@ -4939,8 +4939,8 @@ class type(object):
         def __new__(cls, ea):
             '''Return the structure type at the address `ea`.'''
             ea = interface.address.head(ea, warn=True)
-            res = cls.id(ea)
-            return _structure.by(res, offset=ea)
+            identifier = cls.id(ea)
+            return internal.structure.new(identifier, ea)
 
         @utils.multicase()
         @classmethod
@@ -5982,17 +5982,17 @@ class types(object):
             raise E.DisassemblerError(u"{:s}.dereference(\"{:s}\") : Unable to get the pointer type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
         return pi.obj_type
 
-    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, _structure.structure_t, internal.types.string))
+    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string))
     @classmethod
     def pointer(cls, type):
         '''Create a pointer that references the specified `type`.'''
         return cls.pointer(type, 0, 0)
-    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, _structure.structure_t, internal.types.string), size=internal.types.integer)
+    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string), size=internal.types.integer)
     @classmethod
     def pointer(cls, type, size):
         '''Create a pointer of `size` bytes that references the specified `type`.'''
         return cls.pointer(type, size, 0)
-    @utils.multicase(type=_structure.structure_t, size=internal.types.integer, attributes=internal.types.integer)
+    @utils.multicase(type=internal.structure.structure_t, size=internal.types.integer, attributes=internal.types.integer)
     @classmethod
     def pointer(cls, type, size, attributes, **fields):
         '''Create a pointer of `size` bytes that references the specified structure `type` with the given `size` and extended `attributes`.'''
@@ -6047,12 +6047,12 @@ class types(object):
         if not info.get_array_details(ai):
             raise E.DisassemblerError(u"{:s}.array(\"{:s}\") : Unable to get the array type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
         return ai.elem_type, ai.nelems
-    @utils.multicase(element=(idaapi.tinfo_t, idaapi.struc_t, _structure.structure_t, internal.types.string), length=internal.types.integer)
+    @utils.multicase(element=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string), length=internal.types.integer)
     @classmethod
     def array(cls, element, length):
         '''Create an array of the given `element` with the specified `length`.'''
         return cls.array(element, length, 0)
-    @utils.multicase(type=_structure.structure_t, length=internal.types.integer, base=internal.types.integer)
+    @utils.multicase(type=internal.structure.structure_t, length=internal.types.integer, base=internal.types.integer)
     @classmethod
     def array(cls, type, length, base):
         '''Create an array of the specified structure `type` with the given `length` and `base`.'''
@@ -7115,10 +7115,10 @@ class set(object):
 
         # Check if we need to use older IDA logic by checking of any of our api calls are None
         if idaapi.__version__ < 7.0 and any(f is None for f in [create_struct, create_align]):
-            ok = create_data(ea, idaapi.FF_STRUCT if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
+            ok = create_data(ea, idaapi.FF_STRUCT if isinstance(res, internal.structure.structure_t) else res, size, res.id if isinstance(res, internal.structure.structure_t) else 0)
 
         # Otherwise we can create structures normally
-        elif isinstance(res, (_structure.structure_t, idaapi.struc_t)):
+        elif isinstance(res, (internal.structure.structure_t, idaapi.struc_t)):
             ok = create_struct(ea, size, res.id)
 
         # Or apply alignment properly...
@@ -7744,22 +7744,22 @@ class set(object):
 
     f = float   # XXX: ns alias
 
-    @utils.multicase(type=_structure.structure_t)
+    @utils.multicase(type=internal.structure.structure_t)
     @classmethod
     def structure(cls, type):
         '''Set the data at the current address to the structure_t specified by `type`.'''
         return cls.structure(ui.current.address(), type)
     @utils.multicase(name=internal.types.string)
     @classmethod
-    def structure(cls, name):
+    def structure(cls, name, *suffix):
         '''Set the data at the current address to the structure_t with the given `name`.'''
-        return cls.structure(ui.current.address(), name)
+        return cls.structure(ui.current.address(), name, *suffix)
     @utils.multicase(sptr=idaapi.struc_t)
     @classmethod
     def structure(cls, sptr):
         '''Set the data at the current address to the structure_t for the specified `sptr`.'''
         return cls.structure(ui.current.address(), sptr)
-    @utils.multicase(ea=internal.types.integer, type=_structure.structure_t)
+    @utils.multicase(ea=internal.types.integer, type=internal.structure.structure_t)
     @classmethod
     def structure(cls, ea, type):
         '''Set the data at address `ea` to the structure_t specified by `type`.'''
@@ -7769,23 +7769,23 @@ class set(object):
         return get.structure(ea, type)
     @utils.multicase(ea=internal.types.integer, name=internal.types.string)
     @classmethod
-    def structure(cls, ea, name):
+    @utils.string.decorate_arguments('name', 'suffix')
+    def structure(cls, ea, name, *suffix):
         '''Set the data at address `ea` to the structure_t with the given `name`.'''
-        st = _structure.by(name)
+        st = _structure.by_name(name, *suffix, offset=ea)
         return cls.structure(ea, st)
     @utils.multicase(ea=internal.types.integer, sptr=idaapi.struc_t)
     @classmethod
     def structure(cls, ea, sptr):
         '''Set the data at address `ea` to the structure_t for the specified `sptr`.'''
-        st = _structure.by(sptr)
+        st = internal.structure.new(sptr.id, ea)
         return cls.structure(ea, st)
     @utils.multicase(ea=internal.types.integer, identifier=internal.types.integer)
     @classmethod
     def structure(cls, ea, identifier):
         '''Set the data at address `ea` to the structure_t that has the specified `identifier`.'''
-        st = _structure.by_identifier(identifier)
+        st = internal.structure.new(identifier, ea)
         return cls.structure(ea, st)
-
     struc = struct = utils.alias(structure, 'set')
 
     @utils.multicase()
@@ -8741,11 +8741,12 @@ class get(object):
         return cls.structure(ea, sptr.id)
     @utils.multicase(ea=internal.types.integer, name=internal.types.string)
     @classmethod
-    def structure(cls, ea, name):
+    @utils.string.decorate_arguments('name', 'suffix')
+    def structure(cls, ea, name, *suffix):
         '''Return a dictionary of ctypes for the ``structure_t`` with the specified `name` at the address `ea`.'''
-        st = _structure.by(name)
+        st = _structure.by_name(name, *suffix, offset=ea)
         return cls.structure(ea, st)
-    @utils.multicase(ea=internal.types.integer, type=_structure.structure_t)
+    @utils.multicase(ea=internal.types.integer, type=internal.structure.structure_t)
     @classmethod
     def structure(cls, ea, type):
         '''Return a dictionary of ctypes for the ``structure_t`` specified by `type` at the address `ea`.'''
