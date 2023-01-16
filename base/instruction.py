@@ -561,9 +561,8 @@ def op_number(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_number(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a number and return it.'''
-    t = idaapi.num_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
-    if not ok:
+    t, signed = idaapi.num_flag(), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
+    if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_number({:#x}, {:d}) : Unable to restore the type of operand {:d} to a number.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
@@ -597,9 +596,8 @@ def op_character(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_character(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a character and return it.'''
-    t = idaapi.char_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
-    if not ok:
+    t, signed = idaapi.char_flag(), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
+    if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_character({:#x}, {:d}) : Unable to set the type of operand {:d} to a character.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
@@ -649,9 +647,8 @@ def op_binary(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_binary(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to binary and return it.'''
-    t = idaapi.bin_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
-    if not ok:
+    t, signed = idaapi.bin_flag(), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
+    if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_binary({:#x}, {:d}) : Unable to set the type of operand {:d} to binary.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
@@ -685,9 +682,8 @@ def op_octal(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_octal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to octal and return it.'''
-    t = idaapi.oct_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
-    if not ok:
+    t, signed = idaapi.oct_flag(), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
+    if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_octal({:#x}, {:d}) : Unable to set the type of operand {:d} to octal.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
@@ -721,9 +717,8 @@ def op_decimal(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_decimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to decimal and return it.'''
-    t = idaapi.dec_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
-    if not ok:
+    t, signed = idaapi.dec_flag(), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
+    if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_decimal({:#x}, {:d}) : Unable to set the type of operand {:d} to decimal.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
@@ -757,9 +752,8 @@ def op_hexadecimal(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_hexadecimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to hexadecimal and return it.'''
-    t = idaapi.hex_flag()
-    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
-    if not ok:
+    t, signed = idaapi.hex_flag(), idaapi.is_invsign(ea, interface.address.flags(ea), opnum)
+    if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_hexadecimal({:#x}, {:d}) : Unable to set the type of operand {:d} to hexadecimal.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
@@ -796,8 +790,7 @@ def op_float(ea, opnum):
     t = idaapi.flt_flag()
 
     # Explicitly set the operand type using idaapi.
-    ok = idaapi.set_op_type(ea, t, opnum)
-    if not ok:
+    if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_float({:#x}, {:d}) : Unable to set the type of operand {:d} to floating-point.".format(__name__, ea, opnum, opnum))
 
     # Read the number of bits for the operand so we can figure out how to properly
@@ -846,8 +839,7 @@ def op_stackvar(ea, opnum):
     if not function.has(ea):
         raise E.FunctionNotFoundError(u"{:s}.op_stackvar({:#x}, {:d}) : The specified address ({:#x}) is not within a function.".format(__name__, ea, opnum, ea))
 
-    ok = idaapi.op_stkvar(ea, opnum)
-    if not ok:
+    if not idaapi.op_stkvar(ea, opnum):
         raise E.DisassemblerError(u"{:s}.op_stackvar({:#x}, {:d}) : Unable to set operand {:d} to a stack variable.".format(__name__, ea, opnum, opnum))
 
     # Now that it's set, call into op_structure to return it.
