@@ -3743,48 +3743,47 @@ class instruction(object):
     @classmethod
     def reference(cls, ea, opnum, refinfo=None):
         '''Return the address being referenced for operand `opnum` at instruction address `ea` using the specified `refinfo` if it is available.'''
-        insn = instruction.at(ea)
-        ops = instruction.operands(insn.ea)
+        get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
+        get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
-        # Grab the operand and its reference if it it actually has one. We'll use this
-        # to figure out exactly what address is being referenced by the operand.
-        op = ops[opnum]
+        # Grab the instruction, the operands, and then the operand. This way we can extract
+        # the operand value and its size so that we can turn it into an adiff_t.
+        ea, insn, operand = int(ea), instruction.at(ea), instruction.operand(ea, opnum)
+        dtype, inverted, negated = get_dtype_attribute(operand), node.alt_opinverted(insn.ea, operand.n), node.alt_opnegated(insn.ea, operand.n)
+        value, bits = operand.value if operand.type in {idaapi.o_imm} else operand.addr, 8 * get_dtype_size(dtype)
+        avalue = idaapi.as_signed(value, bits)
+
+        # If we were given a refinfo_t then we can use it to calculate exactly what
+        # address is being referenced by the operand and return it.
         if refinfo:
-            target, base, value = idaapi.ea_pointer(), idaapi.ea_pointer(), op.value if op.type in {idaapi.o_imm} else op.addr
+            target, base = idaapi.ea_pointer(), idaapi.ea_pointer()
 
             # Try and calculate the reference for the operand value. If we couldn't, then we simply treat the value as-is.
-            if not idaapi.calc_reference_data(target.cast(), base.cast(), insn.ea, refinfo, value):
+            if not idaapi.calc_reference_data(target.cast(), base.cast(), insn.ea, refinfo, avalue):
                 logging.debug(u"{:s}.reference({:#x}, {:d}) : The disassembler could not calculate the target for the reference ({:d}) at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, opnum, refinfo.flags & idaapi.REFINFO_TYPE, insn.ea))
                 return value
             return target.value()
 
-            # If we actually wanted to, we could use the reference information to figure
-            # out the actual offset to the data that is being referenced.
-            base, target = (item.value() for item in [base, target])
-            if base:
-                base, offset = base, target - base
-                return base + offset
+            # XXX: This is an attempt to manually calculate this, but I think I'm supposed
+            #      to clamp the operand value to the size of the reference type and I also
+            #      have no idea how REFINFO_SIGNEDOP is supposed to work with it.
+            Ftranslate = functools.partial(operator.sub if refinfo.flags & idaapi.REFINFO_SUBTRACT else operator.add, refinfo.base)
+            return Ftranslate(avalue if refinfo.flags & idaapi.REFINFO_SIGNEDOP else avalue)
 
-            # If we weren't given the base address, then we're supposed to figure it out ourselves.
-            seg = idaapi.getseg(ea)
-            if seg is None:
-                raise internal.exceptions.SegmentNotFoundError(u"{:s}.reference({:#x}, {:d}) : Unable to locate segment containing the specified instruction address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, insn.ea))
-
-            imagebase, segbase = idaapi.get_imagebase(), idaapi.get_segm_base(seg)
-            base, offset = imagebase, seg.start_ea - imagebase
-            return base + offset
-
-        # Otherwise, we need to use the default reference type. Unless the user changed
-        # the default reference type, this should always result in returning the immediate.
+        # Otherwise, we need to figure out the refinfo_t from the default. So, unless the
+        # user changed the default, this should always result in returning the immediate.
         refinfo = idaapi.refinfo_t()
-        _, refinfo.target, refinfo.base = refinfo.set_type(idaapi.get_default_reftype(insn.ea)), idaapi.BADADDR, 0
-        if op.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far, idaapi.o_imm}:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reference({:#x}, {:d}) : Unable to determine the reference type for the instruction at address {:#x} due to its operand ({:d}) being an unsupported type ({:d}).".format('.'.join([__name__, cls.__name__]), ea, opnum, insn.ea, opnum, op.type))
+        refinfo.set_type(idaapi.get_default_reftype(insn.ea))
+        refinfo.base, refinfo.target = 0, idaapi.BADADDR
+        if operand.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far, idaapi.o_imm}:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reference({:#x}, {:d}) : Unable to determine the reference type for the instruction at address {:#x} due to its operand ({:d}) being an unsupported type ({:d}).".format('.'.join([__name__, cls.__name__]), ea, opnum, insn.ea, opnum, operand.type))
 
-        # If the target base can't be calculated, then we need to use the imagebase.
-        target = op.value if op.type in {idaapi.o_imm} else op.addr
-        res = idaapi.calc_target(insn.ea, target, refinfo)
-        return target if res == idaapi.BADADDR else res
+        # If the target base can't be calculated, then we need to treat it as a regular
+        # operand by checking if it's signed or negated and returning the correct value.
+        target, maximum = idaapi.calc_target(insn.ea, avalue, refinfo), pow(2, bits)
+        signed, unsigned = (value - maximum, value) if avalue > 0 else (avalue, value & (maximum - 1))
+        result = signed if inverted else unsigned
+        return target if target != idaapi.BADADDR else result if operand.type == idaapi.o_imm else value
 
 class regmatch(object):
     """
