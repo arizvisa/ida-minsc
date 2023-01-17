@@ -5434,12 +5434,21 @@ class decode(object):
         if not (sptr.props & SF_UNION):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.union_bytes({:#x}, ...) : The `{:s}` for the requested identifier ({:#x}) is not a `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, internal.utils.pycompat.fullname(sptr.__class__), sptr.id, 'SF_UNION'))
 
-        result, data = {}, bytearray(bytes)
+        # Iterate through each union member and use their size to stash the
+        # bytes that are neccessary for decoding each member. We assign the
+        # entire bytes used for decoding to an empty member in case the user
+        # has some need to want to access the decoded data themselves.
+        result, data = {'': bytearray(bytes)}, bytearray(bytes)
         for m in internal.structure.new(sptr.id, 0).members:
             name, mptr, size = m.name, m.ptr, m.size
             if len(data) < size:
                 logging.warning(u"{:s}.union_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at index {:d} of the union due to there being only {:+#x} byte{:s} worth of data available.".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, name, mptr.soff, len(bytes), '' if len(bytes) == 1 else 's'))
             result[name] = data[:size]
+
+        # Figure out if there was anything that we didn't decode and assign them
+        # with the maximum offset in case the user wants to see what was missed.
+        maximum = max(len(item) for name, item in result.items() if name) if result else 0
+        result.setdefault(maximum, data[maximum:]) if maximum <= len(data) else None
         return result
 
     @classmethod
@@ -5454,10 +5463,10 @@ class decode(object):
             name, mptr = m.name, m.ptr
             left, right = 0 if sptr.props & SF_UNION else mptr.soff, mptr.eoff
 
-            # First check our current offset against the member boundaries
-            # in case we need to grab any padding to get to the field.
+            # First check our offset against the member boundaries in case there's an undefined
+            # field that contains unused data. If so, use the current offset as its key.
             if offset < left:
-                result[offset, left], offset = data[offset : left], left
+                result[offset], offset = data[offset : left], left
 
             # If this is a variable-length structure and the size is 0, then we just stash everything.
             if sptr.props & SF_VAR and left == right:
@@ -5470,6 +5479,11 @@ class decode(object):
             if len(result[name]) < right - left:
                 logging.warning(u"{:s}.fragment_bytes({:#x}, ...) : Unable to read member ({:#x}) with the name \"{:s}\" at offset {:#x}..{:#x} of structure due to there being only {:+#x} byte{:s} worth of data available (expected {:+d} byte{:s} more).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, name, left, right, len(bytes), '' if len(bytes) == 1 else 's', right - len(bytes), '' if right - len(bytes) == 1 else 's'))
             offset = right
+
+        # If there's any data that was left unused, then we end of the last member as the
+        # key and store the rest of the data inside of it so that it's still usable.
+        if data[offset:]:
+            result.setdefault(offset, data[offset:])
         return result
 
     @classmethod
