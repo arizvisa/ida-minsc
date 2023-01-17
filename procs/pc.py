@@ -228,8 +228,10 @@ class operand:
     @catalog.operand(idaapi.PLFM_386, idaapi.o_near, types.type)
     def address(insn, op):
         '''Operand type decoder for address operands which return just an immediate address.'''
+        SEGREG_IMM = 0xffff
         segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
-        return op.addr
+        sel = segsel if segrg == SEGREG_IMM else architecture.by_index(segrg)
+        return SegmentOffset(sel, op.addr)
 
     @catalog.operand(idaapi.PLFM_386, idaapi.o_idpspec0, int)
     def trregister(insn, op):
