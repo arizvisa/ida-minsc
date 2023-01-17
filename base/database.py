@@ -22,7 +22,7 @@ import six, builtins
 
 import functools, operator, itertools
 import sys, os, logging, bisect
-import math, array as _array, fnmatch, re, ctypes
+import math, array as _array, fnmatch, re
 
 import function, segment, ui
 import structure as _structure, instruction as _instruction
@@ -7403,7 +7403,7 @@ class set(object):
         @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea):
             '''Set the data at address `ea` to an integer of a type determined by its size.'''
-            res = type.size(ea)
+            res = interface.address.size(ea)
             return cls(ea, res)
         @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
         def __new__(cls, ea, size):
@@ -7412,10 +7412,9 @@ class set(object):
             if not type.unknown(ea, size) or res < size:
                 raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to undefine {:d} byte{:s} for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, size, '' if size == 1 else 's'))
 
-            ok = set.data(ea, size)
-            if not ok:
+            if not set.data(ea, size):
                 raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, size, 8 * size))
-            return get.signed(ea, size) if type.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, size)
+            return get.signed(ea, size) if interface.address.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, size)
 
         @utils.multicase()
         @classmethod
@@ -7431,12 +7430,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 1))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, res, type=idaapi.FF_BYTE)
-            if not ok:
+            if not set.data(ea, res, type=idaapi.FF_BYTE):
                 raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if type.flags(ea, idaapi.FF_SIGN):
+            if interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Return our new size
@@ -7455,12 +7453,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 1))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, res, type=idaapi.FF_BYTE)
-            if not ok:
+            if not set.data(ea, res, type=idaapi.FF_BYTE):
                 raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if not type.flags(ea, idaapi.FF_SIGN):
+            if not interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Return our new size
@@ -7481,12 +7478,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 2))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, res, type=idaapi.FF_WORD)
-            if not ok:
+            if not set.data(ea, res, type=idaapi.FF_WORD):
                 raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if type.flags(ea, idaapi.FF_SIGN):
+            if interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Return our new size
@@ -7505,12 +7501,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 2))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, res, type=idaapi.FF_WORD)
-            if not ok:
+            if not set.data(ea, res, type=idaapi.FF_WORD):
                 raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to set the specfied address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if not type.flags(ea, idaapi.FF_SIGN):
+            if not interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Return our new size
@@ -7534,12 +7529,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 4))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, res, type=FF_DWORD)
-            if not ok:
+            if not set.data(ea, res, type=FF_DWORD):
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if type.flags(ea, idaapi.FF_SIGN):
+            if interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new size
@@ -7561,12 +7555,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 4))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, res, type=FF_DWORD)
-            if not ok:
+            if not set.data(ea, res, type=FF_DWORD):
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if not type.flags(ea, idaapi.FF_SIGN):
+            if not interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new size
@@ -7590,12 +7583,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 8))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, res, type=FF_QWORD)
-            if not ok:
+            if not set.data(ea, res, type=FF_QWORD):
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if type.flags(ea, idaapi.FF_SIGN):
+            if interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new value since everything worked
@@ -7617,12 +7609,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 8))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, res, type=FF_QWORD)
-            if not ok:
+            if not set.data(ea, res, type=FF_QWORD):
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if not type.flags(ea, idaapi.FF_SIGN):
+            if not interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new value since everything worked
@@ -7646,12 +7637,11 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 16))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, res, type=FF_OWORD)
-            if not ok:
+            if not set.data(ea, res, type=FF_OWORD):
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if type.flags(ea, idaapi.FF_SIGN):
+            if interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new value if we succeeded
@@ -7673,18 +7663,16 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join([__name__, 'set', cls.__name__]), ea, 16))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, res, type=FF_OWORD)
-            if not ok:
+            if not set.data(ea, res, type=FF_OWORD):
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join([__name__, 'set', cls.__name__]), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
-            if not type.flags(ea, idaapi.FF_SIGN):
+            if not interface.address.flags(ea, idaapi.FF_SIGN):
                 idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new value if we succeeded
             return get.signed(ea, res)
         oword = utils.alias(uint128_t, 'set.integer')
-
     i = integer # XXX: ns alias
 
     class float(object):
@@ -7706,7 +7694,7 @@ class set(object):
         @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea):
             '''Sets the data at address `ea` to an IEEE-754 floating-point number based on its size.'''
-            size = type.size(ea)
+            size = interface.address.size(ea)
             if size < 4 and type.unknown(ea, 4):
                 logging.warning(u"{:s}({:#x}) : Promoting number at address {:#x} to 32-bit single due to item size ({:+d}) being less than the smallest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'set', cls.__name__]), ea, size, 4))
                 return cls.single(ea)
@@ -7730,8 +7718,7 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join([__name__, 'set', cls.__name__]), ea, 4))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, res, type=idaapi.FF_FLOAT & 0xf0000000)
-            if not ok:
+            if not set.data(ea, res, type=idaapi.FF_FLOAT & 0xf0000000):
                 raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to assign a single to the specified address.".format('.'.join([__name__, 'set', cls.__name__]), ea))
 
             # Return our new value
@@ -7751,55 +7738,50 @@ class set(object):
                 raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join([__name__, 'set', cls.__name__]), ea, 8))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, res, type=idaapi.FF_DOUBLE & 0xf0000000)
-            if not ok:
+            if not set.data(ea, res, type=idaapi.FF_DOUBLE & 0xf0000000):
                 raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to assign a double to the specified address.".format('.'.join([__name__, 'set', cls.__name__]), ea))
 
             # Return our new value
             return get.float.double(ea)
-
     f = float   # XXX: ns alias
 
-    @utils.multicase(type=internal.structure.structure_t)
+    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t))
     @classmethod
-    def structure(cls, type):
-        '''Set the data at the current address to the structure_t specified by `type`.'''
-        return cls.structure(ui.current.address(), type)
+    def structure(cls, structure):
+        '''Set the data at the current address to the specified `structure`.'''
+        return cls.structure(ui.current.address(), structure)
     @utils.multicase(name=internal.types.string)
     @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
     def structure(cls, name, *suffix):
-        '''Set the data at the current address to the structure_t with the given `name`.'''
+        '''Set the data at the current address to the structure with the given `name`.'''
         return cls.structure(ui.current.address(), name, *suffix)
-    @utils.multicase(sptr=idaapi.struc_t)
+    @utils.multicase(ea=internal.types.integer, structure=(idaapi.struc_t, internal.structure.structure_t))
     @classmethod
-    def structure(cls, sptr):
-        '''Set the data at the current address to the structure_t for the specified `sptr`.'''
-        return cls.structure(ui.current.address(), sptr)
-    @utils.multicase(ea=internal.types.integer, type=internal.structure.structure_t)
+    def structure(cls, ea, structure):
+        '''Set the data at address `ea` to the specified `structure`.'''
+        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        return cls.structure(ea, sptr, idaapi.get_struc_size(sptr))
+    @utils.multicase(ea=internal.types.integer, structure=(idaapi.struc_t, internal.structure.structure_t), size=internal.types.integer)
     @classmethod
-    def structure(cls, ea, type):
-        '''Set the data at address `ea` to the structure_t specified by `type`.'''
-        ok = cls.data(ea, type.size, type=type.ptr)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join([__name__, cls.__name__]), ea, type))
-        return get.structure(ea, type)
+    def structure(cls, ea, structure, size):
+        '''Set the data at address `ea` to the specified `structure` of `size` bytes.'''
+        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        result = cls.data(ea, size, type=sptr)
+        if not result:
+            raise E.DisassemblerError(u"{:s}.structure({:#x}, {:#x}, {:+d}) : Unable to apply the given structure ({:#x}) with size ({:+d}) to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, sptr.id, size, sptr.id, size, ea))
+        return get.structure(ea, sptr, result)
     @utils.multicase(ea=internal.types.integer, name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name', 'suffix')
     def structure(cls, ea, name, *suffix):
-        '''Set the data at address `ea` to the structure_t with the given `name`.'''
+        '''Set the data at address `ea` to the structure with the given `name`.'''
         st = _structure.by_name(name, *suffix, offset=ea)
-        return cls.structure(ea, st)
-    @utils.multicase(ea=internal.types.integer, sptr=idaapi.struc_t)
-    @classmethod
-    def structure(cls, ea, sptr):
-        '''Set the data at address `ea` to the structure_t for the specified `sptr`.'''
-        st = internal.structure.new(sptr.id, ea)
         return cls.structure(ea, st)
     @utils.multicase(ea=internal.types.integer, identifier=internal.types.integer)
     @classmethod
     def structure(cls, ea, identifier):
-        '''Set the data at address `ea` to the structure_t that has the specified `identifier`.'''
+        '''Set the data at address `ea` to the structure that has the specified `identifier`.'''
         st = internal.structure.new(identifier, ea)
         return cls.structure(ea, st)
     struc = struct = utils.alias(structure, 'set')
@@ -7998,12 +7980,12 @@ class get(object):
     def unsigned(cls, **byteorder):
         '''Read an unsigned integer from the current address.'''
         ea = ui.current.address()
-        return cls.unsigned(ea, type.size(ea), **byteorder)
+        return cls.unsigned(ea, interface.address.size(ea), **byteorder)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def unsigned(cls, ea, **byteorder):
         '''Read an unsigned integer from the address `ea` using the size defined in the database.'''
-        return cls.unsigned(ea, type.size(ea), **byteorder)
+        return cls.unsigned(ea, interface.address.size(ea), **byteorder)
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def unsigned(cls, ea, size, **byteorder):
@@ -8015,22 +7997,22 @@ class get(object):
         The default value of `byteorder` is the same as specified by the database architecture.
         """
         data = read(ea, size)
-        endian = byteorder.get('order', None) or byteorder.get('byteorder', config.byteorder())
-        if endian.lower().startswith('little'):
-            data = data[::-1]
-        return functools.reduce(lambda agg, byte: agg << 8 | byte, bytearray(data), 0)
+        order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), config.byteorder())
+        if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.unsigned({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
+        return interface.decode.unsigned(data if order.lower() == 'big' else data[::-1])
 
     @utils.multicase()
     @classmethod
     def signed(cls, **byteorder):
         '''Read a signed integer from the current address.'''
         ea = ui.current.address()
-        return cls.signed(ea, type.size(ea), **byteorder)
+        return cls.signed(ea, interface.address.size(ea), **byteorder)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def signed(cls, ea, **byteorder):
         '''Read a signed integer from the address `ea` using the size defined in the database.'''
-        return cls.signed(ea, type.size(ea), **byteorder)
+        return cls.signed(ea, interface.address.size(ea), **byteorder)
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def signed(cls, ea, size, **byteorder):
@@ -8041,10 +8023,11 @@ class get(object):
 
         The default value of `byteorder` is the same as specified by the database architecture.
         """
-        bits = 8 * size
-        sf = pow(2, bits) >> 1
-        res = cls.unsigned(ea, size, **byteorder)
-        return (res - pow(2, bits)) if res & sf else res
+        data = read(ea, size)
+        order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), config.byteorder())
+        if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.signed({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
+        return interface.decode.signed(data if order.lower() == 'big' else data[::-1])
 
     class integer(object):
         """
@@ -8062,15 +8045,15 @@ class get(object):
         @utils.multicase()
         def __new__(cls, **byteorder):
             '''Read an integer from the current address.'''
-            return get.signed(**byteorder) if type.flags(ui.current.address(), idaapi.FF_SIGN) else get.unsigned(**byteorder)
+            return get.signed(**byteorder) if interface.address.flags(ui.current.address(), idaapi.FF_SIGN) else get.unsigned(**byteorder)
         @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea, **byteorder):
             '''Read an integer from the address `ea`.'''
-            return get.signed(ea, **byteorder) if type.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, **byteorder)
+            return get.signed(ea, **byteorder) if interface.address.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, **byteorder)
         @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
         def __new__(cls, ea, size, **byteorder):
             '''Read an integer of the specified `size` from the address `ea`.'''
-            return get.signed(ea, size, **byteorder) if type.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, size, **byteorder)
+            return get.signed(ea, size, **byteorder) if interface.address.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, size, **byteorder)
 
         @utils.multicase()
         @classmethod
@@ -8181,7 +8164,6 @@ class get(object):
             '''Read a sint128_t from the address `ea`.'''
             return get.signed(ea, 16, **byteorder)
         oword = utils.alias(uint128_t, 'get.integer')
-
     i = integer # XXX: ns alias
 
     class float(object):
@@ -8212,54 +8194,41 @@ class get(object):
 
         @utils.multicase()
         def __new__(cls, **byteorder):
-            '''Read a floating-number from the current address using the number type that matches its size.'''
+            '''Read a floating-point number from the current address using the item size from the database.'''
             return cls(ui.current.address(), **byteorder)
         @utils.multicase(ea=internal.types.integer)
         def __new__(cls, ea, **byteorder):
-            '''Read a floating-number at the address `ea` using the number type that matches its size.'''
-            size = type.size(ea)
-            if size == 2:
-                return cls.half(ea, **byteorder)
-            elif size == 4:
-                return cls.single(ea, **byteorder)
-            elif size == 8:
-                return cls.double(ea, **byteorder)
-            elif size > 8:
-                logging.warning(u"{:s}({:#x}) : Demoting size ({:+d}) for floating-point number at {:#x} down to largest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'get', cls.__name__]), ea, size, ea, 8))
-                return cls.double(ea, **byteorder)
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}) : Unable to determine the type of floating-point number for the item's size ({:+#x}).".format('.'.join([__name__, 'get', cls.__name__]), ea, size))
+            '''Read a floating-point number from the address `ea` using the item size from the database.'''
+            size = interface.address.size(ea)
+            return cls(ea, size, **byteorder)
+        @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
+        def __new__(cls, ea, size, **byteorder):
+            """Read a floating-point number from the address `ea` using the given `size`.
 
-        @utils.multicase(components=internal.types.tuple)
-        def __new__(cls, components, **byteorder):
-            '''Read a floating-point number at the current address encoded with the specified `components`.'''
-            return cls(ui.current.address(), components, **byteorder)
-        @utils.multicase(ea=internal.types.integer, components=internal.types.tuple)
-        def __new__(cls, ea, components, **byteorder):
-            """Read a floating-point number at the address `ea` that is encoded with the specified `components`.
-
-            The `components` parameter is a tuple (mantissa, exponent, sign) representing the number of bits for each component of the floating-point number.
             If `byteorder` is 'big' then read in big-endian form.
             If `byteorder` is 'little' then read in little-endian form.
 
             The default value of `byteorder` is the same as specified by the database architecture.
             """
-            cb = sum(components) // 8
+            available = [bits // 8 for bits in sorted(interface.decode.binary_float_table)]
 
-            # Read our data from the database as an integer, as we'll use this
-            # to decode our individual components.
-            integer = get.unsigned(ea, cb, **byteorder)
+            # First we need to figure out which byteorder that we're going to decode with.
+            order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), config.byteorder())
+            if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
+                raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, 'get', cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
 
-            # Unpack the components the user gave us.
-            fraction, exponent, sign = components
+            # Next we need to validate the size and adjust it to the next valid one if necessary.
+            if size and 8 * size not in interface.decode.binary_float_table:
+                promoted = builtins.next((item for item in available if size <= item), available[-1])
+                logging.warning(u"{:s}({:#x}, {:d}{:s}) : Promoting size ({:+d}) for floating-point number at {:#x} up to the next available floating-point size ({:+d}).".format('.'.join([__name__, 'get', cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', size, ea, promoted))
 
-            # Use the components to decode the floating point number
-            try:
-                res = utils.float_of_integer(integer, fraction, exponent, sign)
+            # Otherwise we can use the size as-is and use it to read the necessary bytes.
+            else:
+                promoted = size
 
-            except ValueError as message:
-                raise ValueError(u"{:s}({:#x}, {!s}) : {!s}".format('.'.join([__name__, cls.__name__]), ea, components, message))
-
-            return res
+            # Now we just need to read the data and flip its byteorder before using our api
+            bytes = read(ea, promoted)
+            return interface.decode.float(bytes if order.lower() == 'big' else bytes[::-1])
 
         @utils.multicase()
         @classmethod
@@ -8270,8 +8239,7 @@ class get(object):
         @classmethod
         def half(cls, ea, **byteorder):
             '''Read a half from the address `ea`.'''
-            bits = 10, 5, 1
-            return cls(ea, bits, **byteorder)
+            return cls(ea, 2, **byteorder)
 
         @utils.multicase()
         @classmethod
@@ -8282,8 +8250,7 @@ class get(object):
         @classmethod
         def single(cls, ea, **byteorder):
             '''Read a single from the address `ea`.'''
-            bits = 23, 8, 1
-            return cls(ea, bits, **byteorder)
+            return cls(ea, 4, **byteorder)
 
         @utils.multicase()
         @classmethod
@@ -8294,247 +8261,118 @@ class get(object):
         @classmethod
         def double(cls, ea, **byteorder):
             '''Read a double from the address `ea`.'''
-            bits = 52, 11, 1
-            return cls(ea, bits, **byteorder)
-
+            return cls(ea, 8, **byteorder)
     f = float   # XXX: ns alias
 
     @utils.multicase()
     @classmethod
-    def array(cls, **length):
+    def array(cls, **byteorder):
         '''Return the values of the array at the current selection or address.'''
         address, selection = ui.current.address(), ui.current.selection()
-        if 'length' in length or operator.eq(*(interface.address.head(ea) for ea in selection)):
-            return cls.array(address, **length)
-        return cls.array(selection)
-    @utils.multicase(bounds=internal.types.tuple)
-    @classmethod
-    def array(cls, bounds):
-        '''Return the values within the provided `bounds` as an array.'''
-        start, stop = sorted(bounds)
-        length = (stop - start) / interface.address.size(start)
-        return cls.array(start, length=math.trunc(math.ceil(length)))
-    @utils.multicase(bounds=internal.types.tuple)
-    @classmethod
-    def array(cls, bounds, type):
-        '''Return the values within the provided `bounds` as an array of the pythonic element `type`.'''
-        start, stop = sorted(bounds)
-
-        # figure out the element size from our pythonic type parameter.
-        _, _, size = interface.typemap.resolve(type)
-
-        # the bounds might not divide evenly by the given type, but we want
-        # to lean towards reading too much rather than reading too little.
-        length = (stop - start) / size
-        count = math.trunc(math.ceil(length))
-        return cls.array(start, length=count, type=type)
+        if 'length' in byteorder or operator.eq(*(interface.address.head(ea) for ea in selection)):
+            return cls.array(address, **byteorder)
+        return cls.array(selection, **byteorder)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def array(cls, ea, **length):
-        """Return the values of the array at the address specified by `ea`.
+    def array(cls, ea, **byteorder):
+        '''Decode the data at the address `ea` as an array.'''
+        if 'length' in byteorder or 'type' in byteorder:
+            return cls.array(ea, byteorder.pop('length') if 'length' in byteorder else byteorder.pop('type'), **byteorder)
+        bounds = interface.bounds_t(ea, ea + interface.address.size(ea))
+        return cls.array(bounds, **byteorder)
+    @utils.multicase(bounds=internal.types.tuple)
+    @classmethod
+    def array(cls, bounds, **byteorder):
+        '''Decode the data within the provided `bounds` as an array.'''
 
-        If the integer `length` is defined, then use it as the number of elements for the array.
-        If a pythonic type is passed to `type`, then use it for the element type of the array when decoding.
-        """
-        ea = interface.address.within(ea) if 'length' not in length else ea
+        # Turn the boundaries we were given into a starting place and its size.
+        start, stop = sorted(bounds)
+        ea, size = start, stop - start
 
-        # FIXME: this function is just too fucking large...srsly.
-        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+        # This should be easy and we only need to retrieve the type from the
+        # starting address, read it, and then decode. We don't care about the
+        # result from get_opinfo because if it fails, the flags are the type.
+        info, flags = idaapi.opinfo_t(), interface.address.flags(ea)
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        return interface.decode.array(flags, info if ok else None, read(ea, size), **byteorder)
+    @utils.multicase(bounds=internal.types.tuple)
+    @classmethod
+    def array(cls, bounds, type, **byteorder):
+        '''Return the values within the provided `bounds` as an array of the pythonic element `type`.'''
+        start, stop = sorted(bounds)
+        expected, element = stop - start, interface.typemap.size(type)
 
-        def numeric_lookup_tables():
-            '''
-            This closure is responsible for returning the lookup tables to map IDA types to
-            either lengths or array typecodes which will be used for decoding the elements
-            of the array.
-            '''
+        # First we'll sanity-test the type we were given is not a list (array)
+        # so that we can complain to the user that we were given two lengths.
+        if isinstance(type, internal.types.list):
+            _, length = type
+            if length * element != expected:
+                raise E.InvalidParameterError(u"{:s}.array({:s}, {!s}) : The given element type ({!s}) is an array of {:d} element{:s} with a size ({:+#x}) that is different from the specified boundaries ({:+#x}).".format('.'.join([__name__, cls.__name__]), interface.bounds_t(*bounds), type, type, length, '' if length == 1 else 's', lenth * element, expected))
+            logging.warning(u"{:s}.array({:s}, {!s}) : The given element type ({!s}) is an array that will have its length ({:d}) discarded due to an address range being given ({:s}).".format('.'.join([__name__, cls.__name__]), interface.bounds_t(*bounds), type, type, length, interface.bounds_t(*bounds)))
+            type, _ = type
 
-            # This numerics table is responsible for mapping an idaapi.DT_TYPE
-            # type to a typecode for the _array class.
-            numerics = {
-                idaapi.FF_BYTE : utils.get_array_typecode(1),
-                idaapi.FF_WORD : utils.get_array_typecode(2),
-                idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : utils.get_array_typecode(4),
-                idaapi.FF_FLOAT : 'f',
-                idaapi.FF_DOUBLE : 'd',
-            }
+        # Now we can use the type to figure out how we're going to decode the
+        # array, read the bytes using the bounds, and then decode it.
+        info = idaapi.opinfo_t()
+        flags, info.tid, size = interface.typemap.resolve(type)
+        return interface.decode.array(flags, info, read(bounds), **byteorder)
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def array(cls, ea, type, **byteorder):
+        '''Decode the data at the address `ea` as an array of the pythonic element `type`.'''
+        if isinstance(type, internal.types.list):
+            type, length = type
+            return cls.array(ea, type, length, **byteorder)
 
-            # Some 32-bit versions of python might not have array.array('Q')
-            # and some versions of IDA also might not have FF_QWORD..
-            try:
-                _array.array(utils.get_array_typecode(8))
-                numerics[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = utils.get_array_typecode(8)
-            except (AttributeError, ValueError):
-                pass
+        # If we got a length, then call the correct case to handle it.
+        elif 'length' in byteorder:
+            return cls.array(ea, type, byteorder.pop('length'), **byteorder)
 
-            # This long-numerics table is a mapping-type for converting an
-            # idaapi.DT_TYPE to a length. This way we can manually read the
-            # elements of the array into a list that we can return to the user.
-            lnumerics = {
-                idaapi.FF_BYTE : 1, idaapi.FF_ALIGN : 1,
-                idaapi.FF_WORD : 2,
-                idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : 4,
-                idaapi.FF_FLOAT : 4,
-                idaapi.FF_DOUBLE : 8,
-            }
+        # Now we need the size of the item at the address that was specified
+        # by the user, but we'll also need the offset our address is into that
+        # item in case the user is doing a partial read into it. So we take
+        # the difference and adjust our size with it to get the real size.
+        offset = ea - interface.address.head(ea)
+        size =  interface.address.size(ea) - offset
 
-            # If we have FF_QWORD defined but it cannot be represented by the
-            # _array class, then we'll need to add its size to our long-numerics
-            # table so that we can still read its elements manually.
-            if any(hasattr(idaapi, name) for name in {'FF_QWRD', 'FF_QWORD'}):
-                name = builtins.next(name for name in {'FF_QWRD', 'FF_QWORD'} if hasattr(idaapi, name))
-                value = getattr(idaapi, name)
-                if value not in numerics:
-                    lnumerics[value] = 8
-                pass
+        # Now we can use the type to figure out how we're going to decode the
+        # array, read the bytes using the address and size, and then decode it.
+        info = idaapi.opinfo_t()
+        flags, info.tid, _ = interface.typemap.resolve(type)
+        return interface.decode.array(flags, info, read(ea, size), **byteorder)
+    @utils.multicase(ea=internal.types.integer, length=internal.types.integer)
+    @classmethod
+    def array(cls, ea, length, **byteorder):
+        '''Decode the data at the address `ea` as a `length`-element array.'''
 
-            # FF_OWORD, FF_YWORD and FF_ZWORD might not exist in older versions
-            # of IDA, so try to add them to our long-numerics "softly".
-            try:
-                lnumerics[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = 8
-                lnumerics[idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD] = 16
-                lnumerics[idaapi.FF_YWORD if hasattr(idaapi, 'FF_YWORD') else idaapi.FF_YWRD] = 32
-                lnumerics[idaapi.FF_ZWORD if hasattr(idaapi, 'FF_ZWORD') else idaapi.FF_ZWRD] = 64
-            except AttributeError:
-                pass
+        # First thing we'll need to do is to get the type from whatever is
+        # at the given address. We can ignore the get_opinfo result because
+        # if there's no operand information, then the flags contain everything.
+        info, flags = idaapi.opinfo_t(), interface.address.flags(ea)
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        info = info if ok else None
 
-            # Depending on the version of IDAPython, some of IDA's flags (FF_*) can
-            # be signed or unsigned. Since we're explicitly testing for them by using
-            # container membership, we'll need to ensure that they're unsigned when
-            # storing them into their lookup tables. This way our membership tests
-            # will actually work when determining the types to use.
-            numerics = { idaapi.as_uint32(ff) : typecode for ff, typecode in numerics.items() }
-            lnumerics = { idaapi.as_uint32(ff) : length for ff, length in lnumerics.items() }
+        # Next we need to figure out the size of the operand information so
+        # that we can use it with the length to calculate the amount that
+        # we'll need to read. Afterwards, that's all we need for decoding.
+        element = interface.address.element(flags, info)
+        return interface.decode.array(flags, info, read(ea, element * max(0, length)), **byteorder)
+    @utils.multicase(ea=internal.types.integer, length=internal.types.integer)
+    @classmethod
+    def array(cls, ea, type, length, **byteorder):
+        '''Decode the data at the address `ea` as a `length`-element array of the pythonic element `type`.'''
+        flags, tid, size = interface.typemap.resolve(type)
 
-            # Now they're safe to return to the caller for people to use.
-            return numerics, lnumerics
+        # Now we just need to verify that the resolved size and the element
+        # size are the same to ensure we weren't given an array of some sort.
+        if interface.typemap.size(type) != size:
+            raise E.InvalidParameterError(u"{:s}.array({:#x}, {!s}, {:+d}) : Expected the given type ({!s}) to have a size ({:+d}) that is the same as the calculated size ({:+d}).".format('.'.join([__name__, cls.__name__]), ea, type, length, type, size, interface.typemap.size(type)))
 
-        def decode_array(ea, T, count, numerics, lnumerics):
-            '''
-            This closure is responsible for decoding an array from the given address
-            using the provided type (T) and count for the number of elements. The
-            `numerics` and `lnumerics` tables are used for looking up the typecode
-            or length given a DT_TYPE.
-            '''
-
-            # If the array has a refinfo_t at its address or the signed flag is
-            # set, then we need to lowercase the typecode to get signed or
-            # relative values from the array.
-            if interface.address.refinfo(ea) or F & idaapi.FF_SIGN:
-
-                # FIXME: If the user has set the signed flag, then we need to return
-                #        the negative values that are displayed instead of just
-                #        decoding the array's integers as signed.
-                typecode = numerics[T].lower()
-
-            # Otherwise, we can simply lookup the typecode and use that one.
-            else:
-                typecode = numerics[T]
-
-            # Create an _array using the typecode that we determined so that it can
-            # be decoded and then returned to the caller.
-            res = _array.array(typecode)
-
-            # If our _array's itemsize doesn't match the element size that we expected,
-            # then we need to warn the user that something fucked up and that we're
-            # hijacking the array decoding with our own hardcoded unsigned length.
-            cb = lnumerics[T]
-            if res.itemsize != cb:
-                logging.warning(u"{:s}.array({:#x}{:s}) : Refusing to decode array at address {:#x} using the array size ({:+d}) identified for DT_TYPE ({:#x}) due to the size of the DT_TYPE ({:#x}) not corresponding to the desired element size ({:+d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.itemsize, T, T, cb))
-
-                # Reconstruct the array but with the expected element size.
-                try:
-                    res = _array.array(utils.get_array_typecode(cb, 1))
-
-                # If we can't use the typecode determined by the element size, then
-                # just assume that the elements are just individual bytes.
-                except ValueError:
-                    res = _array.array(utils.get_array_typecode(1))
-
-            # Get the number of elements for our array, and use it to read our data
-            # from the database. Then we can use the data to initialize the _array
-            # that we're going to return to the user.
-            data = read(ea, count * cb)
-            res.fromstring(data) if sys.version_info.major < 3 else res.frombytes(data)
-
-            # Validate the _array's length so that we can warn the user if it's wrong.
-            if len(res) != count:
-                logging.warning(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', len(res), count))
-            return res
-
-        # If the "type" parameter was provided, then resolve that type into the
-        # flags and DT_TYPE that we will need.
-        if 'type' in length:
-            F, tid, total = interface.typemap.resolve(length['type'])
-
-            # If we were given an array in the "type" parameter, then reassign
-            # that back into the "length" parameter so it can be used later.
-            if isinstance(length['type'], internal.types.list):
-                _, count = length['type']
-                length.setdefault('length', count)
-
-        # Otherwise we extract the flags and DT_TYPE directly from the address.
-        else:
-            F, total = type.flags(ea), interface.address.size(ea)
-            tid = type.structure.id(ea) if type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT else idaapi.BADADDR
-
-        # Set the array's length if it hasn't been determined yet.
-        if not operator.contains(length, 'length'):
-            length['length'] = type.array.length(ea)
-
-        # Now that we have the flags and the type, we can use it to determine
-        # how we need to decode the array. Since there's no utilities or
-        # anything for performing these conversions in minsc, we'll need to
-        # handle all of the element types ourselves by explicitly handling
-        # each supported case.
-        T = idaapi.as_uint32(F & idaapi.DT_TYPE)
-        numerics, lnumerics = numeric_lookup_tables()
-
-        # If this is a string-literal, then we need to figure out the element
-        # size in order to figure out which character width to use.
-        if T in {FF_STRLIT}:
-            elesize = idaapi.get_full_data_elsize(ea, F)
-
-            # Python's "u" typecode for their _array can actually change sizes. So
-            # we have no choice here other than to just use the integer typecodes
-            # for both 16-bit and 32-bit wide-character strings.
-            strings = { 1: 'c', 2: utils.get_array_typecode(2), 4: utils.get_array_typecode(4) }
-            t = strings[elesize]
-
-            # Now we need to fix the value for T so that it corresponds to its
-            # element size by checking the lnumerics array. Afterwards we can
-            # simply decode it as normal.
-            T = builtins.next(ff for ff, size in lnumerics.items() if size == elesize)
-            return decode_array(ea, T, length['length'], numerics, lnumerics)
-
-        # If we found a structure at this address, then we'll simply take its
-        # length and use it to create a structure for each individual element.
-        elif T in {FF_STRUCT}:
-            cb = _structure.size(tid)
-            # FIXME: this math doesn't work with dynamically sized structures (of course)
-            count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ cls.structure(ea + index * cb, identifier=tid) for index in builtins.range(count) ]
-
-        # If the DT_TYPE was found in our numerics dictionary, then we're able
-        # to use a native _array with the decode_array closure.
-        elif T in numerics:
-            return decode_array(ea, T, length['length'], numerics, lnumerics)
-
-        # If the DT_TYPE was found in our lnumerics (long) dictionary, then use
-        # that to figure out the element size, and read each integer as a list
-        # due there being no native _array type.
-        elif T in lnumerics:
-            cb, total = lnumerics[T], interface.address.size(ea)
-            # FIXME: Instead of returning the signed version of an integer, we
-            #        need to return IDA's signed representation of the integer
-            #        so that it directly corresponds to the user's view.
-            Fgetinteger = get.signed if F & idaapi.FF_SIGN == idaapi.FF_SIGN else get.unsigned
-            count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ Fgetinteger(ea + index * cb, cb) for index in builtins.range(count) ]
-
-        # Otherwise the DT_TYPE is unsupported, and we don't have a clue on how
-        # this should be properly decoded...
-        raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the `{:s}` as {:#x}.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, F, '.'.join(['idaapi', 'DT_TYPE']), T))
+        # All we need to do since we've resolved the type is to use the length
+        # to calculate the amount of data to read, and then decode the array.
+        info = idaapi.opinfo_t()
+        info.tid = tid
+        return interface.decode.array(flags, info, read(ea, size * max(0, length)), **byteorder)
 
     @utils.multicase()
     @classmethod
@@ -8741,92 +8579,61 @@ class get(object):
 
     @utils.multicase()
     @classmethod
-    def structure(cls):
-        '''Return a dictionary of ctypes for the ``structure_t`` that is applied to the current address.'''
-        return cls.structure(ui.current.address())
+    def structure(cls, **byteorder):
+        '''Return the decoded fields of the structure at current address as a dictionary.'''
+        return cls.structure(ui.current.address(), **byteorder)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def structure(cls, ea):
-        '''Return a dictionary of ctypes for the ``structure_t`` that is applied to the address `ea`.'''
-        sid = type.structure.id(ea)
-        return cls.structure(ea, sid)
+    def structure(cls, ea, **byteorder):
+        '''Return the decoded fields of the structure at address `ea` as a dictionary.'''
+        sid = type.structure.id(interface.address.head(ea))
+        return cls.structure(ea, sid, **byteorder)
+    @utils.multicase(ea=internal.types.integer, structure=(internal.structure.structure_t, idaapi.tinfo_t, internal.types.string, internal.types.integer))
+    @classmethod
+    def structure(cls, ea, structure, **byteorder):
+        '''Return the decoded fields of the given `structure` from the address `ea` as a dictionary.'''
+        st = _structure.by(structure)
+        return cls.structure(ea, st.ptr, **byteorder)
     @utils.multicase(ea=internal.types.integer, sptr=idaapi.struc_t)
     @classmethod
-    def structure(cls, ea, sptr):
-        '''Return a dictionary of ctypes for the ``structure_t`` identified by `sptr` at the address `ea`.'''
-        return cls.structure(ea, sptr.id)
-    @utils.multicase(ea=internal.types.integer, name=internal.types.string)
+    def structure(cls, ea, sptr, **byteorder):
+        '''Return a dictionary containing the decoded fields of the structure represented by `sptr` using the data at address `ea`.'''
+        if not _structure.has(sptr):
+            raise E.StructureNotFoundError(u"{:s}.structure({:#x}, {:#x}{:s}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, ea, sptr.id, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', sptr.id))
+        expected, size = _structure.size(sptr), interface.address.size(ea)
+        return cls.structure(ea, sptr, size if sptr.props & idaapi.SF_VAR else expected, **byteorder)
+    @utils.multicase(ea=internal.types.integer, structure=(idaapi.tinfo_t, internal.types.integer, internal.types.string), size=internal.types.integer)
     @classmethod
-    @utils.string.decorate_arguments('name', 'suffix')
-    def structure(cls, ea, name, *suffix):
-        '''Return a dictionary of ctypes for the ``structure_t`` with the specified `name` at the address `ea`.'''
-        st = _structure.by_name(name, *suffix, offset=ea)
-        return cls.structure(ea, st)
-    @utils.multicase(ea=internal.types.integer, type=internal.structure.structure_t)
+    def structure(cls, ea, structure, size, **byteorder):
+        '''Return a dictionary containing the decoded fields of the given `structure` using `size` bytes from the data at address `ea`.'''
+        if not _structure.has(structure):
+            descr = "{:#x}".format(structure) if isinstance(structure, internal.types.integer) else "{!s}".format(structure) if isinstance(structure, idaapi.tinfo_t) else "\"{:s}\"".format(structure)
+            raise E.StructureNotFoundError(u"{:s}.structure({:#x}, {:s}, {:+d}{:s}) : Unable to find the specified structure ({:s}).".format(__name__, ea, descr, size, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', descr))
+
+        # Extract the structure from what we were given and warn the user about any trickery we performed.
+        st = _structure.by(structure)
+        if isinstance(structure, idaapi.tinfo_t) and not any([structure.is_struct(), structure.is_union()]):
+            typedescr = "{!s}".format(st.typeinfo)
+            logging.warning(u"{:s}.structure({:#x}, {:s}, {:+d}{:s}) : The given type ({!s}) is not exactly a structure, but will result in its referenced structure ({!s}) being used.".format(__name__, ea, structure, size, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', typedescr))
+
+        # The user has been warned if necessary, so we can now hand things off to the real implementation.
+        sptr = st.ptr
+        return cls.structure(ea, sptr, size, **byteorder)
+    @utils.multicase(ea=internal.types.integer, sptr=(idaapi.struc_t, internal.structure.structure_t), size=internal.types.integer)
     @classmethod
-    def structure(cls, ea, type):
-        '''Return a dictionary of ctypes for the ``structure_t`` specified by `type` at the address `ea`.'''
-        return cls.structure(ea, type.id)
-    @utils.multicase(ea=internal.types.integer, identifier=internal.types.integer)
-    @classmethod
-    def structure(cls, ea, identifier):
-        '''Return a dictionary of ctypes for the ``structure_t`` with the specified `identifier` at the address `ea`.'''
-        ea = interface.address.within(ea)
+    def structure(cls, ea, sptr, size, **byteorder):
+        '''Return a dictionary containing the decoded fields of the structure `sptr` using `size` bytes from the data at address `ea`.'''
+        expected, sptr = idaapi.get_struc_size(sptr.id), sptr if isinstance(sptr, idaapi.struc_t) else sptr.ptr
+        if size < expected:
+            logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is smaller than the size of the structure ({:+d}) and will result in the result being partially initialized.".format('.'.join([__name__, cls.__name__]), ea, sptr.id, size, size, expected))
 
-        # FIXME: consolidate this conversion into an interface or something
-        st = _structure.by_identifier(identifier, offset=ea)
-        typelookup = {
-            (int, -1) : ctypes.c_int8,   (int, 1) : ctypes.c_uint8,
-            (int, -2) : ctypes.c_int16,  (int, 2) : ctypes.c_uint16,
-            (int, -4) : ctypes.c_int32,  (int, 4) : ctypes.c_uint32,
-            (int, -8) : ctypes.c_int64,  (int, 8) : ctypes.c_uint64,
-            (float, 4) : ctypes.c_float, (float, 8) : ctypes.c_double,
+        elif size != expected and not sptr.props & idaapi.SF_VAR:
+            logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is larger than the size of the structure ({:+d}) and will result in {:+d} byte{:s} being discarded.".format('.'.join([__name__, cls.__name__]), ea, sptr.id, size, size, expected, size - expected, '' if size - expected == 1 else 's'))
 
-            # pointer types, would be cool if we could have variable-sized pointers..but we don't.
-            (builtins.type, -1) : ctypes.c_int8,    (builtins.type, 1) : ctypes.c_uint8,
-            (builtins.type, -2) : ctypes.c_int16,   (builtins.type, 2) : ctypes.c_uint16,
-            (builtins.type, -4) : ctypes.c_int32,   (builtins.type, 4) : ctypes.c_uint32,
-            (builtins.type, -8) : ctypes.c_int64,   (builtins.type, 8) : ctypes.c_uint64,
-
-            # FIXME: add support for string types
-        }
-
-        res = {}
-        for m in st.members:
-            t, val = m.type, read(m.offset, m.size) or b''
-
-            # try and lookup the individual type + size
-            try:
-                ct = typelookup[t]
-
-            # either we don't support it, or it's an array
-            except (TypeError, KeyError):
-
-                # if it's an array, then unpack the count. otherwise we'll use a
-                # count of -1 so that we can tell ctypes to not actually create
-                # the type as an array. we can't use 0 here because ctypes
-                # recognizes 0-length arrays.
-                ty, count = t if isinstance(t, internal.types.list) else (t, -1)
-
-                # check that we really are handling an array, and lookup its type
-                # to build a ctype with its count
-                if isinstance(t, internal.types.list) and operator.contains(typelookup, ty):
-                    t = typelookup[ty]
-                    ct = t if count < 0 else (t * count)
-
-                # if our type is a string type, then we can simply make a ctype for it
-                elif ty in {chr, str}:
-                    ct = ctypes.c_char if count < 0 else (ctypes.c_char * count)
-
-                # otherwise we have no idea what ctype we can use for this, so skip it
-                # by creating a buffer for it
-                else:
-                    logging.warning(u"{:s}.structure({:#x}, ...) : Using buffer with size {:+#x} for member #{:d} ({:s}) due to unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), ea, m.size, m.index, m.fullname, ty if count < 0 else [ty, count]))
-                    ct = None
-
-            # finally we can add the member to our result by creating a buffer for it
-            res[m.name] = val if any(item is None for item in [ct, val]) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
-        return res
+        # Now we can just read the data from the database and then decode our structure using it.
+        bytes = read(ea, size)
+        fields = interface.decode.structure_bytes(sptr.id, bytes)
+        return interface.decode.structure(sptr.id, fields, **byteorder)
     struc = struct = utils.alias(structure, 'get')
 
     class switch(object):
