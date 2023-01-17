@@ -162,10 +162,18 @@ def by_address(ea):
         raise E.SegmentNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate segment containing the specified address.".format(__name__, ea))
     return seg
 byaddress = utils.alias(by_address)
+@utils.multicase(index=types.integer)
+def by_index(index):
+    '''Return the segment at the specified `index``.'''
+    seg = idaapi.getnseg(index)
+    if seg is None:
+        raise E.SegmentNotFoundError(u"{:s}.by_index({:d}) : Unable to locate segment at the specified index.".format(__name__, index))
+    return seg
+byindex = utils.alias(by_index)
 @utils.multicase(segment=idaapi.segment_t)
 def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
-    ea, _ = interface.range.bounds(seg)
+    ea, _ = interface.range.bounds(segment)
     return by_address(ea)
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name')
@@ -175,6 +183,11 @@ def by(name, *suffix):
 @utils.multicase(ea=types.integer)
 def by(ea):
     '''Return the segment containing the address `ea`.'''
+    return by_address(ea)
+@utils.multicase(bounds=interface.bounds_t)
+def by(bounds):
+    '''Return the segment containing the specified `bounds`.'''
+    ea, _ = bounds
     return by_address(ea)
 @utils.multicase()
 def by():
@@ -222,7 +235,7 @@ def bounds():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.bounds() : Unable to locate the current segment.".format(__name__))
     return interface.range.bounds(seg)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def bounds(segment):
     '''Return the bounds of the segment specified by `segment`.'''
     seg = by(segment)
@@ -236,7 +249,7 @@ def iterate():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.iterate() : Unable to locate the current segment.".format(__name__))
     return iterate(seg)
-@utils.multicase(segment=(types.integer, types.string, types.tuple))
+@utils.multicase(segment=(types.integer, types.string, interface.bounds_t))
 def iterate(segment):
     '''Iterate through all of the addresses within the specified `segment`.'''
     seg = by(segment)
@@ -256,7 +269,7 @@ def size():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.size() : Unable to locate the current segment.".format(__name__))
     return interface.range.size(seg)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def size(segment):
     '''Return the size of the segment specified by `segment`.'''
     seg = by(segment)
@@ -270,7 +283,7 @@ def offset():
 def offset(ea):
     '''Return the offset of the address `ea` from the beginning of the current segment.'''
     return offset(ui.current.segment(), ea)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), ea=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), ea=types.integer)
 def offset(segment, ea):
     '''Return the offset of the address `ea` from the beginning of `segment`.'''
     seg = by(segment)
@@ -280,7 +293,7 @@ def offset(segment, ea):
 def by_offset(offset):
     '''Return the specified `offset` translated to the beginning of the current segment.'''
     return by_offset(ui.current.segment(), offset)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), offset=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), offset=types.integer)
 def by_offset(segment, offset):
     '''Return the specified `offset` translated to the beginning of `segment`.'''
     seg = by(segment)
@@ -291,7 +304,7 @@ byoffset = utils.alias(by_offset)
 def go_offset(offset):
     '''Go to the `offset` of the current segment.'''
     return go_offset(ui.current.segment(), offset)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), offset=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), offset=types.integer)
 def go_offset(segment, offset):
     '''Go to the `offset` of the specified `segment`.'''
     seg = by(segment)
@@ -307,7 +320,7 @@ def read():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.read() : Unable to locate the current segment.".format(__name__))
     return get_bytes(interface.range.start(seg), interface.range.size(seg))
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def read(segment):
     '''Return the contents of the segment identified by `segment`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
@@ -323,7 +336,7 @@ def repr():
     if segment is None:
         raise E.SegmentNotFoundError(u"{:s}.repr() : Unable to locate the current segment.".format(__name__))
     return repr(segment)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def repr(segment):
     '''Return the specified `segment` in a printable form.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -338,7 +351,7 @@ def top():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.top() : Unable to locate the current segment.".format(__name__))
     return interface.range.start(seg)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def top(segment):
     '''Return the top address of the segment identified by `segment`.'''
     seg = by(segment)
@@ -351,7 +364,7 @@ def bottom():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.bottom() : Unable to locate the current segment.".format(__name__))
     return interface.range.end(seg)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def bottom(segment):
     '''Return the bottom address of the segment identified by `segment`.'''
     seg = by(segment)
@@ -367,7 +380,7 @@ def name():
         raise E.SegmentNotFoundError(u"{:s}.name() : Unable to locate the current segment.".format(__name__))
     res = get_segment_name(seg)
     return utils.string.of(res)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def name(segment):
     '''Return the name of the segment identified by `segment`.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -384,7 +397,7 @@ def color():
         raise E.SegmentNotFoundError(u"{:s}.color() : Unable to locate the current segment.".format(__name__))
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def color(segment):
     '''Return the color of the segment identified by `segment`.'''
     seg = by(segment)
@@ -394,13 +407,13 @@ def color(segment):
 def color(none):
     '''Clear the color of the current segment.'''
     return color(ui.current.segment(), None)
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), none=types.none)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), none=types.none)
 def color(segment, none):
     '''Clear the color of the segment identified by `segment`.'''
     seg = by(segment)
     seg.color = 0xffffffff
     return bool(seg.update())
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), rgb=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), rgb=types.integer)
 def color(segment, rgb):
     '''Sets the color of the segment identified by `segment` to `rgb`.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
@@ -450,7 +463,7 @@ def type(name, *suffix):
 def type(segment):
     '''Return the type of the ``idaapi.segment_t`` specified by `segment`.'''
     return segment.type
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), segtype=types.integer)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), segtype=types.integer)
 def type(segment, segtype):
     '''Return whether the given `segment` is of the provided `segtype`.'''
     return type(segment) == segtype
@@ -586,7 +599,7 @@ def new(offset, size, name, **kwds):
     return seg
 create = utils.alias(new)
 
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple))
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
 def remove(segment, contents=False):
     """Remove the specified `segment`.
 
@@ -608,12 +621,12 @@ def remove(segment, contents=False):
     return res
 delete = utils.alias(remove)
 
-@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, types.tuple), filename=types.string)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), filename=types.string)
 @utils.string.decorate_arguments('filename')
 def save(segment, filename):
     '''Export the segment identified by `segment` to the file named `filename`.'''
     return save(segment, filename, 0)
-@utils.multicase(segment=(types.integer, types.string, types.tuple), filename=types.string, offset=types.integer)
+@utils.multicase(segment=(types.integer, types.string, interface.bounds_t), filename=types.string, offset=types.integer)
 @utils.string.decorate_arguments('filename')
 def save(segment, filename, offset):
     '''Export the segment identified by `segment` to the file named `filename` starting at the given `offset`.'''
