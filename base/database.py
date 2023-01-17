@@ -922,7 +922,7 @@ def read(ea, size):
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
     start, end = interface.address.within(ea, ea + size)
     return get_bytes(ea, end - start) or b''
-@utils.multicase(bounds=internal.types.tuple)
+@utils.multicase(bounds=interface.bounds_t)
 def read(bounds):
     '''Return the bytes within the specified `bounds`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
@@ -2760,7 +2760,8 @@ class imports(object):
             idaapi.enum_import_names(idx, utils.fcompose(lambda *items: items, listable.append, utils.fconstant(True)))
             for ea, name, ordinal in listable:
                 ui.navigation.set(ea)
-                realmodule, realname = cls.__symbol__((module, name, ordinal))
+                module_name_ordinal = module, name, ordinal
+                realmodule, realname = cls.__symbol__(module_name_ordinal)
                 yield ea, (utils.string.of(realmodule), utils.string.of(realname), ordinal)
             continue
         return
@@ -3058,11 +3059,11 @@ class address(object):
     def __new__(cls, start, end, step):
         '''Return a list containing each of the addresses from `start` to `end` using the callable `step` to determine the next address.'''
         return [ea for ea in cls.iterate(start, end, step)]
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     def __new__(cls, bounds):
         '''Return a list containing each of the addresses within `bounds`.'''
         return [ea for ea in cls.iterate(bounds)]
-    @utils.multicase(bounds=internal.types.tuple, step=internal.types.callable)
+    @utils.multicase(bounds=interface.bounds_t, step=internal.types.callable)
     def __new__(cls, bounds, step):
         '''Return a list containing each of the addresses within `bounds` using the callable `step` to determine the next address.'''
         return [ea for ea in cls.iterate(bounds, step)]
@@ -3149,13 +3150,13 @@ class address(object):
         '''Iterate through all of the addresses defined within the specified `location`.'''
         bounds = location.bounds
         return cls.iterate(bounds, step)
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
         left, right = bounds
         return cls.iterate(left, right, cls.prev if left > right else cls.next)
-    @utils.multicase(bounds=internal.types.tuple, step=internal.types.callable)
+    @utils.multicase(bounds=interface.bounds_t, step=internal.types.callable)
     @classmethod
     def iterate(cls, bounds, step):
         '''Iterate through all of the addresses defined within `bounds` using the callable `step` to determine the next address.'''
@@ -3173,7 +3174,7 @@ class address(object):
     def blocks(cls, end):
         '''Yields the boundaries of each block from the current address to `end`.'''
         return cls.blocks(ui.current.address(), end)
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def blocks(cls, bounds):
         '''Yields the boundaries of each block within the specified `bounds`.'''
@@ -4804,7 +4805,12 @@ class type(object):
     def relocation(cls, ea):
         '''Return if the address at `ea` was relocated by a relocation during load.'''
         return True if interface.address.refinfo(ea) else False
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
+    @classmethod
+    def relocation(cls, ea, size):
+        '''Return if an address at `ea` up to `size` bytes was relocated by a relocation during load.'''
+        return any(interface.address.refinfo(ea) for ea in address.iterate(bounds))
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def relocation(cls, bounds):
         '''Return if an address within the specified `bounds` was relocated by a relocation during load.'''
@@ -4838,7 +4844,7 @@ class type(object):
         def __new__(cls, ea):
             '''Return the `[type, length]` of the array at the address specified by `ea`.'''
             return cls(ea, interface.address.size(ea))
-        @utils.multicase(bounds=internal.types.tuple)
+        @utils.multicase(bounds=interface.bounds_t)
         def __new__(cls, bounds):
             '''Return the `[type, length]` of the specified `bounds` as an array.'''
             left, right = ea, _ = sorted(bounds)
@@ -5110,7 +5116,7 @@ class type(object):
         if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.exception(address, **flags)
         return cls.exception(address, **flags)
-    @utils.multicase(ea=(internal.types.integer, internal.types.tuple))
+    @utils.multicase(ea=(internal.types.integer, interface.bounds_t))
     @classmethod
     def exception(cls, ea, **flags):
         """Return if the address or boundaries in `ea` is guarded by an exception or part of an exception handler.
@@ -5185,7 +5191,7 @@ class type(object):
         '''Return if the address in `ea` is referenced by an exception matching the specified `flags` (``idaapi.TBEA_*``).'''
         is_ea_tryblks = idaapi.is_ea_tryblks if hasattr(idaapi, 'is_ea_tryblks') else utils.fconstant(False)
         return True if is_ea_tryblks(ea, flags) else False
-    @utils.multicase(bounds=internal.types.tuple, flags=internal.types.integer)
+    @utils.multicase(bounds=interface.bounds_t, flags=internal.types.integer)
     @classmethod
     def exception(cls, bounds, flags):
         '''Return if the given `bounds` is referenced by an exception matching the specified `flags` (``idaapi.TBEA_*``).'''
@@ -7228,7 +7234,7 @@ class set(object):
         if 'length' in strtype or operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.string(address, **strtype)
         return cls.string(selection, **strtype)
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def string(cls, bounds, **strtype):
         '''Set the data within the provided `bounds` to a string with the specified `strtype` and `encoding`.'''
@@ -7274,7 +7280,8 @@ class set(object):
         # If we were given an explicit string length, then we need to adjust our
         # boundaries to include the layout size when making the string.
         if 'length' in strtype:
-            return cls.string((ea, ea + layout + width * strtype['length']), width, layout, strtype.get('encoding', encoding))
+            bounds = interface.bounds_t(ea, ea + layout + width * strtype['length'])
+            return cls.string(bounds, width, layout, strtype.get('encoding', encoding))
         return cls.string(ea, width, layout if layout > 0 else terminals, strtype.get('encoding', encoding))
 
     # The following implementations are responsible for figuring out the correct
@@ -7294,8 +7301,8 @@ class set(object):
 
         # Now we can read the length prefix and use it to calculate the boundaries
         # of our string. Since we're setting it, we start at the length prefix.
-        left, right = ea, ea + length + width * get.unsigned(ea, length)
-        return cls.string((left, right), width, length, encoding)
+        bounds = interface.bounds_t(ea, ea + length + width * get.unsigned(ea, length))
+        return cls.string(bounds, width, length, encoding)
     @utils.multicase(ea=internal.types.integer, width=internal.types.integer, terminal=internal.types.bytes, encoding=(internal.types.integer, internal.types.string, internal.types.none))
     @classmethod
     def string(cls, ea, width, terminal, encoding):
@@ -7322,13 +7329,14 @@ class set(object):
         # Finally that gives us the actual string size but without the terminator
         # characters.. so, we need to add the terminal character size and then we
         # can dispatch to the right function to create the desired string.
-        return cls.string((ea, right + width), width, 0, encoding)
+        bounds = interface.bounds_t(ea, right + width)
+        return cls.string(bounds, width, 0, encoding)
 
     # Each of the implementations that follow are the only ones that are actually
     # responsible for marking the string within the database. This implies that
     # everything prior is just sugar that figures out the parameters to use them.
 
-    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, length=internal.types.integer, encoding=internal.types.string)
+    @utils.multicase(bounds=interface.bounds_t, width=internal.types.integer, length=internal.types.integer, encoding=internal.types.string)
     @classmethod
     def string(cls, bounds, width, length, encoding):
         '''Set data at the specified `bounds` to a string of the given `encoding` with the provided character `width` and `length` prefix size.'''
@@ -7343,7 +7351,7 @@ class set(object):
         if index < 0:
             raise E.ItemNotFoundError(u"{:s}.string({:s}, {:d}, {:d}, {!r}) : The requested string encoding ({:s}) could not be found in the database.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, utils.string.escape(encoding, '"')))
         return cls.string(bounds, width, length, index)
-    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, length=internal.types.integer, encoding=(internal.types.integer, internal.types.none))
+    @utils.multicase(bounds=interface.bounds_t, width=internal.types.integer, length=internal.types.integer, encoding=(internal.types.integer, internal.types.none))
     @classmethod
     def string(cls, bounds, width, length, encoding):
         '''Set data at the specified `bounds` to a string of the given `encoding` with the provided character `width` and `length` prefix size.'''
@@ -7381,7 +7389,8 @@ class set(object):
         # Now we can make a string at the undefined address and decode the string
         # that we just made if we were successful. Otherwise, we bail (of course).
         if Fcreate_string(ea, size, res):
-            return get.string((ea + length, ea + length + size), width, encoding)
+            bounds = interface.bounds_t(ea + length, ea + length + size)
+            return get.string(bounds, width, encoding)
         raise E.DisassemblerError(u"{:s}.string({:s}, {:d}, {:d}, {:d}) : Unable to define the specified address ({:#x}) as a string of the requested strtype {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), bounds, width, length, encoding, ea, res, 2 + 8))
 
     class integer(object):
@@ -7840,7 +7849,7 @@ class set(object):
         if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.array(ui.current.address(), type)
         start, stop = selection
-        return cls.array((start, address.next(stop)), type)
+        return cls.array(interface.bounds_t(start, address.next(stop)), type)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def array(cls, ea, type):
@@ -7900,7 +7909,7 @@ class set(object):
         # actually guesses that length, we don't want to explicitly destroy anything. If the user
         # really wants to, though, they can specify the length themselves to forcefully overwrite it.
         raise E.InvalidParameterError(u"{:s}.array({!s}, {!r}) : Refusing to change the array at address ({:#x}) due it being of a different type {!r}.".format('.'.join([__name__, cls.__name__]), ea, type, ea, original_type))
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def array(cls, bounds, type):
         '''Set the data at the provided `bounds` to an array of the given `type`.'''
@@ -8280,7 +8289,7 @@ class get(object):
             return cls.array(ea, byteorder.pop('length') if 'length' in byteorder else byteorder.pop('type'), **byteorder)
         bounds = interface.bounds_t(ea, ea + interface.address.size(ea))
         return cls.array(bounds, **byteorder)
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def array(cls, bounds, **byteorder):
         '''Decode the data within the provided `bounds` as an array.'''
@@ -8295,7 +8304,7 @@ class get(object):
         info, flags = idaapi.opinfo_t(), interface.address.flags(ea)
         ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
         return interface.decode.array(flags, info if ok else None, read(ea, size), **byteorder)
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def array(cls, bounds, type, **byteorder):
         '''Return the values within the provided `bounds` as an array of the pythonic element `type`.'''
@@ -8382,7 +8391,7 @@ class get(object):
         if 'length' in strtype or operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.string(address, **strtype)
         return cls.string(selection, **strtype)
-    @utils.multicase(bounds=internal.types.tuple)
+    @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def string(cls, bounds, **strtype):
         '''Return the data within the provided `bounds` as a string with the specified `strtype` and `encoding`.'''
@@ -8427,7 +8436,8 @@ class get(object):
 
         # That was it, so we can now use the leftover bytes to calculate our new
         # bounds, and hand it off with the character width and string encoding.
-        return cls.string((ea + layout, ea + layout + leftover), width, strtype.get('encoding', encoding))
+        bounds = interface.bounds_t(ea + layout, ea + layout + leftover)
+        return cls.string(bounds, width, strtype.get('encoding', encoding))
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def string(cls, ea, **strtype):
@@ -8470,14 +8480,16 @@ class get(object):
 
         # That should be it as we have enough information and should be able to decode it.
         if 'length' in strtype:
-            return cls.string((ea + layout, ea + layout + width * strtype['length']), width, strtype.get('encoding', encoding))
+            bounds = interface.bounds_t(ea + layout, ea + layout + width * strtype['length'])
+            return cls.string(bounds, width, strtype.get('encoding', encoding))
 
         # If we're supposed to trust the layout (length prefix) but it's already marked as
         # a string, then we ignore it and trust the string size from the database. If the
         # layout includes a terminator, then we need to subtract the width to crop it.
         if is_string:
             leftover = interface.address.size(ea) - (layout or width)
-            return cls.string((ea + layout, ea + layout + leftover), width, strtype.get('encoding', encoding))
+            bounds = interface.bounds_t(ea + layout, ea + layout + leftover)
+            return cls.string(bounds, width, strtype.get('encoding', encoding))
 
         # Otherwise they explicitly want it as a string and we do it as we're told.
         return cls.string(ea, width, layout if layout > 0 else terminals, strtype.get('encoding', encoding))
@@ -8501,8 +8513,8 @@ class get(object):
 
         # Now we can read the length prefix from our address and use it to
         # calculate the actual boundaries that are occupied by our string.
-        left, right = ea + length, ea + length + width * cls.unsigned(ea, length)
-        return cls.string((left, right), width, encoding)
+        bounds = interface.bounds_t(ea + length, ea + length + width * cls.unsigned(ea, length))
+        return cls.string(bounds, width, encoding)
     @utils.multicase(ea=internal.types.integer, width=internal.types.integer, terminal=internal.types.bytes, encoding=(internal.types.integer, internal.types.string, internal.types.none))
     @classmethod
     def string(cls, ea, width, terminal, encoding):
@@ -8529,14 +8541,15 @@ class get(object):
 
         # That should give us our very last valid address. Since we're returning just
         # the string, we don't need to add the width to include the terminator.
-        return cls.string((ea, right), width, encoding)
+        bounds = interface.bounds_t(ea, right)
+        return cls.string(bounds, width, encoding)
 
     # The functions that follow are actually responsible for reading and
     # decoding the string using the data from the database. The string
     # length is calculated from their first parameter so that it's up to
     # the caller to figure out which boundary contains the wanted string.
 
-    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, encoding=internal.types.string)
+    @utils.multicase(bounds=interface.bounds_t, width=internal.types.integer, encoding=internal.types.string)
     @classmethod
     def string(cls, bounds, width, encoding):
         '''Return the data at the specified `bounds` as a string with the given character `width` and string `encoding`.'''
@@ -8551,7 +8564,7 @@ class get(object):
         if index < 0:
             raise E.ItemNotFoundError(u"{:s}.string({:s}, {:d}, {!r}) : The requested string encoding ({:s}) could not be found in the database.".format('.'.join([__name__, cls.__name__]), bounds, width, encoding, utils.string.escape(encoding, '"')))
         return cls.string(bounds, width, index)
-    @utils.multicase(bounds=internal.types.tuple, width=internal.types.integer, encoding=(internal.types.integer, internal.types.none))
+    @utils.multicase(bounds=interface.bounds_t, width=internal.types.integer, encoding=(internal.types.integer, internal.types.none))
     @classmethod
     def string(cls, bounds, width, encoding):
         '''Return the data at the specified `bounds` as a string with the given character `width` and string `encoding`.'''
