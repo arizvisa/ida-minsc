@@ -7964,6 +7964,7 @@ class get(object):
     In order to decode various things out of the database, some of the
     following examples can be used::
 
+        > res = database.get(ea)
         > res = database.get.signed()
         > res = database.get.unsigned(ea, 8, byteorder='big')
         > res = database.get.array(ea)
@@ -7972,6 +7973,72 @@ class get(object):
         > res = database.get.structure(ea, structure=structure.by('mystructure'))
 
     """
+    @utils.multicase()
+    def __new__(cls):
+        '''Return the value for the item at the current address.'''
+        return cls(ui.current.address())
+    @utils.multicase(ea=internal.types.integer)
+    def __new__(cls, ea):
+        '''Return the value for the item at the address `ea`.'''
+        return cls(ea, interface.address.size(ea))
+    @utils.multicase(bounds=interface.bounds_t)
+    def __new__(cls, bounds):
+        '''Return the value for the item contained within the specified `bounds`.'''
+        start, stop = sorted(bounds)
+        return cls(start, stop - start, partial=True)
+    @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
+    def __new__(cls, ea, size, **partial):
+        """Return the value for the item at the address `ea` up to the given `size`.
+
+        If `partial` is true, then decode as much of the item as possible leaving the result partially decoded.
+        If `byteorder` is specified as `big` or `little` then force the decoding of the item to that byteorder.
+        """
+        FF_ALIGN, FF_STRLIT = map(idaapi.as_uint32, [idaapi.FF_ALIGN, idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI])
+
+        # Filter out the parameters we're able to hand off to any of the decoders we use.
+        parameters = {kwarg : value for kwarg, value in partial.items() if kwarg in ['order', 'byteorder', 'partial']}
+
+        # First get all the information about the address.
+        flags, element = (F(interface.address.head(ea)) for F in [interface.address.flags, interface.address.element])
+        info, dtype = idaapi.opinfo_t(), flags & interface.typemap.FF_MASKSIZE
+        ok = idaapi.get_opinfo(interface.address.head(ea), idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, interface.address.head(ea), idaapi.OPND_ALL, flags)
+        info = info if ok else None
+
+        # If we're currently looking at code or alignment, then our job is easy
+        # and we only need to return the bytes...as bytes.
+        if flags & idaapi.MS_CLS == idaapi.FF_CODE or dtype in {FF_ALIGN}:
+            return read(ea, size)
+
+        # Otherwise we're data and we first figure out if it's a structure, then
+        # we just compare the sizes to distinguish it as an array or a single item.
+        elif dtype in {idaapi.FF_STRUCT} and info and idaapi.get_struc(info.tid):
+            sptr = internal.structure.new(info.tid, ea).ptr
+            return cls.structure(ea, sptr, size, **parameters) if sptr.props & idaapi.SF_VAR or element >= size else interface.decode.array(flags, info, read(ea, size), **parameters)
+
+        # If this is a string, then we just need to unpack the strtype and use it.
+        elif dtype in {FF_STRLIT}:
+            width, length, _, encoding = interface.string.unpack(info.strtype)
+            return cls.string(ea, width, length, encoding)
+
+        # Anything else should be an integer, but we'll need to transform it
+        # depending on the flags in order to get exactly what the user sees.
+        bytes = read(ea, size)
+        maximum, integers = pow(2, 8 * element), interface.decode.array(flags & ~(idaapi.FF_SIGN|idaapi.FF_BNOT), info, bytes, **parameters)
+        if flags & idaapi.FF_SIGN:
+            result = [item - maximum if item else item for item in integers]
+        elif flags & idaapi.FF_BNOT:
+            result = [maximum + ~item if item else item for item in integers]
+        else:
+            result = [item for item in integers]
+
+        # Figure out what our expected size should be, because if the result
+        # doesn't fit what we expect and we're decoding the item partially,
+        # then we'll need to include those extra bytes in the result we return.
+        expected = element * len(result)
+        if parameters.get('partial', False) and expected < len(bytes):
+            return [item for item in itertools.chain(result, [bytes[expected:]])]
+        return result if element < size else result[0]
+
     @utils.multicase()
     @classmethod
     def info(cls):
