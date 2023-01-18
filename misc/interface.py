@@ -5522,8 +5522,11 @@ class decode(object):
         Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
         Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
 
-        # Iterate through all of the members in the structure.
-        result = {}
+        # Iterate through all of the members in the structure. We also check if
+        # we've been asked to decode it partially. In reality, structures are
+        # always partially decoded, but this flag determined whether we also
+        # decode arrays partially and whether we trim incomplete fields when done.
+        result, partial = {}, byteorder.get('partial', False)
         for m in internal.structure.new(identifier, 0).members:
             name, mptr, mtype, mdata = m.name, m.ptr, m.type, fields[m.name]
             dtype, dsize = (mptr.flag & mask for mask in [typemap.FF_MASK, typemap.FF_MASKSIZE])
@@ -5550,7 +5553,8 @@ class decode(object):
                     available, used = len(mdata), sum(len(item) for item in sliced)
                     if available != used:
                         logging.warning(u"{:s}.structure({:#x}, ...{:s}) : The amount of data available ({:#x}) for decoding the \"{:s}\" member is not a multiple of the size ({:d}) of the member ({:#x}) and will result in ignoring {:+d} byte{:s} during decoding.".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, name, element, mptr.id, available - used, '' if available - used == 1 else 's'))
-                    decoded = [cls.structure(sptr.id, cls.structure_bytes(sptr.id, item), order=order) for item in sliced]
+                    iterable = cls.partial(element, mdata) if partial else sliced
+                    decoded = [cls.structure(sptr.id, cls.structure_bytes(sptr.id, item), order=order, partial=partial) for item in iterable]
 
                 # Otherwise, we leave it as-is because we can't figure out what the structure is.
                 else:
@@ -5589,9 +5593,12 @@ class decode(object):
                 result[name] = cls.unsigned(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(mptr.flag, mdata)) or bytes(mdata)
             continue
 
-        # Add everything else that we missed, and then return it to the caller.
+        # Add everything else that we missed, pop out incomplete members if we
+        # weren't asked to decode partially, and then return it to the caller.
+        # Due to the way structure_bytes works, members with string names that
+        # have values which are bytes or bytearrays are considered incomplete.
         result.update({key : fields[key] for key in fields if key not in result})
-        return result
+        return result if partial else {key : value for key, value in result.items() if isinstance(key, internal.types.integer) or not isinstance(value, (bytes, bytearray))}
 
     @classmethod
     def array(cls, flags, info, bytes, **byteorder):
@@ -5627,7 +5634,13 @@ class decode(object):
             available, used = len(bytes), sum(len(item) for item in sliced)
             if available != used:
                 logging.warning(u"{:s}.array({:#x}, {!s}, ...{:s}) : The amount of data available ({:#x}) for decoding is not a multiple of the structure size ({:#x}) and will result in discarding {:+d} byte{:s} when attempting to decode the array.".format('.'.join([__name__, cls.__name__]), flags, "{:#x}".format(info.tid) if info else info, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', available, element, available - used, '' if available - used == 1 else 's'))
-            return [cls.structure(info.tid, cls.structure_bytes(info.tid, item), order=order) for item in sliced]
+
+            # If we're being asked to decode structures partially, then we swap whatever we
+            # sliced with a partial split of the bytes. This way we can partially decode as
+            # much of each structure as possible when returning the list of each structure.
+            partial = byteorder.get('partial', False)
+            iterable = cls.partial(element, bytes) if partial else sliced
+            return [cls.structure(info.tid, cls.structure_bytes(info.tid, item), order=order, partial=partial) for item in iterable]
 
         # Just a string that we need to decode as an array. Since we're just returning
         # an array, we don't need to decode it and can completely ignore the encoding.
