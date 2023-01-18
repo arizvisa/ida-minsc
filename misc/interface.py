@@ -198,6 +198,15 @@ class typemap(object):
         #nonemap = { (None, pow(2, sz)) : (idaapi.align_flag(), -1) for sz in builtins.range(16) }
         nonemap = { None : (idaapi.align_flag(), -1) }
 
+    # Force all the flags for each lookup table to be 32-bit.
+    s = f = v = 0
+    integermap = {s : (idaapi.as_uint32(f), v) for s, (f, v) in integermap.items()}
+    decimalmap = {s : (idaapi.as_uint32(f), v) for s, (f, v) in decimalmap.items()}
+    stringmap = {s : (idaapi.as_uint32(f), v) for s, (f, v) in stringmap.items()}
+    ptrmap = {s : (idaapi.as_uint32(f), v) for s, (f, v) in ptrmap.items()}
+    nonemap = {s : (idaapi.as_uint32(f), v) for s, (f, v) in nonemap.items()}
+    del s, (f, v)
+
     # Generate the lookup table for looking up the correct tables for a given type.
     typemap = {
         int:integermap, float:decimalmap,
