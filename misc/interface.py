@@ -3542,6 +3542,9 @@ class register_t(symbol_t):
             raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the bytes for the associated register name ({:s}).".format(self, rname))
         return rv.bytes()
 
+    def __reduce__(self):
+        return '.'.join(['architecture', 'register', self.__name__.replace('.', '_')])
+
 class instruction(object):
     """
     This namespace provides some basic utilities to extract an instruction
