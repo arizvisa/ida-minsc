@@ -130,7 +130,8 @@ class typemap(object):
             stringmap.setdefault(builtins.unicode, (idaapi.asciflag(), idaapi.ASCSTR_UNICODE))
 
         ptrmap = { (type, sz) : (idaapi.offflag() | flg, 0) for (_, sz), (flg, _) in integermap.items() }
-        nonemap = { None :(idaapi.alignflag(), -1) }
+        #nonemap = { (None, pow(2, sz)) :(idaapi.alignflag(), -1) for sz in builtins.range(16) }
+        nonemap = { None : (idaapi.alignflag(), -1) }
 
     ## IDA 7.0 types
     else:
@@ -194,7 +195,8 @@ class typemap(object):
             stringmap.setdefault(builtins.unicode, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
 
         ptrmap = { (type, sz) : (idaapi.off_flag() | flg, 0) for (_, sz), (flg, _) in integermap.items() }
-        nonemap = { None :(idaapi.align_flag(), -1) }
+        #nonemap = { (None, pow(2, sz)) : (idaapi.align_flag(), -1) for sz in builtins.range(16) }
+        nonemap = { None : (idaapi.align_flag(), -1) }
 
     # Generate the lookup table for looking up the correct tables for a given type.
     typemap = {
@@ -220,8 +222,13 @@ class typemap(object):
         if (next(iter(s)) if isinstance(s, internal.types.tuple) else s) in {str}: # prioritize `str`
             inverted[f & FF_MASKSIZE, _] = s
         continue
+
+    # Default size for alignflag is 1, since alignment is not actually a type and
+    # isn't understood by the disassembler when applied to a member.
+    # XXX: still would be nice if we could somehow connect this to NALT_ALIGN,
+    #      and use the size parameter as the actual alignment size...
     for s, (f, _) in nonemap.items():
-        inverted[f & FF_MASKSIZE] = s
+        inverted[f & FF_MASKSIZE] = s, 1
 
     # Add all the available flag types to support all available pointer types.
     for s, (f, _) in ptrmap.items():
@@ -322,17 +329,18 @@ class typemap(object):
             count = size // idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
             return [t, count] if count > 1 else t
 
-        # If the size matches the datatype size, then this is a single element
-        # which we represent with a tuple composed of the python type, and the
-        # actual byte size of the datatype.
-        elif sz == size:
-            return t, sz * sf
+        # If we received an alignment type, then we need to specially handle this
+        # since None always implies a single-byte regardless of the element size.
+        elif t is None:
+            return [t, size]
 
-        # At this point, the size does not match the datatype size which means
-        # that this is an array where each element is using the datatype. So,
-        # we need to return a list where the first element is the datatype with
-        # the element size, and the second element is the length of the array.
-        return [(t, sz * sf), size // sz]
+        # If the array is exactly one element, then we return a single element
+        # which is represented by a tuple composed of the python type, and the
+        # actual byte size of the datatype. Otherwise, we just return an array.
+        element, count = sz * sf, size // sz if sz else 0
+        if count == 1:
+            return t, element
+        return [(t, element), count]
 
     @classmethod
     def resolve(cls, pythonType):
