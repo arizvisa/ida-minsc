@@ -8041,6 +8041,20 @@ class get(object):
 
     @utils.multicase()
     @classmethod
+    def type(cls):
+        '''Return the pythonic type for the current address.'''
+        return cls.type(ui.current.address())
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def type(cls, ea):
+        '''Return the pythonic type for the address `ea`.'''
+        ea = interface.address.head(ea, warn=True)
+        flags, info, size = interface.address.flags(ea), idaapi.opinfo_t(), interface.address.size(ea)
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        return interface.typemap.dissolve(flags, info.tid if ok else idaapi.BADADDR, size, offset=ea)
+
+    @utils.multicase()
+    @classmethod
     def info(cls):
         '''Return the type information for the current address as an ``idaapi.tinfo_t``.'''
         return cls.info(ui.current.address())
