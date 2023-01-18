@@ -123,6 +123,17 @@ class map_t(object):
             continue
         return '\n'.join(itertools.chain(["{!s}".format(self.__class__)], results))
 
+    ## Serialization
+    def __getnewargs__(self):
+        return ()
+
+    def __getstate__(self):
+        return {name : register for name, register in self.__state__.items()}
+
+    def __setstate__(self, state):
+        validated = {name.replace('.', '_') : register for name, register in state.items()}
+        object.__setattr__(self, '__state__', validated)
+
 class architecture_t(object):
     """
     Base class to represent how IDA maps the registers and types
