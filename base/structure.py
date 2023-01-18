@@ -2838,7 +2838,7 @@ class member_t(object):
         # that opinfo.tid should be BADADDR which isn't actually the truth when
         # you're working with a refinfo. hence we try to be quiet about it.
         if expected_tid != (resulting_tid or idaapi.BADADDR):
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, type, expected_tid, resulting_tid))
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, type, expected_tid, resulting_tid or idaapi.BADADDR))
 
         # return the stuff that actually applied.
         flag, size = resulting
