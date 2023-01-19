@@ -286,53 +286,60 @@ class typemap(object):
         Fstring_encoding = idaapi.set_str_encoding_idx if hasattr(idaapi, 'set_str_encoding_idx') else lambda strtype, encoding_idx: (strtype & 0xffffff) | (encoding_idx << 24)
         strtype = typeid if typeid is None else typeid & Fstring_encoding(0xfffffff, 0)
 
-        # Check if the dtype's size field (dsize) is describing a structure and
-        # verify that our type-id is an integer so that we know that we need to
-        # figure out the structure's size. We also do an explicit check if the type-id
-        # is a structure because in some cases, IDA will forget to set the FF_STRUCT
-        # flag but still assign the structure type-id to a union member.
-        if (dsize == FF_STRUCT and isinstance(typeid, internal.types.integer)) or (typeid is not None and internal.structure.has(typeid)):
-            t = internal.structure.new(typeid, 0 if offset is None else offset)
+        # Check if the dtype's size field (dsize) is describing a structure and verify
+        # that our identifier is an integer or something that will get us a structure.
+        # We have to do this explicit check because in some cases, the disassembler will
+        # forget to set the FF_STRUCT flag but still assign a structure type identifier
+        # to a member's opinfo_t. This way we can still pythonic-type all union members.
+        if (dsize == FF_STRUCT and isinstance(typeid, internal.types.integer) and idaapi.get_struc(typeid)) or (typeid is not None and idaapi.get_struc(typeid)):
+            sptr = idaapi.get_struc(typeid)
+            element, variableQ = idaapi.get_struc_size(sptr), sptr.props & idaapi.SF_VAR
 
-            # grab the size, and check it it's a variable-length struct so we can size it.
-            sz, variableQ = t.size, t.ptr.props & getattr(idaapi, 'SF_VAR', 1)
-            return t if sz == size else (t, size) if variableQ else [t, size // sz]
+            # grab the structure_t and check the flags to figure out if we need to size it.
+            structure = internal.structure.new(sptr.id, 0 if offset is None else offset)
+            return structure if element == size else (structure, size) if variableQ else [structure, size // element]
 
-        # Verify that we actually have the datatype mapped and that we can look it up.
-        if all(item not in cls.inverted for item in [dsize, dtype, (dtype, typeid), (dtype, strtype)]):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dtype, typeid, size))
+        # Verify that we actually have the datatype in our typemap and that we can look it up.
+        elif all(item not in cls.inverted for item in [dsize, dtype, (dtype, typeid), (dtype, strtype)]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({:#x}, {:s}, {:+d}, {:+#x}) : Unable to locate a pythonic type that matches the specified type ({:#x}) or identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), flag, "{:#x}".format(typeid) if isinstance(typeid, internal.types.integer) else "{!s}".format(typeid), size, offset, dtype, idaapi.BADADDR if typeid is None else typeid))
 
-        # Now that we know the datatype exists, extract the actual type (dtype)
-        # and the type's size (dsize) from the inverted map while giving priority
-        # to the type. This way we're checking the dtype for pointers (references)
-        # and then only afterwards do we fall back to depending on the size.
+        # Now that we know the datatype exists, extract the actual dtype (DT_TYPE with MS_0TYPE
+        # and MS_1TYPE) and the type's dsize (DT_TYPE) from the inverted map while giving priority
+        # to the dtype. This way we prioritize checking the dtype for pointers (references) first
+        # (which are stored via MS_XTYPE) and only then we fall back to the dsize to find the type.
         item = cls.inverted[dtype] if dtype in cls.inverted else cls.inverted[dtype, typeid] if (dtype, typeid) in cls.inverted else cls.inverted[dtype, strtype] if (dtype, strtype) in cls.inverted else cls.inverted[dsize]
 
-        # If it's not a tuple, then it's not a "real" type and we only need the size.
+        # If it's not a tuple, then it's not a "real" type and so we can assume it's
+        # a base type and we can combine it with the size to get an array out of it.
         if not isinstance(item, tuple):
             return [item, size]
 
-        # If it's got a length, then we can just use it.
+        # If the item from the table has got a length, then we can just use it and
+        # then fall-through. This has the side-effect of supporting string types
+        # since the second part of a string tuple will always be the character width.
         elif len(item) == 2:
             t, sz = item
 
-        # If our tuple contains extra information (a string), then hack that in.
+        # But, if our tuple contains extra information (a string) then we hack it
+        # in. We do this by unpacking our width and length out of it to return.
         else:
             t, width, length = item
             reduced = item if length > 0 else (t, width) if width > 1 else t
 
-            # XXX: IDA includes the length in the actual count if we're being
-            #      assigned to a structure but not within the database. So, we
-            #      ignore the correct calculation (which makes the python type
-            #      look inaccurate, but it represents the number of characters
-            #      that fit within the prefix) and adjust it in the database module.
+            # XXX: The disassembler only includes the length-prefix as part of the size iff the
+            #      strtype is applied to a structure, and excludes it when it is applied to an
+            #      an address in the database. So, we deal with this by only calculating the
+            #      string length without its prefix. Then in places where the prefix is included
+            #      in the strtype (such as the database module), we use the character width to
+            #      calculate the number of characters used by the length-prefix, and subtract
+            #      that from the returned pythonic-type.
 
             #count = max(0, size - length) // width
             count = size // width
             return [reduced, count] if any([count > 1, size == 0]) else reduced if length > 0 or width > 1 else str
 
-        # If the datatype size is not an integer, then we need to calculate the
-        # size ourselves using the size parameter we were given and the element
+        # If the datatype size (sz) is not an integer, then we need to calculate
+        # the size ourselves using the size parameter we were given and the element
         # size of the datatype as determined by the flags (DT_TYPE | MS_CLS).
         if not isinstance(sz, internal.types.integer):
             count = size // idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
@@ -355,6 +362,7 @@ class typemap(object):
     def resolve(cls, pythonType):
         '''Convert the provided `pythonType` into IDA's `(flag, typeid, size)`.'''
         struc_flag = idaapi.struflag if idaapi.__version__ < 7.0 else idaapi.stru_flag
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
 
         sz, count = None, 1
 
@@ -364,18 +372,37 @@ class typemap(object):
         # the sizes we want to look up, and then we extract the flag and typeid
         # from the table that we determined.
         if isinstance(pythonType, ().__class__) and not isinstance(next(iter(pythonType)), (idaapi.struc_t, internal.structure.structure_t)):
-            table = cls.typemap[builtins.next(item for item in pythonType)]
+            table = cls.typemap.get(builtins.next(item for item in pythonType), {})
 
-            #t, sz = pythonType
-            #table = cls.typemap[t] if not isinstance(t, internal.types.tuple) else cls.typemap[t[0]]
-            #(t, sz), count = (pythonType, 1) if len(pythonType) == 2 else ((pythonType[0], pythonType), 1)
+            # First check if our pythonic type already exists in the table as a regular
+            # tuple. If it is, then this is a string type and we can use it as-is.
             if pythonType in table:
                 flag, typeid = table[pythonType]
                 t, width, length = pythonType if len(pythonType) == 3 else pythonType + (0,)
                 return flag, typeid, width + length
 
+            # If it wasn't in the table and the length of the tuple is not 2 elements,
+            # then this is an invalid type and there's nothing we can do but bail.
+            elif len(pythonType) != 2:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+
+            # Now we unpack the tuple into its basic type so we can use it to verify that
+            # the type actually exists but with a negative size that we needed to absolute.
             (t, sz), count = pythonType, 1
-            table = table[abs(sz)]
+            if (t, abs(sz)) in table:
+                flag, typeid = table[t, abs(sz)]
+                return flag | (idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz)
+
+            # Othrwise, we need to check to see if just the type itself is in our
+            # table. This only occurs if the type is "unsized" which means we rely
+            # on the size we were given which only occurs for alignment.
+            elif t not in table:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+
+            # Now we know that this is a valid type, we can use it to fetch the flags and
+            # typeid. If the user gave us a size for this basic type, this'll get combined
+            # with the count later resulting in a multiple of the basic type's size.
+            flag, typeid = table[t]
 
         # If we were given a pythonic-type that's a list, then we know that this
         # is an array of some kind. We extract the count from the second element
@@ -384,40 +411,59 @@ class typemap(object):
         # given by the first element of the list.
         elif isinstance(pythonType, internal.types.list):
             res, count = pythonType
-            flag, typeid, sz = cls.resolve(res)
+            flag, info, sz = cls.resolve(res)
 
-        # If our pythonic-type is an actual structure_t, then obviously this
-        # type is representing a structure. We know how to create the structure
-        # flag, but we'll need to extract the type-id and the structure's size
-        # from the properties of the structure that we were given.
-        elif isinstance(pythonType, internal.structure.structure_t):
-            flag, typeid, sz = struc_flag(), pythonType.id, pythonType.size
+            # Now we need to check the flag if the type is a string, because if so
+            # we'll need to adjust our size to only use the character width in its product.
+            if flag & cls.FF_MASKSIZE == FF_STRLIT:
+                strtype = info
+                width, layout, _, _ = string.unpack(strtype)
 
-        # If our pythonic-type is an idaapi.struc_t, then we need to do
-        # pretty much the exact same thing that we did for the structure_t
-        # and extract both its type-id and size.
-        elif isinstance(pythonType, idaapi.struc_t):
-            flag, typeid, sz = struc_flag(), pythonType.id, idaapi.get_struc_size(pythonType)
+                # Verify that our resolved array element has the exact size that we expect
+                # so that we can calculate the size of the string correctly and return it.
+                if sz != width + layout:
+                    logging.warning(u"{:s}.resolve({!s}) : Resolving the given type ({!s}) to a string resulted in a size ({:+d}) that does not correspond to the sum of the determined width ({:d}) and length ({:d}).".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, size, width, layout))
+                return flag | (idaapi.FF_SIGN if sz < 0 else 0), strtype, layout + width * count
 
-        # if we got here with a tuple, then that's because we're using a variable-length
-        # structure...which really means the size is forced.
+            # Otherwise we can just multiply our element width by the array length.
+            tid = idaapi.BADADDR if info < 0 else info
+            return flag | (idaapi.FF_SIGN if sz < 0 else 0), tid, abs(sz) * count
+
+        # If our pythonic-type is a structure, then we extract its sptr and then
+        # we can use the sptr to snag its identifier and the size of the structure.
+        elif isinstance(pythonType, (idaapi.struc_t, internal.structure.structure_t)):
+            sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
+            flag, typeid, sz = struc_flag(), sptr.id, idaapi.get_struc_size(sptr)
+
+        # If we got a tuple here (since we processed it earlier), then this is because
+        # we're using a variable-length structure. This really means that the structure
+        # is actually being scaled to the size we were given (its variable-length).
         elif isinstance(pythonType, internal.types.tuple):
-            t, sz = pythonType
+            t, size = pythonType
             sptr = t.ptr if isinstance(t, internal.structure.structure_t) else t
             flag, typeid = struc_flag(), sptr.id
 
-            # if we're not a variable-length structure, then this pythonic type isn't
-            # valid. we still don't error out, though, and we just correct the size.
-            if not sptr.props & getattr(idaapi, 'SF_VAR', 1):
-                sz = idaapi.get_struc_size(sptr)
+            # But if we're not a variable-length structure (according to the flags),
+            # then the pythonic type isn't actually valid. Since this could've been
+            # an accident, we avoid erroring out by correcting the size and using it.
+            sz = size if sptr.props & getattr(idaapi, 'SF_VAR', 1) else idaapi.get_struc_size(sptr)
 
-        # Anything else should be the default value that we're going to have to
-        # look up. We start by using the type to figure out the correct table,
-        # and then we grab the flags and type-id from the None key for the
-        # pythonType. This should give us the default type information for the
-        # current database and architecture.
-        else:
+        # Anything else should be the type's default value which gets assigned for
+        # both the current database and architecture. Whatever type the user gives
+        # us _has_ to lead us to another table in order for it to be valid. We start
+        # by using it to determine the correct table, and then from the correct table
+        # we can grab the flags and type id using the None key of that table.
+        elif pythonType in cls.typemap:
             table = cls.typemap[pythonType]
+
+            # If None is not in the table, then the type-mapper was not initialized
+            # which is either because we didn't receive a processor notification,
+            # the database wasn't loaded, or because of something crazy and unexpected.
+            if None not in table:
+                info = idaapi.get_inf_structure()
+                Fprocessor_name = operator.attrgetter('procname' if hasattr(info, 'procname') else 'procName')
+                why = '' if info and Fprocessor_name(info) else ' due to the processor size not being detected or a database not currently open.'
+                raise internal.exceptions.ItemNotFoundError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type{:s}.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, why))
             flag, typeid = table[None]
 
             # Construct an opinfo_t with the type-id that was returned, and then
@@ -426,10 +472,15 @@ class typemap(object):
             opinfo.tid = typeid
             return flag, typeid, idaapi.get_data_elsize(idaapi.BADADDR, flag, opinfo)
 
-        # Now we can return the flags, type-id, and the total size that IDAPython
-        # uses when describing a type. We also check if our size is negative
-        # because then we'll need to update the flags with the FF_SIGN flag in
-        # order to describe the correct type requested by the user.
+        # This is our catch-all so that we can compain about it to the user.
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType))
+
+        # If we fell-through, we should have the flags, type identifier, and the
+        # total size that IDAPython needs when describing a type. If we received
+        # a count, then our resulting size is the product of the count and the
+        # basic size. We also check our basic size for negativity so that we can
+        # update the flags with FF_SIGN if that's what the user intended.
         typeid = idaapi.BADADDR if typeid < 0 else typeid
         return flag | (idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz) * count
 
