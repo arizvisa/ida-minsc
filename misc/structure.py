@@ -1824,6 +1824,9 @@ class members_t(object):
         `fullname` - Filter the structure members by matching its full name according to a glob
         `comment` or `comments` - Filter the structure members by applying a glob to its comment
         `identifier` or `id` - Filter the structure members by an identifier or a list of identifiers
+        `bounds` - Match the structure members that overlap with the given boundaries
+        `location` - Match the structure members that overlap with the specified location
+        `within` - Filter the structure members within the given boundaries
         `greater` or `ge` - Filter the structure members for any after the specified offset (inclusive)
         `gt` - Filter the structure members for any after the specified offset (exclusive)
         `less` or `le` - Filter the structure members for any before the specified offset (inclusive)
@@ -1857,6 +1860,14 @@ class members_t(object):
         '''Iterate through all of the members in the structure with a name that matches the glob in `string`.'''
         res = string if isinstance(string, types.ordered) else (string,)
         return self.iterate(like=interface.tuplename(*itertools.chain(res, suffix)))
+    @utils.multicase(bounds=interface.bounds_t)
+    def iterate(self, bounds):
+        '''Iterate through all of the members of the structure that overlap the given `bounds`.'''
+        return self.iterate(predicate=operator.truth, bounds=bounds)
+    @utils.multicase(location=interface.location_t)
+    def iterate(self, location):
+        '''Iterate through all of the members of the structure that overlap the given `location`.'''
+        return self.iterate(predicate=operator.truth, location=location)
 
     @utils.multicase(string=(types.string, types.ordered))
     @utils.string.decorate_arguments('string', 'suffix')
@@ -1864,6 +1875,14 @@ class members_t(object):
         '''List any members that match the glob in `string`.'''
         res = string if isinstance(string, types.ordered) else (string,)
         return self.list(like=interface.tuplename(*itertools.chain(res, suffix)))
+    @utils.multicase(bounds=interface.bounds_t)
+    def list(self, bounds):
+        '''List any members that overlap the given `bounds`.'''
+        return self.list(predicate=operator.truth, bounds=bounds)
+    @utils.multicase(location=interface.location_t)
+    def list(self, location):
+        '''List any members that overlap the specified `location`.'''
+        return self.list(predicate=operator.truth, location=location)
     @utils.multicase()
     @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
     def list(self, **type):
@@ -2039,6 +2058,11 @@ class members_t(object):
                 return True
             continue
         return False
+    @utils.multicase(bounds=interface.bounds_t)
+    def has(self, bounds):
+        '''Return whether any members exist within the specified `bounds`.'''
+        start, stop = sorted(bounds)
+        return self.has(start, stop)
 
     @utils.string.decorate_arguments('name', 'suffix')
     def by_name(self, name, *suffix):
@@ -2749,20 +2773,22 @@ class members_t(object):
     ## Matching
     __members_matcher = utils.matcher()
     __members_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
-    __members_matcher.attribute('index', 'index')
-    __members_matcher.attribute('identifier', 'id'), __members_matcher.attribute('id', 'id')
-    __members_matcher.attribute('offset', 'offset')
+    __members_matcher.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), 'index')
+    __members_matcher.combinator('identifier', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), 'id')
+    __members_matcher.alias('id', 'identifier')
+    __members_matcher.combinator('offset', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), 'offset')
     __members_matcher.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
     __members_matcher.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
     __members_matcher.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'fullname')
-    __members_matcher.combinator('comment', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, utils.fdefault(''))), 'comment')
-    __members_matcher.combinator('comments', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, utils.fdefault(''))), 'comment')
-    __members_matcher.boolean('greater', operator.le, lambda member: member.offset + member.size)
-    __members_matcher.boolean('ge', operator.le, lambda member: member.offset + member.size)
-    __members_matcher.boolean('gt', operator.lt, lambda member: member.offset + member.size)
-    __members_matcher.boolean('less', operator.ge, 'offset')
+    __members_matcher.combinator('comment',  utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, utils.fdefault(''))), 'comment')
+    __members_matcher.alias('comments', 'comment')
+    __members_matcher.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(utils.fpartial(operator.methodcaller, 'overlaps'), utils.fcompose(utils.funpack(interface.bounds_t), utils.fpartial(operator.methodcaller, 'overlaps'))), 'bounds')
+    __members_matcher.combinator('location', utils.fcondition(utils.finstance(interface.location_t))(utils.fcompose(operator.attrgetter('bounds'), utils.fpartial(operator.methodcaller, 'overlaps')), utils.fcompose(utils.funpack(interface.location_t), operator.attrgetter('bounds'), utils.fpartial(operator.methodcaller, 'overlaps'))), 'bounds')
+    __members_matcher.combinator('within', utils.fcondition(utils.finstance(interface.bounds_t))(utils.fcompose(utils.fpartial(operator.methodcaller, 'contains')), utils.fcompose(utils.funpack(interface.bounds_t), utils.fpartial(operator.methodcaller, 'contains'))), 'bounds')
+    __members_matcher.boolean('ge', operator.le, utils.fmap(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add)), __members_matcher.alias('greater', 'ge')
+    __members_matcher.boolean('gt', operator.lt, utils.fmap(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add))
     __members_matcher.boolean('le', operator.ge, 'offset')
-    __members_matcher.boolean('lt', operator.gt, 'offset')
+    __members_matcher.boolean('lt', operator.gt, 'offset'), __members_matcher.alias('less', 'lt')
     __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
 
     def __iterate__(self):
@@ -2774,17 +2800,35 @@ class members_t(object):
     @utils.multicase(tag=types.string)
     @utils.string.decorate_arguments('And', 'Or')
     def select(self, tag, *And, **boolean):
-        '''Query all of the members for the specified `tag` and any others specified as `And`.'''
+        '''Query all of the members for the specified `tag` with any others that are required in `And`.'''
         res = {tag} | {item for item in And}
         boolean['And'] = {item for item in boolean.get('And', [])} | res
         return self.select(**boolean)
+    @utils.multicase(bounds=interface.bounds_t, tag=types.string)
+    @utils.string.decorate_arguments('And', 'Or')
+    def select(self, bounds, tag, *And, **boolean):
+        '''Query all of the members overlapping the given `bounds` for the specified `tag` with any others that are required in `And`.'''
+        res = {tag} | {item for item in And}
+        boolean['And'] = {item for item in boolean.get('And', [])} | res
+        return self.select(bounds, **boolean)
+    @utils.multicase(bounds=interface.bounds_t)
+    @utils.string.decorate_arguments('And', 'Or')
+    def select(self, bounds, **boolean):
+        '''Query all of the members overlapping the given `bounds` (linearly) for any tags specified by `boolean`.'''
+        start, stop = sorted(bounds)
+        for member, content in self.select(**boolean):
+            mstart, mstop = member.bounds
+            if start <= mstop and stop > mstart:
+                yield member, content
+            continue
+        return
     @utils.multicase()
     @utils.string.decorate_arguments('And', 'Or')
     def select(self, **boolean):
-        """Query all of the members (linearly) for any tags specified by `boolean`. Yields each member found along with the matching tags as a dictionary.
+        """Query all of the members (linearly) for any tags specified by `boolean` and yield each matching member along with the queried tags as a dictionary.
 
-        If `And` contains an iterable then require the returned members contains them.
-        If `Or` contains an iterable then include any other tags that are specified.
+        If `And` contains an iterable then require the members being returned contain them.
+        If `Or` contains an iterable then include them in the tags that are returned for each member if available.
         """
         boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
