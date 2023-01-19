@@ -1353,42 +1353,42 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
-    @utils.string.decorate_arguments('And', 'Or')
+    @utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
     def select(cls, **boolean):
         '''Query the basic blocks of the current function for any tags specified by `boolean`'''
         return cls.select(ui.current.function(), **boolean)
     @utils.multicase(tag=types.string)
     @classmethod
-    @utils.string.decorate_arguments('tag', 'And', 'Or')
-    def select(cls, tag, *Or, **boolean):
-        '''Query the basic blocks of the current function for the specified `tag` and any others specified as `Or`.'''
-        res = {tag} | {item for item in Or}
-        boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+    @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+    def select(cls, tag, *included, **boolean):
+        '''Query the basic blocks of the current function for the given `tag` or any others that should be `included`.'''
+        res = {tag} | {item for item in included}
+        boolean['included'] = {item for item in boolean.get('included', [])} | res
         return cls.select(ui.current.function(), **boolean)
     @utils.multicase(func=(idaapi.func_t, types.integer), tag=types.string)
     @classmethod
-    @utils.string.decorate_arguments('tag', 'And', 'Or')
-    def select(cls, func, tag, *Or, **boolean):
-        '''Query the basic blocks of the function `func` for the specified `tag` and any others specified as `Or`.'''
-        res = {tag} | {item for item in Or}
-        boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+    @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+    def select(cls, func, tag, *included, **boolean):
+        '''Query the basic blocks of the function `func` for the given `tag` or any others that should be `included`.'''
+        res = {tag} | {item for item in included}
+        boolean['included'] = {item for item in boolean.get('included', [])} | res
         return cls.select(func, **boolean)
-    @utils.multicase(func=(idaapi.func_t, types.integer), tag=types.unordered)
+    @utils.multicase(func=(idaapi.func_t, types.integer), tags=types.unordered)
     @classmethod
-    @utils.string.decorate_arguments('tag', 'And', 'Or')
-    def select(cls, func, tag, *Or, **boolean):
-        '''Query the basic blocks of the function `func` for the specified `tag` and any others specified as `Or`.'''
-        res = {item for item in tag} | {item for item in Or}
-        boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+    @utils.string.decorate_arguments('tags', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+    def select(cls, func, tags, *included, **boolean):
+        '''Query the basic blocks of the function `func` for the given `tags` or any others that should be `included`.'''
+        res = {item for item in tags} | {item for item in included}
+        boolean['included'] = {item for item in boolean.get('included', [])} | res
         return cls.select(func, **boolean)
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    @utils.string.decorate_arguments('And', 'Or')
+    @utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
     def select(cls, func, **boolean):
-        """Query the basic blocks of the function `func` for any tags specified by `boolean`. Yields each basic block found along with the matching tags as a dictionary.
+        """Query the basic blocks of the function `func` for any of the tags specified by `boolean` and yield a tuple for each matching basic block with selected tags and values.
 
-        If `And` contains an iterable then require the returned address contains them.
-        If `Or` contains an iterable then include any other tags that are specified.
+        If `require` is given as an iterable of tag names then require that each returned block uses them.
+        If `include` is given as an iterable of tag names then include the tags for each returned block if available.
         """
         target, flags = by(func), getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
 
@@ -1416,20 +1416,20 @@ class blocks(object):
             return
 
         # Collect the tagnames being queried as specified by the user.
-        Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['Or', 'include', 'included', 'includes'], ['And', 'require', 'required', 'requires']])
 
         # Walk through every tagged address and cross-check it against the query.
         for ea in ordered:
             ui.navigation.analyze(ea)
             collected, address = {}, block.tag(ea)
 
-            # Or(|) includes any of the tagnames that were selected.
-            collected.update({key : value for key, value in address.items() if key in Or})
+            # included is the equivalent of Or(|) and yields a block if any of the specified tagnames are used.
+            collected.update({key : value for key, value in address.items() if key in included})
 
-            # And(&) includes tags only if the address includes all of the specified tagnames.
-            if And:
-                if And & six.viewkeys(address) == And:
-                    collected.update({key : value for key, value in address.items() if key in And})
+            # required is the equivalent of And(&) which yields a block only if it uses all of the specified tagnames.
+            if required:
+                if required & six.viewkeys(address) == required:
+                    collected.update({key : value for key, value in address.items() if key in required})
                 else: continue
 
             # If anything was collected (matched), then yield the block and the matching tags.
@@ -3104,65 +3104,65 @@ def tags(func):
     return tags(ea)
 
 @utils.multicase()
-@utils.string.decorate_arguments('And', 'Or')
+@utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
 def select(**boolean):
     '''Query the contents of the current function for any tags specified by `boolean`'''
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=types.string)
-@utils.string.decorate_arguments('tag', 'And', 'Or')
-def select(tag, *Or, **boolean):
-    '''Query the contents of the current function for the specified `tag` and any others specified as `Or`.'''
-    res = {tag} | {item for item in Or}
-    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+@utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def select(tag, *included, **boolean):
+    '''Query the contents of the current function for the given `tag` or any others that should be `included`.'''
+    res = {tag} | {item for item in included}
+    boolean['included'] = {item for item in boolean.get('included', [])} | res
     return select(ui.current.function(), **boolean)
 @utils.multicase(func=(idaapi.func_t, types.integer), tag=types.string)
-@utils.string.decorate_arguments('tag', 'And', 'Or')
-def select(func, tag, *Or, **boolean):
-    '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
-    res = {tag} | {item for item in Or}
-    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+@utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def select(func, tag, *included, **boolean):
+    '''Query the contents of the function `func` for the given `tag` or any others that should be `included`.'''
+    res = {tag} | {item for item in included}
+    boolean['included'] = {item for item in boolean.get('included', [])} | res
     return select(func, **boolean)
-@utils.multicase(func=(idaapi.func_t, types.integer), tag=types.unordered)
-@utils.string.decorate_arguments('tag', 'And', 'Or')
-def select(func, tag, *Or, **boolean):
-    '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
-    res = {item for item in tag} | {item for item in Or}
-    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+@utils.multicase(func=(idaapi.func_t, types.integer), tags=types.unordered)
+@utils.string.decorate_arguments('tags', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def select(func, tags, *included, **boolean):
+    '''Query the contents of the function `func` for the given `tags` or any others that should be `included`.'''
+    res = {item for item in tags} | {item for item in included}
+    boolean['included'] = {item for item in boolean.get('included', [])} | res
     return select(func, **boolean)
 @utils.multicase(func=(idaapi.func_t, types.integer))
-@utils.string.decorate_arguments('And', 'Or')
+@utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
 def select(func, **boolean):
-    """Query the contents of the function `func` for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
+    """Query the contents of the function `func` for any of the tags specified by `boolean and yield a tuple for each matching address with selected tags.
 
-    If `And` contains an iterable then require the returned address contains them.
-    If `Or` contains an iterable then include any other tags that are specified.
+    If `require` is given as an iterable of tag names then require that each returned address uses them.
+    If `include` is given as an iterable of tag names then include the tags for each returned address if available.
     """
     target = by(func)
     boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
     # If nothing specific was queried, then yield all tags that are available.
     if not boolean:
-        for ea in sorted(internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target))):
+        for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target)):
             ui.navigation.analyze(ea)
             address = database.tag(ea)
             if address: yield ea, address
         return
 
     # Collect the tagnames being queried as specified by the user.
-    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['Or', 'include', 'included', 'includes'], ['And', 'require', 'required', 'requires']])
 
     # Walk through every tagged address and cross-check it against the query.
-    for ea in sorted(internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target))):
+    for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target)):
         ui.navigation.analyze(ea)
         collected, address = {}, database.tag(ea)
 
-        # Or(|) includes any of the tagnames that were selected.
-        collected.update({key : value for key, value in address.items() if key in Or})
+        # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
+        collected.update({key : value for key, value in address.items() if key in included})
 
-        # And(&) includes tags only if the address includes all of the specified tagnames.
-        if And:
-            if And & six.viewkeys(address) == And:
-                collected.update({key : value for key, value in address.items() if key in And})
+        # required is the equivalent of And(&) which yields the addrss only if it uses all of the specified tagnames.
+        if required:
+            if required & six.viewkeys(address) == required:
+                collected.update({key : value for key, value in address.items() if key in required})
             else: continue
 
         # If anything was collected (matched), then yield the address and the matching tags.
