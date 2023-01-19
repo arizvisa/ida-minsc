@@ -2798,23 +2798,23 @@ class members_t(object):
         return
 
     @utils.multicase(tag=types.string)
-    @utils.string.decorate_arguments('And', 'Or')
-    def select(self, tag, *And, **boolean):
-        '''Query all of the members for the specified `tag` with any others that are required in `And`.'''
-        res = {tag} | {item for item in And}
-        boolean['And'] = {item for item in boolean.get('And', [])} | res
+    @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+    def select(self, tag, *required, **boolean):
+        '''Query the structure members for the given `tag` and any others that may be `required`.'''
+        res = {tag} | {item for item in required}
+        boolean['required'] = {item for item in boolean.get('required', [])} | res
         return self.select(**boolean)
     @utils.multicase(bounds=interface.bounds_t, tag=types.string)
-    @utils.string.decorate_arguments('And', 'Or')
-    def select(self, bounds, tag, *And, **boolean):
-        '''Query all of the members overlapping the given `bounds` for the specified `tag` with any others that are required in `And`.'''
-        res = {tag} | {item for item in And}
-        boolean['And'] = {item for item in boolean.get('And', [])} | res
+    @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+    def select(self, bounds, tag, *required, **boolean):
+        '''Query the structure members within the specified `bounds` for the given `tag` and any others that may be `required`.'''
+        res = {tag} | {item for item in required}
+        boolean['required'] = {item for item in boolean.get('required', [])} | res
         return self.select(bounds, **boolean)
     @utils.multicase(bounds=interface.bounds_t)
-    @utils.string.decorate_arguments('And', 'Or')
+    @utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
     def select(self, bounds, **boolean):
-        '''Query all of the members overlapping the given `bounds` (linearly) for any tags specified by `boolean`.'''
+        '''Query the structure members within the specified `bounds` for any tags specified by `boolean`.'''
         start, stop = sorted(bounds)
         for member, content in self.select(**boolean):
             mstart, mstop = member.bounds
@@ -2823,12 +2823,12 @@ class members_t(object):
             continue
         return
     @utils.multicase()
-    @utils.string.decorate_arguments('And', 'Or')
+    @utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
     def select(self, **boolean):
-        """Query all of the members (linearly) for any tags specified by `boolean` and yield each matching member along with the queried tags as a dictionary.
+        """Query the structure members for the tags specified by `boolean` and yield a tuple for each matching member along with selected tags and values.
 
-        If `And` contains an iterable then require the members being returned contain them.
-        If `Or` contains an iterable then include them in the tags that are returned for each member if available.
+        If `require` is given as an iterable of tag names then require that each returned member uses them.
+        If `include` is given as an iterable of tag names then include the tags for each returned member if available.
         """
         boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
@@ -2844,20 +2844,20 @@ class members_t(object):
 
         # Do the same thing we've always done to consoldate our parameters
         # into a form that we can do basic set arithmetic with.
-        Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
 
         # All that's left to do is to slowly iterate through all of our
         # members while looking for the matches requested by the user.
         for m in self.__iterate__():
             collected, content = {}, m.tag()
 
-            # Start out by collecting any tagnames specified by Or(|).
-            collected.update({key : value for key, value in content.items() if key in Or})
+            # Start out by collecting any tagnames that should be included which is similar to Or(|).
+            collected.update({key : value for key, value in content.items() if key in included})
 
-            # Then we need to include any specific tags that come from And(&).
-            if And:
-                if And & six.viewkeys(content) == And:
-                    collected.update({key : value for key, value in content.items() if key in And})
+            # Then we need to include any specific tags that are required which is similar to And(&).
+            if required:
+                if required & six.viewkeys(content) == required:
+                    collected.update({key : value for key, value in content.items() if key in required})
                 else: continue
 
             # Easy to do and easy to yield.
