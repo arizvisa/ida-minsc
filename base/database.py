@@ -2530,19 +2530,19 @@ def tag(ea, key, none):
     return res
 
 @utils.multicase(tag=internal.types.string)
-@utils.string.decorate_arguments('And', 'Or')
-def select(tag, *And, **boolean):
-    '''Query all of the global tags in the database for the specified `tag` and any others specified as `And`.'''
-    res = {tag} | {item for item in And}
-    boolean['And'] = {item for item in boolean.get('And', [])} | res
+@utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def select(tag, *required, **boolean):
+    '''Query the globals in the database for the given `tag` and any others that may be `required`.'''
+    res = {tag} | {item for item in required}
+    boolean['required'] = {item for item in boolean.get('required', [])} | res
     return select(**boolean)
 @utils.multicase()
-@utils.string.decorate_arguments('And', 'Or')
+@utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
 def select(**boolean):
-    """Query all the global tags for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
+    """Query the globals in the database for the tags specified by `boolean` and yield a tuple for each matching address with selected tags and values.
 
-    If `And` contains an iterable then require the returned address contains them.
-    If `Or` contains an iterable then include any other tags that are specified.
+    If `require` is given as an iterable of tag names then require that each returned address uses them.
+    If `include` is given as an iterable of tag names then include the tags for each returned address if available.
     """
     boolean = {key : {item for item in value} if isinstance(value, internal.types.unordered) else {value} for key, value in boolean.items()}
 
@@ -2557,7 +2557,7 @@ def select(**boolean):
         return
 
     # Collect the tagnames to query as specified by the user.
-    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
 
     # Walk through every tagged address so we can cross-check them with the query.
     for ea in internal.comment.globals.address():
@@ -2565,13 +2565,13 @@ def select(**boolean):
         Ftag, owners = (function.tag, {f for f in function.chunk.owners(ea)}) if function.has(ea) else (tag, {ea})
         tags = Ftag(ea)
 
-        # Or(|) includes any of the tagnames that were queried.
-        collected.update({key : value for key, value in tags.items() if key in Or})
+        # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
+        collected.update({key : value for key, value in tags.items() if key in included})
 
-        # And(&) includes any tags that include all of the queried tagnames.
-        if And:
-            if And & six.viewkeys(tags) == And:
-                collected.update({key : value for key, value in tags.items() if key in And})
+        # required is the equivalent of And(&) which yields the address only if it uses all of the specified tagnames.
+        if required:
+            if required & six.viewkeys(tags) == required:
+                collected.update({key : value for key, value in tags.items() if key in required})
             else: continue
 
         # If we collected anything (matches), then yield the address and the matching tags.
@@ -2580,19 +2580,19 @@ def select(**boolean):
     return
 
 @utils.multicase(tag=internal.types.string)
-@utils.string.decorate_arguments('tag', 'And', 'Or')
-def selectcontents(tag, *Or, **boolean):
-    '''Query all function contents for the specified `tag` or any others specified as `Or`.'''
-    res = {tag} | {item for item in Or}
-    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
+@utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def selectcontents(tag, *included, **boolean):
+    '''Query the contents of each function for the given `tag` or any others that may be `included`.'''
+    res = {tag} | {item for item in included}
+    boolean['included'] = {item for item in boolean.get('included', [])} | res
     return selectcontents(**boolean)
 @utils.multicase()
-@utils.string.decorate_arguments('And', 'Or')
+@utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
 def selectcontents(**boolean):
-    """Query all function contents for any tags specified by `boolean`. Yields each function and the tags that match as a set.
+    """Query the contents of each function for any of the tags specified by `boolean` and yield a tuple for each matching function address with selected tags.
 
-    If `And` contains an iterable then require the returned function contains them.
-    If `Or` contains an iterable then include any other tags that are specified.
+    If `require` is given as an iterable of tag names then require that each returned function uses them.
+    If `include` is given as an iterable of tag names then include the specified tags for each returned function if available.
     """
     boolean = {key : {item for item in value} if isinstance(value, internal.types.unordered) else {value} for key, value in boolean.items()}
 
@@ -2607,8 +2607,8 @@ def selectcontents(**boolean):
             elif ea not in owners: Flogging(u"{:s}.selectcontents() : Refusing to yield {:d} contents tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format(__name__, len(contents), '' if len(contents) == 1 else 's', 'function address' if function.has(ea) else 'address', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
         return
 
-    # Collect the tagnames to query as specified by the user.
-    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+    # Collect each potential parameter into sets for checking tag membership.
+    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
 
     # Walk through the index verifying that they're within a function. This
     # way we can cross-check their cache against the user's query.
@@ -2636,13 +2636,13 @@ def selectcontents(**boolean):
         # Now start aggregating the tagnames that the user is searching for.
         collected, names, owners = {item for item in []}, internal.comment.contents.name(ea, target=ea), {item for item in function.chunk.owners(ea)}
 
-        # Or(|) includes the address if any of the tagnames matched.
-        collected.update(Or & names)
+        # included is the equivalent of Or(|) and yields the function address if any of the specified tagnames were used.
+        collected.update(included & names)
 
-        # And(&) includes tags only if the address includes all of the specified tagnames.
-        if And:
-            if And & names == And:
-                collected.update(And)
+        # required is the equivalent of And(&) which yields the function address only if it uses all of the specified tagnames.
+        if required:
+            if required & names == required:
+                collected.update(required)
             else: continue
 
         # If anything was collected (tagnames were matched), then yield the
