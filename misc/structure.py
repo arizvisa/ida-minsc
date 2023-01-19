@@ -2365,7 +2365,7 @@ class members_t(object):
         # FIXME: handle .strtype (strings), .ec (enums), .cd (custom)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
-        realoffset = offset - self.baseoffset
+        index, realoffset = owner.ptr.memqty, offset - self.baseoffset
 
         # If they didn't give us a name, then we figure out a default name
         # using a sort-of hungarian notation as the prefix, and the field's
@@ -2400,10 +2400,10 @@ class members_t(object):
         # Now we need to return the newly created member to the caller. Since
         # all we get is an error code from IDAPython's api, we try and fetch the
         # member that was just added by the offset it's supposed to be at.
-        mptr = idaapi.get_member(owner.ptr, realoffset)
+        mptr = idaapi.get_member(owner.ptr, index if union(owner.ptr) else realoffset)
         if mptr is None:
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at offset {:s}{:+#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(name, '"'), realoffset, nbytes))
+            cls, where = self.__class__, "index {:d}".format(index) if union(owner.ptr) else "offset {:s}{:+#x}".format(realoffset, nbytes)
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at {:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(name, '"'), where))
 
         # We can now log our small success and update the member's refinfo if it
         # was actually necessary.
@@ -2416,12 +2416,28 @@ class members_t(object):
         idx = self.index(mptr)
         return member_t(owner, idx)
 
+    @utils.multicase(index=types.integer)
     def pop(self, index):
         '''Remove the member at the specified `index`.'''
-        item = self[index]
-        return self.remove(item.offset)
+        owner, item = self.owner, self[index]
+        if not union(owner.ptr):
+            return self.remove(item.offset)
 
-    @utils.multicase()
+        # grab the owner, the member, and all of the member's attributes.
+        sptr, mptr = owner.ptr, item.ptr
+        moffset, mindex, msize = self.baseoffset, mptr.soff, idaapi.get_member_size(mptr)
+        mname, location = utils.string.of(idaapi.get_member_name(mptr.id) or ''), interface.location_t(moffset, msize)
+
+        # grab the type information so we can pythonify and return it.
+        info = idaapi.retrieve_member_info(mptr, idaapi.opinfo_t()) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(idaapi.opinfo_t(), mptr)
+        type = interface.typemap.dissolve(mptr.flag, info.tid if info else idaapi.BADADDR, msize, offset=moffset)
+
+        # delete the member and return what we just removed.
+        if not idaapi.del_struc_member(sptr, mindex):
+            raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the union member at the specified index ({:d}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, mindex))
+        return mname, type, location
+
+    @utils.multicase(offset=types.integer)
     def remove(self, offset):
         '''Remove the member at `offset` from the structure.'''
         cls, owner, items = self.__class__, self.owner, [mptr for mptr in self.__members_at__(offset - self.baseoffset)] if offset >= self.baseoffset else []
@@ -2441,7 +2457,7 @@ class members_t(object):
             raise E.DisassemblerError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to remove the member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, self.baseoffset + mptr.soff))
         result, = results
         return result
-    @utils.multicase()
+    @utils.multicase(offset=types.integer, size=types.integer)
     def remove(self, offset, size):
         '''Remove all the members from the structure from the specified `offset` up to `size` bytes.'''
         cls, sptr, soffset = self.__class__, self.owner.ptr, offset - self.baseoffset
@@ -2545,6 +2561,11 @@ class members_t(object):
         logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove {:d} members out of an expected {:d} members within the specified range ({:s}) of the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, len(expected) - len(removed), len(expected), bounds))
         items = [(name, type, location) for id, name, type, location in result if id in removed]
         return items[::-1] if size < 0 else items
+    @utils.multicase(bounds=interface.bounds_t)
+    def remove(self, bounds):
+        '''Remove all the members from the structure within the specified `bounds`.'''
+        start, stop = sorted(bounds)
+        return self.remove(start, stop - start)
 
     ### Properties
     @property
@@ -2852,18 +2873,21 @@ class members_t(object):
         if isinstance(index, types.integer):
             index = owner.ptr.memqty + index if index < 0 else index
             res = member_t(owner, index) if 0 <= index < owner.ptr.memqty else None
+
         elif isinstance(index, types.string):
             res = self.by_name(index)
+
         elif isinstance(index, slice):
             sliceable = [self[idx] for idx in range(owner.ptr.memqty)]
             res = sliceable[index]
+
         else:
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).members.__getitem__({!r}) : An invalid type ({!s}) was specified for the index.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, index.__class__))
 
         if res is None:
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({!r}) : Unable to find the member that was requested.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index))
+            cls, where = self.__class__, "with the specified name (\"{:s}\")".format(index) if isinstance(index, types.string) else "at the given index ({:d})".format(index)
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({:d}) : Unable to find a member {:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, where))
         return res
 
     def __delitem__(self, index):
