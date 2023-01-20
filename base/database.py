@@ -7068,16 +7068,27 @@ class set(object):
     @classmethod
     def data(cls, size, **type):
         '''Set the data at the current address to have the specified `size` and `type`.'''
-        return cls.data(ui.current.address(), size, **type)
+        return cls.data(ui.current.address(), size, type['type']) if 'type' in type else cls.data(ui.current.address(), size, **type)
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
-    def data(cls, ea, size, **type):
-        """Set the data at address `ea` to have the specified `size` and `type`.
+    def data(cls, ea, size):
+        '''Set the data at address `ea` to a type that has the specified `size`'''
+        lookup = {length : flags for flags, length in interface.decode.length_table.items() if flags != idaapi.as_uint32(idaapi.FF_ALIGN)}
 
-        If `type` is not specified, then choose the correct type based on the size.
-        """
+        # If the size doesn't exist, then let the user know that we don't know what to do
+        if size not in lookup:
+            raise E.InvalidTypeOrValueError(u"{:s}.data({:#x}, {:+d}) : Unable to determine the correct type for the given size ({:+d}) to apply to the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, size, size, ea))
 
-        ## Set some constants for anything older than IDA 7.0
+        # Now we can use the size and type to the right function to apply the determined type.
+        flags = lookup[size]
+        return cls.data(ea, size, flags)
+    @utils.multicase(ea=internal.types.integer, size=internal.types.integer, type=(internal.types.integer, internal.structure.structure_t, idaapi.struc_t))
+    @classmethod
+    def data(cls, ea, size, type):
+        '''Set the data at address `ea` to have the specified `size` using the flags or structure given in `type`.'''
+        res = type if isinstance(type, (internal.types.integer, idaapi.struc_t)) else type.ptr
+
+        # Set some constants for anything older than IDA 7.0
         if idaapi.__version__ < 7.0:
             FF_STRUCT = idaapi.FF_STRU
 
@@ -7086,50 +7097,28 @@ class set(object):
             # that IDA applies structures or alignment
             create_data, create_struct, create_align = idaapi.do_data_ex, getattr(idaapi, 'doStruct', None), getattr(idaapi, 'doAlign', None)
 
-            lookup = {
-                1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWRD,
-                8 : idaapi.FF_QWRD
-            }
-
-            # Older versions of IDA might not define FF_OWRD, so we just
-            # try and add if its available. We fall back to an array anyways.
-            if hasattr(idaapi, 'FF_OWRD'): lookup[16] = idaapi.FF_OWRD
-
-        ## Set some constants used for IDA 7.0 and newer
+        # Set some constants used for IDA 7.0 and newer
         else:
             FF_STRUCT = idaapi.FF_STRUCT
             create_data, create_struct, create_align = idaapi.create_data, idaapi.create_struct, idaapi.create_align
 
-            lookup = {
-                1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWORD,
-                8 : idaapi.FF_QWORD, 16 : idaapi.FF_OWORD
-            }
-
-        ## Now we can apply the type to the given address
-        try:
-            res = type['type'] if 'type' in type else lookup[size]
-
-        # If the size doesn't exist, then let the user know that we don't know what to do
-        except KeyError:
-            raise E.InvalidTypeOrValueError("{:s}.data({:#x}, {:d}{:s}) : Unable to determine the correct type for the specified size ({:+d}) to assign to the data.".format('.'.join([__name__, cls.__name__]), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else '', size))
-
-        # Check if we need to use older IDA logic by checking of any of our api calls are None
-        if idaapi.__version__ < 7.0 and any(f is None for f in [create_struct, create_align]):
-            ok = create_data(ea, idaapi.FF_STRUCT if isinstance(res, internal.structure.structure_t) else res, size, res.id if isinstance(res, internal.structure.structure_t) else 0)
-
-        # Otherwise we can create structures normally
-        elif isinstance(res, (internal.structure.structure_t, idaapi.struc_t)):
+        # Check if we're supposed to create a struct and if we can actually create one.
+        if create_struct and isinstance(res, idaapi.struc_t):
             ok = create_struct(ea, size, res.id)
 
-        # Or apply alignment properly...
-        elif res == idaapi.FF_ALIGN and hasattr(idaapi, 'create_align'):
+        # Check if we're supposed to create alignment and if can actually create it.
+        elif res == idaapi.FF_ALIGN and create_align:
             ok = create_align(ea, size, 0)
 
-        # Anything else is just regular data that we can fall back to
-        else:
-            ok = idaapi.create_data(ea, res, size, 0)
+        # Check if we need to use older IDA logic which uses ida_bytes.do_data_ex.
+        elif idaapi.__version__ < 7.0:
+            ok = create_data(ea, FF_STRUCT if isinstance(res, idaapi.struc_t) else res, size, res.id if isinstance(res, idaapi.struc_t) else idaapi.BADADDR)
 
-        # Return our new size if we were successful
+        # Anything else is just regular data that we can fall back to ida_bytes.create_data.
+        else:
+            ok = idaapi.create_data(ea, res, size, idaapi.BADADDR)
+
+        # Return our new size if we were successful.
         return interface.address.size(ea) if ok else 0
 
     @utils.multicase()
