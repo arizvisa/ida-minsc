@@ -2550,7 +2550,7 @@ def select(**boolean):
     if not boolean:
         for ea in internal.comment.globals.address():
             ui.navigation.set(ea)
-            Ftag, owners = (function.tag, {f for f in function.chunk.owners(ea)}) if function.has(ea) else (tag, {ea})
+            Ftag, owners = (function.tag, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (tag, {ea})
             tags = Ftag(ea)
             if tags and ea in owners: yield ea, tags
             elif ea not in owners: logging.info(u"{:s}.select() : Refusing to yield {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, len(tags), '' if len(tags) == 1 else 's', 'function address' if function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
@@ -2562,7 +2562,7 @@ def select(**boolean):
     # Walk through every tagged address so we can cross-check them with the query.
     for ea in internal.comment.globals.address():
         collected, _ = {}, ui.navigation.set(ea)
-        Ftag, owners = (function.tag, {f for f in function.chunk.owners(ea)}) if function.has(ea) else (tag, {ea})
+        Ftag, owners = (function.tag, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (tag, {ea})
         tags = Ftag(ea)
 
         # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
@@ -2598,9 +2598,9 @@ def selectcontents(**boolean):
 
     # Nothing specific was queried, so just yield all tagnames that are available.
     if not boolean:
-        for ea, _ in sorted(internal.comment.contents.iterate()):
-            if function.has(ui.navigation.procedure(ea)):
-                contents, owners, Flogging = internal.comment.contents.name(ea, target=ea), {f for f in function.chunk.owners(ea)}, logging.info
+        for ea, _ in internal.comment.contents.iterate():
+            if interface.function.has(ui.navigation.procedure(ea)):
+                contents, owners, Flogging = internal.comment.contents.name(ea, target=ea), {f for f in interface.function.owners(ea)}, logging.info
             else:
                 contents, owners, Flogging = [], {f for f in []}, logging.warning
             if contents and ea in owners: yield ea, contents
@@ -2612,8 +2612,8 @@ def selectcontents(**boolean):
 
     # Walk through the index verifying that they're within a function. This
     # way we can cross-check their cache against the user's query.
-    for ea, cache in sorted(internal.comment.contents.iterate()):
-        if function.has(ui.navigation.procedure(ea)):
+    for ea, cache in internal.comment.contents.iterate():
+        if interface.function.has(ui.navigation.procedure(ea)):
             sup, contents = {key for key in cache}, internal.comment.contents._read(ea, ea) or {}
 
         # Otherwise if we're not within a function then our cache is lying to us
@@ -2634,7 +2634,7 @@ def selectcontents(**boolean):
             logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency between contents of {:s} address ({:#x}) and address ({:#x}) due to a difference between the supval ({:s}) and its corresponding blob ({:s}).".format(__name__, q, f, 'function', ea, sup_formatted, blob_formatted))
 
         # Now start aggregating the tagnames that the user is searching for.
-        collected, names, owners = {item for item in []}, internal.comment.contents.name(ea, target=ea), {item for item in function.chunk.owners(ea)}
+        collected, names, owners = {item for item in []}, internal.comment.contents.name(ea, target=ea), {item for item in interface.function.owners(ea)}
 
         # included is the equivalent of Or(|) and yields the function address if any of the specified tagnames were used.
         collected.update(included & names)
