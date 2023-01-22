@@ -806,15 +806,10 @@ class contents(tagging):
     def _key(cls, ea):
         '''Converts the address `ea` to a key that's used to store contents data for the specified function.'''
 
-        # First we'll need to verify that we're within a function,
-        # then we can try and grab the chunk for the given address.
-        res = idaapi.get_func(ea)
-        if res is None:
-            return None
-
-        # Try and grab the function chunk for the given address.
-        ch = idaapi.get_fchunk(ea)
-        if ch is None:
+        # First we'll need to verify that we're within a function, then
+        # we can try and grab it and the chunk for the same address.
+        res, ch = idaapi.get_func(ea), idaapi.get_fchunk(ea)
+        if res is None or ch is None:
             return None
         owner, bounds = map(internal.interface.range.bounds, [res, ch])
 
@@ -1273,8 +1268,8 @@ class globals(tagging):
 
     @classmethod
     def address(cls):
-        '''Return all the tag addresses (``sorted``) in the specified database (globals and func-tags)'''
-        return sorted(ea for ea in internal.netnode.alt.fiter(tagging.node()))
+        '''Return all the tag addresses in the specified database (globals and func-tags)'''
+        return internal.netnode.alt.fiter(tagging.node())
 
     @classmethod
     def set_name(cls, name, count):
