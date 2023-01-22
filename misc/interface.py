@@ -4861,6 +4861,51 @@ class function(object):
         '''Raise an exception due to receiving an `unsupported` type.'''
         raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join([cls.__name__]), unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
 
+    @classmethod
+    def owners(cls, ea):
+        '''Return a list of the functions that have ownership of the chunk at address `ea`.'''
+        owner, chunk = idaapi.get_func(ea), idaapi.get_fchunk(ea)
+
+        # If there's no chunk or owner, then this isn't a function and we return an empty list.
+        if owner is None or chunk is None:
+            return []
+
+        # If the chunk is not a FUNC_TAIL, then we just need to return the chunk owner.
+        if not (chunk.flags & idaapi.FUNC_TAIL):
+            return [range.start(owner)]
+
+        # If this is a function tail, then we need to iterate through the referers
+        # for the chunk so that we can yield each address. Older versions of IDA
+        # don't always give us an array, so we construct it if we don't get one.
+        count, iterator = chunk.refqty, idaapi.func_parent_iterator_t(chunk)
+
+        # Try and seek to the very first member of the iterator. This should
+        # always succeed, so if it errors out then this is critical...but only
+        # if our "refqty" is larger than 1. If it's less than 1, then we can
+        # just warn the user..but we're gonna fall back to the func_t anyways.
+        if not iterator.first():
+            if count > 1:
+                raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to seek to the first element of the `{:s}` for the function tail at {!s}.".format('.'.join([__name__, cls.__name__]), ea, internal.utils.pycompat.fullname(iterator.__class__), range.bounds(chunk)))
+
+            # We should only have one single referrer to return. Just in case,
+            # though, we return an empty list if our "refqty" is actually 0.
+            logging.warning(u"{:s}.owners({:#x}) : Returning initial owner ({!s}) for the function tail at {!s} due to being unable to seek to the first element of the associated `{:s}`.".format('.'.join([__name__, cls.__name__]), ea, range.bounds(owner), range.bounds(chunk), internal.utils.pycompat.fullname(iterator.__class__)))
+            referrers = [range.start(owner)] if count else []
+
+        # Grab the first parent address. Afterwards we continue looping
+        # whilst stashing parents in our list of referrers.
+        else:
+            referrers = [iterator.parent()]
+            while iterator.next():
+                item = iterator.parent()
+                referrers.append(item)
+
+        # That was easy enough, so now we just need to confirm that the
+        # number of our referrers matches to the "refqty" of the chunk.
+        if count != len(referrers):
+            logging.warning(u"{:s}.owners({:#x}) : Expected to find {:d} referrer{:s} for the function tail at {!s}, but {:s}{:s} returned.".format('.'.join([__name__, cls.__name__]), ea, count, '' if count == 1 else 's', range.bounds(owner), 'only ' if len(referrers) < count else '', "{:d} was".format(len(referrers)) if len(referrers) == 1 else "{:d} were".format(len(referrers))))
+        return referrers
+
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
