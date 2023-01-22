@@ -591,7 +591,7 @@ class chunk(object):
     def owner(cls, ea):
         '''Return the primary owner of the function chunk containing the address specified by `ea`.'''
         if within(ea):
-            return next(item for item in cls.owners(ea))
+            return next(item for item in interface.function.owners(ea))
         raise E.FunctionNotFoundError(u"{:s}.owner({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
@@ -619,71 +619,28 @@ class chunk(object):
     @utils.multicase()
     @classmethod
     def owners(cls):
-        '''Yield each of the owners which have the current function chunk associated with it.'''
-        ea = ui.current.address()
-        return (item for item in cls.owners(ea))
+        '''Return the owners of the current function chunk as a list.'''
+        return cls.owners(ui.current.address())
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def owners(cls, bounds):
+        '''Return the owners of the function chunk specified by `bounds` as a list.'''
+        ea, _ = bounds
+        return cls.owners(ea)
     @utils.multicase(ea=types.integer)
     @classmethod
     def owners(cls, ea):
-        '''Yield each of the owners which have the function chunk containing the address `ea` associated with it.'''
-        res = idaapi.get_func(ea)
+        '''Return the owners which have the function chunk containing the address `ea` as a list.'''
+        res, ch = idaapi.get_func(ea), idaapi.get_fchunk(ea)
 
-        # If we're not associated with a function, then we just leave. Otherwise,
-        # we grab the function chunk for the requested address.
-        if res is None:
-            return
+        # If we're not associated with a function or we were unable to get the function chunk
+        # for the provided address, then we warn the user that their result will be empty.
+        if res is None or ch is None:
+            message = "a function at the specified address ({:#x})".format(ea) if res is None else "a chunk at the requested address ({:#x}) for the function at {!s}".format(ea, range.bounds(res))
+            logging.warning(u"{:s}.owners({:#x}) : Unable to find {:s}.".format('.'.join([__name__, cls.__name__]), ea, message))
 
-        # If we were unable to get the function chunk for the provided address,
-        # then we can just return because there's nothing that owns it.
-        ch = idaapi.get_fchunk(ea)
-        if ch is None:
-            raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to read the chunk at {:#x} belonging to the function at {!s}.".format('.'.join([__name__, cls.__name__]), ea, ea, interface.range.bounds(res)))
-        owner, bounds = map(interface.range.bounds, [res, ch])
-
-        # If this is a function tail, then we need to iterate through the referers
-        # for the chunk so that we can yield each address. Older versions of IDA
-        # don't always give us an array, so we construct it if we don't get one.
-        if ch.flags & idaapi.FUNC_TAIL:
-            count, iterator = ch.refqty, idaapi.func_parent_iterator_t(ch)
-
-            # Try and seek to the very first member of the iterator. This should
-            # always succeed, so if it errors out then this is critical...but only
-            # if our "refqty" is larger than 1. If it's less than 1, then we can
-            # just warn the user..but we're gonna fall back to the func_t anyways.
-            if not iterator.first():
-                if count > 1:
-                    raise internal.exceptions.DisassemblerError(u"{:s}.owners({:#x}) : Unable to seek to the first element of the `{:s}` for the function tail at {!s}.".format('.'.join([__name__, cls.__name__]), ea, iterator.__class__.__name__, bounds))
-
-                # We should only have one single referrer to return. Just in case,
-                # though, we return an empty list if our "refqty" is actually 0.
-                logging.warning(u"{:s}.owners({:#x}) : Returning initial owner ({!s}) for the function tail at {!s} due to being unable to seek to the first element of the associated `{:s}`.".format('.'.join([__name__, cls.__name__]), ea, owner, bounds, iterator.__class__.__name__))
-                referrers = [ea for ea, _ in ([owner] if count else [])]
-
-            # Grab the first parent address. Afterwards we continue looping
-            # whilst stashing parents in our list of referrers.
-            else:
-                referrers = [iterator.parent()]
-                while iterator.next():
-                    item = iterator.parent()
-                    referrers.append(item)
-
-            # That was easy enough, so now we just need to confirm that the
-            # number of our referrers matches to the "refqty" of the chunk.
-            if count != len(referrers):
-                logging.warning(u"{:s}.owners({:#x}) : Expected to find {:d} referrer{:s} for the function tail at {!s}, but {:s}{:s} returned.".format('.'.join([__name__, cls.__name__]), ea, count, '' if count == 1 else 's', bounds, 'only ' if len(referrers) < count else '', "{:d} was".format(len(referrers)) if len(referrers) == 1 else "{:d} were".format(len(referrers))))
-
-            # That was it, we just need to convert our results to an iterator.
-            iterable = (ea for ea in referrers)
-
-        # Otherwise, we just need to yield the function that owns this chunk.
-        else:
-            iterable = (ea for ea, _ in [owner])
-
-        # We've collected all of our items, so iterate through what we've collected
-        # and then yield them to the caller before returning.
-        for ea in iterable:
-            yield ea
-        return
+        # Return all of the owners for the current chunk address.
+        return interface.function.owners(ea)
 
     @utils.multicase()
     @classmethod
@@ -3082,7 +3039,7 @@ def tags():
 @utils.multicase(ea=types.integer)
 def tags(ea):
     '''Returns all of the content tags for the function at the address `ea`.'''
-    fn, owners = by(ea), {item for item in chunk.owners(ea)}
+    fn, owners = by(ea), {item for item in interface.function.owners(ea)}
 
     # If we have multiple owners, then consolidate all of their tags into a set.
     if len(owners) > 1:
