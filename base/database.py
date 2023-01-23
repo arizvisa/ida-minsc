@@ -3351,6 +3351,259 @@ class address(object):
 
     @utils.multicase()
     @classmethod
+    def prevdata(cls, **count):
+        '''Return the previous address that is defined as data.'''
+        return cls.prevdata(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def prevdata(cls, predicate, **count):
+        '''Return the previous address that is defined as data and satisfies the provided `predicate`.'''
+        return cls.prevdata(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def prevdata(cls, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that is defined as data and satisfies the provided `predicate`.'''
+        counter = max(1, count.get('count', 1))
+        while counter > 0:
+            next = idaapi.find_data(ea, idaapi.SEARCH_UP)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevdata({:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def prevdata(cls, ea):
+        '''Return the previous address from the address `ea` that is defined as data.'''
+        res = idaapi.find_data(ea, idaapi.SEARCH_UP)
+        if res == idaapi.BADADDR:
+            raise E.AddressOutOfBoundsError(u"{:s}.prevdata({:#x}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, top(), ea))
+        return res
+    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def prevdata(cls, ea, count):
+        '''Return the previous `count` addresses from the address `ea` that is defined as data.'''
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_data(ea, idaapi.SEARCH_UP)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevdata({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
+            ea = next
+        return ea
+
+    @utils.multicase()
+    @classmethod
+    def nextdata(cls, **count):
+        '''Return the next address that is defined as data.'''
+        return cls.nextdata(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def nextdata(cls, predicate, **count):
+        '''Return the next address that is defined as data and satisfies the provided `predicate`.'''
+        return cls.nextdata(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextdata(cls, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that is defined as data and satisfies the provided `predicate`.'''
+        counter = max(1, count.get('count', 1))
+        while counter > 0:
+            next = idaapi.find_data(ea, idaapi.SEARCH_DOWN)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextdata({:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def nextdata(cls, ea):
+        '''Return the next address from the address `ea` that is defined as data.'''
+        res = idaapi.find_data(ea, idaapi.SEARCH_DOWN)
+        if res == idaapi.BADADDR:
+            raise E.AddressOutOfBoundsError(u"{:s}.nextdata({:#x}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bottom(), idaapi.get_item_end(ea)))
+        return res
+    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextdata(cls, ea, count):
+        '''Return the next `count` addresses from the address `ea` that is defined as data.'''
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_data(ea, idaapi.SEARCH_DOWN)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextdata({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
+            ea = next
+        return ea
+
+    @utils.multicase()
+    @classmethod
+    def prevcode(cls, **count):
+        '''Return the previous address that is defined as code.'''
+        return cls.prevcode(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def prevcode(cls, predicate, **count):
+        '''Return the previous address that is defined as code and satisfies the provided `predicate`.'''
+        return cls.prevcode(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def prevcode(cls, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that is defined as code and satisfies the provided `predicate`.'''
+        counter = max(1, count.get('count', 1))
+        while counter > 0:
+            next = idaapi.find_code(ea, idaapi.SEARCH_UP)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevcode({:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def prevcode(cls, ea):
+        '''Return the previous address from the address `ea` that is defined as code.'''
+        res = idaapi.find_code(ea, idaapi.SEARCH_UP)
+        if res == idaapi.BADADDR:
+            raise E.AddressOutOfBoundsError(u"{:s}.prevcode({:#x}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, top(), ea))
+        return res
+    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def prevcode(cls, ea, count):
+        '''Return the previous `count` addresses from the address `ea` that is defined as code.'''
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_code(ea, idaapi.SEARCH_UP)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevcode({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
+            ea = next
+        return ea
+
+    @utils.multicase()
+    @classmethod
+    def nextcode(cls, **count):
+        '''Return the next address that is defined as code.'''
+        return cls.nextcode(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def nextcode(cls, predicate, **count):
+        '''Return the next address that is defined as code and satisfies the provided `predicate`.'''
+        return cls.nextcode(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextcode(cls, ea, predicate, **count):
+        '''Return the next address from the address `ea` that is defined as code and satisfies the provided `predicate`.'''
+        counter = max(1, count.get('count', 1))
+        while counter > 0:
+            next = idaapi.find_code(ea, idaapi.SEARCH_DOWN)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextcode({:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def nextcode(cls, ea):
+        '''Return the next address from the address `ea` that is defined as code.'''
+        res = idaapi.find_code(ea, idaapi.SEARCH_DOWN)
+        if res == idaapi.BADADDR:
+            raise E.AddressOutOfBoundsError(u"{:s}.nextcode({:#x}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bottom(), idaapi.get_item_end(ea)))
+        return res
+    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextcode(cls, ea, count):
+        '''Return the next `count` addresses from the address `ea` that is defined as code.'''
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_code(ea, idaapi.SEARCH_DOWN)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextcode({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
+            ea = next
+        return ea
+
+    @utils.multicase()
+    @classmethod
+    def prevunknown(cls, **count):
+        '''Return the previous address that is undefined.'''
+        return cls.prevunknown(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def prevunknown(cls, predicate, **count):
+        '''Return the previous address that is undefined and satisfies the provided `predicate`.'''
+        return cls.prevunknown(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def prevunknown(cls, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that is undefined and satisfies the provided `predicate`.'''
+        counter = max(1, count.get('count', 1))
+        while counter > 0:
+            next = idaapi.find_unknown(ea, idaapi.SEARCH_UP)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevunknown({:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def prevunknown(cls, ea):
+        '''Return the previous address from the address `ea` that is undefined.'''
+        res = idaapi.find_unknown(ea, idaapi.SEARCH_UP)
+        if res == idaapi.BADADDR:
+            raise E.AddressOutOfBoundsError(u"{:s}.prevunknown({:#x}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, top(), ea))
+        return res
+    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def prevunknown(cls, ea, count):
+        '''Return the previous `count` addresses from the address `ea` that is undefined.'''
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_unknown(ea, idaapi.SEARCH_UP)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevunknown({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
+            ea = next
+        return ea
+
+    @utils.multicase()
+    @classmethod
+    def nextunknown(cls, **count):
+        '''Return the next address that is undefined.'''
+        return cls.nextunknown(ui.current.address(), count.pop('count', 1))
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def nextunknown(cls, predicate, **count):
+        '''Return the next address that is undefined and satisfies the provided `predicate`.'''
+        return cls.nextunknown(ui.current.address(), predicate, **count)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextunknown(cls, ea, predicate, **count):
+        '''Return the next address from the address `ea` that is undefined and satisfies the provided `predicate`.'''
+        counter = max(1, count.get('count', 1))
+        while counter > 0:
+            next = idaapi.find_unknown(ea, idaapi.SEARCH_DOWN)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextunknown({:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def nextunknown(cls, ea):
+        '''Return the next address from the address `ea` that is undefined.'''
+        res = idaapi.find_unknown(ea, idaapi.SEARCH_DOWN)
+        if res == idaapi.BADADDR:
+            raise E.AddressOutOfBoundsError(u"{:s}.nextunknown({:#x}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bottom(), idaapi.get_item_end(ea)))
+        return res
+    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextunknown(cls, ea, count):
+        '''Return the next `count` addresses from the address `ea` that is undefined.'''
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_unknown(ea, idaapi.SEARCH_DOWN)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextunknown({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
+            ea = next
+        return ea
+
+    @utils.multicase()
+    @classmethod
     def prevref(cls, **count):
         '''Return the previous address from the current one that has anything referencing it.'''
         return cls.prevref(ui.current.address(), count.pop('count', 1))
@@ -3399,7 +3652,7 @@ class address(object):
         '''Return the next address from the address `ea` that has anything referencing it and satisfies the provided `predicate`.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fxref, predicate), builtins.all)
-        return cls.nextF(ea, Fxref, count.pop('count', 1))
+        return cls.nextF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextref(cls, ea, count):
@@ -3465,10 +3718,6 @@ class address(object):
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fdref, count)
 
-    # FIXME: the semantics of these aliases are wrong, and they really shouldn't be
-    #        aliasing a data reference. thus, we should be checking the address' type.
-    prevdata, nextdata = utils.alias(prevdref, 'address'), utils.alias(nextdref, 'address')
-
     @utils.multicase()
     @classmethod
     def prevcref(cls, **count):
@@ -3490,7 +3739,7 @@ class address(object):
         '''Return the previous address from the address `ea` that has code referencing it and satisfies the provided `predicate`.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
-        return cls.prevF(ea, Fcref, count.pop('count', 1))
+        return cls.prevF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevcref(cls, ea, count):
@@ -3519,17 +3768,13 @@ class address(object):
         '''Return the next address from the address `ea` that has code referencing it and satisfies the provided `predicate`.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
-        return cls.nextF(ea, Fcref, count.pop('count', 1))
+        return cls.nextF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextcref(cls, ea, count):
         '''Return the next `count` addresses from the address `ea` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fcref, count)
-
-    # FIXME: the semantics of these aliases are wrong, and they really shouldn't be#
-    #        aliasing a code reference. thus, we should be checking the address' type.
-    prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
 
     @utils.multicase(reg=(internal.types.string, interface.register_t))
     @classmethod
@@ -4157,60 +4402,6 @@ class address(object):
         tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
         Ftag = type.comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         return cls.nextF(ea, Ftag, count)
-
-    @utils.multicase()
-    @classmethod
-    def prevunknown(cls, **count):
-        '''Return the previous address from the current one that is undefined.'''
-        return cls.prevunknown(ui.current.address(), count.pop('count', 1))
-    @utils.multicase(predicate=internal.types.callable)
-    @classmethod
-    def prevunknown(cls, predicate, **count):
-        '''Return the previous address from the current one that is undefined and satisfies the provided `predicate`.'''
-        return cls.prevunknown(ui.current.address(), predicate, **count)
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def prevunknown(cls, ea):
-        '''Return the previous address from the address `ea` that is undefined.'''
-        return cls.prevunknown(ea, 1)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
-    @classmethod
-    def prevunknown(cls, ea, predicate, **count):
-        '''Return the previous address from the address `ea` that is undefined and satisfies the provided `predicate`.'''
-        F = utils.fcompose(utils.fmap(type.unknown, predicate), builtins.all)
-        return cls.prevF(ea, F, count.pop('count', 1))
-    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
-    @classmethod
-    def prevunknown(cls, ea, count):
-        '''Return the previous `count` addresses from the address `ea` that is undefined.'''
-        return cls.prevF(ea, type.unknown, count)
-
-    @utils.multicase()
-    @classmethod
-    def nextunknown(cls, **count):
-        '''Return the next address from the current one that is undefined.'''
-        return cls.nextunknown(ui.current.address(), count.pop('count', 1))
-    @utils.multicase(predicate=internal.types.callable)
-    @classmethod
-    def nextunknown(cls, predicate, **count):
-        '''Return the next address from the current one that is undefined and satisfies the provided `predicate`.'''
-        return cls.nextunknown(ui.current.address(), predicate, **count)
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def nextunknown(cls, ea):
-        '''Return the next address from the address `ea` that is undefined.'''
-        return cls.nextunknown(ea, 1)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
-    @classmethod
-    def nextunknown(cls, ea, predicate, **count):
-        '''Return the next address from the address `ea` that is undefined and satisfies the provided `predicate`.'''
-        F = utils.fcompose(utils.fmap(type.unknown, predicate), builtins.all)
-        return cls.nextF(ea, F, count.pop('count', 1))
-    @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
-    @classmethod
-    def nextunknown(cls, ea, count):
-        '''Return the next `count` addresses from the address `ea` that is undefined.'''
-        return cls.nextF(ea, type.unknown, count)
 
     @utils.multicase()
     @classmethod
