@@ -2346,7 +2346,7 @@ class members_t(object):
     @utils.multicase(name=(types.string, types.ordered))
     @utils.string.decorate_arguments('name')
     def add(self, name, type):
-        '''Append the specified member `name` with the given pythonic `type` to the end of the structure.'''
+        '''Append the specified member `name` with the given `type` to the end of the structure.'''
         owner = self.owner
 
         # If this structure is a union, then the offset should always be 0.
@@ -2362,9 +2362,14 @@ class members_t(object):
     @utils.multicase(name=(types.string, types.ordered), offset=types.integer)
     @utils.string.decorate_arguments('name')
     def add(self, name, type, offset):
-        '''Add a member at `offset` with the given `name` and pythonic `type`.'''
-        owner = self.owner
-        flag, typeid, nbytes = interface.typemap.resolve(type)
+        '''Add a member at the specified `offset` of the structure with the given `name` and `type`.'''
+        owner, set_member_tinfo = self.owner, idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
+
+        # Figure out whether we're adding a pythonic type or we were given a tinfo_t.
+        # If we were given a tinfo_t, then use the size of the type as a placeholder.
+        res = internal.declaration.parse(type) if isinstance(type, types.string) else type
+        type, tinfo, tdescr = ([None, res.get_size()], res, "{!s}".format(res)) if isinstance(res, idaapi.tinfo_t) else (res, None, "{!s}".format(res))
+        flag, typeid, nbytes = interface.typemap.resolve(type if tinfo is None or 0 < tinfo.get_size() < idaapi.BADSIZE else None)
 
         # If the member is being added to a union, then the offset doesn't
         # matter because it's always zero. We need to check this however because
@@ -2381,7 +2386,7 @@ class members_t(object):
             # to do it again in the future.
             elif offset != self.baseoffset:
                 cls = self.__class__
-                logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Corrected the invalid offset ({:#x}) being used when adding member ({!s}) to union \"{:s}\", and changed it to {:+#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, offset, name, owner.name, self.baseoffset))
+                logging.warning(u"{:s}({:#x}).members.add({!r}, {!r}, {:+#x}) : Corrected the invalid offset ({:#x}) being used when adding member ({!s}) to union \"{:s}\", and changed it to {:+#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, offset, interface.tuplename(*name) if isinstance(name, types.ordered) else name, owner.name, self.baseoffset))
 
             # Now we can actually correct the offset they gave us.
             offset = self.baseoffset
@@ -2391,20 +2396,22 @@ class members_t(object):
         opinfo.tid = typeid
         index, realoffset = owner.ptr.memqty, offset - self.baseoffset
 
-        # If they didn't give us a name, then we figure out a default name
-        # using a sort-of hungarian notation as the prefix, and the field's
-        # offset as the suffix.
-        if name is None:
-            cls = self.__class__
-            logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Name is undefined, defaulting to offset {:+#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, realoffset))
-            name = 'field', realoffset
+        # If we were given a tuple, then we need to pack it into a string and check
+        # to see that it's valid before we use it.
+        packedname = interface.tuplename(*name) if isinstance(name, types.ordered) else name or ''
+        if packedname:
+            name = packedname
 
-        # If we were given a tuple, then we need to concatenate it into a string.
-        if isinstance(name, types.ordered):
-            name = interface.tuplename(*name)
+        # If the name isn't valid (empty, then we figure out the default name using
+        # the disassembler's regular prefix with the field's offset as the suffix.
+        # FIXME: we should support default frame member names too...but we don't.
+        else:
+            cls, res = self.__class__, interface.tuplename('field', index if union(owner.ptr) else realoffset)
+            logging.warning(u"{:s}({:#x}).members.add({!r}, {!r}, {:+#x}) : Name is undefined, defaulting to {:s} name \"{:s}\".".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, 'union' if union(sptr) else 'structure', utils.string.escape(res, '"')))
+            name = res
 
         # Finally we can use IDAPython to add the structure member with the
-        # parameters that we were given and/or figured out.
+        # parameters that we either figured out or were given.
         res = idaapi.add_struc_member(owner.ptr, utils.string.to(name), realoffset, flag, opinfo, nbytes)
 
         # If we received a failure error code, then we convert the error code to
@@ -2417,22 +2424,42 @@ class members_t(object):
                 idaapi.STRUC_ERROR_MEMBER_SIZE : 'Invalid size',
             }
             e = E.DuplicateItemError if res == idaapi.STRUC_ERROR_MEMBER_NAME else E.DisassemblerError
-            callee = u"idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})".format(utils.string.escape(owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes)
+            callee = u"{:s}(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})".format(utils.pycompat.fullname(idaapi.add_struc_member), utils.string.escape(owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes)
             cls = self.__class__
-            raise e(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
+            raise e(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, callee, error.get(res, u"error code {:#x}".format(res))))
 
         # Now we need to return the newly created member to the caller. Since
         # all we get is an error code from IDAPython's api, we try and fetch the
         # member that was just added by the offset it's supposed to be at.
         mptr = idaapi.get_member(owner.ptr, index if union(owner.ptr) else realoffset)
         if mptr is None:
-            cls, where = self.__class__, "index {:d}".format(index) if union(owner.ptr) else "offset {:s}{:+#x}".format(realoffset, nbytes)
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at {:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(name, '"'), where))
+            cls, where = self.__class__, "index {:d}".format(index) if union(owner.ptr) else "offset {:#x}{:+#x}".format(realoffset, nbytes)
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at {:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, utils.string.escape(name, '"'), where))
+
+        # If we were given a tinfo_t for the type, then we need to apply it to
+        # the newly-created member. Our size should already be correct, so we
+        # can just apply the typeinfo in a non-destructive (compatible) manner.
+        res = idaapi.SMT_OK if tinfo is None else set_member_tinfo(owner.ptr, mptr, mptr.soff, tinfo, idaapi.SET_MEMTI_COMPATIBLE)
+
+        # If we couldn't apply the tinfo_t, then we need to bail. We can't remove
+        # the already-created field, so instead we log a critical error since the
+        # size should pretty much be exactly what they wanted.
+        if res == idaapi.SMT_FAILED:
+            logging.fatal(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The type information (\"{:s}\") for structure member \"{:s}\" could not be completely applied.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, utils.string.escape(tdescr, '"'), utils.string.escape(name, '"')))
+
+        elif res not in {idaapi.SMT_OK, idaapi.SMT_KEEP}:
+            errtable = {
+                idaapi.SMT_BADARG: 'an invalid parameter', idaapi.SMT_NOCOMPAT: 'the type being incompatible', idaapi.SMT_WORSE: 'the type being terrible',
+                idaapi.SMT_SIZE: 'the type being invalid for the member size', idaapi.SMT_ARRAY: 'setting a function argument as an array being illegal',
+                idaapi.SMT_OVERLAP: 'the specified type would result in an overlapping member', idaapi.SMT_KEEP: 'the specified type not being ideal',
+            }
+            message = errtable.get(res, "an unknown error {:#x}".format(res))
+            logging.fatal(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The type information (\"{:s}\") for structure member \"{:s}\" could not be completely applied due to {:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, utils.string.escape(tdescr, '"'), utils.string.escape(name, '"')))
 
         # We can now log our small success and update the member's refinfo if it
         # was actually necessary.
         cls, refcount = self.__class__, interface.address.update_refinfo(mptr.id, flag)
-        logging.debug(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success{:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, type, offset, utils.string.escape(owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes, " ({:d} references)".format(refcount) if refcount > 0 else ''))
+        logging.debug(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success{:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, utils.pycompat.fullname(idaapi.add_struc_member), utils.string.escape(owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes, " ({:d} references)".format(refcount) if refcount > 0 else ''))
 
         # If we successfully grabbed the member, then we need to figure out its
         # actual index in our structure. Then we can use the index to instantiate
