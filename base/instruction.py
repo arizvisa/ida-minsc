@@ -229,21 +229,6 @@ def ops_decoder(ea):
     return tuple(map(f, range(ops_count(ea))))
 
 @utils.multicase()
-def ops_state():
-    '''Returns a tuple for all the operands containing one of the states "r", "w", or "rw"` describing how the operands for the current instruction operands are modified.'''
-    return ops_state(ui.current.address())
-@utils.multicase(ea=types.integer)
-def ops_state(ea):
-    '''Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address `ea`.'''
-    ea = interface.address.inside(ea)
-    f = type.feature(ea)
-    res = ( ((f & ops_state.read[i]), (f & ops_state.write[i])) for i in range(ops_count(ea)) )
-    return tuple(interface.reftype_t.of_action((r and 'r' or '') + (w and 'w' or '')) for r, w in res)
-
-# pre-cache the CF_ flags from idaapi inside ops_state
-ops_state.read, ops_state.write = zip(*((getattr(idaapi, "CF_USE{:d}".format(1 + idx), 1 << (7 + idx)), getattr(idaapi, "CF_CHG{:d}".format(1 + idx), 1 << (1 + idx))) for idx in range(idaapi.UA_MAXOP)))
-
-@utils.multicase()
 def ops_access():
     '''Return a tuple containing how each operand belonging to the instruction at the current address is accessed.'''
     return ops_access(ui.current.address())
@@ -379,36 +364,6 @@ def op_repr(ea, opnum):
     outop = utils.fcompose(idaapi.ua_outop2, utils.fdefault(''), idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.fcompose(idaapi.print_operand, utils.fdefault(''), idaapi.tag_remove)
     res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     return utils.string.of(res)
-
-@utils.multicase(opnum=types.integer)
-def op_state(opnum):
-    '''Returns the modification state for the operand `opnum` belonging to the current instruction.'''
-    return op_state(ui.current.address(), opnum)
-@utils.multicase(reference=interface.opref_t)
-def op_state(reference):
-    '''Returns the modification state for the operand pointed to by `reference`.'''
-    address, opnum, _ = reference
-    return op_state(address, opnum)
-@utils.multicase(ea=types.integer, opnum=types.integer)
-def op_state(ea, opnum):
-    """Returns the modification state for the operand `opnum` belonging to the instruction at the address `ea`.
-
-    The returned state is a string that can be "r", "w", or "rw" depending on
-    whether the operand is being read from, written to, or modified (both).
-    """
-    f = type.feature(ea)
-
-    # Verify that we're using a valid operand number.
-    if opnum >= len(operands(ea)):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_state({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
-
-    # Now we can check our instruction feature for what the operand state is.
-    r, w = f & ops_state.read[opnum], f & ops_state.write[opnum]
-    res = (r and 'r' or '') + (w and 'w' or '')
-
-    # Make a reftype_t from the state we determined. If we couldn't figure it out,
-    # then fallback to "r" as the operand still exists and it must be doing something.
-    return interface.reftype_t.of_action(res or 'r')
 
 @utils.multicase(opnum=types.integer)
 def op_access(opnum):
