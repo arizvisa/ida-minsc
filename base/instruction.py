@@ -465,31 +465,36 @@ def op_decoder(ea, opnum):
     return catalog.operand.type(res)
 
 @utils.multicase(opnum=types.integer)
-def op_type(opnum):
+def opt(opnum):
     '''Return the pythonic type of the operand `opnum` for the current instruction.'''
-    return op_type(ui.current.address(), opnum)
+    return opt(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
-def op_type(reference):
+def opt(reference):
     '''Return the pythonic type for the given operand `reference`.'''
     address, opnum, _ = reference
-    return op_type(address, opnum)
+    return opt(address, opnum)
 @utils.multicase(ea=types.integer, opnum=types.integer)
-def op_type(ea, opnum):
+def opt(ea, opnum):
     '''Return the pythonic type of the operand `opnum` for the instruction at address `ea`.'''
     op, opsize = operand(ea, opnum), op_size(ea, opnum)
 
-    # if our operand is not a register, then we can use the operand type.
-    if op.type not in {idaapi.o_reg}:
-        return catalog.operand.ptype(op), opsize
+    # If we got a branch of some kind, then we need to promote the type
+    # because we always maintain that you can only branch to pointers.
+    if any([interface.instruction.is_branch(ea), interface.instruction.is_call(ea)]):
+        return internal.types.type, opsize
 
-    # now we have the register and we only decode the instruction with its
-    # operand and then we can verify that its operand size matches.
-    insn = at(ea)
-    regtype, size = catalog.operand.decode(insn, op).type
-    if size != opsize:
-        logging.info(u"{:s}.op_type({:#x}, {:d}) : Returning the operand size ({:d}) as it is different from the register size ({:d}).".format(__name__, ea, opnum, opsize, size))
-    return regtype, opsize
-opt = utils.alias(op_type)
+    # if our operand is a register, then we decode the instruction with
+    # its operand to verify the operand size before returning the regtype.
+    elif op.type == idaapi.o_reg:
+        insn = at(ea)
+        regtype, size = catalog.operand.decode(insn, op).type
+        if size != opsize:
+            logging.info(u"{:s}.opt({:#x}, {:d}) : Returning the decoded operand size ({:d}) as it is different from the register size ({:d}).".format(__name__, ea, opnum, opsize, size))
+        return regtype, opsize
+
+    # Otherwise we can just trust that the operand type is correct.
+    return catalog.operand.ptype(op), opsize
+op_type = utils.alias(opt)
 
 @utils.multicase(opnum=types.integer)
 def op(opnum):
