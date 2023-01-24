@@ -5324,6 +5324,26 @@ class decode(object):
     }
 
     @classmethod
+    def byteorder(cls, **byteorder):
+        '''Process the keyword arguments in `byteorder` and return either "big" or "little" representing the byte order to use.'''
+        args = ['order', 'byteorder']
+
+        # If we weren't given a byteorder, then we just take the default order from the database.
+        if not any(arg in byteorder for arg in args):
+            information = idaapi.get_inf_structure()
+            mf = idaapi.cvar.inf.mf if idaapi.__version__ < 7.0 else information.lflags & idaapi.LFLG_MSF
+            return 'big' if mf else 'little'
+
+        # Otherwise, we were given a byteorder as a keyword and we can use it.
+        iterable = (byteorder[arg] for arg in args if arg in byteorder and byteorder[arg] in {'big', 'little'})
+        order = next(iterable, None)
+
+        # Verify the order before we return it back to the caller.
+        if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.byteorder({:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), internal.utils.string.kwargs(byteorder), "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
+        return order
+
+    @classmethod
     def unsigned(cls, bytes):
         '''Decode the provided `bytes` into an unsigned integer.'''
         data = bytearray(bytes)
@@ -5521,21 +5541,8 @@ class decode(object):
         FF_FLOAT, FF_DOUBLE = (idaapi.as_uint32(ff) for ff in [idaapi.FF_FLOAT, idaapi.FF_DOUBLE])
         SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
 
-        # If we were given a byteorder, then just use it.
-        args = ['order', 'byteorder']
-        if any(arg in byteorder for arg in args):
-            iterable = (byteorder[arg] for arg in args if arg in byteorder and byteorder[arg] in {'big','little'})
-            order = next(iterable, None)
-
-        # Otherwise, we just take the default order from the database.
-        else:
-            information = idaapi.get_inf_structure()
-            mf = idaapi.cvar.inf.mf if idaapi.__version__ < 7.0 else information.lflags & idaapi.LFLG_MSF
-            order = 'big' if mf else 'little'
-
-        # Verify the byteorder is a valid choice and use it to generate two callables for flipping the order.
-        if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.structure({:#x}, ...{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), identifier, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
+        # Extract the byteorder from the keywords and use it to generate two callables for flipping the order.
+        order = cls.byteorder(**byteorder))
         Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
         Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
 
@@ -5623,21 +5630,8 @@ class decode(object):
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
 
-        # If we were given a byteorder, then just use it.
-        args = ['order', 'byteorder']
-        if any(arg in byteorder for arg in args):
-            iterable = (byteorder[arg] for arg in args if arg in byteorder and byteorder[arg] in {'big','little'})
-            order = next(iterable, None)
-
-        # Otherwise, we just take the default order from the database.
-        else:
-            information = idaapi.get_inf_structure()
-            mf = idaapi.cvar.inf.mf if idaapi.__version__ < 7.0 else information.lflags & idaapi.LFLG_MSF
-            order = 'big' if mf else 'little'
-
-        # Verify the byteorder is a valid choice and use it to generate two callables for flipping the order.
-        if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.array({:#x}, {!s}, ...{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), flags, "{:#x}".format(info.tid) if info else info, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
+        # Extract the byteorder from the keywords and use it to generate two callables for flipping the order.
+        order = cls.byteorder(**byteorder)
         Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
         Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
 
