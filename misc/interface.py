@@ -5382,6 +5382,15 @@ class decode(object):
         '''Decode `bytes` into an array of integers that are of the specified `dtype`.'''
         order = cls.byteorder(**byteorder)
 
+        # If the dtype is not associated with a typecode supported by the _array
+        # module, then we need to do the decoding ourselves. We start by figuring
+        # whether we're a float or an integer to figure out the correct decoder.
+        if dtype & idaapi.DT_TYPE not in cls.integer_typecode:
+            decode = cls.float if dtype & idaapi.DT_TYPE in {idaapi.FF_FLOAT, idaapi.FF_DOUBLE} else cls.signed if dtype & idaapi.FF_SIGN else cls.unsigned
+            items = cls.list(cls.length_table[dtype & idaapi.DT_TYPE], bytes)
+            reordered = [item if order == 'big' else item[::-1] for item in items]
+            return [decode(item) for item in reordered]
+
         # Figure out the typecode and use it to create an _array. We will then use
         # this to do our decoding and then return it back to the caller.
         typecode = cls.integer_typecode[dtype & idaapi.DT_TYPE]
