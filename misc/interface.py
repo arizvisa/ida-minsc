@@ -5378,12 +5378,13 @@ class decode(object):
         return cls.length_table.get(dtype & idaapi.DT_TYPE, 0)
 
     @classmethod
-    def integers(cls, dtype, bytes):
+    def integers(cls, dtype, bytes, **byteorder):
         '''Decode `bytes` into an array of integers that are of the specified `dtype`.'''
-        typecode = cls.integer_typecode[dtype & idaapi.DT_TYPE]
+        order = cls.byteorder(**byteorder)
 
-        # Create an _array using the typecode that we determined so that it can
-        # be decoded and then returned to the caller.
+        # Figure out the typecode and use it to create an _array. We will then use
+        # this to do our decoding and then return it back to the caller.
+        typecode = cls.integer_typecode[dtype & idaapi.DT_TYPE]
         Ftranslate = operator.methodcaller('lower' if dtype & idaapi.FF_SIGN else 'upper')
         result = _array.array(typecode if typecode in 'fd' else Ftranslate(typecode))
 
@@ -5412,14 +5413,16 @@ class decode(object):
             logging.info(u"{:s}.integers({:#x}, {!s}) : The amount of data available ({:#x}) for decoding is not a multiple of the element size ({:d}) and will result in discarding {:+d} byte{:s} when decoding.".format('.'.join([__name__, cls.__name__]), dtype, '...', len(bytes), result.itemsize, extra, '' if extra == 1 else 's'))
             bytes = bytes[:-extra] if extra else bytes
 
-        # Now we can use the bytes we were given to initialize the _array
-        # that we're going to return to the user.
+        # Now we can use the bytes we were given to initialize the _array,
+        # flip it according to the byteorder, and then return it to the user.
         result.fromstring(builtins.bytes(bytes)) if sys.version_info.major < 3 else result.frombytes(bytes)
+        result if order == sys.byteorder else result.byteswap()
         return result
 
     @classmethod
-    def string(cls, width, bytes):
+    def string(cls, width, bytes, **byteorder):
         '''Decode the provided `bytes` as an array containing characters of the specified `width`.'''
+        order = cls.byteorder(**byteorder)
         typecode = cls.string_typecode[width]
         result = _array.array(typecode)
         mask = result.itemsize - 1
@@ -5427,7 +5430,11 @@ class decode(object):
             extra = len(bytes) & mask
             logging.warning(u"{:s}.string({:d}, ...) : The amount of data available ({:#x}) for decoding is not a multiple of the requested character width ({:d}) and will result in discarding {:+d} byte{:s} when decoding the string.".format('.'.join([__name__, cls.__name__]), width, len(bytes), result.itemsize, extra, '' if extra == 1 else 's'))
             bytes = bytes[:-extra] if extra else bytes
+
+        # Now we can load our array with the bytes we were given, flip the array
+        # if the byteorder needs us to, and then return it to the caller.
         result.fromstring(builtins.bytes(bytes)) if sys.version_info.major < 3 else result.frombytes(bytes)
+        result if order == sys.byteorder else result.byteswap()
         return result
 
     @classmethod
@@ -5541,10 +5548,10 @@ class decode(object):
         FF_FLOAT, FF_DOUBLE = (idaapi.as_uint32(ff) for ff in [idaapi.FF_FLOAT, idaapi.FF_DOUBLE])
         SF_VAR, SF_UNION = getattr(idaapi, 'SF_VAR', 0x1), getattr(idaapi, 'SF_UNION', 0x2)
 
-        # Extract the byteorder from the keywords and use it to generate two callables for flipping the order.
-        order = cls.byteorder(**byteorder))
+        # Extract the byteorder from the keywords and use it to generate a callable
+        # for flipping the bytes to correspond to the requested byteorder.
+        order = cls.byteorder(**byteorder)
         Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
-        Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
 
         # Iterate through all of the members in the structure. We also check if
         # we've been asked to decode it partially. In reality, structures are
@@ -5604,7 +5611,7 @@ class decode(object):
             # Just an IEEE float that we need to decode to something that python is able to understand.
             elif dsize in {FF_FLOAT, FF_DOUBLE}:
                 length = cls.length_table[dsize]
-                result[name] = cls.float(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(dtype, mdata)) or bytes(mdata)
+                result[name] = cls.float(Fordered(length, mdata)) if length == len(mdata) else cls.integers(dtype, mdata, order=order) or bytes(mdata)
 
             # Decoding references which could be an arbitrary size, but still need to be resolvable to an address.
             elif info and dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
@@ -5614,7 +5621,7 @@ class decode(object):
             # Otherwise, we can just decode everything using whatever flags were assigned to it.
             else:
                 length = cls.length_table[dsize]
-                result[name] = cls.unsigned(Fordered(length, mdata)) if length == len(mdata) else Freorder(cls.integers(mptr.flag, mdata)) or bytes(mdata)
+                result[name] = cls.unsigned(Fordered(length, mdata)) if length == len(mdata) else cls.integers(mptr.flag, mdata, order=order) or bytes(mdata)
             continue
 
         # Add everything else that we missed, pop out incomplete members if we
@@ -5630,10 +5637,10 @@ class decode(object):
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
 
-        # Extract the byteorder from the keywords and use it to generate two callables for flipping the order.
+        # Extract the byteorder from the keywords and use it to generate a callable
+        # for flipping the bytes to correspond to the requested byteorder.
         order = cls.byteorder(**byteorder)
         Fordered = (lambda length, data: data) if order.lower() == 'big' else (lambda length, data: functools.reduce(operator.add, (item[::-1] for item in cls.list(length, data))) if data else data)
-        Freorder = internal.utils.fidentity if order == sys.byteorder else lambda array: array.byteswap() or array
 
         # Now we need to check the opinfo and flags to figure out how to decode this.
         dtype, dsize = (flags & mask for mask in [typemap.FF_MASK, typemap.FF_MASKSIZE])
@@ -5660,15 +5667,14 @@ class decode(object):
             #codec = string.codec(width, encoding)
             #Fdecode = internal.utils.fidentity if codec is None else functools.partial(codec.decode, errors='replace')
             ldata, strdata = bytes[:length], bytes[length:]
-            prefix, array = cls.unsigned(Fordered(length, ldata)), Freorder(cls.string(width, strdata))
+            prefix, array = cls.unsigned(Fordered(length, ldata)), cls.string(width, strdata, order=order)
             if length and prefix != len(array):
                 logging.warning(u"{:s}.array({:#x}, {!s}, ...{:s}) : The string that was decoded had a length ({:d}) that did not match the length stored as the prefix ({:d}).".format('.'.join([__name__, cls.__name__]), flags, "{:#x}".format(info.strtype) if info else info, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', length, prefix))
             return array
 
         # Decoding references which can be of an arbitrary size, but need to be converted to an address.
         elif info and dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
-            length, items = cls.length_table[dsize], cls.integers(dtype, bytes)
-            reordered = Freorder(items)
+            length, items = cls.length_table[dsize], cls.integers(dtype, bytes, order=order)
 
             # FIXME: We should be determining the length from the reference type and figuring out the
             #        mask to apply to each value so that we can support REF_LOW8, REF_LOW16, REF_HIGH8,
@@ -5680,13 +5686,13 @@ class decode(object):
             # the reference type size. Unfortunately, the idaapi.as_signed function doesn't clamp
             # its integer unless it has its signed bit set, so we need to clamp that ourselves.
             if riflags & idaapi.REFINFO_SIGNEDOP and ritype in {idaapi.REF_OFF8, idaapi.REF_OFF16, idaapi.REF_OFF32, idaapi.REF_OFF64}:
-                mask, signed = pow(2, 8 * length) - 1, (idaapi.as_signed(item, 8 * length) for item in reordered)
+                mask, signed = pow(2, 8 * length) - 1, (idaapi.as_signed(item, 8 * length) for item in items)
                 clamped = (item if item < 0 else item & mask for item in signed)
 
             # Otherwise, we use the items in their unsigned form and clamp them to the reference type.
             else:
                 mask = pow(2, 8 * length) - 1
-                clamped = (item & mask for item in reordered)
+                clamped = (item & mask for item in items)
 
             # Now we can translate each item according to the reference info and return it.
             ribase = 0 if info.ri.base == idaapi.BADADDR else info.ri.base
@@ -5696,4 +5702,4 @@ class decode(object):
 
         # Otherwise, we can just decode everything using whatever flags we got for it.
         length = cls.length_table[dsize]
-        return Freorder(cls.integers(flags, bytes))
+        return cls.integers(flags, bytes, order=order)
