@@ -4219,7 +4219,7 @@ class type(object):
         @classmethod
         def locations(cls, ea):
             '''Return the address of each of the parameters being passed to the function referenced at address `ea`.'''
-            if not database.xref.code(ea, descend=True) or not interface.instruction.is_call(ea):
+            if not (interface.xref.has_code(ea, descend=True) and interface.instruction.is_call(ea)):
                 raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, 'type', cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
             items = idaapi.get_arg_addrs(ea)
             return [] if items is None else [ea for ea in items]
@@ -4267,13 +4267,16 @@ class xref(object):
     ## referencing
     @utils.multicase()
     @classmethod
-    def down(cls):
-        '''Return each address and its ``ref_t`` that is referenced by the instructions from the current function.'''
-        return down(ui.current.function())
+    def down(cls, **all):
+        '''Yield the operand reference and its target ``ref_t`` for each instruction from the current function.'''
+        return down(ui.current.function(), **all)
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def down(cls, func):
-        '''Return each address and its ``ref_t`` that is referenced by the instructions from the function `func`.'''
+    def down(cls, func, **all):
+        """Yield the operand reference and its target ``ref_t`` for each instruction from the function `func`.
+
+        If `all` is true, then include branch instructions (that can exit the function) despite not having a target reference.
+        """
         get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
         # define a closure that will be used to merge multiple references for the same address.
@@ -4302,15 +4305,16 @@ class xref(object):
                 if not database.type.code(ea):
                     continue
 
-                # if it's a branching or call-type instruction that has no xrefs, then log a warning for the user.
-                elif not len(database.xref.down(ea)) and any(F(ea) for F in branches):
+                # if it's a branching or call-type instruction that has no xrefs, and we're not
+                # supposed to be keeping track of them...then log a warning for the user.
+                elif not all.get('all', False) and not interface.xref.has(ea, True) and any(F(ea) for F in branches):
                     logging.warning(u"{:s}.down({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolvable.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
                     continue
 
                 # now we need to check which code xrefs are actually going to be something we care
                 # about by checking to see if there's an xref pointing outside our function.
                 refs = []
-                for ref in database.xref.code_down(ea):
+                for ref in interface.xref.code(ea, True):
                     xref = ref.ea
                     if interface.node.identifier(xref):
                         pass
@@ -4332,15 +4336,25 @@ class xref(object):
                 # we just collected. this is because the branch doesn't actually connect to them directly and instead
                 # we need to modify the access of the data reference to union it with the executable flag.
                 if get_switch_info(ea):
-                    refs[:] = [ ref | 'x' for ref in database.xref.data_down(ea) if not interface.node.identifier(ref.address) ]
+                    refs[:] = [ ref | 'x' for ref in interface.xref.data(ea, True) if not interface.node.identifier(ref.address) ]
 
                 # otherwise we can simply add the data references to our current result for the current address.
                 else:
-                    [ refs.append(ref) for ref in database.xref.data_down(ea) if not interface.node.identifier(ref.address) ]
+                    [ refs.append(ref) for ref in interface.xref.data(ea, True) if not interface.node.identifier(ref.address) ]
 
-                # now we can just take our collected references, merge them, and then yield them to the caller.
+                # now we merge our references, and then figure out which operand it came from.
                 for ref in Fmerge_references(refs):
-                    yield ea, ref
+                    Fcheck_bits = (lambda access: 'x' in access) if 'x' in ref.access else (lambda access: 'w' in access) if 'w' in ref.access else (lambda access: 'w' not in access and any(bit in access for bit in 'r&'))
+                    iterable = (opref for opref in interface.instruction.access(ea) if Fcheck_bits(opref.access))
+
+                    # now we can create our opref_t and then yield both it and the ref_t to the caller.
+                    yield next(iterable), ref
+
+                # If we're supposed to always yield something but didn't get any references, then we need to
+                # check if we're a branch instruction. If we were, then we need to yield an empty reference here.
+                if all.get('all', False) and not refs and not interface.xref.has(ea, True) and any(F(ea) for F in branches):
+                    iterable = (opref for opref in interface.instruction.access(ea) if 'x' in opref.access)
+                    yield next(iterable), interface.ref_t()
                 continue
             return
 
@@ -4359,75 +4373,44 @@ class xref(object):
     def up(cls, func):
         '''Return each address that reference the function `func`.'''
         rt, ea = interface.addressOfRuntimeOrStatic(func)
+
         # runtime
         if rt:
-            return database.xref.up(ea)
+            iterable = itertools.chain(*(F(ea, False) for F in [interface.xref.code, interface.xref.data]))
+
         # regular
-        return database.xref.up(ea)
+        else:
+            iterable = itertools.chain(*(F(ea, False) for F in [interface.xref.code, interface.xref.data]))
+        return sorted({ref for ref in iterable})
 
     @utils.multicase()
     @classmethod
     def calls(cls):
-        '''Return the address of each call instruction and its ``ref_t`` that is referenced from the current function.'''
+        '''Return the operand reference for each call instruction that is referenced from the current function.'''
         return cls.calls(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
-    def calls(cls, func):
-        '''Return the address of each call instruction and its ``ref_t`` that is referenced from the function `func`.'''
+    def calls(cls, func, **all):
+        '''Return the operand reference for each call instruction that is referenced from the function `func`.'''
         fn, results = by(func), []
         for _, right in blocks.calls(fn):
             ea = interface.address.head(right - 1)
-            crefs, drefs = (F(ea) for F in [database.xref.code_down, database.xref.data_down])
-
-            # Group all of the references for the current address.
-            grouped, references = {}, [ref for ref in itertools.chain(crefs, drefs)]
-            [grouped.setdefault(ref.address, []).append(ref) for ref in references]
-
-            # If there were some references, then merge them together and then add them into our results.
-            if references:
-                merged = {ea : functools.reduce(operator.or_, items) for ea, items in grouped.items() if items}
-                [ results.append((ea, merged.pop(ref.address))) for ref in references if ref.address in merged ]
-
-            # If there weren't any references for this basic block, then warn the user about it.
-            else:
-                logging.warning(u"{:s}.calls({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolvable.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
-            continue
+            results.extend(interface.instruction.access(ea))
         return results
 
     @utils.multicase()
     @classmethod
     def branches(cls):
-        '''Return the address of each branch instruction and its ``ref_t`` that is referenced within the current function.'''
+        '''Return the operand reference for each branch instruction and is referenced from the current function.'''
         return cls.branches(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def branches(cls, func):
-        '''Return the address of each call instruction and its ``ref_t`` that is referenced within the function `func`.'''
-        get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+        '''Return the operand reference for each branch instruction that is referenced from the function `func`.'''
         fn, results = by(func), []
         for _, right in blocks.branches(fn):
             ea = interface.address.head(right - 1)
-            crefs, drefs = (F(ea) for F in [database.xref.code_down, database.xref.data_down])
-
-            # If the current address is a switch, then we need to handle this specially to avoid all of
-            # the unmergable code references. We ignore them and instead use an executable data reference.
-            if get_switch_info(ea):
-                [ results.append((ea, ref | 'x')) for ref in drefs ]
-                continue
-
-            # Group all of the references for the current address.
-            grouped, references = {}, [ref for ref in itertools.chain(crefs, drefs)]
-            [grouped.setdefault(ref.address, []).append(ref) for ref in references]
-
-            # If there were some references, then merge them together and then add them into our results.
-            if references:
-                merged = {ea : functools.reduce(operator.or_, items) for ea, items in grouped.items() if items}
-                [ results.append((ea, merged.pop(ref.address))) for ref in references if ref.address in merged ]
-
-            # If there weren't any references for this basic block, then warn the user about it.
-            else:
-                logging.warning(u"{:s}.branches({:#x}) : Discovered the \"{:s}\" instruction at {:#x} that might've contained a reference but was unresolvable.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), utils.string.escape(database.instruction(ea), '"'), ea))
-            continue
+            results.extend(interface.instruction.access(ea))
         return results
 
     @utils.multicase(index=types.integer)
@@ -4459,7 +4442,7 @@ class xref(object):
     @classmethod
     def arguments(cls, ea):
         '''Return the address of each of the parameters being passed to the function reference at address `ea`.'''
-        if not database.xref.code_down(ea) or not interface.instruction.is_call(ea):
+        if not (interface.xref.has_code(ea, True) and interface.instruction.is_call(ea)):
             raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
         items = idaapi.get_arg_addrs(ea)
         return [] if items is None else [ea for ea in items]
