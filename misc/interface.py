@@ -4769,6 +4769,85 @@ class xref(object):
         # XXX: there's really no way to verify this was remove correctly
         #      without iterating back through them.. so we have to assume.
         return True
+
+    # These are just wrappers that were (mostly) moved from the database.xref namespace.
+    @classmethod
+    def any(cls, ea, descend):
+        '''Return a ``ref_t`` for each location that references the address `ea` (if `descend` is false), or that is referenced by the address `ea`.'''
+        xiterate = cls.of if descend else cls.to
+        for xr, iscode, xrtype in xiterate(ea):
+            if any([iscode and xrtype != idaapi.fl_F, not iscode]):
+                yield ref_t(xr, access_t(xrtype, iscode))
+            continue
+        return
+
+    @classmethod
+    def code(cls, ea, descend):
+        '''Return a ``ref_t`` for each location that references the address `ea` as code (if `descend` is false), or that is referenced by the address `ea`.'''
+        xiterate = cls.of if descend else cls.to
+        for xr, iscode, xrtype in xiterate(ea):
+            if iscode and xrtype != idaapi.fl_F:
+                yield ref_t(xr, access_t(xrtype, iscode))
+            continue
+        return
+
+    @classmethod
+    def data(cls, ea, descend):
+        '''Return a ``ref_t`` for each location that references the address `ea` as data (if `descend` is false), or that is referenced by the address `ea`.'''
+        xiterate = cls.of if descend else cls.to
+        for xr, iscode, xrtype in xiterate(ea):
+            if not iscode:
+                yield ref_t(xr, access_t(xrtype, iscode))
+            continue
+        return
+
+    @classmethod
+    def any_address(cls, ea, descend):
+        '''Return each address that references the address `ea` (if `descend` is false), or that is referenced by the address `ea`.'''
+        xiterate = cls.of if descend else cls.to
+        for xr, iscode, xrtype in xiterate(ea):
+            if any([iscode and xrtype != idaapi.fl_F, not iscode]):
+                yield xr
+            continue
+        return
+
+    @classmethod
+    def code_address(cls, ea, descend):
+        '''Return each address that references the address `ea` as code (if `descend` is false), or that is referenced by the address `ea`.'''
+        xiterate = cls.of if descend else cls.to
+        for xr, iscode, xrtype in xiterate(ea):
+            if iscode and xrtype != idaapi.fl_F:
+                yield xr
+            continue
+        return
+
+    @classmethod
+    def data_address(cls, ea, descend):
+        '''Return each address that references the address `ea` as data (if `descend` is false), or that is referenced by the address `ea`.'''
+        xiterate = cls.of if descend else cls.to
+        for xr, iscode, _ in xiterate(ea):
+            if not iscode:
+                yield xr
+            continue
+        return
+
+    @classmethod
+    def has(cls, ea, descend):
+        '''Return if there is a reference to the address `ea` (if `descend` is false), or from the address if otherwise.'''
+        if descend:
+            return next(cls.any_address(ea, True), None) is not None
+        return True if address.flags(ea) & idaapi.FF_REF else False
+
+    @classmethod
+    def has_code(cls, ea, descend):
+        '''Return if there is a code reference to the address `ea` (if `descend` is false), or from the address if otherwise.'''
+        return next(cls.code_address(ea, descend), None) is not None
+
+    @classmethod
+    def has_data(cls, ea, descend):
+        '''Return if there is a data reference to the address `ea` (if `descend` is false), or from the address if otherwise.'''
+        return next(cls.data_address(ea, descend), None) is not None
+
 xiterate = internal.utils.alias(xref.iterate, 'xref')
 
 class function(object):
