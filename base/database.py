@@ -25,7 +25,7 @@ import sys, os, logging, bisect
 import math, array as _array, fnmatch, re
 
 import function, segment, ui
-import structure as _structure, instruction as _instruction
+import structure as _structure
 import idaapi, idc, internal
 from internal import utils, interface, exceptions as E
 
@@ -3198,12 +3198,12 @@ class address(object):
             ## XXX: in later versions of ida, is_basic_block_end takes two args (ea, bool call_insn_stops_block)
 
             # call and halting instructions will terminate a block
-            if _instruction.type.enter(ea) or _instruction.type.leave(ea):
+            if interface.instruction.is_call(ea) or interface.instruction.is_return(ea):
                 results.append(interface.bounds_t(block, nextea))
                 block = nextea
 
             # branch instructions will terminate a block
-            elif _instruction.type.branch(ea):
+            elif interface.instruction.is_branch(ea):
                 results.append(interface.bounds_t(block, nextea))
                 block = nextea
             continue
@@ -4014,13 +4014,13 @@ class address(object):
     @classmethod
     def prevcall(cls, ea, predicate, **count):
         '''Return the previous call instruction from the address `ea` that satisfies the provided `predicate`.'''
-        F = utils.fcompose(utils.fmap(_instruction.type.enter, predicate), builtins.all)
+        F = utils.fcompose(utils.fmap(interface.instruction.is_call, predicate), builtins.all)
         return cls.prevF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevcall(cls, ea, count):
         '''Return the previous `count` call instructions from the address `ea`.'''
-        return cls.prevF(ea, _instruction.type.enter, count)
+        return cls.prevF(ea, interface.instruction.is_call, count)
 
     @utils.multicase()
     @classmethod
@@ -4041,13 +4041,13 @@ class address(object):
     @classmethod
     def nextcall(cls, ea, predicate, **count):
         '''Return the next call instruction from the address `ea` that satisfies the provided `predicate`.'''
-        F = utils.fcompose(utils.fmap(_instruction.type.enter, predicate), builtins.all)
+        F = utils.fcompose(utils.fmap(interface.instruction.is_call, predicate), builtins.all)
         return cls.nextF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextcall(cls, ea, count):
         '''Return the next `count` call instructions from the address `ea`.'''
-        return cls.nextF(ea, _instruction.type.enter, count)
+        return cls.nextF(ea, interface.instruction.is_call, count)
 
     @utils.multicase()
     @classmethod
@@ -4068,8 +4068,8 @@ class address(object):
     @classmethod
     def prevbranch(cls, ea, predicate, **count):
         '''Return the previous branch instruction from the address `ea` that satisfies the provided `predicate`.'''
-        Fnocall = utils.fcompose(_instruction.type.enter, operator.not_)
-        Fbranch = _instruction.type.branch
+        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
+        Fbranch = interface.instruction.is_branch
         Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
         return cls.prevF(ea, F, count.pop('count', 1))
@@ -4077,8 +4077,8 @@ class address(object):
     @classmethod
     def prevbranch(cls, ea, count):
         '''Return the previous `count` branch instructions from the address `ea`.'''
-        Fnocall = utils.fcompose(_instruction.type.enter, operator.not_)
-        Fbranch = _instruction.type.branch
+        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
+        Fbranch = interface.instruction.is_branch
         F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         return cls.prevF(ea, F, count)
 
@@ -4101,8 +4101,8 @@ class address(object):
     @classmethod
     def nextbranch(cls, ea, predicate, **count):
         '''Return the next branch instruction from the address `ea` that satisfies the provided `predicate`.'''
-        Fnocall = utils.fcompose(_instruction.type.enter, operator.not_)
-        Fbranch = _instruction.type.branch
+        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
+        Fbranch = interface.instruction.is_branch
         Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
         return cls.nextF(ea, F, count.pop('count', 1))
@@ -4110,8 +4110,8 @@ class address(object):
     @classmethod
     def nextbranch(cls, ea, count):
         '''Return the next `count` branch instructions from the address `ea`.'''
-        Fnocall = utils.fcompose(_instruction.type.enter, operator.not_)
-        Fbranch = _instruction.type.branch
+        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
+        Fbranch = interface.instruction.is_branch
         F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         return cls.nextF(ea, F, count)
 
@@ -4140,7 +4140,7 @@ class address(object):
     def prevmnemonic(cls, ea, mnemonics, predicate, **count):
         '''Return the address of the previous instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
-        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
         F = utils.fcompose(utils.fmap(Fuses_mnemonics, predicate), builtins.all)
         return cls.prevF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered), count=internal.types.integer)
@@ -4148,7 +4148,7 @@ class address(object):
     def prevmnemonic(cls, ea, mnemonics, count):
         '''Return the address of the previous `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
-        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
         return cls.prevF(ea, Fuses_mnemonics, count)
 
     @utils.multicase(mnemonics=(internal.types.string, internal.types.unordered))
@@ -4176,7 +4176,7 @@ class address(object):
     def nextmnemonic(cls, ea, mnemonics, predicate, **count):
         '''Return the address of the next instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
-        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
         F = utils.fcompose(utils.fmap(Fuses_mnemonics, predicate), builtins.all)
         return cls.nextF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered), count=internal.types.integer)
@@ -4184,7 +4184,7 @@ class address(object):
     def nextmnemonic(cls, ea, mnemonics, count):
         '''Return the address of the next `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
-        Fuses_mnemonics = utils.fcompose(_instruction.mnemonic, utils.fpartial(operator.contains, items))
+        Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
         return cls.nextF(ea, Fuses_mnemonics, count)
 
     @utils.multicase()
@@ -4979,7 +4979,7 @@ class type(object):
         # Otherwise, we need to check our downrefs to see if any exist. However,
         # if it's code with codeflow, then we need to exclude the next instruction
         # from our list unless it has the CF_STOP feature applied to it.
-        ignored = {address.next(ea)} if cls.code(ea) and _instruction.type.feature(ea, idaapi.CF_STOP) != idaapi.CF_STOP else {}
+        ignored = {address.next(ea)} if cls.code(ea) and interface.instruction.feature(ea, idaapi.CF_STOP) != idaapi.CF_STOP else {}
         return any(item not in ignored for item in itertools.chain(xref.code(ea, True), xref.data(ea, True)))
     is_reference = utils.alias(reference, 'type')
 
@@ -6497,7 +6497,7 @@ class xref(object):
         flowtype = reftype.get('flowtype', reftype.get('reftype', idaapi.XREF_USER))
         if flowtype & idaapi.XREF_MASK:
             pass
-        elif _instruction.type.feature(ea, idaapi.CF_CALL) == idaapi.CF_CALL:
+        elif interface.instruction.feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL:
             flowtype |= idaapi.fl_CN if near else idaapi.fl_CF
         else:
             flowtype |= idaapi.fl_JN if near else idaapi.fl_JF
