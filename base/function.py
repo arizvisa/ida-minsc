@@ -1010,7 +1010,7 @@ class blocks(object):
             # if we're unable to split up calls, then we need to traverse this
             # block so that we can figure out where we need to split.
             if not has_calls and flags & FC_CALL_ENDS:
-                start, stop, locations = left, right, [ea for ea in block.iterate(bb) if instruction.type.enter(ea)]
+                start, stop, locations = left, right, [ea for ea in block.iterate(bb) if interface.instruction.is_call(ea)]
                 for item in locations:
                     left, right = start, database.address.next(item)
                     yield idaapi.BasicBlock(bb.id, interface.range.pack(left, right), bb._fc)
@@ -1287,7 +1287,7 @@ class blocks(object):
             bounds = interface.range.bounds(bb)
             left, right = sorted(bounds)
             ea = interface.address.head(right - 1) if right > left else right
-            results.append(bounds) if instruction.type.enter(ea) else None
+            results.append(bounds) if interface.instruction.is_call(ea) else None
         return results
 
     @utils.multicase()
@@ -1305,7 +1305,7 @@ class blocks(object):
             bounds = interface.range.bounds(bb)
             left, right = sorted(bounds)
             ea = interface.address.head(right - 1) if right > left else right
-            results.append(bounds) if instruction.type.branch(ea) else None
+            results.append(bounds) if interface.instruction.is_branch(ea) else None
         return results
 
     @utils.multicase()
@@ -1468,10 +1468,10 @@ class blocks(object):
             attrs.setdefault('__size__', getattr(bounds, 'size', bounds.right - bounds.left))
 
             attrs.setdefault('__entry__', bounds.left == ea or not any(B.preds()))
-            attrs.setdefault('__sentinel__', instruction.type.sentinel(last) or not any(B.succs()))
-            attrs.setdefault('__conditional__', instruction.type.conditional(last))
-            attrs.setdefault('__unconditional__', any(F(last) for F in [instruction.type.unconditional, instruction.type.unconditionali]))
-            attrs.setdefault('__calls__', [ea for ea in items if instruction.type.enter(ea)])
+            attrs.setdefault('__sentinel__', interface.instruction.is_sentinel(last) or not any(B.succs()))
+            attrs.setdefault('__conditional__', interface.instruction.is_conditional(last))
+            attrs.setdefault('__unconditional__', any(F(last) for F in [interface.instruction.is_unconditional, interface.instruction.is_indirect]))
+            attrs.setdefault('__calls__', [ea for ea in items if interface.instruction.is_call(ea)])
 
             attrs.setdefault('__chunk_index__', next((idx for idx, ch in enumerate(availableChunks) if ch.left <= bounds.left < ch.right), None))
             attrs.setdefault('__chunk_start__', bounds.left in {item.left for item in availableChunks})
@@ -1519,12 +1519,12 @@ class blocks(object):
                 attrs = {}
                 if interface.range.end(Bp) == target:
                     operator.setitem(attrs, '__contiguous__', interface.range.end(Bp) == target)
-                elif instruction.type.conditional(source):
+                elif interface.instruction.is_conditional(source):
                     operator.setitem(attrs, '__conditional__', True)
-                elif instruction.type.unconditional(source) or instruction.type.unconditionali(source):
+                elif interface.instruction.is_unconditional(source) or interface.instruction.is_indirect(source):
                     operator.setitem(attrs, '__unconditional__', True)
                 else:
-                    operator.setitem(attrs, '__branch__', instruction.type.branch(source))
+                    operator.setitem(attrs, '__branch__', interface.instruction.is_branch(source))
 
                 # add the dot attributes for the edge
                 operator.setitem(attrs, 'dir', 'forward')
@@ -1543,12 +1543,12 @@ class blocks(object):
                 attrs = {}
                 if interface.range.end(B) == target:
                     operator.setitem(attrs, '__contiguous__', interface.range.end(B) == target)
-                elif instruction.type.conditional(source):
+                elif interface.instruction.is_conditional(source):
                     operator.setitem(attrs, '__conditional__', True)
-                elif instruction.type.unconditional(source) or instruction.type.unconditionali(source):
+                elif interface.instruction.is_unconditional(source) or interface.instruction.is_indirect(source):
                     operator.setitem(attrs, '__unconditional__', True)
                 else:
-                    operator.setitem(attrs, '__branch__', instruction.type.branch(source))
+                    operator.setitem(attrs, '__branch__', interface.instruction.is_branch(source))
 
                 # add the dot attributes for the edge
                 operator.setitem(attrs, 'dir', 'forward')
@@ -2484,7 +2484,7 @@ class frame(object):
         @classmethod
         def location(cls, ea):
             '''Return the list of address locations for each of the parameters that are passed to the function call at `ea`.'''
-            if not any(Finstruction(ea) for Finstruction in [instruction.type.enter, instruction.type.branch]):
+            if not any(Finstruction(ea) for Finstruction in [interface.instruction.is_call, interface.instruction.is_branch]):
                 raise E.MissingTypeOrAttribute(u"{:s}.location({:#x}) : The instruction at the specified address ({:#x}) is not a function call.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
             items = idaapi.get_arg_addrs(ea)
@@ -4219,8 +4219,8 @@ class type(object):
         @classmethod
         def locations(cls, ea):
             '''Return the address of each of the parameters being passed to the function referenced at address `ea`.'''
-            if not database.xref.code(ea, descend=True):
-                raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.enter(ea) else 'is not a call instruction with'))
+            if not database.xref.code(ea, descend=True) or not interface.instruction.is_call(ea):
+                raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, 'type', cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
             items = idaapi.get_arg_addrs(ea)
             return [] if items is None else [ea for ea in items]
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), ea=internal.types.integer)
@@ -4229,7 +4229,7 @@ class type(object):
             '''Return the address of each of the parameters for the function `func` that are being passed to the function referenced at address `ea`.'''
             refs = {ref for ref in cls.up(func)}
             if ea not in refs:
-                logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, cls.__name__]), func, ea, address(func), ea))
+                logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, 'type', cls.__name__]), func, ea, address(func), ea))
             return cls.locations(ea)
         location = utils.alias(locations, 'type.arguments')
 
@@ -4459,8 +4459,8 @@ class xref(object):
     @classmethod
     def arguments(cls, ea):
         '''Return the address of each of the parameters being passed to the function reference at address `ea`.'''
-        if not database.xref.code_down(ea):
-            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.enter(ea) else 'is not a call instruction with'))
+        if not database.xref.code_down(ea) or not interface.instruction.is_call(ea):
+            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
         items = idaapi.get_arg_addrs(ea)
         return [] if items is None else [ea for ea in items]
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
