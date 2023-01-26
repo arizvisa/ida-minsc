@@ -1610,7 +1610,39 @@ class member_t(object):
     ## Serialization
     def __getstate__(self):
         parentbase = self.__parent__.members.baseoffset
-        mptr, fullname, sptr = idaapi.get_member_by_id(self.ptr.id)
+
+        # Grab the member information and unpack it so we can serialize its state.
+        packed_result = idaapi.get_member_by_id(self.ptr.id)
+        if packed_result:
+            mptr, fullname, sptr = packed_result
+
+        # If we couldn't get the member tuple, then this is a "lost field" as per
+        # the disassembler's naming. So, we need a dummy member of some kind for it.
+        else:
+            Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
+            Flost_field_name, Ftry_name = "lost_field_name_{:x}".format, lambda id: internal.netnode.name.get(Fnetnode(id))
+            sptr = self.__parent__.ptr
+            mptr = sptr.get_member(self.__index__)
+
+            # Get any member attributes that we're able to. we don't have any typeinfo
+            # to serialize, but we still need tinfo_t.deserialize to fail successfully.
+            comments = tuple(utils.string.of(idaapi.get_member_cmt(mptr.id, item)) for item in [True, False])
+            msize = idaapi.get_member_size(mptr)
+            ty = mptr.flag, idaapi.BADADDR, msize
+            typeinfo = ty, (b'', b'')
+
+            # The disassembler uses the prefix "lost_field_name_" for the member name,
+            # but since the type is lost there really isn't any other attributes that
+            # are relevant other than comments. Instead of using the "lost_field_name_"
+            # prefix, we use an empty string. This way, during deserialization we can
+            # explicitly check for it and then modify the name using the netnode api.
+            mname = Ftry_name(mptr.id) or u''
+
+            # Pack together our parent intermation and member state so that we can
+            # return everything that we grabbed.
+            parent = Ftry_name(sptr.id), sptr.props, parentbase
+            state = mptr.props, mptr.soff, typeinfo, mname, comments
+            return parent, self.__index__, state
 
         # grab its typeinfo and serialize it
         tid = self.typeid
@@ -1694,20 +1726,41 @@ class member_t(object):
         else:
             opinfo.tid = mytype if isinstance(mytype, types.integer) else mytype.id
 
-        # add the member to the database, and then check whether there was a naming
-        # issue of some sort so that we can warn the user or resolve it.
+        # add the member to the database if the name exists, and then check whether
+        # there was a naming issue of some sort so that we can warn the user or resolve it.
         res = utils.string.to(name)
-        mem = idaapi.add_struc_member(sptr, res, 0 if sptr.props & idaapi.SF_UNION else soff, flag, opinfo, nbytes)
+        if res:
+            mem = idaapi.add_struc_member(sptr, res, 0 if sptr.props & idaapi.SF_UNION else soff, flag, opinfo, nbytes)
+
+        # now for a trick. since the member name doesn't exist and we need the disassembler to
+        # display the name prefixed with "lost_field_name_", we create the member with a placeholder
+        # based on the offset. iff we succeed, then we modify the member name using a netnode.
+        else:
+            Fgenerate_unique_name = lambda recurse, sptr, aggro=u'': (lambda unique_name: unique_name if not idaapi.get_member_by_name(sptr, unique_name) else recurse(recurse, sptr, aggro + u'_'))(unique_name=''.join([u"_{:x}".format(sptr.id), aggro]))
+            unique = Fgenerate_unique_name(Fgenerate_unique_name, sptr)
+            mem = idaapi.add_struc_member(sptr, unique, 0 if sptr.props & idaapi.SF_UNION else soff, flag, opinfo, nbytes)
+
+            # If that was successful, then we just need to get our id and then we can rename it. If
+            # renaming it resulted in an error, then we bail with a fabricated error code which should
+            # be okay because we handle any error that's not equal to STRUC_ERROR_MEMBER_OK below.
+            if mem == idaapi.STRUC_ERROR_MEMBER_OK:
+                F, mptr = getattr(idaapi, 'ea2node', utils.fidentity), idaapi.get_member(sptr, soff)
+                mem = idaapi.STRUC_ERROR_MEMBER_OK if internal.netnode.name.set(mptr.id, res) else -idaapi.BADADDR
 
         # FIXME: handle these naming errors properly
         # duplicate name
         if mem == idaapi.STRUC_ERROR_MEMBER_NAME:
-            if idaapi.get_member_by_name(sptr, res).soff != soff:
+            mptr = idaapi.get_member_by_name(sptr, res)
+            if mptr and mptr.soff != soff:
                 newname = u"{:s}_{:x}".format(res, soff)
                 logging.warning(u"{:s}({:#x}, index={:d}): Duplicate name found for member \"{:s}\" of structure ({:s}), renaming it to \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(name, '"'), parentname, utils.string.escape(newname, '"')))
                 idaapi.set_member_name(sptr, soff, utils.string.to(newname))
-            else:
+
+            elif mptr:
                 logging.info(u"{:s}({:#x}, index={:d}): Ignoring field at index {:d} of structure ({:s}) with the same name (\"{:s}\") and position ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index, index, parentname, utils.string.escape(name, '"'), soff))
+
+            else:
+                logging.warning(u"{:s}({:#x}, index={:d}): Field at index {:d} of structure ({:s}) could not be found using its expected name (\"{:s}\").".format('.'.join([__name__, cls.__name__]), sptr.id, index, index, parentname, utils.string.escape(name, '"')))
 
         # duplicate field (same offset)
         elif mem == idaapi.STRUC_ERROR_MEMBER_OFFSET:
@@ -1727,7 +1780,7 @@ class member_t(object):
             logging.warning(u"{:s}({:#x}, index={:d}): The member that was created (\"{:s}\") was expected at index {:d} but was created at index {:d}.".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), index, count))
             index = count
 
-        # now that we know our parent exists and th member has been added
+        # now that we know our parent exists and the member has been added
         # we can use the soff to grab the the member's mptr.
         mptr = idaapi.get_member(sptr, soff)
         parent = new(sptr.id, offset=parentbase)
