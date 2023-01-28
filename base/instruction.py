@@ -1613,21 +1613,67 @@ def op_refinfo(ea, opnum):
 
 @utils.multicase(opnum=types.integer)
 def op_reference(opnum):
-    '''Return the address being referenced by the operand `opnum` for the current instruction.'''
+    '''Set the type for operand `opnum` at the current instruction to an offset and return its target address.'''
     return op_reference(ui.current.address(), opnum)
 @utils.multicase(reference=interface.opref_t)
 def op_reference(reference):
-    '''Return the address being referenced by the given operand `reference`.'''
+    '''Set the type for the given operand `reference` to an offset and return its target address.'''
     address, opnum, _ = reference
     return op_reference(address, opnum)
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_reference(ea, opnum):
-    '''Return the address being referenced by the operand `opnum` for the instruction at address `ea`.'''
+    '''Set the type for operand `opnum` of the instruction at address `ea` to an offset and return its target address.'''
     insn = interface.instruction.at(ea)
-    ops = interface.instruction.operands(insn.ea)
-    if not(opnum < len(ops)):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_reference({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(ops), insn.ea))
-    return interface.instruction.reference(ea, opnum)
+    operands = interface.instruction.operands(insn.ea)
+    if not(0 <= opnum < len(operands)):
+        message = 'invalid' if opnum < 0 else "larger than the number of operands ({:d})".format(len(operands))
+        raise E.IndexOutOfBoundsError(u"{:s}.op_reference({:#x}, {:d}) : The specified operand number ({:d}) is {:s} for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, message, insn.ea))
+
+    # If there's already a refinfo_t for the operand number, then we don't want
+    # to change anything. So we'll simply use it as-is to return the target.
+    operand, refinfo = operands[opnum], interface.address.refinfo(insn.ea, opnum)
+    if refinfo:
+        return interface.instruction.reference(insn.ea, operand.n, refinfo)
+
+    # We need to check the operand type here because idaapi.op_offset_ex seems
+    # to always return success, even if the operand type is a register. So to
+    # avoid applying a reference to an operand that doesn't make sense, we bail.
+    elif operand.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far, idaapi.o_imm, idaapi.o_displ, idaapi.o_phrase}:
+        raise E.InvalidTypeOrValueError(u"{:s}.op_reference({:#x}, {:d}) : Unable to modify the operand ({:d}) for the instruction at address {:#x} due to the operand being an unsupported type ({:d}).".format(__name__, ea, opnum, operand.n, insn.ea, operand.type))
+
+    # Otherwise, we're going to need to use the default to figure it out
+    # ourselves, apply it to the operand, and then we can return it.
+    refinfo = idaapi.refinfo_t()
+    refinfo.set_type(idaapi.get_default_reftype(insn.ea))
+    refinfo.target = idaapi.BADADDR
+    if not idaapi.op_offset_ex(insn.ea, operand.n, refinfo):
+        raise E.DisassemblerError(u"{:s}.op_reference({:#x}, {:d}) : Unable to change the operand ({:d}) for the specified instruction ({:#x}) to a reference.".format(__name__, ea, opnum, operand.n, ea))
+    return interface.instruction.reference(insn.ea, operand.n, refinfo)
+@utils.multicase(ea=types.integer, opnum=types.integer, refinfo=idaapi.refinfo_t)
+def op_reference(ea, opnum, refinfo):
+    '''Set the type for operand `opnum` of the instruction at address `ea` to an offset with the given `refinfo` and return its target address.'''
+    insn = interface.instruction.at(ea)
+    iterable = ((attribute, getattr(refinfo, attribute)) for attribute in ['base', 'target'])
+    refinfo_attributes = [(attribute, value) for attribute, value in iterable if value != idaapi.BADADDR]
+
+    # Check the operand number is actually valid.
+    operands = interface.instruction.operands(insn.ea)
+    if not(0 <= opnum < len(operands)):
+        descr = "{:s}(flags={:#x}, tdelta={:+#x}{:s})".format(utils.pycompat.fullname(refinfo), refinfo.flags, refinfo.tdelta, ", {:s}".format(', '.join("{:s}={:#x}".format(attribute, value) for attribute, value in refinfo_attributes)) if refinfo_attributes else '')
+        message = 'invalid' if opnum < 0 else "larger than the number of operands ({:d})".format(len(operands))
+        raise E.IndexOutOfBoundsError(u"{:s}.op_reference({:#x}, {:d}, {:s}) : The specified operand number ({:d}) is {:s} for the instruction at address {:#x}.".format(__name__, ea, opnum, descr, opnum, message, insn.ea))
+
+    # Make sure the operand type is something that actually makes sense.
+    operand = operands[opnum]
+    if operand.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far, idaapi.o_imm, idaapi.o_displ, idaapi.o_phrase}:
+        descr = "{:s}(flags={:#x}, tdelta={:+#x}{:s})".format(utils.pycompat.fullname(refinfo), refinfo.flags, refinfo.tdelta, ", {:s}".format(', '.join("{:s}={:#x}".format(attribute, value) for attribute, value in refinfo_attributes)) if refinfo_attributes else '')
+        raise E.InvalidTypeOrValueError(u"{:s}.op_reference({:#x}, {:d}, {:s}) : Unable to modify the operand ({:d}) for the instruction at address {:#x} due to the operand being an unsupported type ({:d}).".format(__name__, ea, opnum, descr, operand.n, insn.ea, operand.type))
+
+    # Now we can try to apply the refinfo_t we were given and return the operand value using it.
+    if not idaapi.op_offset_ex(insn.ea, operand.n, refinfo):
+        descr = "{:s}(flags={:#x}, tdelta={:+#x}{:s})".format(utils.pycompat.fullname(refinfo), refinfo.flags, refinfo.tdelta, ", {:s}".format(', '.join("{:s}={:#x}".format(attribute, value) for attribute, value in refinfo_attributes)) if refinfo_attributes else '')
+        raise E.DisassemblerError(u"{:s}.op_reference({:#x}, {:d}, {:s}) : Unable to change the operand ({:d}) for the specified instruction ({:#x}) to a reference.".format(__name__, ea, opnum, operand.n, insn.ea))
+    return interface.instruction.reference(insn.ea, operand.n, refinfo)
 op_ref = utils.alias(op_reference)
 
 @utils.multicase(opnum=types.integer)
