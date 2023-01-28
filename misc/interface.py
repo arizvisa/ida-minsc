@@ -3814,44 +3814,44 @@ class instruction(object):
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
-        # Grab the instruction, the operands, and then the operand. This way we can extract
-        # the operand value and its size so that we can turn it into an adiff_t.
+        # Grab the instruction, its operand, and then its value. We also grab its dtype in case
+        # we can't treat it as a reference meaning we have to fall back to it as an immediate.
         ea, insn, operand = int(ea), instruction.at(ea), instruction.operand(ea, opnum)
-        dtype, inverted, negated = get_dtype_attribute(operand), node.alt_opinverted(insn.ea, operand.n), node.alt_opnegated(insn.ea, operand.n)
-        value, bits = operand.value if operand.type in {idaapi.o_imm} else operand.addr, 8 * get_dtype_size(dtype)
-        avalue = idaapi.as_signed(value, bits)
+        dtype, value = get_dtype_attribute(operand), operand.value if operand.type in {idaapi.o_imm} else operand.addr
 
-        # If we were given a refinfo_t then we can use it to calculate exactly what
-        # address is being referenced by the operand and return it.
-        if refinfo:
-            target, base = idaapi.ea_pointer(), idaapi.ea_pointer()
+        # If we weren't given a refinfo_t, then we figure it out from the default. So, unless
+        # the user changed it, the default should always result in returning the immediate.
+        if not refinfo:
+            default = idaapi.refinfo_t()
+            default.set_type(idaapi.get_default_reftype(insn.ea))
+            default.base, default.target = 0, idaapi.BADADDR
 
-            # Try and calculate the reference for the operand value. If we couldn't, then we simply treat the value as-is.
-            if not idaapi.calc_reference_data(target.cast(), base.cast(), insn.ea, refinfo, avalue):
-                logging.debug(u"{:s}.reference({:#x}, {:d}) : The disassembler could not calculate the target for the reference ({:d}) at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, opnum, refinfo.flags & idaapi.REFINFO_TYPE, insn.ea))
-                return value
-            return target.value()
+            # Although there's other operand types we can support, we don't take a chance and only handle
+            # immediates. If the user really wants it, they can grab the refinfo_t themselves and do it.
+            if operand.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far, idaapi.o_imm}:
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reference({:#x}, {:d}, {!s}) : Unable to determine the reference type for the instruction at address {:#x} due to its operand ({:d}) being an unsupported type ({:d}).".format('.'.join([__name__, cls.__name__]), ea, opnum, refinfo, insn.ea, operand.n, operand.type))
+            refinfo = default
 
-            # XXX: This is an attempt to manually calculate this, but I think I'm supposed
-            #      to clamp the operand value to the size of the reference type and I also
-            #      have no idea how REFINFO_SIGNEDOP is supposed to work with it.
-            Ftranslate = functools.partial(operator.sub if refinfo.flags & idaapi.REFINFO_SUBTRACT else operator.add, refinfo.base)
-            return Ftranslate(avalue if refinfo.flags & idaapi.REFINFO_SIGNEDOP else avalue)
+        # Now we need to calculate the reference target which requires the operand value to be
+        # an adiff_t. This type is really the same as an sval_t, so we use an sval_pointer for it.
+        ea, sval, target = idaapi.ea_pointer(), idaapi.sval_pointer(), idaapi.ea_pointer()
+        ea.assign(insn.ea), sval.assign(value)
+        if hasattr(idaapi, 'calc_reference_data'):
+            ok = idaapi.calc_reference_data(target.cast(), ea.cast(), insn.ea, refinfo, sval.value())
 
-        # Otherwise, we need to figure out the refinfo_t from the default. So, unless the
-        # user changed the default, this should always result in returning the immediate.
-        refinfo = idaapi.refinfo_t()
-        refinfo.set_type(idaapi.get_default_reftype(insn.ea))
-        refinfo.base, refinfo.target = 0, idaapi.BADADDR
-        if operand.type not in {idaapi.o_mem, idaapi.o_near, idaapi.o_far, idaapi.o_imm}:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reference({:#x}, {:d}) : Unable to determine the reference type for the instruction at address {:#x} due to its operand ({:d}) being an unsupported type ({:d}).".format('.'.join([__name__, cls.__name__]), ea, opnum, insn.ea, opnum, operand.type))
+        # And because I'm an idiot that supports versions of the disassembler that are mad old...
+        else:
+            res = idaapi.calc_reference_target(ea.value(), refinfo, sval.value())
+            ok, _ = res != idaapi.BADADDR, target.assign(res)
 
-        # If the target base can't be calculated, then we need to treat it as a regular
-        # operand by checking if it's signed or negated and returning the correct value.
-        target, maximum = idaapi.calc_target(insn.ea, avalue, refinfo), pow(2, bits)
-        signed, unsigned = (value - maximum, value) if avalue > 0 else (avalue, value & (maximum - 1))
-        result = signed if inverted else unsigned
-        return target if target != idaapi.BADADDR else result if operand.type == idaapi.o_imm else value
+        # If the target can't be calculated and the operand is an immediate, then we need to treat it
+        # as a regular operand honoring negation or signedness and returning the correct value.
+        if not ok and operand.type in {idaapi.o_imm}:
+            bits = 8 * get_dtype_size(dtype)
+            avalue, maximum = idaapi.as_signed(value, bits), pow(2, bits)
+            signed, unsigned = (value - maximum, value) if avalue > 0 else (avalue, value & (maximum - 1))
+            return signed if node.alt_opinverted(insn.ea, operand.n) else unsigned
+        return target.value() if ok else value
 
     @classmethod
     def is_sentinel(cls, ea):
