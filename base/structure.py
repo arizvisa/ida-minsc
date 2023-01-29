@@ -2,22 +2,42 @@
 Structure module
 
 This module exposes a number of tools and defines some classes that
-can be used to interacting with the structures defined in the database.
-The classes defined by this module wrap IDAPython's structure API and expose
-a simpler interface that can be used to perform various operations
-against a structure such as renaming or enumerating the structure's
-members.
+can be used to interacting with the structures, unions, and frames
+defined within the database. The classes returned by this module wrap
+the disassembler's structure API and expose a more-manageable interface
+that can be used to perform various operations against a structure.
+These operations can include things such as the addition, removal,
+or enumeration of members, the modification of many of the attributes
+associated with a member, and fetching reference information related
+to any part of the structure.
 
-The base argument type for getting a ``structure_t`` can be either a name,
-an identifier, or an index. Typically one will call ``structure.by``
-with either identifier type which will then return an instance of their
-``structure_t``.
+The base parameter type for getting a ``structure_t`` can be either a
+name, an identifier, an index, or a type. Generally this is accomplished
+by calling the ``structure.by`` function with either suggested identifier
+type which will then return an instance of the desired ``structure_t``.
 
-To list the different structures available in the database, one can use
+To list the different structures within the database, one can use
 ``structure.list`` with their chosen method of filtering. This will
-list all of the available structures at which point the user can then
-request it by passing an identifer to ``structure.by``. The chosen
-methods of filtering are:
+list each of the available structures which may then be used with
+the ``structure.by`` function to return the desired structure.
+
+When listing structures that are matched, the following legend can be
+used to identify certain characteristics about the returned items.
+
+    `+` - The structure has been been explicitly tagged
+    `.` - The structure has some fields that have been tagged
+    `*` - The structure and its fields have been tagged
+    `P` - The structure is not used by any other structures
+    `L` - The structure has come from a type library
+    `^` - The structure has been folded out of view
+    `?` - The structure is not displayed within the structure list
+    `S` - The structure is defined as a regular structure
+    `U` - The structure is defined as a union
+    `V` - The structure is defined as a variable-length structure
+    `@` - The fields of the structure are contiguous
+    `0` - The structure has a hole as one of its fields
+
+The different types that one can filter structures with are the following:
 
     `name` - Filter the structures by a name or a list of names
     `like` - Filter the structure names according to a glob
@@ -29,12 +49,24 @@ methods of filtering are:
     `gt` - Match structures that are larger (exclusive) than the specified size
     `less` or `le` - Match structures that are smaller (inclusive) than the specified size
     `lt` - Match structures that are smaller (exclusive) than the specified size
-    `predicate` - Filter the structures by passing the id (``idaapi.uval_t``) to a callable
+    `visible` - Match structures that are not hidden or folded within the structure list
+    `folded` - Match structures that have been folded within the structure list
+    `union` - Match structures that are defined as a union
+    `library` - Match structures that originate from a type library
+    `variable` - Match structures that have a variable-size
+    `parent` - Filter structures that are not nested as members of other structures
+    `tagged` - Filter structures for any that use or has fields with the specified tag(s)
+    `members` - Filter structures by the number of members, a name, or specified name(s)
+    `contiguous` - Filter structures that are laid out contiguously (no holes)
+    `predicate` - Filter the structures by passing them to a callable
 
 Some examples of using these keywords are as follows::
 
     > structure.list('my*')
-    > iterable = structure.iterate(regex='__.*')
+    > structure.list(index=range(20))
+    > structure.list(library=False, parent=True, tagged=True)
+    > structure.list(visible=True, tagged='note')
+    > iterable = structure.iterate(regex='__.*', contiguous=False)
     > result = structure.search(index=42)
 
 """
@@ -50,16 +82,24 @@ structure_t, member_t = internal.structure.structure_t, internal.structure.membe
 __matcher__ = utils.matcher()
 __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
 __matcher__.attribute('index', 'id', idaapi.get_struc_idx)
-__matcher__.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
+__matcher__.attribute('identifier', 'id'), __matcher__.alias('id', 'identifier')
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
-__matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
-__matcher__.attribute('size', 'size')
-__matcher__.boolean('greater', operator.le, 'size'), __matcher__.boolean('ge', operator.le, 'size')
-__matcher__.boolean('gt', operator.lt, 'size')
-__matcher__.boolean('less', operator.ge, 'size'), __matcher__.boolean('le', operator.ge, 'size')
-__matcher__.boolean('lt', operator.gt, 'size')
-__matcher__.predicate('predicate')
-__matcher__.predicate('pred')
+__matcher__.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), 'name', operator.methodcaller('lower'))
+__matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.attrgetter('ptr'), idaapi.get_struc_size)
+__matcher__.boolean('ge', operator.le, operator.attrgetter('ptr'), idaapi.get_struc_size)
+__matcher__.boolean('gt', operator.lt, operator.attrgetter('ptr'), idaapi.get_struc_size), __matcher__.alias('greater', 'gt')
+__matcher__.boolean('le', operator.ge, operator.attrgetter('ptr'), idaapi.get_struc_size)
+__matcher__.boolean('lt', operator.gt, operator.attrgetter('ptr'), idaapi.get_struc_size), __matcher__.alias('less', 'lt')
+__matcher__.mapping('visible', operator.not_, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_NOLIST', 0x8) | getattr(idaapi, 'SF_HIDDEN', 0x20)))
+__matcher__.mapping('folded', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_HIDDEN', 0x20)))
+__matcher__.mapping('union', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_UNION', 0x2)))
+__matcher__.mapping('library', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_GHOST', 0x1000) | getattr(idaapi, 'SF_TYPLIB', 0x10)))
+__matcher__.mapping('variable', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, idaapi.SF_VAR))
+__matcher__.mapping('parent', operator.not_, operator.attrgetter('ptr'), operator.attrgetter('id'), interface.xref.to, functools.partial(builtins.map, operator.itemgetter(0)), functools.partial(builtins.filter, idaapi.get_member_by_id), functools.partial(builtins.map, utils.fcompose(idaapi.get_member_by_id, operator.itemgetter(2))), functools.partial(builtins.filter, utils.fcompose(internal.structure.frame, operator.not_)), types.list)
+__matcher__.boolean('tagged', lambda parameter, keys: parameter == any(not key.startswith('__') for key in keys) if isinstance(parameter, types.bool) else operator.contains(keys, parameter) if isinstance(parameter, types.string) else keys & types.set(parameter), utils.fmap(utils.fcompose(operator.methodcaller('tag'), functools.partial(builtins.filter, utils.fcompose(functools.partial(operator.contains, {'__name__', '__typeinfo__'}), operator.not_)), types.set), utils.fcompose(operator.methodcaller('select'), functools.partial(builtins.map, utils.fcompose(operator.itemgetter(1), types.set)), utils.freverse(functools.partial(functools.reduce, operator.or_), types.set()))), utils.funpack(operator.or_))
+__matcher__.boolean('members', lambda parameter, names: len(names) == parameter if isinstance(parameter, types.integer) else fnmatch.filter(names, parameter) if isinstance(parameter, types.string) else all(operator.contains(names, name) for name in parameter), operator.attrgetter('members'), functools.partial(builtins.map, operator.attrgetter('name')), types.list)
+__matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.attrgetter('ptr'), utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('memqty'), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda eoff, member: member.eoff if member.soff == eoff else -1), 0))))
+__matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
 def __iterate__():
     '''Iterate through all structures defined in the database.'''
@@ -102,14 +142,39 @@ def list(string, *suffix):
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all the structures within the database that match the keyword specified by `type`.'''
-    res = [item for item in iterate(**type)]
+    listable = [item for item in iterate(**type)]
 
-    maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) if res else [1])
-    maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), utils.fdefault(''), len), res) if res else [1])
-    maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), res) if res else [1])
+    maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), listable) if listable else [1])
+    maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), utils.fdefault(''), len), listable) if listable else [1])
+    maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), listable) if listable else [1])
 
-    for st in res:
-        six.print_(u"[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), u" // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
+    SF_TYPELIB = getattr(idaapi, 'SF_TYPLIB', 0x10) | getattr(idaapi, 'SF_GHOST', 0x1000)
+    SF_NOLIST = getattr(idaapi, 'SF_NOLIST', 0x8)
+    SF_HIDDEN = getattr(idaapi, 'SF_HIDDEN', 0x20)
+    for item in listable:
+        sptr, tags = item.ptr, item.tag()
+
+        [tags.pop(name, None) for name in ['__name__', '__typeinfo__']]
+        mtags = any(any(not item.startswith('__') for item in items) for _, items in item.select())
+        ftagged = '*' if tags and mtags else '+' if tags else '.' if mtags else '-'
+        flibrary = 'L' if sptr.props & SF_TYPELIB else '^' if sptr.props & SF_HIDDEN else '?' if sptr.props & SF_NOLIST else '-'
+        fstructype = 'U' if internal.structure.union(sptr) else 'V' if sptr.props & idaapi.SF_VAR else 'S'
+
+        fcontiguous = '@' if internal.structure.union(sptr) or functools.reduce(lambda eoff, item: item.ptr.eoff if item.ptr.soff == eoff else -1, builtins.map(functools.partial(operator.getitem, item.members), builtins.range(sptr.memqty)), 0) >= 0 else '0'
+
+        iterable = (idaapi.get_member_by_id(id) for id, _, _ in interface.xref.to(sptr.id) if idaapi.get_member_by_id(id))
+        users = (sptr for _, _, sptr in iterable if not internal.structure.frame(sptr))
+        fparent = '-' if any(users) else 'P'
+
+        flags = itertools.chain(fparent, fstructype, flibrary, fcontiguous, ftagged)
+
+        six.print_(u"{:<{:d}s} {:>{:d}s} {:<+#{:d}x} : {:s} : ({:d} members){:s}".format(
+            "[{:d}]".format(idaapi.get_struc_idx(item.id)), 2 + maxindex,
+            item.name, maxname,
+            item.size, maxsize,
+            ''.join(flags),
+            sptr.memqty, u" // {!s}".format(item.tag() if '\n' in item.comment else item.comment) if item.comment else ''
+        ))
     return
 
 @utils.multicase(tag=types.string)
