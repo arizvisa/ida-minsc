@@ -113,54 +113,52 @@ def list(**type):
     return
 
 @utils.multicase(tag=types.string)
-@utils.string.decorate_arguments('And', 'Or')
-def select(tag, *And, **boolean):
-    '''Query all of the structure tags for the specified `tag` and any others specified as `And`.'''
-    res = {tag} | {item for item in And}
-    boolean['And'] = {item for item in boolean.get('And', [])} | res
+@utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
+def select(tag, *required, **boolean):
+    '''Query the structures in the database for the given `tag` and any others that may be `required`.'''
+    res = {tag} | {item for item in required}
+    boolean['required'] = {item for item in boolean.get('required', [])} | res
     return select(**boolean)
 @utils.multicase()
-@utils.string.decorate_arguments('And', 'Or')
+@utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
 def select(**boolean):
-    """Query all the structures (linearly) for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
+    """Query the structures in the database for the tags specified by `boolean` and yield a tuple for each matching structure with selected tags and values.
 
-    If `And` contains an iterable then require the returned structure contains them.
-    If `Or` contains an iterable then include any other tags that are specified.
+    If `require` is given as an iterable of tag names then require that each returned structure uses them.
+    If `include` is given as an iterable of tag names then include the tags for each returned structure if available.
     """
     boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
-    # User is not asking for anything specifically, so just yield all the
-    # structures that are available.
+    # user doesn't want anything specific, so yield all of them and their tags.
     if not boolean:
-        for st in __iterate__():
-            content = st.tag()
+        for item in __iterate__():
+            content = item.tag()
 
-            # If we have any content, then the structure and its content
-            # can be yielded to the user.
+            # if the structure had some content (tags), then we have a match
+            # and can yield the structure and its content to the user.
             if content:
-                yield st, content
+                yield item, content
             continue
         return
 
-    # Collect the tags we're supposed to look for in the typical lame way.
-    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
+    # collect the tagnames we're supposed to look for in the typical lame way.
+    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
 
-    # Now we slowly iterate through our structures looking for matches,
-    # while ensuring that we pop off any typeinfo since its not relevant.
-    for st in __iterate__():
-        collected, content = {}, st.tag()
+    # now we just slowly iterate through our structures looking for any matches.
+    for item in __iterate__():
+        collected, content = {}, item.tag()
 
-        # Simply collect all tagnames being queried with Or(|).
-        collected.update({key : value for key, value in content.items() if key in Or})
+        # included is the equivalent of Or(|) and yields the structure if any of the tagnames are used.
+        collected.update({key : value for key, value in content.items() if key in included})
 
-        # And(&) is a little more specific...
-        if And:
-            if And & six.viewkeys(content) == And:
-                collected.update({key : value for key, value in content.items() if key in And})
+        # required is the equivalent of And(&) which yields the structure only if it uses all of the tagnames.
+        if required:
+            if required & six.viewkeys(content) == required:
+                collected.update({key : value for key, value in content.items() if key in required})
             else: continue
 
-        # That's all folks. Yield it if you got it.
-        if collected: yield st, collected
+        # that's all folks.. yield it if you got it.
+        if collected: yield item, collected
     return
 
 @utils.multicase(string=(types.string, types.tuple))
