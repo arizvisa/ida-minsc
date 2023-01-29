@@ -175,8 +175,9 @@ def select(**boolean):
 @utils.multicase(string=(six.string_types, tuple))
 @utils.string.decorate_arguments('string', 'suffix')
 def new(string, *suffix, **offset):
-    """Return a new structure using the name specified by `string`.
+    """Return a new structure or union using the name specified by `string`.
 
+    If the boolean `union` is provided, then create a union instead of a structure.
     If the integer `offset` is provided, then use it as the base offset for the newly created structure.
     """
     res = string if isinstance(string, tuple) else (string,)
@@ -184,9 +185,9 @@ def new(string, *suffix, **offset):
 
     # add a structure with the specified name
     realname = utils.string.to(name)
-    id = idaapi.add_struc(idaapi.BADADDR, realname)
+    id = idaapi.add_struc(idaapi.BADADDR, realname, offset.get('union', False))
     if id == idaapi.BADADDR:
-        raise E.DisassemblerError(u"{:s}.new({:s}{:s}) : Unable to add a new structure to the database with the specified name ({!r}).".format(__name__, ', '.join(map("{!r}".format, res + suffix)), u", {:s}".format(utils.string.kwargs(offset)) if offset else '', name))
+        raise E.DisassemblerError(u"{:s}.new({:s}{:s}) : Unable to add a new {:s} to the database with the specified name ({!r}).".format(__name__, ', '.join(map("{!r}".format, res + suffix)), u", {:s}".format(utils.string.kwargs(offset)) if offset else '', 'union' if offset.get('union', False) else 'structure', name))
 
     # return a new instance using the specified identifier
     return __instance__(id, **offset)
