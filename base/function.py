@@ -4416,44 +4416,30 @@ class xref(object):
     @utils.multicase(index=types.integer)
     @classmethod
     def argument(cls, index):
-        '''Return the address of the parameter being passed to the function reference at the current address for the specified `index`.'''
+        '''Return the address of the parameter at the specified `index` being passed to the function reference at the current address.'''
         items = cls.arguments(ui.current.address())
         return items[index]
-    @utils.multicase(index=types.integer, ea=types.integer)
+    @utils.multicase(ea=types.integer, index=types.integer)
     @classmethod
-    def argument(cls, index, ea):
-        '''Return the address of the parameter being passed to the function reference at the address `ea` for the specified `index`.'''
+    def argument(cls, ea, index):
+        '''Return the address of the parameter at the specified `index` being passed to the function reference at address `ea`.'''
         items = cls.arguments(ea)
-        return items[index]
-    @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer, ea=types.integer)
-    @classmethod
-    def argument(cls, func, index, ea):
-        '''Return the address of the parameter from the specified `index` of the function `func` that is being passed to the function reference at the address `ea`.'''
-        items = cls.arguments(func, ea)
         return items[index]
     arg = utils.alias(argument, 'xref')
 
     @utils.multicase()
     @classmethod
     def arguments(cls):
-        '''Return the address of each of the parameters being passed to the function reference at the current address.'''
+        '''Return a list of addresses for the parameters being passed to the function reference at the current address.'''
         return cls.arguments(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
     def arguments(cls, ea):
-        '''Return the address of each of the parameters being passed to the function reference at address `ea`.'''
+        '''Return a list of addresses for the parameters being passed to the function reference at address `ea`.'''
         if not (interface.xref.has_code(ea, True) and interface.instruction.is_call(ea)):
-            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
+            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the given address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
         items = idaapi.get_arg_addrs(ea)
         return [] if items is None else [ea for ea in items]
-    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
-    @classmethod
-    def arguments(cls, func, ea):
-        '''Return the address of each of the parameters for the function `func` that are being passed to the function reference at address `ea`.'''
-        refs = {ref for ref in cls.up(func)}
-        if ea not in refs:
-            logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, cls.__name__]), func, ea, address(func), ea))
-        return cls.arguments(ea)
     args = utils.alias(arguments, 'xref')
 
 x = xref    # XXX: ns alias
