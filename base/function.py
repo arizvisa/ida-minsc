@@ -2220,6 +2220,124 @@ class block(object):
         return '\n'.join(map(F, cls.iterate(bb)))
     disasm = utils.alias(disassemble, 'block')
 
+    @utils.multicase()
+    @classmethod
+    def call(cls):
+        '''Return the operand reference of the call instruction in the current basic block.'''
+        return cls.call(ui.current.address())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def call(cls, ea):
+        '''Return the operand reference of the call instruction for the basic block at address `ea`.'''
+        bb = cls.at(ea)
+        return cls.call(bb)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def call(cls, bounds):
+        '''Return the operand reference of the call instruction for the basic block at the given `bounds`.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+
+        # If the last instruction is not a call, then start scanning for one.
+        if not interface.instruction.is_call(ea):
+            ea = next((ea for ea in database.address.iterate(left, right) if interface.instruction.is_call(ea)), ea)
+
+        # If we couldn't get it this time, then give up and raise an exception.
+        if not interface.instruction.is_call(ea):
+            raise E.InstructionNotFoundError(u"{:s}.call({:s}) : Unable to find a call instruction at the expected address ({:#x}).".format('.'.join([__name__, cls.__name__]), bounds, ea))
+
+        # Now our address should be pointing at a call instruction, so we just
+        # need to return the operand reference for its target.
+        return next(ref for ref in interface.instruction.access(ea) if 'x' in ref.access)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def call(cls, bb):
+        '''Return the operand reference of the call instruction for the basic block `bb`.'''
+        FC_CALL_ENDS = getattr(idaapi, 'FC_CALL_ENDS', 0)
+        fcpath = map(operator.attrgetter, ['_fc', '_q'])
+        bounds = interface.range.bounds(bb)
+
+        # Get the flowchart and check its flags to see if we can trust this block.
+        try:
+            fc = functools.reduce(lambda agg, item: item(agg), fcpath, bb)
+            if not (fc.flags & FC_CALL_ENDS):
+                raise AttributeError
+
+        # If we couldn't get the flowchart to check the flags, then we hand
+        # off to the case that uses a bounds_t to find the call within the block.
+        except AttributeError:
+            return cls.call(bounds)
+
+        # Get the address of the block's last instruction and then check it.
+        _, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+
+        # If we couldn't find a call instruction, then bail with an exception.
+        if not interface.instruction.is_call(ea):
+            raise E.InstructionNotFoundError(u"{:s}.call({:s}) : Unable to find a call instruction at the expected address ({:#x}).".format('.'.join([__name__, cls.__name__]), bounds, ea))
+
+        # Now we just need to figure out which operand it is and return it.
+        return next(ref for ref in interface.instruction.access(ea) if 'x' in ref.access)
+
+    @utils.multicase()
+    @classmethod
+    def branch(cls):
+        '''Return the operand reference of the branch instruction in the current basic block.'''
+        return cls.branch(ui.current.address())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def branch(cls, ea):
+        '''Return the operand reference of the branch instruction for the basic block at address `ea`.'''
+        bb = cls.at(ea)
+        return cls.branch(bb)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def branch(cls, bounds):
+        '''Return the operand reference of the branch instruction for the basic block at the given `bounds`.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+
+        # If the last instruction is not a branch, then start scanning for one.
+        if not interface.instruction.is_branch(ea):
+            ea = next((ea for ea in database.address.iterate(left, right) if interface.instruction.is_branch(ea)), ea)
+
+        # If we couldn't get it this time, then give up and raise an exception.
+        if not interface.instruction.is_branch(ea):
+            raise E.InstructionNotFoundError(u"{:s}.branch({:s}) : Unable to find a branch instruction at the expected address ({:#x}).".format('.'.join([__name__, cls.__name__]), bounds, ea))
+
+        # Now our address should be pointing at a branch instruction, so we just
+        # need to return the operand reference for its target.
+        return next(ref for ref in interface.instruction.access(ea) if 'x' in ref.access)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def branch(cls, bb):
+        '''Return the operand reference of the branch instruction for the basic block `bb`.'''
+        FC_CALL_ENDS = getattr(idaapi, 'FC_CALL_ENDS', 0)
+        fcpath = map(operator.attrgetter, ['_fc', '_q'])
+        bounds = interface.range.bounds(bb)
+
+        # Get the flowchart and check its flags to see if we can trust this block.
+        try:
+            fc = functools.reduce(lambda agg, item: item(agg), fcpath, bb)
+            if not (fc.flags & FC_CALL_ENDS):
+                raise AttributeError
+
+        # If we couldn't get the flowchart to check the flags, then we hand
+        # off to the case that uses a bounds_t to find the branch within the block.
+        except AttributeError:
+            return cls.branch(bounds)
+
+        # Get the address of the block's last instruction and then check it.
+        _, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+
+        # If we couldn't find a branch instruction, then bail with an exception.
+        if not interface.instruction.is_branch(ea):
+            raise E.InstructionNotFoundError(u"{:s}.branch({:s}) : Unable to find a branch instruction at the expected address ({:#x}).".format('.'.join([__name__, cls.__name__]), bounds, ea))
+
+        # Now we just need to figure out which operand it is and return it.
+        return next(ref for ref in interface.instruction.access(ea) if 'x' in ref.access)
+
     # FIXME: implement .decompile for an idaapi.BasicBlock type too
     @utils.multicase()
     @classmethod
