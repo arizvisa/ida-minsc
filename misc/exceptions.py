@@ -216,6 +216,16 @@ class RegisterNotFoundError(ItemNotFoundError):
     Unable to locate the specified register.
     """
 
+class InstructionNotFoundError(ItemNotFoundError):
+    """
+    Unable to locate the specified instruction.
+    """
+
+class BlockNotFoundError(ItemNotFoundError):
+    """
+    Unable to locate the specified basic block.
+    """
+
 class NetNodeNotFoundError(ItemNotFoundError):
     """
     Unable to locate the specified netnode.
