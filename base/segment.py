@@ -600,25 +600,36 @@ def new(offset, size, name, **kwds):
 create = utils.alias(new)
 
 @utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
-def remove(segment, contents=False):
-    """Remove the specified `segment`.
+def remove(segment):
+    '''Remove the specified `segment` and its contents from the database.'''
+    return remove(segment, True)
+@utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t))
+def remove(segment, contents):
+    '''Remove the specified `segment` and its `contents` if specified as true.'''
+    seg, get_segment_name = by(segment), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
 
-    If the bool `contents` is specified, then remove the contents of the segment from the database.
-    """
-    if not isinstance(segment, idaapi.segment_t):
-        cls = segment.__class__
-        raise E.InvalidParameterError(u"{:s}.remove({!r}) : Expected a `{:s}`, but received a {!s}.".format(__name__, segment, idaapi.segment_t.__name__, cls))
+    # grab the segment's selector and its bounds so we can remove it if necessary,
+    # and return the segment's boundaries after we've removed it.
+    name, selector, bounds = utils.string.of(get_segment_name(seg)), seg.sel, interface.range.bounds(seg)
 
-    # delete the selector defined by the segment_t
-    res = idaapi.del_selector(segment.sel)
-    if res == 0:
-        logging.warning(u"{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
+    # verify the selector is the same as our segment, if it isn't then reassign
+    # our variable to BADSEL so we avoid trying to delete it.
+    owner = idaapi.get_segm_by_sel(selector)
+    selector = selector if owner and interface.range.bounds(owner) == bounds else idaapi.BADSEL
 
     # remove the actual segment using the address in the segment_t
-    res = idaapi.del_segm(interface.range.start(segment), idaapi.SEGMOD_KILL if contents else idaapi.SEGMOD_KEEP)
-    if res == 0:
-        logging.warning(u"{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
-    return res
+    if not idaapi.del_segm(interface.range.start(seg), idaapi.SEGMOD_KILL if contents else idaapi.SEGMOD_KEEP):
+        raise E.DisassemblerError(u"{:s}.remove({!r}) : Unable to delete the given segment \"{:s}\" at {:#x}.".format(__name__, segment, utils.string.escape(name, '"'), interface.range.start(seg)))
+
+    # now we need to check that our selector doesn't point to anything. if it
+    # does, then it's not safe to remove and we just return the segment bounds.
+    if selector == idaapi.BADSEL or idaapi.get_segm_by_sel(selector):
+        return bounds
+
+    # idaapi.del_selector doesn't actualy return anything, so we're pretty much done.
+    ea, void = idaapi.sel2ea(selector), idaapi.del_selector(selector)
+    logging.info(u"{:s}.remove({!r}) : Removed selector ({:d}) for address {:#x} that was orphaned by removal of segment \"{:s}\" ({:s}).".format(__name__, segment, selector, ea, utils.string.escape(name, '"'), bounds))
+    return bounds
 delete = utils.alias(remove)
 
 @utils.multicase(segment=(idaapi.segment_t, types.integer, types.string, interface.bounds_t), filename=types.string)
