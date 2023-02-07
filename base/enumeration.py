@@ -117,7 +117,7 @@ def by_identifier(eid):
     '''Return the identifier for the enumeration using the specified `eid`.'''
     if has(eid):
         return eid
-    raise E.EnumerationNotFoundError(u"{:s}.by_identifier({!s}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
+    raise E.EnumerationNotFoundError(u"{:s}.by_identifier({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
 byidentifier = utils.alias(by_identifier)
 
 @utils.multicase(index=types.integer)
@@ -177,15 +177,54 @@ def values(enum):
 ## creation/deletion
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
-def new(name, *suffix, **flags):
-    '''Create an enumeration with the specified `name` and `flags` using ``idaapi.add_enum``.'''
+def new(name, *suffix, **bitfield):
+    """Create an enumeration or `bitfield` within the database with the specified `name`.
+
+    If the bool `bitfield` is true, then create a bitfield that supports bitmasks.
+    If the integers `width` or `bits` is specified, then set the size of the created enumeration in either `bytes` or `bits`.
+    """
     res = (name,) + suffix
-    idx, string = count(), interface.tuplename(*res)
-    return new(idx, string, flags.get('flags', 0))
+    string = interface.tuplename(*res)
+
+    # We take a bunch of keyword arguments, so check that they're a valid type.
+    integers = ['width', 'bits', 'flags']
+    if not all(isinstance(bitfield.get(kwarg, 0), types.integer) for kwarg in integers):
+        invalid = next(kwarg for kwarg in integers if not isinstance(bitfield.get(kwarg, 0), types.integer))
+        raise E.InvalidParameterError(u"{:s}.new({!r}{:s}) : Unable to create an enumeration with {:s} that are not an integer.".format(__name__, string, ", {:s}".format(utils.string.kwargs(bitfield)) if bitfield else '', invalid))
+
+    # Calculate the width because we're going to use it as our default flags.
+    choice = bitfield['bits'] if 'bits' in bitfield else 8 * bitfield.get('width', bitfield.get('bytes', 0))
+    bytes, remainder = divmod(choice, 8)
+    if remainder:
+        logging.warning(u"{:s}.new({!r}{:s}) : Enumeration width has been truncated from {:d} bit{:s} to {:d} bits ({:d} byte{:s}).".format(__name__, string, ", {:s}".format(utils.string.kwargs(bitfield)) if bitfield else '', choice, '' if choice == 1 else 's', 8 * bytes, bytes, '' if bytes == 1 else 's'))
+
+    # Figure out which bitmask parameter we were given and pre-assign it so we know what to do.
+    is_bitmask = next((bitfield[kwarg] for kwarg in ['bitfield', 'bitmask'] if kwarg in bitfield), False)
+
+    # If we're using an older version of IDA, then we can just convert our parameters to
+    # flags and then we can just call the api with whatever we were given.
+    if idaapi.__version__ < 7.0:
+        flags = [8 * bytes, bitfield.get('flags', 0), getattr(idaapi, 'ENUM_FLAGS_IS_BF', 1) if is_bitmask else 0]
+
+    # Otherwise the flags represent something different and they're pretty much unused.
+    else:
+        flags = [bitfield.get('flags', 0), idaapi.FF_SIGN if bitfield.get('signed', False) else 0]
+
+    # Now we can create our enumeration and return it if we're an older (younger?) version.
+    eid = new(idaapi.get_enum_qty(), string, functools.reduce(operator.or_, flags, 0))
+    if idaapi.__version__ < 7.0:
+        return eid
+
+    # If we're using the newer API, then we need to explicitly apply the flags to the enum.
+    if is_bitmask and not idaapi.set_enum_bf(eid, True if is_bitmask else False):
+        logging.warning(u"{:s}.new({!r}{:s}) : Unable to set the bitfield flag for the created enumeration ({:#x}) to {!s}.".format(__name__, string, ", {:s}".format(utils.string.kwargs(bitfield)) if bitfield else '', eid, True if is_bitmask else False))
+    if bytes and not idaapi.set_enum_width(eid, bytes):
+        logging.warning(u"{:s}.new({!r}{:s}) : Unable to set the width for the created enumeration ({:#x}) to {:d} byte{:s}.".format(__name__, string, ", {:s}".format(utils.string.kwargs(bitfield)) if bitfield else '', eid, width, '' if width == 1 else 's'))
+    return eid
 @utils.multicase(index=types.integer, name=(types.string, types.tuple), flags=types.integer)
 @utils.string.decorate_arguments('name')
 def new(index, name, flags):
-    '''Create an enumeration at the specified `index` with the given `name` and `flags`.'''
+    '''Create an enumeration at the specified `index` of the database with the given `name` and `flags`.'''
     idx, string = count(), interface.tuplename(*name) if isinstance(name, tuple) else name
 
     # On older versions of IDA, there were actual flags which described the width, display
@@ -195,13 +234,24 @@ def new(index, name, flags):
     if res == idaapi.BADADDR:
         raise E.DisassemblerError(u"{:s}.new({:d}, {!r}, flags={:d}) : Unable to create an enumeration with the specified name ({!s}).".format(__name__, index, name, flags, utils.string.repr(string)))
     return res
+add = create = utils.alias(new)
 
+@utils.multicase(name=types.string)
+def remove(name, *suffix):
+    '''Remove the enumeration with the given `name` from the database.'''
+    eid = by_name(name, *suffix)
+    if idaapi.del_enum(eid) or has(eid):
+        res = (name,) + suffix
+        raise E.DisassemblerError(u"{:s}.remove({!r}) : Unable to remove the specified enumeration ({:#x}) from the database.".format(__name__, interface.tuplename(*res), eid))
+    return eid
 @utils.multicase(enum=(types.integer, types.string, types.tuple))
-def delete(enum):
-    '''Delete the enumeration `enum`.'''
+def remove(enum):
+    '''Remove the enumeration specified by `enum` from the database.'''
     eid = by(enum)
-    return idaapi.del_enum(eid)
-create, remove = utils.alias(new), utils.alias(delete)
+    if idaapi.del_enum(eid) or has(eid):
+        raise E.DisassemblerError(u"{:s}.remove({!s}) : Unable to remove the specified enumeration ({:#x}) from the database.".format(__name__, "{:#x}".format(enum) if isinstance(enum, types.integer) else "{!r}".format(enum), eid))
+    return eid
+delete = utils.alias(remove)
 
 ## setting enum options
 @utils.multicase(enum=(types.integer, types.string, types.tuple))
@@ -485,7 +535,7 @@ class members(object):
 
         > eid = enum.by('example_enumeration')
         > mid = enum.members.add(eid, 'name', 0x1000)
-        > ok = enum.members.remove(eid, mid)
+        > mid = enum.members.remove(eid, mid)
         > mid = enum.members.by_name(eid, 'name')
         > mid = enum.members.by_value(eid, 0x1000)
         > for mid in enum.members.iterate(eid, like='*ERROR*'): ...
@@ -585,10 +635,9 @@ class members(object):
         eid = by(enum)
         mid = cls.by(eid, member)
         value, serial, mask = idaapi.get_enum_member_value(mid), idaapi.get_enum_member_serial(mid), idaapi.get_enum_member_bmask(mid)
-        ok = idaapi.del_enum_member(eid, value, serial, mask)
-        if not ok:
+        if not idaapi.del_enum_member(eid, value, serial, mask):
             raise E.DisassemblerError(u"{:s}.remove({:#x}, {!r}) : Unable to remove the specified member ({:#x}) having the value {:d} from the enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), eid, member, mid, value, eid))
-        return ok
+        return mid
     delete = destroy = utils.alias(remove, 'members')
 
     ## aggregations
@@ -768,10 +817,12 @@ class members(object):
     __members_matcher.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
     __members_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
     __members_matcher.combinator('comment', utils.fcondition(utils.finstance(types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcondition(operator.truth)(utils.fconstant(operator.truth), utils.fconstant(operator.not_))), utils.frpartial(idaapi.get_enum_member_cmt, False), utils.string.of, utils.fdefault(''))
+    __members_matcher.alias('comments', 'comment')
     __members_matcher.combinator('repeatable', utils.fcondition(utils.finstance(types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcondition(operator.truth)(utils.fconstant(operator.truth), utils.fconstant(operator.not_))), utils.frpartial(idaapi.get_enum_member_cmt, True), utils.string.of, utils.fdefault(''))
     __members_matcher.combinator('value', utils.fcondition(utils.finstance(types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_enum_member_value)
     __members_matcher.combinator('mask', utils.fcondition(utils.finstance(types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_enum_member_bmask)
-    __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
+    __members_matcher.alias('bitmask', 'mask')
+    __members_matcher.predicate('predicate'), __members_matcher.alias('pred', 'predicate')
 
     @classmethod
     def __iterate__(cls, eid):
@@ -899,10 +950,9 @@ class member(object):
     def remove(cls, mid):
         '''Remove the enumeration member with the given `mid`.'''
         eid, value, serial, mask = cls.parent(mid), cls.value(mid), cls.serial(mid), cls.mask(mid)
-        ok = idaapi.del_enum_member(eid, value, serial, mask)
-        if not ok:
+        if not idaapi.del_enum_member(eid, value, serial, mask):
             raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the specified member ({:#x}) having the value {:d} from the enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid, value, eid))
-        return ok
+        return mid
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def remove(cls, enum, member):
