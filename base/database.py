@@ -3129,12 +3129,25 @@ class address(object):
         # worked as the positions we get should be thought of like a cursor.
         op = operator.lt if start <= end else operator.ge
         ea, stop = interface.address.within(start, end) if start <= end else reversed(sorted(interface.address.within(end, idaapi.get_item_head(start))))
+        adder = functools.partial(operator.add, +1 if start <= end else -1)
 
-        # loop continuosly until we terminate or we run out of bounds.
+        # this function is not really intended to be a "filter" for a range, so we
+        # always yield our starting address by ensuring our next address is different.
         try:
+            next = ~ea
+
+            # loop continuosly until we terminate or we run out of bounds.
             while ea not in {idaapi.BADADDR, None} and op(ea, stop):
-                yield ea
-                ea = step(ea)
+                next = step(adder(ea)) if ea == next else step(ea)
+
+                # since we loop indefinitely, we need to detect whether our step
+                # returns the same value to avoid an infinite loop. we do this by
+                # checking for equality and adjusting to the next byte if so.
+                if ea != next:
+                    yield ea
+                ea = next
+
+        # if we caught an OutOfBoundsError, then we bail...quietly.
         except E.OutOfBoundsError:
             pass
         return
@@ -3540,7 +3553,6 @@ class address(object):
                 counter -= 1
             ea = next
         return ea
-
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def prevunknown(cls, ea):
@@ -3599,6 +3611,81 @@ class address(object):
             next = idaapi.find_unknown(ea, idaapi.SEARCH_DOWN)
             if next == idaapi.BADADDR:
                 raise E.AddressOutOfBoundsError(u"{:s}.nextunknown({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
+            ea = next
+        return ea
+
+    @utils.multicase(byte=internal.types.integer)
+    @classmethod
+    def prevbyte(cls, byte, **count):
+        '''Return the previous address that uses the specified `byte` value.'''
+        return cls.prevbyte(byte, ui.current.address(), count.pop('count', 1))
+    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer)
+    @classmethod
+    def prevbyte(cls, byte, ea):
+        '''Return the previous address from the address `ea` that uses the specified `byte` value.'''
+        return cls.prevbyte(byte, ea, 1)
+    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def prevbyte(cls, byte, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that uses the specified `byte` value and satisfies the given `predicate`.'''
+        counter, parameters = max(1, count.get('count', 1)), [byte, False] if idaapi.__version__ < 7.0 else [byte, idaapi.BIN_SEARCH_BACKWARD | idaapi.BIN_SEARCH_CASE]
+        while counter > 0:
+            next = idaapi.find_byter(0, ea, *parameters)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevbyte({:#0{:d}x}, {:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), byte, 2 + 2, ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def prevbyte(cls, byte, ea, count):
+        '''Return the previous `count` addresses from the address `ea` that uses the specified `byte` value.'''
+        parameters = [byte, False] if idaapi.__version__ < 7.0 else [byte, idaapi.BIN_SEARCH_BACKWARD | idaapi.BIN_SEARCH_CASE]
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_byter(0, ea, *parameters)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevbyte({:#0{:d}x}, {:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), byte, 2 + 2, ea, count, top(), ea))
+            ea = next
+        return ea
+
+    @utils.multicase(byte=internal.types.integer)
+    @classmethod
+    def nextbyte(cls, byte, **count):
+        '''Return the next address that uses the specified `byte` value.'''
+        return cls.nextbyte(byte, ui.current.address(), count.pop('count', 1))
+    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer)
+    @classmethod
+    def nextbyte(cls, byte, ea):
+        '''Return the next address from the address `ea` that uses the specified `byte` value.'''
+        return cls.nextbyte(byte, ea, 1)
+    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextbyte(cls, byte, ea, predicate, **count):
+        '''Return the next address from the address `ea` that uses the specified `byte` value and satisfies the given `predicate`.'''
+        asize_t = idaapi.ea_pointer()
+        _, uval = asize_t.assign(-1), asize_t.value() // 2
+        next, counter, parameters = ~ea, max(1, count.get('count', 1)), [uval, byte, False] if idaapi.__version__ < 7.0 else [uval, byte, idaapi.BIN_SEARCH_FORWARD | idaapi.BIN_SEARCH_CASE]
+        while counter > 0:
+            next = idaapi.find_byte(ea + 1 if next == ea else ea, *parameters)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextbyte({:#0{:d}x}, {:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), byte, 2 + 2, ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(byte=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextbyte(cls, byte, ea, count):
+        '''Return the next `count` addresses from the address `ea` that uses the specified `byte` value.'''
+        asize_t = idaapi.ea_pointer()
+        _, uval = asize_t.assign(-1), asize_t.value() // 2
+        parameters = [uval, byte, False] if idaapi.__version__ < 7.0 else [uval, byte, idaapi.BIN_SEARCH_FORWARD | idaapi.BIN_SEARCH_CASE]
+        next = ~ea
+        for index in builtins.range(max(1, count)):
+            next = idaapi.find_byte(ea + 1 if next == ea else ea, *parameters)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextbyte({:#0{:d}x}, {:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), byte, 2 + 2, ea, count, bottom(), ea))
             ea = next
         return ea
 
