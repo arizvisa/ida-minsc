@@ -4119,25 +4119,15 @@ class address(object):
     @classmethod
     def prevmnemonic(cls, mnemonics):
         '''Return the address of the previous instruction from the current address that uses any of the specified `mnemonics`.'''
-        return cls.prevmnemonic(ui.current.address(), mnemonics, 1)
-    @utils.multicase(mnemonics=(internal.types.string, internal.types.unordered), predicate=internal.types.callable)
-    @classmethod
-    def prevmnemonic(cls, mnemonics, predicate, **count):
-        '''Return the address of the previous instruction from the current address that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
-        return cls.prevmnemonic(ui.current.address(), mnemonics, predicate, **count)
-    @utils.multicase(mnemonics=(internal.types.string, internal.types.unordered), count=internal.types.integer)
-    @classmethod
-    def prevmnemonic(cls, mnemonics, count):
-        '''Return the address of the previous `count` instructions from the current address that uses any of the specified `mnemonics`.'''
-        return cls.prevmnemonic(ui.current.address(), mnemonics, count)
+        return cls.prevmnemonic(mnemonics, ui.current.address(), 1)
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered))
     @classmethod
-    def prevmnemonic(cls, ea, mnemonics):
+    def prevmnemonic(cls, mnemonics, ea):
         '''Return the address of the previous instruction from the address `ea` that uses any of the specified `mnemonics`.'''
-        return cls.prevmnemonic(ea, mnemonics, 1)
+        return cls.prevmnemonic(mnemonics, ea, 1)
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered), predicate=internal.types.callable)
     @classmethod
-    def prevmnemonic(cls, ea, mnemonics, predicate, **count):
+    def prevmnemonic(cls, mnemonics, ea, predicate, **count):
         '''Return the address of the previous instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
         Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
@@ -4145,7 +4135,7 @@ class address(object):
         return cls.prevF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered), count=internal.types.integer)
     @classmethod
-    def prevmnemonic(cls, ea, mnemonics, count):
+    def prevmnemonic(cls, mnemonics, ea, count):
         '''Return the address of the previous `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
         Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
@@ -4155,25 +4145,15 @@ class address(object):
     @classmethod
     def nextmnemonic(cls, mnemonics):
         '''Return the address of the next instruction from the current address that uses any of the specified `mnemonics`.'''
-        return cls.nextmnemonic(ui.current.address(), mnemonics, 1)
-    @utils.multicase(mnemonics=(internal.types.string, internal.types.unordered), predicate=internal.types.callable)
-    @classmethod
-    def nextmnemonic(cls, mnemonics, predicate, **count):
-        '''Return the address of the next instruction from the current address that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
-        return cls.nextmnemonic(ui.current.address(), mnemonics, predicate, **count)
-    @utils.multicase(mnemonics=(internal.types.string, internal.types.unordered), count=internal.types.integer)
-    @classmethod
-    def nextmnemonic(cls, mnemonics, count):
-        '''Return the address of the next `count` instructions from the current address that uses any of the specified `mnemonics`.'''
-        return cls.nextmnemonic(ui.current.address(), mnemonics, count)
+        return cls.nextmnemonic(mnemonics, ui.current.address(), 1)
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered))
     @classmethod
-    def nextmnemonic(cls, ea, mnemonics):
+    def nextmnemonic(cls, mnemonics, ea):
         '''Return the address of the next instruction from the address `ea` that uses any of the specified `mnemonics`.'''
-        return cls.nextmnemonic(ea, mnemonics, 1)
+        return cls.nextmnemonic(mnemonics, ea, 1)
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered), predicate=internal.types.callable)
     @classmethod
-    def nextmnemonic(cls, ea, mnemonics, predicate, **count):
+    def nextmnemonic(cls, mnemonics, ea, predicate, **count):
         '''Return the address of the next instruction from the address `ea` that uses any of the specified `mnemonics` and satisfies the provided `predicate`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
         Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
@@ -4181,7 +4161,7 @@ class address(object):
         return cls.nextF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, mnemonics=(internal.types.string, internal.types.unordered), count=internal.types.integer)
     @classmethod
-    def nextmnemonic(cls, ea, mnemonics, count):
+    def nextmnemonic(cls, mnemonics, ea, count):
         '''Return the address of the next `count` instructions from the address `ea` that uses any of the specified `mnemonics`.'''
         items = {mnemonics} if isinstance(mnemonics, internal.types.string) else {item for item in mnemonics}
         Fuses_mnemonics = utils.fcompose(interface.instruction.mnemonic, utils.fpartial(operator.contains, items))
@@ -4446,7 +4426,6 @@ class address(object):
     def nextfunction(cls, ea, count):
         '''Return the next `count` addresses from the address `ea` that is within a function.'''
         return cls.nextF(ea, function.has, count)
-
     prevfunc, nextfunc = utils.alias(prevfunction, 'address'), utils.alias(nextfunction, 'address')
 
     # address translations
