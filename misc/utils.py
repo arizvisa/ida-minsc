@@ -491,6 +491,40 @@ class multicase(object):
             prototype, _, _ = documentation[callable]
             return prototype
 
+        def fetch_candidates(cache, *arguments, **keywords):
+            '''Return the unordered matches for the constraints specified by `arguments` and `keywords`.'''
+            tree, table = cache
+            packed_parameters = arguments, keywords
+            return cls.match(packed_parameters, tree, table)
+
+        def fetch_arguments(cache, *arguments, **keywords):
+            '''Return the candidates for the constraints specified by `arguments`.'''
+            tree, table = cache
+            packed_parameters = arguments, keywords
+            if keywords:
+                logging.warning(u"{:s}({:s}{:s}{:s}): Discarding {:d} keyword{:s} due to {:s} being unused.".format('.'.join([__name__, cls.__name__, 'arguments']), ', '.join("{!r}".format(arg) if isinstance(arg, internal.types.string) else "{!s}".format(arg) for arg in arguments), ', ' if arguments and keywords else '', string.kwargs(keywords), len(keywords), *['', 'it'] if len(keywords) == 1 else ['s', 'them']))
+            iterable = cls.filter_args(packed_parameters, tree, table)
+            return [candidate for candidate in iterable]
+
+        def fetch_keywords(cache, s_args, *arguments, **keywords):
+            '''Return the candidates for the constraints specified by `keywords`.'''
+            tree, table = cache
+            packed_parameters = arguments, keywords
+            if arguments:
+                logging.warning(u"{:s}({:s}{:s}{:s}): Discarding {:d} argument{:s} due to {:s} being unused.".format('.'.join([__name__, cls.__name__, 'keywords']), ', '.join("{!r}".format(arg) if isinstance(arg, internal.types.string) else "{!s}".format(arg) for arg in arguments), ', ' if arguments and keywords else '', string.kwargs(keywords), len(arguments), *['', 'it'] if len(arguments) == 1 else ['s', 'them']))
+            candidates = ((F, index) for F, (_, index, next) in tree[0].items() if index == next or index >= 0)
+            iterable = cls.filter_keywords(candidates, packed_parameters, tree, table)
+            return [candidate for candidate in iterable]
+
+        def transform_parameters(cache, s_args, F, *arguments, **keywords):
+            '''Return the transformed parameters for both `arguments` and `keywords` when calling the function `F`.'''
+            tree, table = cache
+            packed_parameters = tuple(itertools.chain(s_args * [object], arguments)), keywords
+            if F not in tree[0]:
+                raise RuntimeError("{:s}({:s}{:s}{:s}): An internal error occurred due to the requested function ({!s}) not being {:s} the defined case{:s}.".format('.'.join([__name__, cls.__name__, 'keywords']), ', '.join("{!r}".format(arg) if isinstance(arg, internal.types.string) else "{!s}".format(arg) for arg in arguments), ', ' if arguments and keywords else '', string.kwargs(keywords), F, *['a', ''] if len(tree[s_args]) == 1 else ['one of the', 's']))
+            args, kwds, _ = cls.critique_and_transform(F, packed_parameters, tree, table)
+            return args, kwds
+
         # This is the entry-point closure that gets used to update the actual wrapper with a new candidate.
         def result(wrapped):
             '''Return a function that will call the given `wrapped` function if the parameters meet the required type constraints.'''
@@ -550,8 +584,14 @@ class multicase(object):
                 # Attach a few hardcoded utilities to the closure that we return. We add
                 # some empty namespaces as the first argument if it's a classmethod or __new__.
                 setattr(res, 'score', functools.partial(fetch_score, cache, *s_args * [object]))
-                setattr(res, 'fetch', functools.partial(fetch_callable, cache, *s_args * [object]))
+                setattr(res, 'callable', functools.partial(fetch_callable, cache, *s_args * [object]))
                 setattr(res, 'describe', functools.partial(fetch_prototype, documentation))
+
+                # Assign some utilities that can be used for benchmarking certain components.
+                setattr(res, 'candidates', functools.partial(fetch_candidates, cache, *s_args * [object]))
+                setattr(res, 'arguments', functools.partial(fetch_arguments, cache, *s_args * [object]))
+                setattr(res, 'keywords', functools.partial(fetch_keywords, cache, s_args))
+                setattr(res, 'transform', functools.partial(transform_parameters, cache, s_args))
 
             # Now we need to add the function we extracted to our tree of candidate functions.
             constraints = {name : types for name, types in flattened_constraints.items()}
@@ -628,7 +668,6 @@ class multicase(object):
         # First we need a closure that's driven simply by the parameter value. This gets
         # priority and will just descend through the tree until nothing is left.
         def critique_unnamed(parameter, branch):
-            results = []
             for F, node in branch:
                 parameter_name, index, _ = node
                 discard_and_required, critique_and_transform, _ = table[F, index]
@@ -638,24 +677,27 @@ class multicase(object):
                 try: value = parameter_transform(parameter) if parameter_transform else parameter
                 except Exception: continue
                 if parameter_critique(value) if parameter_critique else True:
-                    results.append((F, node))
+                    yield F, node
                 continue
-            return results
+            return
 
         # This function is only needed for processing arguments, because if there aren't any
-        # then all the nodes at a 0-height in our tree need to be checked for termination.
+        # then all the nodes at a 0-height in our tree end up being checked for termination.
         assert(args)
 
         # Iterate through all of our parameters until we're finished or out of parameters.
         iterable = ((F, tree[index][F]) for F, index in candidates)
-        branch = [(F, (name, index, next)) for F, (name, index, next) in iterable if index >= 0]
+        branch = ((F, (name, index, next)) for F, (name, index, next) in iterable if index >= 0)
         for index, parameter in enumerate(parameters):
             candidates = critique_unnamed(parameter, branch)
-            branch = [(F, tree[next][F]) for F, (_, _, next) in candidates if next >= 0 and (F, next) in table]
-        return [(F, index) for F, (_, index, next) in candidates if index == next or next >= 0]
+            branch = ((F, tree[next][F]) for F, (_, _, next) in candidates if next >= 0 and (F, next) in table)
+        return ((F, index) for F, (_, index, next) in candidates if index == next or next >= 0)
+
+    # XXX: Apparently things from pycompat are a _significant_ performance hit. Fortunately,
+    #      both Py2 and Py3 use the same attributes, and we can use CO_VARARGS as a default.
 
     @classmethod
-    def filter_args(cls, packed_parameters, tree, table):
+    def filter_args(cls, packed_parameters, tree, table, CO_VARARGS=pycompat.co_flags.CO_VARARGS):
         '''Critique the arguments from `packed_parameters` using the provided `tree` and `table`.'''
         args, _ = packed_parameters
 
@@ -667,25 +709,25 @@ class multicase(object):
 
             # Next, we go through all of the available functions to grab only the ones
             # which can take varargs and are smaller than our arg count.
-            iterable = ((F, pycompat.function.code(F)) for F in tree.get(0, []))
-            unknowns = {F for F, c in iterable if pycompat.code.flags(c) & pycompat.co_flags.CO_VARARGS and pycompat.code.argcount(c) <= count}
+            iterable = ((F, (F.__code__)) for F in tree.get(0, []))
+            unknowns = {F for F, c in iterable if (c.co_flags) & CO_VARARGS and (c.co_argcount) <= count}
 
             # Now we turn them into a branch and then we can process the arguments.
-            candidates = [(F, 0) for F in results | unknowns]
+            candidates = ((F, 0) for F in results | unknowns)
             return cls.filter_candidates(candidates, packed_parameters, tree, table)
 
         # If there are no parameters, then return everything. This really should only be done
         # by multicase.match, but we're doing this here for the sake of the unit-tests.
         branch = tree[0].items()
-        return [(F, index) for F, (_, index, next) in branch if index == next or index >= 0]
+        return ((F, index) for F, (_, index, next) in branch if index == next or index >= 0)
 
     @classmethod
     def filter_keywords(cls, candidates, packed_parameters, tree, table):
         '''Critique the keywords from the `packed_parameters` against the branch given in `candidates`.'''
-        args, kwds = packed_parameters
+        _, kwds = packed_parameters
 
         def critique_names(kwds, branch):
-            results, keys = [], {name for name in kwds}
+            keys = {name for name in kwds}
             for F, node in branch:
                 parameter_name, index, _ = node
                 discard_and_required, critique_and_transform, wildargs = table[F, index]
@@ -702,40 +744,37 @@ class multicase(object):
                     parameter_critique, parameter_transform, _ = critique_and_transform
                     parameters = (kwds[name] for name in available)
                     transformed = map(parameter_transform, parameters) if parameter_transform else parameters
-                    critique = parameter_critique if parameter_critique else lambda parameter: True
-                    results.append((F, node)) if all(critique(parameter) for parameter in transformed) else None
+                    critiqued = all(parameter_critique(parameter) for parameter in transformed) if parameter_critique else True
+                    (yield F, node) if critiqued else None
 
                 # If our parameter name is available, then we can critique it.
                 elif available and parameter_name in available:
                     parameter_critique, parameter_transform, _ = critique_and_transform
                     try: parameter = parameter_transform(kwds[parameter_name]) if parameter_transform else kwds[parameter_name]
                     except Exception: continue
-                    critique = parameter_critique if parameter_critique else lambda parameter: True
-                    results.append((F, node)) if critique(parameter) else None
+                    critiqued = parameter_critique(parameter) if parameter_critique else True
+                    (yield F, node) if critiqued else None
 
-                # Otherwise this parameter doesn't exist which makes it not a candidate.
-                else:
-                    continue
+                # Otherwise this parameter doesn't exist and we can skip over it.
                 continue
-            return results
+            return
 
         # Process as many keywords as we have left...
-        branch = [(F, tree[index][F]) for F, index in candidates if (F, index) in table]
+        branch = ((F, tree[index][F]) for F, index in candidates if (F, index) in table)
         for count in range(len(kwds)):
             critiqued = critique_names(kwds, branch)
 
             # If processing this keyword resulted in a loop (varargs), then
             # promote it to a wildargs so we can check the rest of the kwargs.
-            candidates = [(F, -1 if index == next else index) for F, (_, index, next) in critiqued]
-            branch = [(F, tree[-1 if index == next else next][F]) for F, (_, index, next) in critiqued if (F, -1 if index == next else next) in table]
+            candidates = ((F, -1 if index == next else index) for F, (_, index, next) in critiqued)
+            branch = ((F, tree[-1 if index == next else next][F]) for F, (_, index, next) in critiqued if (F, -1 if index == next else next) in table)
         return candidates
 
     @classmethod
     def critique_and_transform(cls, F, packed_parameters, tree, table):
         '''Critique and transform the `packed_parameters` for the function `F` returning the resolved parameters and a bias for the number of parameters we needed to transform.'''
         args, kwds = packed_parameters
-        results, keywords = [], {name : value for name, value in kwds.items()}
-        counter = 0
+        counter, results, keywords = 0, [], kwds.copy()
 
         # First process each of the arguments and add them to our results.
         _, index, _ = tree[0][F]
@@ -875,10 +914,13 @@ class multicase(object):
     @classmethod
     def parameter_critique(cls, *types):
         '''Return a callable that critiques its parameter for any of the given `types`.'''
-        unsorted_types = {item for item in types}
 
-        # If there are no types, then we can bail here because critique should always succeed.
-        if not unsorted_types:
+        # If we have some types, then gather them into a set to access them in O(1).
+        if types:
+            unsorted_types = {item for item in types}
+
+        # If there are no types, then we can bail since no types means anything is valid.
+        else:
             return None
 
         # Filter our types for things that are not actual types. This is okay since we
@@ -933,18 +975,17 @@ class multicase(object):
         transformers = []
 
         # Figure out the conditions that require us to avoid transforming the item.
-        Fidentity = lambda item: item
         if callable in unsorted_types and len(unsorted_types) == 1:
-            transformers.append((Fidentity, callable))
+            transformers.append((None, callable))
 
         # If there's no callables in our unsorted_types, then we can just use isinstance.
         elif callable not in unsorted_types:
-            transformers.append((Fidentity, lambda item, types=types: isinstance(item, types)))
+            transformers.append((None, lambda item, types=types: isinstance(item, types)))
 
         # Otherwise there's some types and a callable that we need to split into two transformations.
         else:
-            transformers.append((Fidentity, lambda item, types=types: isinstance(item, types)))
-            transformers.append((Fidentity, callable))
+            transformers.append((None, lambda item, types=types: isinstance(item, types)))
+            transformers.append((None, callable))
 
         # Figure out whether we need to add additional transformations...just in case.
         if {item for item in internal.types.integer} & unsorted_types:
@@ -957,8 +998,8 @@ class multicase(object):
         # Now we figure out if we need to do any actual transformations by checking whether the
         # number of transformers we collected is larger than 1. This is because the first transformer
         # will always be the identity function when the item type is correct.
-        Ftransform = lambda item, transformers=transformers: next((F(item) for F, condition in transformers if condition(item)), item)
-        return Ftransform if len(transformers) > 1 else Fidentity
+        Ftransform = lambda item, transformers=transformers: next((F(item) if F else item for F, condition in transformers if condition(item)), item)
+        return Ftransform if len(transformers) > 1 else None
 
     # XXX: Our main decorator that is responsible for updating the decorated function.
     @classmethod
@@ -1169,17 +1210,16 @@ class multicase(object):
         # If there's no other filters, then we filter our candidates
         # by culling out everything that can still take parameters.
         if not kwargs:
-            assert(all(index >= 0 for F, index in candidates))
             iterable = ((F, tree[index][F]) for F, index in candidates)
-            branch = [(F, (name, index, next)) for F, (name, index, next) in iterable if next <= len(args)]
+            branch = [(F, name, index, next) for F, (name, index, next) in iterable if next <= len(args)]
 
             # Now we have a branch containing everything that we care about. So, all we really
             # need to do here is collect our results if we have any that are available.
-            results = [(F, next) for F, (name, index, next) in branch if (F, next) not in table]
+            results = [(F, next) for F, name, index, next in branch if (F, next) not in table]
 
             # In case we didn't get any results, then we move onto the next branch so that we
             # can grab the next varargs or wildargs candidates that are still available.
-            nextbranch = [(F, tree[next][F]) for F, (name, index, next) in branch if (F, next) in table]
+            nextbranch = [(F, tree[next][F]) for F, name, index, next in branch if (F, next) in table]
             vars = [(F, next) for F, (name, index, next) in nextbranch if index == next and index <= len(args)]
             wild = [(F, next) for F, (name, index, next) in nextbranch if index != next and next < 0]
 
@@ -1189,8 +1229,8 @@ class multicase(object):
         # If we had some args that we ended up processing, then we need to shift them if there's
         # still some parameters or promote them to keywords to do the final filtering pass.
         elif args:
-            iterable = [(F, tree[index][F]) for F, index in candidates if (F, index) in table]
-            candidates = [(F, -1 if index == next else next) for F, (_, index, next) in iterable]
+            iterable = ((F, tree[index][F]) for F, index in candidates if (F, index) in table)
+            candidates = ((F, -1 if index == next else next) for F, (_, index, next) in iterable)
             #candidates = [(F, -1 if index == next else index) for F, (_, index, next) in iterable]
 
         # Now each candidate should be at the right place in their tree and we can filter keywords.
