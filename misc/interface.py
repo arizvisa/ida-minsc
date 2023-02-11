@@ -4443,6 +4443,13 @@ class refbase_t(integerish):
     def __xor__(self, other):
         return self.__merge_with(operator.xor, other)
 
+    def __contains__(self, other):
+        operation = operator.contains
+        if not isinstance(other, internal.types.string):
+            cls = self.__class__
+            raise TypeError(u"{:s}.__contains__({!s}, {!r}) : Unable to perform {:s} operation with a type ({:s}) that is not a string.".format('.'.join([__name__, cls.__name__]), self, other, 'membership', other.__class__.__name__))
+        return any(operation(item, other) for item in tuple(self) if isinstance(item, (reftype_t, access_t)))
+
 class ref_t(refbase_t):
     """
     This tuple is used to represent references to an address that is marked
