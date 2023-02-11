@@ -3370,6 +3370,46 @@ class integerish(namedtypedtuple):
         result = [item if result is None else result for result, item in zip(iterable, self)]
         return self.__class__(*result)
 
+    def __equality__(self, operation, other):
+        cls = self.__class__
+        if isinstance(other, internal.types.integer):
+            return operation(*map(int, [self, other]))
+        elif isinstance(other, self.__class__) and self.__same__(other):
+            return operation(*map(tuple, [self, other]))
+        return operation(True, False)
+
+    def __comparison__(self, operation, other):
+        cls = self.__class__
+        if not isinstance(other, internal.types.integer) and isinstance(other, self.__class__) and self.__same__(other):
+            return operation(*map(tuple, [self, other]))
+        elif not isinstance(other, (internal.types.integer, integerish)):
+            raise TypeError(u"{:s}.__comparison__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
+        return operation(*map(int, [self, other]))
+
+    # equality
+    def __eq__(self, other):
+        return self.__equality__(operator.eq, other)
+    def __hash__(self):
+        items = internal.types.tuple(self)
+        return hash(items)
+
+    # comparisons
+    def __lt__(self, other):
+        return self.__comparison__(operator.lt, other)
+    def __le__(self, other):
+        return self.__comparison__(operator.le, other)
+    def __gt__(self, other):
+        return self.__comparison__(operator.gt, other)
+    def __ge__(self, other):
+        return self.__comparison__(operator.ge, other)
+
+    # ...because py2 does not understand reflexivity
+    if sys.version_info.major < 3:
+        def __ne__(self, other):
+            return self.__equality__(operator.ne, other)
+        def __cmp__(self, other):
+            return -1 if self.__operator__(operator.lt, other) else +1 if self.__operator__(operator.gt, other) else 0
+
     # general arithmetic
     def __add__(self, other):
         return self.__operator__(operator.add, other)
