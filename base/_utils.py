@@ -235,7 +235,7 @@ class pycompat(object):
             return object.co_kwonlyargcount,
         @classmethod
         def new(cls, attributes, extra=(0,)):
-            argcount, nlocals, stacksize, flags, code, consts, names, varnames,filename, name, firstlineno, lnotab, freevars, cellvars = attributes
+            argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
             kwonlyargcount, = extra
             return types.CodeType(argcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
@@ -245,7 +245,7 @@ class pycompat(object):
             return object.co_posonlyargcount, object.co_kwonlyargcount
         @classmethod
         def new(cls, attributes, extra=(0, 0)):
-            argcount, nlocals, stacksize, flags, code, consts, names, varnames,filename, name, firstlineno, lnotab, freevars, cellvars = attributes
+            argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
             posonlyargcount, kwonlyargcount = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
@@ -255,7 +255,7 @@ class pycompat(object):
             return object.co_posonlyargcount, object.co_kwonlyargcount, object.co_qualname, object.co_exceptiontable
         @classmethod
         def new(cls, attributes, extra=(0, 0, str(), bytes())):
-            argcount, nlocals, stacksize, flags, code, consts, names, varnames,filename, name, firstlineno, lnotab, freevars, cellvars = attributes
+            argcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars = attributes
             posonlyargcount, kwonlyargcount, qualname, exceptiontable = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, qualname or name, firstlineno, lnotab, exceptiontable, freevars, cellvars)
 
@@ -1307,8 +1307,18 @@ class wrap(object):
         '''Convert `args` into a ``cell`` tuple.'''
         return tuple((pycompat.function.closure((lambda item: lambda : item)(arg))[0]) for arg in args)
 
-    # Python2 implementation of the assemble function which will take a callable, pass it as the first
-    # parameter to some kind of wrapper (callable) whilst preserving any arguments/names that were called.
+    # The classmethods that follow are responsible for assembling the equivalent of
+    # the closure that gets returned from the following python.
+
+    # def wrap(callable, wrapper):
+    #     def result(callable[arg1], callable[arg2], callable[arg3...], *callable[args], **callable[keywords]):
+    #         return wrapper(callable, callable[arg1], callable[arg2], callable[arg3...], *callable[args], **callable[keywords])
+    #     return result
+
+    # The reason why we're assembling this directly is so that the returned object
+    # has the _exact_ same arguments (including both wild and keyword arguments)
+    # which allows the documentation to still work properly when it's decorated.
+
     @classmethod
     def assemble_2x(cls, function, wrapper, bound=False):
         """Assemble a ``types.CodeType`` that will execute `wrapper` with `F` as its first parameter.
@@ -1392,13 +1402,13 @@ class wrap(object):
         co_code = bytes().join(code_)
 
         ## next we'll construct the code type based on what we have
-        cargs = pycompat.code.cons( \
-                    len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars), \
-                    co_stacksize, co_flags, co_code, \
-                    co_consts, co_names, co_varnames, \
-                    Fc.co_filename, Fc.co_name, Fc.co_firstlineno, \
-                    bytes(), co_freevars, ()
-                )
+        cargs = pycompat.code.cons(
+            len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars),
+            co_stacksize, co_flags, co_code,
+            co_consts, co_names, co_varnames,
+            Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
+            bytes(), co_freevars, ()
+        )
 
         func_code = pycompat.code.new(cargs)
 
@@ -1409,8 +1419,9 @@ class wrap(object):
 
         return res
 
-    # Python3 implementation of the assemble function which will take a callable, pass it as the first
-    # parameter to some kind of wrapper (callable) whilst preserving any arguments/names that were called.
+    # The following Py3 implementation is similar to the prior Py2 impementation,
+    # except that bytecodes for the parameters being different due to CALL_FUNCTION_EX.
+
     @classmethod
     def assemble_38x(cls, function, wrapper, bound=False):
         """Assemble a ``types.CodeType`` that will execute `wrapper` with `F` as its first parameter.
@@ -1495,13 +1506,13 @@ class wrap(object):
         co_code = bytes().join(code_)
 
         # consruct the new code object with all our fields.
-        cargs = pycompat.code.cons( \
-                    len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars), \
-                    co_stacksize, co_flags, co_code, \
-                    co_consts, co_names, co_varnames, \
-                    Fc.co_filename, Fc.co_name, Fc.co_firstlineno, \
-                    bytes(), co_freevars, ()
-                )
+        cargs = pycompat.code.cons(
+            len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars),
+            co_stacksize, co_flags, co_code,
+            co_consts, co_names, co_varnames,
+            Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
+            bytes(), co_freevars, ()
+        )
 
         func_code = pycompat.code.new(cargs)
 
@@ -1511,6 +1522,10 @@ class wrap(object):
         pycompat.function.set_documentation(res, pycompat.function.documentation(F))
 
         return res
+
+    # The following Py3 implementation is pretty similar to the prior one, but since the
+    # BUILD_XXX_UNPACK_WITH_CALL opcodes don't exist..we end up using the BUILD_LIST with
+    # LIST_TO_TUPLE and BUILD_MAP with DICT_MERGE to prepare CALL_FUNCTION_EX's parameters.
 
     @classmethod
     def assemble_39x(cls, function, wrapper, bound=False):
@@ -1597,13 +1612,128 @@ class wrap(object):
         co_code = bytes().join(code_)
 
         # construct the new code object with all our fields.
-        cargs = pycompat.code.cons( \
-                    len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars) if sys.version_info.minor < 11 else len(co_varnames), \
-                    co_stacksize, co_flags, co_code, \
-                    co_consts, co_names, co_varnames, \
-                    Fc.co_filename, Fc.co_name, Fc.co_firstlineno, \
-                    bytes(), co_freevars, ()
-                )
+        cargs = pycompat.code.cons(
+            len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars),
+            co_stacksize, co_flags, co_code,
+            co_consts, co_names, co_varnames,
+            Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
+            bytes(), co_freevars, ()
+        )
+
+        func_code = pycompat.code.new(cargs)
+
+        ## finally take our code object, and put it back into a function/callable.
+        res = pycompat.function.new(func_code, pycompat.function.globals(F), pycompat.function.name(F), pycompat.function.defaults(F), cls.cell(*Svals))
+        pycompat.function.set_name(res, pycompat.function.name(F)),
+        pycompat.function.set_documentation(res, pycompat.function.documentation(F))
+
+        return res
+
+    # The following Py3 implementation is different from the previous one due to Py311 lining
+    # up the freevars and cellvars with the varnames. This results in LOAD_DEREF using an index
+    # relative to varnames to access a freevar from the captured function along with the need to
+    # calculate the number of locals differently. It also seems like there's some more crap we
+    # can shove in the prologue that could allow Py311 to optimize it (lol). Also.. this pasta
+    # definitely seems like it's nearing its ripeness.
+
+    @classmethod
+    def assemble_311x(cls, function, wrapper, bound=False):
+        """Assemble a ``types.CodeType`` that will execute `wrapper` with `F` as its first parameter.
+
+        If `bound` is ``True``, then assume that the first parameter for `F` represents the instance it's bound to.
+        """
+        F, C, S = (cls.extract(item) for item in [function, wrapper, cls.assemble_39x])
+        Fc, Cc, Sc = (pycompat.function.code(item) for item in [F, C, S])
+        Nvarargs, Nvarkwds = 1 if cls.co_varargsQ(Fc) else 0, 1 if cls.co_varkeywordsQ(Fc) else 0
+
+        ### build the namespaces that we'll use.
+
+        # first we'll build the externals that get passed to the wrapper.
+        Sargs = ('F', 'wrapper')
+        Svals = (f if callable(f) else fo for f, fo in [(function, F), (wrapper, C)])
+
+        # rip out the arguments from our target `F`.
+        varnames, argcount = pycompat.code.varnames(Fc), pycompat.code.argcount(Fc)
+        Fargs, Fdefaults = varnames[:argcount], pycompat.function.defaults(F)
+        Fvarargs, Fvarkwds = varnames[argcount : argcount + Nvarargs], varnames[argcount + Nvarargs : argcount + Nvarargs + Nvarkwds]
+
+        # combine them into tuples for looking up variables.
+        co_names, co_varnames = Sargs[:], Fargs[:] + Fvarargs[:] + Fvarkwds[:]
+
+        ## free variables (that get passed to `C`).
+        co_freevars = Sargs[:2]
+
+        ## constants for code type (which consist of just the self-doc).
+        co_consts = (pycompat.function.documentation(F),)
+
+        ## flags for the code type.
+        co_flags = pycompat.co_flags.CO_NESTED | pycompat.co_flags.CO_OPTIMIZED | pycompat.co_flags.CO_NEWLOCALS
+        co_flags |= pycompat.co_flags.CO_VARARGS if Nvarargs > 0 else 0
+        co_flags |= pycompat.co_flags.CO_VARKEYWORDS if Nvarkwds > 0 else 0
+
+        ### figure out some things for assembling the bytecode.
+        code_, co_stacksize = [], 0
+        asm = code_.append
+
+        # push the equivalence of the prologue, which copies free variables
+        # from our closure and warms up Py11's predictor (lol).
+        asm(cls.co_assemble('COPY_FREE_VARS', len(co_freevars)))
+        asm(cls.co_assemble('RESUME', 0))
+        asm(cls.co_assemble('PUSH_NULL', 0))
+
+        # then we push the callable that we need to call to wrap our function.
+        asm(cls.co_assemble('LOAD_DEREF', len(co_varnames) + co_freevars.index('wrapper')))
+        co_stacksize += 1
+
+        ## now we need to pack all of our parameters into a tuple starting with our
+        ## `F` parameter which contains the function that's being wrapped.
+        asm(cls.co_assemble('LOAD_DEREF', len(co_varnames) + co_freevars.index('F')))
+        co_stacksize += 1
+
+        # now we can include all of the original arguments (cropped by +1 if bound).
+        for item in Fargs[int(bound):]:
+            asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
+            co_stacksize += 1
+
+        # then we can finally pack it into a list
+        asm(cls.co_assemble('BUILD_LIST', 1 + len(Fargs[int(bound):])))         # pack(F, args)
+
+        ## now we need to pack all wildcard arguments...
+        for item in Fvarargs:
+            asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
+            asm(cls.co_assemble('LIST_EXTEND', 1))
+        co_stacksize = max(2 + len(Fvarargs), co_stacksize)                     # wrapper + pack(F, args) + load_fast(varargs)
+
+        # ...and convert it into a tuple
+        asm(cls.co_assemble('LIST_TO_TUPLE'))
+
+        ## now we need to pack all kw arguments...
+        asm(cls.co_assemble('BUILD_MAP', 0))
+
+        for item in Fvarkwds:
+            asm(cls.co_assemble('LOAD_FAST', co_varnames.index(item)))
+            asm(cls.co_assemble('DICT_MERGE', 1))
+        co_stacksize = max(2 + len(Fvarkwds), co_stacksize)                     # wrapper + pack(F, args, varargs) + load_fast(varkwds)
+
+        ## finally we have our arguments, and can now assemble our call...
+        asm(cls.co_assemble('CALL_FUNCTION_EX', 1))
+
+        # ...and then return its value.
+        asm(cls.co_assemble('RETURN_VALUE'))
+
+        ## next we'll construct the code type using our new opcodes.
+
+        # combine our opcodes into a single code string.
+        co_code = bytes().join(code_)
+
+        # construct the new code object with all our fields.
+        cargs = pycompat.code.cons(
+            len(Fargs), len(co_varnames),
+            co_stacksize, co_flags, co_code,
+            co_consts, co_names, co_varnames,
+            Fc.co_filename, Fc.co_name, Fc.co_firstlineno,
+            bytes(), co_freevars, ()
+        )
 
         func_code = pycompat.code.new(cargs)
 
@@ -1617,7 +1747,7 @@ class wrap(object):
     def __new__(cls, callable, wrapper):
         '''Return a function similar to `callable` that calls `wrapper` with `callable` as the first argument.'''
         cons, f = cls.constructor(callable), cls.extract(callable)
-        Fassemble = cls.assemble_2x if sys.version_info.major < 3 else cls.assemble_38x if sys.version_info.minor < 9 else cls.assemble_39x
+        Fassemble = cls.assemble_2x if sys.version_info.major < 3 else cls.assemble_38x if sys.version_info.minor < 9 else cls.assemble_39x if sys.version_info.minor < 11 else cls.assemble_311x
 
         # create a wrapper for the function that'll execute `callable` with the function as its first argument, and the rest with any args
         res = Fassemble(callable, wrapper, bound=isinstance(callable, (classmethod, types.MethodType)))
