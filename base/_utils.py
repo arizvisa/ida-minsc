@@ -297,6 +297,45 @@ class pycompat(object):
 
     method = method_2x if sys.version_info.major < 3 else method_3x
 
+    class co_flags_2x(object):
+        CO_OPTIMIZED                = 0x00001
+        CO_NEWLOCALS                = 0x00002
+        CO_VARARGS                  = 0x00004
+        CO_VARKEYWORDS              = 0x00008
+        CO_NESTED                   = 0x00010
+        CO_GENERATOR                = 0x00020
+        CO_NOFREE                   = 0x00040
+
+        CO_ITERABLE_COROUTINE       = 0x00100
+        CO_GENERATOR_ALLOWED        = 0x01000
+        CO_FUTURE_DIVISION          = 0x02000
+        CO_FUTURE_ABSOLUTE_IMPORT   = 0x04000
+        CO_FUTURE_WITH_STATEMENT    = 0x08000
+        CO_FUTURE_PRINT_FUNCTION    = 0x10000
+        CO_FUTURE_UNICODE_LITERALS  = 0x20000
+
+    class co_flags_3x(co_flags_2x):
+        CO_COROUTINE                = 0x00080
+        CO_FUTURE_BARRY_AS_BDFL     = 0x40000
+        CO_FUTURE_GENERATOR_STOP    = 0x80000
+
+    class co_flags_311(co_flags_2x):
+        CO_COROUTINE                = 0x0000080
+        CO_ITERABLE_COROUTINE       = 0x0000100
+        CO_ASYNC_GENERATOR          = 0x0000200
+
+        CO_FUTURE_DIVISION          = 0x0020000
+        CO_FUTURE_ABSOLUTE_IMPORT   = 0x0040000
+        CO_FUTURE_WITH_STATEMENT    = 0x0080000
+        CO_FUTURE_PRINT_FUNCTION    = 0x0100000
+        CO_FUTURE_UNICODE_LITERALS  = 0x0200000
+
+        CO_FUTURE_BARRY_AS_BDFL     = 0x0400000
+        CO_FUTURE_GENERATOR_STOP    = 0x0800000
+        CO_FUTURE_ANNOTATIONS       = 0x1000000
+
+    co_flags = co_flags_2x if sys.version_info.major < 3 else co_flags_3x if sys.version_info.minor < 11 else co_flags_311
+
 ### decorators
 class priority_tuple(object):
     """
@@ -323,24 +362,6 @@ class multicase(object):
     A lot of magic is in this class which allows one to define multiple cases
     for a single function.
     """
-    CO_OPTIMIZED                = 0x00001
-    CO_NEWLOCALS                = 0x00002
-    CO_VARARGS                  = 0x00004
-    CO_VARKEYWORDS              = 0x00008
-    CO_NESTED                   = 0x00010
-    CO_VARGEN                   = 0x00020
-    CO_NOFREE                   = 0x00040
-    CO_COROUTINE                = 0x00080
-    CO_ITERABLE                 = 0x00100
-    CO_GENERATOR_ALLOWED        = 0x01000
-    CO_FUTURE_DIVISION          = 0x02000
-    CO_FUTURE_ABSOLUTE_IMPORT   = 0x04000
-    CO_FUTURE_WITH_STATEMENT    = 0x08000
-    CO_FUTURE_PRINT_FUNCTION    = 0x10000
-    CO_FUTURE_UNICODE_LITERALS  = 0x20000
-    CO_FUTURE_BARRY_AS_BDFL     = 0x40000
-    CO_FUTURE_GENERATOR_STOP    = 0x80000
-
     cache_name = '__multicase_cache__'
 
     def __new__(cls, *other, **t_args):
@@ -730,9 +751,9 @@ class multicase(object):
         varnames_count, varnames_iter = pycompat.code.argcount(c), (item for item in pycompat.code.varnames(c))
         args = tuple(itertools.islice(varnames_iter, varnames_count))
         res = { a : v for v, a in zip(reversed(pycompat.function.defaults(f) or []), reversed(args)) }
-        try: starargs = next(varnames_iter) if pycompat.code.flags(c) & cls.CO_VARARGS else ""
+        try: starargs = next(varnames_iter) if pycompat.code.flags(c) & pycompat.co_flags.CO_VARARGS else ""
         except StopIteration: starargs = ""
-        try: kwdargs = next(varnames_iter) if pycompat.code.flags(c) & cls.CO_VARKEYWORDS else ""
+        try: kwdargs = next(varnames_iter) if pycompat.code.flags(c) & pycompat.co_flags.CO_VARKEYWORDS else ""
         except StopIteration: kwdargs = ""
         return args, res, (starargs, kwdargs)
 
@@ -1232,24 +1253,6 @@ class wrap(object):
     around a single callable.
     """
 
-    CO_OPTIMIZED                = 0x00001
-    CO_NEWLOCALS                = 0x00002
-    CO_VARARGS                  = 0x00004
-    CO_VARKEYWORDS              = 0x00008
-    CO_NESTED                   = 0x00010
-    CO_VARGEN                   = 0x00020
-    CO_NOFREE                   = 0x00040
-    CO_COROUTINE                = 0x00080
-    CO_ITERABLE                 = 0x00100
-    CO_GENERATOR_ALLOWED        = 0x01000
-    CO_FUTURE_DIVISION          = 0x02000
-    CO_FUTURE_ABSOLUTE_IMPORT   = 0x04000
-    CO_FUTURE_WITH_STATEMENT    = 0x08000
-    CO_FUTURE_PRINT_FUNCTION    = 0x10000
-    CO_FUTURE_UNICODE_LITERALS  = 0x20000
-    CO_FUTURE_BARRY_AS_BDFL     = 0x40000
-    CO_FUTURE_GENERATOR_STOP    = 0x80000
-
     import opcode
     if sys.version_info.major < 3:
         import compiler.consts as consts
@@ -1350,12 +1353,12 @@ class wrap(object):
         # now we'll determine the flags to apply
         flags_ = {
             (False, False) : 0,
-            (True, False)  : cls.CO_VARARGS,
-            (False, True)  : cls.CO_VARKEYWORDS,
-            (True, True)   : cls.CO_VARARGS | cls.CO_VARKEYWORDS
+            (True, False)  : pycompat.co_flags.CO_VARARGS,
+            (False, True)  : pycompat.co_flags.CO_VARKEYWORDS,
+            (True, True)   : pycompat.co_flags.CO_VARARGS | pycompat.co_flags.CO_VARKEYWORDS
         }
 
-        co_flags = cls.CO_NESTED | cls.CO_OPTIMIZED | cls.CO_NEWLOCALS | flags_[Tc]
+        co_flags = pycompat.co_flags.CO_NESTED | pycompat.co_flags.CO_OPTIMIZED | pycompat.co_flags.CO_NEWLOCALS | flags_[Tc]
 
         ## assemble the code type that gets turned into a function
         code_, co_stacksize = [], 0
@@ -1439,9 +1442,9 @@ class wrap(object):
         co_consts = (pycompat.function.documentation(F),)
 
         ## flags for the code type.
-        co_flags = cls.CO_NESTED | cls.CO_OPTIMIZED | cls.CO_NEWLOCALS
-        co_flags |= cls.CO_VARARGS if Nvarargs > 0 else 0
-        co_flags |= cls.CO_VARKEYWORDS if Nvarkwds > 0 else 0
+        co_flags = pycompat.co_flags.CO_NESTED | pycompat.co_flags.CO_OPTIMIZED | pycompat.co_flags.CO_NEWLOCALS
+        co_flags |= pycompat.co_flags.CO_VARARGS if Nvarargs > 0 else 0
+        co_flags |= pycompat.co_flags.CO_VARKEYWORDS if Nvarkwds > 0 else 0
 
         ### figure out some things for assembling the bytecode.
         code_, co_stacksize = [], 0
@@ -1540,9 +1543,9 @@ class wrap(object):
         co_consts = (pycompat.function.documentation(F),)
 
         ## flags for the code type.
-        co_flags = cls.CO_NESTED | cls.CO_OPTIMIZED | cls.CO_NEWLOCALS
-        co_flags |= cls.CO_VARARGS if Nvarargs > 0 else 0
-        co_flags |= cls.CO_VARKEYWORDS if Nvarkwds > 0 else 0
+        co_flags = pycompat.co_flags.CO_NESTED | pycompat.co_flags.CO_OPTIMIZED | pycompat.co_flags.CO_NEWLOCALS
+        co_flags |= pycompat.co_flags.CO_VARARGS if Nvarargs > 0 else 0
+        co_flags |= pycompat.co_flags.CO_VARKEYWORDS if Nvarkwds > 0 else 0
 
         ### figure out some things for assembling the bytecode.
         code_, co_stacksize = [], 0
@@ -1654,8 +1657,8 @@ class wrap(object):
         count, iterable = pycompat.code.argcount(c), (item for item in pycompat.code.varnames(c))
         args = tuple(itertools.islice(iterable, count))
         res = { a : v for v, a in zip(reversed(pycompat.function.defaults(f) or []), reversed(args)) }
-        starargs = next(iterable, '') if pycompat.code.flags(c) & cls.CO_VARARGS else ''
-        kwdargs = next(iterable, '') if pycompat.code.flags(c) & cls.CO_VARKEYWORDS else ''
+        starargs = next(iterable, '') if pycompat.code.flags(c) & pycompat.co_flags.CO_VARARGS else ''
+        kwdargs = next(iterable, '') if pycompat.code.flags(c) & pycompat.co_flags.CO_VARKEYWORDS else ''
         return args, res, (starargs, kwdargs)
 
     @classmethod
