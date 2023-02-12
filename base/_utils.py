@@ -249,7 +249,17 @@ class pycompat(object):
             posonlyargcount, kwonlyargcount = extra
             return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, firstlineno, lnotab, freevars, cellvars)
 
-    code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38
+    class code_311(code_2x):
+        @classmethod
+        def unpack_extra(cls, object):
+            return object.co_posonlyargcount, object.co_kwonlyargcount, object.co_qualname, object.co_exceptiontable
+        @classmethod
+        def new(cls, attributes, extra=(0, 0, str(), bytes())):
+            argcount, nlocals, stacksize, flags, code, consts, names, varnames,filename, name, firstlineno, lnotab, freevars, cellvars = attributes
+            posonlyargcount, kwonlyargcount, qualname, exceptiontable = extra
+            return types.CodeType(argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags, code, consts, names, varnames, filename, name, qualname or name, firstlineno, lnotab, exceptiontable, freevars, cellvars)
+
+    code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38 if (sys.version_info.major, sys.version_info.minor) < (3, 11) else code_311
 
     class method_2x(object):
         @classmethod
@@ -1543,7 +1553,7 @@ class wrap(object):
         co_stacksize += 1
 
         ## now we need to pack all of our parameters into a tuple starting with our
-        ## `F` parameter which contains the function taht's being wrapped.
+        ## `F` parameter which contains the function that's being wrapped.
         asm(cls.co_assemble('LOAD_DEREF', co_freevars.index('F')))
         co_stacksize += 1
 
@@ -1583,9 +1593,9 @@ class wrap(object):
         # combine our opcodes into a single code string.
         co_code = bytes().join(code_)
 
-        # consruct the new code object with all our fields.
+        # construct the new code object with all our fields.
         cargs = pycompat.code.cons( \
-                    len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars), \
+                    len(Fargs), len(co_names) + len(co_varnames) + len(co_freevars) if sys.version_info.minor < 11 else len(co_varnames), \
                     co_stacksize, co_flags, co_code, \
                     co_consts, co_names, co_varnames, \
                     Fc.co_filename, Fc.co_name, Fc.co_firstlineno, \
