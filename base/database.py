@@ -6456,8 +6456,7 @@ class xref(object):
     @classmethod
     def up(cls, ea):
         '''Return all of the addresses that reference the address `ea`.'''
-        code, data = {item for item in interface.xref.code(ea, False)}, {item for item in itertools.chain(*(interface.xref.data(ea, False) for ea in interface.address.references(ea)))}
-        return sorted(code | data)
+        return sorted(itertools.chain(*(interface.xref.any(ea, False) for ea in interface.address.references(ea))))
     u = utils.alias(up, 'xref')
 
     # All locations that are referenced by the specified address
@@ -6470,8 +6469,7 @@ class xref(object):
     @classmethod
     def down(cls, ea):
         '''Return all of the addresses that are referred by the address `ea`.'''
-        code, data = {item for item in interface.xref.code(ea, True)}, {item for item in interface.xref.data(ea, True)}
-        return sorted(code | data)
+        return sorted(interface.xref.any(ea, True))
     d = utils.alias(down, 'xref')
 
     @utils.multicase(target=internal.types.integer)
