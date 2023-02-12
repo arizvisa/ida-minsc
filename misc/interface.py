@@ -4821,11 +4821,16 @@ class xref(object):
     @classmethod
     def any(cls, ea, descend):
         '''Return a ``ref_t`` for each location that references the address `ea` (if `descend` is false), or that is referenced by the address `ea`.'''
-        xiterate = cls.of if descend else cls.to
+        grouped, order, xiterate = {}, [], cls.of if descend else cls.to
         for xr, iscode, xrtype in xiterate(ea):
             if any([iscode and xrtype != idaapi.fl_F, not iscode]):
-                yield ref_t(xr, access_t(xrtype, iscode))
+                _, items = (None, grouped[xr]) if xr in grouped else (order.append(xr), grouped.setdefault(xr, []))
+                items.append(ref_t(xr, access_t(xrtype, iscode)))
             continue
+
+        # Now we just need to merge them and yield them in the same order that we collected them.
+        for ea, items in zip(order, map(functools.partial(operator.getitem, grouped), order)):
+            yield functools.reduce(operator.or_, items)
         return
 
     @classmethod
