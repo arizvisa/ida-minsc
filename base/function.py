@@ -4490,15 +4490,8 @@ class xref(object):
     @classmethod
     def up(cls, func):
         '''Return each address that reference the function `func`.'''
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
-
-        # runtime
-        if rt:
-            iterable = itertools.chain(*(F(ea, False) for F in [interface.xref.code, interface.xref.data]))
-
-        # regular
-        else:
-            iterable = itertools.chain(*(F(ea, False) for F in [interface.xref.code, interface.xref.data]))
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        iterable = interface.xref.any(ea, False)
         return sorted({ref for ref in iterable})
 
     @utils.multicase()
