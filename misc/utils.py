@@ -1393,8 +1393,13 @@ class matcher(object):
         attr = self.__attrib__(*attribute)
         self.__predicate__[type] = functools.partial(fcompose, attr)
     def match(self, type, value, iterable):
+        if type not in self.__predicate__:
+            cls, available = self.__class__, sorted(self.__predicate__)
+            raise internal.exceptions.InvalidMatchTypeError(u"{:s}.match({!r}, {!r}, {!r}) : The requested filter (\"{:s}\") is not within the list of available filters ({:s}).".format('.'.join([__name__, cls.__name__]), type, value, iterable, string.escape(type, '"'), ', '.join(available)))
         matcher = self.__predicate__[type](value)
         return (item for item in iterable if matcher(item))
+    def alias(self, target, type):
+        self.__predicate__[target] = self.__predicate__[type]
 
 ### character processing (escaping and unescaping)
 class character(object):
