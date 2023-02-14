@@ -156,6 +156,11 @@ class InvalidParameterError(InvalidTypeOrValueError, E.AssertionError):
     An invalid parameter was specified by the user.
     """
 
+class InvalidMatchTypeError(InvalidParameterError):
+    """
+    An invalid match type was specified by the user.
+    """
+
 class OutOfBoundsError(UnicodeException, E.ValueError):
     """
     The specified item is out of bounds.
