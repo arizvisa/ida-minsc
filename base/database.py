@@ -528,7 +528,7 @@ class functions(object):
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
     __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
-    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
+    __matcher__.alias('ea', 'address')
     __matcher__.mapping('typed', operator.truth, function.top, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.mapping('decompiled', operator.truth, function.type.decompiled)
     __matcher__.mapping('frame', operator.truth, function.type.frame)
@@ -536,8 +536,8 @@ class functions(object):
     __matcher__.mapping('wrapper', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
     __matcher__.mapping('lumina', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, function.tag, operator.methodcaller('keys'), internal.types.set)
-    __matcher__.predicate('predicate', function.by)
-    __matcher__.predicate('pred', function.by)
+    __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))))
+    __matcher__.predicate('predicate', function.by), __matcher__.alias('pred', 'predicate')
 
     if any(hasattr(idaapi, item) for item in ['is_problem_present', 'QueueIsPresent']):
         __matcher__.mapping('problems', operator.truth, function.top, utils.frpartial(function.type.problem, getattr(idaapi, 'PR_BADSTACK', 0xb)))
@@ -581,13 +581,18 @@ class functions(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def iterate(cls, name):
-        '''Iterate through the functions within the database that match the glob specified by `name`.'''
+        '''Iterate through the functions from the database that match the glob specified by `name`.'''
         return cls.iterate(like=name)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def iterate(cls, bounds):
+        '''Iterate through the functions from the database within the given `bounds`.'''
+        return cls.iterate(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
-        '''Iterate through the functions within the database that match the keywords specified by `type`.'''
+        '''Iterate through the functions from the database that match the keywords specified by `type`.'''
         iterable = cls.__iterate__()
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
@@ -597,13 +602,18 @@ class functions(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def list(cls, name):
-        '''List the functions within the database that match the glob specified by `name`.'''
+        '''List the functions from the database that match the glob specified by `name`.'''
         return cls.list(like=name)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def list(cls, bounds):
+        '''List the functions from the database within the given `bounds`.'''
+        return cls.list(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
-        '''List the functions within the database that match the keywords specified by `type`.'''
+        '''List the functions from the database that match the keywords specified by `type`.'''
         listable = []
 
         # Some utility functions for grabbing counts of function attributes
@@ -956,6 +966,7 @@ class names(object):
         `name` - Filter the symbols by unmangled name or a list of unmangled names
         `unmangled` - Filter the unmangled symbol names according to a regular-expression
         `like` - Filter the symbol names according to a glob
+        `bounds` - Filter the symbol names within the given boundaries
         `regex` - Filter the symbol names according to a regular-expression
         `index` - Filter the symbol according to an index or a list of indices
         `function` - Filter the symbol names for any that are referring to a function
@@ -974,18 +985,18 @@ class names(object):
     """
     __matcher__ = utils.matcher()
     __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_nlist_ea)
-    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_nlist_ea)
+    __matcher__.alias('ea', 'address')
     __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('unmangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
-    __matcher__.combinator('demangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
+    __matcher__.alias('demangled', 'unmangled')
     __matcher__.mapping('function', function.has, idaapi.get_nlist_ea)
     __matcher__.mapping('imports', utils.fpartial(operator.eq, idaapi.SEG_XTRN), idaapi.get_nlist_ea, idaapi.segtype)
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_nlist_ea, lambda ea: function.tag(ea) if function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.mapping('typed', operator.truth, idaapi.get_nlist_ea, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
-    __matcher__.predicate('predicate', idaapi.get_nlist_ea)
-    __matcher__.predicate('pred', idaapi.get_nlist_ea)
+    __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t, operator.attrgetter('contains')))), idaapi.get_nlist_ea)
+    __matcher__.predicate('predicate', idaapi.get_nlist_ea), __matcher__.alias('pred', 'predicate')
     __matcher__.attribute('index')
 
     def __new__(cls, *string, **type):
@@ -997,6 +1008,10 @@ class names(object):
     @utils.string.decorate_arguments('string')
     def __iterate__(cls, string):
         return cls.__iterate__(like=string)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def __iterate__(cls, bounds):
+        return cls.__iterate__(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
@@ -1010,13 +1025,18 @@ class names(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def iterate(cls, name):
-        '''Iterate through the names within the database that match the glob specified by `name`.'''
+        '''Iterate through the names from the database that match the glob specified by `name`.'''
         return cls.iterate(like=name)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def iterate(cls, bounds):
+        '''Iterate through the names from the database that match the glob specified by `name`.'''
+        return cls.iterate(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
-        '''Iterate through the names within the database that match the keywords specified by `type`.'''
+        '''Iterate through the names from the database that match the keywords specified by `type`.'''
         for idx in cls.__iterate__(**type):
             ea, name = idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
             yield ea, utils.string.of(name)
@@ -1026,13 +1046,18 @@ class names(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def list(cls, name):
-        '''List the names within the database that match the glob specified by `name`.'''
+        '''List the names from the database that match the glob specified by `name`.'''
         return cls.list(like=name)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def list(cls, bounds):
+        '''List the names from the database within the given `bounds`.'''
+        return cls.list(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
-        '''List the names within the database that match the keywords specified by `type`.'''
+        '''List the names from the database that match the keywords specified by `type`.'''
         MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
         Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
@@ -1079,7 +1104,7 @@ class names(object):
     @utils.string.decorate_arguments('name')
     def search(cls, name):
         '''Search through the names within the database that match the glob `name` and return the first result.'''
-        return cls.search(like=string)
+        return cls.search(like=name)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
@@ -1836,6 +1861,7 @@ class entries(object):
         `address` or `ea` - Filter the entrypoints by an address or a list of addresses
         `name` - Filter the entrypoints by a name or a list of names
         `like` - Filter the entrypoint names according to a glob
+        `bounds` - Filter the entrypoints within the given boundaries
         `regex` - Filter the entrypoint names according to a regular-expression
         `index` - Filter the entrypoints by an index or a list of indices
         `ordinal` - Filter the entrypoint by an ordinal or a list of ordinals
@@ -1858,12 +1884,10 @@ class entries(object):
 
     __matcher__ = utils.matcher()
     __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('greater', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('ge', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.alias('ea', 'address')
+    __matcher__.boolean('ge', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry), __matcher__.alias('greater', 'ge')
     __matcher__.boolean('gt', operator.lt, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('less', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('le', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.boolean('le', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry), __matcher__.alias('less', 'le')
     __matcher__.boolean('lt', operator.gt, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
@@ -1871,10 +1895,10 @@ class entries(object):
     __matcher__.mapping('function', function.has, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
-    __matcher__.predicate('predicate', idaapi.get_entry_ordinal),
-    __matcher__.predicate('pred', idaapi.get_entry_ordinal)
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal)
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
+    __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.predicate('predicate', idaapi.get_entry_ordinal), __matcher__.alias('pred', 'predicate')
 
     def __new__(cls, *string, **type):
         '''Return the address of each entry point defined within the database as a list.'''
@@ -1965,13 +1989,18 @@ class entries(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def iterate(cls, name):
-        '''Iterate through the entry points within the database that match the glob specified by `name`.'''
+        '''Iterate through the entry points from the database that match the glob specified by `name`.'''
         return cls.iterate(like=name)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def iterate(cls, bounds):
+        '''Iterate through the entry points from the database within the given `bounds`.'''
+        return cls.iterate(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
-        '''Iterate through the entry points within the database that match the keywords specified by `type`.'''
+        '''Iterate through the entry points from the database that match the keywords specified by `type`.'''
         for ea in cls.__iterate__(**type):
             yield cls.__address__(ea)
         return
@@ -2055,13 +2084,18 @@ class entries(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def list(cls, name):
-        '''List the entry points within the database that match the glob `name`.'''
+        '''List the entry points from the database that match the glob `name`.'''
+        return cls.list(like=name)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def list(cls, bounds):
+        '''List the entry points from the database within the given `bounds`.'''
         return cls.list(like=name)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
-        '''List the entry points within the database that match the keywords specified by `type`.'''
+        '''List the entry points from the database that match the keywords specified by `type`.'''
         MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
         Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
@@ -2649,6 +2683,7 @@ class imports(object):
         `module` - Filter the imports according to the specified module name
         `fullname` - Filter the full name (module + symbol) of each import with a glob
         `like` - Filter the symbol names of all the imports according to a glob
+        `bounds` - Filter the imports within the given boundaries
         `regex` - Filter the symbol names of all the imports according to a regular-expression
         `ordinal` - Filter the imports by the import hint (ordinal) or a list of hints
         `typed` - Filter all of the imports based on whether they have a type applied to them
@@ -2704,7 +2739,7 @@ class imports(object):
 
     __matcher__ = utils.matcher()
     __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
-    __matcher__.combinator('ea', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
+    __matcher__.alias('ea', 'address')
     __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1), __formats__.__func__, operator.methodcaller('lower'))
     __matcher__.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __formatl__.__func__)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __formats__.__func__)
@@ -2713,8 +2748,8 @@ class imports(object):
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __format__.__func__)
     __matcher__.mapping('typed', operator.truth, operator.itemgetter(0), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), tag, operator.methodcaller('keys'), internal.types.set)
-    __matcher__.predicate('predicate')
-    __matcher__.predicate('pred')
+    __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), operator.itemgetter(0))
+    __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
     @classmethod
     def __iterate__(cls):
@@ -2734,13 +2769,18 @@ class imports(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def iterate(cls, name):
-        '''Iterate through the imports within the database that match the glob specified by `name`.'''
+        '''Iterate through the imports from the database that match the glob specified by `name`.'''
         return cls.iterate(like=name)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def iterate(cls, bounds):
+        '''Iterate through the imports from the database that are contained within the given `bounds`.'''
+        return cls.iterate(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def iterate(cls, **type):
-        '''Iterate through all of the imports in the database that match the keywords specified by `type`.'''
+        '''Iterate through the imports from the database that match the keywords specified by `type`.'''
         iterable = cls.__iterate__()
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = (item for item in cls.__matcher__.match(key, value, iterable))
@@ -2846,13 +2886,18 @@ class imports(object):
     @classmethod
     @utils.string.decorate_arguments('symbol')
     def list(cls, symbol):
-        '''List the imports within the database that match the glob specified by `symbol`.'''
+        '''List the imports from the database that match the glob specified by `symbol`.'''
         return cls.list(fullname=symbol)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def list(cls, bounds):
+        '''List the imports from the database within the given `bounds`.'''
+        return cls.list(predicate=operator.truth, bounds=bounds)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def list(cls, **type):
-        '''List the imports within the database that match the keywords specified by `type`.'''
+        '''List the imports from the database that match the keywords specified by `type`.'''
         MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
         Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
@@ -2881,7 +2926,7 @@ class imports(object):
         caddr = utils.string.digits(maxaddr, 16)
 
         # List all the fields of every import that was matched
-        prefix, get_tinfo = '__imp_', (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        prefix, get_tinfo = idaapi.FUNC_IMPORT_PREFIX, (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         for ea, (module, name, ordinal) in listable:
             ui.navigation.set(ea)
             moduleordinal = "{:s}<{:d}>".format(module or '', ordinal) if ordinal else (module or '')
@@ -2923,7 +2968,7 @@ class imports(object):
     @utils.string.decorate_arguments('fullname')
     def search(cls, fullname):
         '''Search through the imports within the database that match the glob specified by `fullname`.'''
-        return cls.search(fullname=fullname)
+        return cls.search(predicate=operator.truth, fullname=fullname)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
@@ -5163,7 +5208,7 @@ class types(object):
         `regex` - Filter the local types by applying a regular-expression to their definition.
         `typeref` or `typedef` - Filter the local types for any that are an alias declared with typedef.
         `defined` or `present` - Filter the local types for any that are defined.
-        `size` - Filter the local types according to their size.
+        `size` - Filter the local types according to a size or a list of sizes.
         `greater` or `ge` - Filter the local types for the ones that are larger or equal to a certain size.
         `gt` - Filter the local types for the ones that are larger than a certain size.
         `less` or `le` - Filter the local types for the ones that are less or equal to a certain size.
@@ -5214,14 +5259,14 @@ class types(object):
     __matcher__ = utils.matcher()
     __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1), operator.methodcaller('lower'))
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1))
-    __matcher__.predicate('predicate'), __matcher__.predicate('pred')
+    __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
     __matcher__.combinator('definition', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
-    __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref'))
-    __matcher__.mapping('typedef', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref'))
+    __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref')), __matcher__.alias('typedef', 'typeref')
     __matcher__.mapping('defined', operator.truth, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
+    __matcher__.mapping('undefined', operator.not_, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
 
     __matcher__.mapping('integer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_integral'))
     __matcher__.mapping('pointer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_ptr'))
@@ -5232,7 +5277,7 @@ class types(object):
     __matcher__.mapping('union', operator.truth, operator.itemgetter(2), operator.methodcaller('is_union'))
     __matcher__.mapping('enumeration', operator.truth, operator.itemgetter(2), operator.methodcaller('is_enum'))
 
-    __matcher__.boolean('size', operator.eq, operator.itemgetter(2), operator.methodcaller('get_size'))
+    __matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(2), operator.methodcaller('get_size'))
     __matcher__.boolean('greater', operator.le, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('ge', operator.le, operator.itemgetter(2), operator.methodcaller('get_size'))
     __matcher__.boolean('gt', operator.lt, operator.itemgetter(2), operator.methodcaller('get_size')),
     __matcher__.boolean('less', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('le', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size'))
