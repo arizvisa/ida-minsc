@@ -302,7 +302,7 @@ class current(object):
         # If we were able to grab a selection, then return it.
         if idaapi.read_selection(view, left, right):
             pl_l, pl_r = left.place(view), right.place(view)
-            ea_l, ea_r = pl_l.ea, pl_r.ea
+            ea_l, ea_r = pl_l.toea(), pl_r.toea()
             l, r = internal.interface.address.inside(ea_l, ea_r)
             return internal.interface.bounds_t(l, r + 1)
 
