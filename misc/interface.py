@@ -10,8 +10,7 @@ individuals to attempt to understand this craziness.
 import six, builtins
 import sys, logging, contextlib
 import functools, operator, itertools
-import collections, heapq, traceback, ctypes, math, codecs
-import unicodedata as _unicodedata, string as _string, array as _array
+import collections, heapq, traceback, ctypes, math, codecs, array as _array
 
 import idaapi, internal, architecture
 
@@ -6155,3 +6154,135 @@ class decode(object):
         # Otherwise, we can just decode everything using whatever flags we got for it.
         length = cls.length_table[dsize]
         return cls.integers(flags, bytes, order=order)
+
+class name(object):
+    """
+    This namespace provides tools that interact with the names in
+    a database. This implies validating and transforming a name so
+    that it can be applied to a particular address/identifier or
+    checking if the name already exists within the database.
+    """
+    @classmethod
+    def exists(cls, name, *suffix):
+        '''Return if the given `name` already exists at an address within the database.'''
+        fullname = tuplename(name, *suffix)
+        res, ea = idaapi.get_name_value(idaapi.BADADDR, internal.utils.string.to(fullname))
+        return res != idaapi.NT_NONE
+
+    @classmethod
+    def inside(cls, ea, name, *suffix):
+        '''Return if the given `name` already exists within the scope of address `ea`.'''
+        fullname = tuplename(name, *suffix)
+        res, ea = idaapi.get_name_value(ea, internal.utils.string.to(fullname))
+        return res != idaapi.NT_NONE
+
+    @classmethod
+    def used(cls, name, *suffix):
+        '''Return if the given `name` is used somewhere within the database.'''
+        fullname = tuplename(name, *suffix)
+        return internal.netnode.has(fullname)
+
+    @classmethod
+    def identifier(cls, name, *suffix):
+        '''Transform the given `name` to the required characters for an identifier and return it.'''
+        fullname = tuplename(name, *suffix) or '_'
+        validated = idaapi.validate_name2(internal.utils.string.to(fullname)) if idaapi.__version__ < 7.0 else idaapi.validate_name(internal.utils.string.to(fullname), idaapi.SN_IDBENC)
+        return internal.utils.string.of(validated)
+
+    @classmethod
+    def type(cls, name, *suffix):
+        '''Transform the given `name` to the required characters for a type and return it.'''
+        fullname = internal.utils.string.to(tuplename(name, *suffix) or '_')
+        validated = idaapi.validate_name2(fullname) if idaapi.__version__ < 7.0 else idaapi.validate_name(fullname, idaapi.SN_IDBENC)
+        if validated:
+            return internal.utils.string.of(validated)
+
+        # If the name could not be validated, then we need to manually fix the name because we
+        # need to always return something. We test the characters individually since testing
+        # slices of the string and leaning on is_valid_typename would pretty much be factorial time.
+        res = ''.join(fullname[index : index + 1] if idaapi.is_valid_typename('_' + fullname[index : index + 1]) else '_' for index in builtins.range(len(fullname)))
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def member(cls, name, *suffix):
+        '''Transform the given `name` to the required characters for a member and return it.'''
+        fullname = tuplename(name, *suffix) or '_'
+        validated = idaapi.validate_name2(internal.utils.string.to(fullname)) if idaapi.__version__ < 7.0 else idaapi.validate_name(internal.utils.string.to(fullname), idaapi.SN_IDBENC)
+        return internal.utils.string.of(validated)
+
+    @classmethod
+    @internal.utils.string.decorate_arguments('string')
+    def mangled(cls, ea, string):
+        '''Return the type of the mangled `string` at the address `ea` as their corresponding flags.'''
+        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+
+        # Get the mangled name type using the string...since that's all we need.
+        if hasattr(idaapi, 'get_mangled_name_type'):
+            mangled_t = idaapi.get_mangled_name_type(internal.utils.string.to(string))
+
+        # If we're using an older version of IDAPython, then get_mangled_name_type is not
+        # exported and so we literally have no choice but to make an assumption.
+        else:
+            default = MANGLED_CODE if address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE else MANGLED_DATA
+            Fmangled_type = internal.utils.fcompose(utils.frpartial(idaapi.demangle_name, idaapi.cvar.inf.long_demnames), internal.utils.fcondition(operator.truth)(default, MANGLED_UNKNOWN))
+            mangled_t = Fmangled_type(string)
+
+        # We convert the mangled_t into the flags (FF_CODE or FF_DATA) or 0 if it's not mangled.
+        return {MANGLED_CODE: idaapi.FF_CODE, MANGLED_DATA: idaapi.FF_DATA, MANGLED_UNKNOWN: idaapi.FF_UNK}.get(mangled_t, idaapi.FF_UNK)
+
+    @classmethod
+    @contextlib.contextmanager
+    def typename(cls, ordinal, library, name=None):
+        '''Return a context manager that renames the type at the specified `ordinal` in `library` with a temporary `name` on entry and restores it on exit.'''
+        Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}_{:x}".format, 'ti_unique', ordinal))
+
+        # loop indefinitely until we get a name that is unique to the type library.
+        temporary = name or Funique_name(hash("{:b}".format(ordinal)))
+        while not temporary or idaapi.get_type_ordinal(library, temporary):
+            temporary = Funique_name(temporary)
+
+        # get the name and type by ordinal so that we can temporarily replace them.
+        original = idaapi.get_numbered_type_name(library, ordinal)
+        serialized = idaapi.get_numbered_type(library, ordinal)
+
+        # if we were able to get the type, then replace it with our temporary name. if we
+        # failed at either, then we assign an error code which will result in non-action.
+        res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, temporary, *serialized[:1]) if serialized else idaapi.TERR_SAVE
+        try:
+            yield temporary if res == idaapi.TERR_OK else original
+
+        finally:
+            res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | idaapi.NTF_SYMU, original, *serialized[:1]) if serialized else idaapi.TERR_OK
+
+        # if we couldn't reapply the type then this is critical and we can only log it.
+        if res != idaapi.TERR_OK:
+            library_class = library.__class__
+            library_desc = "<{:s}; <{:s}>>".format('.'.join([library_class.__module__, library_class.__name__]), internal.utils.string.of(library.desc))
+            logging.fatal(u"{:s}.typename({:d}, {:s}{:s}) : Unable to restore the original name (\"{:s}\") to ordinal #{:d} from the \"{:s}\" library which is currently named \"{:s}\".".format('.'.join([__name__, cls.__name__]), ordinal, library_desc, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), ordinal, internal.utils.string.of(library.desc), internal.utils.string.escape(temporary, '"')))
+        return
+
+    @classmethod
+    @contextlib.contextmanager
+    def netnode(cls, identifier, name=None):
+        '''Return a context manager that renames the netnode specified by `identifier` with a temporary `name` on entry and restores it on exit.'''
+        Funique_name = internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}_{:x}".format, 'netnode_unique', identifier))
+
+        # loop indefinitely until we get a name that is unique to the type library.
+        temporary = name or Funique_name(hash("{:b}".format(identifier)))
+        while not temporary or internal.netnode.has(temporary):
+            temporary = Funique_name(temporary)
+
+        # get the original netnode name, temporarily rename it, and the yield the temporary name.
+        original = internal.netnode.name.get(identifier) or u''
+        ok = False if original is None else internal.netnode.name.set(identifier, temporary)
+        try:
+            yield temporary if ok else original
+
+        finally:
+            ok = internal.netnode.name.set(identifier, original) if ok else True
+
+        # if we couldn't restore the name then this is critical, so we log it and where the duplicate is.
+        if not ok:
+            logging.fatal(u"{:s}.netnode({:#x}{:s}) : Unable to restore the original name (\"{:s}\") for the netnode at {:#x} which is currently named \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), identifier, internal.utils.string.escape(temporary, '"')))
+            logging.info(u"{:s}.netnode({:#x}{:s}) : The original name (\"{:s}\") is currently associated with the netnode at {:#x}.".format('.'.join([__name__, cls.__name__]), identifier, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), internal.netnode.get(original)))
+        return
