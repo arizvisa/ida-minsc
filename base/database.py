@@ -1586,8 +1586,8 @@ def name(ea, string, *suffix, **flags):
         if idaapi.is_public_name(ea) or any(F & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
             F |= idaapi.SN_PUBLIC if F & idaapi.SN_PUBLIC else idaapi.SN_NON_PUBLIC
 
-        # if we're pointing to the start of the function, then unless
-        # public was explicitly ,specified we need to set the local name.
+        # if we're pointing to the start of the function, then we need
+        # to set the local name unless public was explicitly specified.
         elif interface.range.start(func) == ea and not builtins.all(F & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
             F |= idaapi.SN_LOCAL
 
@@ -2302,13 +2302,9 @@ def tag(ea):
         if type.has(ea):
             ti = type(ea)
 
-            # Filter the name we're going to render with so that it can be parsed properly.
-            valid = {item for item in '0123456789'} | {':'}
-            filtered = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in realname)
-            validname = ''.join(filtered)
-
-            # Demangle just the name if it's mangled in some way, and use it to render
-            # the typeinfo to return.
+            # We need the name to be parseable and IDA just doesn't give a fuck if it outputs
+            # something non-parseable. So we simply fix that here and render the typeinfo.
+            validname = internal.declaration.unmangled.parsable(realname)
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
 
             # Add it to our dictionary that we return to the user.
@@ -2354,13 +2350,38 @@ def tag(ea, key, value):
     # If any of the supported implicit tags were specified, then figure out which
     # one and using it to dispatch to the correct handler.
     if key == '__name__':
-        return name(ea, value, listed=True)
+        local, filtered = function.has(ea), interface.name.identifier(value)
+
+        # If the name isn't used within the database, then we can just apply it...blindly.
+        Fexists = functools.partial(interface.name.inside, ea) if local else interface.name.exists
+        if not (interface.name.used(filtered) or Fexists(filtered)):
+            return name(ea, filtered) if local else name(ea, filtered, listed=True)
+
+        # Otherwise, we need an alternative name which we make by appending the offset.
+        items, offset = [filtered], ea - config.baseaddress()
+        while any(F(interface.tuplename(*items)) for F in [interface.name.used, Fexists]):
+            items.append(offset)
+        alternative = tuple(items)
+
+        # Since we're changing the user's value, we need to figure out which warning
+        # message to use by determining who owned the original name.
+        address = idaapi.get_name_ea(ea if local else idaapi.BADADDR, filtered)
+        target = internal.netnode.get(filtered) if address == idaapi.BADADDR else address
+        description = "identifier {:#x}".format(target) if target == idaapi.BADADDR else "address {:#x}".format(target)
+        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Using an alternative name (\"{:s}\") for {:#x} due to {:s} {:#x} already being named \"{:s}\".".format(__name__, ea, key, value, utils.string.escape(interface.tuplename(*alternative), '"'), ea, 'identifier' if address == idaapi.BADADDR else 'address', target, utils.string.escape(filtered, '"')))
+
+        # Now we can apply the damned name.
+        return name(ea, *alternative) if local else name(ea, *alternative, listed=True)
+
     elif key == '__extra_prefix__':
         return extra.__set_prefix__(ea, value)
+
     elif key == '__extra_suffix__':
         return extra.__set_suffix__(ea, value)
+
     elif key == '__color__':
         return color(ea, value)
+
     elif key == '__typeinfo__':
         return type(ea, value)
 
