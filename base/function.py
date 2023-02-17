@@ -2989,13 +2989,9 @@ def tag(func):
         if type.has(fn):
             ti = type(fn)
 
-            # Filter the name we're going to render with so that it can be parsed properly.
-            valid = {item for item in '0123456789'} | {':'}
-            filtered = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in realname)
-            validname = ''.join(filtered)
-
-            # Use the validname to render the type into a string so that we
-            # can return it to the user in its proper format.
+            # We need this name to be parseable and (of course) IDA doesn't
+            # give a fuck whether its output is parseable by its own parser.
+            validname = internal.declaration.unmangled.parsable(realname)
             fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
             res.setdefault('__typeinfo__', fprototype)
 
@@ -3034,9 +3030,30 @@ def tag(func, key, value):
     # If the user wants to modify any of the implicit tags, then we use the key
     # to figure out which function to dispatch to in order to modify it.
     if key == '__name__':
-        return name(fn, value)
+        filtered = interface.name.identifier(value)
+
+        # If the name isn't used in the database, then just apply it.
+        if not any([interface.name.used(filtered), interface.name.exists(filtered)]) or idaapi.get_name_ea(idaapi.BADADDR, filtered) == ea:
+            return name(fn, filtered)
+
+        # Otherwise, we need an alternate name to avoid complaints.
+        items, offset = [filtered], interface.range.start(fn) - database.config.baseaddress()
+        while any(F(interface.tuplename(*items)) for F in [interface.name.used, interface.name.exists]):
+            items.append(offset)
+        alternative = tuple(items)
+
+        # Since we're using a different name, we need to warn the user why.
+        address = idaapi.get_name_ea(idaapi.BADADDR, filtered)
+        target = internal.netnode.get(filtered) if address == idaapi.BADADDR else address
+        description = "identifier {:#x}".format(target) if target == idaapi.BADADDR else "address {:#x}".format(target)
+        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Using an alternative name (\"{:s}\") for {:#x} due to {:s} {:#x} already being named \"{:s}\".".format(__name__, ea, key, value, utils.string.escape(interface.tuplename(*alternative), '"'), ea, 'identifier' if address == idaapi.BADADDR else 'address', target, utils.string.escape(filtered, '"')))
+
+        # Now that the user knows what's up, we can apply the new name.
+        return name(fn, *alternative)
+
     elif key == '__color__':
         return color(fn, value)
+
     elif key == '__typeinfo__':
         return type(fn, value)
 
