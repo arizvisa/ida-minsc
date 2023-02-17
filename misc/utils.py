@@ -1424,6 +1424,18 @@ class string(object):
     # Convert a string to hexadecimal so that it can be displayed.
     tohex = operator.methodcaller('encode', 'hex') if sys.version_info.major < 3 else operator.methodcaller('hex')
 
+    @classmethod
+    def indices(cls, string, characters):
+        '''Return a generator that yields each index of the given `characters` found in `string`.'''
+        iterable = (string.find(character) for character in characters)
+        current, index = 0, min([index for index in iterable if 0 <= index] or [-1])
+        while 0 <= index:
+            yield current + index
+            current, string = current + 1 + index, string[1 + index:]
+            iterable = [string.find(character) for character in characters]
+            index = min([index for index in iterable if 0 <= index] or [-1])
+        return
+
 ### wrapping functions with another caller whilst preserving the wrapped function
 class wrap(object):
     """
