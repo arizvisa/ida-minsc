@@ -7,16 +7,17 @@ function and type declarations.
 TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
+import string as _string
 
 import internal, idaapi
-import string as _string
+from internal import utils, exceptions, types
 
 ### c declaration stuff
 def function(ea):
     '''Returns the C function declaration at the address `ea`.'''
     res = idaapi.idc_get_type(ea)
     if res is None:
-        raise internal.exceptions.MissingTypeOrAttribute(u"The function {:x} does not have a declaration.".format(ea))
+        raise exceptions.MissingTypeOrAttribute(u"The function {:x} does not have a declaration.".format(ea))
     return res
 
 def arguments(ea):
@@ -36,28 +37,28 @@ def size(string):
         res = idaapi.idc_parse_decl(til, 'void*;', 0)
     else:
         semicoloned = string if string.endswith(';') else "{:s};".format(string)
-        res = idaapi.idc_parse_decl(til, internal.utils.string.to(semicoloned), 0)
+        res = idaapi.idc_parse_decl(til, utils.string.to(semicoloned), 0)
 
     if res is None:
-        raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(internal.utils.string.escape(string, '"')))
+        raise exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(utils.string.escape(string, '"')))
     _, type, _ = res
     f = idaapi.get_type_size0 if idaapi.__version__ < 6.8 else idaapi.calc_type_size
     return f(til, type)
 
-@internal.utils.string.decorate_arguments('string')
+@utils.string.decorate_arguments('string')
 def demangle(string):
     '''Given a mangled C++ `string`, demangle it back into a human-readable symbol.'''
     if idaapi.__version__ < 7.0:
-        res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames)
+        res = idaapi.demangle_name(utils.string.to(string), idaapi.cvar.inf.long_demnames)
     else:
-        res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames, idaapi.DQT_FULL)
-    return string if res is None else internal.utils.string.of(res)
+        res = idaapi.demangle_name(utils.string.to(string), idaapi.cvar.inf.long_demnames, idaapi.DQT_FULL)
+    return string if res is None else utils.string.of(res)
 
 def mangledQ(string):
     '''Return true if the provided `string` has been mangled.'''
     return any(string.startswith(item) for item in ['?', '__'])
 
-@internal.utils.string.decorate_arguments('info')
+@utils.string.decorate_arguments('info')
 def parse(info):
     '''Parse the string `info` into an ``idaapi.tinfo_t``.'''
     if idaapi.__version__ < 7.0:
