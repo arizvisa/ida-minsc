@@ -245,3 +245,256 @@ class extract:
         decl = extract.declaration(string)
         decl = decl[:decl.find('(')].rsplit(' ', 1)[0]
         return decl.split(':', 1)[0].strip() if ':' in decl else ''
+
+class nested(object):
+    """
+    This namespace contains basic utilities for processing a string
+    containing a nested set of characters. This intends to allow one
+    to either select or modify the nested string in a depth-first order.
+
+    Although the functions declared within can be consolidated into
+    a single and individual function, it is broken down into multiple
+    components for readability purposes and to allow another class
+    to inherit and modify its functionality.
+    """
+
+    @classmethod
+    def indices(cls, string, characters):
+        '''Yield each index of the matching `characters` from the given `string`.'''
+        iterable = (string.find(character) for character in characters)
+        current, index = 0, min([index for index in iterable if 0 <= index] or [-1])
+        while 0 <= index:
+            yield current + index, 1
+            current, string = current + 1 + index, string[1 + index:]
+            iterable = [string.find(character) for character in characters]
+            index = min([index for index in iterable if 0 <= index] or [-1])
+        return
+
+    @classmethod
+    def parse(cls, string, pairs):
+        '''Return a list of ranges, a tree, and a list of indices for the errors when parsing the given character `pairs` out of `string`.'''
+        open, close, openers = {pair[0] for pair in pairs}, {pair[1] for pair in pairs}, {pair[-1] : pair[0] for pair in pairs}
+        stack, errors, tree, order = [], [], {}, []
+        for index, length in cls.indices(string, [character for character in itertools.chain(*pairs)]):
+            if string[index] in open:
+                stack.append(index)
+            elif string[index] in close and stack and string[stack[-1]] == openers[string[index]]:
+                #segment = stack.pop(), index + 1
+                segment = stack.pop(), index + length
+                layer = tree.setdefault(stack[-1] if stack else None, [])
+                order.append(segment), layer.append(segment)
+            else:
+                errors.append(index)
+            continue
+        return order, tree, stack + errors
+
+    @classmethod
+    def verify(cls, tree, ordered, index=None):
+        '''Verify a `tree` of character ranges against a mutable `ordered` list of ranges.'''
+        ok = True
+        for item in tree.get(index, []):
+            start, stop = item
+            if start in tree:
+                ok = ok and cls.verify(tree, ordered, start)
+            slice = ordered.pop(0)
+            ok = ok and item == slice
+        return ok
+
+    # XXX: this is not really an augmented tree, but i needed a verb.
+    @classmethod
+    def augment(cls, tree):
+        '''Convert the given `tree` of ranges into a tree of sizes that can be used to modify the string associated with the original tree.'''
+        result = {}
+        for index, items in tree.items():
+            skip, new_items = index or 0, result.setdefault(index, [])
+            for left, right in items:
+                skip, size = left - skip, right - left
+                new_items.append((skip, left, size))
+                skip = right
+            continue
+        return result
+
+    #def modify(string, augmented, index=None):
+    #    result, pos = [], 0
+    #    for skip, key, size in augmented.get(index, []):
+    #        skipped, pos = string[pos : pos + skip], pos + skip
+
+    #        original = string[pos : pos + size]
+    #        if key in tree:
+    #            modified = modify(original, augmented, key)
+    #            replaced = modified[:]
+    #        else:
+    #            replaced = original[:]
+
+    #        _, pos = result.extend([skipped, replaced]), pos + size
+    #    result.append(string[pos:])
+    #    return ''.join(result)
+
+    @classmethod
+    def process(cls, callable, string, augmented, index=None):
+        '''Process the nested contents of `string` using the given `allable` and the sizes specified by the tree in `augmented`.'''
+        result, position = [], 0
+        for skip, key, size in augmented.get(index, []):
+            skipped, position = string[position : position + skip], position + skip
+            original = string[position : position + size]
+            modified = callable(cls.process(callable, original, augmented, key) if key in augmented else original)
+            _, position = result.extend([skipped, modified]), position + size
+        result.append(string[position:])
+        return ''.join(result)
+
+    @classmethod
+    def last(cls, string, characters):
+        '''Return the range of nested `characters` at the end of the given `string`.'''
+        reversed = string[::-1]
+        start, stop, counter = reversed.find(characters[1]), -1, 0
+        iterable = cls.indices(reversed, characters) if start >= 0 else []
+
+        # Iterate through all of our indices that were found.
+        for index, length in iterable:
+            character = reversed[index : index + length]
+            if character == characters[1]:
+                counter = counter + 1
+            elif character == characters[0] and counter > 1:
+                counter = counter - 1
+            elif character == characters[0] and counter:
+                counter, stop = 0, index + len(characters[0])
+            if not counter:
+                break
+            continue
+
+        # If the counter is not 0 or we didn't find any trailers, then we return equal
+        # values. The only thing left to do is to with the result is to invert it.
+        start, stop = (start, start) if stop <= start or counter else (start, stop)
+        corrected = (0 if index < 0 else index for index in [stop, start])
+        return tuple(len(string) - index for index in corrected)
+
+    @classmethod
+    def first(cls, string, characters):
+        '''Return the range of nested `characters` at the beginning of the given `string`.'''
+        start, stop, counter = string.find(characters[0]), -1, 0
+        iterable = cls.indices(string, characters) if start >= 0 else []
+        for index, length in iterable:
+            character = string[index : index + length]
+            if character == characters[0]:
+                counter = counter + 1
+            elif character == characters[1] and counter > 1:
+                counter = counter - 1
+            elif character == characters[1] and counter:
+                counter, stop = 0, index + len(characters[1])
+            if not counter:
+                break
+            continue
+
+        # If the counter is not 0 or we didn't find any trailers, then we return equal
+        # values. The only thing left to do is to with the result is to invert it.
+        start, stop = (start, start) if stop <= start or counter else (start, stop)
+        return tuple(0 if index < 0 else index for index in [start, stop])
+
+    @classmethod
+    def coroutine(cls, string, tokens):
+        '''Return a coroutine that yields each of the components nested by `tokens` for the given `string` while yielding the final string at the end.'''
+
+        # This closure is pretty much the "process" classmethod refactored into a
+        # coroutine so that the user does not need to create their own closure to
+        # process the nested characters within the string.
+        def closure(Fappend, string, augmented, index=None):
+            position = 0
+            for skip, key, size in augmented.get(index, []):
+                skipped, position = string[position : position + skip], position + skip
+                original = string[position : position + size]
+
+                # Make a list that we'll use to gather results from processing our
+                # string. If the key we got from iterating through "augmented" exists,
+                # then we'll need to recurse to collect any modifications from the user.
+                processed = []
+                if key in tree:
+                    coroutine = closure(processed.append, original, augmented, key)
+                    process, changed = True, next(coroutine, original)
+
+                # Otherwise we don't need to recurse or process anything, so append our
+                # original slice to our "processed" list so we can join it at the end.
+                else:
+                    processed.append(original)
+                    process, changed = False, original
+
+                # While we're "supposed" to process the original, continue forever
+                # consuming whatever was sent to us and forwarding that result directly
+                # to the coroutine to add items changed by the user to our collection.
+                try:
+                    while process:
+                        changed = coroutine.send((yield changed))
+                except StopIteration:
+                    pass
+
+                # Now we can take the items that we collected and join it into a string.
+                finally:
+                    modified = (yield ''.join(processed))
+
+                # Append the characters we skipped and the modification we were sent
+                # using the callable we were given in the first parameter.
+                [Fappend(component) for component in [skipped, modified]]
+                position = position + size
+
+            # Then we can add the rest of the string and be done with it.
+            Fappend(string[position:])
+
+        # First we need to parse our string for the ranges we'll use to process
+        # it, and then convert our tree from ranges into sizes.
+        ordered, tree, errors = cls.parse(string, tokens)
+        augmented = cls.augment(tree)
+
+        #assert(verify(tree, ordered) and len(ordered) == 0)
+        #assert(sum(string.count(token) for token in tokens) == sum(map(len, tokens)) * sum(map(len, tree.values())) + len(errors))
+
+        # Our closure uses lists, so we need to gather our results into one
+        # so that we can join it into a string at the end and yield it.
+        result = []
+        coro = closure(result.append, string, augmented)
+        try:
+            component = next(coro)
+            while True:
+                component = coro.send((yield component))
+        except StopIteration:
+            pass
+
+        # Now we should have our transformed result and just need to
+        # join it back into a string before we yield it to the caller.
+        yield ''.join(result)
+
+class token(nested):
+    """
+    This namespace contains basic utilities for processing a string
+    containing a nested set of tokens and is based on the recently
+    declared ``nested`` class. This class allows one to select or
+    modify the nested parts of a string in a depth-first order.
+    """
+
+    @classmethod
+    def indices(cls, string, tokens):
+        '''Yield each index and corresponding length for the matching `tokens` from `string`.'''
+        current, iterable = 0, ((string.find(token), len(token)) for token in tokens)
+        index, skip = min([(index, length) for index, length in iterable if 0 <= index] or [(-1, 1)])
+        while 0 <= index:
+            yield current + index, skip
+            current, string = current + skip + index, string[skip + index:]
+            iterable = ((string.find(token), len(token)) for token in tokens)
+            index, skip = min([(index, length) for index, length in iterable if 0 <= index] or [(-1, 1)])
+        return
+
+    @classmethod
+    def parse(cls, string, tokens):
+        '''Return a list of ranges, a tree, and a list of indices for the errors when parsing the given `tokens` out of `string`.'''
+        stack, tree, order, errors = [], {}, [], []
+        for index, length in cls.indices(string, tokens):
+            token = string[index : index + length]
+            if token == tokens[0]:
+                stack.append(index)
+            elif stack:
+                assert(token == tokens[1])
+                segment = stack.pop(), index + length
+                layer = tree.setdefault(stack[-1] if stack else None, [])
+                order.append(segment), layer.append(segment)
+            else:
+                errors.append((index, index + length))
+            continue
+        return order, tree, stack + errors
