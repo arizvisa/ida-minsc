@@ -507,3 +507,223 @@ class token(nested):
                 errors.append((index, index + length))
             continue
         return order, tree, sorted(itertools.chain(*([(index, index + len(token)) for index in stacks[token]] for token in open))) + errors
+
+class unmangled(object):
+    """
+    This namespace provides tools that interact with an unmangled name and
+    specifically for transforming a declaration in its unmangled form. This
+    is primarily used for stripping invalid characters from different name
+    components which might not be parsable by the disassembler.
+    """
+
+    # XXX: this declarations are definitely not accurate and need some
+    #      research done (by someone else) to their correct names.
+    _declaration_rules = {
+        "`anonymous namespace'":                            'anonymous',
+        "`base-instance'":                                  'base_instance',
+        "`class constructor`":                              'constructor',
+        "`class destructor`":                               'destructor',
+        "`construction vtable for'":                        'construction_vtable_',
+        "`copy constructor closure'":                       'copy_constructor_closure',
+        "`copy-region-'":                                   'copy_region_',
+        "`covariant return thunk to'":                      'covariant_return_',
+        "`default constructor closure'":                    'constructor_closure',
+        "`dynamic atexit destructor for '":                 'dynamic_atexit_',
+        "`dynamic initializer for '":                       'initializer_',
+        "`eh vector constructor iterator'":                 'eh::__vec_ctor',
+        "`eh vector copy constructor iterator'":            'eh::__vec_copy',
+        "`eh vector destructor iterator'":                  'eh::__vec_dtor',
+        "`eh vector vbase constructor iterator'":           'eh::__vec_ctor_vb',
+        "`eh vector vbase copy constructor iterator'":      'eh::__vec_copy_vb',
+        "`global constructor keyed to'":                    'constructor_',
+        "`global destructor keyed to'":                     'destructor_',
+        "`guard variable for'":                             'guard_variable_',
+        "`local static destructor helper'":                 'static_destructor_helper',
+        "`local static guard'":                             'static_guard',
+        "`local static thread guard'":                      'static_thread_guard',
+        "`local vftable constructor closure'":              'vftable_constructor_closure',
+        "`local vftable'":                                  'vftable',
+        "`managed vector constructor iterator'":            'managed::__vec_ctor',
+        "`managed vector copy constructor iterator'":       'managed::__vec_copy',
+        "`managed vector destructor iterator'":             'managed::__vec_dtor',
+        "`non-virtual thunk to'":                           'static_thunk_',
+        "`omni callsig'":                                   'omni_callsig',
+        "`placement delete[] closure'":                     'placement_delete_array_closure',
+        "`placement delete closure'":                       'placement_delete_closure',
+        "`scalar deleting destructor'":                     'scalar_deleting_destructor',
+        "`static-initialization-fun'":                      'static_initialization',
+        "`static-termination-fun'":                         'static_termination',
+        "`string literal'":                                 'string',
+        "`string'":                                         'string',
+        "`template-parameter'":                             'template_parameter',
+        "`template static data member constructor helper'": 'static_template_helper_constructor',
+        "`template static data member destructor helper'":  'static_template_helper_destructor',
+        "`temp-'":                                          'temp_',
+        "`typeinfo for'":                                   'typeinfo_',
+        "`typeinfo name for'":                              'typename_',
+        "`typeof'":                                         'typeof',
+        "`udt returning'":                                  'udt_returning',
+        "`vbase destructor'":                               'vbase_destructor',
+        "`vbtable'":                                        'vbtable',
+        "`vcall'":                                          'vcall',
+        "`vector constructor iterator'":                    '__vec_ctor',
+        "`vector copy constructor iterator'":               '__vec_copy',
+        "`vector deleting destructor'":                     '__vec_dtor',
+        "`vector destructor iterator'":                     '__vec_dtor',
+        "`vector vbase constructor iterator'":              '__vec_ctor_vb',
+        "`vector vbase copy constructor iterator'":         '__vec_copy_vb',
+        "`vftable'":                                        'vftable',
+        "`virtual-base-instance'":                          'vbaseinstance',
+        "`virtual-base-ptr'":                               'vbaseptr',
+        "`virtual displacement map'":                       'vdispmap',
+        "`virtual-fn-table-ptr-table'":                     'vfunctable_ptrt',
+        "`virtual-fn-table-ptr'":                           'vfunctable_ptr',
+        "`virtual thunk to'":                               'thunk_',
+        "`vtable for'":                                     'vtable_',
+        "`vtbl'":                                           'vtable',
+        "`VTT for'":                                        'vtt_',
+
+        # runtime-type information
+        #"`RTTI ":                               'rtti_',
+        "`RTTI Base Class Descriptor at ":      'rtti_base_descriptor_',
+        "`RTTI Base Class Array'":              'rtti_base_array_',
+        "`RTTI Class Hierarchy Descriptor'":    'rtti_descriptor',
+        "`RTTI Complete Object Locator'":       'rtti_locator',
+
+        # unknown
+        "`__vdthk__'": '__vdthk__',
+
+        # XXX: pragmas i guess?
+        #"`adjustor{": '',
+        #"`vtordisp{": '',
+    }
+
+    # pre-calculate the prefixes and suffixes that we'll use to trim and match each component
+    _declaration_prefix_suffix = {item[:1] : item[-1:] for item in _declaration_rules}
+
+    # random keywords that aren't worth anything other than unnecessary whitespace (really).
+    _declaration_keywords = {'enum ', 'struct ', 'union ', 'class ', 'const ', 'volatile '}
+
+    # operators
+    _declaration_operators = {
+        'operator new':         'new',
+        'operator delete':      'delete',
+        'operator new[]':       'new_array',
+        'operator delete[]':    'delete_array',
+
+        'operator=':            'assign',
+        'operator[]':           'subscript',
+        'operator->':           'pointer',
+        'operator->*':          'pointer_member',
+        'operator,':            'comma',
+        'operator()':           'call',
+
+        'operator++':           'increment',
+        'operator--':           'decrement',
+        'operator+':            'add',
+        'operator-':            'subtract',
+        'operator*':            'multiply',
+        'operator/':            'divide',
+        'operator%':            'remainder',
+        'operator<<':           'shiftleft',
+        'operator>>':           'shiftright',
+
+        'operator!':            'not',
+        'operator==':           'equal',
+        'operator!=':           'notequal',
+        'operator<':            'less',
+        'operator<=':           'lessequal',
+        'operator>':            'greater',
+        'operator>=':           'greaterequal',
+        'operator<=>':          'spaceship',
+
+        'operator&&':           'and',
+        'operator||':           'or',
+
+        'operator~':            'bnot',
+        'operator&':            'band',
+        'operator|':            'bor',
+        'operator^':            'bxor',
+
+        'operator+=':           'add_assign',
+        'operator-=':           'subtract_assign',
+        'operator*=':           'multiply_assign',
+        'operator/=':           'divide_assign',
+        'operator%=':           'remainer_assign',
+        'operator<<=':          'shiftleft_assign',
+        'operator>>=':          'shiftright_assign',
+
+        'operator&=':           'band_assign',
+        'operator|=':           'bor_assign',
+        'operator^=':           'bxor_assign',
+    }
+
+    # scopes
+    _declaration_scopes = { 'private: ', 'protected: ', 'public: ' , '[thunk]: '}
+
+    @classmethod
+    def keyword(cls, string):
+        '''Return the given `string` with any known keywords or qualifiers removed.'''
+        iterable = (keyword for keyword in cls._declaration_keywords if keyword in string)
+        return functools.reduce(lambda string, keyword: string.replace(keyword, ''), iterable, string).strip()
+
+    @classmethod
+    def name(cls, string):
+        '''Return a parsable variation of `string` if it is a known function or type.'''
+        if string[:1] not in cls._declaration_prefix_suffix:
+            return string
+
+        # we slice up the string like this so that we can do lookups in O(1).
+        suffix = cls._declaration_prefix_suffix[string[:1]]
+        stop = 1 + string[1:].find(suffix)
+        key = string[:stop + 1]
+        return cls._declaration_rules.get(key, key) + string[stop + 1:] if stop > 0 else string
+
+    @classmethod
+    def operator(cls, string):
+        '''Return a parsable variation of `string` if it is a known operator`.'''
+        return cls._declaration_operators.get(string, string)
+
+    @classmethod
+    def scope(cls, string):
+        '''Return the given `string` without its scope if one was found at its beginning.'''
+        index = string.find(': ')
+        start = index + 2
+        return string if index < 0 else string[start:] if string[:start] in cls._declaration_scopes else string
+
+    @classmethod
+    def variable(cls, string):
+        '''Return the name and type specifier of the variable declaration in `string`.'''
+        Fvalidate = idaapi.validate_name2 if idaapi.__version__ < 7.0 else utils.frpartial(idaapi.validate_name, idaapi.SN_IDBENC)
+
+        # Use validate_name (in a very inefficient way) until we encounter an index to stop at.
+        name, reversed = utils.string.to('_'), utils.string.to(string[::-1])
+        for index, _ in enumerate(reversed):
+            name += reversed[index : index + 1]
+            if Fvalidate(name) != name:
+                break
+            continue
+
+        # If we completed processing the entire string, then the string is not a declaration
+        # with a name and type. So, we just assume that was the name..and return it typeless.
+        else:
+            return string, ''
+
+        # Now we can slice our variable name out, and use its length to slice out the type.
+        variable_name = string[-len(reversed[:index]):] if index > 1 else ''
+        return variable_name, string[:-len(variable_name)] if len(variable_name) else string
+
+    @classmethod
+    def parameters(cls, string):
+        '''Parse a comma-separated `string` containing function parameters or template specifiers and return them as a list.'''
+        _, tree, _ = token.parse(string, '()', '<>', ',')
+        indices = [start for start, stop in tree.get(None, []) if stop - start == 1][::-1]
+
+        # Gather all of the ranges for each parameter inside the "," characters.
+        result, left, right = [], 1 if string[:1] in '()<>' else 0, len(string)
+        for index in indices[::-1]:
+            _, left = result.append((left, index)), index + 1
+        result.append((left, len(string)))
+
+        # Use the results to return a list of strings containing each parameter.
+        return [string[left : right] for left, right in result]
