@@ -5567,7 +5567,7 @@ class types(object):
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
     __matcher__.combinator('definition', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(2), "{!s}".format)
-    __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), operator.methodcaller('is_typeref')), __matcher__.alias('typedef', 'typeref')
+    __matcher__.mapping('typeref', operator.truth, operator.itemgetter(2), utils.fmap(operator.methodcaller('is_typeref'), operator.methodcaller('present')), all), __matcher__.alias('typedef', 'typeref')
     __matcher__.mapping('defined', operator.truth, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
     __matcher__.mapping('undefined', operator.not_, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
 
@@ -6388,6 +6388,49 @@ class types(object):
         if not ti.create_array(ai):
             raise E.DisassemblerError(u"{:s}.array(\"{:s}\", {:d}, {:d}) : Unable to create an array using the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(element), '"'), length, base, "{!s}".format(element)))
         return ti
+
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def typedef(cls, info):
+        '''Return the name and type of the typedef given by `info`.'''
+        if not info.has_details():
+            raise E.MissingTypeOrAttribute(u"{:s}.typedef(\"{:s}\") : The provided type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        if not info.is_typeref():
+            raise E.InvalidTypeOrValueError(u"{:s}.typedef(\"{:s}\") : The provided type information ({!r}) is not a type definition.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        library = interface.tinfo.library(info)
+        name, ordinal = info.get_type_name(), interface.tinfo.ordinal(info, library)
+        return name, cls.get(ordinal, library) if ordinal else None
+    @utils.multicase(ordinal=internal.types.integer)
+    @classmethod
+    def typedef(cls, ordinal):
+        '''Create a reference to a type with the specified `ordinal` from the current type library and return it.'''
+        res = interface.tinfo.reference(ordinal, interface.tinfo.library())
+        if not res:
+            raise E.MissingTypeOrAttribute(u"{:s}.typedef({:d}) : The specified ordinal ({:d}) does not exist in the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        return res
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    def typedef(cls, name, **missing):
+        """Create a reference to a type that is using the specified `name`.
+
+        If `missing` is specified as true, then the name is not required to exist within the current type library.
+        """
+        res = interface.tinfo.reference(name) if missing.get('missing', False) else interface.tinfo.reference(name, interface.tinfo.library())
+        if not res:
+            raise E.MissingTypeOrAttribute(u"{:s}.typedef({!r}{:s}) : A type with the name \"{:s}\" does not exist in the current type library.".format('.'.join([__name__, cls.__name__]), name, u", {:s}".format(utils.string.kwargs(missing)) if missing else '', utils.string.escape(name, '"')))
+        return res
+    @utils.multicase(name=(internal.types.string, internal.types.integer), library=idaapi.til_t)
+    @classmethod
+    def typedef(cls, name, library):
+        '''Create a reference to a type with the given type `name` from the specified type `library`.'''
+        ordinal = cls.ordinal(name, library) if isinstance(name, internal.types.string) else name
+        res = interface.tinfo.reference(ordinal, library)
+        if not res:
+            raise E.MissingTypeOrAttribute(u"{:s}.typedef({!r}, {:s}) : A type with the {:s} does not exist in the specified type library.".format('.'.join([__name__, cls.__name__]), "{:d}".format(name) if isinstance(name, internal.types.integer) else name, cls.__formatter__(library), "given ordinal ({:d})".format(name) if isinstance(name, internal.types.integer) else "name \"{:s}\"".format(name, utils.string.escape(name, '"'))))
+        return ti
+    typeref = utils.alias(typedef, 'types')
 
 class xref(object):
     """
