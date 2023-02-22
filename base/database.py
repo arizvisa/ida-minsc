@@ -4989,6 +4989,7 @@ class types(object):
 
         `L` - The type originated from a type library
         `I` - The type originated from an inherited type library
+        `+` - The type comes from the local type library
         `T` - The type is a type definition and references another type
         `P` - The contents of the type is a pointer
         `F` - The contents of the type is a floating-point value (float, double, long double)
@@ -5102,7 +5103,7 @@ class types(object):
 
             # try and create a new type from the serialized information. if we
             # fail at this, then this is a critical error.
-            ti = cls.get(serialized, library)
+            ti = cls.get(ordinal, library)
             if ti is None:
                 logging.fatal(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to an error during deserialization.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
                 continue
@@ -5143,7 +5144,12 @@ class types(object):
         iterable = cls.__iterate__(library)
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
-        for item in iterable: yield item
+        for ordinal, name, tinfo in iterable:
+            res, td = idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
+            if not res.create_typedef(td):
+                logging.warning(u"{:s}.iterate({:s}{:s}) : Unable to create a type that references the ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
+            yield ordinal, name, res
+        return
 
     @utils.multicase(string=six.string_types)
     @classmethod
@@ -5210,17 +5216,23 @@ class types(object):
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex')
     def list(cls, library, **type):
         '''List all of the types in the specified type `library` that match the keyword specified by `type`.'''
-        ti = idaapi.tinfo_t()
+        iterable = cls.__iterate__(library)
+        for key, value in (type or {'predicate': utils.fconstant(True)}).items():
+            iterable = cls.__matcher__.match(key, value, iterable)
 
         # Set some reasonable defaults for the list of types
         maxordinal = maxname = maxsize = 0
 
         # Perform the first pass through our listable grabbing all the lengths.
         listable = []
-        for ordinal, name, ti in cls.iterate(library, **type):
+        for ordinal, name, ti in iterable:
             maxordinal = max(ordinal, maxordinal)
             maxname = max(len(name or ''), maxname)
             maxsize = max(ti.get_size(), maxsize)
+
+            #res, td = idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
+            #if not res.create_typedef(td):
+            #    logging.warning(u"{:s}.list({:s}{:s}) : Unable to create a type that references the ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
             listable.append((ordinal, name, ti))
 
         # We just need to calculate the number of digits for the largest and size.
@@ -5231,7 +5243,7 @@ class types(object):
         items = [
             ('T', 'is_typeref'),
         ]
-        rlookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(ti, name)]
+        rlookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(idaapi.tinfo_t, name)]
 
         items = [
             ('P', 'is_ptr'),
@@ -5239,7 +5251,7 @@ class types(object):
             ('E', 'is_enum'),
             ('I', 'is_integral'),
         ]
-        ilookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(ti, name)]
+        ilookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(idaapi.tinfo_t, name)]
 
         items = [
             ('A', 'is_array'),
@@ -5249,13 +5261,13 @@ class types(object):
             ('S', 'is_struct'),
             ('U', 'is_union'),
         ]
-        glookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(ti, name)]
+        glookup = [(q, operator.methodcaller(name)) for q, name in items if hasattr(idaapi.tinfo_t, name)]
 
         # Now we can list each type information located within the type library.
         for ordinal, name, ti in listable:
 
             # Apparently we can't use builtins.next because python is garbage.
-            flibrary = '?' if not ti.present() else '-' if not ti.get_til() else 'I' if ti.is_from_subtil() else 'L'
+            flibrary = '?' if not ti.present() else 'I' if ti.is_from_subtil() else 'L' if not internal.netnode.has(name) else '+' if ti.get_til() else '-'
             items = [q for q, F in rlookup if F(ti)]
             frtype = items[0] if items else '-'
             items = [q for q, F in ilookup if F(ti)]
@@ -5345,10 +5357,13 @@ class types(object):
     @classmethod
     def by_index(cls, ordinal, library):
         '''Return the type information from the specified `library` that is at the given `ordinal`.'''
-        serialized = idaapi.get_numbered_type(library, ordinal)
-        if serialized:
-            return cls.get(serialized, library)
-        raise E.ItemNotFoundError(u"{:s}.by_index({:d}, {:s}) : No type information was found in the type library for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+        if not (0 < ordinal < idaapi.get_ordinal_qty(library)):
+            raise E.ItemNotFoundError(u"{:s}.by_index({:d}, {:s}) : No type information was found in the type library for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+
+        ti, td = idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
+        if not ti.create_typedef(td):
+            raise E.DisassemblerError(u"{:s}.get({:d}, {:s}) : Unable to create a type that references the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+        return ti
 
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
@@ -5375,7 +5390,8 @@ class types(object):
         res = idaapi.get_numbered_type_name(library, ordinal)
         if res is None:
             raise E.ItemNotFoundError(u"{:s}.name({:d}, {:s}) : Unable to return the name of specified ordinal ({:d}) from the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
-        # FIXME: which one do we get? the mangled or unmangled name?
+
+        # FIXME: which one do we return? the mangled or unmangled name?
         return utils.string.of(res)
     @utils.multicase(ordinal=six.integer_types, string=six.string_types)
     @classmethod
