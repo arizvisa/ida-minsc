@@ -5952,8 +5952,7 @@ class types(object):
         '''Get the type information at the given `ordinal` of the specified type `library` and return it.'''
         if 0 < ordinal < idaapi.get_ordinal_qty(library):
             serialized = idaapi.get_numbered_type(library, ordinal)
-            if serialized is not None:
-                return cls.get(serialized, library)
+            return interface.tinfo.get(library, *serialized)
         raise E.ItemNotFoundError(u"{:s}.get({:d}, {:s}) : No type information was found for the specified ordinal ({:d}) in the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
@@ -5979,30 +5978,21 @@ class types(object):
     @classmethod
     def get(cls, serialized, library):
         '''Convert the `serialized` type information from the specified type `library` and return it.'''
-        type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
-
-        # ugh..because ida can return a non-bytes as one of the comments, we
-        # need to convert it so that the api will fucking understand us.
-        res = cmt or fieldcmts or b''
-        comments = res if isinstance(res, internal.types.bytes) else res.encode('latin1')
+        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
+        sclass = serialized[4] if len(serialized) == 5 else getattr(idaapi, 'sc_unk', 0)
 
         # we need to generate a description so that we can format error messages the user will understand.
-        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
         names = ['type', 'fields', 'cmt', 'fieldcmts']
-
         items = itertools.chain(["{:s}={!r}".format(name, item) for name, item in zip(names, serialized) if item], ["{:s}={!s}".format('sclass', sclass)] if len(serialized) == 5 else [])
         description = [item for item in items]
 
-        # try and deserialize the type information. if we succeeded then we
-        # can actually return the damned thing.
-        ti = idaapi.tinfo_t()
-        if ti.deserialize(library, type, fields, comments):
-            return ti
-
+        # try to deserialize the type so that we can return it to the caller.
         # if we were unable to do that, then we need to log a critical error
         # that's somewhat useful before returning None back to the user.
-        logging.fatal(u"{:s}.get({:s}{:s}) : Unable to deserialize the type information for a type using the returned storage class {:s}.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(', '.join(description)) if description else '', "{:s}({:d})".format(errors[sclass], sclass) if sclass in errors else "({:d})".format(sclass)))
-        return
+        result = interface.tinfo.get(library, *serialized)
+        if not result:
+            logging.fatal(u"{:s}.get({:s}{:s}) : Unable to deserialize the information for a type using the serialized storage class {:s}.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(', '.join(description)) if description else '', "{:s}({:d})".format(errors[sclass], sclass) if sclass in errors else "({:d})".format(sclass)))
+        return result
 
     @utils.multicase(ordinal=internal.types.integer, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
