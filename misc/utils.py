@@ -16,7 +16,7 @@ import sys, codecs, heapq, collections, array, math
 import internal
 import idaapi, ida, ctypes
 
-__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget', 'nth', 'islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
+__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fthrow','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget', 'nth', 'islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
 
 ### functional programming combinators (FIXME: probably better to document these with examples)
 
@@ -78,12 +78,38 @@ fcurry = lambda *a, **k: lambda F, *ap, **kp: F(*(a + ap), **{ key : value for k
 frpartial = lambda F, *a, **k: lambda *ap, **kp: F(*(ap + builtins.tuple(builtins.reversed(a))), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that applies the arglist to function `F` in reverse.
 freverse = lambda F, *a, **k: lambda *ap, **kp: F(*builtins.reversed(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
-# return a closure that executes function `F` and includes the caught exception (or None) as the first element in the boxed result.
-def fcatch(F, *a, **k):
-    def fcatch(*a, **k):
-        try: return None, F(*a, **k)
-        except: return sys.exc_info()[1], None
-    return functools.partial(fcatch, *a, **k)
+# return a closure that raises exception `E` with the given arguments.
+def fthrow(E, *a, **k):
+    '''Return a closure that raises the exception `E` using the given arguments `a` and keywords `k`.'''
+    def fraise(*ap, **kp):
+        '''Raise the captured exception using the arguments `ap` and keywords `kp`.'''
+        raise E(*(a + ap), **{key : value for key, value in itertools.chain(k.items(), kp.items())})
+    return fraise
+# return a closure that maps the given exceptions to a list of handlers which returns a closure that calls `F` with some arguments.
+def fcatch(*exceptions, **map_exceptions):
+    """Return a closure that calls the function `F` using the arguments `a` and keywords `k` capturing any exceptions that it raises.
+
+    Usage:      fcatch(exceptions..., handler=exception)(traps..., handler=lambda *args, **keywords: result)(callable, ...)(*args, **keywords)
+    Example:    fcatch(ValueError,    IDX=IndexError)   ('ValueError', IDX=lambda x1, x2: ('idx', x1, x2))  (callable, []) (x1, x2)
+    """
+    Fpartial, Fchain = functools.partial, itertools.chain
+    def Fcallable(processors, F, *a, **k):
+        '''Return a closure that calls the function `F` with the arguments `a` and keywords `k` while transforming any caught exceptions using `processors`.'''
+        def handler(*ap, **kp):
+            '''Executes the captured function with the arguments `ap` and keywords `kp` trapping any of the captured exceptions and transforming them to the captured handlers.'''
+            try:
+                return F(*Fchain(a, ap), **{key : value for key, value in Fchain(k.items(), kp.items())})
+            except BaseException as E:
+                cls, result, tb = sys.exc_info()
+                processor = processors[cls] if cls in processors else processors[None] if None in processors else result
+            return processor(*ap, **{key : value for key, value in kp.items()}) if callable(processor) else processor
+        return handler
+    def Fhandlers(*handlers, **map_handlers):
+        '''Return a closure that will call a function trapping any captured exceptions with the given `handlers` and any matching exceptions with `map_handlers`.'''
+        matches = {key for key in map_exceptions} & {key for key in map_handlers}
+        processors = {exception : handler for exception, handler in Fchain(zip(exceptions, handlers + len(exceptions) * (None,)), [(map_exceptions[key], map_handlers[key]) for key in matches])}
+        return Fpartial(Fcallable, processors)
+    return Fhandlers
 # boolean inversion of the result of a function
 fcomplement = fnot = frpartial(fcompose, operator.not_)
 # converts a list to an iterator, or an iterator to a list
