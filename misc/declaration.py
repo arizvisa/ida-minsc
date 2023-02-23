@@ -193,12 +193,6 @@ def unmangle_arguments(ea, info):
 #"?_Atexit@@YAXP6AXXZ@Z"
 #"?__ArrayUnwind@@YGXPAXIHP6EX0@Z@Z"
 
-# FIXME: this code is so hacky, that i need unit-tests for it...which should be properly fixed.
-#        1] If I write a parser, I can easily split out these components. (proper fix)
-#        2] If I use IDA's metadata to figure out each type, I can use those strings to cull them out of the declaration. (hackish)
-#        3] I could use completely unmaintainable nfa-based pattern matching. (regexes whee)
-#        4] I could continue to use string operations to cut parts out...except that they're unable to solve this problem
-#           due to the need to keep a recursive state somewhere in order to associate types with. (current)
 class extract:
     @staticmethod
     def declaration(string):
@@ -727,3 +721,104 @@ class unmangled(object):
 
         # Use the results to return a list of strings containing each parameter.
         return [string[left : right] for left, right in result]
+
+    __parsable_valid = {character for character in itertools.chain(_string.ascii_letters, _string.digits, u'_$:')}
+    @classmethod
+    def parsable(cls, string):
+        '''Transform the given `string` to the required characters for it to be parseable without complaints.'''
+        string = cls.scope(string)
+
+        # first check if there's any unmangled characters within our symbol. if there aren't any, then
+        # we explicitly check for any constructors/destructors and replace it if it matches the typename.
+        if not any(string.count(character) for character in "<>`'() "):
+            destructor = string.split('::~')
+            string = '::'.join([destructor[0], 'destructor']) if len(destructor) == 2 and destructor[0].endswith(destructor[1]) else string
+            constructor = string.split('::')
+            components = constructor[:-1] + ['constructor'] if len(constructor) > 1 and constructor[-2].endswith(constructor[-1]) else constructor
+
+            # check individual components for valid symbols before joining them back together.
+            iterable = (''.join(ch if ch in cls.__parsable_valid else '_' for ch in item) for item in components)
+            return internal.utils.string.of('::'.join(iterable))
+
+        # remove all stupid keywords and then parse our string to figure out where a templates might be at.
+        string = cls.keyword(string)
+        order, tree, _ = nested.parse(string, '<>')
+        _, stop = order[-1] if order else (0, len(string.strip()[:-1]))
+
+        # if there's a closing-parenthesis within the last slice, then we need to strip out some parameters.
+        # FIXME: it is because of this that function names might not be unique. it'll probably be better to
+        #        encode these parameters with single-character codes rather than stripping them.
+        if ')' in string[stop:]:
+            open, close = nested.last(string, '()')
+            string = string[:open] + string[close:] if open < close else string
+
+        # now we can use strip_templates to strip out any and all templates depth-first.
+        stripper = cls.__strip_templates(string)
+        string = nested.process(stripper.send, next(stripper), nested.augment(tree))
+
+        # if there's any other parentheses in the string, then they're unbalanced and need filtering.
+        anti_parenthesis = {character : '_' for character in '()'}
+        if any(character in string for character in anti_parenthesis):
+            string = ''.join(itertools.starmap(anti_parenthesis.get, zip(string, string)))
+
+        # then we fix up each individual component and extract the type to remove it.
+        string = '::'.join(cls.operator(cls.name(item)) for item in string.split('::'))
+        string, type = cls.variable(string.replace(',', '_')) if ' ' in string else (string, '')
+
+        # that should be it and all we need to do is replace all spaces with underscores.
+        assert(not any(string.count(character) for character in "<>`'()")), string
+        return cls.parsable('_'.join(string.split(' ')))
+
+    @classmethod
+    def __strip_function_type(cls, string):
+        '''Internal function that strips all unparsable characters from a function pointer type definition.'''
+        if any(character in string for character in '()'):
+            left, right = nested.last(string, '()')
+            type_and_pointer, parameters, qualifier = string[:left], string[left : right], string[right:]
+            assert(parameters), parameters
+
+            # go through all of the parameters separated by a ',' to strip out qualifiers and types.
+            parameters = [item.replace(' ', '').replace(' *', '_ptr') for item in unmangled.parameters(parameters[+1 : -1])]
+
+            # split up the type and pointer by deleting the pointer and removing spaces.
+            left, right = nested.last(type_and_pointer, '()')
+            type = type_and_pointer[:left] if left <= right else type_and_pointer
+            type = type.replace(' ', '').replace('*', '_ptr')
+
+            # FIXME: rather than replacing parameters like we are, it would be a significant
+            #        improvement to encode them somehow so that we can preserve their value.
+
+            # join all this crap back together again and cull out all the spaces.
+            return '$'.join(["funcptr{:d}${:s}".format(1 + len(parameters), type)] + parameters)
+        return string
+
+    @classmethod
+    def __strip_templates(cls, string):
+        '''Internal coroutine that will strip out the different parts of a template definition.'''
+        string = string
+        while True:
+            string = (yield string)
+            if not string:
+                continue
+
+            # if we received an empty string, then there's nothing to do.
+            if not string:
+                continue
+
+            # first we'll trim out the '<>' from the entire component
+            assert(string[0], string[-1]) == ('<', '>'), string
+            trimmed = string[+1 : -1]
+
+            # go through all parts separated by a "," to strip out any qualifiers,
+            # replace all pointers, method-names, and operators with parsable variations.
+            iterable = (item.strip() for item in cls.parameters(trimmed))
+            iterable = (item.replace(' *', '_ptr') for item in iterable)
+            iterable = (cls.__strip_function_type(item) for item in iterable)
+            iterable = (cls.operator(cls.name(item)) for item in iterable)
+
+            # FIXME: rather than stripping parameters...a better idea would be to encode
+            #        them so that way we can preserve their uniqueness.
+
+            # now we join everything back together, replacing the "<>" with "$$".
+            string = '$$' + '$'.join(iterable) + '$$'
+        return
