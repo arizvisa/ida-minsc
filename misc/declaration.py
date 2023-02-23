@@ -7,7 +7,7 @@ function and type declarations.
 TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
-import string as _string
+import functools, operator, itertools, string as _string
 
 import internal, idaapi
 from internal import utils, exceptions, types
@@ -482,19 +482,28 @@ class token(nested):
         return
 
     @classmethod
-    def parse(cls, string, tokens):
+    def parse(cls, string, *tokens):
         '''Return a list of ranges, a tree, and a list of indices for the errors when parsing the given `tokens` out of `string`.'''
-        stack, tree, order, errors = [], {}, [], []
-        for index, length in cls.indices(string, tokens):
+        groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(tokens, len)}
+        stacks = {token : list for token, list in itertools.chain(*((lambda pair, listref: [(pair[0], listref), (pair[-1], listref)])(pair, []) for pair in filter(None, tokens)))}
+        layer, [capture], (open, close) = (groups.pop(length, length * [()]) for length in range(3))
+        assert(not groups), groups
+
+        # Now we traverse the string while keeping count of each pair of tokens.
+        tree, order, errors = {None : layer}, [], []
+        for index, length in cls.indices(string, stacks):
             token = string[index : index + length]
-            if token == tokens[0]:
-                stack.append(index)
-            elif stack:
-                assert(token == tokens[1])
+            if token in open:
+                stacks[token].append(index)
+            elif token in close and stacks[token]:
+                stack = stacks[token]
                 segment = left, right = stack.pop(), index + length
                 layer = tree.setdefault(stack[-1] if stack else None, [])
+                order.append(segment), layer.append(segment)
+            elif token in capture:
+                segment = index, index + length
                 order.append(segment), layer.append(segment), tree.setdefault(left, [])
             else:
                 errors.append((index, index + length))
             continue
-        return order, tree, stack + errors
+        return order, tree, sorted(itertools.chain(*([(index, index + len(token)) for index in stacks[token]] for token in open))) + errors
