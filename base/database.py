@@ -504,6 +504,9 @@ class functions(object):
         `name` - Filter the functions by a name or a list of names
         `like` - Filter the function names according to a glob
         `regex` - Filter the function names according to a regular-expression
+        `mangled` - Filter the mangled function names according to a glob
+        `decorated` - Match the functions using C++ name decorations
+        `arguments` or `args` - Filter the functions by the argument count or a list of counts
         `typed` - Filter the functions for any that have type information applied to them
         `decompiled` - Filter the functions for any that have been decompiled
         `frame` - Filter the functions for any that contain a frame
@@ -529,6 +532,10 @@ class functions(object):
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
     __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
     __matcher__.alias('ea', 'address')
+    __matcher__.combinator('mangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else utils.fpartial(utils.fcompose, utils.fmap(utils.fidentity, internal.declaration.demangle), utils.funpack(operator.ne)))), idaapi.get_true_name if idaapi.__version__ < 6.8 else idaapi.get_ea_name, utils.string.of)
+    __matcher__.alias('decorated', 'mangled')
+    __matcher__.combinator('arguments', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), function.type, operator.methodcaller('get_nargs'))
+    __matcher__.alias('args', 'arguments')
     __matcher__.mapping('typed', operator.truth, function.top, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.mapping('decompiled', operator.truth, function.type.decompiled)
     __matcher__.mapping('frame', operator.truth, function.type.frame)
@@ -618,10 +625,10 @@ class functions(object):
 
         # Some utility functions for grabbing counts of function attributes
         Fcount_lvars = utils.fcompose(function.frame.lvars, utils.count)
-        Fcount_avars = utils.fcompose(function.frame.args.iterate, utils.count)
+        Fcount_avars = utils.fcompose(function.type, operator.methodcaller('get_nargs')) if hasattr(idaapi.tinfo_t, 'get_nargs') else utils.fcompose(function.frame.args.iterate, utils.count)
 
         # Set some reasonable defaults here
-        maxentry = config.bounds()[0]
+        maxentry = top()
         maxaddr = minaddr = maxchunks = 0
         maxname = maxunmangled = chunks = marks = blocks = exits = 0
         lvars = avars = refs = 0
