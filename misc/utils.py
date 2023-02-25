@@ -54,9 +54,11 @@ fdefault = lambda default: lambda object: object or default
 fcompose = lambda *Fa: functools.reduce(lambda F1, F2: lambda *a: F1(F2(*a)), builtins.reversed(Fa))
 # return a closure that executes function `F` whilst discarding any arguments passed to it.
 fdiscard = lambda F, *a, **k: lambda *ap, **kp: F(*a, **k)
-# return a closure that executes function `crit` and then returns/executes `f` or `t` based on whether or not it's successful.
-fcondition = lambda crit: lambda t, f: \
-    lambda *a, **k: (t(*a, **k) if builtins.callable(t) else t) if crit(*a, **k) else (f(*a, **k) if builtins.callable(f) else f)
+# return a closure using the functions in `critiques` with its parameters to return the result of the matching `truths` if any are successful or the last `truths` if not.
+fcondition = lambda *critiques: lambda *truths: \
+    (lambda false, critiques_and_truths=[pair for pair in zip(critiques, ((t if builtins.callable(t) else fconstant(t)) for t in truths))]: \
+        lambda *a, **k: next((true for crit, true in critiques_and_truths if crit(*a, **k)), false if builtins.callable(false) else fconstant(false))(*a, **k) \
+    )(false=truths[len(critiques)])
 # return a closure that takes a list of functions to execute with the provided arguments
 fmap = lambda *Fa: lambda *a, **k: builtins.tuple(F(*a, **k) for F in Fa)
 #lazy = lambda F, state={}: lambda *a, **k: state[(F, a, builtins.tuple(builtins.sorted(k.items())))] if (F, a, builtins.tuple(builtins.sorted(k.items()))) in state else state.setdefault((F, a, builtins.tuple(builtins.sorted(k.items()))), F(*a, **k))
