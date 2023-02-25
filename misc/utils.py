@@ -37,7 +37,7 @@ fgetitem = fitem = lambda item, *default: lambda object: default[0] if default a
 # return a closure that will set a particular element on an object.
 fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, item, value) or object
 # return a closure that will remove a particular element from an object and return the modified object
-fdelitem = lambda *items: fcompose(fmap(fidentity, *[fcondition(fhasitem(item))(frpartial(operator.delitem, item), None) for item in items]), builtins.iter, builtins.next)
+fdelitem = lambda *items: fcompose(fthrough(fidentity, *[fcondition(fhasitem(item))(frpartial(operator.delitem, item), None) for item in items]), builtins.iter, builtins.next)
 # return a closure that will check if its argument has an `attribute`.
 fhasattr = fattributeQ = lambda attribute: frpartial(builtins.hasattr, attribute)
 # return a closure that will get a particular attribute from an object.
@@ -60,7 +60,7 @@ fcondition = lambda *critiques: lambda *truths: \
         lambda *a, **k: next((true for crit, true in critiques_and_truths if crit(*a, **k)), false if builtins.callable(false) else fconstant(false))(*a, **k) \
     )(false=truths[len(critiques)])
 # return a closure that takes a list of functions to execute with the provided arguments
-fmap = lambda *Fa: lambda *a, **k: builtins.tuple(F(*a, **k) for F in Fa)
+fthrough = fmap = lambda *Fa: lambda *a, **k: builtins.tuple(F(*a, **k) for F in Fa)
 #lazy = lambda F, state={}: lambda *a, **k: state[(F, a, builtins.tuple(builtins.sorted(k.items())))] if (F, a, builtins.tuple(builtins.sorted(k.items()))) in state else state.setdefault((F, a, builtins.tuple(builtins.sorted(k.items()))), F(*a, **k))
 #lazy = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a memoized closure that's lazy and only executes when evaluated
@@ -75,7 +75,7 @@ fpartial = functools.partial
 # return a closure that applies the provided arguments to the function `F`.
 fapply = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that will use the specified arguments to call the provided function.
-fcurry = lambda *a, **k: lambda F, *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
+fapplyto = fcurry = lambda *a, **k: lambda F, *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that applies the initial arglist to the end of function `F`.
 frpartial = lambda F, *a, **k: lambda *ap, **kp: F(*(ap + builtins.tuple(builtins.reversed(a))), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that applies the arglist to function `F` in reverse.
