@@ -3238,6 +3238,222 @@ class tinfo(object):
             pass
         return
 
+    @classmethod
+    def library(cls, type=None):
+        '''Return the type library belonging to the specified type or the default type library for the database.'''
+        til = None if type is None else type.get_til() if hasattr(type, 'get_til') else None
+        try:
+            library = til if til is not None else idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
+            assert(library)
+        except (RuntimeError, AssertionError):
+            library = idaapi.til_t()
+        return library
+
+    @classmethod
+    def size(cls, type, *variable):
+        '''Return the size of the specified `type` as an integer or a pythonic atom if `variable` is true.'''
+        realtype, size, [use_atom] = type.get_realtype(), type.get_size(), variable if variable else [False]
+        if not use_atom:
+            return 0 if size in {0, idaapi.BADSIZE} else size
+        elif realtype in {idaapi.BT_VOID}:
+            return 0
+        elif type.is_array() and not type.get_array_nelems():
+            return Ellipsis
+        return None if size in {idaapi.BADSIZE} else size
+
+    @classmethod
+    def copy(cls, type, *library):
+        '''Return a copy of the given `type` from the specified type library.'''
+        if isinstance(type, idaapi.tinfo_t) and hasattr(type, 'copy'):
+            return type.copy()
+
+        # First try and determine the type library that is needed for deserialization.
+        elif isinstance(type, idaapi.tinfo_t):
+            ti = idaapi.tinfo_t()
+            [til] = library if library else [cls.library(type)]
+
+            # Now we serialize the type, and then deserialize it afterwards.
+            serialized = type.serialize()
+            if not ti.deserialize(til, *serialized):
+                description = "{:s}<{:s}>".format(internal.utils.pycompat.fullname(til.__class__), til.desc or '') if til and til.desc else "{!s}".format(til)
+                raise internal.exceptions.DisassemblerError(u"{:s}.copy({!r}, {:s}) : Unable to use the serialized information from the type ({!r}) to make a copy of it.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), description, serialized))
+            return ti
+        return
+
+    @classmethod
+    def concretize(cls, type, *library):
+        '''Return the specified `type` with its ordinals resolved to names from the given type library.'''
+
+        # If we were not given a type, then return it as-is.
+        if not isinstance(type, idaapi.tinfo_t):
+            return type
+
+        # First we need to figure out what library the type is from.
+        [til] = library if library else [cls.library(type)]
+
+        # Then we can call the replace_ordinal_typerefs function, because what this does.
+        new = cls.copy(type, til)
+        res = idaapi.replace_ordinal_typerefs(til, new) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+
+        # If we failed, then log something..but silently (sorta). This is an
+        # internal function and is intended to be abstracted away from the user.
+        if res < 0:
+            description = "{:s}<{:s}>".format(internal.utils.pycompat.fullname(til.__class__), til.desc or '') if til and til.desc else "{!s}".format(til)
+            logging.debug(u"{:s}.concretize({!r}, {!s}) : Returning the non-concrete type for \"{!s}\" due to an error being returned (error {:d}).".format('.'.join([cls.__name__, cls.__name__]), "{!s}".format(type), description, internal.utils.string.escape("{!s}".format(type), '"'), res))
+        return type if res < 0 else new
+
+    @classmethod
+    def reference(cls, ordinal, *library):
+        '''Return a type reference for the given `ordinal` belonging to the specified type `library`.'''
+        ti, [til] = idaapi.tinfo_t(), library if library else [cls.library()]
+
+        # create an empty typedef_type_data_t, so that we can assign its fields.
+        td = idaapi.typedef_type_data_t(til, 0, True)
+
+        # populate the typedef_type_data_t with either a string or an integer.
+        if isinstance(ordinal, internal.types.string):
+            td.is_ordref, td.name = False, internal.utils.string.to(ordinal)
+        else:
+            td.is_ordref, td.ordinal = True, ordinal
+
+        # now we can populate the tinfo_t and then concretize it before returning it.
+        ok = ti.create_typedef(td)
+
+        # if we were given a library or an ordinal, then explicitly strip out
+        # the ordinal for an actual name in order to always return a named type.
+        if library or isinstance(ordinal, internal.types.integer):
+            res = idaapi.replace_ordinal_typerefs(til, ti) if ok and hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+            return ti if ok and res >= 0 else None
+
+        # if we were given a string with no library, then we return a named type
+        # without attempting to resolve it. this allows returning a fake typeref.
+        return ti if ok else ti
+
+    @classmethod
+    def ordinal(cls, type, *library):
+        '''Return the ordinal for the given `type` from the specified type `library`.'''
+        ti, [til] = type, library if library else [None]
+
+        # first try to get the ordinal naturally and verify that it exists.
+        ordinal = ti.get_ordinal()
+        if ordinal and til:
+            return ordinal if idaapi.get_numbered_type(til, ordinal) else 0
+
+        elif ordinal:
+            return ordinal
+
+        # if it was concretized, then there is no ordinal and it's stored
+        # as a typename. if there isn't a typename, though, then abort.
+        elif not ti.get_type_name():
+            return ti.get_final_ordinal()
+
+        # since it's using a typename, we need to search the type library for it.
+        name = internal.utils.string.of(ti.get_type_name())
+        serialized = idaapi.get_named_type(til if til else cls.library(type), internal.utils.string.to(name), idaapi.NTF_TYPE)
+        if not serialized:
+            return ti.get_final_ordinal()
+
+        # the last item from get_named_type's result contains our ordinal.
+        defaults = [0, b'', b'', b'', b'', getattr(idaapi, 'sc_unk', 0), 0]
+        error, type, fields, cmt, fields_cmt, sclass, ordinal = [item for item in itertools.chain(serialized, defaults[len(serialized) - len(defaults):])][:len(defaults)]
+        return ordinal
+
+    @classmethod
+    def get(cls, library, *serialized):
+        '''Return a type for the `serialized` type information from a specific type `library`.'''
+        type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'\x01', b'', b'', b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
+
+        # ugh..because ida can return a non-bytes as one of the comments, we
+        # need to convert it so that the api will fucking understand us.
+        res = cmt or fieldcmts or b''
+        comments = res if isinstance(res, internal.types.bytes) else res.encode('latin1')
+
+        # try and deserialize the type information so that we can return it.
+        ti, til = idaapi.tinfo_t(), library if library else cls.library()
+        if ti.deserialize(til, bytes(type or b''), bytes(fields or b''), bytes(comments or b'')):
+            return ti if hasattr(idaapi, 'replace_ordinal_typerefs') and idaapi.replace_ordinal_typerefs(til, ti) >= 0 else ti
+
+        # if we failed deserializing the type, then it's probably
+        # because of the comments. so, we try again without them.
+        description = "{:s}<{:s}>".format(internal.utils.pycompat.fullname(til.__class__), til.desc or '') if til and til.desc else "{!s}".format(til)
+        logging.debug(u"{:s}.get({!s}, {!r}) : Retrying the deserialization for the given type without its comments ({!r}).".format('.'.join([__name__, cls.__name__]), description, serialized, comments))
+        if not ti.deserialize(til, bytes(type or b''), bytes(fields or b'')):
+            return None
+        return ti if hasattr(idaapi, 'replace_ordinal_typerefs') and idaapi.replace_ordinal_typerefs(til, ti) >= 0 else ti
+
+    @classmethod
+    def decode_bytes(cls, bytes):
+        '''Decode the given `bytes` into a list containing the length and the bytes for each encoded string.'''
+        ok, results, iterable = True, [], (ord for ord in bytearray(bytes))
+
+        integer = next(iterable, None)
+        length_plus_one, ok = integer or 0, False if integer is None else True
+        while ok:
+            one = 1 if length_plus_one < 0x7f else next(iterable, None)
+            assert((one == 1) and length_plus_one > 0)
+            encoded = bytearray(ord for index, ord in zip(builtins.range(length_plus_one - 1), iterable))
+            results.append((length_plus_one - 1, encoded)) if ok else None
+
+            integer = next(iterable, None)
+            length_plus_one, ok = integer or 0, False if integer is None else True
+        return results
+
+    @classmethod
+    def encode_bytes(cls, strings):
+        '''Encode the list of `strings` with their lengths and return them as bytes.'''
+        encode_length = lambda integer: bytearray([integer + 1] if integer + 1 < 0x80 else [integer + 1, 1])
+        iterable = (bytes(string) if isinstance(string, (bytes, bytearray)) else string.encode('utf-8') for string in strings)
+        pairs = ((len(chunk), chunk) for chunk in iterable)
+        return bytes(bytearray().join(itertools.chain(*((encode_length(length), bytearray(chunk)) for length, chunk in pairs))))
+
+    @classmethod
+    def names(cls, type, *names):
+        '''Return the names for the fields within the given `type` or return a new `type` if any `names` are given.'''
+        library, serialized, description = type.get_til(), type.serialize(), "{!s}".format(type)
+        type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'\x01', b'', b'', b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
+
+        # if we didn't get any names, then proceed to decode each field, verify that the
+        # lengths match, and then decode them into a list of strings to return.
+        if not names:
+            results = cls.decode_bytes(fields or b'')
+            assert(all(length == len(encoded) for length, encoded in results))
+            return [encoded.decode('utf-8') for _, encoded in results]
+
+        # otherwise re-encode the names we were given back into the type after clamping them.
+        [items] = names
+        if isinstance(items, internal.types.ordered):
+            encoded = (bytes(item) if isinstance(item, (bytes, bytearray)) else item.encode('utf-8') for item in items)
+            return cls.get(library, type, cls.encode_bytes([chunk[:0xfe] for chunk in encoded]), cmt or fieldcmts)
+
+        elif isinstance(items, (internal.types.string, bytes, bytearray)):
+            encoded = bytes(items) if isinstance(items, (bytes, bytearray)) else items.encode('utf-8')
+            return cls.get(library, type, encoded, cmt or fieldcmts)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.names({!s}, {!r}) : Unable to set the names for the given type information using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(description, '"'), items, items.__class__.__name__))
+
+    @classmethod
+    def comments(cls, type, *comments):
+        '''Return the comments for the fields within the given `type` or return a new `type` if any `comments` are given.'''
+        library, serialized, description = type.get_til(), type.serialize(), "{!s}".format(type)
+        type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'\x01', b'', b'', b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
+
+        # if we didn't get any comments, then proceed to decode each field, verify that the
+        # lengths match, and then decode them into a list of strings to return.
+        if not comments:
+            results = cls.decode_bytes(cmt or fieldcmts or b'')
+            assert(all(length == len(encoded) for length, encoded in results))
+            return [encoded.decode('utf-8') for _, encoded in results]
+
+        # otherwise re-encode the comments we were given back into the type after clamping them.
+        [items] = comments
+        if isinstance(items, internal.types.ordered):
+            encoded = (bytes(item) if isinstance(item, (bytes, bytearray)) else item.encode('utf-8') for item in items)
+            return cls.get(library, type, fields, cls.encode_bytes([chunk[:0xfe] for chunk in encoded]))
+
+        elif isinstance(items, (internal.types.string, bytes, bytearray)):
+            encoded = bytes(items) if isinstance(items, (bytes, bytearray)) else items.encode('utf-8')
+            return cls.get(library, type, fields, encoded)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.comments({!s}, {!r}) : Unable to set the comments for the given type information using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(description, '"'), items, items.__class__.__name__))
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = ("{:x}".format(abs(item)) if isinstance(item, internal.types.integer) else item for item in names)
