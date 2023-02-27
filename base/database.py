@@ -5276,8 +5276,13 @@ class types(object):
             fgtype = items[0] if items else '-'
             flags = itertools.chain(flibrary, frtype, fitype, fgtype)
 
+            # Render the type and clamp it to some arbitrary size.
+            # FIXME: is there some way to calculate the width of the console rather than hardcoding 0xa0 here?
+            width, description = 0xa0 - sum([cordinal, 1 + csize, maxname]), "{!s}".format(ti)
+            clamped_description = description if len(description) < width else "{:s}...".format(description[:width][:-3])
+
             # That was it, now we can just display it.
-            six.print_(u"{:<{:d}s} {:>+#{:d}x} : {:s} : {:<{:d}s}".format("[{:d}]".format(ordinal), cordinal, ti.get_size() if ti.present() else 0, 1 + csize, ''.join(flags), name, maxname))
+            six.print_(u"{:<{:d}s} {:>+#{:d}x} : {:s} : {:<{:d}s} : {:s}".format("[{:d}]".format(ordinal), cordinal, ti.get_size() if ti.present() else 0, 1 + csize, ''.join(flags), name, maxname, clamped_description))
         return
 
     @utils.multicase(ordinal=six.integer_types)
