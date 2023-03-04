@@ -1506,12 +1506,7 @@ class range(object):
     @classmethod
     def pack(cls, start, stop):
         '''Pack the address at `start` up to `stop` (exclusive) into a `range_t`.'''
-        res = idaapi.range_t()
-        if idaapi.__version__ < 7.0:
-            res.startEA, res.endEA = start, stop
-        else:
-            res.start_ea, res.end_ea = start, stop
-        return res
+        return idaapi.area_t(start, stop) if idaapi.__version__ < 7.0 else idaapi.range_t(start, stop)
 
     @classmethod
     def bounds(cls, area):
@@ -3990,7 +3985,7 @@ class bounds_t(integerish):
     def range(self):
         '''Return the current boundary casted to a native ``idaapi.range_t`` type.'''
         left, right = sorted(self)
-        return idaapi.range_t(left, right)
+        return idaapi.area_t(left, right) if idaapi.__version__ < 7.0 else idaapi.range_t(left, right)
 
     def contains(self, ea):
         '''Return if the address `ea` is contained by the current boundary.'''
