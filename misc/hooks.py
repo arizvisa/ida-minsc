@@ -2057,7 +2057,7 @@ def make_ida_not_suck_cocks(nw_code):
         hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
         ui.hook.idp.add('auto_empty', on_ready, 0)
 
-    ui.hook.idb.add('closebase', on_close, 10000)
+    ui.hook.idb.add('closebase', on_close, 10000) if 'closebase' in ui.hook.idb.available else ui.hook.idp.add('closebase', on_close, 10000)
 
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:
