@@ -8263,7 +8263,6 @@ class get(object):
             cb, fdecode = 4, utils.fcompose(decoder, operator.itemgetter(0)) if decoder else operator.methodcaller('decode', 'utf-32', 'replace')
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sw, ea))
-        type = int, cb
 
         # If we don't need to shift our address, then just trust get.array.
         if not shift:
@@ -8273,7 +8272,7 @@ class get(object):
         # boundaries of the array and then we can read it.
         else:
             left, right = ea + shift, ea + shift + cb * cls.unsigned(ea, shift)
-            res = cls.array((left, right), type)
+            res = cls.array((left, right), (int, cb))
 
         # Convert it to a string and then process it with the callables we determined.
         data = res.tostring() if sys.version_info.major < 3 else res.tobytes()
