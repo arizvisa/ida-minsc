@@ -6286,3 +6286,43 @@ class name(object):
             logging.fatal(u"{:s}.netnode({:#x}{:s}) : Unable to restore the original name (\"{:s}\") for the netnode at {:#x} which is currently named \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), identifier, internal.utils.string.escape(temporary, '"')))
             logging.info(u"{:s}.netnode({:#x}{:s}) : The original name (\"{:s}\") is currently associated with the netnode at {:#x}.".format('.'.join([__name__, cls.__name__]), identifier, '' if name is None else ", name=\"{:s}\"".format(name), internal.utils.string.escape(original, '"'), internal.netnode.get(original)))
         return
+
+    @classmethod
+    @contextlib.contextmanager
+    def typeinfo(cls, identifier, formatter=None):
+        '''Return a context manager that modifies the names for the type information at the given `identifier` using a `formatter` on entry and restores them on exit.'''
+        Funique_name = formatter or internal.utils.fcompose(hash, functools.partial(operator.and_, sys.maxsize), functools.partial("{:s}_{:x}_{:x}".format, '_field_unique', identifier))
+        callables = [idaapi.get_tinfo2, idaapi.guess_tinfo2] if idaapi.__version__ < 7.0 else [idaapi.get_tinfo, idaapi.guess_tinfo]
+        get_tinfo, guess_tinfo = ((functools.partial(lambda F, ti, ea: F(ea, ti), F) if idaapi.__version__ < 7.0 else F) for F in callables)
+
+        # check the address is a function entrypoint in order to determine how to guess
+        # its type and apply it.. then we can snag the type and figure how to use it.
+        ti, owners = idaapi.tinfo_t(), {ea for ea in function.owners(identifier)} if idaapi.get_func(identifier) else {}
+        guessed, res = (False, idaapi.GUESS_FUNC_OK) if get_tinfo(ti, identifier) else (True, guess_tinfo(ti, identifier))
+        ok = identifier in owners if guessed else res != idaapi.GUESS_FUNC_FAILED
+        definite = True if node.aflags(identifier, idaapi.AFL_USERTI) else False
+
+        # if we grabbed the type then go through and temporarily rename all of its names.
+        original = [] if res == idaapi.GUESS_FUNC_FAILED else tinfo.names(ti)
+        if ok:
+            temporary = tinfo.names(ti, [name for name in map(Funique_name, original if formatter else enumerate(original))]) if original else ti
+            ok = idaapi.apply_tinfo(identifier, temporary, idaapi.TINFO_STRICT | (idaapi.TINFO_DEFINITE if definite else idaapi.TINFO_GUESSED))
+
+        # if we snagged the type then use it.. but if we GUESS_FUNC_FAILED, then use None.
+        else:
+            ok, temporary = False, None if res == idaapi.GUESS_FUNC_FAILED else ti
+
+        # now we can yield the address and the type that we figured out.
+        try:
+            yield identifier, temporary
+
+        # reapply the previous type to restore it. if we couldn't apply the type
+        # previously (and didn't), then there's no need to restore anything.
+        finally:
+            ok = idaapi.apply_tinfo(identifier, ti, idaapi.TINFO_STRICT | (idaapi.TINFO_DEFINITE if definite else idaapi.TINFO_GUESSED)) if ok else True
+
+        # if we were supposed to restore the type and couldn't, then we need tocomplain.
+        if not ok:
+            logging.fatal(u"{:s}.typeinfo({:#x}{:s}) : Unable to restore the original type (\"{:s}\") for the item at {:#x} which is currently typed \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, '' if formatter is None else ", formatter={:s}".format("{!s}".format(formatter) if callable(formatter) else "{!r}".format(formatter)), internal.utils.string.escape("{!s}".format(ti), '"'), identifier, internal.utils.string.escape("{!s}".format(temporary), '"')))
+            logging.info(u"{:s}.typeinfo({:#x}{:s}) : The netnode at {:#x} is still using the temporary names{:s}.".format('.'.join([__name__, cls.__name__]), identifier, '' if formatter is None else ", formatter=\"{:s}\"".format("{!s}".format(formatter) if callable(formatter) else "{!r}".format(formatter)), identifier, " ({:s})".format(', '.join(internal.utils.string.escape(name, '"') for name in tinfo.names(temporary))) if tinfo.names(temporary) else ''))
+        return
