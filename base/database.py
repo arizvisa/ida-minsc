@@ -3420,7 +3420,7 @@ class address(object):
         while counter > 0:
             next = Fprev_that(ea, 0, test)
             if next == idaapi.BADADDR:
-                raise E.AddressOutOfBoundsError(u"{:s}.prevflag({!s}, {:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, 2 + 2, ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+                raise E.AddressOutOfBoundsError(u"{:s}.prevflag({!s}, {:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
             elif predicate(next):
                 counter -= 1
             ea = next
@@ -3854,15 +3854,12 @@ class address(object):
     @classmethod
     def prevref(cls, ea, predicate, **count):
         '''Return the previous address from the address `ea` that has anything referencing it and satisfies the provided `predicate`.'''
-        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
-        F = utils.fcompose(utils.fmap(Fxref, predicate), builtins.all)
-        return cls.prevF(ea, F, count.pop('count', 1))
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_REF), ea, predicate, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevref(cls, ea, count):
         '''Return the previous `count` addresses from the address `ea` that has anything referencing it.'''
-        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
-        return cls.prevF(ea, Fxref, count)
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_REF), ea, count)
 
     @utils.multicase()
     @classmethod
@@ -3883,15 +3880,12 @@ class address(object):
     @classmethod
     def nextref(cls, ea, predicate, **count):
         '''Return the next address from the address `ea` that has anything referencing it and satisfies the provided `predicate`.'''
-        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
-        F = utils.fcompose(utils.fmap(Fxref, predicate), builtins.all)
-        return cls.nextF(ea, F, count.pop('count', 1))
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_REF), ea, predicate, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextref(cls, ea, count):
         '''Return the next `count` addresses from the address `ea` that has anything referencing it.'''
-        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
-        return cls.nextF(ea, Fxref, count)
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_REF), ea, count)
 
     @utils.multicase()
     @classmethod
@@ -3914,13 +3908,13 @@ class address(object):
         '''Return the previous address from the address `ea` that has data referencing it and satisfies the provided `predicate`.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fdref, predicate), builtins.all)
-        return cls.prevF(ea, F, count.pop('count', 1))
+        return cls.prevref(ea, F, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevdref(cls, ea, count):
         '''Return the previous `count` addresses from the address `ea` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
-        return cls.prevF(ea, Fdref, count)
+        return cls.prevref(ea, Fdref, count=count)
 
     @utils.multicase()
     @classmethod
@@ -3943,13 +3937,13 @@ class address(object):
         '''Return the next address from the address `ea` that has data referencing it and satisfies the provided `predicate`.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fdref, predicate), builtins.all)
-        return cls.nextF(ea, F, count.pop('count', 1))
+        return cls.nextref(ea, F, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextdref(cls, ea, count):
         '''Return the next `count` addresses from the address `ea` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
-        return cls.nextF(ea, Fdref, count)
+        return cls.nextref(ea, Fdref, count=count)
 
     @utils.multicase()
     @classmethod
@@ -3972,13 +3966,13 @@ class address(object):
         '''Return the previous address from the address `ea` that has code referencing it and satisfies the provided `predicate`.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
-        return cls.prevF(ea, F, count.pop('count', 1))
+        return cls.prevref(ea, F, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevcref(cls, ea, count):
         '''Return the previous `count` addresses from the address `ea` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
-        return cls.prevF(ea, Fcref, count)
+        return cls.prevref(ea, Fcref, count=count)
 
     @utils.multicase()
     @classmethod
@@ -4001,13 +3995,13 @@ class address(object):
         '''Return the next address from the address `ea` that has code referencing it and satisfies the provided `predicate`.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
-        return cls.nextF(ea, F, count.pop('count', 1))
+        return cls.nextref(ea, F, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextcref(cls, ea, count):
         '''Return the next `count` addresses from the address `ea` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
-        return cls.nextF(ea, Fcref, count)
+        return cls.nextref(ea, Fcref, count=count)
 
     @utils.multicase(reg=(internal.types.string, interface.register_t))
     @classmethod
@@ -4419,14 +4413,12 @@ class address(object):
     @classmethod
     def prevlabel(cls, ea, predicate, **count):
         '''Return the address of the previous label from the address `ea` that satisfies the provided `predicate`.'''
-        Flabel = type.label
-        F = utils.fcompose(utils.fmap(Flabel, predicate), builtins.all)
-        return cls.prevF(ea, F, count.pop('count', 1))
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, predicate, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevlabel(cls, ea, count):
         '''Return the address of the previous `count` labels from the address `ea`.'''
-        return cls.prevF(ea, type.label, count)
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, count)
 
     @utils.multicase()
     @classmethod
@@ -4447,14 +4439,12 @@ class address(object):
     @classmethod
     def nextlabel(cls, ea, predicate, **count):
         '''Return the address of the next label from the address `ea` that satisfies the provided `predicate`.'''
-        Flabel = type.label
-        F = utils.fcompose(utils.fmap(Flabel, predicate), builtins.all)
-        return cls.nextF(ea, F, count.pop('count', 1))
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, predicate, **count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextlabel(cls, ea, count):
         '''Return the address of the next `count` labels from the address `ea`.'''
-        return cls.nextF(ea, type.label, count)
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_LABL|idaapi.FF_NAME), ea, count)
 
     @utils.multicase()
     @classmethod
@@ -4479,12 +4469,11 @@ class address(object):
         If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
         """
         if 'repeatable' in repeatable:
-            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
-            Fx = utils.fcompose(utils.fmap(type.comment, Fcheck_comment), builtins.all)
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable.pop('repeatable')), utils.fpartial(operator.is_, None))
+            F = utils.fcompose(utils.fmap(Fcheck_comment, predicate), builtins.all)
         else:
-            Fx = type.comment
-        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
-        return cls.prevF(ea, F, repeatable.pop('count', 1))
+            F = predicate
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, F, **repeatable)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevcomment(cls, ea, count, **repeatable):
@@ -4493,11 +4482,9 @@ class address(object):
         If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
         """
         if 'repeatable' in repeatable:
-            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
-            F = utils.fcompose(utils.fmap(type.comment, Fcheck_comment), builtins.all)
-        else:
-            F = type.comment
-        return cls.prevF(ea, F, count)
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable.pop('repeatable')), utils.fpartial(operator.is_, None))
+            return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, Fcheck_comment, **repeatable)
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **repeatable)
 
     @utils.multicase()
     @classmethod
@@ -4522,12 +4509,11 @@ class address(object):
         If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
         """
         if 'repeatable' in repeatable:
-            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
-            Fx = utils.fcompose(utils.fmap(type.comment, Fcheck_comment), builtins.all)
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable.pop('repeatable')), utils.fpartial(operator.is_, None))
+            F = utils.fcompose(utils.fmap(Fcheck_comment, predicate), builtins.all)
         else:
-            Fx = type.comment
-        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
-        return cls.nextF(ea, F, repeatable.pop('count', 1))
+            F = predicate
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, F, **repeatable)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextcomment(cls, ea, count, **repeatable):
@@ -4536,11 +4522,9 @@ class address(object):
         If the bool `repeatable` is defined, then use it to determine whether to only track repeatable or non-repeatable comments.
         """
         if 'repeatable' in repeatable:
-            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable['repeatable']), utils.fpartial(operator.is_, None))
-            F = utils.fcompose(utils.fmap(type.comment, Fcheck_comment), builtins.all)
-        else:
-            F = type.comment
-        return cls.nextF(ea, F, count)
+            Fcheck_comment = utils.fcompose(utils.frpartial(idaapi.get_cmt, not repeatable.pop('repeatable')), utils.fpartial(operator.is_, None))
+            return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, Fcheck_comment, **repeatable)
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **repeatable)
 
     # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
@@ -4566,18 +4550,21 @@ class address(object):
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def prevtag(cls, ea, predicate, **tagname):
         '''Return the previous address from `ea` that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
-        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
-        Ftag = type.comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
-        F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
-        return cls.prevF(ea, F, tagname.pop('count', 1))
+        tags = builtins.next((tagname.pop(kwd) for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
+        if tags is None:
+            return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, **tagname)
+        Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def prevtag(cls, ea, count, **tagname):
         '''Return the previous `count` addresses from `ea` that contains a tag using the specified `tagname`.'''
-        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
-        Ftag = type.comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
-        return cls.prevF(ea, Ftag, count)
+        tags = builtins.next((tagname.pop(kwd) for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
+        if tags is None:
+            return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **tagname)
+        Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
 
     # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
@@ -4603,18 +4590,21 @@ class address(object):
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def nexttag(cls, ea, predicate, **tagname):
         '''Return the next address from `ea` that contains a tag using the specified `tagname` and satisfies the provided `predicate`.'''
-        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
-        Ftag = type.comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
-        F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
-        return cls.nextF(ea, F, tagname.pop('count', 1))
+        tags = builtins.next((tagname.pop(kwd) for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
+        if tags is None:
+            return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, **tagname)
+        Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
     def nexttag(cls, ea, count, **tagname):
         '''Return the next `count` addresses from `ea` that contains a tag using the specified `tagname`.'''
-        tagname = builtins.next((tagname[kwd] for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
-        Ftag = type.comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
-        return cls.nextF(ea, Ftag, count)
+        tags = builtins.next((tagname.pop(kwd) for kwd in ['tagname', 'tag', 'name'] if kwd in tagname), None)
+        if tags is None:
+            return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **tagname)
+        Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
 
     @utils.multicase()
     @classmethod
@@ -4630,13 +4620,27 @@ class address(object):
     @classmethod
     def prevfunction(cls, ea, predicate, **count):
         '''Return the previous address from the address `ea` that is within a function and satisfies the provided `predicate`.'''
-        F = utils.fcompose(utils.fmap(function.has, predicate), builtins.all)
-        return cls.prevF(ea, F, count.pop('count', 1))
+        counter = max(1, count.get('count', 1))
+        while counter > 0:
+            fn = idaapi.get_prev_fchunk(ea)
+            if not fn:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevfunction({:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+            else:
+                next = interface.range.stop(fn) - 1
+            if predicate(next):
+                count -= 1
+            ea = next
+        return ea
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevfunction(cls, ea, count):
         '''Return the previous `count` addresses from the address `ea` that is within a function.'''
-        return cls.prevF(ea, function.has, count)
+        for index in builtins.range(max(1, count)):
+            fn = idaapi.get_prev_fchunk(ea)
+            if not fn:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevfunction({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
+            ea = interface.range.stop(fn) - 1
+        return ea
 
     @utils.multicase()
     @classmethod
@@ -4652,13 +4656,28 @@ class address(object):
     @classmethod
     def nextfunction(cls, ea, predicate, **count):
         '''Return the next address from the address `ea` that is within a function and satisfies the provided `predicate`.'''
-        F = utils.fcompose(utils.fmap(function.has, predicate), builtins.all)
-        return cls.nextF(ea, F, count.pop('count', 1))
+        next, counter = ~ea, max(1, count.get('count', 1))
+        while counter > 0:
+            fn = idaapi.get_next_fchunk(ea + 1 if next == ea else ea)
+            if not fn:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextfunction({:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
+            else:
+                next = interface.range.start(fn)
+            if predicate(next):
+                counter -= 1
+            ea = next
+        return ea
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextfunction(cls, ea, count):
         '''Return the next `count` addresses from the address `ea` that is within a function.'''
-        return cls.nextF(ea, function.has, count)
+        next = ~ea
+        for index in builtins.range(max(1, count)):
+            fn = idaapi.get_next_fchunk(ea + 1 if next == ea else ea)
+            if not fn:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextfunction({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), ea))
+            ea = next = interface.range.start(fn)
+        return ea
     prevfunc, nextfunc = utils.alias(prevfunction, 'address'), utils.alias(nextfunction, 'address')
 
     # address translations
