@@ -1353,7 +1353,7 @@ class naming(changingchanged):
         event.close()
 
     @classmethod
-    def rename(cls, ea, newname):
+    def rename(cls, ea, new_name):
         """This hook is when a user adds a name or removes it from the database.
 
         We simply increase the reference count for the "__name__" key, or decrease it
@@ -1372,17 +1372,17 @@ class naming(changingchanged):
         ctx = internal.comment.globals if not fn or (interface.range.start(fn) == ea) else internal.comment.contents
 
         # if a name is being removed
-        if not newname:
+        if not new_name:
             # if it's a custom name
             if (not labelQ and customQ):
                 ctx.dec(ea, '__name__')
-                logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format('.'.join([__name__, cls.__name__]), ea, newname, '__name__'))
+                logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format('.'.join([__name__, cls.__name__]), ea, new_name, '__name__'))
             return
 
         # if it's currently a label or is unnamed
         if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
             ctx.inc(ea, '__name__')
-            logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format('.'.join([__name__, cls.__name__]), ea, newname, '__name__'))
+            logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format('.'.join([__name__, cls.__name__]), ea, new_name, '__name__'))
         return
 
 class extra_cmt(changingchanged):
