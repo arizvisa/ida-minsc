@@ -3390,6 +3390,124 @@ class address(object):
         res = cls.__walk__(Fnext(ea), Fnext, Finverse)
         return cls.nextF(res, predicate, count - 1) if count > 1 else res
 
+    @utils.multicase(mask=(internal.types.integer, internal.types.tuple))
+    @classmethod
+    def prevflag(cls, mask, **count):
+        '''Return the previous address where its flags match the given `mask`.'''
+        return cls.prevflag(mask, ui.current.address(), count.pop('count', 1))
+    @utils.multicase(mask=(internal.types.integer, internal.types.tuple, internal.types.callable), ea=internal.types.integer)
+    @classmethod
+    def prevflag(cls, mask, ea):
+        '''Return the previous address from the address `ea` where its flags match the given `mask`.'''
+        return cls.prevflag(mask, ea, 1)
+    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def prevflag(cls, mask_value, ea, predicate, **count):
+        '''Return the previous address from the address `ea` where its flags match the given `mask_value` and satisfies the given `predicate`.'''
+        mask, value = mask_value
+        Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
+        return cls.prevflag(Ftest, ea, predicate, **count)
+    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def prevflag(cls, mask, ea, predicate, **count):
+        '''Return the previous address from the address `ea` where its flags match the given `mask`.'''
+        return cls.prevflag(functools.partial(operator.and_, mask), ea, predicate, **count)
+    @utils.multicase(test=internal.types.callable, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def prevflag(cls, test, ea, predicate, **count):
+        '''Return the previous address from the address `ea` that satisfies the given `predicate` and a flag satisfying the given `test`.'''
+        counter, Fprev_that = max(1, count.get('count', 1)), idaapi.prev_that if hasattr(idaapi, 'prev_that') else idaapi.prevthat
+        while counter > 0:
+            next = Fprev_that(ea, 0, test)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevflag({!s}, {:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, 2 + 2, ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def prevflag(cls, mask_value, ea, count):
+        '''Return the previous `count` addresses from the address `ea` where its flags match the given `mask_value`.'''
+        mask, value = mask_value
+        Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
+        return cls.prevflag(Ftest, ea, count)
+    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def prevflag(cls, mask, ea, count):
+        '''Return the previous `count` addresses from the address `ea` where its flags match the given `mask`.'''
+        return cls.prevflag(functools.partial(operator.and_, mask), ea, count)
+    @utils.multicase(test=internal.types.callable, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def prevflag(cls, test, ea, count):
+        '''Return the previous `count` addresses from the address `ea` that has a flag satisfying the given `test`.'''
+        Fprev_that = idaapi.prev_that if hasattr(idaapi, 'prev_that') else idaapi.prevthat
+        for index in builtins.range(max(1, count)):
+            next = Fprev_that(ea, 0, test)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevflag({!s}, {:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, ea, count, top(), ea))
+            ea = next
+        return ea
+
+    @utils.multicase(mask=(internal.types.integer, internal.types.tuple))
+    @classmethod
+    def nextflag(cls, mask, **count):
+        '''Return the next address where its flags match the given `mask`.'''
+        return cls.nextflag(mask, ui.current.address(), count.pop('count', 1))
+    @utils.multicase(mask=(internal.types.integer, internal.types.tuple, internal.types.callable), ea=internal.types.integer)
+    @classmethod
+    def nextflag(cls, mask, ea):
+        '''Return the next address from the address `ea` where its flags match the given `mask`.'''
+        return cls.nextflag(mask, ea, 1)
+    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextflag(cls, mask_value, ea, predicate, **count):
+        '''Return the next address from the address `ea` where its flags match the given `mask_value` and satisfies the given `predicate`.'''
+        mask, value = mask_value
+        Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
+        return cls.nextflag(Ftest, ea, predicate, **count)
+    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextflag(cls, mask, ea, predicate, **count):
+        '''Return the next address from the address `ea` where its flags match the given `mask`.'''
+        return cls.nextflag(functools.partial(operator.and_, mask), ea, predicate, **count)
+    @utils.multicase(test=internal.types.callable, ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextflag(cls, test, ea, predicate, **count):
+        '''Return the next address from the address `ea` that satisfies the given `predicate` and a flag satisfying the given `test`.'''
+        next, counter, Fnext_that = ~ea, max(1, count.get('count', 1)), idaapi.next_that if hasattr(idaapi, 'next_that') else idaapi.nextthat
+        while counter > 0:
+            next = Fnext_that(ea + 1 if next == ea else ea, idaapi.BADADDR, test)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextflag({!s}, {:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
+            elif predicate(next):
+                counter -= 1
+            ea = next
+        return ea
+    @utils.multicase(mask_value=internal.types.tuple, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextflag(cls, mask_value, ea, count):
+        '''Return the next `count` addresses from the address `ea` where its flags match the given `mask_value`.'''
+        mask, value = mask_value
+        Ftest = utils.fcompose(functools.partial(operator.and_, mask), functools.partial(operator.eq, value))
+        return cls.nextflag(Ftest, ea, count)
+    @utils.multicase(mask=internal.types.integer, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextflag(cls, mask, ea, count):
+        '''Return the next `count` addresses from the address `ea` where its flags match the given `mask`.'''
+        return cls.nextflag(functools.partial(operator.and_, mask), ea, count)
+    @utils.multicase(test=internal.types.callable, ea=internal.types.integer, count=internal.types.integer)
+    @classmethod
+    def nextflag(cls, test, ea, count):
+        '''Return the next `count` addresses from the address `ea` that has a flag satisfying the given `test`.'''
+        next, Fnext_that = ~ea, idaapi.next_that if hasattr(idaapi, 'next_that') else idaapi.nextthat
+        for index in builtins.range(max(1, count)):
+            next = Fnext_that(ea + 1 if next == ea else ea, idaapi.BADADDR, test)
+            if next == idaapi.BADADDR:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextflag({!s}, {:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), test, ea, count, bottom(), ea))
+            ea = next
+        return ea
+
     @utils.multicase()
     @classmethod
     def prevdata(cls, **count):
