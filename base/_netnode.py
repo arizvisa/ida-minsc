@@ -36,17 +36,27 @@ class netnode(object):
     index = _ida_netnode.netnode_index
     kill = _ida_netnode.netnode_kill
 
-    # Although the following apis exist in 5.6 of the sdk, there's a chance that
-    # they're not actually available in IDAPython. To deal with that uncertainty,
-    # we'll explicitly check for it and assign if so, otherwise we have to use
-    # the _ida_netnode.new_netnode function with its "do_create" parameter set
-    # to false.
-    exist = _ida_netnode.exist
+    # We need the following api to explicitly look up a netnode by its address.
+    if hasattr(_ida_netnode, 'exist'):
+        exist = staticmethod(internal.utils.fcompose(_ida_netnode.new_netnode, _ida_netnode.exist))
+
+    # If it didn't exist, though, then we need to call directly into the ida library.
+    # We're fortunate here because netnodes are really just a pointer to an integer,
+    # and the netnode_exist api takes a pointer and returns a straight-up boolean.
+    else:
+        import ctypes, ida
+        ida.netnode_exist.restype, ida.netnode_exist.argtypes = ctypes.c_bool, [ctypes.POINTER(ctypes.c_long)]
+        exist = staticmethod(internal.utils.fcompose(ctypes.c_long, ctypes.pointer, ida.netnode_exist))
+
+    # There's a chance that this api doesn't exist in IDAPython, so if it does then
+    # we can assign it as-is...otherwise we create a netnode with the desired name
+    # and then see if we can grab its index to confirm its existence.
     if hasattr(_ida_netnode, 'netnode_exist'):
         exist_name = _ida_netnode.netnode_exist
     else:
-        exist_name = internal.utils.fcompose(internal.utils.frpartial(_ida_netnode.new_netnode, False, 0), _ida_netnode.netnode_index, internal.utils.fpartial(operator.ne, idaapi.BADADDR))
+        exist_name = staticmethod(internal.utils.fcompose(internal.utils.frpartial(_ida_netnode.new_netnode, False, 0), _ida_netnode.netnode_index, internal.utils.fpartial(operator.ne, idaapi.BADADDR)))
 
+    # These apis should always exist and will hopefully never change.
     long_value = _ida_netnode.netnode_long_value
     next = _ida_netnode.netnode_next
     prev = _ida_netnode.netnode_prev
@@ -304,8 +314,7 @@ def new(name):
 def has(name):
     '''Return whether the netnode with the given `name` exists in the database or not.'''
     if isinstance(name, six.integer_types):
-        node = utils.get(name)
-        return netnode.exist(node)
+        return netnode.exist(name)
     res = internal.utils.string.to(name)
     return netnode.exist_name(res)
 

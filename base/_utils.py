@@ -11,10 +11,10 @@ import six, builtins
 
 import os, logging, types, weakref
 import functools, operator, itertools
-import sys, heapq, collections, array, math
+import sys, codecs, heapq, collections, array, math
 
 import internal
-import idaapi
+import idaapi, ida, ctypes
 
 __all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
 
@@ -1085,8 +1085,148 @@ class string(object):
         '''Handle all strings both from IDA and to IDA transparently.'''
         return None if string is None else string
 
-    of = of_2x if sys.version_info.major < 3 else passthrough
-    to = to_2x if sys.version_info.major < 3 else passthrough
+    # In older versions of IDA, according to https://hex-rays.com/products/ida/news/7_0/docs/i18n/,
+    # the OEM encoding is used on the windows platform with UTF-8 on all of the others. We can get
+    # the correct one on windows using ctypes with the `get_codepages` api from the sdk. This api
+    # can return a constant, though, so it's up to us to figure out which encoding it actually is.
+    # If we're unable to figure anything out, then we fall back to python's "mbcs" encoding which
+    # should represent the current windows codepage according to the documentation.
+
+    if idaapi.__version__ < 7.0 and sys.platform == 'win32':
+        if hasattr(ida, 'get_codepages'):
+            ida.get_codepages.restype, ida.get_codepages.argtypes = ctypes.c_ulong, [ctypes.POINTER(ctypes.c_ulong)]
+
+        class codepage(object):
+            """
+            This class is used for getting information about the current code page so
+            that it can be used to distinguishing how to encode and decode strings into
+            the database and out to Python. It is temporary and shouldn't really be used.
+            """
+
+            # Now we need to figure out which codepage the disassembler is using.
+            @classmethod
+            def get_disassembler_codepage(cls):
+                '''Return the current codepage that is used by the disassembler.'''
+                cp = ctypes.pointer(ctypes.c_ulong(-1))
+                return cp.contents.value if ida.get_codepages(cp) == 0 else 1   # CP_ACP(1)
+
+            # ..And we need some function that will convert that default codepage into something python understands.
+            @classmethod
+            def GetCPInfoExW(cls, CodePage):
+                '''Use ctypes to call the "kernel32.dll!GetCPInfoExW" Windows API and return information about the current codepage.'''
+                class _cpinfoexW(ctypes.Structure):
+                    MAX_LEADBYTES, MAX_DEFAULTCHAR = 12, 2
+                    MAX_PATH = 260
+                    _fields_ = [
+                        ("MaxCharSize", ctypes.c_uint),
+                        ("DefaultChar", ctypes.c_ubyte * MAX_DEFAULTCHAR),
+                        ("LeadByte", ctypes.c_ubyte * MAX_LEADBYTES),
+                        ("UnicodeDefaultChar", ctypes.c_wchar),
+                        ("CodePage", ctypes.c_uint),
+                        ("CodePageName", ctypes.c_wchar * MAX_PATH)
+                    ]
+                GetCPInfoExW = ctypes.windll.kernel32.GetCPInfoExW
+                GetCPInfoExW.restype, GetCPInfoExW.argtypes = ctypes.c_long, [ctypes.c_uint, ctypes.c_long, ctypes.POINTER(_cpinfoexW)]
+                res = _cpinfoexW()
+                if not GetCPInfoExW(CodePage, 0, ctypes.pointer(res)):
+                    return None
+                return res
+
+            # This lookup table is used for mapping a codepage number to a Python encoding,
+            # but these encoding aren't guaranteed to be available in all versions of Python.
+            codepage_codec_map = {codepage : encoding for codepage, encoding in [
+                (1047, 'latin1'), (870, 'latin2'),
+                (1141, 'IBM273',), (1142, 'IBM865',), (1146, 'IBM039',), (1149, 'IBM861',),
+                (10000, 'mac_roman',), (10001, 'mac_roman',), (10002, 'csbig5',), (10006, 'mac_greek',), (10007, 'mac_cyrillic',), (10008, 'gb2312',), (10029, 'mac_latin2',), (10081, 'mac_turkish',),
+                (12000, 'utf-32le'), (12001, 'utf-32be'),
+                (20125, 'IBM855'), (20273, 'IBM273'), (20277, 'IBM277'), (20278, 'IBM278'), (20280, 'IBM280'), (20284, 'IBM284'), (20285, 'IBM285'), (20290, 'IBM290'), (20297, 'IBM297'), (20420, 'IBM420'), (20423, 'IBM423'), (20424, 'IBM424'), (20833, 'IBM833'), (20838, 'IBM838'), (20871, 'IBM871'), (20880, 'IBM880'), (20905, 'IBM905'), (20924, 'IBM924'),
+                (20932, 'euc-jp'), (51949, 'euc-kr'),
+                (20866, 'koi8_r'), (21866, 'koi8_u'),
+                (28591, 'iso8859-1'), (28592, 'iso8859-2'), (28593, 'iso8859-3'), (28594, 'iso8859-4'), (28595, 'iso8859-5'), (28596, 'iso8859-6'), (28597, 'iso8859-7'), (28598, 'iso8859-8'), (28599, 'iso8859-9'), (28603, 'iso8859-13'), (28605, 'iso8859-15'), (38598, 'iso8859-8'),
+                (50220, 'iso2022-jp'), (50221, 'iso2022-jp-ext'), (50222, 'iso2022-jp'), (50225, 'iso2022_kr'), (50227, 'iso2022_jp'), (50229, 'iso2022_jp'),
+                (20936, 'gb2312'), (52936, 'hz-gb-2312'), (54936, 'gb18030'),
+                (20127, 'us-ascii'), (65000, 'utf-7'), (65001, 'utf-8'), (65002, 'utf-16'),
+            ]}
+
+            @classmethod
+            def lookup_codepage(cls, codepage):
+                '''Use the given `codepage` to determine the string codec that will be used by Python to encode or decode strings.'''
+                encoding = "CP{:03d}".format(codepage)
+                try:
+                    codec = codecs.lookup(encoding)
+                except LookupError:
+                    encoding = cls.codepage_codec_map.get(codepage, '')
+                else:
+                    return codec.name
+
+                # if we couldn't find the code for the codepage, then we
+                # need to try again using whatever was in our codec map.
+                try:
+                    codec = codecs.lookup(encoding)
+                except LookupError:
+                    return ''
+                return codec.name
+
+            # Define a table for describing the default codepage types available from windows.
+            windows_codepage_description = {
+                0: 'CP_ACP', 1: 'CP_OEMCP', 2: 'CP_MACCP', 3: 'CP_THREAD_ACP', 42: 'CP_SYMBOL',
+                12000: 'CP_UTF32LE', 12001: 'CP_UTF32BE', 65000: 'CP_UTF7', 65001: 'CP_UTF8', 65002: 'CP_UTF16',
+            }
+
+            @classmethod
+            def describe_codepage(cls, codepage):
+                '''Return a printable description for the specified `codepage`.'''
+                if codepage in cls.windows_codepage_description:
+                    return "{:s}({:d})".format(cls.windows_codepage_description[codepage], codepage)
+                elif codepage in cls.codepage_codec_map:
+                    return cls.codepage_codec_map[codepage]
+                return "unknown({:d})".format(codepage)
+
+            @staticmethod
+            def return_of_encoding(encoding):
+                '''Return a closure that can be used to decode a string from the given `encoding`.'''
+                def of(string):
+                    '''Convert a string using the codepage of the disassembler to a python string.'''
+                    return None if string is None else string.decode(encoding) if isinstance(string, str) else string
+                return of
+
+            @staticmethod
+            def return_to_encoding(encoding):
+                '''Return a closure that can be used to encode a string to the given `encoding`.'''
+                def to(string):
+                    '''Convert a python string to a string using the codepage of the disassembler.'''
+                    return None if string is None else string.encode(encoding) if isinstance(string, unicode) else string
+                return to
+
+            def __new__(cls):
+                '''Return a tuple of functions that may be used to decode strings from the database and encode strings into the database.'''
+                cp = cls.get_disassembler_codepage()
+                cpinfoex = cls.GetCPInfoExW(cp)
+                if cpinfoex:
+                    encoding, description = cls.lookup_codepage(cpinfoex.CodePage), cpinfoex.CodePageName
+                else:
+                    encoding, description = '', 'Unknown'
+
+                # Now we need to verify that the codec actually exists, because if
+                # it doesn't then we need to fallback to something.
+                try:
+                    codec = codecs.lookup(encoding)
+                except LookupError:
+                    encoding = 'MBCS' if sys.version_info.major < 3 and sys.version_info.minor < 6 else 'OEM'
+                else:
+                    encoding = codec.name
+
+                # Okay, that should be it and we just need to log what we figured out.
+                logging.info(u"{:s} : Detected codepage {:s} used by disassembler which will result in using the \"{:s}\" string encoding.".format('.'.join([__name__, cls.__name__]), cls.describe_codepage(cp), encoding))
+                return cls.return_of_encoding(encoding), cls.return_to_encoding(encoding)
+
+        # Now we should be able to get some functions that will encode and decode strings from the database.
+        of, to = map(staticmethod, codepage())
+
+    # Otherwise we should be able to trust that everything is going to be UTF-8.
+    else:
+        of = of_2x if sys.version_info.major < 3 else passthrough
+        to = to_2x if sys.version_info.major < 3 else passthrough
 
     # dictionary for mapping control characters to their correct forms
     mapping = {

@@ -297,12 +297,20 @@ class current(object):
     def selection(cls):
         '''Return the current address range of whatever is selected'''
         view = idaapi.get_current_viewer()
-        left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
+        ok, left, right = False, idaapi.twinpos_t(), idaapi.twinpos_t()
 
         # If we were able to grab a selection, then return it.
-        if idaapi.read_selection(view, left, right):
+        newer = hasattr(idaapi.place_t, 'toea')
+        if newer and idaapi.read_selection(view, left, right):
             pl_l, pl_r = left.place(view), right.place(view)
-            ea_l, ea_r = pl_l.toea(), pl_r.toea()
+            ok, ea_l, ea_r = True, pl_l.toea(), pl_r.toea()
+
+        # Older versions of the disassembler pack it all into the "read_selection" result.
+        elif not newer:
+            ok, ea_l, ea_r = idaapi.read_selection(view, left, right)
+
+        # If we successfully grabbed the selection, then return its boundaries.
+        if ok:
             l, r = internal.interface.address.inside(ea_l, ea_r)
             return internal.interface.bounds_t(l, r + 1)
 

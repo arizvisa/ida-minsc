@@ -1353,7 +1353,7 @@ class naming(changingchanged):
         event.close()
 
     @classmethod
-    def rename(cls, ea, newname):
+    def rename(cls, ea, new_name):
         """This hook is when a user adds a name or removes it from the database.
 
         We simply increase the reference count for the "__name__" key, or decrease it
@@ -1372,17 +1372,17 @@ class naming(changingchanged):
         ctx = internal.comment.globals if not fn or (interface.range.start(fn) == ea) else internal.comment.contents
 
         # if a name is being removed
-        if not newname:
+        if not new_name:
             # if it's a custom name
             if (not labelQ and customQ):
                 ctx.dec(ea, '__name__')
-                logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format('.'.join([__name__, cls.__name__]), ea, newname, '__name__'))
+                logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format('.'.join([__name__, cls.__name__]), ea, new_name, '__name__'))
             return
 
         # if it's currently a label or is unnamed
         if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
             ctx.inc(ea, '__name__')
-            logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format('.'.join([__name__, cls.__name__]), ea, newname, '__name__'))
+            logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format('.'.join([__name__, cls.__name__]), ea, new_name, '__name__'))
         return
 
 class extra_cmt(changingchanged):
@@ -1645,9 +1645,10 @@ def func_tail_removed(pfn, ea):
     We simply iterate through the old chunk, decrease all of its tags in the
     function context, and increase their reference within the global context.
     """
+    start, stop = interface.range.unpack(pfn)
 
     # first we'll grab the addresses from our refs
-    listable = internal.comment.contents.address(ea, target=interface.range.start(pfn))
+    listable = internal.comment.contents.address(ea, target=start)
 
     # these should already be sorted, so our first step is to filter out what
     # doesn't belong. in order to work around one of the issues posed in the
@@ -1655,19 +1656,21 @@ def func_tail_removed(pfn, ea):
     # not None prior to their comparison against `pfn`. this is needed in order
     # to work around a null-pointer exception raised by SWIG when it calls the
     # area_t.__ne__ method to do the comparison.
-    missing = [ item for item in listable if not idaapi.get_func(item) or idaapi.get_func(item) != pfn ]
+    tail, missing = ea, [ item for item in listable if not idaapi.get_func(item) or idaapi.get_func(item) != pfn ]
 
     # if there was nothing found, then we can simply exit the hook early
     if not missing:
         return
 
+    logging.debug(u"{:s}.func_tail_removed({:#x}..{:#x}, {:#x}) : Updating the tags for the function tail being removed at address {:#x} to {:#x}.".format(__name__, start, stop, tail, start, stop))
+
     # now iterate through the min/max of the list as hopefully this is
     # our event.
     for ea in database.address.iterate(min(missing), max(missing)):
         for k in database.tag(ea):
-            internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
+            internal.comment.contents.dec(ea, k, target=start)
             internal.comment.globals.inc(ea, k)
-            logging.debug(u"{:s}.func_tail_removed({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), ea, utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.func_tail_removed({:#x}..{:#x}, {:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, tail, ea, utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
@@ -1698,34 +1701,32 @@ def add_func(pfn):
     to the function and does exactly that.
     """
     implicit = {'__typeinfo__', '__name__'}
-
-    # figure out the newly added function's address, and gather all the imports.
-    ea, imports = interface.range.start(pfn), {item for item in []}
-    for idx in range(idaapi.get_import_module_qty()):
-        idaapi.enum_import_names(idx, lambda address, name, ordinal: imports.add(address) or True)
+    start, stop = interface.range.unpack(pfn)
 
     # check that we're not adding an import as a function. if this happens,
     # then this is because IDA's ELF loader seems to be loading this.
-    if idaapi.segtype(ea) == idaapi.SEG_XTRN or ea in imports:
+    if idaapi.segtype(start) == idaapi.SEG_XTRN:
         return
+
+    logging.debug(u"{:s}.add_func({:#x}..{:#x}) : Updating the tags for the new function being added at address {:#x} to {:#x}.".format(__name__, start, stop, start, stop))
 
     # if the database is ready then we can trust the changingchanged-based classes
     # to add all the implicit tags and thus we can exclude them here. otherwise,
     # we'll do it ourselves because the functions get post-processed after building
     # in order to deal with the events that we didn't receive.
     exclude = implicit if changingchanged.is_ready() else {item for item in []}
-    available = {k for k in function.tag(ea)}
-    [ internal.comment.globals.inc(ea, k) for k in available - exclude ]
+    available = {k for k in function.tag(start)}
+    [ internal.comment.globals.inc(start, k) for k in available - exclude ]
 
     # convert all globals into contents whilst making sure that we don't
     # add any of the implicit tags that are handled by other events.
-    for l, r in function.chunks(ea):
+    for l, r in function.chunks(start):
         for ea in database.address.iterate(l, r):
             available = {item for item in database.tag(ea)}
             for k in available - implicit:
                 internal.comment.globals.dec(ea, k)
-                internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-                logging.debug(u"{:s}.add_func({:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
+                internal.comment.contents.inc(ea, k, target=start)
+                logging.debug(u"{:s}.add_func({:#x}..{:#x}) : Exchanging (decreasing) reference count at {:#x} for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, start, stop, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         continue
     return
@@ -1773,6 +1774,7 @@ def del_func(pfn):
     and then increasing it for the database. Afterwards we simply remove the
     reference count cache for the function.
     """
+    start, stop = interface.range.unpack(pfn)
 
     try:
         rt, fn = interface.addressOfRuntimeOrStatic(pfn)
@@ -1796,13 +1798,13 @@ def del_func(pfn):
 
         results = remove_contents(pfn, iterable)
         for tag, items in results.items():
-            logging.debug(u"{:s}.del_func({:#x}) : Removed {:d} instances of tag ({:s}) that were associated with a removed function.".format(__name__, interface.range.start(pfn), len(items), utils.string.repr(tag)))
+            logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Removed {:d} instances of tag ({:s}) that were associated with a removed function.".format(__name__, start, stop, len(items), utils.string.repr(tag)))
 
         # Now we need to remove the global tags associated with this function.
         items = idaapi.get_func_cmt(pfn, True), idaapi.get_func_cmt(pfn, False)
         repeatable, nonrepeatable = (internal.comment.decode(item) for item in items)
 
-        logging.debug(u"{:s}.del_func({:#x}) : Removing both repeatable references ({:d}) and non-repeatable references ({:d}) from {:s} ({:#x}).".format(__name__, interface.range.start(pfn), len(repeatable), len(nonrepeatable), 'globals', fn))
+        logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Removing both repeatable references ({:d}) and non-repeatable references ({:d}) from {:s} ({:#x}).".format(__name__, start, stop, len(repeatable), len(nonrepeatable), 'globals', fn))
 
         # After decoding them, we can try to decrease our reference count.
         [ internal.comment.globals.dec(fn, k) for k in repeatable ]
@@ -1826,7 +1828,7 @@ def del_func(pfn):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=fn)
             internal.comment.globals.inc(ea, k)
-            logging.debug(u"{:s}.del_func({:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, ea, utils.string.repr(k), utils.string.repr(k)))
         continue
 
     # remove all function tags depending on whether our address
@@ -1834,7 +1836,7 @@ def del_func(pfn):
     Ftags = database.tag if rt else function.tag
     for k in Ftags(fn):
         internal.comment.globals.dec(fn, k)
-        logging.debug(u"{:s}.del_func({:#x}) : Removing (global) tag {!s} from function.".format(__name__, fn, utils.string.repr(k)))
+        logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Removing (global) tag {!s} from function at {:#x}.".format(__name__, start, stop, utils.string.repr(k), fn))
     return
 
 def set_func_start(pfn, new_start):
@@ -1844,26 +1846,27 @@ def set_func_start(pfn, new_start):
     the function that was changed. Then we can update the reference count for
     any globals that were tagged by moving them into the function's tagcache.
     """
+    start, stop = interface.range.unpack(pfn)
 
     # if new_start has removed addresses from function, then we need to transform
     # all contents tags into globals tags
-    if interface.range.start(pfn) > new_start:
-        for ea in database.address.iterate(new_start, interface.range.start(pfn)):
+    if start > new_start:
+        for ea in database.address.iterate(new_start, start):
             for k in database.tag(ea):
-                internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
+                internal.comment.contents.dec(ea, k, target=start)
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_start, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
 
     # if new_start has added addresses to function, then we need to transform all
     # its global tags into contents tags
-    elif interface.range.start(pfn) < new_start:
-        for ea in database.address.iterate(interface.range.start(pfn), new_start):
+    elif start < new_start:
+        for ea in database.address.iterate(start, new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
-                internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
+                internal.comment.contents.inc(ea, k, target=start)
+                logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Exchanging (decreasing) reference count at {:#x} for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_start, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
     return
@@ -1875,26 +1878,27 @@ def set_func_end(pfn, new_end):
     end of the function that was changed. Then we can update the reference count
     for any globals that were tagged by moving them into the function's tagcache.
     """
+    start, stop = interface.range.unpack(pfn)
 
     # if new_end has added addresses to function, then we need to transform
     # all globals tags into contents tags
-    if new_end > interface.range.end(pfn):
-        for ea in database.address.iterate(interface.range.end(pfn), new_end):
+    if new_end > stop:
+        for ea in database.address.iterate(stop, new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
-                internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
+                internal.comment.contents.inc(ea, k, target=start)
+                logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Exchanging (decreasing) reference count at {:#x} for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_end, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
 
     # if new_end has removed addresses from function, then we need to transform
     # all contents tags into globals tags
-    elif new_end < interface.range.end(pfn):
-        for ea in database.address.iterate(new_end, interface.range.end(pfn)):
+    elif new_end < stop:
+        for ea in database.address.iterate(new_end, stop):
             for k in database.tag(ea):
-                internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
+                internal.comment.contents.dec(ea, k, target=start)
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_end, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
     return
@@ -2057,7 +2061,7 @@ def make_ida_not_suck_cocks(nw_code):
         hasattr(idaapi, '__notification__') and idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
         ui.hook.idp.add('auto_empty', on_ready, 0)
 
-    ui.hook.idb.add('closebase', on_close, 10000)
+    ui.hook.idb.add('closebase', on_close, 10000) if 'closebase' in ui.hook.idb.available else ui.hook.idp.add('closebase', on_close, 10000)
 
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:

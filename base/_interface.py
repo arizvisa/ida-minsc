@@ -89,7 +89,7 @@ class typemap(object):
             (int, 16):(idaapi.owrdflag(), -1),
         }
         if hasattr(idaapi, 'ywrdflag'):
-            integermap[32] = getattr(idaapi, 'ywrdflag')(), -1
+            integermap[int, 32] = getattr(idaapi, 'ywrdflag')(), -1
 
         decimalmap = {
             (float,  4):(idaapi.floatflag(), -1),     (float, 8):(idaapi.doubleflag(), -1),
@@ -109,14 +109,14 @@ class typemap(object):
             (chr, 2): (idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
 
             # variable-terminated, multiple-byte
-            (str, 1, 0): (idaapi.asciflag(), idaapi.ASCSTR_C),
+            (str, 1, 0): (idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
             (str, 2, 0): (idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
             (str, 1, 1): (idaapi.asciflag(), idaapi.ASCSTR_PASCAL),
             (str, 1, 2): (idaapi.asciflag(), idaapi.ASCSTR_LEN2),
             (str, 2, 2): (idaapi.asciflag(), idaapi.ASCSTR_ULEN2),
             (str, 2, 4): (idaapi.asciflag(), idaapi.ASCSTR_ULEN4),
 
-            (chr, 1, 0): (idaapi.asciflag(), idaapi.ASCSTR_C),
+            (chr, 1, 0): (idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
             (chr, 2, 0): (idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
             (chr, 1, 1): (idaapi.asciflag(), idaapi.ASCSTR_PASCAL),
             (chr, 1, 2): (idaapi.asciflag(), idaapi.ASCSTR_LEN2),
