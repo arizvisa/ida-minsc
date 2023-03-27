@@ -116,7 +116,7 @@ def list(**type):
     # List all the fields for each segment that we've aggregated
     for seg in listable:
         comment, _ = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1), ui.navigation.set(interface.range.start(seg))
-        six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, math.trunc(cindex), interface.range.start(seg), 2 + math.trunc(caddr), interface.range.end(seg), 2 + math.trunc(caddr), seg.size(), 3 + math.trunc(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
+        six.print_(u"[{:{:d}d}] {:#0{:d}x}..{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, math.trunc(cindex), interface.range.start(seg), 2 + math.trunc(caddr), interface.range.end(seg), 2 + math.trunc(caddr), seg.size(), 3 + math.trunc(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
     return
 
 ## searching
