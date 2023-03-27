@@ -1285,8 +1285,9 @@ class multicase(object):
         # Now we can use the new code object that we created in order to create a function,
         # assign the previous name and documentation into it, and return it.
         result = pycompat.function.new(newcode, pycompat.function.globals(f), pycompat.function.name(f), pycompat.function.defaults(f), pycompat.function.closure(f))
-        pycompat.function.set_name(result, pycompat.function.name(func)),
+        pycompat.function.set_name(result, pycompat.function.name(func))
         pycompat.function.set_documentation(result, pycompat.function.documentation(func))
+        setattr(result, '__qualname__', func.__qualname__) if hasattr(func, '__qualname__') else None
         return result
 
     @classmethod
@@ -2187,9 +2188,9 @@ class wrap(object):
 
         ## and then turn it back into a function
         res = pycompat.function.new(func_code, pycompat.function.globals(F), pycompat.function.name(F), pycompat.function.defaults(F), cls.cell(*Svals))
-        pycompat.function.set_name(res, pycompat.function.name(F)),
+        pycompat.function.set_name(res, pycompat.function.name(F))
         pycompat.function.set_documentation(res, pycompat.function.documentation(F))
-
+        setattr(res, '__qualname__', F.__qualname__) if hasattr(F, '__qualname__') else None
         return res
 
     # The following Py3 implementation is similar to the prior Py2 impementation,
@@ -2291,9 +2292,9 @@ class wrap(object):
 
         ## finally take our code object, and put it back into a function/callable.
         res = pycompat.function.new(func_code, pycompat.function.globals(F), pycompat.function.name(F), pycompat.function.defaults(F), cls.cell(*Svals))
-        pycompat.function.set_name(res, pycompat.function.name(F)),
+        pycompat.function.set_name(res, pycompat.function.name(F))
         pycompat.function.set_documentation(res, pycompat.function.documentation(F))
-
+        setattr(res, '__qualname__', F.__qualname__) if hasattr(F, '__qualname__') else None
         return res
 
     # The following Py3 implementation is pretty similar to the prior one, but since the
@@ -2397,9 +2398,9 @@ class wrap(object):
 
         ## finally take our code object, and put it back into a function/callable.
         res = pycompat.function.new(func_code, pycompat.function.globals(F), pycompat.function.name(F), pycompat.function.defaults(F), cls.cell(*Svals))
-        pycompat.function.set_name(res, pycompat.function.name(F)),
+        pycompat.function.set_name(res, pycompat.function.name(F))
         pycompat.function.set_documentation(res, pycompat.function.documentation(F))
-
+        setattr(res, '__qualname__', F.__qualname__) if hasattr(F, '__qualname__') else None
         return res
 
     # The following Py3 implementation is different from the previous one due to Py311 lining
@@ -2512,9 +2513,9 @@ class wrap(object):
 
         ## finally take our code object, and put it back into a function/callable.
         res = pycompat.function.new(func_code, pycompat.function.globals(F), pycompat.function.name(F), pycompat.function.defaults(F), cls.cell(*Svals))
-        pycompat.function.set_name(res, pycompat.function.name(F)),
+        pycompat.function.set_name(res, pycompat.function.name(F))
         pycompat.function.set_documentation(res, pycompat.function.documentation(F))
-
+        setattr(res, '__qualname__', F.__qualname__) if hasattr(F, '__qualname__') else None
         return res
 
     def __new__(cls, callable, wrapper):
@@ -2600,10 +2601,10 @@ def transform(translate, *names):
         argnames, defaults, (wildname, _) = wrap.arguments(f)
 
         # convert any positional arguments
-        res = ()
+        res = []
         for value, argname in zip(rargs, argnames):
             try:
-                res += (translate(value) if argname in names else value),
+                res.append(translate(value) if argname in names else value)
             except Exception as E:
                 cls = E.__class__
                 raise cls("{!s}: Exception raised while transforming parameter `{:s}` with value {!r}".format('.'.join([f.__module__, f.__name__]), argname, value))
@@ -2611,7 +2612,7 @@ def transform(translate, *names):
         # get the rest
         for value in rargs[len(res):]:
             try:
-                res += (translate(value) if wildname in names else value,)
+                res.append(translate(value) if wildname in names else value)
             except Exception as E:
                 cls = E.__class__
                 raise cls("{!s}: Exception raised while transforming parameters `{:s}` with value {!r}".format('.'.join([f.__module__, f.__name__]), wildname, value))
