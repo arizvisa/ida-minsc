@@ -178,6 +178,10 @@ class pycompat(object):
     @classmethod
     def fullname(cls, object):
         '''Return the fully qualified name for the specified `object` as a string if possible.'''
+        if isinstance(object, functools.partial):
+            return "{:s}({:s}{:s}{:s})".format(cls.fullname(functools.partial), cls.fullname(object.func), ", {:s}".format(', '.join(map("{!s}".format, object.args))) if object.args else '', ", {:s}".format(string.kwargs(object.keywords)) if object.keywords else '')
+
+        # Otherwise we'll have to just trust whatever name the object has.
         Fqualified_name = fattribute('__qualname__') if hasattr(object, '__qualname__') else cls.function.name if isinstance(object, internal.types.function) else cls.code.name if isinstance(object, internal.types.code) else fattribute('__name__', object.__name__)
         return '.'.join([object.__module__, Fqualified_name(object)] if hasattr(object, '__module__') else [Fqualified_name(object)])
 
