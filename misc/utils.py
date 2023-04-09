@@ -185,7 +185,61 @@ class pycompat(object):
         Fqualified_name = fattribute('__qualname__') if hasattr(object, '__qualname__') else cls.function.name if isinstance(object, internal.types.function) else cls.code.name if isinstance(object, internal.types.code) else fattribute('__name__', object.__name__)
         return '.'.join([object.__module__, Fqualified_name(object)] if hasattr(object, '__module__') else [Fqualified_name(object)])
 
-    class function_2x(object):
+    # this class definition gets used as a base class, before its name
+    # gets reassigned later when it goes out of scope.
+    class function(object):
+        @classmethod
+        def arguments(cls, function):
+            '''Return a tuple containing the names of the arguments, keywords, and both variable argument types for the given `function`.'''
+            c = pycompat.function.code(function)
+            varnames_count, varnames_iter = pycompat.code.argcount(c), (item for item in pycompat.code.varnames(c))
+            args = tuple(itertools.islice(varnames_iter, varnames_count))
+            res = { a : v for v, a in zip(reversed(pycompat.function.defaults(function) or []), reversed(args)) }
+            try: starargs = next(varnames_iter) if pycompat.code.flags(c) & pycompat.co_flags.CO_VARARGS else ""
+            except StopIteration: starargs = ""
+            try: kwdargs = next(varnames_iter) if pycompat.code.flags(c) & pycompat.co_flags.CO_VARKEYWORDS else ""
+            except StopIteration: kwdargs = ""
+            return args, res, (starargs, kwdargs)
+
+        @classmethod
+        def extract(cls, callable):
+            '''Extract the function object from the given `callable` and return it.'''
+            if isinstance(callable, internal.types.function):
+                return callable
+            elif isinstance(callable, internal.types.method):
+                return pycompat.method.function(callable)
+            elif isinstance(callable, internal.types.code):
+                [res] = (item for item in gc.get_referrers(c) if pycompat.function.name(item) == pycompat.code.name(c) and isinstance(item, internal.types.function))
+                return res
+            elif isinstance(callable, internal.types.descriptor):
+                return callable.__func__
+            elif isinstance(callable, functools.partial):
+                return callable.func
+            raise internal.exceptions.InvalidTypeOrValueError(callable)
+
+        @classmethod
+        def constructor(cls, function):
+            '''Return a closure that constructs the original callable for the type of the given `function`.'''
+            if isinstance(function, internal.types.function):
+                return lambda f: f
+            elif isinstance(function, internal.types.method):
+                self, method_t = pycompat.method.self(function), pycompat.method.type(function)
+                return lambda f: pycompat.method.new(f, self, method_t)
+            elif isinstance(function, internal.types.descriptor):
+                descriptor_t = type(function)
+                return lambda f: descriptor_t(f)
+            elif sys.version_info.major < 3 and isinstance(function, internal.types.instance):
+                instance_t = type(function)
+                return lambda f: internal.types.InstanceType(instance_t, {key : value for key, value in f.__dict__.items()})
+            elif isinstance(function, internal.types.class_t):
+                type_t = type(item)
+                return lambda f: type_t(item.__name__, item.__bases__, {key : value for key, value in f.__dict__.items()})
+            elif isinstance(function, functools.partial):
+                fpartial, args, keywords = functools.partial, function.args, function.keywords
+                return lambda f: fpartial(f, *args, **keywords)
+            raise internal.exceptions.InvalidTypeOrValueError(type(function))
+
+    class function_2x(function):
         @classmethod
         def new(cls, code, globals, name, argdefs, closure):
             return internal.types.function(code, globals, name, argdefs, closure)
@@ -534,7 +588,7 @@ class multicase(object):
             # so that we can read any properties we need from it. We also extract
             # its "constructor" so that we can re-create it after we've processed it.
             try:
-                cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
+                cons, func = pycompat.function.constructor(wrapped), pycompat.function.extract(wrapped)
                 if not callable(func):
                     raise internal.exceptions.InvalidTypeOrValueError
 
@@ -547,7 +601,7 @@ class multicase(object):
             # argument is irrelevant for our needs. With regards to this, we can't do anything
             # for methods since we see them before they get attached. However, we can explicitly
             # check if it's using the magic name "__new__" which uses an implicit parameter.
-            args, defaults, (star, starstar) = cls.ex_args(func)
+            args, defaults, (star, starstar) = pycompat.function.arguments(func)
             s_args = 1 if isinstance(wrapped, (internal.types.classmethod, internal.types.method)) or func.__name__ in {'__new__'} else 0
 
             # If the user decorated us whilst explicitly providing the previous
@@ -566,7 +620,7 @@ class multicase(object):
                 ok = False
 
             # So if we found an already-existing wrapper, then we need to steal its cache.
-            res = ok and prev and cls.ex_function(prev)
+            res = ok and prev and pycompat.function.extract(prev)
             if ok and hasattr(res, cls.cache_name):
                 owner, cache, documentation = res, getattr(res, cls.cache_name), getattr(res, cls.documentation_name)
 
@@ -629,7 +683,7 @@ class multicase(object):
         # way we can ensure that our previously decorated functions are actually of the
         # correct type. We do this strictly to assist with debugging.
         try:
-            [cls.ex_function(item) for item in other]
+            [pycompat.function.extract(item) for item in other]
         except Exception:
             error_keywords = ("{:s}={!s}".format(name, types.__name__ if isinstance(types, internal.types.type) or types in {internal.types.callable} else '|'.join(item.__name__ for item in types) if hasattr(types, '__iter__') else "{!r}".format(types)) for name, types in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
@@ -1005,7 +1059,7 @@ class multicase(object):
     @classmethod
     def add(cls, callable, constraints, tree, table):
         '''Add the `callable` with the specified type `constraints` to both the `tree` and `table`.'''
-        args, kwargs, packed = cls.ex_args(callable)
+        args, kwargs, packed = pycompat.function.arguments(callable)
         varargs, wildargs = packed
 
         Fflattened_constraints = lambda types: {item for item in cls.flatten(types if isinstance(types, internal.types.unordered) else [types])}
@@ -1122,7 +1176,7 @@ class multicase(object):
     @classmethod
     def render_documentation(cls, function, constraints, ignored):
         '''Render the documentation for a `function` using the given `constraints` while skipping over any `ignored` parameters.'''
-        args, defaults, (star, starstar) = cls.ex_args(function)
+        args, defaults, (star, starstar) = pycompat.function.arguments(function)
         parameters = [name for name in itertools.chain(args, [star, starstar]) if name]
         prototype = cls.prototype(function, constraints, ignored)
         documentation = function.__doc__ or ''
@@ -1157,7 +1211,7 @@ class multicase(object):
     @classmethod
     def prototype(cls, function, constraints={}, ignored={item for item in []}):
         '''Generate a prototype for the given `function` and `constraints` while skipping over the `ignored` argument names.'''
-        args, defaults, (star, starstar) = cls.ex_args(function)
+        args, defaults, (star, starstar) = pycompat.function.arguments(function)
 
         def Femit_arguments(names, constraints, ignored):
             '''Yield a tuple for each individual parameter composed of the name and its constraints.'''
@@ -1290,48 +1344,6 @@ class multicase(object):
         setattr(result, '__qualname__', func.__qualname__) if hasattr(func, '__qualname__') else None
         return result
 
-    @classmethod
-    def ex_function(cls, object):
-        '''Extract the actual function type from a callable.'''
-        if isinstance(object, internal.types.function):
-            return object
-        elif isinstance(object, internal.types.method):
-            return pycompat.method.function(object)
-        elif isinstance(object, internal.types.code):
-            res, = (item for item in gc.get_referrers(c) if pycompat.function.name(item) == pycompat.code.name(c) and isinstance(item, internal.types.function))
-            return res
-        elif isinstance(object, internal.types.descriptor):
-            return object.__func__
-        raise internal.exceptions.InvalidTypeOrValueError(object)
-
-    @classmethod
-    def reconstructor(cls, item):
-        '''Return a closure that returns the original callable type for a function.'''
-        if isinstance(item, internal.types.function):
-            return lambda f: f
-        if isinstance(item, internal.types.method):
-            return lambda f: pycompat.method.new(f, pycompat.method.self(item), pycompat.method.type(item))
-        if isinstance(item, internal.types.descriptor):
-            return lambda f: type(item)(f)
-        if isinstance(item, internal.types.instance):
-            return lambda f: internal.types.InstanceType(type(item), {key : value for key, value in f.__dict__.items()})
-        if isinstance(item, internal.types.class_t):
-            return lambda f: type(item)(item.__name__, item.__bases__, {key : value for key, value in f.__dict__.items()})
-        raise internal.exceptions.InvalidTypeOrValueError(type(item))
-
-    @classmethod
-    def ex_args(cls, f):
-        '''Extract the arguments from a function.'''
-        c = pycompat.function.code(f)
-        varnames_count, varnames_iter = pycompat.code.argcount(c), (item for item in pycompat.code.varnames(c))
-        args = tuple(itertools.islice(varnames_iter, varnames_count))
-        res = { a : v for v, a in zip(reversed(pycompat.function.defaults(f) or []), reversed(args)) }
-        try: starargs = next(varnames_iter) if pycompat.code.flags(c) & pycompat.co_flags.CO_VARARGS else ""
-        except StopIteration: starargs = ""
-        try: kwdargs = next(varnames_iter) if pycompat.code.flags(c) & pycompat.co_flags.CO_VARKEYWORDS else ""
-        except StopIteration: kwdargs = ""
-        return args, res, (starargs, kwdargs)
-
 class alias(object):
     """
     This class is used to generate a function that will be replaced with a
@@ -1343,7 +1355,7 @@ class alias(object):
         if isinstance(other, type):
             return cls.namespace_wrapper(other, klass)
 
-        cons, func = multicase.reconstructor(other), multicase.ex_function(other)
+        cons, func = pycompat.function.constructor(other), pycompat.function.extract(other)
         qualname = fattribute('__qualname__', None)(func)
         if klass:
             module = [func.__module__, klass]
@@ -2099,7 +2111,7 @@ class wrap(object):
 
         If `bound` is ``True``, then assume that the first parameter for `F` represents the instance it's bound to.
         """
-        F, C, S = (cls.extract(item) for item in [function, wrapper, cls.assemble_2x])
+        F, C, S = (pycompat.function.extract(item) for item in [function, wrapper, cls.assemble_2x])
         Fc, Cc, Sc = (pycompat.function.code(item) for item in [F, C, S])
 
         ## build the namespaces that we'll use
@@ -2202,7 +2214,7 @@ class wrap(object):
 
         If `bound` is ``True``, then assume that the first parameter for `F` represents the instance it's bound to.
         """
-        F, C, S = (cls.extract(item) for item in [function, wrapper, cls.assemble_38x])
+        F, C, S = (pycompat.function.extract(item) for item in [function, wrapper, cls.assemble_38x])
         Fc, Cc, Sc = (pycompat.function.code(item) for item in [F, C, S])
         Nvarargs, Nvarkwds = 1 if cls.co_varargsQ(Fc) else 0, 1 if cls.co_varkeywordsQ(Fc) else 0
 
@@ -2307,7 +2319,7 @@ class wrap(object):
 
         If `bound` is ``True``, then assume that the first parameter for `F` represents the instance it's bound to.
         """
-        F, C, S = (cls.extract(item) for item in [function, wrapper, cls.assemble_39x])
+        F, C, S = (pycompat.function.extract(item) for item in [function, wrapper, cls.assemble_39x])
         Fc, Cc, Sc = (pycompat.function.code(item) for item in [F, C, S])
         Nvarargs, Nvarkwds = 1 if cls.co_varargsQ(Fc) else 0, 1 if cls.co_varkeywordsQ(Fc) else 0
 
@@ -2416,7 +2428,7 @@ class wrap(object):
 
         If `bound` is ``True``, then assume that the first parameter for `F` represents the instance it's bound to.
         """
-        F, C, S = (cls.extract(item) for item in [function, wrapper, cls.assemble_39x])
+        F, C, S = (pycompat.function.extract(item) for item in [function, wrapper, cls.assemble_39x])
         Fc, Cc, Sc = (pycompat.function.code(item) for item in [F, C, S])
         Nvarargs, Nvarkwds = 1 if cls.co_varargsQ(Fc) else 0, 1 if cls.co_varkeywordsQ(Fc) else 0
 
@@ -2520,7 +2532,7 @@ class wrap(object):
 
     def __new__(cls, callable, wrapper):
         '''Return a function similar to `callable` that calls `wrapper` with `callable` as the first argument.'''
-        cons, f = cls.constructor(callable), cls.extract(callable)
+        cons, f = pycompat.function.constructor(callable), pycompat.function.extract(callable)
         Fassemble = cls.assemble_2x if sys.version_info.major < 3 else cls.assemble_38x if sys.version_info.minor < 9 else cls.assemble_39x if sys.version_info.minor < 11 else cls.assemble_311x
 
         # create a wrapper for the function that'll execute `callable` with the function as its first argument, and the rest with any args
@@ -2530,75 +2542,13 @@ class wrap(object):
         # now we re-construct it and then return it
         return cons(res)
 
-    @classmethod
-    def extract(cls, object):
-        '''Extract a ``types.FunctionType`` from a callable.'''
-
-        # `object` is already a function
-        if isinstance(object, internal.types.function):
-            return object
-
-        # if it's a method, then extract the function from its propery
-        elif isinstance(object, internal.types.method):
-            return pycompat.method.function(object)
-
-        # if it's a code type, then walk through all of its referrers finding one that matches it
-        elif isinstance(object, internal.types.code):
-            res, = (item for item in gc.get_referrers(c) if pycompat.function.name(item) == pycompat.code.name(c) and isinstance(item, internal.types.function))
-            return res
-
-        # if it's a property decorator, then they hide the function in an attribute
-        elif isinstance(object, internal.types.descriptor):
-            return object.__func__
-
-        # okay, no go. we have no idea what this is.
-        raise internal.exceptions.InvalidTypeOrValueError(object)
-
-    @classmethod
-    def arguments(cls, f):
-        '''Extract the arguments from a function `f`.'''
-        c = pycompat.function.code(f)
-        count, iterable = pycompat.code.argcount(c), (item for item in pycompat.code.varnames(c))
-        args = tuple(itertools.islice(iterable, count))
-        res = { a : v for v, a in zip(reversed(pycompat.function.defaults(f) or []), reversed(args)) }
-        starargs = next(iterable, '') if pycompat.code.flags(c) & pycompat.co_flags.CO_VARARGS else ''
-        kwdargs = next(iterable, '') if pycompat.code.flags(c) & pycompat.co_flags.CO_VARKEYWORDS else ''
-        return args, res, (starargs, kwdargs)
-
-    @classmethod
-    def constructor(cls, callable):
-        '''Return a closure that constructs the original `callable` type from a function.'''
-
-        # `callable` is a function type, so just return a closure that returns it
-        if isinstance(callable, internal.types.function):
-            return lambda func: func
-
-        # if it's a method type, then we just need to extract the related properties to construct it
-        elif isinstance(callable, internal.types.method):
-            return lambda method, self=pycompat.method.self(callable), cls=pycompat.method.type(callable): pycompat.method.new(method, self, cls)
-
-        # if it's a property decorator, we just need to pass the function as an argument to the decorator
-        elif isinstance(callable, internal.types.descriptor):
-            return lambda method, mt=callable.__class__: mt(method)
-
-        # if it's a method instance, then we just need to instantiate it so that it's bound
-        elif isinstance(callable, internal.types.InstanceType):
-            return lambda method, mt=callable.__class__: internal.types.InstanceType(mt, {key : value for key, value in method.__dict__.items()})
-
-        # otherwise if it's a class or a type, then we just need to create the object with its bases
-        elif isinstance(n, (internal.types.type, internal.types.ClassType)):
-            return lambda method, t=callable.__class__, name=callable.__name__, bases=callable.__bases__: t(name, bases, {key : value for key, value in method.__dict__.items()})
-
-        # if we get here, then we have no idea what kind of type `callable` is
-        raise internal.exceptions.InvalidTypeOrValueError(callable.__class__)
-
 ### function decorator for translating arguments belonging to a function
 def transform(translate, *names):
     '''This applies the callable `translate` to any function arguments that match `names` in the decorated function.'''
     names = {name for name in names}
     def wrapper(F, *rargs, **rkwds):
-        f = wrap.extract(F)
-        argnames, defaults, (wildname, _) = wrap.arguments(f)
+        f = pycompat.function.extract(F)
+        argnames, defaults, (wildname, _) = pycompat.function.arguments(f)
 
         # convert any positional arguments
         res = []
@@ -2639,7 +2589,7 @@ def require_attribute(object, attribute):
     target if one was found, or `None` if neither was found.
     """
     def ignored(wrapped):
-        func = multicase.ex_function(wrapped)
+        func = pycompat.function.extract(wrapped)
         name = pycompat.function.name(func)
         if name in sys._getframe().f_back.f_locals:
             return sys._getframe().f_back.f_locals[name]
