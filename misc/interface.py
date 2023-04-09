@@ -1823,6 +1823,74 @@ class address(object):
         # Just return the total number of operands that we updated...for now.
         return len(operands)
 
+    @classmethod
+    def walk_backward(cls, ea, step):
+        '''Start at the address `ea` walking backwards through each address return by `step`.'''
+        start = ea
+        try:
+            ea, next = step(start), ea + 1
+        except internal.exceptions.OutOfBoundsError:
+            ea, next = None, ea
+
+        # After our first step, continue in a loop yielding each taken step. We don't
+        # need to adjust anything because find_prev skips over the current address.
+        try:
+            while ea not in {idaapi.BADADDR, None} and ea < next:
+                next = ea
+                yield ea
+                ea = step(next)
+
+            logging.info(u"{:s}.walk_backward({:#x}, {!s}) : Walking backwards from address {:#x} terminated at {:#x}.".format('.'.join([__name__, cls.__name__]), start, internal.utils.pycompat.fullname(step), start, next))
+
+        except internal.exceptions.OutOfBoundsError:
+            logging.info(u"{:s}.walk_backward({:#x}, {!s}) : Walking backwards from address {:#x} terminated at {:#x} due to the address being out-of-bounds.".format('.'.join([__name__, cls.__name__]), start, internal.utils.pycompat.fullname(step), start, next))
+
+    @classmethod
+    def walk_forward(cls, ea, step):
+        '''Start at the address `ea` walking forwards through each address return by `step`.'''
+        start = ea
+        try:
+            ea, next = step(start), ea - 1
+        except internal.exceptions.OutOfBoundsError:
+            ea, next = None, ea
+
+        # After our first step, continue in a loop yielding each taken step while
+        # adjusting the following step by +1 to avoid the potential infinite loop.
+        try:
+            while ea not in {idaapi.BADADDR, None} and ea > next:
+                next = ea
+                yield ea
+                ea = step(next + 1)
+
+            logging.info(u"{:s}.walk_forward({:#x}, {!s}) : Walking forwards from address {:#x} terminated at {:#x}.".format('.'.join([__name__, cls.__name__]), start, internal.utils.pycompat.fullname(step), start, next))
+
+        except internal.exceptions.OutOfBoundsError:
+            logging.info(u"{:s}.walk_forward({:#x}, {!s}) : Walking forwards from address {:#x} terminated at {:#x} due to the address being out-of-bounds.".format('.'.join([__name__, cls.__name__]), start, internal.utils.pycompat.fullname(step), start, next))
+        return
+
+    @classmethod
+    def iterate(cls, ea, step):
+        '''Start at the address `ea` yielding each address returned by the callable `step`.'''
+        start = next = ea
+        try:
+            ea = step(next)
+        except internal.exceptions.OutOfBoundsError:
+            ea = next
+
+        # Continue in a loop yielding each value returned from our callable. If
+        # the returned address is bad or results in a cycle, then we can bail.
+        try:
+            while ea not in {next, idaapi.BADADDR, None}:
+                next = ea
+                yield ea
+                ea = step(next)
+
+            logging.info(u"{:s}.iterate({:#x}, {!s}) : Iteration starting from address {:#x} terminated at {:#x}.".format('.'.join([__name__, cls.__name__]), start, internal.utils.pycompat.fullname(step), start, next))
+
+        except internal.exceptions.OutOfBoundsError:
+            logging.info(u"{:s}.iterate({:#x}, {!s}) : Iteration starting from address {:#x} terminated at {:#x} due to the address being out-of-bounds.".format('.'.join([__name__, cls.__name__]), start, internal.utils.pycompat.fullname(step), start, next))
+        return
+
 class range(object):
     """
     This namespace provides tools that assist with interacting with IDA 6.x's
