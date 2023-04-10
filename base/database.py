@@ -3110,19 +3110,6 @@ class address(object):
         '''Return the bounds of the specified address `ea` in a tuple formatted as `(left, right)`.'''
         return interface.bounds_t(ea, ea + interface.address.size(ea))
 
-    @staticmethod
-    def __walk__(ea, next, predicate):
-        '''Return the first address from `ea` using `next` for stepping while the callable in `predicate` returns true.'''
-        res = interface.address.inside(ea)
-
-        # Now that we know we're a valid address in the database,
-        # we simply need to keeping calling next() while match()
-        # continuously allows us to.
-        while res not in {None, idaapi.BADADDR} and predicate(res):
-            ea = ui.navigation.analyze(res)
-            res = next(ea)
-        return res
-
     @utils.multicase()
     @classmethod
     def iterate(cls):
@@ -3350,21 +3337,23 @@ class address(object):
     @classmethod
     def prevF(cls, ea, predicate, count):
         '''Return the previous `count` addresses from the address `ea` that satisfies the provided `predicate`.'''
-        Fprev, Finverse = utils.fcompose(interface.address.within, idaapi.prev_not_tail), utils.fcompose(predicate, operator.not_)
+        top, bottom = config.bounds()
+        ea, Fstart, Fprev = (ea, functools.partial(operator.sub, 1), idaapi.prev_not_tail) if ea == bottom else (interface.address.within(ea), idaapi.get_item_head, idaapi.prev_not_tail)
 
-        # If we're at the very bottom address of the database then skip
-        # the boundary check for interface.address.within().
-        _, bottom = config.bounds()
-        if ea == bottom:
-            Fprev = idaapi.prev_not_tail
-
-        # Otherwise if we're already at the top, there's nowhere else to go.
+        # if we're already at the top, there's nowhere else to go.
         if Fprev(ea) == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.prevF: Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), config.bounds()[0], ea))
+            top, bottom = config.bounds()
+            raise E.AddressOutOfBoundsError(u"{:s}.prevF({:#x}, {!r}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, top, ea))
 
-        # Walk until right before the matching address, and then return the one before.
-        res = cls.__walk__(Fprev(ea), Fprev, Finverse)
-        return cls.prevF(res, predicate, count - 1) if count > 1 else res
+        # grab all of the matching addresses and return the very last one.
+        iterable = (item for item in interface.address.iterate(Fstart(ea), Fprev) if predicate(ui.navigation.analyze(item)))
+        items = [item for index, item in zip(builtins.range(count), iterable)]
+
+        # if we didn't retrieve enough items, then we seeked past the top of the database.
+        if count and len(items) < count:
+            top, bottom = config.bounds()
+            raise E.AddressOutOfBoundsError(u"{:s}.prevF({:#x}, {!r}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, top, items[-1] if items else ea))
+        return items[-1] if items else ea
 
     @utils.multicase(predicate=internal.types.callable)
     @classmethod
@@ -3380,15 +3369,21 @@ class address(object):
     @classmethod
     def nextF(cls, ea, predicate, count):
         '''Return the next `count` addresses from the address `ea` that satisfies the provided `predicate`.'''
-        Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
+        top, bottom = config.bounds()
+        ea, Fnext = (ea, idaapi.next_not_tail) if ea == top else (interface.address.within(ea), idaapi.next_not_tail)
 
-        # If we're at the very bottom of the database, then we're done.
+        # if we're already at the bottom, there's nowhere else to go.
         if Fnext(ea) == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.nextF: Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), config.bounds()[1], idaapi.get_item_end(ea)))
+            raise E.AddressOutOfBoundsError(u"{:s}.nextF({:#x}, {!r}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, bottom, idaapi.get_item_end(ea)))
 
-        # Walk until right before the matching address, and then return the one after.
-        res = cls.__walk__(Fnext(ea), Fnext, Finverse)
-        return cls.nextF(res, predicate, count - 1) if count > 1 else res
+        # grab all of the matching addresses and return the very last one.
+        iterable = (item for item in interface.address.iterate(idaapi.get_item_head(ea), Fnext) if predicate(ui.navigation.analyze(item)))
+        items = [item for index, item in zip(builtins.range(count), iterable)]
+
+        # if we didn't retrieve enough items, then we seeked past the top of the database.
+        if count and len(items) < count:
+            raise E.AddressOutOfBoundsError(u"{:s}.nextF({:#x}, {!r}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, bottom, items[-1] if items else ea))
+        return items[-1] if items else ea
 
     @utils.multicase(mask=(internal.types.integer, internal.types.tuple))
     @classmethod
@@ -4017,7 +4012,7 @@ class address(object):
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
         '''Return the previous address from the address `ea` containing an instruction that uses `reg` or any one of the specified `regs`.'''
-        return cls.prevreg(ea, utils.fconst(True), reg, *regs, **modifiers)
+        return cls.prevreg(ea, modifiers.pop('predicate', utils.fconstant(True)), reg, *regs, **modifiers)
     @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, reg=(internal.types.string, interface.register_t))
     @classmethod
     def prevreg(cls, ea, predicate, reg, *regs, **modifiers):
@@ -4027,46 +4022,37 @@ class address(object):
         args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(str(reg), '"')) for reg in regs])
         args = args + (u", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '')
 
-        # generate each helper using the regmatch class
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use(regs)
-
-        # if within a function, then make sure we're within the chunk's bounds and we're a code type
+        # if we are within a function, then make sure we find a code type within
+        # the chunk's bounds. thus we'll stop at the very top of the chunk.
         if function.has(ea):
             (start, _) = function.chunk(ea)
             fwithin = utils.fcompose(utils.fmap(functools.partial(operator.le, start), type.code), builtins.all)
 
-        # otherwise ensure that we're not in the function and we're a code type.
+        # otherwise ensure that we find a code type that is not in the function,
+        # which means that we'll stop at the very top of the database.
         else:
+            top, bottom = config.bounds()
             fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.has, operator.not_), type.code), builtins.all)
+            iterable = (item for item in interface.address.iterate(ea, idaapi.prev_not_tail) if not fwithin(ui.navigation.analyze(item)))
+            res = builtins.next(iterable, None)
+            start = top if res is None else idaapi.get_item_end(res)
 
-            start = cls.__walk__(ea, cls.prev, fwithin)
-            start = top() if start == idaapi.BADADDR else start
+        # generate each helper using the regmatch class
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use(regs)
 
-        # define a predicate for cls.walk to continue looping when true
-        Freg = lambda ea: fwithin(ea) and not builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
+        # define a predicate for checking whether an address uses the desired registers.
+        Freg = lambda ea: fwithin(ea) and builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
         F = utils.fcompose(utils.fmap(Freg, predicate), builtins.all)
 
-        ## skip the current address
-        prevea = cls.prev(ea)
-        if prevea is None:
-            # FIXME: include registers in message
-            logging.fatal(u"{:s}.prevreg({:s}) : Unable to start walking from the previous address of {:#x}.".format('.'.join([__name__, cls.__name__]), args, ea))
-            return ea
+        # now grab all addresses where any of our registers match using the count.
+        iterable = (item for item in interface.address.iterate(ea, idaapi.prev_not_tail) if item >= start and type.code(ui.navigation.analyze(item)) and F(item))
+        items = [item for index, item in zip(builtins.range(count), iterable)]
 
-        # now walk while none of our registers match
-        res = cls.__walk__(prevea, cls.prev, F)
-        if res in {None, idaapi.BADADDR} or (cls == address and res < start):
-            # FIXME: include registers in message
-            raise E.RegisterNotFoundError(u"{:s}.prevreg({:s}) : Unable to find register{:s} within the chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), args, '' if len(regs)==1 else 's', start, ea, res))
-
-        # if the address is not a code type, then recurse so we can skip it.
-        if not type.code(res):
-            return cls.prevreg(res, predicate, *regs, **modifiers)
-
-        # recurse if the user specified it
-        modifiers['count'] = count - 1
-        return cls.prevreg(res, predicate, *regs, **modifiers) if count > 1 else res
+        # if we didn't retrieve enough items, then we seeked past the top of the chunk.
+        if count and len(items) < count:
+            raise E.RegisterNotFoundError(u"{:s}.prevreg({:s}) : Unable to find register{:s} within the chunk {:#x}..{:#x}. Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), args, '' if len(regs) == 1 else 's', start, ea - 1, items[-1] if items else ea))
+        return items[-1] if items else ea
 
     @utils.multicase(reg=(internal.types.string, interface.register_t))
     @classmethod
@@ -4082,7 +4068,7 @@ class address(object):
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
         '''Return the next address from the address `ea` containing an instruction that uses `reg` or any one of the specified `regs`.'''
-        return cls.nextreg(ea, utils.fconst(True), reg, *regs, **modifiers)
+        return cls.nextreg(ea, modifiers.pop('predicate', utils.fconstant(True)), reg, *regs, **modifiers)
     @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, reg=(internal.types.string, interface.register_t))
     @classmethod
     def nextreg(cls, ea, predicate, reg, *regs, **modifiers):
@@ -4092,46 +4078,37 @@ class address(object):
         args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(str(reg), '"')) for reg in regs])
         args = args + (u", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '')
 
-        # generate each helper using the regmatch class
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use(regs)
-
-        # if within a function, then make sure we're within the chunk's bounds.
+        # if we are within a function, then make sure we find a code type within
+        # the chunk's bounds. thus we'll stop at the very end of the chunk.
         if function.has(ea):
             (_, end) = function.chunk(ea)
             fwithin = utils.fcompose(utils.fmap(functools.partial(operator.gt, end), type.code), builtins.all)
 
-        # otherwise ensure that we're not in a function and we're a code type.
+        # otherwise ensure that we find a code type that is not in the function,
+        # which means that we'll stop at the very bottom of the database.
         else:
+            top, bottom = config.bounds()
             fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.has, operator.not_), type.code), builtins.all)
+            iterable = (item for item in interface.address.iterate(ea, idaapi.next_not_tail) if not fwithin(ui.navigation.analyze(item)))
+            res = builtins.next(iterable, None)
+            end = bottom if res is None else idaapi.get_item_head(res)
 
-            end = cls.__walk__(ea, cls.next, fwithin)
-            end = bottom() if end == idaapi.BADADDR else end
+        # generate each helper using the regmatch class
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use(regs)
 
-        # define a predicate for cls.walk to continue looping when true
-        Freg = lambda ea: fwithin(ea) and not builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
+        # define a predicate for checking whether an address uses the desired registers.
+        Freg = lambda ea: fwithin(ea) and builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
         F = utils.fcompose(utils.fmap(Freg, predicate), builtins.all)
 
-        # skip the current address
-        nextea = cls.next(ea)
-        if nextea is None:
-            # FIXME: include registers in message
-            logging.fatal(u"{:s}.nextreg({:s}) : Unable to start walking from the next address of {:#x}.".format('.'.join([__name__, cls.__name__]), args, ea))
-            return ea
+        # now grab all addresses where any of our registers match using the count.
+        iterable = (item for item in interface.address.iterate(ea, idaapi.next_not_tail) if item < end and type.code(ui.navigation.analyze(item)) and F(item))
+        items = [item for index, item in zip(builtins.range(count), iterable)]
 
-        # now walk while none of our registers match
-        res = cls.__walk__(nextea, cls.next, F)
-        if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
-            # FIXME: include registers in message
-            raise E.RegisterNotFoundError(u"{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), args, '' if len(regs)==1 else 's', ea, end, res))
-
-        # if the address is not a code type, then recurse so we can skip it.
-        if not type.code(res):
-            return cls.nextreg(res, predicate, *regs, **modifiers)
-
-        # recurse if the user specified it
-        modifiers['count'] = count - 1
-        return cls.nextreg(res, predicate, *regs, **modifiers) if count > 1 else res
+        # if we didn't retrieve enough items, then we seeked past the top of the chunk.
+        if count and len(items) < count:
+            raise E.RegisterNotFoundError(u"{:s}.nextreg({:s}) : Unable to find register{:s} within the chunk {:#x}..{:#x}. Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), args, '' if len(regs) == 1 else 's', ea, end - 1, items[-1] if items else ea))
+        return items[-1] if items else ea
 
     @utils.multicase(delta=internal.types.integer)
     @classmethod
