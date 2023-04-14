@@ -1314,13 +1314,11 @@ class search(object):
         If `reverse` is specified as a bool, then search backwards from the given address.
         If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
-        queryF = utils.string.to
-
         reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = idaapi.SEARCH_REGEX
         flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
+        res = idaapi.find_text(ea, 0, 0, utils.string.to(string), flags)
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
@@ -1341,13 +1339,11 @@ class search(object):
         If `reverse` is specified as a bool, then search backwards from the given address.
         If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
-        queryF = utils.string.to
-
         reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = 0
         flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
+        res = idaapi.find_text(ea, 0, 0, utils.string.to(string), flags)
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
@@ -1357,24 +1353,24 @@ class search(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def by_name(cls, name, **options):
-        '''Search through the database at the current address for the symbol `name`.'''
+        '''Search through the database from the current address for the symbol `name`.'''
         return cls.by_name(ui.current.address(), name, **options)
     @utils.multicase(ea=internal.types.integer, name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by_name(cls, ea, name, **options):
-        """Search through the database at address `ea` for the symbol `name`.
+        """Search through the database from the address `ea` for the symbol `name`.
 
-        If `reverse` is specified as a bool, then search backwards from the given address.
-        If `sensitive` is specified as bool, then perform a case-sensitive search.
+        If `reverse` is specified as true, then search backwards from the given address.
+        If `ignorecase` is specified as true, then perform a case-insensitive search (slowly).
         """
-        queryF = utils.string.to
-
         reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
+        ignore = builtins.next((options[k] for k in ['ignore', 'case', 'ignorecase'] if k in options), False)
         flags = idaapi.SEARCH_IDENT
         flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
-        flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        res = idaapi.find_text(ea, 0, 0, queryF(name), flags)
+        flags |= idaapi.SEARCH_CASE if ignore else 0
+        res = idaapi.BADADDR if ignore else idaapi.get_name_ea(ea, utils.string.to(name))
+        res = idaapi.find_text(ea, 0, 0, utils.string.to(name), flags) if res == idaapi.BADADDR else res
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
