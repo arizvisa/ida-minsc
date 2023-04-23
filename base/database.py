@@ -3061,6 +3061,14 @@ class address(object):
             return cls.head(address)
         start, stop = selection
         return [ea for ea in cls.iterate(start, stop)]
+    @utils.multicase(step=internal.types.callable)
+    def __new__(cls, step):
+        '''Return a list of each address from the current selection using the callable `step` to find the next address.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        start, stop = (address, address) if operator.eq(*(interface.address.head(ea) for ea in selection)) else selection
+        if operator.sub(*sorted([start, stop])[::-1]) == 0:
+            logging.warning(u"{:s}({!s}) : There are {:d} bytes currently selected around address {:#x} which will result in an empty range being returned.".format('.'.join([__name__, cls.__name__]), utils.pycompat.fullname(step), operator.sub(*sorted([start, stop])[::-1]), address))
+        return [ea for ea in cls.iterate(start, stop, step)]
     @utils.multicase(ea=internal.types.integer)
     def __new__(cls, ea):
         '''Return the address of the item containing the address `ea`.'''
@@ -3075,21 +3083,21 @@ class address(object):
         if ea == idaapi.BADADDR:
             raise E.AddressNotFoundError(u"{:s}({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
         return ea
-    @utils.multicase(start=internal.types.integer, end=internal.types.integer)
-    def __new__(cls, start, end):
-        '''Return a list containing each of the addresses from `start` to `end`.'''
-        return [ea for ea in cls.iterate(start, end)]
-    @utils.multicase(start=internal.types.integer, end=internal.types.integer, step=internal.types.callable)
-    def __new__(cls, start, end, step):
-        '''Return a list containing each of the addresses from `start` to `end` using the callable `step` to determine the next address.'''
-        return [ea for ea in cls.iterate(start, end, step)]
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
+    def __new__(cls, start, stop):
+        '''Return a list of each address from `start` until the address `stop`.'''
+        return [ea for ea in cls.iterate(start, stop)]
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer, step=internal.types.callable)
+    def __new__(cls, start, stop, step):
+        '''Return a list of each address from `start` until the address `stop` using the callable `step` to find the next address.'''
+        return [ea for ea in cls.iterate(start, stop, step)]
     @utils.multicase(bounds=interface.bounds_t)
     def __new__(cls, bounds):
-        '''Return a list containing each of the addresses within `bounds`.'''
+        '''Return a list of each address within the given `bounds`.'''
         return [ea for ea in cls.iterate(bounds)]
     @utils.multicase(bounds=interface.bounds_t, step=internal.types.callable)
     def __new__(cls, bounds, step):
-        '''Return a list containing each of the addresses within `bounds` using the callable `step` to determine the next address.'''
+        '''Return a list of each address within the given `bounds` using the callable `step` to find the next address.'''
         return [ea for ea in cls.iterate(bounds, step)]
 
     @utils.multicase()
@@ -3175,25 +3183,25 @@ class address(object):
         '''Iterate through the currently selected blocks.'''
         selection = ui.current.selection()
         return cls.blocks(selection)
-    @utils.multicase(end=internal.types.integer)
+    @utils.multicase(stop=internal.types.integer)
     @classmethod
-    def blocks(cls, end):
-        '''Yields the boundaries of each block from the current address to `end`.'''
-        return cls.blocks(ui.current.address(), end)
+    def blocks(cls, stop):
+        '''Yields the boundaries of each block from the current address until the address `stop`.'''
+        return cls.blocks(ui.current.address(), stop)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def blocks(cls, bounds):
         '''Yields the boundaries of each block within the specified `bounds`.'''
         left, right = bounds
         return cls.blocks(left, right)
-    @utils.multicase(start=internal.types.integer, end=internal.types.integer)
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
     @classmethod
-    def blocks(cls, start, end):
-        '''Yields the boundaries of each block between the addresses `start` and `end`.'''
-        block, _ = start, end = interface.address.head(start, warn=True), interface.address.tail(end, warn=False) + 1
+    def blocks(cls, start, stop):
+        '''Yields the boundaries of each block from the address `start` until the address `stop`.'''
+        block, _ = start, stop = interface.address.head(start, warn=True), interface.address.tail(stop, warn=False) + 1
 
         results = []
-        for ea in cls.iterate(start, end):
+        for ea in cls.iterate(start, stop):
             nextea = cls.next(ea)
 
             ## XXX: it seems that idaapi.is_basic_block_end requires the following to be called
