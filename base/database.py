@@ -3112,56 +3112,38 @@ class address(object):
         '''Iterate through the currently selected addresses.'''
         selection = ui.current.selection()
         return cls.iterate(selection)
-    @utils.multicase(end=internal.types.integer)
+    @utils.multicase(step=internal.types.callable)
     @classmethod
-    def iterate(cls, end):
-        '''Iterate from the current address to `end`.'''
-        return cls.iterate(ui.current.address(), end)
-    @utils.multicase(end=internal.types.integer, step=internal.types.callable)
+    def iterate(cls, step):
+        '''Iterate through the currently selected addresses using the callable `step` to find the next address.'''
+        selection = ui.current.selection()
+        return cls.iterate(selection, step)
+    @utils.multicase(stop=internal.types.integer)
     @classmethod
-    def iterate(cls, end, step):
-        '''Iterate from the current address to `end` using the callable `step` to determine the next address.'''
-        return cls.iterate(ui.current.address(), end, step)
-    @utils.multicase(start=internal.types.integer, end=internal.types.integer)
+    def iterate(cls, stop):
+        '''Iterate from the current address to until right before the address `stop`.'''
+        return cls.iterate(ui.current.address(), stop)
+    @utils.multicase(stop=internal.types.integer, step=internal.types.callable)
     @classmethod
-    def iterate(cls, start, end):
-        '''Iterate from address `start` to `end`.'''
-        start, end = interface.address.within(start, end)
-        step = cls.prev if start > end else cls.next
-        return cls.iterate(start, end, step)
-    @utils.multicase(start=internal.types.integer, end=internal.types.integer, step=internal.types.callable)
+    def iterate(cls, stop, step):
+        '''Iterate from the current address to the address `stop` using the callable `step` to find the next address.'''
+        return cls.iterate(ui.current.address(), stop, step)
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
     @classmethod
-    def iterate(cls, start, end, step):
-        '''Iterate from address `start` to `end` using the callable `step` to determine the next address.'''
-        left, right = config.bounds()
-
-        # we need to always ensure that the maximum address is always excluded. no
-        # good reason for this, but i'm pretty sure that this is how this had always
-        # worked as the positions we get should be thought of like a cursor.
-        op = operator.lt if start <= end else operator.ge
-        ea, stop = interface.address.within(start, end) if start <= end else reversed(sorted(interface.address.within(end, idaapi.get_item_head(start))))
-        adder = functools.partial(operator.add, +1 if start <= end else -1)
-
-        # this function is not really intended to be a "filter" for a range, so we
-        # always yield our starting address by ensuring our next address is different.
-        try:
-            next = ~ea
-
-            # loop continuosly until we terminate or we run out of bounds.
-            while ea not in {idaapi.BADADDR, None} and op(ea, stop):
-                next = step(adder(ea)) if ea == next else step(ea)
-
-                # since we loop indefinitely, we need to detect whether our step
-                # returns the same value to avoid an infinite loop. we do this by
-                # checking for equality and adjusting to the next byte if so.
-                if ea != next:
-                    yield ea
-                ea = next
-
-        # if we caught an OutOfBoundsError, then we bail...quietly.
-        except E.OutOfBoundsError:
-            pass
-        return
+    def iterate(cls, start, stop):
+        '''Iterate from the address `start` until right before the address `stop`.'''
+        left, right = interface.address.within(*sorted([start, stop]))
+        ea, step, Fwhile = (left, idaapi.next_not_tail, functools.partial(operator.gt, right)) if start <= stop else (right, idaapi.prev_not_tail, functools.partial(operator.le, left))
+        iterable = itertools.takewhile(Fwhile, interface.address.iterate(ea, step))
+        return itertools.chain([ea], iterable)
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer, step=internal.types.callable)
+    @classmethod
+    def iterate(cls, start, stop, step):
+        '''Iterate from address `start` until the address `stop` using the callable `step` to find the next address.'''
+        left, right = interface.address.within(*sorted([start, stop]))
+        Fwhile, Fwalk = (functools.partial(operator.gt, right), interface.address.walk_forward) if start <= stop else (functools.partial(operator.le, left), interface.address.walk_backward)
+        iterable = (ui.navigation.set(ea) for ea in Fwalk(start, step))
+        return itertools.takewhile(Fwhile, iterable)
     @utils.multicase(location=interface.location_t)
     @classmethod
     def iterate(cls, location):
@@ -3178,12 +3160,12 @@ class address(object):
     @classmethod
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
-        left, right = bounds
-        return cls.iterate(left, right, cls.prev if left > right else cls.next)
+        start, stop = bounds
+        return cls.iterate(start, stop)
     @utils.multicase(bounds=interface.bounds_t, step=internal.types.callable)
     @classmethod
     def iterate(cls, bounds, step):
-        '''Iterate through all of the addresses defined within `bounds` using the callable `step` to determine the next address.'''
+        '''Iterate through all of the addresses defined within `bounds` using the callable `step` to find the next address.'''
         left, right = bounds
         return cls.iterate(left, right, step)
 
