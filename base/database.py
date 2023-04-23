@@ -4088,6 +4088,9 @@ class address(object):
             raise E.RegisterNotFoundError(u"{:s}.nextreg({:s}) : Unable to find register{:s} within the chunk {:#x}..{:#x}. Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), args, '' if len(regs) == 1 else 's', ea, end - 1, items[-1] if items else ea))
         return items[-1] if items else ea
 
+    # FIXME: these two functions, prevstack and nextstack, should be deprecated as they're really not
+    #        useful for anything and their performance sucks. the only reason why they're not deprecated
+    #        is because they're used in tools.general.makecall...which should also be considered dead.
     @utils.multicase(delta=internal.types.integer)
     @classmethod
     def prevstack(cls, delta):
@@ -4100,17 +4103,17 @@ class address(object):
 
         # FIXME: it'd be much better to keep track of this with a global class that wraps the logger
         if getattr(cls, '__prevstack_warning_count__', 0) == 0:
-            logging.warning(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join([__name__, cls.__name__]), ea, delta))
+            logging.warning(u"{:s}.prevstack({:#x}, {:#x}) : This function will be deprecated in the near future. Please use `{:s}` or Hex-Rays to locate stack points.".format('.'.join([__name__, cls.__name__]), ea, delta, utils.pycompat.fullname(function.chunk.points)))
             cls.__prevstack_warning_count__ = getattr(cls, '__prevstack_warning_count__', 0) + 1
 
         # Get all the stack changes within the current function chunk, and the
-        # current sp. This way we can bisect to found our starting point and
+        # current sp. This way we can bisect to find our starting point and
         # traverse backwards from there.
         points = [(item, sp) for item, sp in function.chunk.points(ea)]
         addresses = [item for item, _ in points]
 
-        # Now we'll bisect our list of items in order to slice the points that
-        # out that are completely irrelevant, and reverse the list so that
+        # Now we'll bisect our list of items in order to slice the points out
+        # that are completely irrelevant, and reverse the list so that
         # we can just walk it until we find the address that matches our argument.
         index = bisect.bisect_left(addresses, ea)
         filtered = points[:index][::-1]
@@ -4125,12 +4128,13 @@ class address(object):
             position = cls.prev(address)
 
         # If we ran out of entries in the list, then save the last address
-        # so that we can raise an exception to the user.
+        # so that we can raise an exception for the user.
         else:
-            fn, end = function.address(ea), address
-        raise E.AddressOutOfBoundsError(u"{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the top ({:#x}) of the function {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, end, fn))
+            fn, end = function.address(ea), filtered[-1] if filtered else ea
+        raise E.AddressOutOfBoundsError(u"{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the first stack point ({:#x}) of the function {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, end, fn))
 
-    # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
+    # XXX: this function needs to be completely removed... it's not even remotely
+    #      useful and only exists as the inverse of prevstack.
     @utils.multicase(delta=internal.types.integer)
     @classmethod
     def nextstack(cls, delta):
@@ -4143,17 +4147,17 @@ class address(object):
 
         # FIXME: it'd be much better to keep track of this with a global class that wraps the logger
         if getattr(cls, '__nextstack_warning_count__', 0) == 0:
-            logging.warning(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join([__name__, cls.__name__]), ea, delta))
+            logging.warning(u"{:s}.nextstack({:#x}, {:#x}) : This function will be deprecated in the near future. Please use `{:s}` or Hex-Rays to locate stack points.".format('.'.join([__name__, cls.__name__]), ea, delta, utils.pycompat.fullname(function.chunk.points)))
             cls.__nextstack_warning_count__ = getattr(cls, '__nextstack_warning_count__', 0) + 1
 
         # Get all the stack changes within the current function chunk, and the
         # current sp. This way we can bisect to find out where to start from
-        # continue to walk forwards from there looking for our match.
+        # and continue to walk forwards from there to find our match.
         points = [(item, sp) for item, sp in function.chunk.points(ea)]
         addresses = [item for item, _ in points]
 
         # Now we'll bisect our list of items in order to select only the
-        # point thats are relevant. This way we can just walk the list
+        # points that are relevant. This way we can just walk the list
         # until we find the address with the matching delta.
         index = bisect.bisect_right(addresses, ea)
         filtered = points[index:]
@@ -4170,12 +4174,8 @@ class address(object):
         # If we completed processing our filtered list, then we ran out
         # of addresses and need to save the address to raise an exception.
         else:
-            fn, end = function.address(ea), address
-        raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the bottom ({:#x}) of the function {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, end, fn))
-
-    # FIXME: we should add aliases for a stack point as per the terminology that's used
-    #        by IDA in its ``idaapi.func_t`` when getting points for a function or a chunk.
-    prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
+            fn, end = function.address(ea), filtered[-1] if filtered else ea
+        raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the last stack point ({:#x}) of the function {:#x}.".format('.'.join([__name__, cls.__name__]), ea, delta, end, fn))
 
     @utils.multicase()
     @classmethod
@@ -4250,19 +4250,13 @@ class address(object):
     @classmethod
     def prevbranch(cls, ea, predicate, **count):
         '''Return the previous branch instruction from the address `ea` that satisfies the provided `predicate`.'''
-        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
-        Fbranch = interface.instruction.is_branch
-        Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
-        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
+        F = utils.fcompose(utils.fmap(interface.instruction.is_branch, predicate), builtins.all)
         return cls.prevF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def prevbranch(cls, ea, count):
         '''Return the previous `count` branch instructions from the address `ea`.'''
-        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
-        Fbranch = interface.instruction.is_branch
-        F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
-        return cls.prevF(ea, F, count)
+        return cls.prevF(ea, interface.instruction.is_branch, count)
 
     @utils.multicase()
     @classmethod
@@ -4283,19 +4277,13 @@ class address(object):
     @classmethod
     def nextbranch(cls, ea, predicate, **count):
         '''Return the next branch instruction from the address `ea` that satisfies the provided `predicate`.'''
-        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
-        Fbranch = interface.instruction.is_branch
-        Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
-        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
+        F = utils.fcompose(utils.fmap(interface.instruction.is_branch, predicate), builtins.all)
         return cls.nextF(ea, F, count.pop('count', 1))
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def nextbranch(cls, ea, count):
         '''Return the next `count` branch instructions from the address `ea`.'''
-        Fnocall = utils.fcompose(interface.instruction.is_call, operator.not_)
-        Fbranch = interface.instruction.is_branch
-        F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
-        return cls.nextF(ea, F, count)
+        return cls.nextF(ea, interface.instruction.is_branch, count)
 
     @utils.multicase(mnemonics=(internal.types.string, internal.types.unordered))
     @classmethod
