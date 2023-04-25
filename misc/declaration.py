@@ -484,19 +484,19 @@ class token(nested):
         assert(not groups), groups
 
         # Now we traverse the string while keeping count of each pair of tokens.
-        tree, order, errors = {None : layer}, [], []
+        owner, tree, order, errors = [None], {None : layer}, [], []
         for index, length in cls.indices(string, stacks):
             token = string[index : index + length]
             if token in open:
-                stacks[token].append(index)
+                stacks[token].append(index), owner.append(index)
             elif token in close and stacks[token]:
                 stack = stacks[token]
                 segment = left, right = stack.pop(), index + length
                 layer = tree.setdefault(stack[-1] if stack else None, [])
-                order.append(segment), layer.append(segment)
+                order.append(segment), layer.append(segment), tree.setdefault(left, []), owner.pop()
             elif token in capture:
                 segment = index, index + length
-                order.append(segment), layer.append(segment), tree.setdefault(left, [])
+                tree.setdefault(owner[-1], []).append(segment)
             else:
                 errors.append((index, index + length))
             continue
