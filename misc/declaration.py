@@ -479,28 +479,38 @@ class token(nested):
     def parse(cls, string, *tokens):
         '''Return a list of ranges, a tree, and a list of indices for the errors when parsing the given `tokens` out of `string`.'''
         groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(tokens, len)}
-        stacks = {token : list for token, list in itertools.chain(*((lambda pair, listref: [(pair[0], listref), (pair[-1], listref)])(pair, []) for pair in filter(None, tokens)))}
         layer, [capture], (open, close) = (groups.pop(length, length * [()]) for length in range(3))
         assert(not groups), groups
 
-        # Now we traverse the string while keeping count of each pair of tokens.
+        # We first need a stack that will store the index of the beginning of
+        # each pair. We also store two tables for tracking mismatches. One tracks
+        # stacks specific to a pair, the other maps a close token to an open one.
+        stack, pairs = [], {pair[-1] : pair[0] for pair in tokens if len(pair) == 2}
+        locations = {token : list for token, list in itertools.chain(*((lambda pair, listref: [(pair[0], listref), (pair[-1], listref)])(pair, []) for pair in filter(None, tokens)))}
+
+        # Now we can enter the main loop that packs each grouped pair into a
+        # tree. We maintain two stacks so we can check them against each other.
         owner, tree, order, errors = [None], {None : layer}, [], []
-        for index, length in cls.indices(string, stacks):
+        for index, length in cls.indices(string, locations):
             token = string[index : index + length]
             if token in open:
-                stacks[token].append(index), owner.append(index)
-            elif token in close and stacks[token]:
-                stack = stacks[token]
-                segment = left, right = stack.pop(), index + length
+                stack.append(index), locations[token].append(index), owner.append(index)
+            elif token in close and locations[token] and locations[token][-1] == stack[-1] and string[stack[-1]] == pairs[token]:
+                segment = stack.pop(), index + length
                 layer = tree.setdefault(stack[-1] if stack else None, [])
-                order.append(segment), layer.append(segment), tree.setdefault(left, []), owner.pop()
+                order.append(segment), layer.append(segment), tree.setdefault(locations[token].pop(), []), owner.pop()
             elif token in capture:
                 segment = index, index + length
                 tree.setdefault(owner[-1], []).append(segment)
             else:
                 errors.append((index, index + length))
             continue
-        return order, tree, sorted(itertools.chain(*([(index, index + len(token)) for index in stacks[token]] for token in open))) + errors
+
+        # If the stack isn't empty, then we encountered some mismatched pairs
+        # (errors) in the beginning of the string and we need to return them first.
+        if stack:
+            return order, tree, sorted(itertools.chain(*([(index, index + len(token)) for index in locations[token]] for token in open))) + errors
+        return order, tree, errors
 
 class unmangled(object):
     """
