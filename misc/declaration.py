@@ -332,7 +332,7 @@ class nested(object):
             skipped, position = string[position : position + skip], position + skip
             original = string[position : position + size]
             modified = callable(cls.process(callable, original, augmented, key) if key in augmented else original)
-            _, position = result.extend([skipped, modified]), position + size
+            _, position = result.extend([skipped, original if modified is None else modified]), position + size
         result.append(string[position:])
         return ''.join(result)
 
@@ -447,7 +447,8 @@ class nested(object):
         try:
             component = next(coro)
             while True:
-                component = coro.send((yield component))
+                suggestion = (yield component)
+                component = coro.send(component if suggestion is None else suggestion)
         except StopIteration:
             pass
 
@@ -476,9 +477,9 @@ class token(nested):
         return
 
     @classmethod
-    def parse(cls, string, *tokens):
+    def parse(cls, string, tokens):
         '''Return a list of ranges, a tree, and a list of indices for the errors when parsing the given `tokens` out of `string`.'''
-        groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(tokens, len)}
+        groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(sorted(tokens, key=len), len)}
         layer, [capture], (open, close) = (groups.pop(length, length * [()]) for length in range(3))
         assert(not groups), groups
 
@@ -720,7 +721,7 @@ class unmangled(object):
     @classmethod
     def parameters(cls, string):
         '''Parse a comma-separated `string` containing function parameters or template specifiers and return them as a list.'''
-        _, tree, _ = token.parse(string, '()', '<>', ',')
+        _, tree, _ = token.parse(string, ['()', '<>', ','])
         indices = [start for start, stop in tree.get(None, []) if stop - start == 1][::-1]
 
         # Gather all of the ranges for each parameter inside the "," characters.
@@ -752,7 +753,7 @@ class unmangled(object):
 
         # remove all stupid keywords and then parse our string to figure out where a templates might be at.
         string = cls.keyword(string)
-        order, tree, _ = nested.parse(string, '<>')
+        order, tree, _ = nested.parse(string, ['<>'])
         _, stop = order[-1] if order else (0, len(string.strip()[:-1]))
 
         # if there's a closing-parenthesis within the last slice, then we need to strip out some parameters.
