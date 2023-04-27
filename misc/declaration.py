@@ -456,6 +456,44 @@ class nested(object):
         # join it back into a string before we yield it to the caller.
         yield ''.join(result)
 
+    @classmethod
+    def segments(cls, range, segments=None):
+        '''Yield each segment within the given `range` using the points defined by `segments`.'''
+        start, stop = range
+        assert(start <= stop), (start, stop)
+        for item in segments or []:
+            point, _ = item
+            point = max(point, start)
+            if start < point:
+                yield start, min(point, stop)
+            _, start = item
+            start = min(start, stop)
+            yield point, start
+        if start < stop:
+            yield start, stop
+        return
+
+    @classmethod
+    def split(cls, string, range, segments, tokens={}):
+        '''Use the `range` and `segments` associated with `string` to yield each selection that is delimited by any of the given `tokens`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        assert(start <= stop), (start, stop)
+        result = []
+        for item in segments:
+            left, right = item
+            # ignore any tokens that do not start in range.
+            if not (start <= left < stop):
+                continue
+            # if we matched, yield our state and reset.
+            elif string[left : right] in tokens:
+                yield (start, left), result
+                result, start = [], right
+            # only collect tokens that stop within range.
+            elif start < right <= stop:
+                result.append((left, right))
+            continue
+        yield (start, stop), result
+
 class token(nested):
     """
     This namespace contains basic utilities for processing a string
