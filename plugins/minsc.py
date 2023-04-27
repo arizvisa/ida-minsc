@@ -1179,7 +1179,7 @@ class MINSC(idaapi.plugin_t):
         return
 
     def run(self, args):
-        import ui, hook
+        import ui, hook, internal
 
         # Shove some help down the user's throat.
         print("Python>{:<{:d}s} # Use `help({:s})` for usage".format('ui.keyboard.list()', 40, 'ui.keyboard'))
@@ -1190,10 +1190,13 @@ class MINSC(idaapi.plugin_t):
         print('')
 
         # Have some more...
-        hooks = [name for name in dir(hook) if not any([name.startswith('__'), callable(getattr(hook, name))])]
+        Fgetattribute_silently = internal.utils.fcatch(internal.exceptions.DisassemblerError)(None)(getattr)
+        hooks = [name for name in dir(hook) if not any([name.startswith('__'), callable(Fgetattribute_silently(hook, name))])]
         print('The following hook types are locked and loaded:' if hooks else 'Currently no hooks have been initialized.')
         for name in hooks:
-            item = getattr(hook, name)
+            item = Fgetattribute_silently(hook, name, None)
+            if item is None:
+                continue
             fullname = '.'.join(['hook', name])
             print("Python>{:<{:d}s} # Use `help({:s})` for usage and `{:s}.list()` to see availability".format(fullname, 40, fullname, fullname))
             print(item)
