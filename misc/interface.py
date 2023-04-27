@@ -804,11 +804,10 @@ class prioritybase(object):
     def __repr__(self):
         cls, enabled = self.__class__, {item for item in self.__cache__} - {item for item in self.__disabled}
 
-        # Extract the parameters from a function. This is just a
-        # wrapper around utils.multicase.ex_args so we can extract
-        # the names.
+        # Extract the parameters from a function. This is just a wrapper around
+        # utils.pycompat.function.arguments so that we can extract the names.
         def parameters(func):
-            args, defaults, (star, starstar) = internal.utils.multicase.ex_args(func)
+            args, defaults, (star, starstar) = internal.utils.pycompat.function.arguments(func)
             for item in args:
                 yield "{:s}={!s}".format(item, defaults[item]) if item in defaults else item
             if star:
