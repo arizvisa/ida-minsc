@@ -4884,37 +4884,45 @@ class type(object):
     @utils.multicase()
     @classmethod
     def code(cls):
-        '''Return if the current address is marked as code.'''
+        '''Return if the item at the current address is marked as code.'''
         return cls.code(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def code(cls, ea):
-        '''Return if the address specified by `ea` is marked as code.'''
-        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE
+        '''Return if the item at the address specified by `ea` is marked as code.'''
+        flags = interface.address.flags(interface.address.within(ea), idaapi.MS_CLS)
+        if flags == idaapi.FF_TAIL:
+            return interface.address.flags(interface.address.head(ea), idaapi.MS_CLS) == idaapi.FF_CODE
+        return flags == idaapi.FF_CODE
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def code(cls, ea, size):
-        '''Return if the address specified by `ea` up to `size` bytes is marked as code.'''
-        ea = interface.address.within(ea)
-        return all(interface.address.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_CODE for offset in builtins.range(size))
+        '''Return if the item at the address specified by `ea` up to `size` bytes is marked as code.'''
+        ea, flags = interface.address.within(ea), interface.address.flags(interface.address.head(ea), idaapi.MS_CLS)
+        items = {interface.address.flags(ea + offset, idaapi.MS_CLS) for offset in builtins.range(size)}
+        return flags == idaapi.FF_CODE and all(flag in {idaapi.FF_TAIL, idaapi.FF_CODE} for flag in items)
     is_code = utils.alias(code, 'type')
 
     @utils.multicase()
     @classmethod
     def data(cls):
-        '''Return if the current address is marked as data.'''
+        '''Return if item at the current address is marked as data.'''
         return cls.data(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def data(cls, ea):
-        '''Return if the address specified by `ea` is marked as data.'''
-        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_DATA
+        '''Return if item at the address specified by `ea` is marked as data.'''
+        flags = interface.address.flags(interface.address.within(ea), idaapi.MS_CLS)
+        if flags == idaapi.FF_TAIL:
+            return interface.address.flags(interface.address.head(ea), idaapi.MS_CLS) == idaapi.FF_DATA
+        return flags == idaapi.FF_DATA
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def data(cls, ea, size):
-        '''Return if the address specified by `ea` up to `size` bytes is marked as data.'''
-        ea = interface.address.within(ea)
-        return all(interface.address.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_DATA for offset in builtins.range(size))
+        '''Return if the item at the address specified by `ea` up to `size` bytes is marked as data.'''
+        ea, flags = interface.address.within(ea), interface.address.flags(interface.address.head(ea), idaapi.MS_CLS)
+        items = {interface.address.flags(ea + offset, idaapi.MS_CLS) for offset in builtins.range(size)}
+        return flags == idaapi.FF_DATA and all(flag in {idaapi.FF_TAIL, idaapi.FF_DATA} for flag in items)
     is_data = utils.alias(data, 'type')
 
     # True if ea marked unknown
@@ -4927,13 +4935,17 @@ class type(object):
     @classmethod
     def unknown(cls, ea):
         '''Return if the address specified by `ea` is marked as unknown.'''
-        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
+        flags = interface.address.flags(interface.address.within(ea), idaapi.MS_CLS)
+        if flags == idaapi.FF_TAIL:
+            return interface.address.flags(interface.address.head(ea), idaapi.MS_CLS) == idaapi.FF_UNK
+        return flags == idaapi.FF_UNK
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def unknown(cls, ea, size):
         '''Return if the address specified by `ea` up to `size` bytes is marked as unknown.'''
-        ea = interface.address.within(ea)
-        return all(interface.address.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_UNK for offset in builtins.range(size))
+        ea, flags = interface.address.within(ea), interface.address.flags(interface.address.head(ea), idaapi.MS_CLS)
+        items = {interface.address.flags(ea + offset, idaapi.MS_CLS) for offset in builtins.range(size)}
+        return flags == idaapi.FF_UNK and all(flag in {idaapi.FF_TAIL, idaapi.FF_UNK} for flag in items)
     is_unknown = is_undefined = undefined = utils.alias(unknown, 'type')
 
     @utils.multicase()
@@ -4945,7 +4957,7 @@ class type(object):
     @classmethod
     def head(cls, ea):
         '''Return if the address `ea` points to the beginning of an item in the database.'''
-        return interface.address.flags(interface.address.within(ea), idaapi.FF_DATA) != 0
+        return interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) != idaapi.FF_TAIL
     is_head = utils.alias(head, 'type')
 
     @utils.multicase()
@@ -5046,7 +5058,7 @@ class type(object):
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def auto(cls, ea, boolean):
-        '''Specify whether the name for the address at `ea` was named automatically depending on the value of `boolean`.'''
+        '''Specify whether the name for the address at `ea` is named automatically depending on the value of `boolean`.'''
         ea = interface.address.within(ea)
         res, _ = idaapi.has_auto_name(ea), idaapi.make_name_auto(ea) if boolean else idaapi.make_name_user(ea)
         return res
