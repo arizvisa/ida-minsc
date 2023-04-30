@@ -401,6 +401,36 @@ class information(object):
         _, uval = asize_t.assign(RIDX_ALT_NOPENS), asize_t.value()
         return internal.netnode.alt.get(root, uval)
 
+    @classmethod
+    def CRC32(cls):
+        '''Return the CRC32 of the input file used for the current database.'''
+        if idaapi.__version__ < 7.4:
+            raise E.UnsupportedVersion(u"{:s}.CRC32() : This function is only supported on versions of IDA 7.4 and newer.".format('.'.join([__name__, cls.__name__])))
+        RIDX_ALT_CRC32 = -5
+        asize_t, root = idaapi.ea_pointer(), internal.netnode.get('Root Node')
+        _, uval = asize_t.assign(RIDX_ALT_CRC32), asize_t.value()
+        return internal.netnode.alt.get(root, uval)
+
+    @classmethod
+    def MD5(cls):
+        '''Return the CRC32 of the input file used for the current database.'''
+        if idaapi.__version__ < 7.4:
+            raise E.UnsupportedVersion(u"{:s}.MD5() : This function is only supported on versions of IDA 7.4 and newer.".format('.'.join([__name__, cls.__name__])))
+        RIDX_MD5 = 1302
+        asize_t, root = idaapi.ea_pointer(), internal.netnode.get('Root Node')
+        _, uval = asize_t.assign(RIDX_MD5), asize_t.value()
+        return internal.netnode.sup.get(root, uval, type=memoryview).tobytes()
+
+    @classmethod
+    def SHA256(cls):
+        '''Return the SHA256 of the input file used for the current database.'''
+        if idaapi.__version__ < 7.4:
+            raise E.UnsupportedVersion(u"{:s}.SHA256() : This function is only supported on versions of IDA 7.4 and newer.".format('.'.join([__name__, cls.__name__])))
+        RIDX_SHA256 = 1349
+        asize_t, root = idaapi.ea_pointer(), internal.netnode.get('Root Node')
+        _, uval = asize_t.assign(RIDX_SHA256), asize_t.value()
+        return internal.netnode.sup.get(root, uval, type=memoryview).tobytes()
+
 config = info = information # XXX: ns alias
 
 range = utils.alias(information.bounds, 'information')
