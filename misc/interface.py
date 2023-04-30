@@ -1816,28 +1816,23 @@ class address(object):
         get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
         return get_data_elsize(idaapi.BADADDR, flags) if info is None else get_data_elsize(idaapi.BADADDR, flags, info)
 
-    @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
-    def flags(cls, ea):
-        '''Return the flags of the item at the address `ea`.'''
-        getflagsex = idaapi.get_flags_ex if hasattr(idaapi, 'get_flags_ex') else (lambda ea, _: idaapi.get_full_flags(ea)) if hasattr(idaapi, 'get_full_flags') else (lambda ea, _: idaapi.getFlags(ea))
-        return idaapi.as_uint32(getflagsex(ea, getattr(idaapi, 'GFE_VALUE', 0)))
-    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer)
-    @classmethod
-    def flags(cls, ea, mask):
+    def flags(cls, ea, *mask):
         '''Return the flags at the address `ea` masked with `mask`.'''
         getflagsex = idaapi.get_flags_ex if hasattr(idaapi, 'get_flags_ex') else (lambda ea, _: idaapi.get_full_flags(ea)) if hasattr(idaapi, 'get_full_flags') else (lambda ea, _: idaapi.getFlags(ea))
-        return getflagsex(ea, getattr(idaapi, 'GFE_VALUE', 0)) & idaapi.as_uint32(mask)
-    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer, value=internal.types.integer)
-    @classmethod
-    def flags(cls, ea, mask, value):
-        '''Sets the flags at the address `ea` masked with `mask` to the specified `value`.'''
-        getflagsex = idaapi.get_flags_ex if hasattr(idaapi, 'get_flags_ex') else (lambda ea, _: idaapi.get_full_flags(ea)) if hasattr(idaapi, 'get_full_flags') else (lambda ea, _: idaapi.getFlags(ea))
-        if hasattr(idaapi, 'setFlags'):
-            res = getflagsex(ea, getattr(idaapi, 'GFE_VALUE', 0))
-            idaapi.setFlags(ea, (res & ~mask) | value)
+        ea, flags = int(ea), getflagsex(int(ea), getattr(idaapi, 'GFE_VALUE', 0))
+        if not mask:
+            return idaapi.as_uint32(flags)
+        elif len(mask) == 1:
+            return getflagsex(ea, getattr(idaapi, 'GFE_VALUE', 0)) & idaapi.as_uint32(int(*mask))
+        elif len(mask) != 2:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.flags({:#x}, {:s}) : An unsupported number of parameters ({:d}) were provided for the given function.".format('.'.join([__name__, cls.__name__]), ea, ", {:s}".format(', '.join(map("{!r}".format, mask))), len(mask)))
+        elif hasattr(idaapi, 'setFlags'):
+            [mask, value] = mask
+            idaapi.setFlags(ea, (flags & ~mask) | value)
             return res & mask
-        raise internal.exceptions.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA has deprecated the ability to modify the flags for an address.".format('.'.join([__name__, cls.__name__]), ea, mask, value))
+        [mask, value] = mask
+        raise internal.exceptions.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : Modifying the flags for an address has since been deprecated by the disassembler.".format('.'.join([__name__, cls.__name__]), ea, mask, value))
 
     @classmethod
     def references(cls, ea):
@@ -1993,18 +1988,12 @@ class address(object):
             return cls.__within2__(*args)
         return cls.__within1__(*args)
 
-    @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
-    def refinfo(cls, ea):
-        '''This returns the ``idaapi.refinfo_t`` for the address given in `ea`.'''
-        OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
-        return cls.refinfo(ea, OPND_ALL)
-    @internal.utils.multicase(ea=internal.types.integer, opnum=internal.types.integer)
-    @classmethod
-    def refinfo(cls, ea, opnum):
+    def refinfo(cls, ea, *opnum):
         '''This returns the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the address given in `ea`.'''
-        ri = idaapi.refinfo_t()
-        ok = idaapi.get_refinfo(ea, opnum, ri) if idaapi.__version__ < 7.0 else idaapi.get_refinfo(ri, ea, opnum)
+        ri, OPND_ALL = idaapi.refinfo_t(), getattr(idaapi, 'OPND_ALL', 0xf)
+        [opnum] = opnum if opnum else [OPND_ALL]
+        ok = idaapi.get_refinfo(int(ea), opnum, ri) if idaapi.__version__ < 7.0 else idaapi.get_refinfo(ri, int(ea), opnum)
         return ri if ok else None
 
     @classmethod
@@ -2582,28 +2571,20 @@ class node(object):
         offset, items = id64(sup) if bit64Q else id32(sup)
         return offset, [Fidentifier(item) for item in items]
 
-    @internal.utils.multicase(ea=internal.types.integer)
     @classmethod
-    def aflags(cls, ea):
-        '''Return the additional flags for the instruction at the address `ea`.'''
+    def aflags(cls, ea, *mask):
+        '''Apply or return the additional flags for the item at address `ea` using the given `mask` and another integer as the value..'''
         NALT_AFLAGS = getattr(idaapi, 'NALT_AFLAGS', 8)
-        if hasattr(idaapi, 'get_aflags'):
-            return idaapi.get_aflags(ea)
-        return internal.netnode.alt.get(idaapi.ea2node(ea) if hasattr(idaapi, 'ea2node') else ea, NALT_AFLAGS)
-    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer)
-    @classmethod
-    def aflags(cls, ea, mask):
-        '''Return the additional flags for the instruction at the address `ea` masked with the integer provided by `mask`.'''
-        return cls.aflags(ea) & mask
-    @internal.utils.multicase(ea=internal.types.integer, mask=internal.types.integer, value=internal.types.integer)
-    @classmethod
-    def aflags(cls, ea, mask, value):
-        '''Set the additional flags for the instruction at address `ea` using the provided `mask` and `value`.'''
-        NALT_AFLAGS = getattr(idaapi, 'NALT_AFLAGS', 8)
-        result, flags = cls.aflags(ea, ~mask), value & mask
-        if hasattr(idaapi, 'set_aflags'):
-            return idaapi.set_aflags(ea, result | flags)
-        return internal.netnode.alt.set(idaapi.ea2node(ea) if hasattr(idaapi, 'ea2node') else ea, NALT_AFLAGS, result | flags)
+        result = idaapi.get_aflags(int(ea)) if hasattr(idaapi, 'get_aflags') else internal.netnode.alt.get(idaapi.ea2node(int(ea)) if hasattr(idaapi, 'ea2node') else int(ea), NALT_AFLAGS)
+        if len(mask) < 2:
+            return idaapi.as_uint32(operator.and_(result, *mask) if mask else result)
+
+        # Set the additional flags for the item at address `ea` using the provided `mask` and `value`.
+        [mask, value] = mask
+        preserve, value = idaapi.as_uint32(~mask), idaapi.as_uint32(-1 if value else 0) if isinstance(value, internal.types.bool) else idaapi.as_uint32(value)
+        flags = (result & preserve) | (value & mask)
+        idaapi.set_aflags(int(ea), flags) if hasattr(idaapi, 'set_aflags') else internal.netnode.alt.set(idaapi.ea2node(int(ea)) if hasattr(idaapi, 'ea2node') else int(ea), NALT_AFLAGS, flags)
+        return result & mask
 
     @classmethod
     def alt_opinverted(cls, ea, opnum):
@@ -5463,53 +5444,57 @@ class function(object):
             return None if ea == idaapi.BADADDR else idaapi.get_func(ea)
         return None
 
-    @internal.utils.multicase(func=idaapi.func_t)
     @classmethod
-    def by(cls, func):
-        '''Return the function identified by `func`.'''
-        return func
-    @internal.utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def by(cls, ea):
-        '''Return the function at the address `ea`.'''
-        return cls.by_address(ea)
-    @internal.utils.multicase(name=internal.types.string)
-    @classmethod
-    def by(cls, name):
-        '''Return the function with the specified `name`.'''
-        return cls.by_name(name)
-    @internal.utils.multicase(frame=idaapi.struc_t)
-    @classmethod
-    def by(cls, frame):
-        '''Return the function that owns the specified `frame`.'''
-        return cls.by_frame(frame)
-    @internal.utils.multicase()
-    @classmethod
-    def by(cls, unsupported):
-        '''Raise an exception due to receiving an `unsupported` type.'''
-        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join([cls.__name__]), unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
+    def by(cls, func, **caller):
+        '''Return the function that can be identified by `func`.'''
+        if isinstance(func, idaapi.func_t):
+            result = func
+        elif isinstance(func, internal.types.integer) or hasattr(func, '__int__'):
+            result = cls.by_address(int(func))
+        elif isinstance(func, internal.types.string):
+            result = cls.by_name(func)
+        elif isinstance(func, idaapi.struc_t):
+            result = cls.by_frame(func)
+        else:
+            result = None
 
-    @internal.utils.multicase(name=internal.types.string)
-    @classmethod
-    def missing(cls, name):
-        '''Raise an exception related to the `name` not being found.'''
-        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({!r}) : Unable to locate a function with the specified name ({!s}).".format('.'.join([cls.__name__]), name, internal.utils.string.repr(name)))
-    @internal.utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def missing(cls, ea):
-        '''Raise an exception related to the address in `ea` not pointing to a function.'''
-        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join([cls.__name__]), ea, ea))
-    @internal.utils.multicase(frame=idaapi.struc_t)
-    @classmethod
-    def missing(cls, frame):
-        '''Raise an exception related to the structure in `frame` not being part of a function.'''
-        name = utils.string.of(idaapi.get_struc_name(frame.id))
-        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate a function using a structure ({!s}) that is not a frame.".format('.'.join([cls.__name__]), frame.id, internal.utils.string.repr(name)))
+        # If any of our finders returned None, then raise an exception.
+        if result is None:
+            raise cls.missing(func, **caller)
+        return result
+
     @internal.utils.multicase()
     @classmethod
-    def missing(cls, unsupported):
+    def missing(cls, **caller):
+        '''Raise an exception related to the current location not containing a function.'''
+        caller = caller.get('caller', [cls.__name__, 'by'])
+        ea = idaapi.get_screen_ea()
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}({:#x}) : Unable to locate a function at the currently selected address ({:#x}).".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, ea, ea))
+    @internal.utils.multicase(name=internal.types.string)
+    @classmethod
+    def missing(cls, name, **caller):
+        '''Raise an exception related to the `name` not being found.'''
+        caller = caller.get('caller', [cls.__name__, 'by'])
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}({!r}) : Unable to locate a function with the specified name ({!s}).".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, name, internal.utils.string.repr(name)))
+    @internal.utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def missing(cls, ea, **caller):
+        '''Raise an exception related to the address in `ea` not pointing to a function.'''
+        caller = caller.get('caller', [cls.__name__, 'by'])
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, ea, ea))
+    @internal.utils.multicase(frame=idaapi.struc_t)
+    @classmethod
+    def missing(cls, frame, **caller):
+        '''Raise an exception related to the structure in `frame` not being part of a function.'''
+        caller = caller.get('caller', [cls.__name__, 'by'])
+        name = internal.utils.string.of(idaapi.get_struc_name(frame.id))
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}({:#x}) : Unable to locate a function using a structure ({!s}) that is not a frame.".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, frame.id, internal.utils.string.repr(name)))
+    @internal.utils.multicase()
+    @classmethod
+    def missing(cls, unsupported, **caller):
         '''Raise an exception due to receiving an `unsupported` type.'''
-        raise internal.exceptions.FunctionNotFoundError(u"{:s}.by({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join([cls.__name__]), unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
+        caller = caller.get('caller', [cls.__name__, 'by'])
+        raise internal.exceptions.FunctionNotFoundError(u"{:s}({!r}) : Unable to locate a function using an unsupported type ({!s}).".format('.'.join(caller) if isinstance(caller, internal.types.list) else caller, unsupported, internal.utils.pycompat.fullname(unsupported.__class__)))
 
     @classmethod
     def owners(cls, ea):
@@ -5555,6 +5540,19 @@ class function(object):
         if count != len(referrers):
             logging.warning(u"{:s}.owners({:#x}) : Expected to find {:d} referrer{:s} for the function tail at {!s}, but {:s}{:s} returned.".format('.'.join([__name__, cls.__name__]), ea, count, '' if count == 1 else 's', range.bounds(owner), 'only ' if len(referrers) < count else '', "{:d} was".format(len(referrers)) if len(referrers) == 1 else "{:d} were".format(len(referrers))))
         return referrers
+
+    @classmethod
+    def flags(cls, func, *mask):
+        '''Return the flags for the function `func` selected with the specified `mask`.'''
+        flags = func.flags
+        if len(mask) < 2:
+            return idaapi.as_uint32(operator.and_(flags, *mask) if mask else flags)
+
+        # Set the flags for the function `func` selected by the specified `mask` to the provided `integer`.
+        [mask, integer] = mask
+        preserve, value = idaapi.as_uint32(~mask), idaapi.as_uint32(-1 if integer else 0) if isinstance(integer, internal.types.bool) else idaapi.as_uint32(integer)
+        res, func.flags = func.flags, (func.flags & preserve) | (value & mask)
+        return idaapi.as_uint32(res & mask) if idaapi.update_func(func) else None
 
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
