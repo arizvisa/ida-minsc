@@ -2116,6 +2116,119 @@ class address(object):
             logging.info(u"{:s}.iterate({:#x}, {!s}) : Iteration starting from address {:#x} terminated at {:#x} due to the address being out-of-bounds.".format('.'.join([__name__, cls.__name__]), start, internal.utils.pycompat.fullname(step), start, next))
         return
 
+    @classmethod
+    def offset(cls, ea):
+        '''Return the address `ea` translated to an offset relative to the base address of the database.'''
+        return ea - database.imagebase()
+
+    @classmethod
+    def color(cls, ea, *rgb):
+        '''Get the color (RGB) for the item at address `ea` or set it to the color given by `rgb`.'''
+        original, DEFCOLOR = idaapi.get_item_color(int(ea)), 0xffffffff
+
+        # Set the color for the item at address `ea` to `rgb`.
+        if rgb:
+            r, b = (operator.and_(0xff * shift, *rgb) // shift for shift in [0x010000, 0x000001])
+            idaapi.set_item_color(int(ea), DEFCOLOR if operator.contains({None, DEFCOLOR}, *rgb) else sum([b * 0x010000, operator.and_(0x00ff00, *rgb), r * 0x000001]))
+
+        # Return the original color (BGR) with its order set to to RGB.
+        b, r = (operator.and_(original, 0xff * shift) // shift for shift in [0x010000, 0x000001])
+        return original if original == DEFCOLOR else sum([0x010000 * r, 0x00ff00 & original, 0x000001 * b])
+
+    @classmethod
+    def has_typeinfo(cls, ea):
+        '''Return if the address at `ea` has any type information associated with it.'''
+        ok = cls.typeinfo(int(ea)) is not None
+
+        # If we couldn't find any type information, then we need to check if
+        # the name is mangled since a mangled name can be used to guess for it.
+        if not ok and not (function.has(int(ea)) and range.start(function.by_address(int(ea))) == ea):
+            realname, guessed = name.get(int(ea)), idaapi.guess_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(idaapi.tinfo_t(), ea)
+            return internal.declaration.demangle(realname) != realname and guessed != idaapi.GUESS_FUNC_FAILED
+        return ok
+
+    @classmethod
+    def typeinfo(cls, ea):
+        '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
+        ea, get_tinfo = int(ea), (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+
+        # First try and get the actual typeinfo for the given address. If it
+        # actually worked, then we can just return it as-is.
+        ti = idaapi.tinfo_t()
+        if get_tinfo(ti, ea):
+            return tinfo.concretize(ti)
+
+        # Otherwise we'll go ahead and guess the typeinfo for the same address.
+        res = idaapi.guess_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
+
+        # If we failed, then we'll try and hack around it using idaapi.print_type
+        # and parsing the result. If we don't succeed, then we assume no type.
+        if res != idaapi.GUESS_FUNC_OK:
+            fl = idaapi.PRTYPE_1LINE
+            info_s = idaapi.print_type(ea, fl)
+            ti = None if info_s is None else internal.declaration.parse(info_s)
+            if info_s is not None and ti is None:
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.typeinfo({:#x}) : Unable to parse the type declaration (\"{:s}\") returned from the requested address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, internal.utils.string.escape(info_s, '"'), ea))
+            return tinfo.concretize(ti)
+        return tinfo.concretize(ti)
+
+    @classmethod
+    def apply_typeinfo(cls, ea, info, *flags):
+        '''Apply the given type information in `info` to the address `ea` with the given `flags`.'''
+        ea = int(ea)
+
+        # If `info` is None, then we're only being asked to remove the type information.
+        if info is None and any(hasattr(idaapi, attribute) for attribute in ['del_tinfo', 'del_tinfo2']):
+            del_tinfo = idaapi.del_tinfo2 if idaapi.__version__ < 7.0 else idaapi.del_tinfo
+            void = del_tinfo(ea)
+            return True
+
+        # If `info` is None, but we don't have an API then we don't have a real way to remove
+        # type information. Still, we can remove the NSUP_TYPEINFO(3000) and clear its aflags.
+        elif info is None:
+            supvals = [idaapi.NSUP_TYPEINFO, idaapi.NSUP_TYPEINFO + 1]
+            aflags = [idaapi.AFL_TI, idaapi.AFL_USERTI, getattr(idaapi, 'AFL_HR_GUESSED_FUNC', 0x40000000), getattr(idaapi, 'AFL_HR_GUESSED_DATA', 0x80000000)]
+
+            # Save the original type, and zero out everything. This should pretty much get it done...
+            discard = node.aflags(ea, functools.reduce(operator.or_, aflags), 0)
+            [ internal.netnode.sup.remove(ea, val) for val in supvals ]
+            return True
+
+        # Now we need to figure out what flags to use when applying the type. If
+        # the caller didn't provide any flags, we try to preserve them with the
+        # intention that type changes are always guesses unless they're explicit.
+        definitive = node.aflags(ea, idaapi.AFL_USERTI)
+        [tflags] = itertools.chain(flags if flags else [idaapi.TINFO_DEFINITE if definitive else idaapi.TINFO_GUESSED])
+
+        # If the aflags already claim that this is a user-specified type, but we
+        # were asked to apply it non-definitively, then we need to clear the aflag.
+        if flags and tflags == idaapi.TINFO_GUESSED and definitive:
+            node.aflags(ea, idaapi.AFL_USERTI, 0)
+
+        # Now everything is set to use idaapi and apply our tinfo_t to the address.
+        ok = idaapi.apply_tinfo(ea, info, tflags)
+
+        # If the caller gave us explicit flags to apply as TINFO_GUESSED, then
+        # we need to clear the aflags to force the applied type as being guessed.
+        if ok and flags and tflags & idaapi.TINFO_GUESSED:
+            node.aflags(ea, idaapi.AFL_USERTI, 0)
+        return ok
+
+    @classmethod
+    def read(cls, ea, size):
+        '''Read `size` number of bytes from the database at address `ea` and return them.'''
+        if idaapi.__version__ < 7.0:
+            return idaapi.get_many_bytes(int(ea), max(0, size)) or b''
+        return idaapi.get_bytes(int(ea), max(0, size)) or b''
+
+    @classmethod
+    def items(cls, start, stop):
+        '''Iterate through all of the items from the address `start` until right before the address `stop`.'''
+        left, right = cls.within(*sorted(map(int, [start, stop])))
+        ea, step, Fwhile = (left, idaapi.next_not_tail, functools.partial(operator.gt, right)) if start <= stop else (right, idaapi.prev_not_tail, functools.partial(operator.le, left))
+        iterable = itertools.takewhile(Fwhile, cls.iterate(ea, step))
+        return itertools.chain([ea], iterable)
+
 class range(object):
     """
     This namespace provides tools that assist with interacting with IDA 6.x's
@@ -5499,7 +5612,7 @@ class function(object):
     @classmethod
     def owners(cls, ea):
         '''Return a list of the functions that have ownership of the chunk at address `ea`.'''
-        owner, chunk = idaapi.get_func(ea), idaapi.get_fchunk(ea)
+        owner, chunk = idaapi.get_func(int(ea)), idaapi.get_fchunk(int(ea))
 
         # If there's no chunk or owner, then this isn't a function and we return an empty list.
         if owner is None or chunk is None:
@@ -5553,6 +5666,229 @@ class function(object):
         preserve, value = idaapi.as_uint32(~mask), idaapi.as_uint32(-1 if integer else 0) if isinstance(integer, internal.types.bool) else idaapi.as_uint32(integer)
         res, func.flags = func.flags, (func.flags & preserve) | (value & mask)
         return idaapi.as_uint32(res & mask) if idaapi.update_func(func) else None
+
+    @classmethod
+    def chunks(cls, func):
+        '''Yield each chunk that is associated with the function `func`.'''
+        fn = cls.by(func)
+        fci = idaapi.func_tail_iterator_t(fn, range.start(fn))
+        if not fci.main():
+            raise internal.exceptions.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `{:s}` to iterate through the chunks for the given function.".format(__name__, range.start(fn), internal.utils.pycompat.fullname(idaapi.func_tail_iterator_t)))
+
+        results = []
+        while True:
+            ch = fci.chunk()
+            yield ch
+            if not fci.next(): break
+        return
+
+    @classmethod
+    def chunk(cls, func, ea):
+        '''Return the chunk belonging the function `func` that resides at the address `ea`.'''
+        ea = int(ea)
+        for chunk in cls.chunks(func):
+            left, right = range.unpack(chunk)
+            if left <= ea < right:
+                return range.pack(left, right)
+            continue
+        return
+
+    @classmethod
+    def frame_offset(cls, func, *offset):
+        '''Return the base offset used by the frame belonging to the function `func`.'''
+        fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
+        res = 0 if fn is None or fn.frame == idaapi.BADNODE else -idaapi.frame_off_args(fn)
+        return operator.add(res, *map(int, offset)) if offset else res
+
+    @classmethod
+    def frame_disassembler_offset(cls, func, *offset):
+        '''Return the disassembler offset used by the frame belonging to the function `func`.'''
+        fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
+        res = 0 if fn is None or fn.frame == idaapi.BADNODE else -fn.frsize
+        return operator.add(res, *map(int, offset)) if offset else res
+
+    @classmethod
+    def frame_member_offset(cls, func, offset):
+        '''Return the offset of the member at the specified `offset` in the frame belonging to the function `func`.'''
+        fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
+        return cls.frame_disassembler_offset(fn, offset) if offset < idaapi.frame_off_args(fn) else cls.frame_offset(fn, offset)
+
+    @classmethod
+    def frame_registers(cls, func):
+        '''Return the size of the preserved registers in the frame belonging to the function `func`.'''
+        fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
+        return fn.frregs + idaapi.get_frame_retsize(fn) if fn else 0
+
+    @classmethod
+    def frame_pointer_delta(cls, func, *delta):
+        '''Return the size of the frame pointer delta belonging to the function `func`.'''
+        fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+        if delta and not idaapi.update_fpd(fn, *map(int, delta)):
+            raise internal.exceptions.DisassemblerError(u"{:s}.frame_pointer_delta({:#x}, {:s}) : Unable to update the frame pointer delta for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), range.start(fn), "{:+#x}".format(*map(int, delta)), range.start(fn)))
+        return fn.fpd
+
+    @classmethod
+    def frame(cls, func):
+        '''Return the frame belonging to the function `func`.'''
+        fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+        sptr = idaapi.get_frame(fn)
+        if fn.frame == idaapi.BADNODE or not sptr:
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.frame({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), range.start(fn)))
+
+        offset = idaapi.frame_off_args(fn)
+        return internal.structure.new(sptr.id, -offset)
+
+    @classmethod
+    def name(cls, func):
+        '''Return the unmangled name of the function at `func`.'''
+        utils, get_name = internal.utils, functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
+        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
+        MNG_LONG_FORM = getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
+
+        # check to see if it's a runtime-linked function
+        rt, ea = addressOfRuntimeOrStatic(func)
+        if rt:
+            name = get_name(ea)
+            mangled_name_type_t = Fmangled_type(name)
+            return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name)
+
+        # otherwise it's a regular function, so try and get its name in a couple of ways
+        name = idaapi.get_func_name(ea)
+        if not name: name = get_name(ea)
+        if not name: name = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
+
+        # decode the string from IDA's UTF-8 and demangle it if we need to
+        # XXX: how does demangling work with utf-8? this would be implementation specific, no?
+        mangled_name_type_t = Fmangled_type(name)
+        return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name)
+
+    @classmethod
+    def color(cls, func, *rgb):
+        '''Get the color (RGB) of the function `func` or set it to the color given by `rgb`.'''
+        original, DEFCOLOR, ok = func.color, 0xffffffff, True
+        fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+
+        # Set the color (RGB) of the function `func` to `rgb`.
+        if rgb:
+            r, b = (operator.and_(0xff * shift, *rgb) // shift for shift in [0x010000, 0x000001])
+            fn.color = DEFCOLOR if operator.contains({None, DEFCOLOR}, *rgb) else sum([b * 0x010000, operator.and_(0x00ff00, *rgb), r * 0x000001])
+            ok = idaapi.update_func(fn)
+
+        # Return the original color (BGR) with its order set to to RGB.
+        b, r = (operator.and_(0xff * shift, original) // shift for shift in [0x010000, 0x000001])
+        if ok:
+            return original if original == DEFCOLOR else sum([0x010000 * r, 0x00ff00 & original, 0x000001 * b])
+        return
+
+    @classmethod
+    def blockcolor(cls, bb, *rgb, **frame):
+        '''Get the background color (RGB) belonging to the basic block at `bb` or set it to the color given by `rgb`.'''
+        get_node_info, set_node_info, clr_node_info = (idaapi.get_node_info2, idaapi.set_node_info2, idaapi.clr_node_info2) if idaapi.__version__ < 7.0 else (idaapi.get_node_info, idaapi.set_node_info, idaapi.clr_node_info)
+        DEFCOLOR, framecolorQ = 0xffffffff, operator.contains(frame, 'frame') and (not isinstance(frame['frame'], internal.types.bool) or (rgb and 'frame' in frame))
+
+        # Grab the node information and the color from its attributes.
+        fn, ni = cls.by(range.start(bb)), idaapi.node_info_t()
+        ok = get_node_info(ni, range.start(fn), bb.id) or 0 <= bb.id < bb._fc.size
+        ea, original = range.start(fn), ni.frame_color if frame.get('frame', framecolorQ) else ni.bg_color
+        if not ok: return
+
+        # Set the colors (RGB) of the basic block at `bb` to `rgb`.
+        [framergb] = frame.values() if isinstance(frame.get('frame', None), internal.types.integer) else rgb if rgb else [None]
+        if rgb and framecolorQ and isinstance(framergb, internal.types.integer):
+            [blockrgb], original, flags = rgb, ni.bg_color, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR
+
+            # Assign the necessary attributes to apply the chosen colors.
+            r, b = (operator.and_(0xff * shift, blockrgb) // shift for shift in [0x010000, 0x000001])
+            ni.bg_color = DEFCOLOR if blockrgb == DEFCOLOR else sum([b * 0x010000, 0x00ff00 & blockrgb, r * 0x000001])
+            r, b = (operator.and_(0xff * shift, framergb) // shift for shift in [0x010000, 0x000001])
+            ni.frame_color = DEFCOLOR if framergb == DEFCOLOR else sum([b * 0x010000, 0x00ff00 & framergb, r * 0x000001])
+            (set_node_info(ea, bb.id, ni, flags), clr_node_info(ea, bb.id, flags)) if (blockrgb, framergb) == (DEFCOLOR, DEFCOLOR) else set_node_info(ea, bb.id, ni, flags)
+
+        # Set the frame color (RGB) of the basic block at `bb` to `rgb`.
+        elif framecolorQ:
+            blockrgb, original, flags = framergb, ni.frame_color, idaapi.NIF_FRAME_COLOR
+            r, b = (operator.and_(0xff * shift, blockrgb) // shift for shift in [0x010000, 0x000001])
+            ni.frame_color = blockrgb if blockrgb == DEFCOLOR else sum([b * 0x010000, 0x00ff00 & blockrgb, r * 0x000001])
+            (set_node_info(ea, bb.id, ni, flags), clr_node_info(ea, bb.id, flags)) if blockrgb == DEFCOLOR else set_node_info(ea, bb.id, ni, flags)
+
+        # Set the background color (RGB) of the basic block at `bb` to `rgb`.
+        elif rgb and not framecolorQ:
+            [blockrgb], original, flags = rgb, ni.bg_color, idaapi.NIF_BG_COLOR
+            r, b = (operator.and_(0xff * shift, blockrgb) // shift for shift in [0x010000, 0x000001])
+            ni.bg_color = blockrgb if blockrgb == DEFCOLOR else sum([b * 0x010000, 0x00ff00 & blockrgb, r * 0x000001])
+            (set_node_info(ea, bb.id, ni, flags), clr_node_info(ea, bb.id, flags)) if blockrgb == DEFCOLOR else set_node_info(ea, bb.id, ni, flags)
+
+        # Otherwise, we were given a non-integer and we simply ignore the stupidity.
+        elif rgb:
+            assert(framecolorQ and not isinstance(framergb, internal.types.integer))
+
+        # Refresh the view if we updated any of the block's colors.
+        if rgb or framecolorQ:
+            idaapi.refresh_idaview_anyway()
+
+        # Return the original color (RGB) of the basic block at `bb`.
+        b, r = (operator.and_(0xff * shift, original) // shift for shift in [0x010000, 0x000001])
+        return original if original == DEFCOLOR else sum([0x010000 * r, 0x00ff00 & original, 0x000001 * b])
+
+    @classmethod
+    def has_typeinfo(cls, func):
+        '''Return a boolean describing whether the function `func` has a prototype associated with it.'''
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        guess_tinfo = (lambda ti, ea: idaapi.guess_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo
+        _, ea = addressOfRuntimeOrStatic(func)
+
+        # If we're able to straight-up get the type information for a function or guess it, then we're good.
+        ti = idaapi.tinfo_t()
+        ok = get_tinfo(ti, ea) or guess_tinfo(ti, ea) == idaapi.GUESS_FUNC_OK
+        return True if ok else False
+
+    @classmethod
+    def typeinfo(cls, func):
+        '''Return the type information for the function `func`.'''
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        guess_tinfo = (lambda ti, ea: idaapi.guess_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo
+        rt, ea = addressOfRuntimeOrStatic(func)
+
+        # Try to get the type information for the function or guess it if we couldn't.
+        ti = idaapi.tinfo_t()
+        res = get_tinfo(ti, ea) or guess_tinfo(ti, ea)
+
+        # If our result is not equal to GUESS_FUNC_FAILED (get_tinfo returns True, then we're good.
+        if res != idaapi.GUESS_FUNC_FAILED:
+            return tinfo.concretize(ti)
+
+        # If that didn't work, then we lie about it, because we should always be able to return a type.
+        logging.debug(u"{:s}({:#x}) : Ignoring failure code ({:d}) when trying to guess the `{:s}` for the specified function.".format('.'.join([__name__, cls.__name__]), ea, res, ti.__class__.__name__))
+
+        # Guess the default int size by checking the size of a pointer. It's pretty
+        # likely this is a terrible way to determine the size of a default result.
+        tif = idaapi.tinfo_t()
+        tif.create_ptr(idaapi.tinfo_t(idaapi.BT_VOID))
+        deftype = {1: idaapi.BT_INT8, 2: idaapi.BT_INT16, 4: idaapi.BT_INT, 8: idaapi.BT_INT64}.get(tif.get_size(), idaapi.BT_INT)
+        int = idaapi.tinfo_t(deftype)
+
+        # FIXME: Figure out if the decompiler determines the default integer from something
+        #        other than the register size used by a result. I couldn't find anything
+        #        inside the compiler_info_t, so maybe there's something inside processor_t?
+
+        # Instead of assuming stdcall for rt-linked and cdecl for in-module functions (not always
+        # true), use the unknown calling convention which seems to appear as the compiler default.
+        ftd = idaapi.func_type_data_t()
+        ftd.rettype, ftd.cc = int, functools.reduce(operator.or_, [getattr(idaapi, attribute, value) for attribute, value in [('CM_CC_UNKNOWN', 0x10), ('CM_M_NN', 0), ('CM_UNKNOWN', 0)]])
+        return tinfo.concretize(ti) if ti.create_func(ftd) else None
+
+    @classmethod
+    def pointer(cls, info):
+        '''Promote the type information specified as `info` to a function pointer if necessary.'''
+        if any([info.is_ptr(), info.is_func()]):
+            return info
+
+        # If it's not a pointer then we need to promote it.
+        ti = idaapi.tinfo_t()
+        pi = idaapi.ptr_type_data_t()
+        pi.obj_type = info
+        return ti if ti.create_ptr(pi) else None
 
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
