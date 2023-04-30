@@ -63,7 +63,7 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = interface.function.by_address(ea)
     if res is None:
-        raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to find a function at the specified address ({:#x}).".format(__name__, ea, ea))
+        raise interface.function.missing(ea)
     return res
 byaddress = utils.alias(by_address)
 
@@ -75,7 +75,7 @@ def by_name(name, *suffix):
     string = interface.tuplename(*packed)
     res = interface.function.by_name(string)
     if res is None:
-        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to find a function with the specified name ({!s}).".format(__name__, res if suffix else string, utils.string.repr(string)))
+        raise interface.function.missing(string)
     return res
 byname = utils.alias(by_name)
 
@@ -101,8 +101,7 @@ def by(frame):
     '''Return the function that owns the specified `frame`.'''
     res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
     if res is None:
-        name = structure.name(frame)
-        raise E.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate function using a structure ({!s}) that is not a frame.".format(__name__, frame.id, utils.string.repr(name)))
+        raise interface.function.missing(frame)
     return res
 
 # FIXME: implement a matcher class for func_t
@@ -120,7 +119,7 @@ def offset(func):
 def offset(func, offset):
     '''Return the offset from the base of the database for the function `func` and add the provided `offset` to it.'''
     ea = address(func)
-    return database.address.offset(ea) + offset
+    return interface.address.offset(ea) + offset
 
 ## properties
 @utils.multicase()
@@ -135,7 +134,7 @@ def comment(func, **repeatable):
 
     If the bool `repeatable` is specified, then return the repeatable comment.
     """
-    fn = by(func)
+    fn = interface.function.by(func)
     res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
     return utils.string.of(res)
 @utils.multicase(string=types.string)
@@ -156,7 +155,7 @@ def comment(func, string, **repeatable):
 
     If the bool `repeatable` is specified, then modify the repeatable comment.
     """
-    fn = by(func)
+    fn = interface.function.by(func)
 
     res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, utils.string.to(string), repeatable.get('repeatable', True))
     if not ok:
@@ -177,32 +176,7 @@ def name():
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def name(func):
     '''Return the name of the function `func`.'''
-    get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
-    MNG_LONG_FORM = getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
-
-    # check to see if it's a runtime-linked function
-    rt, ea = interface.addressOfRuntimeOrStatic(func)
-    if rt:
-        name = get_name(ea)
-        mangled_name_type_t = Fmangled_type(name)
-        return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name)
-        #return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
-        #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
-
-    # otherwise it's a regular function, so try and get its name in a couple of ways
-    name = idaapi.get_func_name(ea)
-    if not name: name = get_name(ea)
-    if not name: name = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
-
-    # decode the string from IDA's UTF-8 and demangle it if we need to
-    # XXX: how does demangling work with utf-8? this would be implementation specific, no?
-    mangled_name_type_t = Fmangled_type(name)
-    return utils.string.of(name) if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name)
-    #return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
-    #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
-    #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
+    return interface.function.name(func)
 @utils.multicase(none=types.none)
 def name(none, **flags):
     '''Remove the custom-name from the current function.'''
@@ -231,42 +205,43 @@ def name(func, string, *suffix, **flags):
     If `flags` is specified, then use the specified value as the flags.
     If the boolean `listed` is specified, then specify whether to add the label to the Names list or not.
     """
+    # figure out if address is a runtime or static function
+    rt, ea = interface.addressOfRuntimeOrStatic(func)
 
     # combine name with its suffix
     res = (string,) + suffix
     string = interface.tuplename(*res)
 
-    # figure out if address is a runtime or static function
-    rt, ea = interface.addressOfRuntimeOrStatic(func)
-
     # set the default flags that we'll use based on whether the listed parameter was set.
-    res = idaapi.SN_NOWARN | (0 if flags.get('listed', idaapi.is_in_nlist(ea)) else idaapi.SN_NOLIST)
+    flag = idaapi.SN_NOWARN | (0 if flags.get('listed', idaapi.is_in_nlist(ea)) else idaapi.SN_NOLIST)
 
     # if it's a runtime-linked function, then it's not a public name.
     if rt:
-        flags.setdefault('flags', res | idaapi.SN_NON_PUBLIC)
+        flag |= idaapi.SN_NON_PUBLIC
 
     # if it's a static function, then we need to preserve its flags.
     else:
-        res |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
-        res |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
-        flags.setdefault('flags', res)
+        flag |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+        flag |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
 
     # FIXME: mangle the name and shuffle it into the prototype if possible
-    return database.name(ea, string, **flags)
+    return interface.name.set(ea, string, flag, flag | idaapi.SN_NOLIST)
 
 @utils.multicase()
 def bounds():
     '''Return a tuple containing the bounds of the first chunk of the current function.'''
-    fn = ui.current.function()
+    try:
+        fn = ui.current.function()
+    except E.ItemNotFoundError:
+        raise interface.function.missing(caller=[__name__, 'bounds'])
     return interface.range.bounds(fn)
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function `func`.'''
     try:
-        fn = by(func)
+        fn = interface.function.by(func)
     except E.ItemNotFoundError:
-        raise E.FunctionNotFoundError(u"{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func))
+        raise interface.function.missing(func, caller=[__name__, 'bounds'])
     return interface.range.bounds(fn)
 range = utils.alias(bounds)
 
@@ -277,30 +252,27 @@ def color():
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def color(func):
     '''Return the color (RGB) of the function `func`.'''
-    fn, DEFCOLOR = by(func), 0xffffffff
-    b, r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
-    return None if fn.color == DEFCOLOR else (r<<16) | (fn.color&0x00ff00) | b
+    fn, DEFCOLOR = interface.function.by(func), 0xffffffff
+    res = interface.function.color(fn)
+    return None if res == DEFCOLOR else res
 @utils.multicase(func=(idaapi.func_t, types.integer), none=types.none)
 def color(func, none):
     '''Remove the color for the function `func`.'''
-    fn, DEFCOLOR = by(func), 0xffffffff
-    res, fn.color = fn.color, DEFCOLOR
-    if not idaapi.update_func(fn):
+    fn, DEFCOLOR = interface.function.by(func), 0xffffffff
+    res = interface.function.color(fn, DEFCOLOR)
+    if res is None:
         F, ea = idaapi.update_func, interface.range.start(fn)
-        raise E.DisassemblerError(u"{:s}.color({:#x}, {!s}) : Unable to clear the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, none, ea, '.'.join([F.__module__ or '', F.__name__]), ea))
-    b, r = (res&0xff0000)>>16, res&0x0000ff
-    return None if res == DEFCOLOR else (r<<16) | (res&0x00ff00) | b
+        raise E.DisassemblerError(u"{:s}.color({:#x}, {!s}) : Unable to clear the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, none, ea, utils.pycompat.fullname(F), ea))
+    return None if res == DEFCOLOR else res
 @utils.multicase(func=(idaapi.func_t, types.integer), rgb=types.integer)
 def color(func, rgb):
     '''Set the color (RGB) of the function `func` to `rgb`.'''
-    r, b = (rgb&0xff0000)>>16, rgb&0x0000ff
-    fn, DEFCOLOR = by(func), 0xffffffff
-    res, fn.color = fn.color, (b<<16) | (rgb&0x00ff00) | r
-    if not idaapi.update_func(fn):
+    fn, DEFCOLOR = interface.function.by(func), 0xffffffff
+    res = interface.function.color(fn, rgb)
+    if res is None:
         F, ea = idaapi.update_func, interface.range.start(fn)
-        raise E.DisassemblerError(u"{:s}.color({:#x}, {:#x}) : Unable to set the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, rgb, ea, '.'.join([F.__module__ or '', F.__name__]), ea))
-    b, r = (res&0xff0000)>>16, res&0x0000ff
-    return None if res == DEFCOLOR else (r<<16) | (res&0x00ff00) | b
+        raise E.DisassemblerError(u"{:s}.color({:#x}, {:#x}) : Unable to set the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, rgb, ea, utils.pycompat.fullname(F), ea))
+    return None if res == DEFCOLOR else res
 @utils.multicase(none=types.none)
 def color(none):
     '''Remove the color from the current function.'''
@@ -312,7 +284,7 @@ def address():
     try:
         res = ui.current.function()
     except E.ItemNotFoundError:
-        raise E.FunctionNotFoundError(u"{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
+        raise interface.function.missing(caller=[__name__, 'address'])
     return interface.range.start(res)
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def address(func):
@@ -321,7 +293,7 @@ def address(func):
 @utils.multicase(func=(idaapi.func_t, types.integer), offset=types.integer)
 def address(func, offset):
     '''Return the address for the entrypoint belonging to the function `func` and add the provided `offset` to it.'''
-    res = by(func)
+    res = interface.function.by(func)
     return interface.range.start(res) + offset
 top = addr = utils.alias(address)
 
@@ -332,7 +304,7 @@ def bottom():
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def bottom(func):
     '''Return the exit-points of the function `func`.'''
-    fn = by(func)
+    fn = interface.function.by(func)
     fc = blocks.flowchart(fn, idaapi.FC_PREDS)
     exit_types = (
         interface.fc_block_type_t.fcb_ret,
@@ -350,7 +322,7 @@ def marks():
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def marks(func):
     '''Return all the marks in the function `func`.'''
-    fn, res = by(func), []
+    fn, res = interface.function.by(func), []
     for ea, comment in database.marks():
         try:
             if address(ea) == interface.range.start(fn):
@@ -373,7 +345,7 @@ def new(ea):
         fullname = '.'.join([getattr(idaapi.add_func, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.add_func, attribute)])
         raise E.DisassemblerError(u"{:s}.new({:#x}) : Unable create a new function at the given address ({:#x}) with `{:s}`.".format(__name__, ea, start, fullname))
     ui.state.wait()
-    return interface.range.bounds(by_address(start))
+    return interface.range.bounds(interface.function.by(start))
 @utils.multicase(start=types.integer, end=types.integer)
 def new(start, end):
     '''Create a new function from the address `start` until `end`.'''
@@ -382,7 +354,7 @@ def new(start, end):
         fullname = '.'.join([getattr(idaapi.add_func, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.add_func, attribute)])
         raise E.DisassemblerError(u"{:s}.new({:#x}, {:#x}) : Unable create a new function for the given boundaries ({:s}) with `{:s}`.".format(__name__, start, end, bounds, fullname))
     ui.state.wait()
-    return interface.range.bounds(by_address(ea))
+    return interface.range.bounds(interface.function.by(ea))
 @utils.multicase(bounds=interface.bounds_t)
 def new(bounds):
     '''Create a new function using the specified `bounds`.'''
@@ -397,7 +369,7 @@ def remove():
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def remove(func):
     '''Remove the function `func` from the database.'''
-    fn = by(func)
+    fn = interface.function.by(func)
     bounds = ea, _ = interface.range.bounds(fn)
     if not idaapi.del_func(ea):
         fullname = '.'.join([getattr(idaapi.del_func, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.del_func, attribute)])
@@ -424,22 +396,13 @@ class chunks(object):
     """
     @utils.multicase()
     def __new__(cls):
-        '''Yield the bounds of each chunk within current function.'''
+        '''Return a list containing the bounds of each chunk for the current function.'''
         return cls(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     def __new__(cls, func):
-        '''Yield the bounds of each chunk for the function `func`.'''
-        fn = by(func)
-        fci = idaapi.func_tail_iterator_t(fn, interface.range.start(fn))
-        if not fci.main():
-            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `{:s}` to iterate through the chunks for the given function.".format(__name__, interface.range.start(fn), utils.pycompat.fullname(idaapi.func_tail_iterator_t)))
-
-        results = []
-        while True:
-            ch = fci.chunk()
-            results.append(interface.range.bounds(ch))
-            if not fci.next(): break
-        return results
+        '''Return a list containing the bounds of each chunk for the function `func`.'''
+        fn = interface.function.by(func)
+        return [ interface.range.bounds(ch) for ch in interface.function.chunks(fn) ]
 
     @utils.multicase()
     @classmethod
@@ -451,8 +414,8 @@ class chunks(object):
     def iterate(cls, func):
         '''Iterate through all the instructions for each chunk in the function `func`.'''
         for start, end in cls(func):
-            for ea in database.address.iterate(start, end):
-                if database.type.code(ea):
+            for ea in interface.address.items(start, end):
+                if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
                     yield ea
                 continue
             continue
@@ -467,19 +430,17 @@ class chunks(object):
     @classmethod
     def at(cls, ea):
         '''Return an ``idaapi.range_t`` describing the bounds of the function chunk at the address `ea`.'''
-        fn = by_address(ea)
+        fn = interface.function.by(ea)
         return cls.at(fn, ea)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
     def at(cls, func, ea):
         '''Return an ``idaapi.range_t`` describing the bounds of the function chunk belonging to `func` at the address `ea`.'''
-        fn = by(func)
-        for left, right in cls(fn):
-            if left <= ea < right:
-                area = interface.bounds_t(left, right)
-                return area.range()
-            continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate the chunk for the given address ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+        fn = interface.function.by(func)
+        res = interface.function.chunk(fn, ea)
+        if res is None:
+            raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate the chunk for the given address ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+        return res
 
     @utils.multicase()
     @classmethod
@@ -496,7 +457,7 @@ class chunks(object):
     def contains(cls, func, ea):
         '''Returns True if the function `func` contains the address `ea` in any of its chunks.'''
         try:
-            fn, ea = by(func), interface.address.within(ea)
+            fn, ea = interface.function.by(func), interface.address.within(ea)
 
         # If the function is not found, or the address is out of bounds
         # then the address isn't contained in the function. Simple.
@@ -506,7 +467,7 @@ class chunks(object):
         # If we didn't raise any exceptions, then grab all of the chunks
         # for the function that we determined.
         else:
-            iterable = cls(fn)
+            iterable = ( interface.range.bounds(ch) for ch in interface.function.chunks(fn) )
 
         # Now we can just iterate through each chunk whilst checking the bounds.
         return any(start <= ea < end for start, end in iterable)
@@ -545,7 +506,7 @@ class chunks(object):
     @classmethod
     def points(cls, func):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the function `func`.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         for ch, _ in cls(fn):
             for ea, delta in chunk.points(fn, ch):
                 yield ea, delta
@@ -592,7 +553,7 @@ class chunk(object):
         '''Return the primary owner of the function chunk containing the address specified by `ea`.'''
         if within(ea):
             return next(item for item in interface.function.owners(ea))
-        raise E.FunctionNotFoundError(u"{:s}.owner({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+        raise interface.function.missing(ea, caller=[__name__, cls.__name__, 'owner'])
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def owner(cls, bounds):
@@ -603,7 +564,7 @@ class chunk(object):
     @classmethod
     def owner(cls, ea, func):
         '''Set the primary owner of the chunk at `ea` to the function `func`.'''
-        ea, fn = interface.address.within(ea), by(func)
+        ea, fn = interface.address.within(ea), interface.function.by(func)
         result, ok = cls.owner(ea), idaapi.set_tail_owner(fn, ea)
         if not ok:
             fullname = '.'.join([getattr(idaapi.set_tail_owner, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.set_tail_owner, attribute)])
@@ -654,8 +615,8 @@ class chunk(object):
     def iterate(cls, ea):
         '''Iterate through all the instructions for the function chunk containing the address ``ea``.'''
         start, end = cls(ea)
-        for ea in database.address.iterate(start, end):
-            if database.type.code(ea):
+        for ea in interface.address.items(start, end):
+            if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
                 yield ea
             continue
         return
@@ -693,13 +654,13 @@ class chunk(object):
     @classmethod
     def points(cls, ea):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea`.'''
-        fn = by_address(ea)
+        fn = interface.function.by(ea)
         return cls.points(fn, ea)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
     def points(cls, func, ea):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea` belonging to the function `func`.'''
-        fn, ch = by(func), idaapi.get_fchunk(ea)
+        fn, ch = interface.function.by(func), idaapi.get_fchunk(ea)
 
         # If we were unable to get the function chunk for the provided address,
         # then IDA didn't calculate any stack deltas for what was requested.
@@ -747,18 +708,18 @@ class chunk(object):
     @classmethod
     def at(cls):
         '''Return an ``idaapi.range_t`` describing the bounds of the current function chunk.'''
-        return cls.at(ui.current.function(), ui.current.address())
+        return interface.function.chunk(ui.current.function(), ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
     def at(cls, ea):
         '''Return an ``idaapi.range_t`` describing the bounds of the function chunk at the address `ea`.'''
-        fn = by_address(ea)
-        return cls.at(fn, ea)
+        fn = interface.function.by(ea)
+        return interface.function.chunk(fn, ea)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
     def at(cls, func, ea):
         '''Return an ``idaapi.range_t`` describing the bounds of the function chunk belonging to `func` at the address `ea`.'''
-        return chunks.at(func, ea)
+        return interface.function.chunk(func, ea)
 
     @utils.multicase()
     @classmethod
@@ -842,7 +803,7 @@ class chunk(object):
     def offset(cls, ea, offset):
         '''Return the offset from the base of the database for the function chunk containing the address `ea` and add the provided `offset` to it.'''
         left, _ = cls(ea)
-        return database.address.offset(left) + offset
+        return interface.address.offset(left) + offset
 
     @utils.multicase(start=types.integer)
     @classmethod
@@ -858,7 +819,7 @@ class chunk(object):
     @classmethod
     def add(cls, func, ea):
         '''Add the chunk starting at address `ea` to the function `func`.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         start = interface.address.inside(ea)
         if not idaapi.append_func_tail(fn, start, idaapi.BADADDR):
             fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
@@ -869,7 +830,7 @@ class chunk(object):
     @classmethod
     def add(cls, func, start, end):
         '''Add the chunk from the address `start` until `end` to the function `func`.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         ea, stop = bounds = interface.bounds_t(*interface.address.within(start, end))
         if not idaapi.append_func_tail(fn, ea, stop):
             fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
@@ -903,7 +864,7 @@ class chunk(object):
     @classmethod
     def remove(cls, func, ea):
         '''Remove the chunk at `ea` from the function `func`.'''
-        fn, ea = by(func), interface.address.within(ea)
+        fn, ea = interface.function.by(func), interface.address.within(ea)
         bounds = cls(ea)
         if not idaapi.remove_func_tail(fn, ea):
             fullname = '.'.join([getattr(idaapi.remove_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.remove_func_tail, attribute)])
@@ -960,7 +921,7 @@ class blocks(object):
         If `external` is true, then include all blocks that are a branch target despite being outside the function boundaries.
         If `split` is false, then do not allow a call instruction to split a block.
         """
-        fn = by_address(left)
+        fn = interface.function.by(left)
 
         # Define a closure that filters the basic-blocks within the given range.
         def filtered(left, right, iterable=cls.iterate(fn, **external)):
@@ -996,7 +957,7 @@ class blocks(object):
     @classmethod
     def iterate(cls, func, flags, **silent):
         '''Returns each ``idaapi.BasicBlock`` from the flowchart built with the specified `flags` (``idaapi.FC_*``) for the function `func`.'''
-        fn, FC_CALL_ENDS, has_calls = by(func), getattr(idaapi, 'FC_CALL_ENDS', 0x20), hasattr(idaapi, 'FC_CALL_ENDS')
+        fn, FC_CALL_ENDS, has_calls = interface.function.by(func), getattr(idaapi, 'FC_CALL_ENDS', 0x20), hasattr(idaapi, 'FC_CALL_ENDS')
         boundaries = [bounds for bounds in chunks(fn)]
 
         # iterate through all the basic-blocks in the flow chart and yield
@@ -1012,7 +973,7 @@ class blocks(object):
             if not has_calls and flags & FC_CALL_ENDS:
                 start, stop, locations = left, right, [ea for ea in block.iterate(bb) if interface.instruction.is_call(ea)]
                 for item in locations:
-                    left, right = start, database.address.next(item)
+                    left, right = start, idaapi.next_not_tail(item)
                     yield idaapi.BasicBlock(bb.id, interface.range.pack(left, right), bb._fc)
                     start = right
 
@@ -1052,7 +1013,7 @@ class blocks(object):
     @classmethod
     def walk(cls, func, **flags):
         '''Traverse each of the successor blocks starting from the beginning of the function `func`.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         return cls.traverse(fn, interface.range.start(fn), operator.methodcaller('succs'), **flags)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
@@ -1102,14 +1063,14 @@ class blocks(object):
     @classmethod
     def traverse(cls, func, predicate, **flags):
         '''Traverse the blocks from the beginning of function `func` until the callable `predicate` returns no more elements.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         ea = interface.range.start(fn)
         return cls.traverse(fn, ea, predicate, **flags)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer, predicate=types.callable)
     @classmethod
     def traverse(cls, func, ea, predicate, **flags):
         '''Traverse the blocks of function `func` from the block given by `ea` until the callable `predicate` returns no more elements.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         bb = cls.at(fn, ea, **flags)
         return cls.traverse(bb, predicate)
     @utils.multicase(bb=idaapi.BasicBlock, predicate=types.callable)
@@ -1168,7 +1129,7 @@ class blocks(object):
     @classmethod
     def at(cls, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` of address `ea` in the current function.'''
-        fn = by_address(ea)
+        fn = interface.function.by(ea)
         return cls.at(fn, ea, **flags)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
@@ -1182,7 +1143,7 @@ class blocks(object):
     @classmethod
     def at(cls, func, ea, flags):
         '''Return the ``idaapi.BasicBlock`` with the specified `flags` (``idaapi.FC_*``) for function `func` at address `ea`.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         for bb in cls.iterate(fn, flags):
             if interface.range.within(ea, bb):
                 return bb
@@ -1202,7 +1163,7 @@ class blocks(object):
         # if we can't get ahold of the flowchart, then we need to use
         # BasicBlock's address to find the function it's a part of.
         except AttributeError:
-            fn = func.by(bounds.left)
+            fn = interface.function.by(bounds.left)
             logging.warning(u"{:s}.at({!s}) : Unable to determine the flowchart from the provided `{:s}` ({:s}) for function {:#x}.".format('.'.join([__name__, cls.__name__]), bounds, utils.pycompat.fullname(idaapi.BasicBlock), bounds, interface.range.start(fn)))
             return cls.at(fn, bb)
 
@@ -1220,7 +1181,7 @@ class blocks(object):
     @classmethod
     def at(cls, func, bb):
         '''Return the ``idaapi.BasicBlock`` in function `func` identifed by `bb`.'''
-        fn, bounds = by(func), interface.range.bounds(bb)
+        fn, bounds = interface.function.by(func), interface.range.bounds(bb)
 
         # now we need to extract the flags from the fc if possible.
         path = map(operator.attrgetter, ['_fc', '_q', 'flags'])
@@ -1254,7 +1215,7 @@ class blocks(object):
     @classmethod
     def flowchart(cls, func, flags):
         '''Return an ``idaapi.FlowChart`` object built with the specified `flags` for the function `func`.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         return idaapi.FlowChart(f=fn, flags=flags)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
@@ -1347,7 +1308,7 @@ class blocks(object):
         If `require` is given as an iterable of tag names then require that each returned block uses them.
         If `include` is given as an iterable of tag names then include the tags for each returned block if available.
         """
-        target, flags = by(func), getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+        target, flags = interface.function.by(func), getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
 
         # Turn all of our parameters into a dict of sets that we can iterate through.
         boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
@@ -1405,7 +1366,7 @@ class blocks(object):
 
         Requires the ``networkx`` module in order to build the graph.
         """
-        fn, fcflags = by(func), flags.get('flags', idaapi.FC_PREDS | idaapi.FC_NOEXT | getattr(idaapi, 'FC_CALL_ENDS', 0x20))
+        fn, fcflags = interface.function.by(func), flags.get('flags', idaapi.FC_PREDS | idaapi.FC_NOEXT | getattr(idaapi, 'FC_CALL_ENDS', 0x20))
         ea = interface.range.start(fn)
 
         # assign some default values and create some tools to use when creating the graph
@@ -1428,8 +1389,9 @@ class blocks(object):
         except E.MissingTypeOrAttribute:
             pass
 
-        if color(fn) is not None:
-            operator.setitem(attrs, '__color__', color(fn))
+        res, DEFCOLOR = interface.function.color(fn), 0xffffffff
+        if res != DEFCOLOR:
+            operator.setitem(attrs, '__color__', res)
 
         G = networkx.DiGraph(name=name(ea), **attrs)
 
@@ -1444,8 +1406,8 @@ class blocks(object):
 
             # check if the boundary is zero-sized and handle it differently if so.
             if bounds.size:
-                items = [item for item in database.address.iterate(bounds)]
-                last = database.address.prev(bounds.right)
+                items = [item for item in interface.address.items(*bounds)]
+                last = idaapi.prev_not_tail(bounds.right)
 
             # as the boundaries are defining an empty basic-block, we only need
             # to find the one address that it's actually pointing to.
@@ -1494,7 +1456,7 @@ class blocks(object):
             if attrs.get('__entry__', False):
                 operator.setitem(attrs, 'rank', 'max')
                 operator.setitem(attrs, 'shape', 'diamond')
-                attrs.setdefault('__name__', database.name(bounds.left) or name(bounds.left))
+                attrs.setdefault('__name__', interface.name.get(bounds.left) or interface.function.name(bounds.left))
 
             elif attrs.get('__sentinel__', False):
                 operator.setitem(attrs, 'rank', 'min')
@@ -1513,7 +1475,7 @@ class blocks(object):
 
             # ...add an edge for its predecessors
             for Bp in B.preds():
-                source, target = database.address.prev(interface.range.end(Bp)), interface.range.start(B)
+                source, target = idaapi.prev_not_tail(interface.range.end(Bp)), interface.range.start(B)
 
                 # FIXME: figure out some more default attributes to include
                 attrs = {}
@@ -1537,7 +1499,7 @@ class blocks(object):
 
             # ...add an edge for its successors
             for Bs in B.succs():
-                source, target = database.address.prev(interface.range.end(B)), interface.range.start(Bs)
+                source, target = idaapi.prev_not_tail(interface.range.end(B)), interface.range.start(Bs)
 
                 # FIXME: figure out some more default attributes to include
                 attrs = {}
@@ -1622,7 +1584,7 @@ class block(object):
     @classmethod
     def at(cls, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` of address `ea` in the current function.'''
-        fn = by_address(ea)
+        fn = interface.function.by(ea)
         return cls.at(fn, ea, **flags)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
@@ -1674,7 +1636,7 @@ class block(object):
     @utils.multicase(ea=types.integer)
     def __new__(cls, ea, **flags):
         '''Returns the boundaries of the basic block at address `ea`.'''
-        return cls(by_address(ea), ea, **flags)
+        return cls(interface.function.by(ea), ea, **flags)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     def __new__(cls, func, ea, **flags):
         '''Returns the boundaries of the basic block at address `ea` in function `func`.'''
@@ -1809,7 +1771,7 @@ class block(object):
     def offset(cls, ea, offset):
         '''Return the offset from the base of the database for the basic block at address `ea` and add the provided `offset` to it.'''
         left, _ = cls(ea)
-        return database.address.offset(left) + offset
+        return interface.address.offset(left) + offset
 
     @utils.multicase()
     @classmethod
@@ -1823,23 +1785,17 @@ class block(object):
         return cls.color(ui.current.address(), None)
     @utils.multicase(ea=types.integer)
     @classmethod
-    def color(cls, ea):
+    def color(cls, ea, **frame):
         '''Returns the color of the basic block at the address `ea`.'''
-        bb = cls.at(ea)
-        return cls.color(bb)
+        bb, DEFCOLOR = blocks.at(ea), 0xffffffff
+        res = interface.function.blockcolor(bb, **frame)
+        return None if res == DEFCOLOR else res
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
-    def color(cls, bb):
+    def color(cls, bb, **frame):
         '''Returns the color of the basic block `bb`.'''
-        get_node_info = idaapi.get_node_info2 if idaapi.__version__ < 7.0 else idaapi.get_node_info
-
-        fn, ni = by_address(interface.range.start(bb)), idaapi.node_info_t()
-        ok = get_node_info(ni, interface.range.start(fn), bb.id)
-        if ok and ni.valid_bg_color():
-            res = ni.bg_color
-            b, r = (res&0xff0000)>>16, res&0x0000ff
-            return (r<<16) | (res&0x00ff00) | b
-        return None
+        res, DEFCOLOR = interface.function.blockcolor(bb, **frame), 0xffffffff
+        return None if res == DEFCOLOR else res
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def color(cls, bounds):
@@ -1848,18 +1804,13 @@ class block(object):
         return cls.color(bb)
     @utils.multicase(ea=types.integer, none=types.none)
     @classmethod
-    def color(cls, ea, none):
+    def color(cls, ea, none, **frame):
         '''Removes the color of the basic block at the address `ea`.'''
-        clr_node_info = idaapi.clr_node_info2 if idaapi.__version__ < 7.0 else idaapi.clr_node_info
-
-        res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
-        try: clr_node_info(interface.range.start(fn), bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
-        finally: idaapi.refresh_idaview_anyway()
-
-        # clear the color of each item too.
+        bb, DEFCOLOR = blocks.at(ea), 0xffffffff
+        res = interface.function.blockcolor(bb, DEFCOLOR, **frame)
         for ea in block.iterate(ea):
-            database.color(ea, None)
-        return res
+            interface.address.color(ea, DEFCOLOR)
+        return None if res == DEFCOLOR else res
     @utils.multicase(bounds=interface.bounds_t, none=types.none)
     @classmethod
     def color(cls, bounds, none):
@@ -1868,73 +1819,33 @@ class block(object):
         return cls.color(bb, None)
     @utils.multicase(bb=idaapi.BasicBlock, none=types.none)
     @classmethod
-    def color(cls, bb, none):
+    def color(cls, bb, none, **frame):
         '''Removes the color of the basic block `bb`.'''
-        clr_node_info = idaapi.clr_node_info2 if idaapi.__version__ < 7.0 else idaapi.clr_node_info
-
-        res, fn = cls.color(bb), by_address(interface.range.start(bb))
-        try: clr_node_info(interface.range.start(fn), bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
-        finally: idaapi.refresh_idaview_anyway()
-
-        # clear the color of each item too.
+        DEFCOLOR = 0xffffffff
+        res = interface.function.blockcolor(bb, DEFCOLOR, **frame)
         for ea in block.iterate(bb):
-            database.color(ea, None)
-        return res
+            interface.address.color(ea, DEFCOLOR)
+        return None if res == DEFCOLOR else res
     @utils.multicase(ea=types.integer, rgb=types.integer)
     @classmethod
     def color(cls, ea, rgb, **frame):
         """Sets the color of the basic block at the address `ea` to `rgb`.
 
-        If the color `frame` is specified, set the frame to the specified color.
+        If the color `frame` is specified, set the frame to the specified color or both the frame and background if true.
         """
-        set_node_info = idaapi.set_node_info2 if idaapi.__version__ < 7.0 else idaapi.set_node_info
-
-        res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
-        ni = idaapi.node_info_t()
-
-        # specify the bgcolor
-        r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
-        ni.bg_color = ni.frame_color = (b<<16) | (rgb&0x00ff00) | r
-
-        # now the frame color
-        frgb = frame.get('frame', 0x000000)
-        fr, fb = (frgb&0xff0000)>>16, frgb&0x0000ff
-        ni.frame_color = (fb<<16) | (frgb&0x00ff00) | fr
-
-        # set the node
-        f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: set_node_info(interface.range.start(fn), bb, ni, f)
-        finally: idaapi.refresh_idaview_anyway()
-
-        # update the color of each item too
-        for ea in block.iterate(ea):
-            database.color(ea, rgb)
-        return res
+        bb, DEFCOLOR = blocks.at(ea), 0xffffffff
+        res = interface.function.blockcolor(bb, rgb, **frame)
+        for ea in block.iterate(bb):
+            interface.address.color(ea, rgb)
+        return None if res == DEFCOLOR else res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=types.integer)
     @classmethod
     def color(cls, bb, rgb, **frame):
         '''Sets the color of the basic block `bb` to `rgb`.'''
-        set_node_info = idaapi.set_node_info2 if idaapi.__version__ < 7.0 else idaapi.set_node_info
-        res, fn, ni = cls.color(bb), by_address(interface.range.start(bb)), idaapi.node_info_t()
-
-        # specify the bg color
-        r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
-        ni.bg_color = ni.frame_color = (b<<16) | (rgb&0x00ff00) | r
-
-        # now the frame color
-        frgb = frame.get('frame', 0x000000)
-        fr, fb = (frgb&0xff0000)>>16, frgb&0x0000ff
-        ni.frame_color = (fb<<16) | (frgb&0x00ff00) | fr
-
-        # set the node
-        f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: set_node_info(interface.range.start(fn), bb.id, ni, f)
-        finally: idaapi.refresh_idaview_anyway()
-
-        # update the colors of each item too.
+        res, DEFCOLOR = interface.function.blockcolor(bb, rgb, **frame), 0xffffffff
         for ea in block.iterate(bb):
-            database.color(ea, rgb)
-        return res
+            interface.address.color(ea, rgb)
+        return None if res == DEFCOLOR else res
     @utils.multicase(bounds=interface.bounds_t, rgb=types.integer)
     @classmethod
     def color(cls, bounds, rgb, **frame):
@@ -1963,7 +1874,7 @@ class block(object):
     @classmethod
     def before(cls, bb):
         '''Return the addresses of all the instructions that branch to the basic block `bb`.'''
-        return [ database.address.prev(interface.range.end(bb)) for bb in bb.preds() ]
+        return [ idaapi.prev_not_tail(interface.range.end(bb)) for bb in bb.preds() ]
     predecessors = preds = utils.alias(before, 'block')
 
     @utils.multicase()
@@ -2000,18 +1911,18 @@ class block(object):
     def iterate(cls, ea):
         '''Yield all the addresses in the basic block at address `ea`.'''
         left, right = cls(ea)
-        return database.address.iterate(left, right)
+        return interface.address.items(left, right)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def iterate(cls, bounds):
         '''Yield all the addresses in the basic block identified by `bounds`.'''
-        return database.address.iterate(bounds)
+        return interface.address.items(*bounds)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def iterate(cls, bb):
         '''Yield all the addresses in the basic block `bb`.'''
         left, right = interface.range.unpack(bb)
-        return database.address.iterate(left, right)
+        return interface.address.items(left, right)
 
     # current block
     @utils.multicase()
@@ -2073,7 +1984,7 @@ class block(object):
     @utils.string.decorate_arguments('key', 'value')
     def tag(cls, bb):
         '''Returns all the tags defined for the ``idaapi.BasicBlock`` given in `bb`.'''
-        ea = interface.range.start(bb)
+        DEFCOLOR, ea = 0xffffffff, interface.range.start(bb)
 
         # first thing to do is to read the tags for the address. this
         # gives us "__extra_prefix__", "__extra_suffix__", and "__name__".
@@ -2081,8 +1992,8 @@ class block(object):
 
         # next, we're going to remove the one implicit tag that we
         # need to handle...and that's the "__color__" tag.
-        col, _ = cls.color(bb), res.pop('__color__', None)
-        if col is not None: res.setdefault('__color__', col)
+        col = interface.function.blockcolor(bb)
+        if col not in {None, DEFCOLOR}: res.setdefault('__color__', col)
 
         # that was pretty much it, so we can just return our results.
         return res
@@ -2101,12 +2012,14 @@ class block(object):
     @utils.string.decorate_arguments('key', 'value')
     def tag(cls, bb, key, value):
         '''Sets the value for the tag `key` to `value` in the ``idaapi.BasicBlock`` given by `bb`.'''
-        ea = interface.range.start(bb)
+        DEFCOLOR, ea = 0xffffffff, interface.range.start(bb)
 
         # the only real implicit tag we need to handle is "__color__", because our
         # database.tag function does "__extra_prefix__", "__extra_suffix__", and "__name__".
         if key == '__color__':
-            return cls.color(bb, value)
+            res = interface.function.blockcolor(bb, value)
+            [ interface.address.color(ea, value) for ea in cls.iterate(bb) ]
+            return None if res == DEFCOLOR else res
 
         # now we can passthrough to database.tag for everything else.
         return database.tag(ea, key, value)
@@ -2115,11 +2028,13 @@ class block(object):
     @utils.string.decorate_arguments('key')
     def tag(cls, bb, key, none):
         '''Removes the tag identified by `key` from the ``idaapi.BasicBlock`` given by `bb`.'''
-        ea = interface.range.start(bb)
+        DEFCOLOR, ea = 0xffffffff, interface.range.start(bb)
 
         # if the '__color__' tag was specified, then explicitly clear it.
         if key == '__color__':
-            return cls.color(bb, none)
+            res = interface.function.blockcolor(bb, DEFCOLOR)
+            [ interface.address.color(ea, DEFCOLOR) for ea in cls.iterate(bb) ]
+            return None if res == DEFCOLOR else res
 
         # passthrough to database.tag for removing the ones we don't handle.
         return database.tag(ea, key, none)
@@ -2142,7 +2057,7 @@ class block(object):
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use( (reg,) + regs )
 
-        for ea in database.address.iterate(bounds):
+        for ea in interface.address.items(*bounds):
             for opnum in iterops(ea):
                 if uses_register(ea, opnum):
                     items = ea, opnum, instruction.op_access(ea, opnum)
@@ -2192,8 +2107,8 @@ class block(object):
     @classmethod
     def read(cls, bb):
         '''Return all the bytes contained in the basic block `bb`.'''
-        bounds = interface.range.bounds(bb)
-        return database.read(bounds)
+        bounds = ea, _ = interface.range.bounds(bb)
+        return interface.address.read(ea, bounds.size)
 
     @utils.multicase()
     @classmethod
@@ -2240,7 +2155,7 @@ class block(object):
 
         # If the last instruction is not a call, then start scanning for one.
         if not interface.instruction.is_call(ea):
-            ea = next((ea for ea in database.address.iterate(left, right) if interface.instruction.is_call(ea)), ea)
+            ea = next((ea for ea in interface.address.items(left, right) if interface.instruction.is_call(ea)), ea)
 
         # If we couldn't get it this time, then give up and raise an exception.
         if not interface.instruction.is_call(ea):
@@ -2299,7 +2214,7 @@ class block(object):
 
         # If the last instruction is not a branch, then start scanning for one.
         if not interface.instruction.is_branch(ea):
-            ea = next((ea for ea in database.address.iterate(left, right) if interface.instruction.is_branch(ea)), ea)
+            ea = next((ea for ea in interface.address.items(left, right) if interface.instruction.is_branch(ea)), ea)
 
         # If we couldn't get it this time, then give up and raise an exception.
         if not interface.instruction.is_branch(ea):
@@ -2386,12 +2301,10 @@ class frame(object):
     @utils.multicase(func=(idaapi.func_t, types.integer))
     def __new__(cls, func):
         '''Return the frame of the function `func`.'''
-        fn = by(func)
-        res = idaapi.get_frame(interface.range.start(fn))
-        if res is not None:
-            size = idaapi.frame_off_args(fn)
-            return structure.by_identifier(res.id, offset=-size)
-        raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
+        fn = interface.function.by(func)
+        if fn.frame == idaapi.BADNODE:
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
+        return interface.function.frame(fn)
 
     @utils.multicase()
     @classmethod
@@ -2417,7 +2330,7 @@ class frame(object):
 
         When specifying the size of the registers (`regs`) the size of the saved instruction pointer must also be included.
         """
-        fn = by(func)
+        fn = interface.function.by(func)
         _r = idaapi.get_frame_retsize(fn)
         ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
@@ -2433,7 +2346,7 @@ class frame(object):
     @classmethod
     def id(cls, func):
         '''Returns the structure id for the function `func`.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         return fn.frame
 
     @utils.multicase()
@@ -2445,13 +2358,13 @@ class frame(object):
     @classmethod
     def delta(cls, ea):
         '''Returns the stack delta for the address `ea` within its given function.'''
-        fn, ea = by_address(ea), interface.address.inside(ea)
+        fn, ea = interface.function.by(ea), interface.address.inside(ea)
         return idaapi.get_spd(fn, ea)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
     def delta(cls, func, ea):
         '''Returns the stack delta for the address `ea` within the function `func`.'''
-        fn, ea = by(func), interface.address.inside(ea)
+        fn, ea = interface.function.by(func), interface.address.inside(ea)
         return idaapi.get_spd(fn, ea)
 
     class arguments(object):
@@ -2629,14 +2542,14 @@ class frame(object):
         def iterate(cls, func):
             '''Yield the `(member, type, name)` associated with the arguments for the function `func`.'''
             rt, ea = interface.addressOfRuntimeOrStatic(func)
-            fn, has_tinfo = None if rt else by(ea), type.has(ea)
+            fn, has_tinfo = None if rt else interface.function.by_address(ea), interface.function.has_typeinfo(ea)
 
             # We need our frame to be correct, so we confirm it by checking the problem queue.
             Fproblem = builtins.next((getattr(idaapi, candidate) for candidate in ['is_problem_present', 'QueueIsPresent'] if hasattr(idaapi, candidate)), utils.fconstant(False))
             PR_BADSTACK = getattr(idaapi, 'PR_BADSTACK', 0xb)
 
             # Build a lookup table that we'll use to deserialize the correct type for each size.
-            bits, tilookup = database.config.bits(), {
+            bits, tilookup = interface.database.bits(), {
                 8: idaapi.BT_INT8, 16: idaapi.BT_INT16, 32: idaapi.BT_INT32,
                 64: idaapi.BT_INT64, 128: idaapi.BT_INT128, 80: idaapi.BTF_TBYTE,
             }
@@ -2740,7 +2653,7 @@ class frame(object):
 
             # If we got here, then we have type information that we can grab out
             # of the given address. Once we have it, rip the details out o it.
-            tinfo = type(ea)
+            tinfo = interface.function.typeinfo(ea)
             _, ftd = interface.tinfo.function_details(ea, tinfo)
 
             # Now we just need to iterate through our parameters collecting the
@@ -2811,7 +2724,7 @@ class frame(object):
         @classmethod
         def size(cls, func):
             '''Returns the size of the arguments for the function `func`.'''
-            fn = by(func)
+            fn = interface.function.by(func)
             max = structure.size(get_frameid(fn))
             total = frame.lvars.size(fn) + frame.regs.size(fn)
             return max - total
@@ -2834,7 +2747,7 @@ class frame(object):
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
             '''Yield the `(offset, name, size)` of each local variable relative to the stack pointer for the function `func`.'''
-            fn = by(func)
+            fn = interface.function.by(func)
 
             # figure out the frame
             fr = idaapi.get_frame(fn)
@@ -2855,7 +2768,7 @@ class frame(object):
         @classmethod
         def size(cls, func):
             '''Returns the size of the local variables for the function `func`.'''
-            fn = by(func)
+            fn = interface.function.by(func)
             return fn.frsize
     vars = lvars    # XXX: ns alias
 
@@ -2877,7 +2790,7 @@ class frame(object):
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
             '''Yield the `(offset, name, size)` of each saved register relative to the stack pointer of the function `func`.'''
-            fn = by(func)
+            fn = interface.function.by(func)
 
             # figure out the frame
             fr = idaapi.get_frame(fn)
@@ -2899,7 +2812,7 @@ class frame(object):
         @classmethod
         def size(cls, func):
             '''Returns the number of bytes occupied by the saved registers for the function `func`.'''
-            fn = by(func)
+            fn = interface.function.by(func)
             return fn.frregs + idaapi.get_frame_retsize(fn)
 
 get_frameid = utils.alias(frame.id, 'frame')
@@ -2954,10 +2867,10 @@ def tag(func):
 
     # Read both repeatable and non-repeatable comments from the address, and
     # decode the tags that are stored within to a dictionary.
-    fn, repeatable = by_address(ea), True
-    res = comment(fn, repeatable=False)
+    fn, repeatable = interface.function.by_address(ea), True
+    res = utils.string.of(idaapi.get_func_cmt(fn, False) or '')
     d1 = internal.comment.decode(res)
-    res = comment(fn, repeatable=True)
+    res = utils.string.of(idaapi.get_func_cmt(fn, True) or '')
     d2 = internal.comment.decode(res)
 
     # Detect if the address had content in both repeatable or non-repeatable
@@ -2970,7 +2883,7 @@ def tag(func):
     [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
 
     # Collect all of the naming information for the function.
-    fname, mangled = name(ea), utils.string.of(idaapi.get_func_name(ea))
+    fname, mangled = interface.function.name(ea), utils.string.of(idaapi.get_func_name(ea))
     if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
         realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
     else:
@@ -2979,15 +2892,15 @@ def tag(func):
     # Add any of the implicit tags for the given function into our results.
     fname = fname
     if fname and interface.address.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', realname)
-    fcolor = color(fn)
-    if fcolor is not None: res.setdefault('__color__', fcolor)
+    fcolor, DEFCOLOR = interface.function.color(fn), 0xffffffff
+    if fcolor != DEFCOLOR: res.setdefault('__color__', fcolor)
 
     # For the function's type information within the implicit "__typeinfo__"
     # tag, we'll need to extract the prototype and the function's name. This
     # is so that we can use the name to emit a proper function prototype.
     try:
-        if type.has(fn):
-            ti = type(fn)
+        if interface.function.has_typeinfo(fn):
+            ti = interface.function.typeinfo(fn)
 
             # We need this name to be parseable and (of course) IDA doesn't
             # give a fuck whether its output is parseable by its own parser.
@@ -3025,7 +2938,7 @@ def tag(func, key, value):
         return database.tag(ea, key, value)
 
     # Otherwise, it's a function.
-    fn = by_address(ea)
+    fn = interface.function.by_address(ea)
 
     # If the user wants to modify any of the implicit tags, then we use the key
     # to figure out which function to dispatch to in order to modify it.
@@ -3037,7 +2950,7 @@ def tag(func, key, value):
             return name(fn, filtered)
 
         # Otherwise, we need an alternate name to avoid complaints.
-        items, offset = [filtered], interface.range.start(fn) - database.config.baseaddress()
+        items, offset = [filtered], interface.range.start(fn) - interface.database.imagebase()
         while any(F(interface.tuplename(*items)) for F in [interface.name.used, interface.name.exists]):
             items.append(offset)
         alternative = tuple(items)
@@ -3052,7 +2965,8 @@ def tag(func, key, value):
         return name(fn, *alternative)
 
     elif key == '__color__':
-        return color(fn, value)
+        res, DEFCOLOR = interface.function.color(fn, value), 0xffffffff
+        return None if res == DEFCOLOR else res
 
     elif key == '__typeinfo__':
         return type(fn, value)
@@ -3060,8 +2974,8 @@ def tag(func, key, value):
     # Decode both comment types for the function so that we can figure out which
     # type that the tag they specified is currently in. If it's in neither, then
     # we can simply use a repeatable comment because we're a function.
-    state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
-    state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
+    state_correct = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
+    state_wrong = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
     state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
     # Grab the previous value from the correct dictionary, and update it with
@@ -3081,7 +2995,7 @@ def tag(func, key, value):
 
     # Finally we can encode the modified dict and write it to the function comment.
     else:
-        comment(fn, internal.comment.encode(state), repeatable=where)
+        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(state)), where)
 
     # Release the hooks that we disabled since we finished modifying the comment.
     finally:
@@ -3119,22 +3033,25 @@ def tag(func, key, none):
         return database.tag(ea, key, none)
 
     # Otherwise, it's a function.
-    fn = by_address(ea)
+    fn = interface.function.by_address(ea)
 
     # If the user wants to remove any of the implicit tags, then we need to
     # dispatch to the correct function in order to clear the requested value.
     if key == '__name__':
         return name(fn, None)
     elif key == '__color__':
-        return color(fn, None)
+        DEFCOLOR = 0xffffff
+        res = interface.function.color(fn, DEFCOLOR)
+        return None if res == DEFCOLOR else res
     elif key == '__typeinfo__':
-        return type(fn, None)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        return interface.address.apply_typeinfo(ea, None)
 
     # Decode both comment types so that we can figure out which comment type
     # the tag they're trying to remove is in. If it's in neither, then we just
     # assume which comment it should be in as an exception will be raised later.
-    state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
-    state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
+    state_correct = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
+    state_wrong = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
     state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
     # If the user's key was not in any of the decoded dictionaries, then raise
@@ -3156,7 +3073,7 @@ def tag(func, key, none):
 
     # Finally we can encode the modified dict back into the function comment.
     else:
-        comment(fn, internal.comment.encode(state), repeatable=where)
+        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(state)), where)
 
     # Release the hooks that were disabled now that that comment has been written.
     finally:
@@ -3174,7 +3091,7 @@ def tags():
 @utils.multicase(ea=types.integer)
 def tags(ea):
     '''Returns all of the content tags for the function at the address `ea`.'''
-    fn, owners = by(ea), {item for item in interface.function.owners(ea)}
+    fn, owners = interface.function.by(ea), {item for item in interface.function.owners(ea)}
 
     # If we have multiple owners, then consolidate all of their tags into a set.
     if len(owners) > 1:
@@ -3191,7 +3108,7 @@ def tags(ea):
 @utils.multicase(func=(idaapi.func_t, types.string))
 def tags(func):
     '''Returns all of the content tags for the function `func`.'''
-    fn = by(func)
+    fn = interface.function.by(func)
     ea = interface.range.start(fn)
     return tags(ea)
 
@@ -3229,7 +3146,7 @@ def select(func, **boolean):
     If `require` is given as an iterable of tag names then require that each returned address uses them.
     If `include` is given as an iterable of tag names then include the tags for each returned address if available.
     """
-    target = by(func)
+    target = interface.function.by(func)
     boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
     # If nothing specific was queried, then yield all tags that are available.
@@ -3310,29 +3227,9 @@ class type(object):
     @utils.multicase(func=(types.integer, idaapi.func_t))
     def __new__(cls, func):
         '''Return the type information for the function `func` as an ``idaapi.tinfo_t``.'''
-        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-        guess_tinfo = (lambda ti, ea: idaapi.guess_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo
-
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
-
-        # Try to get the type information for the function or guess it if we couldn't.
-        ti = idaapi.tinfo_t()
-        res = get_tinfo(ti, ea) or guess_tinfo(ti, ea)
-
-        # If our result is not equal to GUESS_FUNC_FAILED (get_tinfo returns True, then we're good.
-        if res != idaapi.GUESS_FUNC_FAILED:
-            return ti
-
-        # If that didn't work, then we lie about it, because we should always be able to return a type.
-        logging.debug(u"{:s}({:#x}) : Ignoring failure code ({:d}) when trying to guess the `{:s}` for the specified function.".format('.'.join([__name__, cls.__name__]), ea, res, ti.__class__.__name__))
-        int = idaapi.tinfo_t()
-        int.create_simple_type(idaapi.BT_INT)
-
-        # Instead of assuming stdcall for rt-linked and cdecl for in-module functions (which isn't always
-        # true), use the unknown calling convention which seems to appear as the compiler default.
-        ftd = idaapi.func_type_data_t()
-        ftd.rettype, ftd.cc = int, functools.reduce(operator.or_, [getattr(idaapi, attribute, value) for attribute, value in [('CM_CC_UNKNOWN', 0x10), ('CM_M_NN', 0), ('CM_UNKNOWN', 0)]])
-        if not ti.create_func(ftd):
+        ti = interface.function.typeinfo(func)
+        if ti is None:
+            _, ea = interface.addressOfRuntimeOrStatic(func)
             raise E.DisassemblerError(u"{:s}({:#x}) : Unable to create a function type to return for the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
         return ti
     @utils.multicase(func=(idaapi.func_t, types.integer), info=idaapi.tinfo_t)
@@ -3340,35 +3237,30 @@ class type(object):
         '''Apply the ``idaapi.tinfo_t`` in `info` to the function `func`.'''
         TINFO_GUESSED, TINFO_DEFINITE = getattr(idaapi, 'TINFO_GUESSED', 0), getattr(idaapi, 'TINFO_DEFINITE', 1)
 
+        # First figure out whether we're adjusting with the type or explicitly changing it.
+        iterable = (guessed[kwd] for kwd in ['guess', 'guessed'] if kwd in guessed)
+        flags = [TINFO_GUESSED if builtins.next(iterable, False) else TINFO_DEFINITE] if any(kwd in guessed for kwd in ['guess', 'guessed']) else []
+
         # Now we can figure out what address we're actually working with.
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
         # If the type is not a function type whatsoever, then bail.
         if not any([info.is_func(), info.is_funcptr()]):
-            raise E.InvalidTypeOrValueError("{:s}({:#x}, {!r}) : Refusing to apply a non-function type ({!r}) to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), 'address' if rt else 'function', ea))
-
-        # If it's a regular function, then we can just use it as-is.
-        if not rt:
-            ti = info
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-function type ({!r}) to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), 'address' if rt else 'function', ea))
 
         # If we're being used against an export, then we need to make sure that
         # our type is a function pointer and we need to promote it if not.
-        elif not info.is_ptr():
-            pi = idaapi.ptr_type_data_t()
-            pi.obj_type = info
-            ti = idaapi.tinfo_t()
-            if not ti.create_ptr(pi):
-                raise E.DisassemblerError("{:s}({:#x}, {!r}) : Unable to promote type to a pointer due to being applied to a function pointer.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info)))
-            logging.warning("{:s}({:#x}, {!r}) : Promoting type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(info), "{!s}".format(ti), ea))
+        ti = interface.function.pointer(info) if rt else info
+        if rt and ti is None:
+            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to promote type to a pointer as required when applying a function type to a runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ea))
+
+        elif ti is not info:
+            logging.warning(u"{:s}({:#x}, {!r}) : Promoted type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(info), "{!s}".format(ti), ea))
 
         # and then we just need to apply the type to the given address.
-        result, ok = cls(ea), idaapi.apply_tinfo(ea, ti, TINFO_DEFINITE)
+        result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, ti, *flags)
         if not ok:
-            raise E.DisassemblerError("{:s}({:#x}, {!r}) : Unable to apply typeinfo ({!r}) to the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), 'address' if rt else 'function', ea))
-
-        # since TINFO_GUESSED doesn't always work, we clear aflags here.
-        if guessed.get('guessed', False):
-            interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
+            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to apply typeinfo ({!r}) to the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), 'address' if rt else 'function', ea))
         return result
     @utils.multicase(func=(idaapi.func_t, types.integer), info=types.string)
     @utils.string.decorate_arguments('info')
@@ -3384,7 +3276,7 @@ class type(object):
         # and figure out what its real name is so that we can mangle it if necessary.
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-        fname, mangled = name(ea), database.name(ea) if rt else utils.string.of(idaapi.get_func_name(ea))
+        fname, mangled = interface.function.name(ea), interface.name.get(ea) if rt else utils.string.of(idaapi.get_func_name(ea))
         if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
             realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
         else:
@@ -3397,28 +3289,27 @@ class type(object):
             raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}, {!r}) : Unable to parse the provided string (\"{!s}\") into an actual type.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"')))
 
         elif not any([ti.is_func(), ti.is_funcptr()]):
-            raise E.InvalidTypeOrValueError("{:s}({:#x}, {!r}) : Refusing to apply a non-function type (\"{!s}\") to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"'), 'address' if rt else 'function', ea))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-prototype (\"{!s}\") to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"'), 'address' if rt else 'function', ea))
 
-        # Otherwise, te type is valid and we only need to figure out if it needs
-        # to be promoted to a pointer or not.
-        if rt and not ti.is_funcptr():
-            pi = idaapi.ptr_type_data_t()
-            pi.obj_type = ti
-            ti = idaapi.tinfo_t()
-            if not ti.create_ptr(pi):
-                raise E.DisassemblerError("{:s}({:#x}, {!r}) : Unable to promote type to a pointer due to being applied to a function pointer.".format('.'.join([__name__, cls.__name__]), ea, info))
+        # Otherwise, the type is valid and we only need to figure
+        # out if it needs to be promoted to a pointer or not.
+        newti = interface.function.pointer(ti) if rt else ti
+        if rt and not newti:
+            raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to promote type to a pointer as required when applying a function type to a runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, ea))
 
-            # Now we re-render it into a string so that it can be applied.
-            logging.warning("{:s}({:#x}, {!r}) : Promoting type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, info, info, "{!s}".format(ti), ea))
-            info = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
+        elif newti is not ti:
+            logging.warning(u"{:s}({:#x}, {!r}) : Promoting type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, info, "{!s}".format(ti), "{!s}".format(newti), ea))
+
+        # Now we re-render it into a string so that it can be applied.
+        newinfo = idaapi.print_tinfo('', 0, 0, 0, newti, utils.string.to(realname), '')
 
         # Terminate the typeinfo string with a ';' so that IDA can parse it.
-        terminated = info if info.endswith(';') else "{:s};".format(info)
+        terminated = newinfo if newinfo.endswith(';') else "{:s};".format(newinfo)
 
         # Now we should just be able to apply it to the function.
         result, ok = cls(ea), idaapi.apply_cdecl(til, ea, terminated, TINFO_DEFINITE)
         if not ok:
-            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to apply the specified type declaration (\"{!s}\").".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(info, '"')))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to apply the specified type declaration (\"{!s}\").".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(newinfo, '"')))
 
         # since TINFO_GUESSED doesn't always work, we clear aflags here.
         if guessed.get('guessed', False):
@@ -3427,29 +3318,10 @@ class type(object):
     @utils.multicase(func=(idaapi.func_t, types.integer), none=types.none)
     def __new__(cls, func, none):
         '''Remove the type information for the function `func`.'''
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
-
-        # If we're interacting with a runtime address, then it's just regular type
-        # information and we can just assign empty type information to it.
-        if rt:
-            return database.type(ea, none)
-
-        # All we need to do is just delete the type information from the address.
-        if hasattr(idaapi, 'del_tinfo'):
-            result, _ = cls(ea), idaapi.del_tinfo(ea)
-
-        elif idaapi.__version__ < 7.0:
-            result, _ = cls(ea), idaapi.del_tinfo2(ea)
-
-        # We don't have a real way to remove the type information from a function,
-        # but what we can do is remove the NSUP_TYPEINFO(3000) and clear the its aflags.
-        else:
-            supvals = [idaapi.NSUP_TYPEINFO, idaapi.NSUP_TYPEINFO + 1]
-            aflags = [idaapi.AFL_TI, idaapi.AFL_USERTI, getattr(idaapi, 'AFL_HR_GUESSED_FUNC', 0x40000000), getattr(idaapi, 'AFL_HR_GUESSED_DATA', 0x80000000)]
-
-            # Save the original type, and zero out everything. This should pretty much get it done...
-            result, _  = cls(ea), interface.node.aflags(ea, functools.reduce(operator.or_, aflags), 0)
-            [ internal.netnode.sup.remove(ea, val) for val in supvals ]
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, None)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}({:#x}, {!s}) : Unable to remove the type information from the given function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, none, ea))
         return result
 
     @utils.multicase()
@@ -3461,24 +3333,24 @@ class type(object):
     @classmethod
     def flags(cls, func):
         '''Return the flags for the function `func`.'''
-        fn = by(func)
-        return idaapi.as_uint32(fn.flags)
+        fn = interface.function.by(func)
+        return interface.function.flags(fn)
     @utils.multicase(func=(idaapi.func_t, types.integer), mask=types.integer)
     @classmethod
     def flags(cls, func, mask):
         '''Return the flags for the function `func` selected with the specified `mask`.'''
-        fn = by(func)
-        return idaapi.as_uint32(fn.flags & mask)
+        fn = interface.function.by(func)
+        return interface.function.flags(fn, mask)
     @utils.multicase(func=(idaapi.func_t, types.integer), mask=types.integer, integer=(types.bool, types.integer))
     @classmethod
     def flags(cls, func, mask, integer):
         '''Set the flags for the function `func` selected by the specified `mask` to the provided `integer`.'''
-        fn, preserve, value = by(func), idaapi.as_uint32(~mask), idaapi.as_uint32(-1 if integer else 0) if isinstance(integer, types.bool) else idaapi.as_uint32(integer)
-        res, fn.flags = fn.flags, (fn.flags & preserve) | (value & mask)
-        if not idaapi.update_func(fn):
+        fn = interface.function.by(func)
+        res = interface.function.flags(fn, mask, integer)
+        if res is None:
             description = ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func)
             logging.fatal(u"{:s}.flags({:s}, {:#x}, {!s}) : Unable to change the flags ({:#x}) for function at {:s} to requested value ({:#x}).".format('.'.join([__name__, cls.__name__]), description, mask, value, idaapi.as_uint32(res), description, idaapi.as_uint32(fn.flags)))
-        return idaapi.as_uint32(res & mask)
+        return res
 
     @utils.multicase()
     @classmethod
@@ -3552,7 +3424,7 @@ class type(object):
     @classmethod
     def frame(cls, func):
         '''Return if the function `func` has a frame allocated to it.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         return fn.frame != idaapi.BADADDR
     has_frame = utils.alias(frame, 'type')
 
@@ -3591,7 +3463,7 @@ class type(object):
     @classmethod
     def leave(cls, func):
         '''Return if the function `func` returns.'''
-        fn = by(func)
+        fn = interface.function.by(func)
         if fn.flags & idaapi.FUNC_NORET_PENDING == idaapi.FUNC_NORET_PENDING:
             logging.warning(u"{:s}.leave({:s}) : Analysis for function return is still pending due to the `{:s}` flag being set.".format('.'.join([__name__, cls.__name__]), ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), '.'.join(['idaapi', 'FUNC_NORET_PENDING'])))
         return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
@@ -3693,14 +3565,7 @@ class type(object):
     @classmethod
     def has(cls, func):
         '''Return a boolean describing whether the function `func` has a prototype associated with it.'''
-        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-        guess_tinfo = (lambda ti, ea: idaapi.guess_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo
-        _, ea = interface.addressOfRuntimeOrStatic(func)
-
-        # If we're able to straight-up get the type information for a function or guess it, then we're good.
-        ti = idaapi.tinfo_t()
-        ok = get_tinfo(ti, ea) or guess_tinfo(ti, ea) == idaapi.GUESS_FUNC_OK
-        return True if ok else False
+        return interface.function.has_typeinfo(func)
     has_prototype = prototype = has_typeinfo = utils.alias(has, 'type')
 
     @utils.multicase()
@@ -4437,7 +4302,7 @@ class xref(object):
             for ea in iterate(fn):
 
                 # if it isn't code, then we skip it.
-                if not database.type.code(ea):
+                if interface.address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
                     continue
 
                 # if it's a branching or call-type instruction that has no xrefs, and we're not
@@ -4458,7 +4323,7 @@ class xref(object):
                         refs.append(ref)
 
                     # if it's a branching or call-type instruction, but referencing non-code, then we care about it.
-                    elif not database.type.code(xref) and any(F(ea) for F in branches):
+                    elif interface.address.flags(xref, idaapi.MS_CLS) != idaapi.FF_CODE and any(F(ea) for F in branches):
                         refs.append(ref)
 
                     # if we're recursive and there's a code xref that's referencing our entrypoint,
@@ -4494,7 +4359,7 @@ class xref(object):
             return
 
         # grab our function and then grab all of the references from it.
-        fn = by(func)
+        fn = interface.function.by(func)
         iterable = Freferences(fn)
         return sorted(iterable)
 
@@ -4520,7 +4385,7 @@ class xref(object):
     @classmethod
     def calls(cls, func, **all):
         '''Return the operand reference for each call instruction that is referenced from the function `func`.'''
-        fn, results = by(func), []
+        fn, results = interface.function.by(func), []
         for _, right in blocks.calls(fn):
             ea = interface.address.head(right - 1)
             results.extend(interface.instruction.access(ea))
@@ -4535,7 +4400,7 @@ class xref(object):
     @classmethod
     def branches(cls, func):
         '''Return the operand reference for each branch instruction that is referenced from the function `func`.'''
-        fn, results = by(func), []
+        fn, results = interface.function.by(func), []
         for _, right in blocks.branches(fn):
             ea = interface.address.head(right - 1)
             results.extend(interface.instruction.access(ea))
