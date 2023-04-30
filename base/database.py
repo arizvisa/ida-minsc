@@ -2673,7 +2673,7 @@ class imports(object):
         formats.setdefault(idc.FT_MACHO, osx_format) if hasattr(idc, 'FT_MACHO') else None
 
         # format what we were given and then return it.
-        long_formatter = formats.get(config.info.filetype, gdb_format)
+        long_formatter = formats.get(information.filetype(), gdb_format)
         return long_formatter(module, name)
 
     __format__ = __formatl__
@@ -7542,8 +7542,8 @@ class set(object):
     @classmethod
     def string(cls, bounds, **strtype):
         '''Set the data within the provided `bounds` to a string with the specified `strtype` and `encoding`.'''
-        inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-        width, layout, terminals, encoding = interface.string.unpack(inf)
+        default = interface.string.default()
+        width, layout, terminals, encoding = interface.string.unpack(default)
 
         # If we received any explicit string type, then update our defaults.
         if any(item in strtype for item in ['strtype', 'type']):
@@ -7565,8 +7565,8 @@ class set(object):
 
         The integer or tuple `strtype` contains the character width and the length prefix (or desired terminator) for the bytes representing the string.
         """
-        inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-        width, layout, terminals, encoding = interface.string.unpack(inf)
+        default = interface.string.default()
+        width, layout, terminals, encoding = interface.string.unpack(default)
 
         # First check if we received any explicit string type information.
         if any(item in strtype for item in ['strtype', 'type']):
@@ -7599,8 +7599,8 @@ class set(object):
         # If we were given a length of 0, then use the default string type
         # to figure out what our terminal characters should be.
         if length == 0:
-            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-            _, _, terminals, _ = interface.string.unpack(inf)
+            default = interface.string.default()
+            _, _, terminals, _ = interface.string.unpack(default)
             return cls.string(ea, width, terminals, encoding)
 
         # Now we can read the length prefix and use it to calculate the boundaries
@@ -7611,7 +7611,8 @@ class set(object):
     @classmethod
     def string(cls, ea, width, terminal, encoding):
         '''Set data at the address `ea` to a string terminated by `terminal` using the given `encoding` and character `width`.'''
-        _, _, default, _ = interface.string.unpack(config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype())
+        default = interface.string.default()
+        _, _, default, _ = interface.string.unpack(default)
 
         # Tests used to terminate reading if our current address ends up being out
         # of bounds or is pointing at an uninitialized value that we can't read.
@@ -8795,7 +8796,7 @@ class get(object):
             res = idaapi.get_str_type(interface.address.head(ea, warn=True))
 
         # Figure out our defaults using either what we found or what the database says.
-        default = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+        default = interface.string.default()
         strtypeinfo, is_string = (default, False) if res in {idaapi.BADADDR, 0xffffffff, -1} else (res, True)
         width, layout, terminals, encoding = interface.string.unpack(strtypeinfo)
 
@@ -8843,7 +8844,7 @@ class get(object):
             res = idaapi.get_str_type(interface.address.head(ea, warn=True))
 
         # Figure out our defaults using either what we found or what the database says.
-        default = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
+        default = interface.string.default()
         strtypeinfo, is_string = (default, False) if res in {idaapi.BADADDR, 0xffffffff, -1} else (res, True)
         width, layout, terminals, encoding = interface.string.unpack(strtypeinfo)
 
@@ -8892,8 +8893,8 @@ class get(object):
         # If we were given a length of 0, then use the default string type
         # to figure out what our terminal characters should be.
         if length == 0:
-            inf = config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype()
-            _, _, terminals, _ = interface.string.unpack(inf)
+            default = interface.string.default()
+            _, _, terminals, _ = interface.string.unpack(default)
             return cls.string(ea, width, terminals, encoding)
 
         # Now we can read the length prefix from our address and use it to
@@ -8904,7 +8905,8 @@ class get(object):
     @classmethod
     def string(cls, ea, width, terminal, encoding):
         '''Return the data at the address `ea` as a string with the given character `width` and string `encoding` that is terminated by the bytes in `terminal`.'''
-        _, _, default, _ = interface.string.unpack(config.info.strtype if idaapi.__version__ < 7.2 else idaapi.inf_get_strtype())
+        default = interface.string.default()
+        _, _, default, _ = interface.string.unpack(default)
 
         # Some tests that are used to terminate reading if our current address
         # ends up being out of bounds or is not pointing to an initialized value.
