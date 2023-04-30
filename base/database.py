@@ -464,6 +464,7 @@ class functions(object):
         `name` - Filter the functions by a name or a list of names
         `like` - Filter the function names according to a glob
         `regex` - Filter the function names according to a regular-expression
+        `index` - Filter the functions by an index or a list of indices
         `mangled` - Filter the mangled function names according to a glob
         `decorated` - Match the functions using C++ name decorations
         `arguments` or `args` - Filter the functions by the argument count or a list of counts
@@ -487,38 +488,39 @@ class functions(object):
 
     """
     __matcher__ = utils.matcher()
-    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), function.by, function.name, operator.methodcaller('lower'))
-    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
-    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), function.by, function.name)
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), interface.function.by_address, interface.function.name, operator.methodcaller('lower'))
+    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), interface.function.by_address, interface.function.name)
+    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), interface.function.by_address, interface.function.name)
     __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
     __matcher__.alias('ea', 'address')
+    __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_func_num)
     __matcher__.combinator('mangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else utils.fpartial(utils.fcompose, utils.fmap(utils.fidentity, internal.declaration.demangle), utils.funpack(operator.ne)))), idaapi.get_true_name if idaapi.__version__ < 6.8 else idaapi.get_ea_name, utils.string.of)
     __matcher__.alias('decorated', 'mangled')
     __matcher__.combinator('arguments', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), function.type, operator.methodcaller('get_nargs'))
     __matcher__.alias('args', 'arguments')
-    __matcher__.mapping('typed', operator.truth, function.top, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
+    __matcher__.mapping('typed', operator.truth, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.mapping('decompiled', operator.truth, function.type.decompiled)
     __matcher__.mapping('frame', operator.truth, function.type.frame)
-    __matcher__.mapping('library', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_LIB))
-    __matcher__.mapping('wrapper', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
-    __matcher__.mapping('lumina', operator.truth, function.by, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
+    __matcher__.mapping('library', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_LIB))
+    __matcher__.mapping('wrapper', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
+    __matcher__.mapping('lumina', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, function.tag, operator.methodcaller('keys'), internal.types.set)
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))))
-    __matcher__.predicate('predicate', function.by), __matcher__.alias('pred', 'predicate')
+    __matcher__.predicate('predicate', interface.function.by_address), __matcher__.alias('pred', 'predicate')
 
     if any(hasattr(idaapi, item) for item in ['is_problem_present', 'QueueIsPresent']):
-        __matcher__.mapping('problems', operator.truth, function.top, utils.frpartial(function.type.problem, getattr(idaapi, 'PR_BADSTACK', 0xb)))
+        __matcher__.mapping('problems', operator.truth, utils.frpartial(function.type.problem, getattr(idaapi, 'PR_BADSTACK', 0xb)))
 
     if all(hasattr(idaapi, Fname) for Fname in ['tryblks_t', 'get_tryblks']):
-        __matcher__.mapping('exceptions', operator.truth, function.by, lambda fn: idaapi.get_tryblks(idaapi.tryblks_t(), fn), utils.fpartial(operator.ne, 0))
+        __matcher__.mapping('exceptions', operator.truth, interface.function.by_address, lambda fn: idaapi.get_tryblks(idaapi.tryblks_t(), fn), utils.fpartial(operator.ne, 0))
 
     # chunk matching
     #__matcher__.boolean('greater', operator.le, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max))
     #__matcher__.boolean('less', operator.ge, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(0)), min)), __matcher__.boolean('lt', operator.gt, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(0)), min))
 
     # entry point matching
-    __matcher__.boolean('greater', operator.le, function.top), __matcher__.boolean('gt', operator.lt, function.top)
-    __matcher__.boolean('less', operator.ge, function.top), __matcher__.boolean('lt', operator.gt, function.top)
+    __matcher__.boolean('greater', operator.le, utils.fidentity), __matcher__.boolean('gt', operator.lt, utils.fidentity)
+    __matcher__.boolean('less', operator.ge, utils.fidentity), __matcher__.boolean('lt', operator.gt, utils.fidentity)
 
     def __new__(cls, *string, **type):
         '''Return the address of each of the functions within the database as a list.'''
@@ -527,8 +529,8 @@ class functions(object):
     @utils.multicase()
     @classmethod
     def __iterate__(cls):
-        '''Iterates through the functions within the current database (ripped from idautils).'''
-        left, right = information.bounds()
+        '''Iterates through each of the functions within the current database.'''
+        left, right = interface.address.bounds()
 
         # find first function chunk
         ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
@@ -539,7 +541,7 @@ class functions(object):
         # iterate through the rest of the functions in the database
         while ch and interface.range.start(ch) < right:
             ui.navigation.procedure(interface.range.start(ch))
-            if function.has(interface.range.start(ch)):
+            if interface.function.has(interface.range.start(ch)):
                 yield interface.range.start(ch)
             ch = idaapi.get_next_func(interface.range.start(ch))
         return
@@ -585,7 +587,7 @@ class functions(object):
 
         # Some utility functions for grabbing counts of function attributes
         Fcount_lvars = utils.fcompose(function.frame.lvars, utils.count)
-        Fcount_avars = utils.fcompose(function.type, operator.methodcaller('get_nargs')) if hasattr(idaapi.tinfo_t, 'get_nargs') else utils.fcompose(function.frame.args.iterate, utils.count)
+        Fcount_avars = utils.fcompose(interface.function.typeinfo, operator.methodcaller('get_nargs')) if hasattr(idaapi.tinfo_t, 'get_nargs') else utils.fcompose(function.frame.args.iterate, utils.count)
 
         # Set some reasonable defaults here
         maxentry = top()
@@ -595,14 +597,14 @@ class functions(object):
 
         # First pass through the list to grab the maximum lengths of the different fields
         for ea in cls.iterate(**type):
-            func, _ = function.by(ea), ui.navigation.procedure(ea)
+            func, _ = interface.function.by_address(ea), ui.navigation.procedure(ea)
             maxentry = max(ea, maxentry)
 
-            unmangled, realname = function.name(func), name(ea)
+            unmangled, realname = interface.function.name(func), interface.name.get(ea)
             maxname = max(len(unmangled), maxname)
             maxunmangled = max(len(unmangled), maxunmangled) if not internal.declaration.mangledQ(realname) else maxunmangled
 
-            bounds, items = function.bounds(func), [item for item in function.chunks(func)]
+            bounds, items = interface.range.bounds(func), [interface.range.bounds(item) for item in interface.function.chunks(func)]
             maxaddr, minaddr = max(max(bounds), maxaddr), max(min(bounds), minaddr)
             maxchunks = max(len(items), maxchunks)
 
@@ -624,22 +626,22 @@ class functions(object):
 
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
-            func, decompiledQ = function.by(ui.navigation.procedure(ea)), interface.node.aflags(ui.navigation.procedure(ea), getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000))
+            func, decompiledQ = interface.function.by_address(ui.navigation.procedure(ea)), interface.node.aflags(ui.navigation.procedure(ea), getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000))
             tags = function.tag(ea)
 
             # any flags that might be useful
             ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
-            ftyped = 'D' if function.type.decompiled(ea) else '-' if not function.type.has(func) else 'T' if interface.node.aflags(ea, idaapi.AFL_USERTI) else 't'
+            ftyped = 'D' if function.type.decompiled(ea) else '-' if not interface.function.has_typeinfo(func) else 'T' if interface.node.aflags(ea, idaapi.AFL_USERTI) else 't'
             fframe = '?' if function.type.problem(ea, getattr(idaapi, 'PR_BADSTACK', 0xb)) else '-' if idaapi.get_frame(ea) else '^'
             fgeneral = 'J' if func.flags & idaapi.FUNC_THUNK else 'L' if func.flags & idaapi.FUNC_LIB else 'S' if func.flags & idaapi.FUNC_STATICDEF else 'F'
             flags = itertools.chain(fgeneral, fframe, ftyped, ftagged)
 
             # naming information
-            unmangled, realname = function.name(func), name(ea)
+            unmangled, realname = interface.function.name(func), interface.name.get(ea)
 
             # chunks and boundaries
-            chunks = [item for item in function.chunks(func)]
-            bounds = function.bounds(func)
+            chunks = [interface.range.bounds(item) for item in interface.function.chunks(func)]
+            bounds = interface.range.bounds(func)
 
             # try/except handlers
             if all(hasattr(idaapi, Fname) for Fname in ['tryblks_t', 'get_tryblks']):
@@ -684,9 +686,9 @@ class functions(object):
 
         listable = [item for item in cls.iterate(**type)]
         if len(listable) > 1:
-            messages = ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(listable))
+            messages = ((u"[{:d}] {:s}".format(i, interface.function.name(ea))) for i, ea in enumerate(listable))
             [ logging.info(msg) for msg in messages ]
-            f = utils.fcompose(function.by, function.name)
+            f = utils.fcompose(interface.function.by_address, interface.function.name)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
         iterable = (item for item in listable)
@@ -882,19 +884,17 @@ def read():
 @utils.multicase(ea=internal.types.integer)
 def read(ea):
     '''Return the number of bytes associated with the address `ea`.'''
-    return read(ea, interface.address.size(ea))
+    return interface.address.read(ea, interface.address.size(ea))
 @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
 def read(ea, size):
     '''Return `size` number of bytes from address `ea`.'''
-    get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
     start, end = interface.address.within(ea, ea + size)
-    return get_bytes(ea, end - start) or b''
+    return interface.address.read(ea, end - start)
 @utils.multicase(bounds=interface.bounds_t)
 def read(bounds):
     '''Return the bytes within the specified `bounds`.'''
-    get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
     bounds = ea, _ = interface.bounds_t(*bounds)
-    return get_bytes(ea, bounds.size) or b''
+    return interface.address.read(ea, bounds.size)
 
 @utils.multicase(data=internal.types.bytes)
 def write(data, **persist):
@@ -958,9 +958,9 @@ class names(object):
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('unmangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.alias('demangled', 'unmangled')
-    __matcher__.mapping('function', function.has, idaapi.get_nlist_ea)
+    __matcher__.mapping('function', interface.function.has, idaapi.get_nlist_ea)
     __matcher__.mapping('imports', utils.fpartial(operator.eq, idaapi.SEG_XTRN), idaapi.get_nlist_ea, idaapi.segtype)
-    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_nlist_ea, lambda ea: function.tag(ea) if function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_nlist_ea, lambda ea: function.tag(ea) if interface.function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.mapping('typed', operator.truth, idaapi.get_nlist_ea, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t, operator.attrgetter('contains')))), idaapi.get_nlist_ea)
     __matcher__.predicate('predicate', idaapi.get_nlist_ea), __matcher__.alias('pred', 'predicate')
@@ -1048,7 +1048,7 @@ class names(object):
         # List all the fields of each name that was found
         for index in listable:
             ea, name = ui.navigation.set(idaapi.get_nlist_ea(index)), utils.string.of(idaapi.get_nlist_name(index))
-            tags = function.tag(ea) if function.has(ea) else tag(ea)
+            tags = function.tag(ea) if interface.function.has(ea) else tag(ea)
 
             # Any flags that could be useful
             ftype = 'I' if idaapi.segtype(ea) == idaapi.SEG_XTRN else '-' if t.unknown(ea) else 'C' if t.code(ea) else 'D' if t.data(ea) else '-'
@@ -1473,22 +1473,7 @@ def name(ea, **flags):
     If `flags` is specified, then use the specified value as the flags.
     """
     ea = interface.address.inside(ea)
-
-    # figure out what default flags to use
-    fn = idaapi.get_func(ea)
-
-    # figure out which name function to call
-    if idaapi.__version__ < 6.8:
-        # if get_true_name is going to return the function's name instead of a real one, then leave it as unnamed.
-        if fn and interface.range.start(fn) == ea and not flags:
-            return None
-
-        aname = idaapi.get_true_name(ea) or idaapi.get_true_name(ea, ea)
-    else:
-        aname = idaapi.get_ea_name(ea, flags.get('flags', idaapi.GN_LOCAL))
-
-    # return the name at the specified address or not
-    return utils.string.of(aname) or None
+    return interface.name.get(ea, flags['flags']) if 'flags' in flags else interface.name.get(ea)
 @utils.multicase(string=internal.types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
@@ -1511,106 +1496,29 @@ def name(ea, string, *suffix, **flags):
     If `flags` is specified, then use the specified value as the flags.
     If the boolean `listed` is specified, then specify whether to add the label to the Names list or not.
     """
+    ea = interface.address.inside(ea)
+
     # combine name with its suffix
     res = (string,) + suffix
     string = interface.tuplename(*res)
 
-    # validate the address, and get the original flags
-    ea = interface.address.inside(ea)
-    ofl = interface.address.flags(ea)
-
-    ## define some closures that perform the different tasks necessary to
-    ## apply a name to a given address
-    def apply_name(ea, string, F):
-        '''Apply the name in `string` to the address `ea` with the flags specified in `F`.'''
-
-        # convert the specified string into a form that IDA can handle
-        ida_string = utils.string.to(string)
-
-        # validate the name
-        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
-        if ida_string and ida_string != res:
-            logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(utils.string.of(res), '"')))
-            ida_string = res
-
-        # fetch the old name and set the new one at the same time.
-        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", F)
-
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `{:s}({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.pycompat.fullname(idaapi.set_name), ea, utils.string.escape(string, '"'), F))
-        return res
-
-    def name_within(ea, string, F):
-        '''Add or rename the label at the address `ea` using the name in `string` with the flags in `F`.'''
-        func, realname, localname = idaapi.get_func(ea), idaapi.get_visible_name(ea), idaapi.get_visible_name(ea, idaapi.GN_LOCAL)
-
-        # if there's a public name at this address then use the
-        # flags to determine how to update the public name.
-        if idaapi.is_public_name(ea) or any(F & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
-            F |= idaapi.SN_PUBLIC if F & idaapi.SN_PUBLIC else idaapi.SN_NON_PUBLIC
-
-        # if we're pointing to the start of the function, then we need
-        # to set the local name unless public was explicitly specified.
-        elif interface.range.start(func) == ea and not builtins.all(F & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
-            F |= idaapi.SN_LOCAL
-
-        # if the name is supposed to be in the list, then we need to check if there's a
-        # local name.
-        elif not F & idaapi.SN_NOLIST:
-            if localname and realname != localname:
-                idaapi.del_local_name(ea), idaapi.set_name(ea, localname, idaapi.SN_NOLIST)
-            F &= ~idaapi.SN_LOCAL
-
-        # if a regular name is defined, but not a local one, then we need to set the local
-        # one first.
-        elif realname and realname == localname:
-            F |= idaapi.SN_NOLIST
-
-        # otherwise we're using a local name because we're inside a function.
-        else:
-            F |= idaapi.SN_LOCAL
-
-        # now we can apply the name with the flags that we determined.
-        return apply_name(ea, string, F)
-
-    def name_outside(ea, string, F):
-        '''Add or rename the global at the address `ea` using the name in `string` with the flags in `F`.'''
-        realname, localname = idaapi.get_visible_name(ea), idaapi.get_visible_name(ea, idaapi.GN_LOCAL)
-
-        # preserve the name if its public
-        F |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
-
-        # if 'listed' wasn't explicitly specified then ensure it's
-        # not listed as requested.
-        if 'listed' not in flags:
-            F |= idaapi.SN_NOLIST
-
-        # then finally apply the name.
-        return apply_name(ea, string, F)
-
-    ## now we can define the actual logic for naming the given address
-    flag = idaapi.SN_NON_AUTO
-    flag |= idaapi.SN_NOCHECK
-
-    # preserve any flags that were previously applied
-    flag |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
-    flag |= idaapi.SN_WEAK if idaapi.is_public_name(ea) and idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
-
     # if the bool `listed` is True, then ensure that it's added to the name list.
-    if 'listed' in flags:
-        flag = (flag & ~idaapi.SN_NOLIST) if flags.get('listed', False) else (flag | idaapi.SN_NOLIST)
+    #if 'listed' in flags:
+    #    return interface.name.set(ea, string, 0 if flags.get('listed', False) else idaapi.SN_NOLIST, idaapi.SN_NOLIST)
 
-    # if custom flags were specified, then just use those as they should get
-    # priority
+    # if custom flags were specified, then just use those as they should get priority.
     if 'flags' in flags:
-        return apply_name(ea, string, flags['flags'])
+        maximum = max(idaapi.SN_LOCAL, flags['flags'])
+        return interface.name.set(ea, string, flags['flags'], 2 * pow(2, int(math.log(maximum, 2))) - 1)
 
-    # if we're within a function, then use the name_within closure to apply the name
-    elif function.has(ea):
-        return name_within(ea, string, flag)
+    # otherwise, we need to check for "listed", "weak", and "public".
+    flag, preserve = 0 if flags.get('listed', False) else idaapi.SN_NOLIST, idaapi.SN_NOLIST if 'listed' in flags else 0
+    if 'weak' in flags:
+        flag, preserve = flag | (idaapi.SN_WEAK if flags.get('weak', False) else idaapi.SN_NON_WEAK), preserve | idaapi.SN_WEAK | idaapi.SN_NON_WEAK
+    elif 'public' in flags:
+        flag, preserve = flag | (idaapi.SN_PUBLIC if flags.get('public', False) else idaapi.SN_NON_PUBLIC), preserve | idaapi.SN_PUBLIC | idaapi.SN_NON_PUBLIC
+    return interface.name.set(ea, string, flag, preserve) if 'listed' in flags else interface.name.set(ea, string, flag)
 
-    # otherwise, we use the name_without closure to apply it
-    return name_outside(ea, string, flag)
 @utils.multicase(ea=internal.types.integer, none=internal.types.none)
 def name(ea, none, **flags):
     '''Removes the name defined at the address `ea`.'''
@@ -1626,7 +1534,7 @@ def mangled(ea):
     MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
     Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
 
-    result = name(ea)
+    result = interface.name.get(ea)
     mangled_name_type_t = Fmangled_type(utils.string.to(result))
     if mangled_name_type_t == MANGLED_UNKNOWN:
         logging.warning(u"{:s}.mangled({:#x}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, ea, mangled_name_type_t, 'regular'))
@@ -1655,7 +1563,7 @@ def mangled(ea, string, *suffix):
     # FIXME: mangle the string that we were given according to the schema for
     #        the default compiler type with the suffix appended to its name.
     logging.warning(u"{:s}.mangled({:#x}, {:s}) : The specified name (\"{:s}\") is already mangled ({:d}) and will be assigned to the given address ({:#x}) as \"{:s}\".".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), mangled_name_type_t, ea, internal.declaration.demangle(string)))
-    return name(ea, string, *suffix)
+    return interface.name.set(ea, interface.tuplename(*itertools.chain([string], suffix)))
 @utils.multicase(ea=internal.types.integer, none=internal.types.none)
 def mangled(ea, none):
     '''Remove the name at the address specified by `ea` and return its previous mangled value.'''
@@ -1664,7 +1572,7 @@ def mangled(ea, none):
     GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
 
     flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
-    string, _ = name(ea), name(ea, none, flags=flags)
+    string, _ = interface.name.get(ea, flags), interface.name.set(ea, none)
     mangled_name_type_t = Fmangled_type(utils.string.to(string))
     if mangled_name_type_t == MANGLED_UNKNOWN:
         logging.warning(u"{:s}.mangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_t, 'regular'))
@@ -1681,7 +1589,7 @@ def unmangled(ea):
     GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
 
     flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
-    result = name(ea, flags=flags)
+    result = interface.name.get(ea, flags)
     return result if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
 @utils.multicase(string=internal.types.string)
 @utils.string.decorate_arguments('string','suffix')
@@ -1708,7 +1616,7 @@ def unmangled(ea, string, *suffix):
     # FIXME: correct the string, doing whatever it takes to keep it the same
     #        when it gets mangled(?) and append the given suffix to its name.
     flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
-    result = name(ea, string, *suffix, flags=flags)
+    result, original = interface.name.get(ea, flags), interface.name.set(ea, interface.tuplename(*itertools.chain([string], suffix)), 0, idaapi.SN_LOCAL)
     return result if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
 @utils.multicase(ea=internal.types.integer, none=internal.types.none)
 def unmangled(ea, none):
@@ -1718,7 +1626,7 @@ def unmangled(ea, none):
     GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
 
     flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
-    string, result = name(ea), name(ea, none, flags=flags)
+    string, result = interface.name.get(ea, flags), interface.name.set(ea, none, 0, idaapi.SN_LOCAL)
     mangled_name_type_t = Fmangled_type(utils.string.to(string))
     if mangled_name_type_t == MANGLED_UNKNOWN:
         logging.warning(u"{:s}.unmangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_t, 'regular'))
@@ -1732,26 +1640,27 @@ def color():
 @utils.multicase(none=internal.types.none)
 def color(none):
     '''Remove the color from the item at the current address.'''
-    return color(ui.current.address(), None)
+    DEFCOLOR = 0xffffffff
+    res = interface.address.color(ui.current.address(), DEFCOLOR)
+    return None if res == DEFCOLOR else res
 @utils.multicase(ea=internal.types.integer)
 def color(ea):
     '''Return the color (RGB) for the item at the address specified by `ea`.'''
     DEFCOLOR = 0xffffffff
-    res = idaapi.get_item_color(interface.address.inside(ea))
-    b, r = (res&0xff0000)>>16, res&0x0000ff
-    return None if res == DEFCOLOR else (r<<16)|(res&0x00ff00)|b
+    res = interface.address.color(interface.address.inside(ea))
+    return None if res == DEFCOLOR else res
 @utils.multicase(ea=internal.types.integer, none=internal.types.none)
 def color(ea, none):
     '''Remove the color from the item at the address specified by `ea`.'''
     DEFCOLOR = 0xffffffff
-    res, void = color(ea), idaapi.set_item_color(interface.address.inside(ea), DEFCOLOR)
-    return res
+    res = interface.address.color(interface.address.inside(ea), DEFCOLOR)
+    return None if res == DEFCOLOR else res
 @utils.multicase(ea=internal.types.integer, rgb=internal.types.integer)
 def color(ea, rgb):
     '''Set the color for the item at address `ea` to `rgb`.'''
-    r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
-    res, void = color(ea), idaapi.set_item_color(interface.address.inside(ea), (b<<16)|(rgb&0x00ff00)|r)
-    return res
+    DEFCOLOR = 0xffffffff
+    res = interface.address.color(interface.address.inside(ea), rgb)
+    return None if res == DEFCOLOR else res
 
 @utils.multicase()
 def comment(**repeatable):
@@ -1852,12 +1761,12 @@ class entries(object):
     __matcher__.boolean('gt', operator.lt, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('le', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry), __matcher__.alias('less', 'le')
     __matcher__.boolean('lt', operator.gt, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.mapping('function', function.has, idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.mapping('function', interface.function.has, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
-    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if interface.function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal)
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -1890,7 +1799,7 @@ class entries(object):
     @classmethod
     def at(cls, ea):
         '''Return the address of the entry point at the address specified by `ea`.'''
-        if not function.has(ea):
+        if not interface.function.has(ea):
             address = interface.address.inside(ea)
 
         # If we're within a function then adjust our address to its entrypoint.
@@ -1921,7 +1830,7 @@ class entries(object):
     @classmethod
     def has(cls, ea):
         '''Return whether the address in `ea` is referencing an entry point.'''
-        if not function.has(ea):
+        if not interface.function.has(ea):
             address = interface.address.inside(ea)
 
         # If the address is a function, then translate it to the function address.
@@ -1993,7 +1902,7 @@ class entries(object):
         return None if res == idaapi.BADADDR else res
 
     # Return the name of the entry point at the specified `index`.
-    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of))
+    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of))
     # Return the ordinal of the entry point at the specified `index`.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
@@ -2006,7 +1915,7 @@ class entries(object):
     @classmethod
     def ordinal(cls, ea):
         '''Return the ordinal of the entry point at the address `ea`.'''
-        if not function.has(ea):
+        if not interface.function.has(ea):
             address = interface.address.inside(ea)
 
         # If we're within a function then adjust our address to its entrypoint.
@@ -2029,7 +1938,7 @@ class entries(object):
     @classmethod
     def name(cls, ea):
         '''Return the name of the entry point at the address `ea`.'''
-        if not function.has(ea):
+        if not interface.function.has(ea):
             address = interface.address.inside(ea)
 
         # If we're within a function then adjust our address to its entrypoint.
@@ -2087,11 +1996,11 @@ class entries(object):
         for index in listable:
             ordinal = cls.__entryordinal__(index)
             ea = idaapi.get_entry(ordinal)
-            tags = function.tag(ea) if function.has(ea) else tag(ea)
-            realname = cls.__entryname__(index) or name(ea)
+            tags = function.tag(ea) if interface.function.has(ea) else tag(ea)
+            realname = cls.__entryname__(index) or interface.name.get(ea)
 
             # Some flags that could be useful.
-            fclass = 'A' if t.data(ea) or t.unknown(ea) else 'D' if function.has(ea) and function.type.decompiled(ea) else 'F' if function.has(ea) else 'C' if t.code(ea) else '-'
+            fclass = 'A' if t.data(ea) or t.unknown(ea) else 'D' if interface.function.has(ea) and function.type.decompiled(ea) else 'F' if interface.function.has(ea) else 'C' if t.code(ea) else '-'
             finitialized = '-' if not t.initialized(ea) else 'C' if t.code(ea) else 'D' if t.data(ea) else '^'
             ftyped = 'T' if get_tinfo(idaapi.tinfo_t(), ea) else 't' if t.has(ea) else '-'
             tags.pop('__name__', None)
@@ -2101,7 +2010,7 @@ class entries(object):
             # If we're within a function, then display the type information if available
             # while being aware of name mangling. If there's no type information, then
             # use the unmangled name for displaying the export.
-            if function.has(ea):
+            if interface.function.has(ea):
                 ti, mangled_name_type_t = idaapi.tinfo_t(), Fmangled_type(utils.string.to(realname))
                 dname = realname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_NODEFINIT|MNG_NOPTRTYP) or realname)
                 demangled = utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_LONG_FORM|MNG_NOSCTYP|MNG_NOCALLC)) or realname
@@ -2128,7 +2037,7 @@ class entries(object):
 
         listable = [item for item in cls.__iterate__(**type)]
         if len(listable) > 1:
-            messages = ((u"[{:d}] ({:s}) {:#x} : {:s} {:s}".format(idx, '' if ordinal == ea else "#{:d}".format(ordinal), ea, '[FUNC]' if function.has(ea) else '[ADDR]', name or unmangled(ea))) for idx, ordinal, name, ea in map(utils.fmap(utils.fidentity, cls.__entryordinal__, cls.__entryname__, cls.__address__), listable))
+            messages = ((u"[{:d}] ({:s}) {:#x} : {:s} {:s}".format(idx, '' if ordinal == ea else "#{:d}".format(ordinal), ea, '[FUNC]' if interface.function.has(ea) else '[ADDR]', name or unmangled(ea))) for idx, ordinal, name, ea in map(utils.fmap(utils.fidentity, cls.__entryordinal__, cls.__entryname__, cls.__address__), listable))
             [ logging.info(msg) for msg in messages ]
             f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f(listable[0])))
@@ -2143,7 +2052,7 @@ class entries(object):
     @classmethod
     def new(cls):
         '''Makes an entry point at the current address.'''
-        ea, entryname, ordinal = ui.current.address(), name(ui.current.address()) or function.name(ui.current.address()), idaapi.get_entry_qty()
+        ea, entryname, ordinal = ui.current.address(), interface.name.get(ui.current.address()) or interface.function.name(ui.current.address()), idaapi.get_entry_qty()
         if entryname is None:
             raise E.MissingTypeOrAttribute(u"{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join([__name__, cls.__name__]), ea))
         return cls.new(ea, entryname, ordinal)
@@ -2151,7 +2060,7 @@ class entries(object):
     @classmethod
     def new(cls, ea):
         '''Makes an entry point at the specified address `ea`.'''
-        entryname, ordinal = name(ea) or function.name(ea), idaapi.get_entry_qty()
+        entryname, ordinal = interface.name.get(ea) or interface.function.name(ea), idaapi.get_entry_qty()
         if entryname is None:
             raise E.MissingTypeOrAttribute(u"{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join([__name__, cls.__name__]), ea))
         return cls.new(ea, entryname, ordinal)
@@ -2207,24 +2116,24 @@ def tag(ea):
     # runtime-linked address or not. If we're within a function, then
     # we need to ensure that we're using non-repeatable comments.
     try:
-        func = function.by_address(ea)
-        rt, _ = interface.addressOfRuntimeOrStatic(func)
+        func = interface.function.by_address(ea)
+        rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
 
     # If the address is not within a function, then assign some variables
     # so that we will use a repeatable comment.
-    except E.FunctionNotFoundError:
+    except LookupError:
         rt, func = False, None
-    repeatable = False if func and function.has(ea) and not rt else True
+    repeatable = False if func and interface.function.has(ea) and not rt else True
 
     # Read both repeatable and non-repeatable comments from the chosen
     # address so that we can decode both of them into dictionaries to
     # use. We also decode the (repeatable) function comment, because in
     # some cases a function is created for a runtime-linked address.
-    res = comment(ea, repeatable=False)
+    res = utils.string.of(idaapi.get_cmt(ea, False) or '')
     d1 = internal.comment.decode(res)
-    res = comment(ea, repeatable=True)
+    res = utils.string.of(idaapi.get_cmt(ea, True) or '')
     d2 = internal.comment.decode(res)
-    res = function.comment(ea, repeatable=True) if rt else ''
+    res = utils.string.of(idaapi.get_func_cmt(func, True) or '') if rt else ''
     d3 = internal.comment.decode(res)
 
     # Check if the address had content in either decoding types of
@@ -2244,7 +2153,7 @@ def tag(ea):
 
     # First thing we need to figure out is whether the name exists and if
     # it's actually special in that we need to demangle it for the real name.
-    aname = name(ea)
+    aname = interface.name.get(ea)
     if aname and Fmangled_type(utils.string.to(aname)) != MANGLED_UNKNOWN:
         realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP) or aname)
     else:
@@ -2252,18 +2161,18 @@ def tag(ea):
 
     # Add any of the implicit tags for the specified address to our results.
     if aname and interface.address.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', realname)
-    eprefix = extra.__get_prefix__(ea)
+    eprefix = internal.comment.extra.get_prefix(ea)
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
-    esuffix = extra.__get_suffix__(ea)
+    esuffix = internal.comment.extra.get_suffix(ea)
     if esuffix is not None: res.setdefault('__extra_suffix__', esuffix)
-    col = color(ea)
-    if col is not None: res.setdefault('__color__', col)
+    col, DEFCOLOR = interface.address.color(ea), 0xffffffff
+    if col != DEFCOLOR: res.setdefault('__color__', col)
 
     # If there was some type information associated with the address, then
     # we need its name so that we can format it and add it as an implicit tag.
     try:
-        if type.has(ea):
-            ti = type(ea)
+        if interface.address.has_typeinfo(ea):
+            ti = interface.address.typeinfo(ea)
 
             # We need the name to be parseable and IDA just doesn't give a fuck if it outputs
             # something non-parseable. So we simply fix that here and render the typeinfo.
@@ -2313,7 +2222,7 @@ def tag(ea, key, value):
     # If any of the supported implicit tags were specified, then figure out which
     # one and using it to dispatch to the correct handler.
     if key == '__name__':
-        local, filtered = function.has(ea), interface.name.identifier(value)
+        local, filtered = interface.function.has(ea), interface.name.identifier(value)
 
         # If the name isn't used within the database, then we can just apply it...blindly.
         Fexists = functools.partial(interface.name.inside, ea) if local else interface.name.exists
@@ -2337,13 +2246,14 @@ def tag(ea, key, value):
         return name(ea, *alternative) if local else name(ea, *alternative, listed=True)
 
     elif key == '__extra_prefix__':
-        return extra.__set_prefix__(ea, value)
+        return internal.extra.set_prefix(ea, value)
 
     elif key == '__extra_suffix__':
-        return extra.__set_suffix__(ea, value)
+        return internal.extra.set_suffix(ea, value)
 
     elif key == '__color__':
-        return color(ea, value)
+        res, DEFCOLOR = interface.address.color(ea, value), 0xffffffff
+        return None if res == DEFCOLOR else res
 
     elif key == '__typeinfo__':
         return type(ea, value)
@@ -2353,17 +2263,17 @@ def tag(ea, key, value):
     # address then a repeatable comment is used. Otherwise we encode the tags
     # within a non-repeatable comment.
     try:
-        func = function.by_address(ea)
-        rt, _ = interface.addressOfRuntimeOrStatic(func)
+        func = interface.function.by_address(ea)
+        rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
 
     # If the address was not within a function, then set the necessary variables
     # so that a repeatable comment is used.
-    except E.FunctionNotFoundError:
+    except LookupError:
         rt, func = False, None
 
     # If we're outside a function or pointing to a runtime-linked address, then
     # we use a repeatable comment. Anything else means a non-repeatable comment.
-    repeatable = False if func and function.has(ea) and not rt else True
+    repeatable = False if func and interface.function.has(ea) and not rt else True
 
     # Go ahead and decode the tags that are written to all 3 comment types. This
     # way we can search them for the correct one that the user is trying to modify.
@@ -2385,7 +2295,7 @@ def tag(ea, key, value):
     # address or outside a function, then it's a global tag. Otherwise if it's
     # within a function, then it's a contents tag that we need to adjust.
     if key not in state:
-        if func and function.has(ea) and not rt:
+        if func and interface.function.has(ea) and not rt:
             internal.comment.contents.inc(ea, key)
         else:
             internal.comment.globals.inc(ea, key)
@@ -2431,29 +2341,31 @@ def tag(ea, key, none):
     if key == '__name__':
         return name(ea, None, listed=True)
     elif key == '__extra_prefix__':
-        return extra.__delete_prefix__(ea)
+        return internal.extra.delete_prefix(ea)
     elif key == '__extra_suffix__':
-        return extra.__delete_suffix__(ea)
+        return internal.extra.delete_suffix(ea)
     elif key == '__typeinfo__':
         return type(ea, None)
     elif key == '__color__':
-        return color(ea, None)
+        DEFCOLOR = 0xffffffff
+        res = interface.address.color(ea, DEFCOLOR)
+        return None if res == DEFCOLOR else res
 
     # If we're within a function, then we need to distinguish whether the
     # address is a runtime-linked one or not. This way we can determine the
     # actual comment type that will be used.
     try:
-        func = function.by_address(ea)
-        rt, _ = interface.addressOfRuntimeOrStatic(func)
+        func = interface.function.by_address(ea)
+        rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
 
     # If the address wasn't within a function, then assign the necessary
     # values to the variables so that a repeatable comment gets used.
-    except E.FunctionNotFoundError:
+    except LookupError:
         rt, func = False, None
 
     # If we're outside a function or pointing to a runtime-linked address, then
     # a repeatable comment gets used. Inside a function is always a non-repeatable.
-    repeatable = False if func and function.has(ea) and not rt else True
+    repeatable = False if func and interface.function.has(ea) and not rt else True
 
     # figure out which comment type the user's key is in so that we can remove
     # that one. if we're a runtime-linked address, then we need to remove the
@@ -2505,7 +2417,7 @@ def tag(ea, key, none):
     # we need to remove its reference. If the address is a runtime address
     # or outside a function, then it's a global tag being removed. Otherwise
     # it's within a function and thus a contents tag being removed.
-    if func and function.has(ea) and not rt:
+    if func and interface.function.has(ea) and not rt:
         internal.comment.contents.dec(ea, key)
     else:
         internal.comment.globals.dec(ea, key)
@@ -2537,7 +2449,7 @@ def select(**boolean):
             Ftag, owners = (function.tag, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (tag, {ea})
             tags = Ftag(ea)
             if tags and ea in owners: yield ea, tags
-            elif ea not in owners: logging.info(u"{:s}.select() : Refusing to yield {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, len(tags), '' if len(tags) == 1 else 's', 'function address' if function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
+            elif ea not in owners: logging.info(u"{:s}.select() : Refusing to yield {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, len(tags), '' if len(tags) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
         return
 
     # Collect the tagnames to query as specified by the user.
@@ -2560,7 +2472,7 @@ def select(**boolean):
 
         # If we collected anything (matches), then yield the address and the matching tags.
         if collected and ea in owners: yield ea, collected
-        elif ea not in owners: logging.info(u"{:s}.select({:s}) : Refusing to select from {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, utils.string.kwargs(boolean), len(tags), '' if len(tags) == 1 else 's', 'function address' if function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
+        elif ea not in owners: logging.info(u"{:s}.select({:s}) : Refusing to select from {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, utils.string.kwargs(boolean), len(tags), '' if len(tags) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
     return
 
 @utils.multicase(tag=internal.types.string)
@@ -2588,7 +2500,7 @@ def selectcontents(**boolean):
             else:
                 contents, owners, Flogging = [], {f for f in []}, logging.warning
             if contents and ea in owners: yield ea, contents
-            elif ea not in owners: Flogging(u"{:s}.selectcontents() : Refusing to yield {:d} contents tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format(__name__, len(contents), '' if len(contents) == 1 else 's', 'function address' if function.has(ea) else 'address', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
+            elif ea not in owners: Flogging(u"{:s}.selectcontents() : Refusing to yield {:d} contents tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format(__name__, len(contents), '' if len(contents) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
         return
 
     # Collect each potential parameter into sets for checking tag membership.
@@ -3968,14 +3880,14 @@ class address(object):
 
         # if we are within a function, then make sure we find a code type within
         # the chunk's bounds. thus we'll stop at the very top of the chunk.
-        if function.has(ea):
-            (start, _) = function.chunk(ea)
+        if interface.function.has(ea):
+            start = interface.range.start(interface.function.chunk(interface.function.by_address(ea), ea))
             fwithin = utils.fcompose(utils.fmap(functools.partial(operator.le, start), type.code), builtins.all)
 
         # otherwise ensure that we find a code type that is not in the function,
         # which means that we'll stop at the very top of the database.
         else:
-            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.has, operator.not_), type.code), builtins.all)
+            fwithin = utils.fcompose(utils.fmap(utils.fcompose(interface.function.has, operator.not_), type.code), builtins.all)
             iterable = (item for item in interface.address.iterate(ea, idaapi.prev_not_tail) if not fwithin(ui.navigation.analyze(item)))
             res = builtins.next(iterable, None)
             start = top() if res is None else idaapi.get_item_end(res)
@@ -4023,14 +3935,14 @@ class address(object):
 
         # if we are within a function, then make sure we find a code type within
         # the chunk's bounds. thus we'll stop at the very end of the chunk.
-        if function.has(ea):
-            (_, end) = function.chunk(ea)
+        if interface.function.has(ea):
+            end = interface.range.end(interface.function.chunk(interface.function.by_address(ea), ea))
             fwithin = utils.fcompose(utils.fmap(functools.partial(operator.gt, end), type.code), builtins.all)
 
         # otherwise ensure that we find a code type that is not in the function,
         # which means that we'll stop at the very bottom of the database.
         else:
-            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.has, operator.not_), type.code), builtins.all)
+            fwithin = utils.fcompose(utils.fmap(utils.fcompose(interface.function.has, operator.not_), type.code), builtins.all)
             iterable = (item for item in interface.address.iterate(ea, idaapi.next_not_tail) if not fwithin(ui.navigation.analyze(item)))
             res = builtins.next(iterable, None)
             end = bottom() if res is None else idaapi.get_item_head(res)
@@ -4603,7 +4515,7 @@ class address(object):
     @classmethod
     def offset(cls, ea):
         '''Return the address `ea` translated to an offset relative to the base address of the database.'''
-        return interface.address.inside(ea) - information.baseaddress()
+        return interface.address.offset(interface.address.inside(ea))
     getoffset = utils.alias(offset, 'address')
 
     @utils.multicase()
@@ -4664,33 +4576,7 @@ class type(object):
     @utils.multicase(ea=internal.types.integer)
     def __new__(cls, ea):
         '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
-        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-
-        # First try and get the actual typeinfo for the given address. If it
-        # actually worked, then we can just return it as-is.
-        ti = idaapi.tinfo_t()
-        if get_tinfo(ti, ea):
-            return ti
-
-        # Otherwise we'll go ahead and guess the typeinfo for the same address.
-        res = idaapi.guess_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
-
-        # If we failed, then we'll try and hack around it using idaapi.print_type.
-        if res != idaapi.GUESS_FUNC_OK:
-            fl = idaapi.PRTYPE_1LINE
-            info_s = idaapi.print_type(ea, fl)
-
-            # If we still couldn't get the typeinfo, then return None because
-            # there isn't any typeinfo associated with the specified address.
-            if info_s is None:
-                return None
-
-            # Parse the type information string that IDA gave us and return it.
-            ti = internal.declaration.parse(info_s)
-            if ti is None:
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}) : Unable to parse the type declaration (\"{:s}\") returned from the requested address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(info_s, '"'), ea))
-            return ti
-        return ti
+        return interface.address.typeinfo(ea)
     @utils.multicase(none=internal.types.none)
     def __new__(cls, none):
         '''Remove the type information from the current address.'''
@@ -4706,80 +4592,53 @@ class type(object):
         If `guess` is true, then apply the type information as a guess.
         If `force` is true, then apply the type as-is regardless of its location.
         """
-        TINFO_GUESSED, TINFO_DEFINITE = getattr(idaapi, 'TINFO_GUESSED', 0), getattr(idaapi, 'TINFO_DEFINITE', 1)
         info_s = "{!s}".format(info)
 
-        # Check if we're pointing directly at a function, because if we are,
-        # then we need to use function.type instead.
+        # Check if we're pointing directly at a function or a runtime-linked one.
         try:
             rt, ea = interface.addressOfRuntimeOrStatic(ea)
-            if not rt:
-                return function.type(ea, info)
 
-        except E.FunctionNotFoundError:
-            pass
-
-        # If we didn't exception, then that means we're pointing at a runtime
-        # address. If we are then we need to ensure that our type is a pointer.
-        else:
-            ti = idaapi.tinfo_t()
-            if any([info.is_ptr(), info.is_func()]) or builtins.next((guessed[kwd] for kwd in ['force', 'forced'] if kwd in guessed), False):
-                ti, ok = info, True
-
-            # If it's not a pointer then we need to promote it.
-            else:
-                logging.warning(u"{:s}({:#x}, {!s}{:s}) : Promoting the given type (\"{:s}\") to a pointer before applying it to the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.escape(info_s, '"'), ea))
-                pi = idaapi.ptr_type_data_t()
-                pi.obj_type = info
-                ok = ti.create_ptr(pi)
-
-            # If we couldn't promote it to a pointer, then we need to bail so we
-            # don't damage anything that the user might not have intended to do.
+        # If we hit an exception, then we're not a function and all
+        # we need to do is to apply our tinfo_t to the address.
+        except LookupError:
+            result, ok = cls(ea), interface.address.apply_typeinfo(ea, info, **guessed)
             if not ok:
+                raise E.DisassemblerError(u"{:s}({:#x}, {!s}{:s}) : Unable to apply the given type ({!s}) to the address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.repr(info_s), ea))
+            return result
+
+        # If we didn't get an exception and we're pointing at a runtime-linked
+        # address, then we need to ensure that our type is a pointer to apply it.
+        if rt:
+            ti = info if builtins.next((guessed[kwd] for kwd in ['force', 'forced'] if kwd in guessed), False) else interface.function.pointer(info)
+
+            # If we didn't get a type back, then we failed during promotion.
+            if ti is None:
                 raise E.DisassemblerError(u"{:s}({:#x}, {!s}{:s}) : Unable to promote type (\"{:s}\") to a pointer for the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.escape(info_s, '"'), ea))
-            info = ti
 
-        # All we need to do is to use idaapi to apply our tinfo_t to the address.
-        result, ok = cls(ea), idaapi.apply_tinfo(ea, info, TINFO_DEFINITE)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}({:#x}, {!s}{:s}) : Unable to apply the given type ({!s}) to the address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.repr(info_s), ea))
+            # Otherwise warn the user about the dirty thing we just did.
+            elif ti is not info:
+                logging.warning(u"{:s}({:#x}, {!s}{:s}) : Promoted the given type (\"{:s}\") to a pointer before applying it to the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.escape(info_s, '"'), ea))
 
-        # TINFO_GUESSED doesn't appear to work, so instead we'll force the option
-        # here by clearing the aflag if the user wants to mark this as guessed.
-        if builtins.next((guessed[kwd] for kwd in ['guess', 'guessed'] if kwd in guessed), False):
-            interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
-        return result
+            # Now we can just apply our tinfo_t to the address.
+            result, ok = cls(ea), interface.address.apply_typeinfo(ea, ti, **guessed)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}({:#x}, {!s}{:s}) : Unable to apply the given type ({!s}) to runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.repr(info_s), ea))
+            return result
+
+        # Otherwise, we're pointing at a function and we should be using `function.type`.
+        return function.type(ea, info)
     @utils.multicase(ea=internal.types.integer, none=internal.types.none)
     def __new__(cls, ea, none):
         '''Remove the type information from the address `ea`.'''
-        del_tinfo = idaapi.del_tinfo2 if idaapi.__version__ < 7.0 else idaapi.del_tinfo
-
-        # Grab the previous typeinfo if there was something there, and coerce
-        # it to None if we got an error of some sort.
-        try:
-            ti = cls(ea)
-
-        except E.DisassemblerError:
-            ti = None
-
-        result, _ = ti, del_tinfo(ea)
+        result, ok = cls(ea), interface.address.apply_typeinfo(ea, none)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}({:#x}, {!s}) : Unable to remove the type information from the given address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, none, ea))
         return result
     @utils.multicase(ea=internal.types.integer, string=internal.types.string)
     @utils.string.decorate_arguments('string')
     def __new__(cls, ea, string, **guessed):
         '''Parse the type information in `string` into an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
-
-        # Check if we're pointing directly at a function, because if we are,
-        # then we need to use function.type instead.
-        try:
-            rt, ea = interface.addressOfRuntimeOrStatic(ea)
-            if not rt:
-                return function.type(ea, string)
-
-        except E.FunctionNotFoundError:
-            pass
-
-        # Now we can just ask IDA to parse this into a tinfo_t for us and then recurse
+        # We just need to ask IDA to parse this into a tinfo_t for us and then recurse
         # into ourselves. If we received None, then that's pretty much a parsing error.
         ti = internal.declaration.parse(string)
         if ti is None:
@@ -5094,7 +4953,7 @@ class type(object):
         # symbol that contains type information.
         except E.InvalidTypeOrValueError as e:
             #logging.warning(u"{:s}.has({:#x}) : Unable to interpret the type information at address {:#x}.".format('.'.join([__name__, type.__name__]), ea, ea), exc_info=True)
-            realname = name(ea)
+            realname = interface.name.get(ea)
             ok = internal.declaration.demangle(realname) != realname
         return ok
     has_typeinfo = info = utils.alias(has, 'type')
@@ -5141,12 +5000,12 @@ class type(object):
     @classmethod
     def relocation(cls, ea, size):
         '''Return if an address at `ea` up to `size` bytes was relocated by a relocation during load.'''
-        return any(interface.address.refinfo(ea) for ea in address.iterate(bounds))
+        return any(interface.address.refinfo(ea) for ea in interface.address.items(*bounds))
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def relocation(cls, bounds):
         '''Return if an address within the specified `bounds` was relocated by a relocation during load.'''
-        return any(interface.address.refinfo(ea) for ea in address.iterate(bounds))
+        return any(interface.address.refinfo(ea) for ea in interface.address.items(*bounds))
     has_relocation = is_relocation = utils.alias(relocation, 'type')
 
     class array(object):
@@ -5527,7 +5386,7 @@ class type(object):
     @classmethod
     def exception(cls, bounds, flags):
         '''Return if the given `bounds` is referenced by an exception matching the specified `flags` (``idaapi.TBEA_*``).'''
-        return any(cls.exception(ea, flags) for ea in address.iterate(bounds))
+        return any(cls.exception(ea, flags) for ea in interface.address.items(*bounds))
     is_exception = has_exception = utils.alias(exception, 'type')
 
 t = type    # XXX: ns alias
@@ -6949,7 +6808,8 @@ def mark(ea, none):
         tag(ea, 'mark', None)
     except E.MissingTagError:
         pass
-    color(ea, None)
+    DEFCOLOR = 0xffffffff
+    interface.address.color(ea, DEFCOLOR)
     return marks.remove(ea)
 @utils.multicase(ea=internal.types.integer, description=internal.types.string)
 @utils.string.decorate_arguments('description')
@@ -6973,349 +6833,134 @@ class extra(object):
 
     """
 
-    MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
-    MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
-
-    @classmethod
-    def __has_extra__(cls, ea, base):
-        sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
-        return sup.get(Fnetnode(ea), base, type=memoryview) is not None
-
     @utils.multicase()
     @classmethod
     def has_prefix(cls):
         '''Return true if there are any extra comments that prefix the item at the current address.'''
-        return cls.__has_extra__(ui.current.address(), idaapi.E_PREV)
+        return internal.comment.extra.has_extra(ui.current.address(), idaapi.E_PREV)
     @utils.multicase()
     @classmethod
     def has_suffix(cls):
         '''Return true if there are any extra comments that suffix the item at the current address.'''
-        return cls.__has_extra__(ui.current.address(), idaapi.E_NEXT)
+        return internal.comment.extra.has_extra(ui.current.address(), idaapi.E_NEXT)
+
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def has_prefix(cls, ea):
         '''Return true if there are any extra comments that prefix the item at the address `ea`.'''
-        return cls.__has_extra__(ea, idaapi.E_PREV)
+        return internal.comment.extra.has_extra(ea, idaapi.E_PREV)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def has_suffix(cls, ea):
         '''Return true if there are any extra comments that suffix the item at the address `ea`.'''
-        return cls.__has_extra__(ea, idaapi.E_NEXT)
-
-    @classmethod
-    def __count__(cls, ea, base):
-        sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
-        for i in builtins.range(cls.MAX_ITEM_LINES):
-            row = sup.get(Fnetnode(ea), base + i, type=memoryview)
-            if row is None: break
-        return i or None
-
-    if idaapi.__version__ < 7.0:
-        @classmethod
-        def __hide__(cls, ea):
-            '''Hide the extra comments at the address `ea`.'''
-            if interface.address.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
-                interface.address.flags(ea, idaapi.FF_LINE, 0)
-                return True
-            return False
-
-        @classmethod
-        def __show__(cls, ea):
-            '''Show the extra comments at the address `ea`.'''
-            if interface.address.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
-                interface.address.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE) # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
-                return True
-            return False
-
-        @classmethod
-        def __get__(cls, ea, base):
-            '''Fetch the extra comments from the address `ea` that are specified by the index in `base`.'''
-            sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
-
-            # count the number of rows
-            count = cls.__count__(ea, base)
-            if count is None: return None
-
-            # now we can fetch them
-            res = (sup.get(Fnetnode(ea), base + i, type=internal.types.bytes) for i in builtins.range(count))
-
-            # remove the null-terminator if there is one
-            res = (row.rstrip(b'\0') for row in res)
-
-            # fetch them from IDA and join them with newlines
-            return '\n'.join(map(utils.string.of, res))
-        @classmethod
-        @utils.string.decorate_arguments('string')
-        def __set__(cls, ea, string, base):
-            '''Set the newline-delimited `string` as the extra comments for the address `ea` at the index specified by `base`.'''
-            cls.__hide__(ea)
-            sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
-
-            # break the string up into rows, and encode each type for IDA
-            res = [ utils.string.to(item) for item in string.split('\n') ]
-
-            # assign them directly into IDA
-            [ sup.set(Fnetnode(ea), base + i, row + b'\0') for i, row in enumerate(res) ]
-
-            # now we can show (refresh) them
-            cls.__show__(ea)
-
-            # an exception before this happens would imply failure
-            return True
-        @classmethod
-        def __delete__(cls, ea, base):
-            '''Remove the extra comments from the address `ea` that start at the index in `base`.'''
-            sup, Fnetnode = internal.netnode.sup, getattr(idaapi, 'ea2node', utils.fidentity)
-
-            # count the number of rows to remove
-            count = cls.__count__(ea, base)
-            if count is None: return False
-
-            # hide them before we modify it
-            cls.__hide__(ea)
-
-            # now we can remove them
-            [ sup.remove(Fnetnode(ea), base + i) for i in builtins.range(count) ]
-
-            # and then show (refresh) it
-            cls.__show__(ea)
-            return True
-    else:
-        @classmethod
-        def __get__(cls, ea, base):
-            '''Fetch the extra comments from the address `ea` that are specified by the index in `base`.'''
-            # count the number of rows
-            count = cls.__count__(ea, base)
-            if count is None: return None
-
-            # grab the extra comments from the database
-            iterable = (idaapi.get_extra_cmt(ea, base + i) or '' for i in builtins.range(count))
-
-            # convert them back into Python and join them with a newline
-            iterable = (utils.string.of(item) for item in iterable)
-            return '\n'.join(iterable)
-        @classmethod
-        @utils.string.decorate_arguments('string')
-        def __set__(cls, ea, string, base):
-            '''Set the newline-delimited `string` as the extra comments for the address `ea` at the index specified by `base`.'''
-            # break the string up into rows, and encode each type for IDA
-            iterable = (utils.string.to(item) for item in string.split('\n'))
-
-            # assign them into IDA using its api
-            [ idaapi.update_extra_cmt(ea, base + i, row) for i, row in enumerate(iterable) ]
-
-            # return how many newlines there were
-            return string.count('\n')
-        @classmethod
-        def __delete__(cls, ea, base):
-            '''Remove the extra comments from the address `ea` that start at the index in `base`.'''
-
-            # count the number of extra comments to remove
-            res = cls.__count__(ea, base)
-            if res is None: return 0
-
-            # now we can delete them using the api
-            [idaapi.del_extra_cmt(ea, base + i) for i in builtins.range(res)]
-
-            # return how many comments we deleted
-            return res
-
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def __get_prefix__(cls, ea):
-        '''Return the prefixed comment at address `ea`.'''
-        return cls.__get__(ea, idaapi.E_PREV)
-
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def __get_suffix__(cls, ea):
-        '''Return the suffixed comment at address `ea`.'''
-        return cls.__get__(ea, idaapi.E_NEXT)
-
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def __delete_prefix__(cls, ea):
-        '''Delete the prefixed comment at address `ea`.'''
-        res = cls.__get__(ea, idaapi.E_PREV)
-        cls.__delete__(ea, idaapi.E_PREV)
-        return res
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def __delete_suffix__(cls, ea):
-        '''Delete the suffixed comment at address `ea`.'''
-        res = cls.__get__(ea, idaapi.E_NEXT)
-        cls.__delete__(ea, idaapi.E_NEXT)
-        return res
-
-    @utils.multicase(ea=internal.types.integer, string=internal.types.string)
-    @classmethod
-    def __set_prefix__(cls, ea, string):
-        '''Set the prefixed comment at address `ea` to the specified `string`.'''
-        res, ok = cls.__delete_prefix__(ea), cls.__set__(ea, string, idaapi.E_PREV)
-        ok = cls.__set__(ea, string, idaapi.E_PREV)
-        return res
-    @utils.multicase(ea=internal.types.integer, string=internal.types.string)
-    @classmethod
-    def __set_suffix__(cls, ea, string):
-        '''Set the suffixed comment at address `ea` to the specified `string`.'''
-        res, ok = cls.__delete_suffix__(ea), cls.__set__(ea, string, idaapi.E_NEXT)
-        return res
-
-    @utils.multicase()
-    @classmethod
-    def __get_prefix__(cls):
-        '''Return the prefixed comment at the current address.'''
-        return cls.__get_prefix__(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def __get_suffix__(cls):
-        '''Return the suffixed comment at the current address.'''
-        return cls.__get_suffix__(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def __delete_prefix__(cls):
-        '''Delete the prefixed comment at the current address.'''
-        return cls.__delete_prefix__(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def __delete_suffix__(cls):
-        '''Delete the suffixed comment at the current address.'''
-        return cls.__delete_suffix__(ui.current.address())
-    @utils.multicase(string=internal.types.string)
-    @classmethod
-    def __set_prefix__(cls, string):
-        '''Set the prefixed comment at the current address to the specified `string`.'''
-        return cls.__set_prefix__(ui.current.address(), string)
-    @utils.multicase(string=internal.types.string)
-    @classmethod
-    def __set_suffix__(cls, string):
-        '''Set the suffixed comment at the current address to the specified `string`.'''
-        return cls.__set_suffix__(ui.current.address(), string)
+        return internal.comment.extra.has_extra(ea, idaapi.E_NEXT)
 
     @utils.multicase()
     @classmethod
     def prefix(cls):
         '''Return the prefixed comment at the current address.'''
-        return cls.__get_prefix__(ui.current.address())
+        return internal.comment.extra.get_prefix(ui.current.address())
     @utils.multicase(string=internal.types.string)
     @classmethod
     def prefix(cls, string):
         '''Set the prefixed comment at the current address to the specified `string`.'''
-        return cls.__set_prefix__(ui.current.address(), string)
+        return internal.comment.extra.set_prefix(ui.current.address(), string)
     @utils.multicase(none=internal.types.none)
     @classmethod
     def prefix(cls, none):
         '''Delete the prefixed comment at the current address.'''
-        return cls.__delete_prefix__(ui.current.address())
+        return internal.comment.extra.delete_prefix(ui.current.address())
+
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def prefix(cls, ea):
         '''Return the prefixed comment at address `ea`.'''
-        return cls.__get_prefix__(ea)
+        return internal.comment.extra.get_prefix(ea)
     @utils.multicase(ea=internal.types.integer, string=internal.types.string)
     @classmethod
     def prefix(cls, ea, string):
         '''Set the prefixed comment at address `ea` to the specified `string`.'''
-        return cls.__set_prefix__(ea, string)
+        return internal.comment.extra.set_prefix(ea, string)
     @utils.multicase(ea=internal.types.integer, none=internal.types.none)
     @classmethod
     def prefix(cls, ea, none):
         '''Delete the prefixed comment at address `ea`.'''
-        return cls.__delete_prefix__(ea)
+        return internal.comment.extra.delete_prefix(ea)
 
     @utils.multicase()
     @classmethod
     def suffix(cls):
         '''Return the suffixed comment at the current address.'''
-        return cls.__get_suffix__(ui.current.address())
+        return internal.comment.extra.get_suffix(ui.current.address())
     @utils.multicase(string=internal.types.string)
     @classmethod
     def suffix(cls, string):
         '''Set the suffixed comment at the current address to the specified `string`.'''
-        return cls.__set_suffix__(ui.current.address(), string)
+        return internal.comment.extra.set_suffix(ui.current.address(), string)
     @utils.multicase(none=internal.types.none)
     @classmethod
     def suffix(cls, none):
         '''Delete the suffixed comment at the current address.'''
-        return cls.__delete_suffix__(ui.current.address())
+        return internal.comment.extra.delete_suffix(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def suffix(cls, ea):
         '''Return the suffixed comment at address `ea`.'''
-        return cls.__get_suffix__(ea)
+        return internal.comment.extra.get_suffix(ea)
     @utils.multicase(ea=internal.types.integer, string=internal.types.string)
     @classmethod
     def suffix(cls, ea, string):
         '''Set the suffixed comment at address `ea` to the specified `string`.'''
-        return cls.__set_suffix__(ea, string)
+        return internal.comment.extra.set_suffix(ea, string)
     @utils.multicase(ea=internal.types.integer, none=internal.types.none)
     @classmethod
     def suffix(cls, ea, none):
         '''Delete the suffixed comment at address `ea`.'''
-        return cls.__delete_suffix__(ea)
-
-    @classmethod
-    def __insert_space(cls, ea, count, getter_setter_remover):
-        getter, setter, remover = getter_setter_remover
-
-        res = getter(ea)
-        lstripped, nl = ('', 0) if res is None else (res.lstrip('\n'), len(res) - len(res.lstrip('\n')) + 1)
-        return setter(ea, '\n'*(nl + count - 1) + lstripped) if nl + count > 0 or lstripped else remover(ea)
-    @classmethod
-    def __append_space(cls, ea, count, getter_setter_remover):
-        getter, setter, remover = getter_setter_remover
-
-        res = getter(ea)
-        rstripped, nl = ('', 0) if res is None else (res.rstrip('\n'), len(res) - len(res.rstrip('\n')) + 1)
-        return setter(ea, rstripped + '\n'*(nl + count - 1)) if nl + count > 0 or rstripped else remover(ea)
+        return internal.comment.extra.delete_suffix(ea)
 
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def preinsert(cls, ea, count):
         '''Insert `count` lines in front of the item at address `ea`.'''
-        res = cls.__get_prefix__, cls.__set_prefix__, cls.__delete_prefix__
-        return cls.__insert_space(ea, count, res)
+        return internal.comment.extra.insert_anterior(ea, count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def preappend(cls, ea, count):
         '''Append `count` lines in front of the item at address `ea`.'''
-        res = cls.__get_prefix__, cls.__set_prefix__, cls.__delete_prefix__
-        return cls.__append_space(ea, count, res)
+        return internal.comment.extra.append_anterior(ea, count)
 
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def postinsert(cls, ea, count):
         '''Insert `count` lines after the item at address `ea`.'''
-        res = cls.__get_suffix__, cls.__set_suffix__, cls.__delete_suffix__
-        return cls.__insert_space(ea, count, res)
+        return internal.comment.extra.insert_posterior(ea, count)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     def postappend(cls, ea, count):
         '''Append `count` lines after the item at address `ea`.'''
-        res = cls.__get_suffix__, cls.__set_suffix__, cls.__delete_suffix__
-        return cls.__append_space(ea, count, res)
+        return internal.comment.extra.append_posterior(ea, count)
 
     @utils.multicase(count=internal.types.integer)
     @classmethod
     def preinsert(cls, count):
         '''Insert `count` lines in front of the item at the current address.'''
-        return cls.preinsert(ui.current.address(), count)
+        return internal.comment.extra.insert_anterior(ui.current.address(), count)
     @utils.multicase(count=internal.types.integer)
     @classmethod
     def preappend(cls, count):
         '''Append `count` lines in front of the item at the current address.'''
-        return cls.preappend(ui.current.address(), count)
+        return internal.comment.extra.append_anterior(ui.current.address(), count)
 
     @utils.multicase(count=internal.types.integer)
     @classmethod
     def postinsert(cls, count):
         '''Insert `count` lines after the item at the current address.'''
-        return cls.postinsert(ui.current.address(), count)
+        return internal.comment.extra.insert_posterior(ui.current.address(), count)
     @utils.multicase(count=internal.types.integer)
     @classmethod
     def postappend(cls, count):
         '''Append `count` lines after the item at the current address.'''
-        return cls.postappend(ui.current.address(), count)
+        return internal.comment.extra.append_posterior(ui.current.address(), count)
 
     insert, append = utils.alias(preinsert, 'extra'), utils.alias(preappend, 'extra')
 ex = extra  # XXX: ns alias
@@ -7525,8 +7170,8 @@ class set(object):
             # if the address is initialized, then we'll figure it out by
             # looking for bytes that repeat.
             if type.initialized(ea):
-                size, by = 0, read(ea, 1)
-                while read(ea + size, 1) == by:
+                size, by = 0, interface.address.read(ea, 1)
+                while interface.address.read(ea + size, 1) == by:
                     size += 1
                 return size
 
@@ -8355,13 +8000,13 @@ class get(object):
         # If we're currently looking at code or alignment, then our job is easy
         # and we only need to return the bytes...as bytes.
         if flags & idaapi.MS_CLS == idaapi.FF_CODE or dtype in {FF_ALIGN}:
-            return read(ea, size)
+            return interface.address.read(ea, size)
 
         # Otherwise we're data and we first figure out if it's a structure, then
         # we just compare the sizes to distinguish it as an array or a single item.
         elif dtype in {idaapi.FF_STRUCT} and info and idaapi.get_struc(info.tid):
             sptr = internal.structure.new(info.tid, ea).ptr
-            return cls.structure(ea, sptr, size, **parameters) if sptr.props & idaapi.SF_VAR or element >= size else interface.decode.array(flags, info, read(ea, size), **parameters)
+            return cls.structure(ea, sptr, size, **parameters) if sptr.props & idaapi.SF_VAR or element >= size else interface.decode.array(flags, info, interface.address.read(ea, size), **parameters)
 
         # If this is a string, then we just need to unpack the strtype and use it.
         elif dtype in {FF_STRLIT}:
@@ -8370,7 +8015,7 @@ class get(object):
 
         # Anything else should be an integer, but we'll need to transform it
         # depending on the flags in order to get exactly what the user sees.
-        bytes = read(ea, size)
+        bytes = interface.address.read(ea, size)
         maximum, integers = pow(2, 8 * element), interface.decode.array(flags & ~(idaapi.FF_SIGN|idaapi.FF_BNOT), info, bytes, **parameters)
         if flags & idaapi.FF_SIGN:
             result = [item - maximum if item else item for item in integers]
@@ -8410,7 +8055,7 @@ class get(object):
     @classmethod
     def info(cls, ea):
         '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
-        return type(ea)
+        return interface.address.typeinfo(ea)
     typeinfo = utils.alias(info, 'get')
 
     @utils.multicase()
@@ -8434,7 +8079,7 @@ class get(object):
 
         The default value of `byteorder` is the same as specified by the database architecture.
         """
-        data = read(ea, size)
+        data = interface.address.read(ea, size)
         order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), information.byteorder())
         if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
             raise internal.exceptions.InvalidParameterError(u"{:s}.unsigned({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
@@ -8461,7 +8106,7 @@ class get(object):
 
         The default value of `byteorder` is the same as specified by the database architecture.
         """
-        data = read(ea, size)
+        data = interface.address.read(ea, size)
         order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), information.byteorder())
         if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
             raise internal.exceptions.InvalidParameterError(u"{:s}.signed({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
@@ -8665,7 +8310,7 @@ class get(object):
                 promoted = size
 
             # Now we just need to read the data and flip its byteorder before using our api
-            bytes = read(ea, promoted)
+            bytes = interface.address.read(ea, promoted)
             return interface.decode.float(bytes if order.lower() == 'big' else bytes[::-1])
 
         @utils.multicase()
@@ -8732,7 +8377,7 @@ class get(object):
         # result from get_opinfo because if it fails, the flags are the type.
         info, flags = idaapi.opinfo_t(), interface.address.flags(ea)
         ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
-        return interface.decode.array(flags, info if ok else None, read(ea, size), **byteorder)
+        return interface.decode.array(flags, info if ok else None, interface.address.read(ea, size), **byteorder)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def array(cls, bounds, type, **byteorder):
@@ -8753,7 +8398,7 @@ class get(object):
         # array, read the bytes using the bounds, and then decode it.
         info = idaapi.opinfo_t()
         flags, info.tid, size = interface.typemap.resolve(type)
-        return interface.decode.array(flags, info, read(bounds), **byteorder)
+        return interface.decode.array(flags, info, interface.address.read(start, expected), **byteorder)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def array(cls, ea, type, **byteorder):
@@ -8777,7 +8422,7 @@ class get(object):
         # array, read the bytes using the address and size, and then decode it.
         info = idaapi.opinfo_t()
         flags, info.tid, _ = interface.typemap.resolve(type)
-        return interface.decode.array(flags, info, read(ea, size), **byteorder)
+        return interface.decode.array(flags, info, interface.address.read(ea, size), **byteorder)
     @utils.multicase(ea=internal.types.integer, length=internal.types.integer)
     @classmethod
     def array(cls, ea, length, **byteorder):
@@ -8794,7 +8439,7 @@ class get(object):
         # that we can use it with the length to calculate the amount that
         # we'll need to read. Afterwards, that's all we need for decoding.
         element = interface.address.element(flags, info)
-        return interface.decode.array(flags, info, read(ea, element * max(0, length)), **byteorder)
+        return interface.decode.array(flags, info, interface.address.read(ea, element * max(0, length)), **byteorder)
     @utils.multicase(ea=internal.types.integer, length=internal.types.integer)
     @classmethod
     def array(cls, ea, type, length, **byteorder):
@@ -8810,7 +8455,7 @@ class get(object):
         # to calculate the amount of data to read, and then decode the array.
         info = idaapi.opinfo_t()
         info.tid = tid
-        return interface.decode.array(flags, info, read(ea, size * max(0, length)), **byteorder)
+        return interface.decode.array(flags, info, interface.address.read(ea, size * max(0, length)), **byteorder)
 
     @utils.multicase()
     @classmethod
@@ -9009,7 +8654,7 @@ class get(object):
 
         # Read the bytes that we need to decode and use the character
         # width to create an array that we'll use to decode our bytes.
-        data = read(ea, distance - extra)
+        data = interface.address.read(ea, distance - extra)
         res = _array.array(utils.get_array_typecode(width, 1), data)
 
         # Next thing to do is to figure out which decoder to use, turn our
@@ -9074,7 +8719,7 @@ class get(object):
             logging.warning(u"{:s}.structure({:#x}, {:#x}, {:+#x}) : The requested size ({:+d}) is larger than the size of the structure ({:+d}) and will result in {:+d} byte{:s} being discarded.".format('.'.join([__name__, cls.__name__]), ea, sptr.id, size, size, expected, size - expected, '' if size - expected == 1 else 's'))
 
         # Now we can just read the data from the database and then decode our structure using it.
-        bytes = read(ea, size)
+        bytes = interface.address.read(ea, size)
         fields = interface.decode.structure_bytes(sptr.id, bytes)
         return interface.decode.structure(sptr.id, fields, **byteorder)
     struc = struct = utils.alias(structure, 'get')
@@ -9200,7 +8845,7 @@ class get(object):
 
         @classmethod
         def __of_block__(cls, ea):
-            if not function.has(ea):
+            if not interface.function.has(ea):
                 switch_t = idaapi.switch_info_ex_t if idaapi.__version__ < 7.0 else idaapi.switch_info_t
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a `{:s}` using the given address ({:#x}) due to it not being within a function.".format('.'.join([__name__, 'type', cls.__name__]), ea, switch_t.__name__, ea))
             bounds = function.block(ea)
