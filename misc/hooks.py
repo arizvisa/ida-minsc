@@ -978,7 +978,7 @@ def __process_functions(percentage=0.10):
 def __execute_rcfile():
     '''Look in the current IDB directory for an rcfile that might need to be executed.'''
     ns, filename = sys.modules['__main__'].__dict__ if '__main__' in sys.modules else globals(), 'idapythonrc.py'
-    path = database.config.path(filename)
+    path = database.information.path(filename)
 
     try:
         with open(path) as infile:
@@ -2153,16 +2153,16 @@ def make_ida_not_suck_cocks(nw_code):
     else:
         hook.notification.add(idaapi.NW_OPENIDB, catalog.nw_newprc, -10)
 
-    ## ensure the database.config namespace is initialized as it's
+    ## ensure the internal.interface.database namespace is initialized as it's
     ## necessary and used by the processor detection.
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_init', database.config.__init_info_structure__, -100)
+        hook.idp.add('ev_init', internal.interface.database.__init_info_structure__, -100)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('init', database.config.__init_info_structure__, -100)
+        hook.idp.add('init', internal.interface.database.__init_info_structure__, -100)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
+        hook.notification.add(idaapi.NW_OPENIDB, internal.interface.database.__nw_init_info_structure__, -30)
 
     ## keep track of individual tags like colors and type info
     if idaapi.__version__ >= 7.2:
