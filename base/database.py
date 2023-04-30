@@ -22,7 +22,7 @@ import six, builtins
 
 import functools, operator, itertools
 import sys, os, logging, bisect
-import math, array as _array, fnmatch, re
+import math, array as _array, fnmatch, re, time, datetime
 
 import function, segment, ui
 import structure as _structure
@@ -69,20 +69,6 @@ class information(object):
     its filename, the path to the generated database, etc. Some tools
     for determining the type of the binary are also included.
     """
-
-    # cache the default value for the structure
-    info = idaapi.get_inf_structure()
-
-    @classmethod
-    def __init_info_structure__(cls, idp_modname):
-        res = interface.database.__init_info_structure__(idp_modname)
-        cls.info = interface.database.__idainfo__
-
-    @classmethod
-    def __nw_init_info_structure__(cls, nw_code, is_old_database):
-        logging.debug(u"{:s}.__nw_init_info_structure__({!s}) : Received notification to initialize information structure for database.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, [nw_code, is_old_database]))))
-        idp_modname = idaapi.get_idp_name()
-        return cls.__init_info_structure__(idp_modname)
 
     class register(object):
         """
@@ -367,13 +353,6 @@ class information(object):
         return interface.database.byteorder()
 
     @classmethod
-    def main(cls):
-        # FIXME: WHAT THE FUCK IS THIS
-        if idaapi.__version__ < 7.2:
-            return cls.info.main
-        return idaapi.inf_get_main()
-
-    @classmethod
     def entry(cls):
         '''Return the first entry point for the database.'''
         return interface.database.entrypoint()
@@ -388,6 +367,40 @@ class information(object):
         '''Return the bounds of the current database in a tuple formatted as `(left, right)`.'''
         start, stop = interface.address.bounds()
         return interface.bounds_t(start, stop)
+
+    @classmethod
+    def created(cls):
+        '''Return the date and time that the database was created.'''
+        if idaapi.__version__ < 7.4:
+            raise E.UnsupportedVersion(u"{:s}.created() : This function is only supported on versions of IDA 7.4 and newer.".format('.'.join([__name__, cls.__name__])))
+        RIDX_ALT_CTIME = -2
+        asize_t, root = idaapi.ea_pointer(), internal.netnode.get('Root Node')
+        _, uval = asize_t.assign(RIDX_ALT_CTIME), asize_t.value()
+        ts = internal.netnode.alt.get(root, uval)
+        utc = builtins.type('timezone.utc', (datetime.tzinfo,), {k : v for k, v in itertools.chain([('__repr__', lambda self: 'utc')], [(attribute, lambda self, dt, value=value: value) for attribute, value in zip(['utcoffset', 'dst', 'tzname'], itertools.chain(2 * [datetime.timedelta(0)], ['UTC']))])})
+        tzinfo = utc() if sys.version_info.major < 3 else datetime.timezone.utc
+        return datetime.datetime.fromtimestamp(time.mktime(time.gmtime(ts)), tzinfo).astimezone()
+
+    @classmethod
+    def elapsed(cls):
+        '''Return the number of seconds that the database has remained open.'''
+        if idaapi.__version__ < 7.4:
+            raise E.UnsupportedVersion(u"{:s}.elapsed() : This function is only supported on versions of IDA 7.4 and newer.".format('.'.join([__name__, cls.__name__])))
+        RIDX_ALT_ELAPSED = -3
+        asize_t, root = idaapi.ea_pointer(), internal.netnode.get('Root Node')
+        _, uval = asize_t.assign(RIDX_ALT_ELAPSED), asize_t.value()
+        return internal.netnode.alt.get(root, uval)
+
+    @classmethod
+    def opens(cls):
+        '''Return the number of times that the database has been opened.'''
+        if idaapi.__version__ < 7.4:
+            raise E.UnsupportedVersion(u"{:s}.opened() : This function is only supported on versions of IDA 7.4 and newer.".format('.'.join([__name__, cls.__name__])))
+        RIDX_ALT_NOPENS = -4
+        asize_t, root = idaapi.ea_pointer(), internal.netnode.get('Root Node')
+        _, uval = asize_t.assign(RIDX_ALT_NOPENS), asize_t.value()
+        return internal.netnode.alt.get(root, uval)
+
 config = info = information # XXX: ns alias
 
 range = utils.alias(information.bounds, 'information')
