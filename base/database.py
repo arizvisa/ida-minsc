@@ -42,7 +42,7 @@ def has():
 @utils.multicase(ea=internal.types.integer)
 def has(ea):
     '''Return true if address `ea` is within the bounds of the database.'''
-    left, right = config.bounds()
+    left, right = information.bounds()
     return left <= ea < right
 @utils.multicase(name=internal.types.string)
 def has(name, *suffix):
@@ -55,14 +55,14 @@ contains = within = utils.alias(has)
 
 def top():
     '''Return the very lowest address within the database.'''
-    ea, _ = config.bounds()
+    ea, _ = information.bounds()
     return ea
 def bottom():
     '''Return the very highest address within the database.'''
-    _, ea = config.bounds()
+    _, ea = information.bounds()
     return ea
 
-class config(object):
+class information(object):
     """
     This namespace contains various read-only properties about the
     database. This includes things such as the database boundaries,
@@ -75,371 +75,14 @@ class config(object):
 
     @classmethod
     def __init_info_structure__(cls, idp_modname):
-        information = idaapi.get_inf_structure()
-        if information:
-            logging.debug(u"{:s}.__init_info_structure__({!s}) : Successfully fetched and cached information structure for database.".format('.'.join([__name__, cls.__name__]), utils.string.escape(idp_modname, '"')))
-
-            # Display summary of the database and what it's used for.
-            bits = "{:d}-bit".format(64 if information.is_64bit() else 32 if information.is_32bit() else 16)
-            format = 'library' if information.lflags & idaapi.LFLG_IS_DLL else 'binary'
-
-            if idaapi.__version__ < 7.0:
-                byteorder = "{:s}-endian".format('big' if idaapi.cvar.inf.mf else 'little')
-            else:
-                byteorder = "{:s}-endian".format('big' if information.lflags & idaapi.LFLG_MSF else 'little')
-
-            if idaapi.__version__ >= 7.0:
-                mode = ' kernelspace' if information.lflags & idaapi.LFLG_KERNMODE else ' userspace'
-            else:
-                mode = ''
-            logging.warning("Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s}{mode:s} {format:s}.".format('.'.join([information.__class__.__module__, information.__class__.__name__]), tag=information.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=information.version))
-
-        else:
-            logging.fatal(u"{:s}.__init_info_structure__({!s}) : Unknown error while trying to get information structure for database.".format('.'.join([__name__, cls.__name__]), utils.string.escape(idp_modname, '"')))
-        cls.info = information
+        res = interface.database.__init_info_structure__(idp_modname)
+        cls.info = interface.database.__idainfo__
 
     @classmethod
     def __nw_init_info_structure__(cls, nw_code, is_old_database):
         logging.debug(u"{:s}.__nw_init_info_structure__({!s}) : Received notification to initialize information structure for database.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, [nw_code, is_old_database]))))
         idp_modname = idaapi.get_idp_name()
         return cls.__init_info_structure__(idp_modname)
-
-    @utils.multicase()
-    @classmethod
-    def lflags(cls):
-        '''Return the value of the ``idainfo.lflags`` field from the database.'''
-        if idaapi.__version__ < 7.2:
-            return cls.info.lflags
-        return idaapi.inf_get_lflags()
-    @utils.multicase(mask=internal.types.integer)
-    @classmethod
-    def lflags(cls, mask):
-        '''Return the value of the ``idainfo.lflags`` field from the database with the specified `mask`.'''
-        if idaapi.__version__ < 7.2:
-            return cls.info.lflags & mask
-        return idaapi.inf_get_lflags() & mask
-    @utils.multicase(mask=internal.types.integer, value=internal.types.integer)
-    @classmethod
-    def lflags(cls, mask, value):
-        '''Set the ``idainfo.lflags`` with the provided `mask` from the database to the specified `value`.'''
-        if idaapi.__version__ < 7.2:
-            result, cls.info.lflags = cls.info.lflags, (result & ~mask) | (value & mask)
-            return result
-
-        # Newer versions of IDA use the idaapi.inf_get_lflags() function.
-        result = idaapi.inf_get_lflags()
-        if not idaapi.inf_set_lflags((result & ~mask) | (value & mask)):
-            raise E.DisassemblerError(u"{:s}.lflags({:#x}, {:#x}) : Unable to modify the flags in idainfo.lflags ({:#x} & {:#x}) to the specified value ({:s}).".format('.'.join([__name__, cls.__name__]), result, mask, "{:#x} & {:#x}".format(value, mask) if value & ~mask else "{:#x}".format(value)))
-        return result
-
-    @classmethod
-    def filename(cls):
-        '''Return the filename that the database was built from.'''
-        res = idaapi.get_root_filename()
-        return utils.string.of(res)
-
-    @classmethod
-    def idb(cls):
-        '''Return the full path to the database.'''
-        res = idaapi.cvar.database_idb if idaapi.__version__ < 7.0 else idaapi.get_path(idaapi.PATH_TYPE_IDB)
-        res = utils.string.of(res)
-        return res.replace(os.sep, '/')
-    database = utils.alias(idb, 'config')
-
-    @classmethod
-    def module(cls):
-        '''Return the module name as per the windows loader.'''
-        res = cls.filename()
-        res = os.path.split(res)
-        return os.path.splitext(res[1])[0]
-
-    @utils.multicase()
-    @classmethod
-    def path(cls):
-        '''Return the absolute path to the directory containing the database.'''
-        res = cls.idb()
-        path, _ = os.path.split(res)
-        return path
-    @utils.multicase(pathname=internal.types.string)
-    @classmethod
-    def path(cls, pathname, *components):
-        '''Return an absolute path composed of the provided `pathname` and any additional `components` relative to the directory containing the database.'''
-        res = cls.idb()
-        path, _ = os.path.split(res)
-        return os.path.join(path, pathname, *components)
-
-    @classmethod
-    def baseaddress(cls):
-        '''Return the baseaddress of the database.'''
-        return idaapi.get_imagebase()
-
-    @classmethod
-    def readonly(cls):
-        '''Return whether the database is read-only or not.'''
-        if idaapi.__version__ < 7.0:
-            raise E.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-        elif idaapi.__version__ < 7.2:
-            return cls.info.readonly_idb()
-        return idaapi.inf_readonly_idb()
-    is_readonly = utils.alias(readonly, 'config')
-
-    @classmethod
-    def shared(cls):
-        '''Return whether the database is a shared-object or not.'''
-        if idaapi.__version__ < 7.0:
-            raise E.UnsupportedVersion(u"{:s}.shared() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-        return True if cls.lflags(idaapi.LFLG_IS_DLL) else False
-    is_sharedobject = is_shared = is_dll = utils.alias(shared, 'config')
-
-    @classmethod
-    def kernel(cls):
-        '''Return whether the database is using a kernelmode address space or not.'''
-        if idaapi.__version__ < 7.0:
-            raise E.UnsupportedVersion(u"{:s}.kernel() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-        return True if cls.lflags(idaapi.LFLG_KERNMODE) else False
-    is_kernelspace = is_kernel = utils.alias(kernel, 'config')
-
-    @utils.multicase()
-    @classmethod
-    def filetype(cls):
-        '''Return the file type identified by the loader when creating the database.'''
-        if idaapi.__version__ < 7.2:
-            return cls.info.filetype
-        return idaapi.inf_get_filetype()
-    @utils.multicase(filetype_t=internal.types.integer)
-    @classmethod
-    def filetype(cls, filetype_t):
-        '''Set the file type identified by the loader to the specified `filetype_t`.'''
-        if idaapi.__version__ < 7.2:
-            result, cls.info.filetype = cls.info.filetype, filetype_t
-            return result
-
-        # Newer versions of IDA use the idaapi.inf_get_filetype() and idaapi.inf_set_filetype() functions.
-        result = idaapi.inf_get_filetype()
-        if not idaapi.inf_set_filetype(filetype_t):
-            raise E.DisassemblerError(u"{:s}.filetype({:#x}) : Unable to set value for idainfo.filetype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), filetype_t, filetype_t))
-        return result
-    @utils.multicase(FT_=internal.types.string)
-    @classmethod
-    def filetype(cls, FT_):
-        '''Set the file type identified by the loader to the value for the string `FT_`.'''
-        prefix, choice = 'FT_', FT_.upper()
-        candidates = {prefix + choice, choice}
-
-        # Grab all of our available choices from the idc module since they're not defined anywhere else.
-        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
-        choices = {item : value for item, value in filtered if isinstance(value, internal.types.integer)}
-
-        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
-        iterable = (value for item, value in choices.items() if item in candidates)
-        value = builtins.next(iterable, None)
-        if value is None:
-            raise E.ItemNotFoundError(u"{:s}.filetype({!r}) : Unable to find the requested file type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), FT_, string))
-
-        # We found it, so we can recurse into the correct case to assign it.
-        return cls.filetype(value)
-
-    @utils.multicase()
-    @classmethod
-    def ostype(cls):
-        '''Return the operating system type identified by the loader when creating the database.'''
-        # FIXME: this is a bitflag that should be documented in libfuncs.hpp
-        #        which unfortunately is not included anywhere in the sdk.
-        if idaapi.__version__ < 7.2:
-            return cls.info.ostype
-        return idaapi.inf_get_ostype()
-    @utils.multicase(ostype_t=internal.types.integer)
-    @classmethod
-    def ostype(cls, ostype_t):
-        '''Set the operating system type for the database to the specified `ostype_t`.'''
-        if idaapi.__version__ < 7.2:
-            result, cls.info.ostype = cls.info.ostype, ostype_t
-            return result
-
-        # Newer versions of IDA use the idaapi.inf_get_filetype() and idaapi.inf_set_filetype() functions.
-        result = idaapi.inf_get_ostype()
-        if not idaapi.inf_set_ostype(ostype_t):
-            raise E.DisassemblerError(u"{:s}.ostype({:#x}) : Unable to set value for idainfo.ostype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), ostype_t, ostype_t))
-        return result
-    @utils.multicase(OSTYPE_=internal.types.string)
-    @classmethod
-    def ostype(cls, OSTYPE_):
-        '''Set the operating system type for the database to the value for the string `OSTYPE_`.'''
-        prefix, choice = 'OSTYPE_', OSTYPE_.upper()
-        candidates = {prefix + choice, choice}
-
-        # Grab all of our available choices from the idc module since they're not defined anywhere else.
-        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
-        choices = {item : value for item, value in filtered if isinstance(value, internal.types.integer)}
-
-        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
-        iterable = (value for item, value in choices.items() if item in candidates)
-        value = builtins.next(iterable, None)
-        if value is None:
-            raise E.ItemNotFoundError(u"{:s}.ostype({!r}) : Unable to find the requested operating system type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), OSTYPE_, string))
-
-        # We found it, so we can recurse into the correct case to assign it.
-        return cls.ostype(value)
-
-    @utils.multicase()
-    @classmethod
-    def apptype(cls):
-        '''Return the application type identified by the loader when creating the database.'''
-        # FIXME: this is a bitflag that should be documented in libfuncs.hpp
-        #        which unfortunately is not included anywhere in the sdk.
-        if idaapi.__version__ < 7.2:
-            return cls.info.apptype
-        return idaapi.inf_get_apptype()
-    @utils.multicase(apptype_t=internal.types.integer)
-    @classmethod
-    def apptype(cls, apptype_t):
-        '''Set the application type for the database to the specified `apptype_t`.'''
-        if idaapi.__version__ < 7.2:
-            result, cls.info.apptype = cls.info.ostype, apptype_t
-            return result
-
-        # Newer versions of IDA use the idaapi.inf_get_filetype() and idaapi.inf_set_filetype() functions.
-        result = idaapi.inf_get_apptype()
-        if not idaapi.inf_set_apptype(apptype_t):
-            raise E.DisassemblerError(u"{:s}.apptype({:#x}) : Unable to set value for idainfo.apptype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), apptype_t, apptype_t))
-        return result
-    @utils.multicase(APPT_=internal.types.string)
-    @classmethod
-    def apptype(cls, APPT_):
-        '''Set the application type for the database to the value for the string `APPT_`.'''
-        prefix, choice = 'APPT_', APPT_.upper()
-        candidates = {prefix + choice, choice}
-
-        # Grab all of our available choices from the idc module since they're not defined anywhere else.
-        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
-        choices = {item : value for item, value in filtered if isinstance(value, internal.types.integer)}
-
-        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
-        iterable = (value for item, value in choices.items() if item in candidates)
-        value = builtins.next(iterable, None)
-        if value is None:
-            raise E.ItemNotFoundError(u"{:s}.apptype({!r}) : Unable to find the requested application type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), APPT_, string))
-
-        # We found it, so we can recurse into the correct case to assign it.
-        return cls.apptype(value)
-
-    @classmethod
-    def changes(cls):
-        '''Return the number of changes within the database.'''
-        if idaapi.__version__ < 7.0:
-            raise E.UnsupportedVersion(u"{:s}.changes() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-        elif idaapi.__version__ < 7.2:
-            return cls.info.database_change_count
-        return idaapi.inf_get_database_change_count()
-
-    @classmethod
-    def processor(cls):
-        '''Return the name of the processor used by the database.'''
-        if idaapi.__version__ < 7.0:
-            raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-        elif hasattr(cls.info, 'procname'):
-            result = cls.info.procname
-        elif hasattr(cls.info, 'procName'):
-            result = cls.info.procName
-        else:
-            result = idaapi.inf_get_procname()
-        return utils.string.of(result)
-
-    @classmethod
-    def compiler(cls):
-        '''Return the compiler that was configured for the database.'''
-        if idaapi.__version__ < 7.2:
-            return cls.info.cc
-
-        # Newer versions of IDA use the idaapi.inf_get_cc() function.
-        cc = idaapi.compiler_info_t()
-        if not idaapi.inf_get_cc(cc):
-            raise E.DisassemblerError(u"{:s}.processor() : Unable to fetch the value for the idainfo.cc attribute.".format('.'.join([__name__, cls.__name__])))
-        return cc
-    @classmethod
-    def version(cls):
-        '''Return the version of the database.'''
-        if idaapi.__version__ < 7.2:
-            return cls.info.version
-        return idaapi.inf_get_version()
-
-    @classmethod
-    def type(cls, typestr):
-        '''Evaluates a type string and returns its size according to the compiler used by the database.'''
-        lookup = {
-            'bool': 'size_b',
-            'short': 'size_s',
-            'int': 'size_i', 'float': 'size_l', 'single': 'size_l',
-            'long': 'size_l',
-            'longlong': 'size_ll', 'double': 'size_ll',
-            'enum': 'size_e',
-            'longdouble': 'size_ldbl',
-            'align': 'defalign', 'alignment': 'defalign',
-        }
-        string = typestr.replace(' ', '')
-        return getattr(cls.compiler(), lookup.get(string.lower(), typestr.lower()))
-
-    @classmethod
-    def bits(cls):
-        '''Return number of bits for the processor used by the database.'''
-        result = cls.lflags(idaapi.LFLG_PC_FLAT | idaapi.LFLG_64BIT)
-        if result & idaapi.LFLG_64BIT:
-            return 64
-        elif result & idaapi.LFLG_PC_FLAT:
-            return 32
-        return 32 if result & idaapi.LFLG_FLAT_OFF32 else 16
-
-    @classmethod
-    def size(cls):
-        '''Return the number of bytes used to represent an address in the database.'''
-        import ida_typeinf
-
-        # This is a trick gifted by me by rolfr through his comprehensive
-        # knowledge of IDA internals in order to get this attribute in the
-        # exact way that IDA does it. We use the ida_typeinf module instead
-        # of idaapi in order to preserve this tech throughout history in the
-        # way it was bestowed upon us...
-
-        tif = ida_typeinf.tinfo_t()
-        tif.create_ptr(ida_typeinf.tinfo_t(ida_typeinf.BT_VOID))
-        return tif.get_size()
-
-    @classmethod
-    def bitsize(cls):
-        '''Return the number of bits used to represent an address in the database.'''
-        return 8 * cls.size()
-
-    @classmethod
-    def byteorder(cls):
-        '''Return a string representing the byte-order used by integers in the database.'''
-        if idaapi.__version__ < 7.0:
-            res = idaapi.cvar.inf.mf
-            return 'big' if res else 'little'
-        return 'big' if cls.lflags(idaapi.LFLG_MSF) else 'little'
-
-    @classmethod
-    def main(cls):
-        if idaapi.__version__ < 7.2:
-            return cls.info.main
-        return idaapi.inf_get_main()
-
-    @classmethod
-    def entry(cls):
-        '''Return the first entry point for the database.'''
-        if idaapi.__version__ < 7.2:
-            return cls.info.start_ea
-        return idaapi.inf_get_start_ea()
-
-    @classmethod
-    def margin(cls):
-        '''Return the current margin position for the current database.'''
-        return cls.info.margin if idaapi.__version__ < 7.2 else idaapi.inf_get_margin()
-
-    @classmethod
-    def bounds(cls):
-        '''Return the bounds of the current database in a tuple formatted as `(left, right)`.'''
-        start, stop = interface.address.bounds()
-        return interface.bounds_t(start, stop)
 
     class register(object):
         """
@@ -473,10 +116,284 @@ class config(object):
             '''Return the segment register size for the database.'''
             return 8 * idaapi.ph_get_segreg_size()
 
-range = utils.alias(config.bounds, 'config')
-filename, idb, module, path = utils.alias(config.filename, 'config'), utils.alias(config.idb, 'config'), utils.alias(config.module, 'config'), utils.alias(config.path, 'config')
-path = utils.alias(config.path, 'config')
-baseaddress = base = utils.alias(config.baseaddress, 'config')
+    @utils.multicase()
+    @classmethod
+    def lflags(cls):
+        '''Return the value of the ``idainfo.lflags`` field from the database.'''
+        return interface.database.flags()
+    @utils.multicase(mask=internal.types.integer)
+    @classmethod
+    def lflags(cls, mask):
+        '''Return the value of the ``idainfo.lflags`` field from the database with the specified `mask`.'''
+        return interface.database.flags(mask)
+    @utils.multicase(mask=internal.types.integer, value=internal.types.integer)
+    @classmethod
+    def lflags(cls, mask, value):
+        '''Set the ``idainfo.lflags`` with the provided `mask` from the database to the specified `value`.'''
+        result = interface.database.flags()
+        if not interface.database.setflags(mask, value):
+            raise E.DisassemblerError(u"{:s}.lflags({:#x}, {:#x}) : Unable to modify the flags in idainfo.lflags ({:#x} & {:#x}) to the specified value ({:s}).".format('.'.join([__name__, cls.__name__]), result, mask, "{:#x} & {:#x}".format(value, mask) if value & ~mask else "{:#x}".format(value)))
+        return result
+
+    @classmethod
+    def filename(cls):
+        '''Return the filename that the database was built from.'''
+        return interface.database.filename()
+
+    @classmethod
+    def idb(cls):
+        '''Return the full path to the database.'''
+        return interface.database.idb()
+    database = utils.alias(idb, 'information')
+
+    @classmethod
+    def module(cls):
+        '''Return the module name as per the windows loader.'''
+        res = cls.filename()
+        res = os.path.split(res)
+        return os.path.splitext(res[1])[0]
+
+    @utils.multicase()
+    @classmethod
+    def path(cls):
+        '''Return the absolute path to the directory containing the database.'''
+        return interface.database.path()
+    @utils.multicase(pathname=internal.types.string)
+    @classmethod
+    def path(cls, pathname, *components):
+        '''Return an absolute path composed of the provided `pathname` and any additional `components` relative to the directory containing the database.'''
+        base = interface.database.path()
+        return os.path.join(base, pathname, *components)
+
+    @classmethod
+    def baseaddress(cls):
+        '''Return the baseaddress of the database.'''
+        return interface.database.imagebase()
+
+    @classmethod
+    def readonly(cls):
+        '''Return whether the database is read-only or not.'''
+        if idaapi.__version__ < 7.0:
+            raise E.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        return interface.database.readonly()
+    is_readonly = utils.alias(readonly, 'information')
+
+    @classmethod
+    def shared(cls):
+        '''Return whether the database is a shared-object or not.'''
+        if idaapi.__version__ < 7.0:
+            raise E.UnsupportedVersion(u"{:s}.shared() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        return True if cls.lflags(idaapi.LFLG_IS_DLL) else False
+    is_sharedobject = is_shared = is_dll = utils.alias(shared, 'information')
+
+    @classmethod
+    def kernel(cls):
+        '''Return whether the database is using a kernelmode address space or not.'''
+        if idaapi.__version__ < 7.0:
+            raise E.UnsupportedVersion(u"{:s}.kernel() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        return True if cls.lflags(idaapi.LFLG_KERNMODE) else False
+    is_kernelspace = is_kernel = utils.alias(kernel, 'information')
+
+    @utils.multicase()
+    @classmethod
+    def filetype(cls):
+        '''Return the file type identified by the loader when creating the database.'''
+        return interface.database.filetype()
+    @utils.multicase(filetype_t=internal.types.integer)
+    @classmethod
+    def filetype(cls, filetype_t):
+        '''Set the file type identified by the loader to the specified `filetype_t`.'''
+        result = interface.database.filetype()
+        if not interface.database.setfiletype(filetype_t):
+            raise E.DisassemblerError(u"{:s}.filetype({:#x}) : Unable to set value for idainfo.filetype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), filetype_t, filetype_t))
+        return result
+    @utils.multicase(FT_=internal.types.string)
+    @classmethod
+    def filetype(cls, FT_):
+        '''Set the file type identified by the loader to the value for the string `FT_`.'''
+        prefix, choice = 'FT_', FT_.upper()
+        candidates = {prefix + choice, choice}
+
+        # Grab all of our available choices from the idc module since they're not defined anywhere else.
+        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
+        choices = {item : value for item, value in filtered if isinstance(value, internal.types.integer)}
+
+        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
+        iterable = (value for item, value in choices.items() if item in candidates)
+        value = builtins.next(iterable, None)
+        if value is None:
+            raise E.ItemNotFoundError(u"{:s}.filetype({!r}) : Unable to find the requested file type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), FT_, string))
+
+        # We found it, so we can recurse into the correct case to assign it.
+        return cls.filetype(value)
+
+    @utils.multicase()
+    @classmethod
+    def ostype(cls):
+        '''Return the operating system type identified by the loader when creating the database.'''
+        return interface.database.ostype()
+    @utils.multicase(ostype_t=internal.types.integer)
+    @classmethod
+    def ostype(cls, ostype_t):
+        '''Set the operating system type for the database to the specified `ostype_t`.'''
+        result = interface.database.ostype()
+        if not interface.database.setostype(ostype_t):
+            raise E.DisassemblerError(u"{:s}.ostype({:#x}) : Unable to set value for idainfo.ostype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), ostype_t, ostype_t))
+        return result
+    @utils.multicase(OSTYPE_=internal.types.string)
+    @classmethod
+    def ostype(cls, OSTYPE_):
+        '''Set the operating system type for the database to the value for the string `OSTYPE_`.'''
+        prefix, choice = 'OSTYPE_', OSTYPE_.upper()
+        candidates = {prefix + choice, choice}
+
+        # Grab all of our available choices from the idc module since they're not defined anywhere else.
+        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
+        choices = {item : value for item, value in filtered if isinstance(value, internal.types.integer)}
+
+        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
+        iterable = (value for item, value in choices.items() if item in candidates)
+        value = builtins.next(iterable, None)
+        if value is None:
+            raise E.ItemNotFoundError(u"{:s}.ostype({!r}) : Unable to find the requested operating system type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), OSTYPE_, string))
+
+        # We found it, so we can recurse into the correct case to assign it.
+        return cls.ostype(value)
+
+    @utils.multicase()
+    @classmethod
+    def apptype(cls):
+        '''Return the application type identified by the loader when creating the database.'''
+        return interface.database.apptype()
+    @utils.multicase(apptype_t=internal.types.integer)
+    @classmethod
+    def apptype(cls, apptype_t):
+        '''Set the application type for the database to the specified `apptype_t`.'''
+        result = interface.database.apptype()
+        if not interface.database.setapptype(apptype_t):
+            raise E.DisassemblerError(u"{:s}.apptype({:#x}) : Unable to set value for idainfo.apptype to the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), apptype_t, apptype_t))
+        return result
+    @utils.multicase(APPT_=internal.types.string)
+    @classmethod
+    def apptype(cls, APPT_):
+        '''Set the application type for the database to the value for the string `APPT_`.'''
+        prefix, choice = 'APPT_', APPT_.upper()
+        candidates = {prefix + choice, choice}
+
+        # Grab all of our available choices from the idc module since they're not defined anywhere else.
+        filtered = ((name, getattr(idc, name)) for name in dir(idc) if name.startswith(prefix))
+        choices = {item : value for item, value in filtered if isinstance(value, internal.types.integer)}
+
+        # Find a valid choice by iterating through each one and seeing if its in our list of candidates.
+        iterable = (value for item, value in choices.items() if item in candidates)
+        value = builtins.next(iterable, None)
+        if value is None:
+            raise E.ItemNotFoundError(u"{:s}.apptype({!r}) : Unable to find the requested application type ({!r}) in the list of choices.".format('.'.join([__name__, cls.__name__]), APPT_, string))
+
+        # We found it, so we can recurse into the correct case to assign it.
+        return cls.apptype(value)
+
+    @classmethod
+    def changes(cls):
+        '''Return the number of changes within the database.'''
+        if idaapi.__version__ < 7.0:
+            raise E.UnsupportedVersion(u"{:s}.changes() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        return interface.database.changecount()
+
+    @classmethod
+    def processor(cls):
+        '''Return the name of the processor used by the database.'''
+        if idaapi.__version__ < 7.0:
+            raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        return interface.database.processor()
+
+    @classmethod
+    def compiler(cls):
+        '''Return the compiler that was configured for the database.'''
+        res = interface.database.compiler()
+        if res is None:
+            raise E.DisassemblerError(u"{:s}.processor() : Unable to fetch the value for the idainfo.cc attribute.".format('.'.join([__name__, cls.__name__])))
+        return res
+
+    @classmethod
+    def version(cls):
+        '''Return the version of the database.'''
+        return interface.database.version()
+
+    @classmethod
+    def type(cls, typestr):
+        '''Evaluates a type string and returns its size according to the compiler used by the database.'''
+        lookup = {
+            'bool': 'size_b',
+            'short': 'size_s',
+            'int': 'size_i', 'float': 'size_l', 'single': 'size_l',
+            'long': 'size_l',
+            'longlong': 'size_ll', 'double': 'size_ll',
+            'enum': 'size_e',
+            'longdouble': 'size_ldbl',
+            'align': 'defalign', 'alignment': 'defalign',
+        }
+        string = typestr.replace(' ', '')
+        return getattr(cls.compiler(), lookup.get(string.lower(), typestr.lower()))
+
+    @classmethod
+    def bits(cls):
+        '''Return number of bits for the processor used by the database.'''
+        return interface.database.bits()
+
+    @classmethod
+    def size(cls):
+        '''Return the number of bytes used to represent an address in the database.'''
+        import ida_typeinf
+
+        # This is a trick gifted by me by rolfr through his comprehensive
+        # knowledge of IDA internals in order to get this attribute in the
+        # exact way that IDA does it. We use the ida_typeinf module instead
+        # of idaapi in order to preserve this tech throughout history in the
+        # way it was bestowed upon us...
+
+        tif = ida_typeinf.tinfo_t()
+        tif.create_ptr(ida_typeinf.tinfo_t(ida_typeinf.BT_VOID))
+        return tif.get_size()
+
+    @classmethod
+    def bitsize(cls):
+        '''Return the number of bits used to represent an address in the database.'''
+        return 8 * cls.size()
+
+    @classmethod
+    def byteorder(cls):
+        '''Return a string representing the byte-order used by integers in the database.'''
+        return interface.database.byteorder()
+
+    @classmethod
+    def main(cls):
+        # FIXME: WHAT THE FUCK IS THIS
+        if idaapi.__version__ < 7.2:
+            return cls.info.main
+        return idaapi.inf_get_main()
+
+    @classmethod
+    def entry(cls):
+        '''Return the first entry point for the database.'''
+        return interface.database.entrypoint()
+
+    @classmethod
+    def margin(cls):
+        '''Return the current margin position for the current database.'''
+        return interface.database.margin()
+
+    @classmethod
+    def bounds(cls):
+        '''Return the bounds of the current database in a tuple formatted as `(left, right)`.'''
+        start, stop = interface.address.bounds()
+        return interface.bounds_t(start, stop)
+config = info = information # XXX: ns alias
+
+range = utils.alias(information.bounds, 'information')
+filename, idb, module, path = utils.alias(information.filename, 'information'), utils.alias(information.idb, 'information'), utils.alias(information.module, 'information'), utils.alias(information.path, 'information')
+path = utils.alias(information.path, 'information')
+baseaddress = base = utils.alias(information.baseaddress, 'information')
 
 class functions(object):
     r"""
@@ -568,7 +485,7 @@ class functions(object):
     @classmethod
     def __iterate__(cls):
         '''Iterates through the functions within the current database (ripped from idautils).'''
-        left, right = config.bounds()
+        left, right = information.bounds()
 
         # find first function chunk
         ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
@@ -1205,7 +1122,7 @@ class search(object):
         If `radix` is not specified, then assume that `data` represents the exact bytes to search.
         """
         radix = direction.get('radix', 0)
-        left, right = config.bounds()
+        left, right = information.bounds()
 
         # Figure out the correct format depending on the radix that we were given by the caller.
         formats = {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02X}".format}
@@ -2361,7 +2278,7 @@ def tag(ea, key, value):
             return name(ea, filtered) if local else name(ea, filtered, listed=True)
 
         # Otherwise, we need an alternative name which we make by appending the offset.
-        items, offset = [filtered], ea - config.baseaddress()
+        items, offset = [filtered], ea - information.baseaddress()
         while any(F(interface.tuplename(*items)) for F in [interface.name.used, Fexists]):
             items.append(offset)
         alternative = tuple(items)
@@ -3323,12 +3240,11 @@ class address(object):
     @classmethod
     def prevF(cls, ea, predicate, count):
         '''Return the previous `count` addresses from the address `ea` that satisfies the provided `predicate`.'''
-        top, bottom = config.bounds()
+        top, bottom = information.bounds()
         ea, Fstart, Fprev = (ea, functools.partial(operator.sub, 1), idaapi.prev_not_tail) if ea == bottom else (interface.address.within(ea), idaapi.get_item_head, idaapi.prev_not_tail)
 
         # if we're already at the top, there's nowhere else to go.
         if Fprev(ea) == idaapi.BADADDR:
-            top, bottom = config.bounds()
             raise E.AddressOutOfBoundsError(u"{:s}.prevF({:#x}, {!r}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, top, ea))
 
         # grab all of the matching addresses and return the very last one.
@@ -3337,7 +3253,6 @@ class address(object):
 
         # if we didn't retrieve enough items, then we seeked past the top of the database.
         if count and len(items) < count:
-            top, bottom = config.bounds()
             raise E.AddressOutOfBoundsError(u"{:s}.prevF({:#x}, {!r}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, count, top, items[-1] if items else ea))
         return items[-1] if items else ea
 
@@ -3355,7 +3270,7 @@ class address(object):
     @classmethod
     def nextF(cls, ea, predicate, count):
         '''Return the next `count` addresses from the address `ea` that satisfies the provided `predicate`.'''
-        top, bottom = config.bounds()
+        top, bottom = information.bounds()
         ea, Fnext = (ea, idaapi.next_not_tail) if ea == top else (interface.address.within(ea), idaapi.next_not_tail)
 
         # if we're already at the bottom, there's nowhere else to go.
@@ -4017,11 +3932,10 @@ class address(object):
         # otherwise ensure that we find a code type that is not in the function,
         # which means that we'll stop at the very top of the database.
         else:
-            top, bottom = config.bounds()
             fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.has, operator.not_), type.code), builtins.all)
             iterable = (item for item in interface.address.iterate(ea, idaapi.prev_not_tail) if not fwithin(ui.navigation.analyze(item)))
             res = builtins.next(iterable, None)
-            start = top if res is None else idaapi.get_item_end(res)
+            start = top() if res is None else idaapi.get_item_end(res)
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -4073,11 +3987,10 @@ class address(object):
         # otherwise ensure that we find a code type that is not in the function,
         # which means that we'll stop at the very bottom of the database.
         else:
-            top, bottom = config.bounds()
             fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.has, operator.not_), type.code), builtins.all)
             iterable = (item for item in interface.address.iterate(ea, idaapi.next_not_tail) if not fwithin(ui.navigation.analyze(item)))
             res = builtins.next(iterable, None)
-            end = bottom if res is None else idaapi.get_item_head(res)
+            end = bottom() if res is None else idaapi.get_item_head(res)
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -4635,7 +4548,7 @@ class address(object):
     @classmethod
     def by_offset(cls, offset):
         '''Return the specified `offset` translated to an address in the database.'''
-        return config.baseaddress() + offset
+        return information.baseaddress() + offset
     byoffset = utils.alias(by_offset, 'address')
 
     @utils.multicase()
@@ -4647,7 +4560,7 @@ class address(object):
     @classmethod
     def offset(cls, ea):
         '''Return the address `ea` translated to an offset relative to the base address of the database.'''
-        return interface.address.inside(ea) - config.baseaddress()
+        return interface.address.inside(ea) - information.baseaddress()
     getoffset = utils.alias(offset, 'address')
 
     @utils.multicase()
@@ -8478,7 +8391,7 @@ class get(object):
         The default value of `byteorder` is the same as specified by the database architecture.
         """
         data = read(ea, size)
-        order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), config.byteorder())
+        order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), information.byteorder())
         if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
             raise internal.exceptions.InvalidParameterError(u"{:s}.unsigned({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
         return interface.decode.unsigned(data if order.lower() == 'big' else data[::-1])
@@ -8505,7 +8418,7 @@ class get(object):
         The default value of `byteorder` is the same as specified by the database architecture.
         """
         data = read(ea, size)
-        order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), config.byteorder())
+        order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), information.byteorder())
         if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
             raise internal.exceptions.InvalidParameterError(u"{:s}.signed({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
         return interface.decode.signed(data if order.lower() == 'big' else data[::-1])
@@ -8694,7 +8607,7 @@ class get(object):
             available = [bits // 8 for bits in sorted(interface.decode.binary_float_table)]
 
             # First we need to figure out which byteorder that we're going to decode with.
-            order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), config.byteorder())
+            order = builtins.next((byteorder[kwarg] for kwarg in ['order', 'byteorder'] if kwarg in byteorder), information.byteorder())
             if not isinstance(order, internal.types.string) or order.lower() not in {'big', 'little'}:
                 raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}, {:d}{:s}) : An invalid byteorder ({:s}) that is not \"{:s}\" or \"{:s}\" was specified.".format('.'.join([__name__, 'get', cls.__name__]), ea, size, ", {:s}".format(internal.utils.string.kwargs(byteorder)) if byteorder else '', "\"{:s}\"".format(order) if isinstance(order, internal.types.string) else "{!s}".format(order), 'big', 'little'))
 
