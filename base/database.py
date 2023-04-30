@@ -1127,7 +1127,7 @@ class search(object):
         # Figure out the correct format depending on the radix that we were given by the caller.
         formats = {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02X}".format}
         if radix and not operator.contains(formats, radix):
-            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : In invalid radix ({:d}) was specified.".format('.'.join([__name__, search.__name__]), ea, '...' if isinstance(data, idaapi.compiled_binpat_vec_t) else utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
+            raise E.InvalidParameterError(u"{:s}.by_bytes({:#x}, {:s}{:s}) : An invalid radix ({:d}) was specified.".format('.'.join([__name__, search.__name__]), ea, '...' if isinstance(data, idaapi.compiled_binpat_vec_t) else utils.string.repr(data), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
         format = formats[radix or 16]
 
         # If we're using an earlier version of IDA, then we need to completely build the query ourselves.
@@ -1365,7 +1365,7 @@ class search(object):
         # Extract the radix if we were given one so that we can pretty up the logs.
         radix, formats = direction.get('radix', 16), {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02x}".format}
         if not operator.contains(formats, radix):
-            raise E.InvalidParameterError(u"{:s}({:#x}, {:s}{:s}) : In invalid radix ({:d}) was specified.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
+            raise E.InvalidParameterError(u"{:s}({:#x}, {:s}{:s}) : An invalid radix ({:d}) was specified.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
         format = formats[radix]
 
         # Now we need to parse them all individually into an idaapi.compiled_binpat_vec_t().
