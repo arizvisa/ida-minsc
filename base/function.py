@@ -1374,7 +1374,7 @@ class blocks(object):
 
         # create digraph
         import networkx
-        attrs = tag(ea)
+        attrs = internal.tags.function.get(ea)
         attrs.setdefault('__address__', ea)
         attrs.setdefault('__chunks__', availableChunks)
 
@@ -1416,10 +1416,10 @@ class blocks(object):
                 last, = items
 
             # figure out all of the tags in the list of addresses (items).
-            tags = [database.tag(item) for item in items]
+            tags = [internal.tags.address.get(item) for item in items]
 
             # now we can continue to collect attributes to add to our graph.
-            attrs = database.tag(bounds.left)
+            attrs = internal.tags.address.get(bounds.left)
             comment = attrs.pop('', None)
             comment and attrs.setdefault('__comment__', comment)
 
@@ -1988,9 +1988,9 @@ class block(object):
 
         # first thing to do is to read the tags for the address. this
         # gives us "__extra_prefix__", "__extra_suffix__", and "__name__".
-        res = database.tag(ea)
+        res = internal.tags.address.get(ea)
 
-        # next, we're going to remove the one implicit tag that we
+        # next, we're going to replace the one implicit tag that we
         # need to handle...and that's the "__color__" tag.
         col = interface.function.blockcolor(bb)
         if col not in {None, DEFCOLOR}: res.setdefault('__color__', col)
@@ -2022,7 +2022,7 @@ class block(object):
             return None if res == DEFCOLOR else res
 
         # now we can passthrough to database.tag for everything else.
-        return database.tag(ea, key, value)
+        return internal.tags.address.set(ea, key, value)
     @utils.multicase(bb=idaapi.BasicBlock, key=types.string, none=types.none)
     @classmethod
     @utils.string.decorate_arguments('key')
@@ -2037,7 +2037,7 @@ class block(object):
             return None if res == DEFCOLOR else res
 
         # passthrough to database.tag for removing the ones we don't handle.
-        return database.tag(ea, key, none)
+        return internal.tags.address.remove(ea, key, none)
 
     @utils.multicase(reg=(types.string, interface.register_t))
     @classmethod
@@ -2826,7 +2826,7 @@ get_spdelta = spdelta = utils.alias(frame.delta, 'frame')
 @utils.multicase()
 def tag():
     '''Returns all the tags defined for the current function.'''
-    return tag(ui.current.address())
+    return internal.tags.function.get(ui.current.address())
 @utils.multicase(key=types.string)
 @utils.string.decorate_arguments('key')
 def tag(key):
@@ -2836,253 +2836,34 @@ def tag(key):
 @utils.string.decorate_arguments('key', 'value')
 def tag(key, value):
     '''Sets the value for the tag `key` to `value` for the current function.'''
-    return tag(ui.current.address(), key, value)
+    return internal.tags.function.set(ui.current.address(), key, value)
 @utils.multicase(func=(idaapi.func_t, types.integer), key=types.string)
 @utils.string.decorate_arguments('key')
 def tag(func, key):
     '''Returns the value of the tag identified by `key` for the function `func`.'''
-    res = tag(func)
+    res = internal.tags.function.get(func)
     if key in res:
         return res[key]
     raise E.MissingFunctionTagError(u"{:s}.tag({:s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the function.".format(__name__, ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, utils.string.escape(key, '"')))
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
-    MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
-
-    try:
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
-
-    # If the given location was not within a function, then fall back to a database tag.
-    except E.FunctionNotFoundError:
-        logging.warning(u"{:s}.tag({:s}) : Attempted to read any tags from a non-function. Falling back to using database tags.".format(__name__, ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func)))
-        return database.tag(func)
-
-    # If we were given a runtime function, then the address actually uses a database tag.
-    if rt:
-        logging.warning(u"{:s}.tag({:#x}) : Attempted to read any tags from a runtime-linked address. Falling back to using database tags.".format(__name__, ea))
-        return database.tag(ea)
-
-    # Read both repeatable and non-repeatable comments from the address, and
-    # decode the tags that are stored within to a dictionary.
-    fn, repeatable = interface.function.by_address(ea), True
-    res = utils.string.of(idaapi.get_func_cmt(fn, False) or '')
-    d1 = internal.comment.decode(res)
-    res = utils.string.of(idaapi.get_func_cmt(fn, True) or '')
-    d2 = internal.comment.decode(res)
-
-    # Detect if the address had content in both repeatable or non-repeatable
-    # comments so we can warn the user about what we're going to do.
-    if six.viewkeys(d1) & six.viewkeys(d2):
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
-
-    # Then we can store them into a dictionary whilst preserving priority.
-    res = {}
-    [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
-
-    # Collect all of the naming information for the function.
-    fname, mangled = interface.function.name(ea), utils.string.of(idaapi.get_func_name(ea))
-    if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
-        realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
-    else:
-        realname = fname or ''
-
-    # Add any of the implicit tags for the given function into our results.
-    fname = fname
-    if fname and interface.address.flags(interface.range.start(fn), idaapi.FF_NAME): res.setdefault('__name__', realname)
-    fcolor, DEFCOLOR = interface.function.color(fn), 0xffffffff
-    if fcolor != DEFCOLOR: res.setdefault('__color__', fcolor)
-
-    # For the function's type information within the implicit "__typeinfo__"
-    # tag, we'll need to extract the prototype and the function's name. This
-    # is so that we can use the name to emit a proper function prototype.
-    try:
-        if interface.function.has_typeinfo(fn):
-            ti = interface.function.typeinfo(fn)
-
-            # We need this name to be parseable and (of course) IDA doesn't
-            # give a fuck whether its output is parseable by its own parser.
-            validname = internal.declaration.unmangled.parsable(realname)
-            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
-            res.setdefault('__typeinfo__', fprototype)
-
-    # If an exception was raised, then we're using an older version of IDA and we
-    # need to rip the type information from the unmangled name.
-    except E.InvalidTypeOrValueError:
-        if fname != realname:
-            res.setdefault('__typeinfo__', fname)
-
-    # Finally we can hand our result back to the caller.
-    return res
+    return internal.tags.function.get(func)
 @utils.multicase(func=(idaapi.func_t, types.integer), key=types.string)
 @utils.string.decorate_arguments('key', 'value')
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
-    if value is None:
-        raise E.InvalidParameterError(u"{:s}.tag({:s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format(__name__, ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, value, utils.string.escape(key, '"'), value))
-
-    # Check to see if function tag is being applied to an import
-    try:
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
-
-    # If we're not even in a function, then use a database tag.
-    except E.FunctionNotFoundError:
-        logging.warning(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag (\"{:s}\") for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, value, utils.string.escape(key, '"')))
-        return database.tag(func, key, value)
-
-    # If we are a runtime-only function, then write the tag to the import
-    if rt:
-        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag (\"{:s}\") for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value, utils.string.escape(key, '"')))
-        return database.tag(ea, key, value)
-
-    # Otherwise, it's a function.
-    fn = interface.function.by_address(ea)
-
-    # If the user wants to modify any of the implicit tags, then we use the key
-    # to figure out which function to dispatch to in order to modify it.
-    if key == '__name__':
-        filtered = interface.name.identifier(value)
-
-        # If the name isn't used in the database, then just apply it.
-        if not any([interface.name.used(filtered), interface.name.exists(filtered)]) or idaapi.get_name_ea(idaapi.BADADDR, filtered) == ea:
-            return name(fn, filtered)
-
-        # Otherwise, we need an alternate name to avoid complaints.
-        items, offset = [filtered], interface.range.start(fn) - interface.database.imagebase()
-        while any(F(interface.tuplename(*items)) for F in [interface.name.used, interface.name.exists]):
-            items.append(offset)
-        alternative = tuple(items)
-
-        # Since we're using a different name, we need to warn the user why.
-        address = idaapi.get_name_ea(idaapi.BADADDR, filtered)
-        target = internal.netnode.get(filtered) if address == idaapi.BADADDR else address
-        description = "identifier {:#x}".format(target) if target == idaapi.BADADDR else "address {:#x}".format(target)
-        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Using an alternative name (\"{:s}\") for {:#x} due to {:s} {:#x} already being named \"{:s}\".".format(__name__, ea, key, value, utils.string.escape(interface.tuplename(*alternative), '"'), ea, 'identifier' if address == idaapi.BADADDR else 'address', target, utils.string.escape(filtered, '"')))
-
-        # Now that the user knows what's up, we can apply the new name.
-        return name(fn, *alternative)
-
-    elif key == '__color__':
-        res, DEFCOLOR = interface.function.color(fn, value), 0xffffffff
-        return None if res == DEFCOLOR else res
-
-    elif key == '__typeinfo__':
-        return type(fn, value)
-
-    # Decode both comment types for the function so that we can figure out which
-    # type that the tag they specified is currently in. If it's in neither, then
-    # we can simply use a repeatable comment because we're a function.
-    state_correct = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
-    state_wrong = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
-    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
-
-    # Grab the previous value from the correct dictionary, and update it with
-    # the new value that was given to us.
-    res, state[key] = state.get(key, None), value
-
-    # Now we need to guard the modification of the comment so that we don't
-    # mistakenly tamper with any of the reference counts in the tag cache.
-    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
-    try:
-        [ ui.hook.idb.disable(item) for item in hooks ]
-
-    # If we weren't able to disable the hooks due to an exception, then don't
-    # bother to re-encoding the tags back into the comment.
-    except Exception:
-        raise
-
-    # Finally we can encode the modified dict and write it to the function comment.
-    else:
-        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(state)), where)
-
-    # Release the hooks that we disabled since we finished modifying the comment.
-    finally:
-        [ ui.hook.idb.enable(item) for item in hooks ]
-
-    # If there wasn't a key in any of the dictionaries we decoded, then
-    # we know one was added and so we need to update the tagcache.
-    if res is None:
-        internal.comment.globals.inc(interface.range.start(fn), key)
-
-    # return what we fetched from the dict
-    return res
+    return internal.tags.function.set(func, key, value)
 @utils.multicase(key=types.string, none=types.none)
 @utils.string.decorate_arguments('key')
 def tag(key, none):
     '''Removes the tag identified by `key` for the current function.'''
-    return tag(ui.current.address(), key, None)
+    return internal.tags.function.remove(ui.current.address(), key, none)
 @utils.multicase(func=(idaapi.func_t, types.integer), key=types.string, none=types.none)
 @utils.string.decorate_arguments('key')
 def tag(func, key, none):
     '''Removes the tag identified by `key` from the function `func`.'''
-
-    # Check to see if function tag is being applied to an import
-    try:
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
-
-    # If we're not even in a function, then use a database tag.
-    except E.FunctionNotFoundError:
-        logging.warning(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear the tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, types.integer) else '{!r}').format(func), key, none))
-        return database.tag(func, key, none)
-
-    # If so, then write the tag to the import
-    if rt:
-        logging.warning(u"{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, none))
-        return database.tag(ea, key, none)
-
-    # Otherwise, it's a function.
-    fn = interface.function.by_address(ea)
-
-    # If the user wants to remove any of the implicit tags, then we need to
-    # dispatch to the correct function in order to clear the requested value.
-    if key == '__name__':
-        return name(fn, None)
-    elif key == '__color__':
-        DEFCOLOR = 0xffffff
-        res = interface.function.color(fn, DEFCOLOR)
-        return None if res == DEFCOLOR else res
-    elif key == '__typeinfo__':
-        _, ea = interface.addressOfRuntimeOrStatic(func)
-        return interface.address.apply_typeinfo(ea, None)
-
-    # Decode both comment types so that we can figure out which comment type
-    # the tag they're trying to remove is in. If it's in neither, then we just
-    # assume which comment it should be in as an exception will be raised later.
-    state_correct = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
-    state_wrong = internal.comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
-    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
-
-    # If the user's key was not in any of the decoded dictionaries, then raise
-    # an exception because the key doesn't exist within the function's tags.
-    if key not in state:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag (\"{:s}\") from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
-    res = state.pop(key)
-
-    # Before modifying the comment, we first need to guard its modification
-    # so that the hooks don't also tamper with the reference count in the cache.
-    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
-    try:
-        [ ui.hook.idb.disable(item) for item in hooks ]
-
-    # If an exception was raised while trying to disable the hooks, then we just
-    # give up and avoid re-encoding the user's tags back into the comment.
-    except Exception:
-        raise
-
-    # Finally we can encode the modified dict back into the function comment.
-    else:
-        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(state)), where)
-
-    # Release the hooks that were disabled now that that comment has been written.
-    finally:
-        [ ui.hook.idb.enable(item) for item in hooks ]
-
-    # If we got here cleanly without an exception, then the tag was successfully
-    # removed and we just need to update the tag cache with its removal.
-    internal.comment.globals.dec(interface.range.start(fn), key)
-    return res
+    return internal.tags.function.remove(func, key, none)
 
 @utils.multicase()
 def tags():
@@ -3153,7 +2934,7 @@ def select(func, **boolean):
     if not boolean:
         for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target)):
             ui.navigation.analyze(ea)
-            address = database.tag(ea)
+            address = internal.tags.address.get(ea)
             if address: yield ea, address
         return
 
@@ -3163,7 +2944,7 @@ def select(func, **boolean):
     # Walk through every tagged address and cross-check it against the query.
     for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target)):
         ui.navigation.analyze(ea)
-        collected, address = {}, database.tag(ea)
+        collected, address = {}, internal.tags.address.get(ea)
 
         # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
         collected.update({key : value for key, value in address.items() if key in included})
