@@ -129,7 +129,7 @@ class changingchanged(object):
         """
         states = getattr(cls, '__states__', {})
         if states:
-            logging.info(u"{:s}.init() : Removing {:d} incomplete states due to re-initialization of database.".format('.'.join([__name__, cls.__name__]), len(states)))
+            logging.info(u"{:s}.init() : Removing {:d} incomplete state{:s} due to re-initialization of database.".format('.'.join([__name__, cls.__name__]), len(states), '' if len(states) == 1 else 's'))
         cls.__states__ = {}
 
     @classmethod
@@ -684,7 +684,7 @@ class typeinfo(changingchanged):
             new_ea = ea
         elif expected != tidata:
             logging.warning(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was received by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
-            tidata, _, _ = database.type(ea)
+            tidata, _, _ = interface.address.typeinfo(ea)
 
         # Okay, we now have the data that we need to compare in order to determine
         # if we're removing typeinfo, adding it, or updating it. Since we
@@ -720,7 +720,7 @@ class typeinfo(changingchanged):
         # new values by the event.
         logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Received typeinfo.changing for new_type ({!s}) and new_fname ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), utils.string.repr(new_type), new_fname))
 
-        ti = database.type(ea)
+        ti = interface.address.typeinfo(ea)
         old_type, old_fname, _ = (b'', b'', None) if ti is None else ti.serialize()
 
         # Construct a new state for this address, and pre-pack both our tuple
@@ -915,7 +915,7 @@ def __process_functions(percentage=0.10):
     P.open()
     six.print_(u"Indexing the tags for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
-        chunks = [item for item in function.chunks(fn)]
+        chunks = [interface.range.bounds(item) for item in interface.function.chunks(fn)]
 
         # Check to see if the progress bar was cancelled for "some reason". If
         # so, we double-check if that's what the user really wanted.
@@ -962,7 +962,7 @@ def __process_functions(percentage=0.10):
 
             # Iterate through each address in the function, only updating the
             # references for tags that are not in our set of implicit ones.
-            for ea in database.address.iterate(ui.navigation.analyze(l), r):
+            for ea in interface.address.items(ui.navigation.analyze(l), r):
                 available = {k for k in database.tag(ea)}
                 for k in available - implicit:
                     if ea in globals: internal.comment.globals.dec(ea, k)
@@ -1053,7 +1053,7 @@ def relocate(info):
         # the netnodes have already been moved.
         listable = [ea for ea in functions if info[si].to <= ea < info[si].to + info[si].size]
         for i, offset in __relocate_function(info[si]._from, info[si].to, info[si].size, (item for item in listable), moved=True if idaapi.__version__ < 7.3 else False):
-            name = database.name(info[si].to + offset)
+            name = interface.name.get(info[si].to + offset)
             text = u"Relocating function {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(listable), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
             P.update(value=sum([fcount, gcount, i]), text=text)
             ui.navigation.procedure(info[si].to + offset)
@@ -1062,7 +1062,7 @@ def relocate(info):
         # Iterate through all of the globals that were moved.
         listable = [(ea, count) for ea, count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
         for i, offset in __relocate_globals(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
-            name = database.name(info[si].to + offset)
+            name = interface.name.get(info[si].to + offset)
             text = u"Relocating global {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(listable), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
             P.update(value=sum([fcount, gcount, i]), text=text)
             ui.navigation.analyze(info[si].to + offset)
@@ -1160,7 +1160,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
             logging.critical(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Refusing to clean up index for {:#x} as it has been relocated to {:#x} which is in use by function ({:#x}).".format(__name__, old, new, size, iterable, ea, offset + new, interface.range.start(ch)))
             continue
         elif ch.flags & idaapi.FUNC_TAIL:
-            owners = [item for item in function.chunk.owners(target)]
+            owners = [item for item in interface.function.owners(target)]
             logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cache at {:#x} should've been relocated to {:#x} but is a tail associated with more than one function ({:s}).".format(__name__, old, new, size, iterable, ea, target, ', '.join(map("{:#x}".format, owners))))
         else:
             logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cache at {:#x} should've been relocated to {:#x} but its boundaries ({:#x}<>{:#x}) do not correspond with a function ({:#x}).".format(__name__, old, new, size, iterable, ea, target, interface.range.start(ch), interface.range.end(ch), interface.range.start(fn)))
@@ -1229,14 +1229,14 @@ def segm_moved(source, destination, size, changed_netmap):
 
     # Iterate through each function that we're moving and relocate its contents.
     for i, offset in __relocate_function(source, destination, size, (item for item in functions), moved=not changed_netmap):
-        name = database.name(destination + offset)
+        name = interface.name.get(destination + offset)
         text = u"Relocating function {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(functions), " ({:s})".format(name) if name else '', source + offset, destination + offset)
         P.update(value=i, text=text)
         ui.navigation.procedure(destination + offset)
 
     # Iterate through each global that we're moving (we use the target address, because IDA moved everything already).
     for i, offset in __relocate_globals(source, destination, size, (item for item in globals)):
-        name = database.name(destination + offset)
+        name = interface.name.get(destination + offset)
         text = u"Relocating global {:d} of {:d}{:s}: {:#x} -> {:#x}".format(1 + i, len(globals), " ({:s})".format(name) if name else '', source + offset, destination + offset)
         P.update(value=len(functions) + i, text=text)
         ui.navigation.analyze(destination + offset)
@@ -1549,7 +1549,7 @@ def func_tail_appended(pfn, tail):
     than one, then we simply add the references in the tail to the function.
     """
     bounds = interface.range.bounds(tail)
-    referrers = [fn for fn in function.chunk.owners(bounds.left)]
+    referrers = [fn for fn in interface.function.owners(bounds.left)]
 
     # If the number of referrers is larger than just 1, then the tail is
     # owned by more than one function. We still doublecheck, though, to
@@ -1560,7 +1560,7 @@ def func_tail_appended(pfn, tail):
 
         # Now we just need to iterate through the tail, and tally up
         # the tags for the function in pfn.
-        for ea in database.address.iterate(bounds):
+        for ea in interface.address.items(*bounds):
             for k in database.tag(ea):
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
                 logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Adding reference for tag ({:s}) at {:#x} to cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
@@ -1575,7 +1575,7 @@ def func_tail_appended(pfn, tail):
 
     # All we need to do is to iterate through the tail, and adjust
     # any references by exchanging them with the cache for pfn.
-    for ea in database.address.iterate(bounds):
+    for ea in interface.address.items(*bounds):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -1596,7 +1596,7 @@ def removing_func_tail(pfn, tail):
     # Before we do anything, we need to make sure we can iterate through the
     # boundaries in the database that we're supposed to act upon.
     try:
-        iterable = database.address.iterate(bounds)
+        iterable = interface.address.items(*bounds)
 
     # If the address is out of bounds, then IDA removed this tail completely from
     # the database and we need to manually delete the tail's contents. Since we
@@ -1666,7 +1666,7 @@ def func_tail_removed(pfn, ea):
 
     # now iterate through the min/max of the list as hopefully this is
     # our event.
-    for ea in database.address.iterate(min(missing), max(missing)):
+    for ea in interface.address.items(min(missing), max(missing)):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=start)
             internal.comment.globals.inc(ea, k)
@@ -1685,7 +1685,7 @@ def tail_owner_changed(tail, owner_func):
 
     # this is easy as we just need to walk through tail and add it
     # to owner_func
-    for ea in database.address.iterate(interface.range.bounds(tail)):
+    for ea in interface.address.items(interface.range.bounds(tail)):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=owner_func)
@@ -1720,8 +1720,8 @@ def add_func(pfn):
 
     # convert all globals into contents whilst making sure that we don't
     # add any of the implicit tags that are handled by other events.
-    for l, r in function.chunks(start):
-        for ea in database.address.iterate(l, r):
+    for l, r in map(interface.range.bounds, interface.function.chunks(pfn)):
+        for ea in interface.address.items(l, r):
             available = {item for item in database.tag(ea)}
             for k in available - implicit:
                 internal.comment.globals.dec(ea, k)
@@ -1754,9 +1754,9 @@ def remove_contents(fn, iterable):
         # check the name, type information, and color.
         if idaapi.get_item_color(ea) == idaapi.COLOR_DEFAULT:
             internal.comment.contents.dec(ea, '__color__', target=func)
-        if database.extra.__get_prefix__(ea) is not None:
+        if internal.comment.extra.get_prefix(ea) is not None:
             internal.comment.contents.dec(ea, '__extra_prefix__', target=func)
-        if database.extra.__get_suffix__(ea) is not None:
+        if internal.comment.extra.get_suffix(ea) is not None:
             internal.comment.contents.dec(ea, '__extra_suffix__', target=func)
 
         get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
@@ -1852,7 +1852,7 @@ def set_func_start(pfn, new_start):
     # if new_start has removed addresses from function, then we need to transform
     # all contents tags into globals tags
     if start > new_start:
-        for ea in database.address.iterate(new_start, start):
+        for ea in interface.address.items(new_start, start):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=start)
                 internal.comment.globals.inc(ea, k)
@@ -1863,7 +1863,7 @@ def set_func_start(pfn, new_start):
     # if new_start has added addresses to function, then we need to transform all
     # its global tags into contents tags
     elif start < new_start:
-        for ea in database.address.iterate(start, new_start):
+        for ea in interface.address.items(start, new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=start)
@@ -1884,7 +1884,7 @@ def set_func_end(pfn, new_end):
     # if new_end has added addresses to function, then we need to transform
     # all globals tags into contents tags
     if new_end > stop:
-        for ea in database.address.iterate(stop, new_end):
+        for ea in interface.address.items(stop, new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=start)
@@ -1895,7 +1895,7 @@ def set_func_end(pfn, new_end):
     # if new_end has removed addresses from function, then we need to transform
     # all contents tags into globals tags
     elif new_end < stop:
-        for ea in database.address.iterate(new_end, stop):
+        for ea in interface.address.items(new_end, stop):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=start)
                 internal.comment.globals.inc(ea, k)
