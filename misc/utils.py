@@ -185,6 +185,28 @@ class pycompat(object):
         Fqualified_name = fattribute('__qualname__') if hasattr(object, '__qualname__') else cls.function.name if isinstance(object, internal.types.function) else cls.code.name if isinstance(object, internal.types.code) else fattribute('__name__', object.__name__)
         return '.'.join([object.__module__, Fqualified_name(object)] if hasattr(object, '__module__') else [Fqualified_name(object)])
 
+    @classmethod
+    def file(cls, callable):
+        '''Return a tuple containing the filename and line number of the specified `callable`.'''
+        func = callable.func if isinstance(callable, functools.partial) else cls.method.function(callable) if isinstance(callable, (staticmethod, classmethod, internal.types.method)) else callable
+
+        if isinstance(func, internal.types.function):
+            co = cls.function.code(func)
+            filename, linenumber = cls.code.filename(co), cls.code.linenumber(co)
+
+        # If it's not a function, then the best we can do is take a
+        # huge performance hit and get the filename.
+        else:
+            module = cls.module(func)
+            filename, linenumber = __import__(module).__file__, None
+        res = os.path.relpath(filename, idaapi.get_user_idadir())
+        return os.path.abspath(filename) if res.startswith(''.join(['..', os.path.sep])) else res, linenumber
+
+    @classmethod
+    def module(cls, object):
+        '''Return the module name for the specified `object`.'''
+        return object.__module__
+
     # this class definition gets used as a base class, before its name
     # gets reassigned later when it goes out of scope.
     class function(object):
