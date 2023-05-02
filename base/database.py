@@ -504,7 +504,7 @@ class functions(object):
     __matcher__.mapping('library', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_LIB))
     __matcher__.mapping('wrapper', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
     __matcher__.mapping('lumina', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
-    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, function.tag, operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, internal.tags.function.get, operator.methodcaller('keys'), internal.types.set)
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))))
     __matcher__.predicate('predicate', interface.function.by_address), __matcher__.alias('pred', 'predicate')
 
@@ -627,7 +627,7 @@ class functions(object):
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
             func, decompiledQ = interface.function.by_address(ui.navigation.procedure(ea)), interface.node.aflags(ui.navigation.procedure(ea), getattr(idaapi, 'AFL_HR_DETERMINED', 0xc0000000))
-            tags = function.tag(ea)
+            tags = internal.tags.function.get(ea)
 
             # any flags that might be useful
             ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
@@ -960,7 +960,7 @@ class names(object):
     __matcher__.alias('demangled', 'unmangled')
     __matcher__.mapping('function', interface.function.has, idaapi.get_nlist_ea)
     __matcher__.mapping('imports', utils.fpartial(operator.eq, idaapi.SEG_XTRN), idaapi.get_nlist_ea, idaapi.segtype)
-    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_nlist_ea, lambda ea: function.tag(ea) if interface.function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_nlist_ea, lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.mapping('typed', operator.truth, idaapi.get_nlist_ea, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t, operator.attrgetter('contains')))), idaapi.get_nlist_ea)
     __matcher__.predicate('predicate', idaapi.get_nlist_ea), __matcher__.alias('pred', 'predicate')
@@ -1048,7 +1048,7 @@ class names(object):
         # List all the fields of each name that was found
         for index in listable:
             ea, name = ui.navigation.set(idaapi.get_nlist_ea(index)), utils.string.of(idaapi.get_nlist_name(index))
-            tags = function.tag(ea) if interface.function.has(ea) else tag(ea)
+            tags = internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea)
 
             # Any flags that could be useful
             ftype = 'I' if idaapi.segtype(ea) == idaapi.SEG_XTRN else '-' if t.unknown(ea) else 'C' if t.code(ea) else 'D' if t.data(ea) else '-'
@@ -1766,7 +1766,7 @@ class entries(object):
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.mapping('function', interface.function.has, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
-    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: function.tag(ea) if interface.function.has(ea) else tag(ea), operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal)
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -1996,7 +1996,7 @@ class entries(object):
         for index in listable:
             ordinal = cls.__entryordinal__(index)
             ea = idaapi.get_entry(ordinal)
-            tags = function.tag(ea) if interface.function.has(ea) else tag(ea)
+            tags = internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea)
             realname = cls.__entryname__(index) or interface.name.get(ea)
 
             # Some flags that could be useful.
@@ -2102,98 +2102,11 @@ def tags():
 @utils.multicase()
 def tag():
     '''Return all of the tags defined at the current address.'''
-    return tag(ui.current.address())
+    return internal.tags.address.get(ui.current.address())
 @utils.multicase(ea=internal.types.integer)
 def tag(ea):
     '''Return all of the tags defined at address `ea`.'''
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
-    MNG_NODEFINIT, MNG_NOPTRTYP = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7)
-
-    ea = interface.address.inside(ea)
-
-    # Check if we're within a function and determine whether it's a
-    # runtime-linked address or not. If we're within a function, then
-    # we need to ensure that we're using non-repeatable comments.
-    try:
-        func = interface.function.by_address(ea)
-        rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
-
-    # If the address is not within a function, then assign some variables
-    # so that we will use a repeatable comment.
-    except LookupError:
-        rt, func = False, None
-    repeatable = False if func and interface.function.has(ea) and not rt else True
-
-    # Read both repeatable and non-repeatable comments from the chosen
-    # address so that we can decode both of them into dictionaries to
-    # use. We also decode the (repeatable) function comment, because in
-    # some cases a function is created for a runtime-linked address.
-    res = utils.string.of(idaapi.get_cmt(ea, False) or '')
-    d1 = internal.comment.decode(res)
-    res = utils.string.of(idaapi.get_cmt(ea, True) or '')
-    d2 = internal.comment.decode(res)
-    res = utils.string.of(idaapi.get_func_cmt(func, True) or '') if rt else ''
-    d3 = internal.comment.decode(res)
-
-    # Check if the address had content in either decoding types of
-    # comments so that we can warn the user about it.
-    if six.viewkeys(d1) & six.viewkeys(d2):
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
-    if rt and (six.viewkeys(d3) & six.viewkeys(d1) or six.viewkeys(d3) & six.viewkeys(d2)):
-        logging.info(u"{:s}.tag({:#x}) : Contents of the runtime-linked comment conflict with one of the database comments due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d3) & six.viewkeys(d2) or six.viewkeys(d3) & six.viewkeys(d1)), 'function'))
-
-    # Merge all of the decoded tags into a dictionary while giving priority
-    # to the correct one. If the address was pointing to a runtime-linked
-    # address and was a case that had a function comment, then we need to
-    # give those tags absolute priority when building our dictionary.
-    res = {}
-    [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
-    rt and res.update(d3)
-
-    # First thing we need to figure out is whether the name exists and if
-    # it's actually special in that we need to demangle it for the real name.
-    aname = interface.name.get(ea)
-    if aname and Fmangled_type(utils.string.to(aname)) != MANGLED_UNKNOWN:
-        realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP) or aname)
-    else:
-        realname = aname or ''
-
-    # Add any of the implicit tags for the specified address to our results.
-    if aname and interface.address.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', realname)
-    eprefix = internal.comment.extra.get_prefix(ea)
-    if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
-    esuffix = internal.comment.extra.get_suffix(ea)
-    if esuffix is not None: res.setdefault('__extra_suffix__', esuffix)
-    col, DEFCOLOR = interface.address.color(ea), 0xffffffff
-    if col != DEFCOLOR: res.setdefault('__color__', col)
-
-    # If there was some type information associated with the address, then
-    # we need its name so that we can format it and add it as an implicit tag.
-    try:
-        if interface.address.has_typeinfo(ea):
-            ti = interface.address.typeinfo(ea)
-
-            # We need the name to be parseable and IDA just doesn't give a fuck if it outputs
-            # something non-parseable. So we simply fix that here and render the typeinfo.
-            validname = internal.declaration.unmangled.parsable(realname)
-            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
-
-            # Add it to our dictionary that we return to the user.
-            res.setdefault('__typeinfo__', ti_s)
-
-    # If we caught an exception, then the name from the type information could be
-    # mangled and so we need to rip the type information directly out of the name.
-    except E.InvalidTypeOrValueError:
-        demangled = internal.declaration.demangle(aname)
-
-        # if the demangled name is different from the actual name, then we need
-        # to extract its result type and prepend it to the demangled name.
-        if demangled != aname:
-            res.setdefault('__typeinfo__', demangled)
-
-    # Finally we can return what the user cares about.
-    return res
+    return internal.tags.address.get(ea)
 @utils.multicase(key=internal.types.string)
 @utils.string.decorate_arguments('key')
 def tag(key):
@@ -2203,12 +2116,12 @@ def tag(key):
 @utils.string.decorate_arguments('key', 'value')
 def tag(key, value):
     '''Set the tag identified by `key` to `value` at the current address.'''
-    return tag(ui.current.address(), key, value)
+    return internal.tags.address.set(ui.current.address(), key, value)
 @utils.multicase(ea=internal.types.integer, key=internal.types.string)
 @utils.string.decorate_arguments('key')
 def tag(ea, key):
     '''Return the tag identified by `key` from the address `ea`.'''
-    res = tag(ea)
+    res = internal.tags.address.get(ea)
     if key in res:
         return res[key]
     raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag (\"{:s}\") from address.".format(__name__, ea, key, utils.string.escape(key, '"')))
@@ -2216,214 +2129,18 @@ def tag(ea, key):
 @utils.string.decorate_arguments('key', 'value')
 def tag(ea, key, value):
     '''Set the tag identified by `key` to `value` at the address `ea`.'''
-    if value is None:
-        raise E.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format(__name__, ea, key, value, utils.string.escape(key, '"'), value))
-
-    # If any of the supported implicit tags were specified, then figure out which
-    # one and using it to dispatch to the correct handler.
-    if key == '__name__':
-        local, filtered = interface.function.has(ea), interface.name.identifier(value)
-
-        # If the name isn't used within the database, then we can just apply it...blindly.
-        Fexists = functools.partial(interface.name.inside, ea) if local else interface.name.exists
-        if not (interface.name.used(filtered) or Fexists(filtered)):
-            return name(ea, filtered) if local else name(ea, filtered, listed=True)
-
-        # Otherwise, we need an alternative name which we make by appending the offset.
-        items, offset = [filtered], ea - information.baseaddress()
-        while any(F(interface.tuplename(*items)) for F in [interface.name.used, Fexists]):
-            items.append(offset)
-        alternative = tuple(items)
-
-        # Since we're changing the user's value, we need to figure out which warning
-        # message to use by determining who owned the original name.
-        address = idaapi.get_name_ea(ea if local else idaapi.BADADDR, filtered)
-        target = internal.netnode.get(filtered) if address == idaapi.BADADDR else address
-        description = "identifier {:#x}".format(target) if target == idaapi.BADADDR else "address {:#x}".format(target)
-        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Using an alternative name (\"{:s}\") for {:#x} due to {:s} {:#x} already being named \"{:s}\".".format(__name__, ea, key, value, utils.string.escape(interface.tuplename(*alternative), '"'), ea, 'identifier' if address == idaapi.BADADDR else 'address', target, utils.string.escape(filtered, '"')))
-
-        # Now we can apply the damned name.
-        return name(ea, *alternative) if local else name(ea, *alternative, listed=True)
-
-    elif key == '__extra_prefix__':
-        return internal.extra.set_prefix(ea, value)
-
-    elif key == '__extra_suffix__':
-        return internal.extra.set_suffix(ea, value)
-
-    elif key == '__color__':
-        res, DEFCOLOR = interface.address.color(ea, value), 0xffffffff
-        return None if res == DEFCOLOR else res
-
-    elif key == '__typeinfo__':
-        return type(ea, value)
-
-    # If we're within a function, then we also need to determine whether it's a
-    # runtime-linked address or not. This is because if it's a runtime-linked
-    # address then a repeatable comment is used. Otherwise we encode the tags
-    # within a non-repeatable comment.
-    try:
-        func = interface.function.by_address(ea)
-        rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
-
-    # If the address was not within a function, then set the necessary variables
-    # so that a repeatable comment is used.
-    except LookupError:
-        rt, func = False, None
-
-    # If we're outside a function or pointing to a runtime-linked address, then
-    # we use a repeatable comment. Anything else means a non-repeatable comment.
-    repeatable = False if func and interface.function.has(ea) and not rt else True
-
-    # Go ahead and decode the tags that are written to all 3 comment types. This
-    # way we can search them for the correct one that the user is trying to modify.
     ea = interface.address.inside(ea)
-    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
-    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True)) if func else {}
-
-    # Now we just need to figure out which one of the dictionaries that we decoded
-    # contains the key that the user is trying to modify. We need to specially
-    # handle the case where the address is actually referring to a runtime address.
-    if rt:
-        rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
-    else:
-        state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
-
-    # If the key was not in any of the encoded dictionaries, then we need to
-    # update the reference count in the tag cache. If the address is a runtime
-    # address or outside a function, then it's a global tag. Otherwise if it's
-    # within a function, then it's a contents tag that we need to adjust.
-    if key not in state:
-        if func and interface.function.has(ea) and not rt:
-            internal.comment.contents.inc(ea, key)
-        else:
-            internal.comment.globals.inc(ea, key)
-
-    # Grab the previous value from the correct dictionary that we discovered,
-    # and update it with the new value that the user is modifying it with.
-    res, state[key] = state.get(key, None), value
-
-    # Now we can finally update the comment in the database. However, we need
-    # to guard the modification so that the hooks don't interfere with the
-    # references that we updated. We guard this situation by disabling the hooks.
-    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
-    try:
-        [ ui.hook.idb.disable(item) for item in hooks ]
-
-    # If an exception was raised while disabling the hooks, then we need to bail.
-    except Exception:
-        raise
-
-    # Finally we can actually encode the dictionary and write it to the address
-    # the user specified using the correct comment type.
-    else:
-        function.comment(ea, internal.comment.encode(state), repeatable=where) if rt else comment(ea, internal.comment.encode(state), repeatable=where)
-
-    # Lastly we release the hooks now that we've finished modifying the comment.
-    finally:
-        [ ui.hook.idb.enable(item) for item in hooks ]
-
-    # Now we can return the result the user asked us for.
-    return res
+    return internal.tags.address.set(ea, key, value)
 @utils.multicase(key=internal.types.string, none=internal.types.none)
 def tag(key, none):
     '''Remove the tag identified by `key` from the current address.'''
-    return tag(ui.current.address(), key, none)
+    return internal.tags.address.remove(ui.current.address(), key, none)
 @utils.multicase(ea=internal.types.integer, key=internal.types.string, none=internal.types.none)
 @utils.string.decorate_arguments('key')
 def tag(ea, key, none):
     '''Removes the tag identified by `key` at the address `ea`.'''
     ea = interface.address.inside(ea)
-
-    # If any of the supported implicit tags were specified, then dispatch to
-    # the correct function in order to properly clear it.
-    if key == '__name__':
-        return name(ea, None, listed=True)
-    elif key == '__extra_prefix__':
-        return internal.extra.delete_prefix(ea)
-    elif key == '__extra_suffix__':
-        return internal.extra.delete_suffix(ea)
-    elif key == '__typeinfo__':
-        return type(ea, None)
-    elif key == '__color__':
-        DEFCOLOR = 0xffffffff
-        res = interface.address.color(ea, DEFCOLOR)
-        return None if res == DEFCOLOR else res
-
-    # If we're within a function, then we need to distinguish whether the
-    # address is a runtime-linked one or not. This way we can determine the
-    # actual comment type that will be used.
-    try:
-        func = interface.function.by_address(ea)
-        rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
-
-    # If the address wasn't within a function, then assign the necessary
-    # values to the variables so that a repeatable comment gets used.
-    except LookupError:
-        rt, func = False, None
-
-    # If we're outside a function or pointing to a runtime-linked address, then
-    # a repeatable comment gets used. Inside a function is always a non-repeatable.
-    repeatable = False if func and interface.function.has(ea) and not rt else True
-
-    # figure out which comment type the user's key is in so that we can remove
-    # that one. if we're a runtime-linked address, then we need to remove the
-    # tag from a repeatable function comment. if the tag isn't in any of them,
-    # then it doesn't really matter since we're going to raise an exception anyways.
-
-    # Now we decode the tags from are written to all 3 available comment types.
-    # This way we can search for the correct one that the user is going to modify.
-    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
-    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True)) if func else {}
-
-    # Then we need to figure out which one of the decoded dictionaries contains
-    # the key that the user is trying to remove. The case where a runtime-linked
-    # address is being referenced needs to be specially handled as IDA may
-    # incorrectly declare some runtime-linked addresses as functions.
-    if rt:
-        rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
-    else:
-        state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
-
-    # If the key is not in the expected dictionary, then raise an exception. If
-    # it is, then we can modify the dictionary and remove it to return to the user.
-    if key not in state:
-        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
-    res = state.pop(key)
-
-    # Now we can do our update and encode our modified dictionary, but we need
-    # to guard the modification so that the hooks don't also interfere with the
-    # references that we're updating. We guard by disabling the relevant hooks.
-    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in ui.hook.idb}
-    try:
-        [ ui.hook.idb.disable(item) for item in hooks ]
-
-    # If an exception was raised while disabling the hooks, then simply bail.
-    except Exception:
-        raise
-
-    # Finally we can encode the dictionary that we removed the key from and
-    # write it to the correct comment at the address that the user specified.
-    else:
-        function.comment(ea, internal.comment.encode(state), repeatable=where) if rt else comment(ea, internal.comment.encode(state), repeatable=where)
-
-    # Release our hooks once we've finished updating the comment.
-    finally:
-        [ ui.hook.idb.enable(item) for item in hooks ]
-
-    # Now that we've removed the key from the tag and updated the comment,
-    # we need to remove its reference. If the address is a runtime address
-    # or outside a function, then it's a global tag being removed. Otherwise
-    # it's within a function and thus a contents tag being removed.
-    if func and interface.function.has(ea) and not rt:
-        internal.comment.contents.dec(ea, key)
-    else:
-        internal.comment.globals.dec(ea, key)
-
-    # Finally we can return the value of the tag that was removed.
-    return res
+    return internal.tags.address.remove(ea, key, none)
 
 @utils.multicase(tag=internal.types.string)
 @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
@@ -2446,7 +2163,7 @@ def select(**boolean):
     if not boolean:
         for ea in internal.comment.globals.address():
             ui.navigation.set(ea)
-            Ftag, owners = (function.tag, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (tag, {ea})
+            Ftag, owners = (internal.tags.function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (internal.tags.address.get, {ea})
             tags = Ftag(ea)
             if tags and ea in owners: yield ea, tags
             elif ea not in owners: logging.info(u"{:s}.select() : Refusing to yield {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, len(tags), '' if len(tags) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
@@ -2458,7 +2175,7 @@ def select(**boolean):
     # Walk through every tagged address so we can cross-check them with the query.
     for ea in internal.comment.globals.address():
         collected, _ = {}, ui.navigation.set(ea)
-        Ftag, owners = (function.tag, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (tag, {ea})
+        Ftag, owners = (internal.tags.function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (internal.tags.address.get, {ea})
         tags = Ftag(ea)
 
         # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
@@ -2643,7 +2360,7 @@ class imports(object):
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(1), operator.itemgetter(-1))
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __format__.__func__)
     __matcher__.mapping('typed', operator.truth, operator.itemgetter(0), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
-    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), tag, operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(0), internal.tags.address.get, operator.methodcaller('keys'), internal.types.set)
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), operator.itemgetter(0))
     __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
@@ -2841,7 +2558,7 @@ class imports(object):
             ftyped = 'T' if get_tinfo(idaapi.tinfo_t(), ea) else 't' if t.has(ea) else '-'
             fordinaled = 'H' if ordinal > 0 else '-'
 
-            tags = tag(ea)
+            tags = internal.tags.address.get(ea)
             tags.pop('__name__', None)
             ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
 
@@ -4373,7 +4090,7 @@ class address(object):
         if tags is None:
             return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, **tagname)
         Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
@@ -4383,7 +4100,7 @@ class address(object):
         if tags is None:
             return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **tagname)
         Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
-        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
+        return cls.prevflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
 
     # FIXME: We should add the Or= or And= tests to this or we should allow specifying a set of tags.
     @utils.multicase()
@@ -4413,7 +4130,7 @@ class address(object):
         if tags is None:
             return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, **tagname)
         Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('tagname', 'tag', 'name')
@@ -4423,7 +4140,7 @@ class address(object):
         if tags is None:
             return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, count, **tagname)
         Ftests = [utils.frpartial(operator.contains, tags)] if isinstance(tags, internal.types.string) else [builtins.set, functools.partial(operator.and_, {item for item in tags})]
-        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(tag, *Ftests), **tagname)
+        return cls.nextflag(functools.partial(operator.and_, idaapi.FF_COMM), ea, utils.fcompose(internal.tags.address.get, *Ftests), **tagname)
 
     @utils.multicase()
     @classmethod
@@ -6805,7 +6522,7 @@ def mark(description):
 def mark(ea, none):
     '''Erase the mark at address `ea`.'''
     try:
-        tag(ea, 'mark', None)
+        internal.tags.address.remove(ea, 'mark', None)
     except E.MissingTagError:
         pass
     DEFCOLOR = 0xffffffff
