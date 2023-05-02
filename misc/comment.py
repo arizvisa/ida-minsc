@@ -772,7 +772,6 @@ class tagging(object):
         return node
 
 class contents(tagging):
-    '''Tagging for an address within a function (contents)'''
     """
     This namespace is used to update the tag state for any content tags
     associated with a function in the database. The address for the top
@@ -1304,3 +1303,281 @@ class globals(tagging):
             string = internal.utils.string.of(item)
             yield string, count
         return
+
+### Define some namespaces that can be used to interact with "extra" comments.
+
+class extra_pre70(object):
+    """
+    This namespace is a base class for interacting with the "extra" comments
+    that are within the database. Specifically, the implemented functionality
+    is used to interact with versions of the disassembler prior to v7.0. The
+    class itself is intended to be inherited from by a frontend class once
+    the disassembler version is known.
+    """
+
+    @classmethod
+    def hide(cls, ea):
+        '''Hide the extra comments at the address `ea`.'''
+        ok = internal.interface.address.flags(int(ea), idaapi.FF_LINE) == idaapi.FF_LINE
+        if ok:
+            discarded = internal.interface.address.flags(int(ea), idaapi.FF_LINE, 0)
+        return True if ok else False
+
+    @classmethod
+    def show(cls, ea):
+        '''Show the extra comments at the address `ea`.'''
+        ok = internal.interface.address.flags(int(ea), idaapi.FF_LINE) != idaapi.FF_LINE
+        if ok:
+            discarded = internal.interface.address.flags(int(ea), idaapi.FF_LINE, idaapi.FF_LINE)    # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
+        return True if ok else False
+
+    @classmethod
+    def get(cls, ea, base):
+        '''Fetch the extra comments from the address `ea` that are specified by the index in `base`.'''
+        ea, sup, Fnetnode = int(ea), internal.netnode.sup, getattr(idaapi, 'ea2node', internal.utils.fidentity)
+
+        # count the number of rows
+        count = cls.count(ea, base)
+        if count is None: return None
+
+        # now we can fetch them
+        res = (sup.get(Fnetnode(ea), base + i, type=internal.types.bytes) for i in range(count))
+
+        # remove the null-terminator if there is one
+        res = (row.rstrip(b'\0') for row in res)
+
+        # fetch them from IDA and join them with newlines
+        return '\n'.join(map(internal.utils.string.of, res))
+
+    @classmethod
+    def set(cls, ea, string, base):
+        '''Set the newline-delimited `string` as the extra comments for the address `ea` at the index specified by `base`.'''
+        ea, sup, Fnetnode = int(ea), internal.netnode.sup, getattr(idaapi, 'ea2node', internal.utils.fidentity)
+
+        # first hide the extra comment before doing anything
+        discarded, string = cls.hide(ea), internal.utils.string.of(string)
+
+        # break the string up into rows, and encode each type for IDA
+        res = [ internal.utils.string.to(item) for item in string.split('\n') ]
+
+        # assign them directly into IDA
+        [ sup.set(Fnetnode(ea), base + i, row + b'\0') for i, row in enumerate(res) ]
+
+        # now we can show (refresh) them
+        discarded = cls.show(ea)
+
+        # an exception before this happens would imply failure
+        return True
+
+    @classmethod
+    def delete(cls, ea, base):
+        '''Remove the extra comments from the address `ea` that start at the index in `base`.'''
+        ea, sup, Fnetnode = int(ea), internal.netnode.sup, getattr(idaapi, 'ea2node', internal.utils.fidentity)
+
+        # count the number of rows to remove
+        count = cls.count(ea, base)
+        if count is None:
+            return False
+
+        # hide them before we modify it
+        discarded = cls.hide(ea)
+
+        # now we can remove them
+        [ sup.remove(Fnetnode(ea), base + i) for i in range(count) ]
+
+        # and then show (refresh) it
+        discarded = cls.show(ea)
+        return True
+
+class extra_post70(object):
+    """
+    This namespace is a base class for interacting with the "extra" comments
+    that may be found within a database. The functionality implemented by
+    this namespace is used to interact with newer versions of the disassembler.
+    Specifically, this class supports v7.0 of the disassembler and newer. The
+    class is intended to be inherited from by a frontend once the disassembler
+    version has been determined.
+    """
+    @classmethod
+    def get(cls, ea, base):
+        '''Fetch the extra comments from the address `ea` that are specified by the index in `base`.'''
+        ea = int(ea)
+
+        # count the number of rows
+        count = cls.count(ea, base)
+        if count is None:
+            return None
+
+        # grab the extra comments from the database
+        iterable = (idaapi.get_extra_cmt(ea, base + i) or '' for i in range(count))
+
+        # convert them back into Python and join them with a newline
+        iterable = (internal.utils.string.of(item) for item in iterable)
+        return '\n'.join(iterable)
+
+    @classmethod
+    def set(cls, ea, string, base):
+        '''Set the newline-delimited `string` as the extra comments for the address `ea` at the index specified by `base`.'''
+        ea, string = int(ea), internal.utils.string.of(string)
+
+        # break the string up into rows, and encode each type for IDA
+        iterable = (internal.utils.string.to(item) for item in string.split('\n'))
+
+        # assign them into IDA using its api
+        [ idaapi.update_extra_cmt(ea, base + i, row) for i, row in enumerate(iterable) ]
+
+        # return how many newlines there were
+        return string.count('\n')
+
+    @classmethod
+    def delete(cls, ea, base):
+        '''Remove the extra comments from the address `ea` that start at the index in `base`.'''
+        ea = int(ea)
+
+        # count the number of extra comments to remove
+        res = cls.count(ea, base)
+        if res is None:
+            return 0
+
+        # now we can delete them using the api
+        [idaapi.del_extra_cmt(ea, base + i) for i in range(res)]
+
+        # return how many comments we deleted
+        return res
+
+## Now we can define the namespace intended for dealing with extra comments.
+
+class extra(extra_pre70 if idaapi.__version__ < 7.0 else extra_post70):
+    """
+    This namespace is used for reading the disassemblers "extra" comments
+    from the database in a way that is portable between the different versions
+    of the disassembler. These "extra" comments are also known "anterior" and
+    "posterior" lines. Most of the core functionality within this namespace
+    uses the methods inherited from its base class in order to remain
+    backwards-compatible with older versions of the disassembler.
+    """
+
+    MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
+    MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else (idaapi.E_PREV - idaapi.E_NEXT)
+
+    @classmethod
+    def has_extra(cls, ea, base):
+        '''Return true if there is an extra comment at the supval `base` for the address `ea`.'''
+        ea, sup, Fnetnode = int(ea), internal.netnode.sup, getattr(idaapi, 'ea2node', internal.utils.fidentity)
+        return sup.get(Fnetnode(ea), base, type=memoryview) is not None
+
+    @classmethod
+    def count(cls, ea, base):
+        '''Return the number of extra comments for the address `ea` that start at the supval `base`.'''
+        ea, sup, Fnetnode = int(ea), internal.netnode.sup, getattr(idaapi, 'ea2node', internal.utils.fidentity)
+        for i in range(cls.MAX_ITEM_LINES):
+            row = sup.get(Fnetnode(ea), base + i, type=memoryview)
+            if row is None: break
+        return i or None
+
+    @classmethod
+    def has_prefix(cls, ea):
+        '''Return true if there are any extra comments that prefix the item at the address `ea`.'''
+        return cls.has_extra(int(ea), idaapi.E_PREV)
+
+    @classmethod
+    def has_suffix(cls, ea):
+        '''Return true if there are any extra comments that suffix the item at the address `ea`.'''
+        return cls.has_extra(int(ea), idaapi.E_NEXT)
+
+    ### The following methods are actually used to get or set the extra comments at an address.
+
+    @classmethod
+    def get_prefix(cls, ea):
+        '''Return the prefixed comment at address `ea`.'''
+        return cls.get(int(ea), idaapi.E_PREV)
+
+    @classmethod
+    def get_suffix(cls, ea):
+        '''Return the suffixed comment at address `ea`.'''
+        return cls.get(int(ea), idaapi.E_NEXT)
+
+    @classmethod
+    def delete_prefix(cls, ea):
+        '''Delete the prefixed comment at address `ea`.'''
+        res = cls.get(int(ea), idaapi.E_PREV)
+        count = cls.delete(int(ea), idaapi.E_PREV)
+        return res
+
+    @classmethod
+    def delete_suffix(cls, ea):
+        '''Delete the suffixed comment at address `ea`.'''
+        res = cls.get(int(ea), idaapi.E_NEXT)
+        count = cls.delete(int(ea), idaapi.E_NEXT)
+        return res
+
+    @classmethod
+    def set_prefix(cls, ea, string):
+        '''Set the prefixed comment at address `ea` to the specified `string`.'''
+        ea = int(ea)
+        res, ok = cls.delete_prefix(ea), cls.set(ea, string, idaapi.E_PREV)
+        ok = cls.set(ea, string, idaapi.E_PREV)
+        return res
+
+    @classmethod
+    def set_suffix(cls, ea, string):
+        '''Set the suffixed comment at address `ea` to the specified `string`.'''
+        ea = int(ea)
+        res, ok = cls.delete_suffix(ea), cls.set(ea, string, idaapi.E_NEXT)
+        return res
+
+    ### These private methods are used to explicitly set the whitespace (newlines)
+    ### for an extra comment using a numberical count instead of a string.
+
+    @classmethod
+    def __insert_whitespace(cls, ea, count, getter, setter, remover):
+        '''Use the callables specified by `getter`, `setter`, and `remover` to insert `count` lines of whitespace in front of the extra comment for address `ea`.'''
+        ea = int(ea)
+
+        # Start by getting the current contents of the desired extra comment.
+        res = getter(ea)
+
+        # Then we strip out any newlines in front of it, and then either assign
+        # some new ones or remove the old ones depending on the chosen count.
+        lstripped, nl = ('', 0) if res is None else (res.lstrip('\n'), len(res) - len(res.lstrip('\n')) + 1)
+        return setter(ea, '\n' * (nl + count - 1) + lstripped) if nl + count > 0 or lstripped else remover(ea)
+
+    @classmethod
+    def __append_whitespace(cls, ea, count, getter, setter, remover):
+        '''Use the callables specified by `getter`, `setter`, and `remover` to append `count` lines of whitespace after the extra comment for address `ea`.'''
+        ea = int(ea)
+
+        # First we need to get the contents of the extra comment they wanted.
+        res = getter(ea)
+
+        # Next we strip out any trailing newlines, and then assign the new
+        # ones or remove the old ones depending on the specified count.
+        rstripped, nl = ('', 0) if res is None else (res.rstrip('\n'), len(res) - len(res.rstrip('\n')) + 1)
+        return setter(ea, rstripped + '\n' * (nl + count - 1)) if nl + count > 0 or rstripped else remover(ea)
+
+    ### Now we define some utility functions that are intended to be used as the
+    ### frontend to explicitly control the newlines used by an extra comment.
+
+    @classmethod
+    def insert_anterior(cls, ea, count):
+        '''Insert `count` lines in front of the anterior comment for the item at address `ea`.'''
+        res = cls.get_prefix, cls.set_prefix, cls.delete_prefix
+        return cls.__insert_whitespace(ea, count, *res)
+
+    @classmethod
+    def append_anterior(cls, ea, count):
+        '''Append `count` lines after the anterior comment for the item at address `ea`.'''
+        res = cls.get_prefix, cls.set_prefix, cls.delete_prefix
+        return cls.__append_whitespace(ea, count, *res)
+
+    @classmethod
+    def insert_posterior(cls, ea, count):
+        '''Insert `count` lines in front of the posterior comment for the item at address `ea`.'''
+        res = cls.get_suffix, cls.set_suffix, cls.delete_suffix
+        return cls.__insert_whitespace(ea, count, *res)
+
+    @classmethod
+    def append_posterior(cls, ea, count):
+        '''Append `count` lines after the posterior comment for the item at address `ea`.'''
+        res = cls.get_suffix, cls.set_suffix, cls.delete_suffix
+        return cls.__append_whitespace(ea, count, *res)
