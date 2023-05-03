@@ -917,7 +917,7 @@ class prioritybase(object):
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a non-callable ({!s}) for the requested target with the given priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, format(priority)))
         elif not isinstance(priority, internal.types.integer):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({!s}) for the requested target with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, format(priority)))
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({:s}) for the requested target with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, internal.utils.pycompat.fullname(callable), format(priority)))
 
         # attach to the requested target if possible
         if target not in self.__cache__:
@@ -1014,7 +1014,7 @@ class prioritybase(object):
         # in the table and then we grab the first index for the given priority.
         if priority not in table:
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise internal.exceptions.ItemNotFoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the specific priority ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(prio), format(prio)))
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the specific priority ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(priority), format(priority)))
         index = table[priority].pop(0)
 
         # We now can pop the index directly out of the state. Afterwards, we
@@ -1043,7 +1043,7 @@ class prioritybase(object):
             # executing it with the parameters we received
             hookq, captured = self.__cache__[target][:], None
             for priority, callable in heapq.nsmallest(len(hookq), hookq, key=operator.attrgetter('priority')):
-                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) to callable ({!s}) with priority ({:+d}).".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
+                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) with priority {:+d} to {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
 
                 try:
                     result = callable(*parameters)
@@ -1055,7 +1055,7 @@ class prioritybase(object):
                     current = str().join(traceback.format_exception(*sys.exc_info()))
 
                     format = functools.partial(u"{:s}.callable({:s}) : {:s}".format, '.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)))
-                    logging.fatal(format(u"Callable for {:s} with priority ({:+d}) raised an exception while executing {!s}.".format(self.__formatter__(target), priority, callable)))
+                    logging.fatal(format(u"Target {:s} for {:s} with priority {:+d} raised an exception while executing.".format(self.__formatter__(target), internal.utils.pycompat.fullname(callable), priority)))
                     logging.warning(format(u"Traceback ({:s} was attached at):".format(self.__formatter__(target))))
                     [ logging.warning(format(item)) for item in str().join(bt).split('\n') ]
                     [ logging.warning(format(item)) for item in current.split('\n') ]
@@ -1074,7 +1074,7 @@ class prioritybase(object):
                 # If we received an unexpected type, then throw up an exception.
                 elif isinstance(result, self.result):
                     cls = self.__class__
-                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callable({:s}) : Unable to determine the type of result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callable({:s}) : Unable to determine the type of result ({!r}) returned from {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
 
                 # If there was no result, then just continue on like nothing happened.
                 elif result is None:
@@ -1084,11 +1084,11 @@ class prioritybase(object):
                 # warn the user that someone is trying to interfere with results.
                 elif captured is None:
                     cls = self.__class__
-                    logging.info(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({!s}) to return to caller.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), callable))
+                    logging.info(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({:s}) to return to the caller.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), internal.utils.pycompat.fullname(callable)))
 
                 elif result != captured:
                     cls = self.__class__
-                    logging.warning(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({!s}) that is different than the previous ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), callable, captured))
+                    logging.warning(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({:s}) that is different than the previous result ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), internal.utils.pycompat.fullname(callable), captured))
 
                 # Assign the captured return code now that we know what it is.
                 captured = captured if result is None else result
@@ -1141,6 +1141,9 @@ class priorityhook(prioritybase):
         mapping = self.__mapping__
         return mapping.get(name, supermethod)
 
+    def __format__(self, spec):
+        return internal.utils.pycompat.fullname(self.__klass__)
+
     def __formatter__(self, name):
         cls = self.__klass__
         return '.'.join([cls.__name__, name])
@@ -1181,7 +1184,7 @@ class priorityhook(prioritybase):
                         return supermethod(instance, *args, **kwargs)
 
                     # Otherwise we return the code that was given to us.
-                    logging.debug(u"{:s}.method({:s}) : Received a value ({!r}) to return from {!s} for {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target), result, callable, self.__formatter__(target)))
+                    logging.debug(u"{:s}.method({:s}) : Received a value ({!r}) to return from the callable ({:s}) for target {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target), result, internal.utils.pycompat.fullname(callable), self.__formatter__(target)))
                     return result
                 return method
 
@@ -1331,7 +1334,7 @@ class priorityhook(prioritybase):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if name not in self.__attachable__:
             cls = self.__class__
-            raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard the callable ({!s}) from the cache due to the target ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, callable, self.__formatter__(name)))
+            raise NameError(u"{:s}.discard({!r}, {!s}) : Unable to discard the callable ({:s}) from the cache due to the target ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, internal.utils.pycompat.fullname(callable), self.__formatter__(name)))
         return super(priorityhook, self).discard(name, callable)
 
     def __repr__(self):
@@ -1349,6 +1352,9 @@ class prioritynotification(prioritybase):
     def __init__(self):
         super(prioritynotification, self).__init__()
         self.__lookup = { getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('NW_') }
+
+    def __format__(self, spec):
+        return internal.utils.pycompat.fullname(idaapi.notify_when)
 
     def __formatter__(self, notification):
         name = self.__lookup.get(notification, '')
@@ -1374,7 +1380,7 @@ class prioritynotification(prioritybase):
         for callable in self.get(notification):
             ok = self.discard(notification, callable)
             Flogging = logging.info if ok else logging.warning
-            Flogging(u"{:s}.detach({:#x}) : {:s} the callable ({!s}) attached to the notification {:s}.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(notification)))
+            Flogging(u"{:s}.detach({:#x}) : {:s} the callable ({:s}) attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(notification)))
 
         # Define a dummy closure to pass to the api to avoid a dereference.
         def closure(*parameters):
@@ -1429,6 +1435,10 @@ class priorityhxevent(prioritybase):
         self.__events__ = { getattr(ida_hexrays, name) : name for name in dir(ida_hexrays) if name.startswith(('hxe_', 'lxe_')) }
         self.__attached__ = {}
 
+    def __format__(self, spec):
+        res = self.__module.install_hexrays_callback
+        return internal.utils.pycompat.fullname(res)
+
     def __formatter__(self, event):
         name = self.__events__.get(event, '')
         return "{:s}({:#x})".format(name, event) if name else "{:#x}".format(event) if isinstance(event, internal.types.integer) else "{!r} (event needs to be an integer)".format(event)
@@ -1460,7 +1470,7 @@ class priorityhxevent(prioritybase):
 
         # Now we have a callable to use, so we just need to install it.
         if not self.__module.install_hexrays_callback(callable):
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} with the specified callable ({!s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), callable))
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} with the specified callable ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(callable)))
             return False
 
         # Last thing to do is to save our state so that we can remove it later.
@@ -1483,13 +1493,13 @@ class priorityhxevent(prioritybase):
         for callable in self.get(event):
             ok = self.discard(event, callable)
             Flogging = logging.info if ok else logging.warning
-            Flogging(u"{:s}.detach({!r}) : {:s} the callable ({!s}) attached to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(event)))
+            Flogging(u"{:s}.detach({!r}) : {:s} the callable ({:s}) attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(event)))
 
         # Because Hex-Rays callback API wants the original callable that we gave it,
         # we need to rip it out of our state so we can remove it.
         callable = self.__attached__.pop(event)
         count = self.__module.remove_hexrays_callback(callable)
-        logging.info(u"{:s}.detach({!r}) : Removed {:d} callback{:s} for the callable ({!s}) attached to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', callable, self.__formatter__(event)))
+        logging.info(u"{:s}.detach({!r}) : Removed {:d} callback{:s} for the callable ({:s}) attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', internal.utils.pycompat.fullname(callable), self.__formatter__(event)))
 
         return super(priorityhxevent, self).detach(event)
 
