@@ -776,8 +776,7 @@ class prioritybase(object):
         # This property is intended to be part of the public api and
         # thus it can reimplemented by one if considered necessary.
 
-        result = {item for item in self.__cache__}
-        return sorted(result)
+        return {item for item in self.__cache__}
 
     def list(self):
         '''List all of the targets that are available along with a description.'''
@@ -785,12 +784,12 @@ class prioritybase(object):
         # This property is intended to be part of the public api and
         # thus it can reimplemented by one if considered necessary.
 
-        sorted = self.available
-        formatted = {item : "{!s}:".format(item) for item in sorted}
+        targets = sorted(self.available)
+        formatted = {item : "{!s}:".format(item) for item in targets}
         length = max(map(len, formatted.values())) if formatted else 0
 
         if formatted:
-            for item in sorted:
+            for item in targets:
                 six.print_(u"{:<{:d}s} {:s}".format(formatted[item], length, self.__formatter__(item)))
             return
         six.print_(u"There are no available targets.")
@@ -798,13 +797,11 @@ class prioritybase(object):
     @property
     def disabled(self):
         '''Return all of the attached targets that are currently disabled.'''
-        result = {item for item in self.__disabled}
-        return sorted(result)
+        return {item for item in self.__disabled}
     @property
     def enabled(self):
         '''Return all of the attached targets that are currently enabled.'''
-        result = {item for item in self.__cache__} - {item for item in self.__disabled}
-        return sorted(result)
+        return {item for item in self.__cache__} - {item for item in self.__disabled}
 
     def __repr__(self):
         cls, enabled = self.__class__, {item for item in self.__cache__} - {item for item in self.__disabled}
@@ -1206,17 +1203,16 @@ class priorityhook(prioritybase):
     @property
     def available(self):
         '''Return all of the targets that may be attached to.'''
-        result = {name for name in self.__attachable__}
-        return sorted(result)
+        return {name for name in self.__attachable__}
 
     def list(self):
         '''List all of the available targets with their prototype and description.'''
-        klass, sorted = self.__klass__, self.available
-        attributes = {item : getattr(klass, item) for item in sorted}
+        klass, targets = self.__klass__, sorted(self.available)
+        attributes = {item : getattr(klass, item) for item in targets}
         documentation = {item : autodocumentation.__doc__ for item, autodocumentation in attributes.items()}
 
         # If there weren't any attributes, then we can just leave.
-        if not sorted:
+        if not targets:
             return six.print_(u"There are no available targets for {:s}.".format(klass.__name__))
 
         # Define a closure that we can use to extract the parameters from the documentation.
@@ -1228,11 +1224,11 @@ class priorityhook(prioritybase):
             return replaced.strip()
 
         # Figure out the lengths of each of the columns so that we can align them.
-        length = max(map(len, map("{:s}:".format, sorted)))
+        length = max(map(len, map("{:s}:".format, targets)))
 
         # Iterate through all of the sorted items and output them.
         six.print_(u"List of events for {:s}".format(klass.__name__))
-        for item in sorted:
+        for item in targets:
             doc = documentation[item]
             six.print_(u"{:<{:d}s} {:s}".format("{:s}:".format(item), length, parameters(doc)))
         return
