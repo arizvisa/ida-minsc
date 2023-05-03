@@ -2249,7 +2249,7 @@ class Scheduler(object):
         self.__hooks.setdefault(None, {empty for empty in []}).add((hook, target))
         if not hook.add(target, callable, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
-            logging.warning(u"{:s}.default({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+            logging.warning(u"{:s}.default({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
 
         # If we've already added this hook and target before, then there's nothing to do.
         if (hook, target) in self.__used:
@@ -2266,7 +2266,7 @@ class Scheduler(object):
         F = self.__guard_closure(self.state.init, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
-            logging.warning(u"{:s}.initialized({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+            logging.warning(u"{:s}.initialized({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
 
         # If we've already used this hook and target, we're free to leave.
         if (hook, target) in self.__used:
@@ -2284,7 +2284,7 @@ class Scheduler(object):
         F = self.__guard_closure(self.state.loaded, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
-            logging.warning(u"{:s}.loaded({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+            logging.warning(u"{:s}.loaded({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
 
         # If this hook and target has been added already, then return success.
         if (hook, target) in self.__used:
@@ -2302,7 +2302,7 @@ class Scheduler(object):
         F = self.__guard_closure(self.state.ready, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
-            logging.warning(u"{:s}.ready({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+            logging.warning(u"{:s}.ready({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
 
         # If the current hook and target has been used already, then there's nothing to do.
         if (hook, target) in self.__used:
@@ -2320,7 +2320,7 @@ class Scheduler(object):
         F = self.__guard_closure(self.state.unavailable, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
-            logging.warning(u"{:s}.unavailable({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+            logging.warning(u"{:s}.unavailable({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
 
         # If the current hook and target is used, then we can just leave.
         if (hook, target) in self.__used:
