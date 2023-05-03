@@ -114,12 +114,6 @@ class changingchanged(object):
         return cls.database_init(idp_modname)
 
     @classmethod
-    def is_ready(cls):
-        '''This is just a utility method for determining if a database is ready or not.'''
-        global State
-        return State in {state.ready}
-
-    @classmethod
     def initialize(cls):
         """
         This method just initializes our states dictionary and should be
@@ -314,8 +308,6 @@ class address(changingchanged):
 
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
@@ -347,8 +339,6 @@ class address(changingchanged):
 
     @classmethod
     def changed(cls, ea, repeatable_cmt):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
@@ -381,8 +371,6 @@ class address(changingchanged):
 
     @classmethod
     def old_changed(cls, ea, repeatable_cmt):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
@@ -522,8 +510,6 @@ class globals(changingchanged):
 
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         if interface.node.identifier(interface.range.start(a)):
             return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
@@ -562,8 +548,6 @@ class globals(changingchanged):
 
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         if interface.node.identifier(interface.range.start(a)):
             return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
@@ -605,8 +589,6 @@ class globals(changingchanged):
 
     @classmethod
     def old_changed(cls, cb, a, cmt, repeatable):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         if interface.node.identifier(interface.range.start(a)):
             return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
@@ -703,8 +685,6 @@ class typeinfo(changingchanged):
 
     @classmethod
     def changing(cls, ea, new_type, new_fname):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (database not ready) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), utils.string.repr(new_type), new_fname, ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (not an address) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), utils.string.repr(new_type), new_fname, ea))
 
@@ -751,8 +731,6 @@ class typeinfo(changingchanged):
 
     @classmethod
     def changed(cls, ea, type, fnames):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (database not ready) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), utils.string.repr(type), fnames, ea))
 
@@ -792,32 +770,31 @@ class typeinfo(changingchanged):
         event.close()
 
 ### database scope
-class state(object):
-    '''database notification state'''
-    init = type('init', (object,), {})()
-    loaded = type('loaded', (object,), {})()
-    ready = type('ready', (object,), {})()
-
-State = None
-
 def on_close():
     '''IDB_Hooks.closebase'''
+    import hook
+    scheduler = hook.scheduler
 
     # Database was closed, so we need to reset our state.
-    global State
-    if state:
-        logging.debug(u"{:s}.on_close() : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(State)))
-    State = None
+    ok, state = any([scheduler.is_initialized(), hook.scheduler.is_loaded(), scheduler.is_ready()]), scheduler.reset()
+    if not ok:
+        logging.debug(u"{:s}.on_close() : Received unexpected state transition from state {!s} to {!s}.".format(__name__, state, scheduler.state.unavailable))
+    else:
+        logging.debug(u"{:s}.on_close() : Transition from {!s} to {!s} due to database being closed.".format(__name__, state, scheduler.state.unavailable))
+    return
 
 def on_init(idp_modname):
     '''IDP_Hooks.init'''
+    import hook
+    scheduler = hook.scheduler
 
     # Database has just been opened, setup the initial state.
-    global State
-    if State == None:
-        State = state.init
+    state = scheduler.modulate(scheduler.state.init)
+    if state is not scheduler.state.unavailable:
+        logging.debug(u"{:s}.on_init({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(idp_modname), state, scheduler.state.init))
     else:
-        logging.debug(u"{:s}.on_init({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(idp_modname), utils.string.repr(State)))
+        logging.debug(u"{:s}.on_init({!s}) : Transitioned from {!s} to {!s} during initialization of database.".format(__name__, utils.string.repr(idp_modname), state, scheduler.state.init))
+    return
 
 def nw_on_init(nw_code, is_old_database):
     idp_modname = idaapi.get_idp_name()
@@ -825,13 +802,15 @@ def nw_on_init(nw_code, is_old_database):
 
 def on_newfile(fname):
     '''IDP_Hooks.newfile'''
+    import hook
+    scheduler = hook.scheduler
 
     # Database has been created, switch the state to loaded.
-    global State
-    if State == state.init:
-        State = state.loaded
+    if scheduler.is_initialized():
+        state = scheduler.modulate(scheduler.state.loaded)
+        logging.debug(u"{:s}.on_newfile({!s}) : Transitioned from {!s} to {!s}.".format(__name__, utils.string.repr(fname), state, scheduler.state.loaded))
     else:
-        logging.debug(u"{:s}.on_newfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
+        logging.debug(u"{:s}.on_newfile({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(fname), scheduler.get(), scheduler.state.loaded))
 
     # FIXME: save current state like base addresses and such
     __execute_rcfile()
@@ -844,15 +823,16 @@ def nw_on_newfile(nw_code, is_old_database):
 
 def on_oldfile(fname):
     '''IDP_Hooks.oldfile'''
+    import hook
+    scheduler = hook.scheduler
 
     # Database has been loaded, switch the state to ready.
-    global State
-    if State == state.init:
-        State = state.ready
-
+    if scheduler.is_initialized():
+        state = scheduler.modulate(scheduler.state.ready)
+        logging.debug(u"{:s}.on_oldfile({!s}) : Transitioned from state {!s} to {!s} while opening up old database.".format(__name__, utils.string.repr(fname), state, scheduler.state.ready))
         __check_functions()
     else:
-        logging.debug(u"{:s}.on_oldfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
+        logging.debug(u"{:s}.on_oldfile({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(fname), scheduler.get(), scheduler.state.ready))
 
     # FIXME: save current state like base addresses and such
     __execute_rcfile()
@@ -869,20 +849,22 @@ def __check_functions():
 
 def on_ready():
     '''IDP_Hooks.auto_empty'''
-    global State
+    import hook
+    scheduler = hook.scheduler
 
-    # Queues have just been emptied, so now we can transition
-    if State == state.loaded:
-        State = state.ready
+    # Queues have just been emptied, so now we can enable the relevant hooks.
+    if scheduler.is_loaded():
+        state = scheduler.modulate(scheduler.state.ready)
+        logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty.".format(__name__, state, scheduler.state.ready))
 
         # update tagcache using function state
         __process_functions()
 
-    elif State == state.ready:
-        logging.debug(u"{:s}.on_ready() : Database is already ready ({!s}).".format(__name__, utils.string.repr(State)))
-
+    elif scheduler.is_ready():
+        logging.debug(u"{:s}.on_ready() : Ignoring request to transition to {!s} as database is currently at {!s}.".format(__name__, scheduler.state.ready, scheduler.get()))
     else:
-        logging.debug(u"{:s}.on_ready() : Received unexpected transition from state ({!s}).".format(__name__, utils.string.repr(State)))
+        logging.debug(u"{:s}.on_ready() : Received unexpected transition from {!s} to {!s}.".format(__name__, scheduler.get(), scheduler.state.ready))
+    return
 
 def auto_queue_empty(type):
     """This waits for the analysis queue to be empty.
@@ -893,6 +875,7 @@ def auto_queue_empty(type):
     """
     if type == idaapi.AU_FINAL:
         on_ready()
+    return
 
 def __process_functions(percentage=0.10):
     """This prebuilds the tag cache and index for the entire database so that we can differentiate tags made by the user and the application.
@@ -1321,8 +1304,6 @@ class naming(changingchanged):
 
     @classmethod
     def changing(cls, ea, new_name):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring naming.changing event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {!r}) : Ignoring naming.changing event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
 
@@ -1336,8 +1317,6 @@ class naming(changingchanged):
 
     @classmethod
     def changed(cls, ea, new_name, local_name):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({:#x}, {!r}, {!s}) : Ignoring naming.changed event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {!r}, {!s}) : Ignoring naming.changed event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, local_name, ea))
 
@@ -1359,8 +1338,6 @@ class naming(changingchanged):
         We simply increase the reference count for the "__name__" key, or decrease it
         if the name is being removed.
         """
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.rename({:#x}, {!r}) : Ignoring rename event (database not ready) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.rename({:#x}, {!r}) : Ignoring rename event (not an address) for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, new_name, ea))
 
@@ -1423,8 +1400,6 @@ class extra_cmt(changingchanged):
 
     @classmethod
     def changed(cls, ea, line_idx, cmt):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (database not ready) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (not an address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
@@ -1539,6 +1514,8 @@ def item_color_changed(ea, color):
 
 ### function scope
 def thunk_func_created(pfn):
+    # XXX: This might be interesting to track, but the disassembler generally
+    #      removes them unless they're actually referenced by something.
     pass
 
 def func_tail_appended(pfn, tail):
@@ -1700,7 +1677,6 @@ def add_func(pfn):
     from global tags to function tags. This iterates through each chunk belonging
     to the function and does exactly that.
     """
-    implicit = {'__typeinfo__', '__name__'}
     start, stop = interface.range.unpack(pfn)
 
     # check that we're not adding an import as a function. if this happens,
@@ -1714,16 +1690,16 @@ def add_func(pfn):
     # to add all the implicit tags and thus we can exclude them here. otherwise,
     # we'll do it ourselves because the functions get post-processed after building
     # in order to deal with the events that we didn't receive.
-    exclude = implicit if changingchanged.is_ready() else {item for item in []}
+    excluded = {'__typeinfo__', '__name__'}
     available = {k for k in internal.tags.function.get(start)}
-    [ internal.comment.globals.inc(start, k) for k in available - exclude ]
+    [ internal.comment.globals.inc(start, k) for k in available - excluded ]
 
     # convert all globals into contents whilst making sure that we don't
     # add any of the implicit tags that are handled by other events.
     for l, r in map(interface.range.bounds, interface.function.chunks(pfn)):
         for ea in interface.address.items(l, r):
             available = {item for item in internal.tags.address.get(ea)}
-            for k in available - implicit:
+            for k in available - excluded:
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=start)
                 logging.debug(u"{:s}.add_func({:#x}..{:#x}) : Exchanging (decreasing) reference count at {:#x} for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, start, stop, ea, utils.string.repr(k), utils.string.repr(k)))
@@ -2041,132 +2017,140 @@ def make_ida_not_suck_cocks(nw_code):
     ## "ui" module for backwards compatibility with older versions of the plugin.
     ui.hook.__start_ida__()
 
+    ## verify that the scheduler exists and if it doesn't, then create a fake one.
+    fake_hook_method = lambda self, hook, *args, **kwargs: hook.add(*args, **kwargs)
+    fake_modulate_method = lambda self, state: state
+    scheduler = hook.scheduler if hasattr(hook, 'scheduler') else type('scheduler', (object,), {attribute : value for attribute, value in itertools.chain(zip(['default', 'initialized', 'loaded', 'ready'], 4 * [fake_hook_method]), [('modulate', fake_modulate_method)])})
+
     ## setup default integer types for the typemapper once the loader figures everything out
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_newprc', interface.typemap.__ev_newprc__, 0)
+        scheduler.default(hook.idp, 'ev_newprc', interface.typemap.__ev_newprc__, 0)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('newprc', interface.typemap.__newprc__, 0)
+        scheduler.default(hook.idp, 'newprc', interface.typemap.__newprc__, 0)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
 
     ## monitor when ida enters its various states so we can pre-build the tag cache
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_init', on_init, -100)
-        hook.idp.add('ev_newfile', on_newfile, -100)
-        hook.idp.add('ev_oldfile', on_oldfile, -100)
-        hook.idp.add('ev_auto_queue_empty', auto_queue_empty, -100)
+        scheduler.default(hook.idp, 'ev_init', on_init, -100)
+        scheduler.default(hook.idp, 'ev_newfile', on_newfile, -100)
+        scheduler.default(hook.idp, 'ev_oldfile', on_oldfile, -100)
+        scheduler.default(hook.idp, 'ev_auto_queue_empty', auto_queue_empty, -100)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('init', on_init, -100)
-        hook.idp.add('newfile', on_newfile, -100)
-        hook.idp.add('oldfile', on_oldfile, -100)
-        hook.idp.add('auto_empty', on_ready, -100)
+        scheduler.default(hook.idp, 'init', on_init, -100)
+        scheduler.default(hook.idp, 'newfile', on_newfile, -100)
+        scheduler.default(hook.idp, 'oldfile', on_oldfile, -100)
+        scheduler.default(hook.idp, 'auto_empty', on_ready, -100)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, nw_on_init, -50)
-        hook.notification.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
-        hook.notification.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
-        hook.idp.add('auto_empty', on_ready, 0)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_init, -50)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_newfile, -20)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, nw_on_oldfile, -20)
+        scheduler.default(hook.idp, 'auto_empty', on_ready, 0)
 
-    hook.idb.add('closebase', on_close, 10000) if 'closebase' in hook.idb.available else hook.idp.add('closebase', on_close, 10000)
+    scheduler.default(hook.idb, 'closebase', on_close, 10000) if 'closebase' in hook.idb.available else scheduler.default(hook.idp, 'closebase', on_close, 10000)
 
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_init', internal.comment.tagging.__init_tagcache__, -1)
+        scheduler.default(hook.idp, 'ev_init', internal.comment.tagging.__init_tagcache__, -1)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('init', internal.comment.tagging.__init_tagcache__, -1)
+        scheduler.default(hook.idp, 'init', internal.comment.tagging.__init_tagcache__, -1)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, internal.comment.tagging.__nw_init_tagcache__, -40)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, internal.comment.tagging.__nw_init_tagcache__, -40)
 
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_init', address.database_init, 0)
-        hook.idp.add('ev_init', globals.database_init, 0)
-        hook.idb.add('changing_range_cmt', globals.changing, 0)
-        hook.idb.add('range_cmt_changed', globals.changed, 0)
+        scheduler.default(hook.idp, 'ev_init', address.database_init, 0)
+        scheduler.default(hook.idp, 'ev_init', globals.database_init, 0)
+        scheduler.ready(hook.idb, 'changing_range_cmt', globals.changing, 0)
+        scheduler.ready(hook.idb, 'range_cmt_changed', globals.changed, 0)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('init', address.database_init, 0)
-        hook.idp.add('init', globals.database_init, 0)
-        hook.idb.add('changing_area_cmt', globals.changing, 0)
-        hook.idb.add('area_cmt_changed', globals.changed, 0)
+        scheduler.default(hook.idp, 'init', address.database_init, 0)
+        scheduler.default(hook.idp, 'init', globals.database_init, 0)
+        scheduler.ready(hook.idb, 'changing_area_cmt', globals.changing, 0)
+        scheduler.ready(hook.idb, 'area_cmt_changed', globals.changed, 0)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
-        hook.notification.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
-        hook.idb.add('area_cmt_changed', globals.old_changed, 0)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, address.nw_database_init, -30)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, globals.nw_database_init, -30)
+        scheduler.ready(hook.idb, 'area_cmt_changed', globals.old_changed, 0)
 
     # hook the changing of a comment
     if idaapi.__version__ >= 6.9:
-        hook.idb.add('changing_cmt', address.changing, 0)
-        hook.idb.add('cmt_changed', address.changed, 0)
+        scheduler.ready(hook.idb, 'changing_cmt', address.changing, 0)
+        scheduler.ready(hook.idb, 'cmt_changed', address.changed, 0)
 
     else:
-        hook.idb.add('cmt_changed', address.old_changed, 0)
+        scheduler.ready(hook.idb, 'cmt_changed', address.old_changed, 0)
 
     ## hook renames to support updating the "__name__" implicit tag
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_init', naming.database_init, 0)
-        hook.idp.add('ev_rename', naming.changing, 0)
-        hook.idb.add('renamed', naming.changed, 0)
+        scheduler.default(hook.idp, 'ev_init', naming.database_init, 0)
+        scheduler.ready(hook.idp, 'ev_rename', naming.changing, 0)
+        scheduler.ready(hook.idb, 'renamed', naming.changed, 0)
 
     else:
-        hook.idp.add('rename', naming.rename, 0)
+        scheduler.ready(hook.idp, 'rename', naming.rename, 0)
 
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
-        hook.idb.add('deleting_func_tail', removing_func_tail, 0)
-        hook.idb.add('func_added', add_func, 0)
-        hook.idb.add('deleting_func', del_func, 0)
-        hook.idb.add('set_func_start', set_func_start, 0)
-        hook.idb.add('set_func_end', set_func_end, 0)
+        scheduler.ready(hook.idb, 'deleting_func_tail', removing_func_tail, 0)
+        scheduler.ready(hook.idb, 'func_added', add_func, 0)
+        scheduler.ready(hook.idb, 'deleting_func', del_func, 0)
+        scheduler.ready(hook.idb, 'set_func_start', set_func_start, 0)
+        scheduler.ready(hook.idb, 'set_func_end', set_func_end, 0)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idb.add('removing_func_tail', removing_func_tail, 0)
-        [ hook.idp.add(item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
+        scheduler.ready(hook.idb, 'removing_func_tail', removing_func_tail, 0)
+        [ scheduler.ready(hook.idp, item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
 
     else:
-        hook.idb.add('func_tail_removed', func_tail_removed, 0)
-        hook.idp.add('add_func', add_func, 0)
-        hook.idp.add('del_func', del_func, 0)
-        hook.idb.add('tail_owner_changed', tail_owner_changed, 0)
+        scheduler.ready(hook.idb, 'func_tail_removed', func_tail_removed, 0)
+        scheduler.ready(hook.idp, 'add_func', add_func, 0)
+        scheduler.ready(hook.idp, 'del_func', del_func, 0)
+        scheduler.ready(hook.idb, 'tail_owner_changed', tail_owner_changed, 0)
 
-    [ hook.idb.add(item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
+    [ scheduler.ready(hook.idb, item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
 
     ## Relocate the tagcache for an individual segment if that segment is moved.
-    hook.idb.add('segm_start_changed', segm_start_changed, 0)
-    hook.idb.add('segm_end_changed', segm_end_changed, 0)
-    hook.idb.add('segm_moved', segm_moved, 0)
+    scheduler.ready(hook.idb, 'segm_start_changed', segm_start_changed, 0)
+    scheduler.ready(hook.idb, 'segm_end_changed', segm_end_changed, 0)
+    scheduler.ready(hook.idb, 'segm_moved', segm_moved, 0)
+
+    # XXX: We could use the "allsegs_moved" event which gets called after everything is moved,
+    #      but fortunately after talking to igorsk these hooks are really the best method here.
 
     ## switch the instruction set when the processor is switched
     import __catalog__ as catalog
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_newprc', catalog.ev_newprc, 0)
+        scheduler.default(hook.idp, 'ev_newprc', catalog.ev_newprc, 0)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('newprc', catalog.newprc, 0)
+        scheduler.default(hook.idp, 'newprc', catalog.newprc, 0)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, catalog.nw_newprc, -10)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, catalog.nw_newprc, -10)
 
     ## ensure the internal.interface.database namespace is initialized as it's
     ## necessary and used by the processor detection.
     if idaapi.__version__ >= 7.0:
-        hook.idp.add('ev_init', internal.interface.database.__init_info_structure__, -100)
+        scheduler.default(hook.idp, 'ev_init', internal.interface.database.__init_info_structure__, -100)
 
     elif idaapi.__version__ >= 6.9:
-        hook.idp.add('init', internal.interface.database.__init_info_structure__, -100)
+        scheduler.default(hook.idp, 'init', internal.interface.database.__init_info_structure__, -100)
 
     else:
-        hook.notification.add(idaapi.NW_OPENIDB, internal.interface.database.__nw_init_info_structure__, -30)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, internal.interface.database.__nw_init_info_structure__, -30)
 
     ## keep track of individual tags like colors and type info
     if idaapi.__version__ >= 7.2:
-        hook.idb.add('item_color_changed', item_color_changed, 0)
+        scheduler.ready(hook.idb, 'item_color_changed', item_color_changed, 0)
 
     # anything earlier than v7.0 doesn't expose the "changing_ti" and "ti_changed"
     # hooks... plus, v7.1 doesn't pass us the correct type (idaapi.tinfo_t) as its
@@ -2174,14 +2158,18 @@ def make_ida_not_suck_cocks(nw_code):
     # completely fucking useless to us. so if we're using 7.1 or earlier, then
     # we completely skip the addition of the typeinfo hooks.
     if idaapi.__version__ >= 7.2:
-        hook.idp.add('ev_init', typeinfo.database_init, 0)
-        hook.idb.add('changing_ti', typeinfo.changing, 0)
-        hook.idb.add('ti_changed', typeinfo.changed, 0)
+        scheduler.default(hook.idp, 'ev_init', typeinfo.database_init, 0)
+
+        # XXX: we keep these hooks scheduled all the time because i personally
+        #      care about types, and you probably should too.
+        scheduler.default(hook.idb, 'changing_ti', typeinfo.changing, 0)
+        scheduler.default(hook.idb, 'ti_changed', typeinfo.changed, 0)
 
     # earlier versions of IDAPython don't expose anything about "extra" comments
     # so we can't do anything here.
     if idaapi.__version__ >= 6.9:
-        hook.idb.add('extra_cmt_changed', extra_cmt.changed, 0)
+        scheduler.default(hook.idb, 'extra_cmt_changed', extra_cmt.changed, 0)
+        # XXX: we schedule extra comments by default because they give us segment boundaries.
 
     ## just some debugging notification hooks
     #[ hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
@@ -2207,6 +2195,170 @@ def ida_is_busy_sucking_cocks(*args, **kwargs):
     make_ida_not_suck_cocks(idaapi.NW_INITIDA)
     hook.notification.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
     return -1
+
+### database state
+class SchedulerState(object):
+    '''This base class is used to represent the different states a disassembler database can be in.'''
+    def __init__(self, name, documentation=None):
+        self.__name__, self.__doc__ = name, documentation
+    def __repr__(self):
+        return "{:s} ({:s})".format(self.__name__, self.__doc__) if self.__doc__ else self.__name__
+
+# the available states that the database could be in.
+SchedulerState.unavailable = SchedulerState('state.unavailable')
+SchedulerState.init = SchedulerState('state.init', 'initialized')
+SchedulerState.loaded = SchedulerState('state.loaded')
+SchedulerState.ready = SchedulerState('state.ready')
+
+class Scheduler(object):
+    """
+    This class describes an object that is used to manage which hooks
+    are enabled by correlating them with the current database state.
+    The database can either be initialized, loaded, ready, or not
+    available. Once an instance is created, the caller may use the
+    object to attach hooks to one of these 3 states.
+
+    After the hooks have been attached, the instance can be used to
+    modulate the object to either of these states or to check the
+    current state. When a new state is being transitioned to, the
+    object will disable all of the targets from the prior state
+    before enabling all of the targets for the new one.
+    """
+    state = SchedulerState
+    def __init__(self):
+        self.__state, states = self.state.unavailable, [getattr(self.state, name) for name in dir(self.state) if not name.startswith('__')]
+        self.__hooks = {state: {empty for empty in []} for state in states}
+        self.__used = {empty for empty in []}
+
+    def __guard_closure(self, required_state, callable):
+        '''Return a closure that only executes `callable` if the scheduler state matches `required_state`.'''
+        if not isinstance(required_state, SchedulerState):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__guard_closure({!r}, {:s}) : Unable to create a guarded closure for the given state due to it being of the wrong type ({!r}).".format('.'.join(['hook', 'scheduler']), required_state, utils.pycompat.fullname(callable), required_state.__class__))
+
+        def closure(*parameters):
+            if self.__state not in {required_state}:
+                return
+            return callable(*parameters)
+        utils.pycompat.function.set_name(closure, utils.pycompat.function.name(callable))
+        utils.pycompat.function.set_documentation(closure, utils.pycompat.function.documentation(callable))
+        setattr(closure, '__qualname__', callable.__qualname__) if hasattr(callable, '__qualname__') else None
+        return closure
+
+    def default(self, hook, target, callable, priority):
+        '''Assign the specified `hook` and `target` to always be enabled by default.'''
+        self.__hooks.setdefault(None, {empty for empty in []}).add((hook, target))
+        if not hook.add(target, callable, priority):
+            hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
+            logging.warning(u"{:s}.default({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+
+        # If we've already added this hook and target before, then there's nothing to do.
+        if (hook, target) in self.__used:
+            return True
+
+        # Add the current hook and target and then enable it since it should
+        # be running all the time regardless of the current state.
+        self.__used.add((hook, target))
+        return True if target in hook.enabled else hook.enable(target)
+
+    def initialized(self, hook, target, callable, priority):
+        '''Assign the specified `hook` and `target` to only be enabled when the database has been initialized.'''
+        self.__hooks.setdefault(self.state.init, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.state.init, callable)
+        if not hook.add(target, F, priority):
+            hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
+            logging.warning(u"{:s}.initialized({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+
+        # If we've already used this hook and target, we're free to leave.
+        if (hook, target) in self.__used:
+            return True
+
+        # Add the hook and target to our list of already used targets, and then we
+        # just need to check if we're in the correct state to enable or disable it.
+        self.__used.add((hook, target))
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.init} else (hook.disable, hook.enabled)
+        return Fmodulate(target) if target in required_state else True
+
+    def loaded(self, hook, target, callable, priority):
+        '''Assign the specified `hook` and `target` to only be enabled when the database is being loaded.'''
+        self.__hooks.setdefault(self.state.loaded, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.state.loaded, callable)
+        if not hook.add(target, F, priority):
+            hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
+            logging.warning(u"{:s}.loaded({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+
+        # If this hook and target has been added already, then return success.
+        if (hook, target) in self.__used:
+            return True
+
+        # Mark the hook and target that was added as used, and then we check the
+        # current state to determine if we should enable it or not.
+        self.__used.add((hook, target))
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.loaded} else (hook.disable, hook.enabled)
+        return Fmodulate(target) if target in required_state else True
+
+    def ready(self, hook, target, callable, priority):
+        '''Assign the specified `hook` and `target` to only be enabled when the database is ready.'''
+        self.__hooks.setdefault(self.state.ready, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.state.ready, callable)
+        if not hook.add(target, F, priority):
+            hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
+            logging.warning(u"{:s}.ready({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+
+        # If the current hook and target has been used already, then there's nothing to do.
+        if (hook, target) in self.__used:
+            return True
+
+        # Add the current hook and target, and then enable it if we're currently
+        # in the correct state or disable it if we're not.
+        self.__used.add((hook, target))
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.ready} else (hook.disable, hook.enabled)
+        return Fmodulate(target) if target in required_state else True
+
+    def unavailable(self, hook, target, callable, priority):
+        '''Assign the specified `hook` and `target` to only be enabled when the database is unavailable or has been unloaded.'''
+        self.__hooks.setdefault(self.state.unavailable, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.state.unavailable, callable)
+        if not hook.add(target, F, priority):
+            hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
+            logging.warning(u"{:s}.unavailable({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {:s} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
+
+        # If the current hook and target is used, then we can just leave.
+        if (hook, target) in self.__used:
+            return True
+
+        # Set the current hook and target as used, and then enable it if we're
+        # presently in the correct state. If we're not, then just disable it.
+        self.__used.add((hook, target))
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.unavailable} else (hook.disable, hook.enabled)
+        return Fmodulate(target) if target in required_state else True
+
+    def modulate(self, state):
+        '''Modulate the current state of the database to `state` and enable the hooks associated with it.'''
+        if not isinstance(state, SchedulerState):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.modulate({!r}) : Unable to modulate to the suggested state due to it being of the wrong type ({!r}).".format('.'.join(['hook', 'scheduler']), state, state.__class__))
+        current, self.__state = self.__state, state
+        [ hook.disable(target) for hook, target in self.__hooks[current] if target in hook.enabled ]
+        [ hook.enable(target) for hook, target in itertools.chain(self.__hooks[None], self.__hooks[state]) if target in hook.disabled ]
+        return current
+
+    def reset(self):
+        '''Reset the current perceived state of the database and return the state that is being transitioned from.'''
+        return self.modulate(self.state.unavailable)
+    def is_initialized(self):
+        '''Return true if the database is initialized.'''
+        return self.__state in {self.state.init}
+    def is_loaded(self):
+        '''Return true if the database has been loaded.'''
+        return self.__state in {self.state.loaded}
+    def is_ready(self):
+        '''Return true if the database is ready.'''
+        return self.__state in {self.state.ready}
+    def is_unavailable(self):
+        '''Return true if the database is unavailable or unloaded.'''
+        return self.__state in {self.state.unavailable}
+    def get(self):
+        '''Return the current monitored state for the purpose of debugging.'''
+        return self.__state
 
 class singleton_descriptor(object):
     '''
@@ -2312,6 +2464,10 @@ class module(object):
         # there's no reason that one would need to close this, but our descriptor will
         # end up reinstantiating it if it ends up still being needed.
         delattr(self, 'notification')
+
+    # Create a descriptor that maintains the scheduler that controls the enabling
+    # and disabling of hooks depending on the current database state.
+    scheduler = singleton_descriptor(lambda cons, *args: cons(*args), Scheduler, __repr__=staticmethod(lambda: 'Internal scheduler for managing hooks depending on database state.'))
 
 # Now we just need to change the name of our class so that the documentation reads right.
 module.__name__ = 'hook'
