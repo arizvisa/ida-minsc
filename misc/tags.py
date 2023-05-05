@@ -112,6 +112,260 @@ class address(object):
 
         return res
 
+    @classmethod
+    def set(cls, ea, key, value):
+        '''Set the tag identified by `key` to `value` at the address `ea`.'''
+        if value is None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('database', ea, key, value, utils.string.escape(key, '"'), value))
+        ea = interface.address.inside(int(ea))
+
+        # If any of the supported implicit tags were specified, then figure out which
+        # one and use it to choose the correct handler to use.
+        if key == '__name__':
+            local, filtered = interface.function.has(ea), interface.name.identifier(value)
+
+            # If the name isn't used within the database, then we can just apply it...blindly.
+            Fexists = functools.partial(interface.name.inside, ea) if local else interface.name.exists
+            if not (interface.name.used(filtered) or Fexists(filtered)) or idaapi.get_name_ea(idaapi.BADADDR, filtered) == ea:
+                return interface.name.set(ea, filtered) if local else interface.name.set(ea, filtered, 0, idaapi.SN_NOLIST)
+
+            # Otherwise, we need an alternative name which we make by appending the offset.
+            items, offset = [filtered], ea - interface.database.imagebase()
+            while any(F(interface.tuplename(*items)) for F in [interface.name.used, Fexists]):
+                items.append(offset)
+            alternative = tuple(items)
+
+            # Since we're changing the user's value, we need to figure out which warning
+            # message to use by determining who owned the original name.
+            address = idaapi.get_name_ea(ea if local else idaapi.BADADDR, filtered)
+            target = internal.netnode.get(filtered) if address == idaapi.BADADDR else address
+            description = "identifier {:#x}".format(target) if target == idaapi.BADADDR else "address {:#x}".format(target)
+            logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Using an alternative name (\"{:s}\") for {:#x} due to {:s} {:#x} already being named \"{:s}\".".format('database', ea, key, value, utils.string.escape(interface.tuplename(*alternative), '"'), ea, 'identifier' if address == idaapi.BADADDR else 'address', target, utils.string.escape(filtered, '"')))
+
+            # Now we can apply the damned name.
+            return interface.name.set(ea, interface.tuplename(*alternative)) if local else interface.name.set(ea, interface.tuplename(*alternative), 0, idaapi.SN_NOLIST)
+
+        elif key == '__extra_prefix__':
+            return comment.extra.set_prefix(ea, value)
+
+        elif key == '__extra_suffix__':
+            return comment.extra.set_suffix(ea, value)
+
+        elif key == '__color__':
+            res, DEFCOLOR = interface.address.color(ea, value), 0xffffffff
+            return None if res == DEFCOLOR else res
+
+        elif key == '__typeinfo__':
+            return cls.set_typeinfo(ea, value)
+
+        # If we're within a function, then we also need to determine whether it's a
+        # runtime-linked address or not. This is because if it's a runtime-linked
+        # address then a repeatable comment is used. Otherwise we encode the tags
+        # within a non-repeatable comment.
+        try:
+            func = interface.function.by(ea)
+            rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
+
+        # If the address was not within a function, then set the necessary variables
+        # so that a repeatable comment is used.
+        except LookupError:
+            rt, func = False, None
+
+        # If we're outside a function or pointing to a runtime-linked address, then
+        # we use a repeatable comment. Anything else means a non-repeatable comment.
+        repeatable = False if func and interface.function.has(ea) and not rt else True
+
+        # Go ahead and decode the tags that are written to all 3 comment types. This
+        # way we can search them for the correct one that the user is trying to modify.
+        state_correct = comment.decode(utils.string.of(idaapi.get_cmt(ea, repeatable)))
+        state_wrong = comment.decode(utils.string.of(idaapi.get_cmt(ea, not repeatable)))
+        state_runtime = comment.decode(utils.string.of(idaapi.get_func_cmt(func, True))) if func else {}
+
+        # Now we just need to figure out which one of the dictionaries that we decoded
+        # contains the key that the user is trying to modify. We need to specially
+        # handle the case where the address is actually referring to a runtime address.
+        if rt:
+            rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
+        else:
+            state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+
+        # If the key was not in any of the encoded dictionaries, then we need to
+        # update the reference count in the tag cache. If the address is a runtime
+        # address or outside a function, then it's a global tag. Otherwise if it's
+        # within a function, then it's a contents tag that we need to adjust.
+        if key not in state:
+            if func and interface.function.has(ea) and not rt:
+                comment.contents.inc(ea, key)
+            else:
+                comment.globals.inc(ea, key)
+
+        # Grab the previous value from the correct dictionary that we discovered,
+        # and update it with the new value that the user is modifying it with.
+        res, state[key] = state.get(key, None), value
+
+        # Now we can finally update the comment in the database. However, we need
+        # to guard the modification so that the hooks don't interfere with the
+        # references that we updated. We guard this situation by disabling the hooks.
+        import hook as hooker
+        targets = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in hooker.idb}
+        try:
+            [ hooker.idb.disable(item) for item in targets ]
+
+        # If an exception was raised while disabling the hooks, then we need to bail.
+        except Exception:
+            raise
+
+        # Finally we can actually encode the dictionary and write it to the address
+        # the user specified using the correct comment type.
+        else:
+            idaapi.set_func_cmt(func, utils.string.to(comment.encode(state)), where) if rt else idaapi.set_cmt(ea, utils.string.to(comment.encode(state)), where)
+
+        # Lastly we release the hooks now that we've finished modifying the comment.
+        finally:
+            [ hooker.idb.enable(item) for item in targets ]
+
+        # Now we can return the result the user asked us for.
+        return res
+
+    @classmethod
+    def set_typeinfo(cls, ea, value, forced=False):
+        '''Apply the type information specified by `value` to the given address.'''
+        info, key = internal.declaration.parse(value) if isinstance(value, internal.types.string) else value, '__typeinfo__'
+        if info is None:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('database', ea, key, value, utils.string.repr(value), ea))
+
+        try:
+            rt, ea = interface.addressOfRuntimeOrStatic(ea)
+
+        # If we hit an exception, then we're not a function and all
+        # we need to do is to apply our tinfo_t to the address.
+        except LookupError:
+            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, info)
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type ({!s}) to the address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(info)), ea))
+            return result
+
+        # Now we can apply the type to the address if it's runtime-linked.
+        if rt:
+            ti = info if forced else interface.function.pointer(info)
+
+            # If we didn't get a type back, then we failed during promotion.
+            if ti is None:
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to promote type (\"{:s}\") to a pointer for the runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
+
+            # Otherwise warn the user about the dirty thing we just did.
+            elif ti is not info:
+                logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted the given type (\"{:s}\") to a pointer before applying it to the runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
+
+            # Now we can just apply our tinfo_t to the address.
+            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, ti)
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type ({!s}) to runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
+            return result
+
+        # Otherwise, we're tagging a function and this is the wrong classmethod.
+        return function.set_typeinfo(ea, info)
+
+    @classmethod
+    def remove(cls, ea, key, none):
+        '''Removes the tag identified by `key` at the address `ea`.'''
+        if none is not None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('database', ea, key, none, utils.string.escape(key, '"'), none))
+        ea = interface.address.inside(int(ea))
+
+        # If any of the supported implicit tags were specified, then dispatch to
+        # the correct function in order to properly clear it.
+        if key == '__name__':
+            return interface.name.set(ea, none)
+        elif key == '__extra_prefix__':
+            return comment.extra.delete_prefix(ea)
+        elif key == '__extra_suffix__':
+            return comment.extra.delete_suffix(ea)
+        elif key == '__typeinfo__':
+            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, none)
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to remove the type information from the given address ({:#x}).".format('database', ea, key, none, ea))
+            return result
+        elif key == '__color__':
+            DEFCOLOR = 0xffffffff
+            res = interface.address.color(ea, DEFCOLOR)
+            return None if res == DEFCOLOR else res
+
+        # If we're within a function, then we need to distinguish whether the
+        # address is a runtime-linked one or not. This way we can determine the
+        # actual comment type that will be used.
+        try:
+            func = interface.function.by(ea)
+            rt, _ = interface.addressOfRuntimeOrStatic(ea if func is None else func)
+
+        # If the address wasn't within a function, then assign the necessary
+        # values to the variables so that a repeatable comment gets used.
+        except LookupError:
+            rt, func = False, None
+
+        # If we're outside a function or pointing to a runtime-linked address, then
+        # a repeatable comment gets used. Inside a function is always a non-repeatable.
+        repeatable = False if func and interface.function.has(ea) and not rt else True
+
+        # figure out which comment type the user's key is in so that we can remove
+        # that one. if we're a runtime-linked address, then we need to remove the
+        # tag from a repeatable function comment. if the tag isn't in any of them,
+        # then it doesn't really matter since we're going to raise an exception anyways.
+
+        # Now we decode the tags from are written to all 3 available comment types.
+        # This way we can search for the correct one that the user is going to modify.
+        state_correct = comment.decode(utils.string.of(idaapi.get_cmt(ea, repeatable)))
+        state_wrong = comment.decode(utils.string.of(idaapi.get_cmt(ea, not repeatable)))
+        state_runtime = comment.decode(utils.string.of(idaapi.get_func_cmt(func, True))) if func else {}
+
+        # Then we need to figure out which one of the decoded dictionaries contains
+        # the key that the user is trying to remove. The case where a runtime-linked
+        # address is being referenced needs to be specially handled as IDA may
+        # incorrectly declare some runtime-linked addresses as functions.
+        if rt:
+            rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
+        else:
+            state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+
+        # If the key is not in the expected dictionary, then raise an exception. If
+        # it is, then we can modify the dictionary and remove it to return to the user.
+        if key not in state:
+            raise internal.exceptions.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from address.".format('database', ea, key, none, utils.string.escape(key, '"')))
+        res = state.pop(key)
+
+        # Now we can do our update and encode our modified dictionary, but we need
+        # to guard the modification so that the hooks don't also interfere with the
+        # references that we're updating. We guard by disabling the relevant hooks.
+        import hook as hooker
+        targets = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in hooker.idb}
+        try:
+            [ hooker.idb.disable(item) for item in targets ]
+
+        # If an exception was raised while disabling the hooks, then simply bail.
+        except Exception:
+            raise
+
+        # Finally we can encode the dictionary that we removed the key from and
+        # write it to the correct comment at the address that the user specified.
+        else:
+            idaapi.set_func_cmt(func, utils.string.to(comment.encode(state)), where) if rt else idaapi.set_cmt(ea, utils.string.to(comment.encode(state)), where)
+
+        # Release our hooks once we've finished updating the comment.
+        finally:
+            [ hooker.idb.enable(item) for item in targets ]
+
+        # Now that we've removed the key from the tag and updated the comment,
+        # we need to remove its reference. If the address is a runtime address
+        # or outside a function, then it's a global tag being removed. Otherwise
+        # it's within a function and thus a contents tag being removed.
+        if func and interface.function.has(ea) and not rt:
+            comment.contents.dec(ea, key)
+        else:
+            comment.globals.dec(ea, key)
+
+        # Finally we can return the value of the tag that was removed.
+        return res
+
 class function(object):
     """
     This namespace is responsible for reading from and writing tags for
@@ -197,6 +451,209 @@ class function(object):
         fcolor, DEFCOLOR = interface.function.color(fn), 0xffffffff
         if fcolor != DEFCOLOR: res.setdefault('__color__', fcolor)
 
+        return res
+
+    @classmethod
+    def set(cls, func, key, value):
+        '''Sets the value for the tag `key` to `value` for the function `func`.'''
+        if value is None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format('function', ("{:#x}" if isinstance(func, internal.types.integer) else "{!r}").format(func), key, value, utils.string.escape(key, '"'), value))
+
+        # Check to see if function tag is being applied to an import
+        try:
+            rt, ea = interface.addressOfRuntimeOrStatic(func)
+
+        # If we're not even in a function, then use a database tag.
+        except internal.exceptions.FunctionNotFoundError:
+            logging.warning(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag (\"{:s}\") for a non-function. Falling back to a database tag.".format('function', ("{:#x}" if isinstance(func, internal.types.integer) else "{!r}").format(func), key, value, utils.string.escape(key, '"')))
+            return address.set(func, key, value)
+
+        # If we are a runtime-only function, then write the tag to the import
+        if rt:
+            logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag (\"{:s}\") for a runtime-linked symbol. Falling back to a database tag.".format('function', ea, key, value, utils.string.escape(key, '"')))
+            return address.set(ea, key, value)
+
+        # Otherwise, it's a function.
+        fn = interface.function.by_address(ea)
+
+        # If the user wants to modify any of the implicit tags, then we use the key
+        # to figure out which function to dispatch to in order to modify it.
+        if key == '__name__':
+            filtered = interface.name.identifier(value)
+
+            flag, preserved = idaapi.SN_NOWARN, idaapi.SN_NOWARN | idaapi.SN_NOLIST | idaapi.SN_PUBLIC|idaapi.SN_NON_PUBLIC | idaapi.SN_WEAK|idaapi.SN_NON_WEAK
+            flag = 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
+            flag = idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+            flag = idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
+
+            # If the name isn't used in the database, then just apply it.
+            if not (interface.name.used(filtered) or interface.name.exists(filtered)) or idaapi.get_name_ea(idaapi.BADADDR, filtered) == ea:
+                return interface.name.set(ea, filtered, flag, preserved)
+
+            # Otherwise, we need an alternate name to avoid complaints.
+            items, offset = [filtered], interface.range.start(fn) - interface.database.imagebase()
+            while any(F(interface.tuplename(*items)) for F in [interface.name.used, interface.name.exists]):
+                items.append(offset)
+            alternative = tuple(items)
+
+            # Since we're using a different name, we need to warn the user why.
+            res = idaapi.get_name_ea(idaapi.BADADDR, filtered)
+            target = internal.netnode.get(filtered) if res == idaapi.BADADDR else res
+            description = "identifier {:#x}".format(target) if target == idaapi.BADADDR else "address {:#x}".format(target)
+            logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Using an alternative name (\"{:s}\") for {:#x} due to {:s} {:#x} already being named \"{:s}\".".format('function', ea, key, value, utils.string.escape(interface.tuplename(*alternative), '"'), ea, 'identifier' if res == idaapi.BADADDR else 'address', target, utils.string.escape(filtered, '"')))
+
+            # Now that the user knows what's up, we can apply the new name.
+            return interface.name.set(ea, interface.tuplename(*alternative), flag, preserved)
+
+        elif key == '__color__':
+            res, DEFCOLOR = interface.function.color(fn, value), 0xffffffff
+            return None if res == DEFCOLOR else res
+
+        elif key == '__typeinfo__':
+            return cls.set_typeinfo(fn, value)
+
+        # Decode both comment types for the function so that we can figure out which
+        # type that the tag they specified is currently in. If it's in neither, then
+        # we can simply use a repeatable comment because we're a function.
+        state_correct = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
+        state_wrong = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
+        state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
+
+        # Grab the previous value from the correct dictionary, and update it with
+        # the new value that was given to us.
+        res, state[key] = state.get(key, None), value
+
+        # Now we need to guard the modification of the comment so that we don't
+        # mistakenly tamper with any of the reference counts in the tag cache.
+        import hook as hooker
+        targets = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in hooker.idb}
+        try:
+            [ hooker.idb.disable(item) for item in targets ]
+
+        # If we weren't able to disable the hooks due to an exception, then don't
+        # bother to re-encoding the tags back into the comment.
+        except Exception:
+            raise
+
+        # Finally we can encode the modified dict and write it to the function comment.
+        else:
+            idaapi.set_func_cmt(fn, utils.string.to(comment.encode(state)), where)
+
+        # Release the hooks that we disabled since we finished modifying the comment.
+        finally:
+            [ hooker.idb.enable(item) for item in targets ]
+
+        # If there wasn't a key in any of the dictionaries we decoded, then
+        # we know one was added and so we need to update the tagcache.
+        if res is None:
+            comment.globals.inc(interface.range.start(fn), key)
+
+        # return what we fetched from the dict
+        return res
+
+    @classmethod
+    def set_typeinfo(cls, func, value):
+        '''Apply the type information specified by `value` to the function at the given address.'''
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
+
+        # First we'll try and parse the type if it was given to us as a string.
+        info, key = internal.declaration.parse(value) if isinstance(value, internal.types.string) else value, '__typeinfo__'
+        if info is None:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('function', ea, key, value, utils.string.repr("{!s}".format(value)), ea))
+
+        # If the type is not a function type whatsoever, then bail.
+        if not any([info.is_func(), info.is_funcptr()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Refusing to apply a non-function type ({!r}) to the given {:s} ({:#x}).".format('function', ea, key, value, "{!s}".format(info), 'address' if rt else 'function', ea))
+
+        # If we're being used against an export, then we need to make sure that
+        # our type is a function pointer and we need to promote it if not.
+        ti = interface.function.pointer(info)
+        if rt and ti is None:
+            raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to promote type to a pointer due to being applied to a function pointer.".format('function', ea, key, value))
+
+        elif ti is not info:
+            logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('function', ea, key, value, "{!s}".format(info), "{!s}".format(ti), ea))
+
+        # and then we just need to apply the type to the given address.
+        result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, ti)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply typeinfo ({!r}) to the {:s} ({:#x}).".format('function', ea, key, value, "{!s}".format(ti), 'address' if rt else 'function', ea))
+        return result
+
+    @classmethod
+    def remove(cls, func, key, none):
+        '''Removes the tag identified by `key` from the function `func`.'''
+        if none is not None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format('function', ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, none, utils.string.escape(key, '"'), none))
+
+        # Check to see if function tag is being applied to an import
+        try:
+            rt, ea = interface.addressOfRuntimeOrStatic(func)
+
+        # If we're not even in a function, then use a database tag.
+        except internal.exceptions.FunctionNotFoundError:
+            logging.warning(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear the tag for a non-function. Falling back to a database tag.".format('function', ('{:#x}' if isinstance(func, types.integer) else '{!r}').format(func), key, none))
+            return address.remove(func, key, none)
+
+        # If so, then write the tag to the import
+        if rt:
+            logging.warning(u"{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format('function', ea, key, none))
+            return address.remove(ea, key, none)
+
+        # Otherwise, it's a function.
+        fn = interface.function.by_address(ea)
+
+        # If the user wants to remove any of the implicit tags, then we need to
+        # dispatch to the correct function in order to clear the requested value.
+        if key == '__name__':
+            return name(fn, None)
+        elif key == '__color__':
+            DEFCOLOR = 0xffffffff
+            res = interface.function.color(fn, DEFCOLOR)
+            return None if res == DEFCOLOR else res
+        elif key == '__typeinfo__':
+            _, ea = interface.addressOfRuntimeOrStatic(func)
+            result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, None)
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!!}, {!s}) : Unable to remove the type information from the given function ({:#x}).".format('function', ea, key, none, ea))
+            return result
+
+        # Decode both comment types so that we can figure out which comment type
+        # the tag they're trying to remove is in. If it's in neither, then we just
+        # assume which comment it should be in as an exception will be raised later.
+        state_correct = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, True))), True
+        state_wrong = comment.decode(utils.string.of(idaapi.get_func_cmt(fn, False))), False
+        state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
+
+        # If the user's key was not in any of the decoded dictionaries, then raise
+        # an exception because the key doesn't exist within the function's tags.
+        if key not in state:
+            raise internal.exceptions.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag (\"{:s}\") from function.".format('function', ea, key, none, utils.string.escape(key, '"')))
+        res = state.pop(key)
+
+        # Before modifying the comment, we first need to guard its modification
+        # so that the hooks don't also tamper with the reference count in the cache.
+        import hook as hooker
+        targets = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & {target for target in hooker.idb}
+        try:
+            [ hooker.idb.disable(item) for item in targets ]
+
+        # If an exception was raised while trying to disable the hooks, then we just
+        # give up and avoid re-encoding the user's tags back into the comment.
+        except Exception:
+            raise
+
+        # Finally we can encode the modified dict back into the function comment.
+        else:
+            idaapi.set_func_cmt(fn, utils.string.to(comment.encode(state)), where)
+
+        # Release the hooks that were disabled now that that comment has been written.
+        finally:
+            [ hooker.idb.enable(item) for item in targets ]
+
+        # If we got here cleanly without an exception, then the tag was successfully
+        # removed and we just need to update the tag cache with its removal.
+        comment.globals.dec(interface.range.start(fn), key)
         return res
 
 class structure(object):
