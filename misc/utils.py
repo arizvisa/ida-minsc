@@ -16,7 +16,7 @@ import sys, codecs, heapq, collections, array, math
 import internal
 import idaapi, ida, ctypes
 
-__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fthrow','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget', 'nth', 'islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
+__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fidentity','fdefault','fcompose','fdiscard','fcondition','fthrough','flazy','fpartial','fapply','fapplyto','frpartial','freverse','fthrow','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','nth','first','second','third','last','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
 
 ### functional programming combinators (FIXME: probably better to document these with examples)
 
@@ -31,7 +31,7 @@ fcdr = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap[1:]), **{ key : value for
 # return a closure that will check that `object` is an instance of `type`.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item `key`.
-fhasitem = fitemQ = lambda key: frpartial(operator.contains, key)
+fhasitem = lambda key: frpartial(operator.contains, key)
 # return a closure that will get a particular element from an object.
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
 # return a closure that will set a particular element on an object.
@@ -39,13 +39,13 @@ fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, it
 # return a closure that will remove a particular element from an object and return the modified object
 fdelitem = lambda *items: fcompose(fthrough(fidentity, *[fcondition(fhasitem(item))(frpartial(operator.delitem, item), None) for item in items]), builtins.iter, builtins.next)
 # return a closure that will check if its argument has an `attribute`.
-fhasattr = fattributeQ = lambda attribute: frpartial(builtins.hasattr, attribute)
+fhasattr = lambda attribute: frpartial(builtins.hasattr, attribute)
 # return a closure that will get a particular attribute from an object.
 fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(object, attribute, *default)
 # return a closure that will set a particular attribute on an object.
 fsetattr = fsetattribute = lambda attribute: lambda value: lambda object: builtins.setattr(object, attribute, value) or object
 # return a closure that always returns `object`.
-fconstant = fconst = falways = lambda object: lambda *a, **k: object
+fconstant = lambda object: lambda *a, **k: object
 # a closure that returns its argument always.
 fidentity = lambda object: object
 # a closure that returns a default value if its object is false-y
@@ -65,9 +65,11 @@ fthrough = fmap = lambda *Fa: lambda *a, **k: builtins.tuple(F(*a, **k) for F in
 #lazy = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a memoized closure that's lazy and only executes when evaluated
 def flazy(F, *a, **k):
-    sortedtuple, state = fcompose(builtins.sorted, builtins.tuple), {}
+    '''Return a closure that will call the function `F` with the arguments `a` and keywords `k` reusing the result from any previous invocations.'''
+    state = {}
     def lazy(*ap, **kp):
-        A, K = a + ap, sortedtuple(builtins.tuple(k.items()) + builtins.tuple(kp.items()))
+        '''Calls the captured function, arguments, and keywords with the additional arguments `ap` and keywords `kp` reusing the preserved result from any previous invocations.'''
+        A, K = a + ap, frozenset(builtins.tuple(k.items()) + builtins.tuple(kp.items()))
         return state[(A, K)] if (A, K) in state else state.setdefault((A, K), F(*A, **{ key : value for key, value in itertools.chain(k.items(), kp.items()) }))
     return lazy
 # return a closure with the function's arglist partially applied
