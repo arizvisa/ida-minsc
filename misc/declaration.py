@@ -193,7 +193,14 @@ def unmangle_arguments(ea, info):
 #"?_Atexit@@YAXP6AXXZ@Z"
 #"?__ArrayUnwind@@YGXPAXIHP6EX0@Z@Z"
 
-class extract:
+class extract(object):
+    """
+    This namespace is responsible for extracting specific parts of an
+    unmangled C++ name using the tree that has been parsed and created
+    by either the `nested` or `token` namespace. The functions within
+    the namespace do not return strings directly, but rather a tuple
+    that contains the slice of the string that is being acted upon.
+    """
     @staticmethod
     def declaration(string):
         return demangle(string)
@@ -239,6 +246,10 @@ class extract:
         decl = extract.declaration(string)
         decl = decl[:decl.find('(')].rsplit(' ', 1)[0]
         return decl.split(':', 1)[0].strip() if ':' in decl else ''
+
+    ## XXX: all of the `extract` classmethods defined before this are mad ancient,
+    ##      and more importantly can be treated as complete garbage. this class is
+    ##      only used by `unmangle_arguments` and thus both should be killed together.
 
 class nested(object):
     """
