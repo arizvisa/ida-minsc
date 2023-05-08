@@ -251,6 +251,104 @@ class extract(object):
     ##      and more importantly can be treated as complete garbage. this class is
     ##      only used by `unmangle_arguments` and thus both should be killed together.
 
+    @classmethod
+    def parameters(cls, tree, string, range=None, assertion={'()', '<>'}, delimiter={','}):
+        '''Use the given `tree` to yield a token for each item within the given `range` of `string` that is separated by `delimiter` and wrapped by `assertion`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        assert(string[start:][:+1] + string[:stop][-1:] in assertion if assertion else True), string[start:][:+1] + string[:stop][-1:]
+        adjustment, listable = 1 if assertion else 0, [(segment, items) for segment, items in token.split(string, range, tree[start], delimiter)]
+
+        # start at the first list item and adjust the segment past the first
+        # parenthese. if there's no items left, then adjust the ending too.
+        segment, items = listable.pop(0)
+        left, right = segment
+        if listable:
+            yield (left + adjustment, right), items or [(left + adjustment, right)]
+        else:
+            yield (left + adjustment, right - adjustment), items or [(left + adjustment, right - adjustment)]
+
+        # continue consuming items until we have at least one element left.
+        while len(listable) > 1:
+            segment, items = listable.pop(0)
+            yield segment, items
+        assert(len(listable) <= 1), listable
+
+        # the very last item should contain the closing parenthese..
+        # hence, we need to adjust the segment we yield to cull it.
+        while listable:
+            segment, items = listable.pop(0)
+            left, right = segment
+            if right - adjustment > left:
+                yield (left, right - adjustment), items or [(left, right - adjustment)]
+            continue
+        return
+
+    @classmethod
+    def prototype(cls, tree, string, range=None):
+        '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the result type, name, list of parameters, and list of qualifiers.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        branch, ignored, symbols = tree[start or None], {'', ' '}, {' ', '*', '&'}
+
+        # start by finding the assumed parameters and using it as our pivot.
+        iterable = (1 + index for index, (left, right) in enumerate(branch[::-1]) if string[left] + string[left : right][-1] == '()')
+        parameters_index = next(iterable)
+
+        # extract the qualifiers after the parameters, ignoring any
+        # empty strings or spaces that don't have any other meaning.
+        right, point = (start, stop) if not branch else branch[-parameters_index] if parameters_index else branch[-1]
+        qualifiers = (point, stop), branch[-parameters_index:][1:] if point < stop else []
+
+        # next token in the branch contains the parameters, we just need
+        # to pop it off and skip all whitespace to get to the name.
+        index, rindex, selection = 0, 1, branch[:-parameters_index] if parameters_index else branch[:]
+        (stop, _), (left, right) = branch[-parameters_index], selection[-rindex] if selection else (start, stop)
+
+        # here we're checking both (left, right) for the token and (right, stop).
+        while rindex < len(selection) and string[right : stop] in ignored:
+            if string[left : right] not in ignored:
+                break
+            index, rindex = rindex, rindex + 1
+            stop, (left, right) = left, selection[-rindex]
+
+        # if we got to the end, but "right" and "stop" are still the same, then
+        # the prototype is not well-formed and there's still whitespace to trim.
+        stop, name_index = (stop, index) if rindex < len(selection) or right != stop else (left, rindex)
+        assert(all(string[left : right] for left, right in selection[-index:]))
+
+        # first we need a list that filters away any tokens that are past
+        # the "stop" index which references the end of the prototype name.
+        iterable = selection[:] if not name_index else itertools.chain(selection[:-name_index], [selection[-name_index]]) if name_index < len(selection) else []
+        filtered = [(left, right) for left, right in iterable if left < stop]
+
+        # now that we have our list of relevant tokens, we just need to scan
+        # backwards until the first symbol. then, everything inside is the name.
+        iterable = (index for index, (left, right) in enumerate(filtered[::-1]) if string[left : right] in symbols)
+        index = next(iterable, 0)
+
+        # use the index to grab all tokens before the name. afterwards we
+        # can figure out the point in front of it and then store its tokens.
+        trimmed = filtered[:-index] if index else filtered[:]
+        _, point = trimmed[-1] if trimmed else (None, start)
+        name = (point, stop), filtered[-index:] if index else []
+
+        # everything else that we've trimmed contains the calling convention,
+        # the result type, and the scope. we only need to skip the whitespace.
+        index, rindex, stop = 0, 1, point
+        while rindex <= len(trimmed) and string[slice(*trimmed[-rindex])] in ignored:
+            left, right = trimmed[-rindex]
+            if stop != right:
+                break
+            stop, index, rindex = left, rindex, rindex + 1
+
+        # reset "stop" if it was malformed, and verify that we only trimmed whitespace.
+        stop, _ = trimmed[-index] if index else trimmed[-1] if trimmed else (start, point)
+        assert(all(string[left : right] in ignored for left, right in trimmed[-index:]))
+
+        # that should be it.. we have every component and can return them.
+        result_and_convention = (start, stop), trimmed[:-index] if index else trimmed[:]
+        parameters_range = branch[-parameters_index]
+        return result_and_convention, name, parameters_range, qualifiers
+
 class nested(object):
     """
     This namespace contains basic utilities for processing a string
