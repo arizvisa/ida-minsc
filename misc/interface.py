@@ -4177,20 +4177,40 @@ class register_t(symbol_t):
         '''Return the pythonic type of the register.'''
         return self.__ptype__, self.__size__ // 8
 
-    def __format__(self, spec):
-        '''Return the architecture's register prefix concatenated to the register's name.'''
-        if spec != 's':
-            cls = self.__class__
-            raise TypeError("unsupported format string ({!s}) passed to {:s}".format(spec, '.'.join([cls.__name__, '__format__'])))
-        prefix = getattr(self.architecture, 'prefix', '') if hasattr(self, 'architecture') else ''
-        return prefix + self.name
+    def __description__(self):
+        '''Return a short description of the current register using its class and name.'''
+        cls = register_t
+        return "{:s}<{:s}>".format(cls.__name__, self.name)
 
+    def __format__(self, spec):
+        '''Format the register as either an object or a string using its name.'''
+        prefix = getattr(self.architecture, 'prefix', '') if hasattr(self, 'architecture') else ''
+
+        # If no formatspec was given, then we include the architecture prefix and
+        # treat it as a register that needs to be distinguished from other symbols.
+        if not spec:
+            return prefix + self.name
+
+        # If the register is being formatted as a string, then we exclude the
+        # architecture prefix because the name is being used explicitly.
+        elif spec == 's':
+            return self.name
+
+        # Otherwise we bitch and complain about what the caller attempted to do.
+        cls = self.__class__
+        raise internal.exceptions.InvalidParameterError(u"{:s}.format({!r}) : Unable to format the specified register using an unsupported format code ({!s}).".format(self.__description__(), spec, spec))
+
+    # When the register is implicitly converted to a string (like when it
+    # is directly passed to `print`), we include the architecture prefix.
     def __str__(self):
         '''Return the architecture's register prefix concatenated to the register's name.'''
         prefix = getattr(self.architecture, 'prefix', '') if hasattr(self, 'architecture') else ''
         return prefix + self.name
 
+    # If the caller wants the representation of the register, then we try
+    # to make it look like a python type but including additional attributes.
     def __repr__(self):
+        '''Return the register formatted as an instance of an object with additional attributes.'''
         iterable = (name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi, name) == self.dtype)
         try:
             dt = next(iterable)
@@ -4240,15 +4260,15 @@ class register_t(symbol_t):
         '''Return the integer value of the current register.'''
         rv, rname = idaapi.regval_t(), self.name
         if not idaapi.get_reg_val(rname, rv):
-            raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the integer value from the associated register name ({:s}).".format(self, rname))
+            raise internal.exceptions.DisassemblerError(u"{:s}.int() : Unable to fetch the integer for the value of the associated register ({}) using its name ({!r}).".format(self.__description__(), self, rname))
         mask = pow(2, self.bits) - 1
         if rv.rvtype == idaapi.RVT_INT:
             return rv.ival & mask
         elif rv.rvtype == idaapi.RVT_FLOAT:
-            logging.warning(u"{!s} : Converting a non-integer register type ({:d}) to an integer using {:d} bytes.".format(self, rv.rvtype, self.size))
+            logging.warning(u"{:s}.int() : Converting a non-integer register type ({:d}) to an integer using {:d} bytes.".format(self.__description__(), rv.rvtype, self.size))
             bytes = rv.fval.bytes
         else:
-            logging.warning(u"{!s} : Converting a non-integer register type ({:d}) to an integer using {:d} bytes.".format(self, rv.rvtype, self.size))
+            logging.warning(u"{:s}.int() : Converting a non-integer register type ({:d}) to an integer using {:d} bytes.".format(self.__description__(), rv.rvtype, self.size))
             bytes = rv.bytes()
         return functools.reduce(lambda agg, item: agg * 0x100 + item, bytearray(bytes), 0)
 
@@ -4256,17 +4276,17 @@ class register_t(symbol_t):
         '''Return the floating-point value of the current register.'''
         rv, rname = idaapi.regval_t(), self.name
         if not idaapi.get_reg_val(rname, rv):
-            raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the floating-point value from the associated register name ({:s}).".format(self, rname))
+            raise internal.exceptions.DisassemblerError(u"{:s}.float() : Unable to fetch the floating-point number for the value of the associated register ({}) using its name ({!r}).".format(self.__description__(), self, rname))
         if rv.rvtype == idaapi.RVT_FLOAT:
             return rv.fval._get_float()
-        raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to concretize an unknown register value type ({:d}) to a floating-point number.".format(self, rv.rvtype))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.float() : Unable to concretize an unknown register value type ({:d}) to a floating-point number.".format(self.__description__(), rv.rvtype))
 
     @property
     def bytes(self):
         '''Return the bytes that make up the value of the current register.'''
         rv, rname = idaapi.regval_t(), self.name
         if not idaapi.get_reg_val(rname, rv):
-            raise internal.exceptions.DisassemblerError(u"{!s} : Unable to fetch the bytes for the associated register name ({:s}).".format(self, rname))
+            raise internal.exceptions.DisassemblerError(u"{:s}.bytes : Unable to fetch the bytes for the value of the associated register ({}) using its name ({!r}).".format(self.__description__(), self, rname))
         return rv.bytes()
 
     def __reduce__(self):
