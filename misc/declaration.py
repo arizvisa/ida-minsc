@@ -359,6 +359,61 @@ class extract(object):
         parameters_range = branch[-parameters_index]
         return result_and_convention, name, parameters_range, qualifiers
 
+    @classmethod
+    def declaration_and_name(cls, string, range, segments):
+        '''Use the given `range` on the trimmed `string` with `segments` to return a selection of its declaration and segment for its name.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        ignored, symbols = {'', ' '}, {' ', '*', '&'}
+
+        # scan for the name until we get to a symbol to pivot from.
+        iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left : right] in symbols)
+        pivot = next(iterable, 0)
+        (_, point) = segments[-pivot] if pivot else (stop, stop)
+        name_segment = (point, stop)
+
+        # now we can scan left from the pivot to identify any whitespace.
+        iterable = segments[:] if not pivot else itertools.chain(segments[:-pivot], [segments[-pivot]]) if pivot < len(segments) else []
+        selection = [(left, right) for left, right in iterable]
+
+        index, rindex, stop = 0, 1, point
+        while rindex <= len(selection) and string[slice(*selection[-rindex])] in ignored:
+            left, right = selection[-rindex]
+            if stop != right:
+                break
+            stop, index, rindex = left, rindex, rindex + 1
+
+        # we have the name and the slice for the type which we can return.
+        declaration = (start, stop), selection[:-index] if index else selection[:]
+        return declaration, name_segment
+
+    @classmethod
+    def name_and_template(cls, string, range, segments, template='<>'):
+        '''Use the given `range` on the trimmed `string` with `segments` to return a tuple containing the template name, the segment of its parameters, and any qualifiers.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        ignored, symbols = {'', ' '}, {' ', '*', '&'}
+
+        # we first need to scan for the template from the parameters (<>).
+        iterable = (string[left : right] for (left, right) in segments[::-1])
+        iterable = (index for index, item in enumerate(iterable) if item[:1] + item[-1:] == template)
+        pivot = next(iterable, len(segments))
+
+        # extract the qualifiers from the last segment, set our
+        # pivot point, and stash the qualifiers to return later.
+        _, point = (stop, stop) if not segments else segments[-pivot] if pivot else segments[-1]
+        qualifiers = (point, stop), segments[-pivot:] if pivot else []
+
+        # now we examine the last segment and ensure it's a template.
+        selected = segments[:-pivot] if pivot else segments[:]
+        parameters = left, right = selected.pop(-1) if selected else (stop, stop)
+        candidate = string[left : right]
+        assert(not selected or candidate[:1] + candidate[-1:] == template), candidate[:1] + candidate[-1:]
+
+        # whatever we didn't process is considered part of the name.
+        # the caller should've given us the exact range they wanted.
+        stop, _ = parameters
+        name_leftover = (start, stop), selected
+        return name_leftover, parameters, qualifiers
+
 class nested(object):
     """
     This namespace contains basic utilities for processing a string
