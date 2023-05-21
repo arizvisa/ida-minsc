@@ -252,6 +252,16 @@ class extract(object):
     ##      only used by `unmangle_arguments` and thus both should be killed together.
 
     @classmethod
+    def trimmed(cls, string, range, segments, whitespace=' '):
+        '''Return a token for the given `string` with the characters in `whitespace` removed using both `range` and `segments`.'''
+        left, right = range if isinstance(range, tuple) else (0, len(string))
+        original = string[left : right]
+        start, stop = (len(original) - len(F(*whitespace)) for F in [original.lstrip, original.rstrip])
+        assert(all(string[left : right] in whitespace for left, right in segments[:start]))
+        assert(all(string[left : right] in whitespace for left, right in segments[-stop:]) if stop else True)
+        return (left + start, right - stop), segments[+start : -stop] if stop else segments[start:]
+
+    @classmethod
     def parameters(cls, tree, string, range=None, assertion={'()', '<>'}, delimiter={','}):
         '''Use the given `tree` to yield a token for each item within the given `range` of `string` that is separated by `delimiter` and wrapped by `assertion`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
