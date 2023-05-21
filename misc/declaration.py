@@ -414,6 +414,34 @@ class extract(object):
         name_leftover = (start, stop), selected
         return name_leftover, parameters, qualifiers
 
+    @classmethod
+    def function_pointer(cls, string, range, segments):
+        '''Use the given `range` on the trimmed `string` with `segments` to return a tuple containing the result type, and the segments of both the calling convention and parameters.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        ignored, symbols = {'', ' '}, {' ', '*', '&'}
+
+        # first we need to find the parameters.
+        iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left] + string[left : right][-1] == '()')
+        parameters_index = next(iterable)
+        assert(all(string[left : right] in ignored for left, right in segments[-parameters_index:][1:]))
+
+        # then we continue to find the convention, pointer, and name.
+        pointer_index = next(iterable)
+        assert(all(string[left : right] in ignored for left, right in segments[-pointer_index : -parameters_index:][1:]))
+
+        # next we need to skip any whitespace to find the range of the result.
+        result_segments, (stop, _) = segments[:-pointer_index], segments[-pointer_index]
+        index, rindex = 0, 1
+        while rindex <= len(result_segments) and string[slice(*result_segments[-rindex])] in ignored:
+            left, right = result_segments[-rindex]
+            if stop != right:
+                break
+            stop, index, rindex = left, rindex, rindex + 1
+
+        # that was it, just need to pack the result and return each part.
+        result = (start, stop), result_segments[:-index] if index else result_segments[:]
+        return result, segments[-pointer_index], segments[-parameters_index]
+
 class nested(object):
     """
     This namespace contains basic utilities for processing a string
