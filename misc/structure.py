@@ -2990,39 +2990,45 @@ class members_t(object):
     def __str__(self):
         '''Render all of the fields within the current structure.'''
         res = []
-        mn, ms, mti = 0, 0, 0
+        offset, mn, ms, mti = self.baseoffset, 0, 0, 0
         for i in range(len(self)):
             m = self[i]
-            name, t, ti, ofs, size, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
-            res.append((i, name, t, ti, ofs, size, comment or '', tag))
+            name, t, ti, moffset, msize, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
+            res.append((-1, '', [None, moffset - offset], None, offset, moffset - offset, '', {})) if offset < moffset else None
+            res.append((i, name, t, ti, moffset, msize, comment or '', tag))
             mn = max(mn, len(name))
-            ms = max(ms, len("{:+#x}".format(size)))
+            ms = max(ms, len("{:+#x}".format(moffset - offset)))
+            ms = max(ms, len("{:+#x}".format(msize)))
             mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
+            offset = moffset + msize
 
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
         if len(self):
             mo = max(map(len, map("{:x}".format, [self.baseoffset, self[-1].offset + self[-1].size])))
-            return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
+            return "{!r}\n{:s}".format(self.owner, '\n'.join("{:<{:d}s} {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s}{:s}".format('' if i < 0 else "[{:d}]".format(i), 2 + mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*') if ti else '', mti, '' if i < 0 else utils.string.repr(n), mn + 2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
         return "{!r}".format(self.owner)
 
     def __unicode__(self):
         '''Render all of the fields within the current structure.'''
         res = []
-        mn, ms, mti = 0, 0, 0
+        offset, mn, ms, mti = self.baseoffset, 0, 0, 0
         for i in range(len(self)):
             m = self[i]
-            name, t, ti, ofs, size, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
-            res.append((i, name, t, ti, ofs, size, comment or '', tag))
+            name, t, ti, moffset, msize, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
+            res.append((-1, '', [None, moffset - offset], None, offset, moffset - offset, '', {})) if offset < moffset else None
+            res.append((i, name, t, ti, moffset, msize, comment or '', tag))
             mn = max(mn, len(name))
-            ms = max(ms, len("{:+#x}".format(size)))
+            ms = max(ms, len("{:+#x}".format(moffset - offset)))
+            ms = max(ms, len("{:+#x}".format(msize)))
             mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
+            offset = moffset + msize
 
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
         if len(self):
             mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
-            return u"{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
+            return u"{!r}\n{:s}".format(self.owner, '\n'.join("{:<{:d}s} {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s}{:s}".format('' if i < 0 else "[{:d}]".format(i), mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*') if ti else '', mti, '' if i < 0 else utils.string.repr(n), mn + 2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
         return u"{!r}".format(self.owner)
 
     def __repr__(self):
