@@ -90,7 +90,7 @@ class address(object):
 
                 # We need the name to be parseable and IDA just doesn't give a fuck if it outputs
                 # something non-parseable. So we simply fix that here and render the typeinfo.
-                validname = declaration.unmangled.parsable(realname)
+                validname = 'fucker' #declaration.unmangled.parsable(realname)
                 ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
 
                 # Add it to our dictionary that we return to the user.
@@ -460,7 +460,7 @@ class function(object):
 
                 # We need this name to be parseable and (of course) IDA doesn't
                 # give a fuck whether its output is parseable by its own parser.
-                validname = declaration.unmangled.parsable(realname)
+                validname = 'fucker' #declaration.unmangled.parsable(realname)
                 fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(validname), '')
                 res.setdefault('__typeinfo__', fprototype)
 
