@@ -4233,6 +4233,17 @@ class address(object):
     def offset(cls, ea):
         '''Return the address `ea` translated to an offset relative to the base address of the database.'''
         return interface.address.offset(interface.address.inside(ea))
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
+    def offset(cls, name, *suffix):
+        '''Return the offset relative to the base address of the database for the given symbol `name`.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}.offset({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
+        return interface.address.offset(ea)
     getoffset = utils.alias(offset, 'address')
 
     @utils.multicase()
@@ -4244,6 +4255,17 @@ class address(object):
     @classmethod
     def fileoffset(cls, ea):
         '''Return the file offset in the input file for the address `ea`.'''
+        return idaapi.get_fileregion_offset(ea)
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
+    def fileoffset(cls, name, *suffix):
+        '''Return the file offset in the input file for the symbol with the given `name`.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}.fileoffset({!r}) : Unable to find the offset for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
         return idaapi.get_fileregion_offset(ea)
 
     @utils.multicase(offset=internal.types.integer)
