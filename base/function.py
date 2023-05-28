@@ -108,18 +108,27 @@ def by(frame):
 
 @utils.multicase()
 def offset():
-    '''Return the offset from the base of the database for the current function.'''
+    '''Return the offset of the current function from the base address of the database.'''
     func = ui.current.function()
     return offset(func, 0)
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def offset(func):
-    '''Return the offset from the base of the database for the function `func`.'''
+    '''Return the offset of the function `func` from the base address of the database.'''
     return offset(func, 0)
 @utils.multicase(func=(idaapi.func_t, types.integer), offset=types.integer)
 def offset(func, offset):
-    '''Return the offset from the base of the database for the function `func` and add the provided `offset` to it.'''
-    ea = address(func)
+    '''Return the offset of the function `func` from the base address of the database and add the provided `offset` to it.'''
+    res = interface.function.by(func)
+    ea = interface.range.start(res)
     return interface.address.offset(ea) + offset
+@utils.multicase(name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def offset(name, *suffix):
+    '''Return the offset from the base address of the database for the function with the given `name`.'''
+    res = (name,) + suffix
+    func = interface.function.by(interface.tuplename(*res))
+    ea = interface.range.start(func)
+    return interface.address.offset(ea)
 
 ## properties
 @utils.multicase()
@@ -295,6 +304,13 @@ def address(func, offset):
     '''Return the address for the entrypoint belonging to the function `func` and add the provided `offset` to it.'''
     res = interface.function.by(func)
     return interface.range.start(res) + offset
+@utils.multicase(name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def address(name, *suffix):
+    '''Return the address for the entrypoint belonging to the function with the given `name`.'''
+    res = (name,) + suffix
+    res = interface.function.by(interface.tuplename(*res))
+    return interface.range.start(res)
 top = addr = utils.alias(address)
 
 @utils.multicase()
@@ -4143,6 +4159,14 @@ class xref(object):
         fn = interface.function.by(func)
         iterable = Freferences(fn)
         return sorted(iterable)
+    @utils.multicase(name=types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
+    def down(cls, name, *suffix, **all):
+        '''Yield the operand reference and its target ``ref_t`` for each instruction from the function with the given `name`.'''
+        res = (name,) + suffix
+        func = interface.function.by(interface.tuplename(*res))
+        return cls.down(func)
 
     @utils.multicase()
     @classmethod
@@ -4152,7 +4176,17 @@ class xref(object):
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def up(cls, func):
-        '''Return each address that reference the function `func`.'''
+        '''Return each address that references the function `func`.'''
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        iterable = interface.xref.any(ea, False)
+        return sorted({ref for ref in iterable})
+    @utils.multicase(name=types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
+    def up(cls, name, *suffix):
+        '''Return each address that references the function with the given `name`'''
+        res = (name,) + suffix
+        func = interface.function.by(interface.tuplename(*res))
         _, ea = interface.addressOfRuntimeOrStatic(func)
         iterable = interface.xref.any(ea, False)
         return sorted({ref for ref in iterable})
@@ -4171,6 +4205,14 @@ class xref(object):
             ea = interface.address.head(right - 1)
             results.extend(interface.instruction.access(ea))
         return results
+    @utils.multicase(name=types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
+    def calls(cls, name, *suffix, **all):
+        '''Return the operand reference for each call instruction that is referenced from the function with the given `name`.'''
+        res = (name,) + suffix
+        func = interface.function.by(interface.tuplename(*res))
+        return cls.calls(func, **all)
 
     @utils.multicase()
     @classmethod
@@ -4186,6 +4228,14 @@ class xref(object):
             ea = interface.address.head(right - 1)
             results.extend(interface.instruction.access(ea))
         return results
+    @utils.multicase(name=types.string)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
+    def branches(cls, name, *suffix):
+        '''Return the operand reference for each branch instruction that is referenced from the function with the given `name`.'''
+        res = (name,) + suffix
+        func = interface.function.by(interface.tuplename(*res))
+        return cls.branches(func)
 
     @utils.multicase(index=types.integer)
     @classmethod
