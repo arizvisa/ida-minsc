@@ -442,6 +442,37 @@ class extract(object):
         result = (start, stop), result_segments[:-index] if index else result_segments[:]
         return result, segments[-pointer_index], segments[-parameters_index]
 
+    @classmethod
+    def function_pointer_convention(cls, string, range, segments, assertion={'()'}, symbols={'*', '&'}, whitespace={' '}):
+        '''Use the given `range` on both `string` and `segments` to return a tuple containing the calling convention, the segments of each symbol, and the tokens that compose the name.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        assert(string[start:][:+1] + string[:stop][-1:] in assertion if assertion else True), string[start:][:+1] + string[:stop][-1:]
+        adjustment, ignored = 1 if assertion else 0, {item for item in symbols} | whitespace
+
+        # now we can shrink our range excluding the parentheses, and then extract
+        # the convention from the start up to the very first symbol of some sort.
+        start, stop = start + adjustment, stop - adjustment
+        left, right = segments[0] if segments else (start, start)
+        convention, start = (start, left), left
+
+        # next, we keep consuming tokens while they're contiguous and they're
+        # symbols. this should give us the reference depth of the pointer.
+        index, point = 0, left
+        while index < len(segments) and string[left : right] in ignored:
+            left, right = segments[index]
+            if point != left:
+                break
+            point, index = right, index + 1
+
+        # now we have the starting point that the name begins
+        # at along with all of the segments that compose it.
+        name = (point, stop), segments[index:]
+
+        # everything we skipped is the pointer definition where each
+        # segment is contiguous and we only need it filtered to return.
+        pointers = [(left, right) for left, right in segments[:index] if string[left : right] not in whitespace]
+        return convention, pointers, name
+
 class nested(object):
     """
     This namespace contains basic utilities for processing a string
