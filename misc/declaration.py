@@ -527,19 +527,13 @@ class nested(object):
             ok = ok and item == slice
         return ok
 
-    # XXX: this is not really an augmented tree, but i needed a verb.
-    @classmethod
-    def augmented(cls, tree):
-        '''Convert the given `tree` of ranges into a tree of sizes that can be used to modify the string associated with the original tree.'''
-        return {index: cls.augment(index, segments) for index, segments in tree.items()}
-
     @classmethod
     def augment(cls, index, segments):
-        '''Convert the given `segments` starting at `index` into a list composed of the sizes for traversing a string.'''
+        '''Convert the given `segments` starting at `index` into a list composed of the parsed sizes that can be used for traversing a string.'''
         skip, result = index or 0, []
         for left, right in segments:
-            skip, size = left - skip, right - left
-            result.append((skip, left, size))
+            key, skip, size = left, left - skip, right - left   # what makes this list special is that we're preserving
+            result.append((skip, key, size))                    # "left" since it's used as an index into the tree.
             skip = right
         return result
 
@@ -547,9 +541,9 @@ class nested(object):
     def unaugment(cls, index, augment):
         '''Convert the list of sizes given by `augment` into a list of segments that start at `index`.'''
         result, position = [], index or 0
-        for skip, index, size in sizes:
+        for skip, index, size in augment:
             position += skip
-            assert(position == index)
+            assert(position == index), (position, index)
             result.append((position, position + size))
             position += size
         return result
@@ -681,7 +675,7 @@ class nested(object):
         # First we need to parse our string for the ranges we'll use to process
         # it, and then convert our tree from ranges into sizes.
         ordered, tree, errors = cls.parse(string, tokens)
-        augmented = cls.augmented(tree)
+        augmented = {index : cls.augment(segments) for index, segments in tree.items()}
 
         #assert(verify(tree, ordered) and len(ordered) == 0)
         #assert(sum(string.count(token) for token in tokens) == sum(map(len, tokens)) * sum(map(len, tree.values())) + len(errors))
@@ -1049,7 +1043,7 @@ class unmangled(object):
 
         # now we can use strip_templates to strip out any and all templates depth-first.
         stripper = cls.__strip_templates(string)
-        string = nested.process(stripper.send, next(stripper), nested.augmented(tree))
+        string = nested.process(stripper.send, next(stripper), {index : nested.augment(segments) for index, segments in tree.items()})
 
         # if there's any other parentheses in the string, then they're unbalanced and need filtering.
         anti_parenthesis = {character : '_' for character in '()'}
