@@ -529,8 +529,9 @@ class nested(object):
 
     @classmethod
     def augment(cls, index, segments):
-        '''Convert the given `segments` starting at `index` into a list composed of the parsed sizes that can be used for traversing a string.'''
-        skip, result = index or 0, []
+        '''Return the given `segments` starting at `index` into a list of sizes that can be used for iterating through the tokens in a string.'''
+        (start, _) = index if isinstance(index, tuple) else (index, index)
+        skip, result = start or 0, []
         for left, right in segments:
             key, skip, size = left, left - skip, right - left   # what makes this list special is that we're preserving
             result.append((skip, key, size))                    # "left" since it's used as an index into the tree.
@@ -539,14 +540,15 @@ class nested(object):
 
     @classmethod
     def unaugment(cls, index, augment):
-        '''Convert the list of sizes given by `augment` into a list of segments that start at `index`.'''
-        result, position = [], index or 0
+        '''Return the list of sizes given by `augment` as a range and list of segments that start at `index`.'''
+        (start, _) = index if isinstance(index, tuple) else (index, index)
+        position, result = start or 0, []
         for skip, index, size in augment:
             position += skip
             assert(position == index), (position, index)
             result.append((position, position + size))
             position += size
-        return result
+        return (start or 0, position), result
 
     #def modify(string, augmented, index=None):
     #    result, pos = [], 0
