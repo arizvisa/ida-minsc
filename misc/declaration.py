@@ -531,14 +531,27 @@ class nested(object):
     @classmethod
     def augmented(cls, tree):
         '''Convert the given `tree` of ranges into a tree of sizes that can be used to modify the string associated with the original tree.'''
-        result = {}
-        for index, items in tree.items():
-            skip, new_items = index or 0, result.setdefault(index, [])
-            for left, right in items:
-                skip, size = left - skip, right - left
-                new_items.append((skip, left, size))
-                skip = right
-            continue
+        return {index: cls.augment(index, segments) for index, segments in tree.items()}
+
+    @classmethod
+    def augment(cls, index, segments):
+        '''Convert the given `segments` starting at `index` into a list composed of the sizes for traversing a string.'''
+        skip, result = index or 0, []
+        for left, right in segments:
+            skip, size = left - skip, right - left
+            result.append((skip, left, size))
+            skip = right
+        return result
+
+    @classmethod
+    def unaugment(cls, index, augment):
+        '''Convert the list of sizes given by `augment` into a list of segments that start at `index`.'''
+        result, position = [], index or 0
+        for skip, index, size in sizes:
+            position += skip
+            assert(position == index)
+            result.append((position, position + size))
+            position += size
         return result
 
     #def modify(string, augmented, index=None):
