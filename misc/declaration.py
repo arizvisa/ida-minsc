@@ -529,7 +529,7 @@ class nested(object):
 
     # XXX: this is not really an augmented tree, but i needed a verb.
     @classmethod
-    def augment(cls, tree):
+    def augmented(cls, tree):
         '''Convert the given `tree` of ranges into a tree of sizes that can be used to modify the string associated with the original tree.'''
         result = {}
         for index, items in tree.items():
@@ -668,7 +668,7 @@ class nested(object):
         # First we need to parse our string for the ranges we'll use to process
         # it, and then convert our tree from ranges into sizes.
         ordered, tree, errors = cls.parse(string, tokens)
-        augmented = cls.augment(tree)
+        augmented = cls.augmented(tree)
 
         #assert(verify(tree, ordered) and len(ordered) == 0)
         #assert(sum(string.count(token) for token in tokens) == sum(map(len, tokens)) * sum(map(len, tree.values())) + len(errors))
@@ -1036,7 +1036,7 @@ class unmangled(object):
 
         # now we can use strip_templates to strip out any and all templates depth-first.
         stripper = cls.__strip_templates(string)
-        string = nested.process(stripper.send, next(stripper), nested.augment(tree))
+        string = nested.process(stripper.send, next(stripper), nested.augmented(tree))
 
         # if there's any other parentheses in the string, then they're unbalanced and need filtering.
         anti_parenthesis = {character : '_' for character in '()'}
