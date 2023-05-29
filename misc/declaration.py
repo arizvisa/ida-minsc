@@ -550,6 +550,15 @@ class nested(object):
             position += size
         return (start or 0, position), result
 
+    @classmethod
+    def reversed(cls, string, range, segments):
+        '''Return the specified `range` and `segments` translated for the reversed version of the given `string`.'''
+        (start, stop) = range if isinstance(range, tuple) else (0, len(string) if hasattr(string, '__len__') else string)
+        result, point = [], len(string)
+        for left, right in segments:
+            result.append((point - right, point - left))
+        return (point - stop, point - start), result[::-1]
+
     #def modify(string, augmented, index=None):
     #    result, pos = [], 0
     #    for skip, key, size in augmented.get(index, []):
