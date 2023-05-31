@@ -7770,6 +7770,15 @@ class get(object):
         if parameters.get('partial', False) and expected < len(bytes):
             return [item for item in itertools.chain(result, [bytes[expected:]])]
         return result if element < size else result[0]
+    @utils.multicase(name=internal.types.string)
+    def __new__(cls, name, *suffix):
+        '''Return the data at the symbol identified by `name`.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
+        return cls(ea, interface.address.size(ea))
 
     @utils.multicase()
     @classmethod
@@ -7784,6 +7793,16 @@ class get(object):
         flags, info, size = interface.address.flags(ea), idaapi.opinfo_t(), interface.address.size(ea)
         ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
         return interface.typemap.dissolve(flags, info.tid if ok else idaapi.BADADDR, size, offset=ea)
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    def type(cls, name, *suffix):
+        '''Return the pythonic type for the symbol with the given `name`.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}.type({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
+        return cls.type(ea)
 
     @utils.multicase()
     @classmethod
@@ -7794,6 +7813,16 @@ class get(object):
     @classmethod
     def info(cls, ea):
         '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
+        return interface.address.typeinfo(ea)
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    def info(cls, name, *suffix):
+        '''Return the type information for the symbol with the given `name`.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}.info({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
         return interface.address.typeinfo(ea)
     typeinfo = utils.alias(info, 'get')
 
@@ -7876,6 +7905,15 @@ class get(object):
         def __new__(cls, ea, size, **byteorder):
             '''Read an integer of the specified `size` from the address `ea`.'''
             return get.signed(ea, size, **byteorder) if interface.address.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, size, **byteorder)
+        @utils.multicase(name=internal.types.string)
+        def __new__(cls, name, *suffix, **byteorder):
+            '''Read an integer from the symbol with the given `name`.'''
+            res = (name,) + suffix
+            string = interface.tuplename(*res)
+            ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+            if ea == idaapi.BADADDR:
+                raise E.AddressNotFoundError(u"{:s}({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, 'get', cls.__name__]), res if suffix else string, utils.string.escape(string, '"')))
+            return get.signed(ea, **byteorder) if interface.address.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, **byteorder)
 
         @utils.multicase()
         @classmethod
@@ -8051,6 +8089,15 @@ class get(object):
             # Now we just need to read the data and flip its byteorder before using our api
             bytes = interface.address.read(ea, promoted)
             return interface.decode.float(bytes if order.lower() == 'big' else bytes[::-1])
+        @utils.multicase(name=internal.types.string)
+        def __new__(cls, name, *suffix, **byteorder):
+            '''Read a floating-point number from the symbol with the given `name`.'''
+            res = (name,) + suffix
+            string = interface.tuplename(*res)
+            ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+            if ea == idaapi.BADADDR:
+                raise E.AddressNotFoundError(u"{:s}({!r}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, 'get', cls.__name__]), res if suffix else string, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', utils.string.escape(string, '"')))
+            return cls(ea, interface.address.size(ea), **byteorder)
 
         @utils.multicase()
         @classmethod
@@ -8195,6 +8242,16 @@ class get(object):
         info = idaapi.opinfo_t()
         info.tid = tid
         return interface.decode.array(flags, info, interface.address.read(ea, size * max(0, length)), **byteorder)
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    def array(cls, name, *suffix, **byteorder):
+        '''Decode the data at the symbol identified by `name` as an array.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}.array({!r}{:s}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', utils.string.escape(string, '"')))
+        return cls.array(ea, **byteorder)
 
     @utils.multicase()
     @classmethod
@@ -8306,6 +8363,16 @@ class get(object):
 
         # Otherwise they explicitly want it as a string and we do it as we're told.
         return cls.string(ea, width, layout if layout > 0 else terminals, strtype.get('encoding', encoding))
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    def string(cls, name, *suffix, **strtype):
+        '''Return the data at the symbol identified by `name` as a string with the specified `strtype`.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}.string({!r}{:s}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, u", {:s}".format(utils.string.kwargs(strtype)) if strtype else '', utils.string.escape(string, '"')))
+        return cls.string(ea, **strtype)
 
     # The following definitions for "get.string" explicitly trust their parameters
     # and do not infer any of their strtype information from the database. The only
@@ -8461,6 +8528,16 @@ class get(object):
         bytes = interface.address.read(ea, size)
         fields = interface.decode.structure_bytes(sptr.id, bytes)
         return interface.decode.structure(sptr.id, fields, **byteorder)
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    def structure(cls, name, *suffix, **byteorder):
+        '''Return the decoded fields for the structure belonging to the symbol `name` as a dictionary.'''
+        res = (name,) + suffix
+        string = interface.tuplename(*res)
+        ea = idaapi.get_name_ea(idaapi.BADADDR, utils.string.to(string))
+        if ea == idaapi.BADADDR:
+            raise E.AddressNotFoundError(u"{:s}.structure({!r}{:s}) : Unable to find the address for the specified symbol \"{:s}\".".format('.'.join([__name__, cls.__name__]), res if suffix else string, u", {:s}".format(utils.string.kwargs(byteorder)) if byteorder else '', utils.string.escape(string, '"')))
+        return cls.structure(ea, **byteorder)
     struc = struct = utils.alias(structure, 'get')
 
     class switch(object):
