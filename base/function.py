@@ -3355,6 +3355,26 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def outline(cls):
+        '''Return a boolean describing whether the current function is outlined.'''
+        return cls.outline(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def outline(cls, func):
+        '''Return a boolean describing whether the function `func` is outlined.'''
+        FUNC_OUTLINE = getattr(idaapi, 'FUNC_OUTLINE', 0x20000)
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        return True if ok and cls.flags(func, FUNC_OUTLINE) else False
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def outline(cls, func, boolean):
+        '''Modify the attributes of the function `func` to set it as an outlined function depending on the value of `boolean`.'''
+        FUNC_OUTLINE = getattr(idaapi, 'FUNC_OUTLINE', 0x20000)
+        return cls.flags(func, FUNC_OUTLINE, -1 if boolean else 0) == idaapi.FUNC_OUTLINE
+    is_outline = utils.alias(outline, 'type')
+
+    @utils.multicase()
+    @classmethod
     def has(cls):
         '''Return a boolean describing whether the current function has a prototype associated with it.'''
         return cls.has(ui.current.address())
