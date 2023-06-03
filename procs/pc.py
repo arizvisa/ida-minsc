@@ -26,7 +26,10 @@ class Intel(internal.architecture.architecture_t):
     def __init__(self):
         super(Intel, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
+
+        # miscellaneous tools for helping out with the register definitions.
         i2s = "{:d}".format
+        Fidaname = lambda idaname, available={name for name in idaapi.ph_get_regnames()}: {'idaname': idaname} if idaname in available else {}
 
         [ setitem('r'+_, self.new('r'+_, 64, _)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
         [ setitem('r'+_, self.new('r'+_, 64)) for _ in map(i2s, range(8, 16)) ]
@@ -52,15 +55,18 @@ class Intel(internal.architecture.architecture_t):
         [ self.__cache__.setdefault((_+'x', self.by_name(_+'l').dtype), self.by_name(_+'l').__name__) for _ in ('a', 'c', 'd', 'b') ]
 
         setitem('fpstack', self.new('fpstack', 80*8, dtype=None))
-        # single precision
-        [ setitem("st{:d}f".format(_), self.child(self.by_name('fpstack'), "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float, ptype=types.float)) for _ in range(8) ]
-        # double precision
-        [ setitem("st{:d}d".format(_), self.child(self.by_name('fpstack'), "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double, ptype=types.float)) for _ in range(8) ]
         # umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
-        [ setitem("st{:d}".format(_), self.child(self.by_name('fpstack'), "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte, ptype=types.float)) for _ in range(8) ]
+        [ setitem("st{:d}".format(_), self.child(self.by_name('fpstack'), "st{:d}".format(_), _*80, 80, dtype=idaapi.dt_packreal, ptype=types.float)) for _ in range(8) ]
+        # double precision
+        [ setitem("st{:d}d".format(_), self.child(self.by_name("st{:d}".format(_)), "st{:d}d".format(_), 0, 64, dtype=idaapi.dt_double, ptype=types.float)) for _ in range(8) ]
+        # single precision
+        [ setitem("st{:d}f".format(_), self.child(self.by_name("st{:d}d".format(_)), "st{:d}f".format(_), 0, 32, dtype=idaapi.dt_float, ptype=types.float)) for _ in range(8) ]
+        # half precision
+        [ setitem("st{:d}h".format(_), self.child(self.by_name("st{:d}f".format(_)), "st{:d}h".format(_), 0, 16, dtype=getattr(idaapi, 'dt_half', idaapi.dt_word), ptype=types.float)) for _ in range(8) ]
 
         # not sure if the mmx registers trash the other 16 bits of an fp register
-        [ setitem("mm{:d}".format(_), self.child(self.by_name('fpstack'), "mm{:d}".format(_), _*80, 64, dtype=idaapi.dt_qword)) for _ in range(8) ]
+        [ setitem("mm{:d}u".format(_), self.child(self.by_name('fpstack'), "mm{:d}u".format(_), _*80, 80, dtype=idaapi.dt_tbyte)) for _ in range(8) ]
+        [ setitem("mm{:d}".format(_), self.child(self.by_name("mm{:d}u".format(_)), "mm{:d}".format(_), 0, 64, "mm{:d}".format(_), dtype=idaapi.dt_qword)) for _ in range(8) ]
 
         # sse1/sse2 simd registers
         [ setitem("zmm{:d}".format(_), self.new("zmm{:d}".format(_), 512, dtype=idaapi.dt_byte64, ptype=types.float)) for _ in range(32) ]
