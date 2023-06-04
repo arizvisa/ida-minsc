@@ -42,8 +42,8 @@ class AArch(internal.architecture.architecture_t):
         else:
             [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_), dtype=idaapi.dt_double, ptype=types.float)) for _ in range(32) ]
         [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_), dtype=idaapi.dt_float, ptype=types.float)) for _ in range(32) ]
-        [ setitem("h{:d}".format(_), self.child(getitem("s{:d}".format(_)), "h{:d}".format(_), 0, 16, idaname="X{:d}".format(_), dtype=getattr(idaapi, 'dt_half', idaapi.dt_word), ptype=types.float)) for _ in range(32) ]
-        [ setitem("b{:d}".format(_), self.child(getitem("h{:d}".format(_)), "b{:d}".format(_), 0, 8, idaname="X{:d}".format(_), ptype=types.float)) for _ in range(32) ]
+        [ setitem("h{:d}".format(_), self.child(getitem("s{:d}".format(_)), "h{:d}".format(_), 0, 16, dtype=getattr(idaapi, 'dt_half', idaapi.dt_word), ptype=types.float)) for _ in range(32) ]
+        [ setitem("b{:d}".format(_), self.child(getitem("h{:d}".format(_)), "b{:d}".format(_), 0, 8, ptype=types.float)) for _ in range(32) ]
 
         # General-purpose registers
         [ setitem("x{:d}".format(_), self.new("x{:d}".format(_), BITS, idaname="X{:d}".format(_))) for _ in range(31) ]
@@ -71,10 +71,10 @@ class AArch(internal.architecture.architecture_t):
         setitem('eapsr', self.child(getitem('xpsr'), 'eapsr', 0, 96, idaname='EAPSR'))
 
         # Status registers (application)
-        # XXX: We only define these registers as children of the parent
-        #      registers that can be written to.
+        # XXX: We only define the registers that are children of parent
+        #      registers that can actually be written to.
         setitem('apsr', self.child(getitem('xpsr'), 'apsr', 0, 32, idaname='APSR'))
-        setitem('q', self.child(getitem('apsr'), 'q', 27, 1))
+        setitem('qf', self.child(getitem('apsr'), 'qf', 27, 1))     # XXX: disassembler doesn't define this
         setitem('vf', self.child(getitem('apsr'), 'vf', 28, 1, idaname='VF'))
         setitem('cf', self.child(getitem('apsr'), 'cf', 29, 1, idaname='CF'))
         setitem('zf', self.child(getitem('apsr'), 'zf', 30, 1, idaname='ZF'))
@@ -172,10 +172,13 @@ class AArch(internal.architecture.architecture_t):
         # XScale register(s?)
         setitem('acc0', self.new('acc0', 32, idaname='acc0'))
 
-        # XXX: for some reason IDA defines the CS and DS registers??
+        # XXX: for some reason IDA defines the CS and DS registers?? this is weird
+        #      because CS is the same as a condition-code.. but DS isn't anything?
+        setitem('_cs', self.new('_cs', 16, idaname='CS'))
+        setitem('_ds', self.new('_ds', 16, idaname='DS'))
 
         # Conditions (not really registers, but condition_t)
-        [ setitem(_, condition_t(index)) for index, _ in enumerate(['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 'HI', 'LS', 'GE', 'LT', 'GT', 'LE', 'AL', 'NV']) ]
+        [ setitem(_, self.pseudoregister("c{:s}".format(name), 1, condition_t, index=index)) for index, name in enumerate(['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 'HI', 'LS', 'GE', 'LT', 'GT', 'LE', 'AL', 'NV']) ]
 
     def by_condition(self, index):
         '''Return the condition type for the specified `index`.'''
@@ -524,7 +527,7 @@ class memory(interface.integerish, interface.symbol_t):
         res = super(memory, self).__operation__(operation)
         return self.__remake(int(res))
 
-class condition_t(interface.symbol_t):
+class condition_t(interface.register_t):
     """
     A symbol for representing a condition operand on either the AArch32 or AArch64 architectures.
     """
