@@ -190,7 +190,10 @@ class architecture_t(object):
         return idaapi.dt_bitfild if bits < 8 else borked.get(bits // 8, dtype_by_size(bits // 8))
 
     def new(self, name, bits, idaname=None, **kwargs):
-        '''Add a new register to the current architecture's register cache.'''
+        """Add a new register with the given `name` and `bits` to the current architecture's register cache.
+
+        If `idaname` is a string, then use it to identify the disassembler register instead of `name`.
+        """
         key = name if idaname is None else idaname
 
         # now we just figure out which ptype, and then we can use it to
@@ -220,7 +223,10 @@ class architecture_t(object):
         return res
 
     def child(self, parent, name, position, bits, idaname=None, **kwargs):
-        '''Add a new child register to the architecture's register cache.'''
+        """Add a register with the specified `name`, `position`, and `bits` to the architecture cache as a child of the given `parent` register.
+
+        If `idaname` is a string, then use it to identify the disassembler register instead of `name`.
+        """
         assert(isinstance(parent, interface.register_t))
 
         # grab the type from the parameter if it exists, and then try to
@@ -261,6 +267,33 @@ class architecture_t(object):
         # we need to update the cache so that the parent register is relative to us.
         elif idaname is not None:
             self.__cache__.setdefault((idaname, parent.dtype), parent.name)
+        return res
+
+    def pseudoregister(self, name, bits, pseudo_t, idaname=None, **kwargs):
+        """Add a new pseudo-register of the specified `name` and `bits` to the architecture's register cache using the class `pseudo_t`.
+
+        If `idaname` is a string, then use it to identify the disassembler register instead of `name`.
+        """
+        dt_bitfield, dtype_by_size = idaapi.dt_bitfild, internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+        ptype = builtins.next((kwargs.pop(item) for item in ['ptype'] if item in kwargs), int)
+        dtype = builtins.next((kwargs.pop(item) for item in ['dtyp', 'dtype', 'type'] if item in kwargs), self.__get_dtype_by_size__(ptype, bits))
+
+        # check if the key has already been registered in the cache.
+        key = name if idaname is None else idaname
+        if (key, dtype) in self.__cache__ or key in self.__cache__:
+            cls = self.__class__
+            raise internal.exceptions.DuplicateItemError(u"{:s}.pseudo({!r}, {:d}, {!s}{:s}) : Unable to create the \"{:s}\" pseudo-register with dtype {:d} as there is one that already exists.".format('.'.join([cls.__module__, cls.__name__]), name, bits, pseudo_t, ", {:s}".format(internal.utils.string.kwargs(kwargs)) if kwargs else '', internal.utils.string.escape(name, '"'), dtype))
+
+        # prepare the register's namespace for attachment.
+        namespace = {key : value for key, value in pseudo_t.__dict__.items() }
+        namespace.update({'__name__': name, '__parent__': None, '__children__': {}, '__dtype__': dtype, '__position__': 0, '__size__': bits, '__ptype__': ptype})
+        namespace['realname'] = None
+        namespace['alias'] = kwargs.pop('alias', {item for item in []})
+        namespace['architecture'] = self
+
+        res = type(name, (pseudo_t,), namespace)(**kwargs)
+        self.__register__.__state__[name] = res
+        self.__cache__[key, dtype] = self.__cache__[key] = name
         return res
 
     def by_index(self, index):
@@ -677,7 +710,7 @@ else:
             # now we'll scan the entire mregspace for all other variable-byte registers
             # that "we" know about, but hexrays doesn't. (heh)
             iterable = ((ida_hexrays.get_mreg_name(midx, 1), midx) for midx in range(count))
-            iterable = ((name, midx) for name, midx in iterable if ida_hexrays.get_mreg_name(midx, bits // 8) == name)
+            iterable = ((name, midx) for name, midx in iterable if ida_hexrays.get_mreg_name(midx, bits // 8).lower() == name.lower())
             iterable = ((owner.by_name(name), midx) for name, midx in iterable if owner.has(name))
             mregindex.update({reg : midx for reg, midx in iterable if idaapi.reg2mreg(reg.id) < 0})
 
@@ -712,10 +745,9 @@ else:
                 head = results[root] = self.new(root.name, root.bits, idaname=root.realname if midx < 0 else midx, ptype=root.__ptype__, dtype=root.__dtype__)
                 for hidx in range(1, used[0]):
                     for (position, ptype), reg in matrix[hidx].items():
-                        assert reg not in mregindex
-                        midx = mregindex[registers[reg.name if reg.realname is None else reg.realname]]
-
-                        assert 0 <= midx
+                        assert(reg not in mregindex)
+                        dreg = registers[reg.name if reg.realname is None else reg.realname]
+                        midx = mregindex.get(dreg, -1)
                         parent = results[reg.__parent__]
                         results[reg] = self.child(parent, reg.name, position, reg.bits, idaname=midx, ptype=reg.__ptype__, dtype=reg.__dtype__)
                     continue
