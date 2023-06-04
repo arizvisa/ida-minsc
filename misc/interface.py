@@ -4418,7 +4418,110 @@ class instruction(object):
         return res
 
     @classmethod
-    def access(cls, ea):
+    def access_75(cls, ea):
+        '''Yield the ``opref_t`` for each operand belonging to the instruction at address `ea`.'''
+        READ, WRITE, MODIFY = getattr(idaapi, 'READ_ACCESS', 2), getattr(idaapi, 'WRITE_ACCESS', 1), getattr(idaapi, 'RW_ACCESS', 3)
+        get_operand_size = internal.utils.fcompose(*[operator.attrgetter('dtyp'), idaapi.get_dtyp_size] if idaapi.__version__ < 7.0 else [operator.attrgetter('dtype'), idaapi.get_dtype_size])
+        ea, architecture_word_size = int(ea), database.bits() // 8
+
+        # Get the register accesses for the instruction.
+        ra, insn, flags = idaapi.reg_accesses_t(), instruction.at(ea), address.flags(ea)
+        sflags = idaapi.sval_pointer(); sflags.assign(flags)
+        if not idaapi.ph_get_reg_accesses(ra, insn, sflags.value()):
+            return
+
+        # Grab the features and create some tools for accesing them.
+        features = cls.feature(ea)
+        Ffeature, Fflag = map(functools.partial(functools.partial, operator.and_), [features, flags])
+
+        # Get all the instruction-specific attributes that are relevant to the access_t of each operand.
+        is_call, is_jump, is_shift = cls.is_call(ea), cls.is_branch(ea), cls.is_shift(ea)
+        operands, MS_XTYPE = cls.operands(ea), Fflag(idaapi.MS_0TYPE | idaapi.MS_1TYPE)
+
+        # Grab all of the register accesses for the instruction grouped by opnum.
+        accesses, iterable = {}, (ra[index] for index in builtins.range(ra.size()))
+        [accesses.setdefault(item.opnum, []).append((item.access_type, item.regnum, item.range.bitoff(), item.range.bitsize())) for item in iterable]
+
+        # First we create tables that map the operand type to an xref flag. These contain
+        # the base flag to use when constructing an access_t prior to it being modified.
+        xref_call_table, xref_jump_table = {
+            idaapi.o_near: idaapi.fl_CN,
+            idaapi.o_far: idaapi.fl_CF,
+            idaapi.o_mem: idaapi.fl_CF,
+            idaapi.o_displ: idaapi.fl_CF,
+        }, {
+            idaapi.o_near: idaapi.fl_JN,
+            idaapi.o_far: idaapi.fl_JF,
+            idaapi.o_mem: idaapi.fl_JF,
+            idaapi.o_displ: idaapi.fl_JF,
+        }
+
+        # Now we can grab the operands and use them to yield each access. Branches and
+        # instructions get different semantics in that branches will always execute ('x')
+        # an address. The only difference is whether they load ('r') it or not. Regular
+        # instructions will read ('r') or write ('w') to their operand. However, if it's
+        # loading or storing to an address, then '&' will be used to signify that.
+        for opnum, op in enumerate(cls.operands(ea)):
+            word_sized, access = get_operand_size(op) == architecture_word_size, accesses.get(opnum, ())
+            used, modified = Ffeature(cls.uses_bits[opnum]), Ffeature(cls.changes_bits[opnum])
+            adds_xrefs = idaapi.op_adds_xrefs(flags, opnum) and op.type != idaapi.o_reg
+
+            # If this is a call, then we only need to distinguish whether it loads from
+            # some address. So the only two states, are loading from an address or not.
+            if Ffeature(idaapi.CF_CALL):
+                reftype = xref_call_table.get(op.type, idaapi.fl_CF if word_sized else idaapi.fl_CN)
+                check = op.type in {idaapi.o_displ, idaapi.o_phrase} if access else op.type in {idaapi.o_mem}
+                loading = True if Ffeature(idaapi.CF_JUMP) and op.type in {idaapi.o_displ, idaapi.o_phrase, idaapi.o_mem} else False
+                assert(check == loading), "{:s}.access_75({:#x}) : Operand {:d} of {:s} instruction with access ({!s}) is not an expected operand type ({:d}).".format('.'.join([__name__, cls.__name__]), ea, opnum, ' and '.join(feature for feature in ['CF_CALL', 'CF_JUMP'] if Ffeature(getattr(idaapi, feature))) or 'unknown', access, op.type)
+                realaccess = access_t(reftype, True) | 'r' if loading else access_t(reftype, True)
+
+            # If it's a jump, then we essentially do the same thing as a call. The
+            # only thing that's different is the base reftype used for the access_t.
+            elif is_jump:
+                reftype = xref_jump_table.get(op.type, idaapi.fl_JF if word_sized else idaapi.fl_JN)
+                check = op.type in {idaapi.o_displ} if not access else op.type in {idaapi.o_mem}
+                loading = True if Ffeature(idaapi.CF_JUMP) and op.type not in {idaapi.o_reg} else False
+                mod = 'w' if modified else 'r'
+                realaccess = access_t(reftype, True) | mod if loading else access_t(reftype, True)
+
+            # If the operand is both used and modified, then we check everything.
+            # If any are being modified (WRITE), then this is being updated. If
+            # none of the registers are modified then it's used for storing.
+            elif modified and used:
+                storing = all(item[0] & MODIFY != WRITE for item in access)
+                modifying = any(item[0] & MODIFY == WRITE for item in access)
+                referencing = adds_xrefs or op.type in {idaapi.o_mem, idaapi.o_displ, idaapi.o_phrase}
+                res = access_t(idaapi.dr_W, False) | 'r' if storing or modifying else access_t(idaapi.dr_R, False)
+                realaccess = res | '&' if referencing else res
+
+            # If the operand is just being used, then we only need to check if it's
+            # an immediate and/or it's referencing a memory address type.
+            elif used and not modified:
+                referencing = adds_xrefs if op.type in {idaapi.o_imm} else op.type in {idaapi.o_mem, idaapi.o_displ, idaapi.o_phrase}
+                reftype = idaapi.fl_USobsolete if op.type in {idaapi.o_imm} else idaapi.dr_R
+                realaccess = access_t(reftype, False) | '&' if referencing else access_t(reftype, False)
+
+            # If the operand is being modified, then it's only storing if all the
+            # registers are being read from. Then if the operand is an address type
+            # that could have references we add the '&' for it.
+            elif modified and not used:
+                storing = all(item[0] & MODIFY == READ for item in access)
+                referencing = adds_xrefs or op.type in {idaapi.o_mem, idaapi.o_displ, idaapi.o_phrase}
+                realaccess = access_t(idaapi.dr_W, False) | '&' if referencing or storing else access_t(idaapi.dr_W, False)
+
+            # If there's no registers accesses, then we only need to specially handle
+            # immediates and operands that will add xrefs.
+            else:
+                reftype = idaapi.fl_USobsolete if op.type in {idaapi.o_imm} else idaapi.dr_W if modified else idaapi.dr_R
+                referencing = adds_xrefs
+                realaccess = access_t(reftype, False) | '&' if referencing else access_t(reftype, False)
+
+            # Now we can just yield the correct access inside an opref_t for the caller.
+            yield opref_t(ea, opnum, realaccess)
+        return
+
+    @classmethod
+    def access_74(cls, ea):
         '''Yield the ``opref_t`` for each operand belonging to the instruction at the address `ea`.'''
         ea, fn, insn = int(ea), idaapi.get_func(int(ea)), cls.at(int(ea))
 
@@ -4456,7 +4559,7 @@ class instruction(object):
         # Anything else is just a regular instruction which can either read or write to its operand.
         else:
             xrefcode, xreftype, xrefdefault = False, {
-                idaapi.o_imm: [idaapi.fl_USobsolete, idaapi.dr_U],
+                idaapi.o_imm: [idaapi.fl_USobsolete, getattr(idaapi, 'dr_U', 0)],
             }, [idaapi.dr_R, idaapi.dr_W]
 
         # Iterate through all of the operands and yield their access_t.
@@ -4484,8 +4587,11 @@ class instruction(object):
             # If it's data and it references memory, then we need to update the access with '&'.
             elif op.type in {idaapi.o_imm} and has_xrefs:
                 access = access | '&'
+            elif op.type in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ}:
+                access = access | '&'
             yield opref_t(ea, opnum, access)
         return
+    access = access_74 if idaapi.__version__ < 7.5 else access_75
 
     @classmethod
     def reference(cls, ea, opnum, refinfo=None):
