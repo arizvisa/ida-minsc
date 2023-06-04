@@ -170,59 +170,97 @@ class architecture_t(object):
     def __getinitargs__(self): return
     def __getstate__(self): return
 
+    @classmethod
+    def __get_dtype_by_size__(cls, type, bits):
+        '''Return the disassembler data type (``idaapi.dt_*``) for the specified number of `bits` and `type`.'''
+        dtype_size, dtype_by_size = (idaapi.get_dtyp_size(op.dtyp), internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)) if idaapi.__version__ < 7.0 else (idaapi.get_dtype_size, idaapi.get_dtype_by_size)
+
+        # normally we'd just use get_dtype_by_size to map the size to its dtype, but this is
+        # actually borked in the disassembler for both tbyte and packreal (10 bytes each). So,
+        # we generate tables for looking it up...one for integers, and another for floats.
+        borked_dtype_integer = {dtype_size(dtype) : dtype for dtype in {idaapi.dt_tbyte}}
+        borked_dtype_float = {dtype_size(dtype) : dtype for dtype in {getattr(idaapi, 'dt_half', idaapi.dt_word), idaapi.dt_float, idaapi.dt_double, idaapi.dt_packreal}}
+
+        # add "long double", but only if it has a different size than the others.
+        borked_dtype_float.setdefault(dtype_size(idaapi.dt_ldbl), idaapi.dt_ldbl)
+
+        # now we just figure out which type, and then use it to select the correct table.
+        # then we can fetch the dtype from a table or fall back to get_dtype_by_size.
+        borked = borked_dtype_float if type is types.float else borked_dtype_integer
+        return idaapi.dt_bitfild if bits < 8 else borked.get(bits // 8, dtype_by_size(bits // 8))
+
     def new(self, name, bits, idaname=None, **kwargs):
         '''Add a new register to the current architecture's register cache.'''
+        key = name if idaname is None else idaname
 
-        # older
-        if idaapi.__version__ < 7.0:
-            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
-            dt_bitfield = idaapi.dt_bitfild
-        # newer
-        else:
-            dtype_by_size = idaapi.get_dtype_by_size
-            dt_bitfield = idaapi.dt_bitfild
-
-        #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
-        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        # now we just figure out which ptype, and then we can use it to
+        # determine the dtype if we weren't given one explicitly.
         ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
+        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), self.__get_dtype_by_size__(ptype, bits))
 
+        # check if the key has already been registered in the cache.
+        if (key, dtype) in self.__cache__ or key in self.__cache__:
+            cls, realname_description = self.__class__, '' if idaname is None else " for \"{:s}\"".format(internal.utils.string.escape(idaname, '"')) if isinstance(idaname, internal.types.string) else " ({:d})".format(idaname)
+            raise internal.exceptions.DuplicateItemError(u"{:s}.new({!r}, {:d}, {!r}{:s}) : Unable to create the \"{:s}\" register{:s} with dtype {:d} as there is one that already exists.".format('.'.join([cls.__module__, cls.__name__]), name, bits, idaname, ", {:s}".format(internal.utils.string.kwargs(kwargs)) if kwargs else '', internal.utils.string.escape(name, '"'), realname_description, dtype))
+
+        # now we can come up with the namespace and create the register.
         namespace = {key : value for key, value in interface.register_t.__dict__.items()}
         namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits, '__ptype__':ptype})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', {item for item in []})
         namespace['architecture'] = self
+
+        # create the register and assign it into our namespace.
         res = type(name, (interface.register_t,), namespace)()
         self.__register__.__state__[name] = res
-        key = name if idaname is None else idaname
+
+        # now we need to update the cache so that the register name can be looked up. we
+        # register the default key also so that grabbing the name gives us the root register.
         self.__cache__[key, dtype] = self.__cache__[key] = name
         return res
 
     def child(self, parent, name, position, bits, idaname=None, **kwargs):
         '''Add a new child register to the architecture's register cache.'''
+        assert(isinstance(parent, interface.register_t))
 
-        # older
-        if idaapi.__version__ < 7.0:
-            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
-            dt_bitfield = idaapi.dt_bitfild
-        # newer
-        else:
-            dtype_by_size = idaapi.get_dtype_by_size
-            dt_bitfield = idaapi.dt_bitfild
-
-        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
-        #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
+        # grab the type from the parameter if it exists, and then try to
+        # calculate the dtype with it if we weren't given one explicitly.
         ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
+        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), self.__get_dtype_by_size__(ptype, bits))
 
+        # confirm that the key hasn't already beeen used to register something else.
+        key = name if idaname is None else idaname
+        if (key, dtype) in self.__cache__:
+            cls, realname_description = self.__class__, '' if idaname is None else " for \"{:s}\"".format(internal.utils.string.escape(idaname, '"')) if isinstance(idaname, internal.types.string) else " ({:d})".format(idaname)
+            raise internal.exceptions.DuplicateItemError(u"{:s}.child({!s}, {!r}, {:d}, {:d}, {!r}{:s}) : Unable to create the \"{:s}\" register{:s} with dtype {:d} as there is one that already exists.".format('.'.join([cls.__module__, cls.__name__]), parent, name, position, bits, idaname, ", {:s}".format(internal.utils.string.kwargs(kwargs)) if kwargs else '', internal.utils.string.escape(name, '"'), realname_description, dtype))
+
+        # populate the namespace for the child register, and then use it.
         namespace = {key : value for key, value in interface.register_t.__dict__.items() }
         namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits, '__ptype__':ptype})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', {item for item in []})
         namespace['architecture'] = self
+
+        # create the child register, add it to our namespace, and update its parent
+        # to reference it so that we can traverse downard from the parent to it.
         res = type(name, (interface.register_t,), namespace)()
         self.__register__.__state__[name] = res
-        key = name if idaname is None else idaname
-        self.__cache__[key, dtype] = self.__cache__[key] = name
         parent.__children__[position, ptype] = res
+
+        # we now need to register the child into the cache. we conditionally register the
+        # default key so that we don't overwrite a root register that may already exist.
+        self.__cache__[key, dtype] = name
+        self.__cache__.setdefault(key, name)
+
+        # we also update the cache with any parent registers that are above us. if the
+        # parent is a real-register, then update the cache with us being relative to it.
+        if parent.realname is not None:
+            self.__cache__.setdefault((parent.realname, dtype), name)
+
+        # otherwise our parent is a pseudo-register (and our current register isn't), so
+        # we need to update the cache so that the parent register is relative to us.
+        elif idaname is not None:
+            self.__cache__.setdefault((idaname, parent.dtype), parent.name)
         return res
 
     def by_index(self, index):
@@ -259,8 +297,8 @@ class architecture_t(object):
 
     def by_indexsize(self, index, size):
         '''Return a register from the given architecture by its `index` and `size`.'''
-        dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
-        dtype = dtype_by_size(size)
+        ptype = self.by_index(index).__ptype__
+        dtype = self.__get_dtype_by_size__(ptype, 8 * size)
         return self.by_indextype(index, dtype)
     byindexsize = internal.utils.alias(by_indexsize)
 
@@ -675,7 +713,7 @@ else:
                 for hidx in range(1, used[0]):
                     for (position, ptype), reg in matrix[hidx].items():
                         assert reg not in mregindex
-                        midx = mregindex[registers[reg.realname]]
+                        midx = mregindex[registers[reg.name if reg.realname is None else reg.realname]]
 
                         assert 0 <= midx
                         parent = results[reg.__parent__]
@@ -734,6 +772,41 @@ else:
 
             # Otherwise we have a matching register, or the smallest one available.
             return register
+
+        def new(self, name, bits, idaname=None, **kwargs):
+            '''Add a new uregister to the current architecture's register cache overwriting the old one if it already exists.'''
+            key = name if idaname is None else idaname
+
+            # similar to our parent, architecture_t.new, we need the dtype for registration.
+            ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
+            dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), self.__get_dtype_by_size__(ptype, bits))
+
+            # now we can check the cache, remove any registers that exist, and chain to the parent.
+            [self.__cache__.pop(item) for item in [(key, dtype), key] if item in self.__cache__]
+            res = super(uarchitecture_t, self).new(name, bits, idaname, **kwargs)
+
+            # last thing to do is to ensure its registered in the cache. we overwrite any
+            # previous instances with the new register due to the way they get created.
+            self.__cache__[key, dtype] = self.__cache__[key] = name
+            return res
+
+        def child(self, parent, name, position, bits, idaname=None, **kwargs):
+            '''Add a new child uregister to the current architecture's register cache overwriting the old one if it already exists.'''
+            key = name if idaname is None else idaname
+
+            # here we do the same dance as architecture_t.child in order to get the dtype for registration.
+            ptype = builtins.next((kwargs[item] for item in ['ptype'] if item in kwargs), int)
+            dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), self.__get_dtype_by_size__(ptype, bits))
+
+            # go through the cache removing any other registers so that we can chain to the parent method.
+            [self.__cache__.pop(item) for item in [(key, dtype), key] if item in self.__cache__]
+            res = super(uarchitecture_t, self).child(parent, name, position, bits, idaname, **kwargs)
+
+            # all we need to do is to ensure its registered. uregisters are pretty much
+            # guaranteed to be unique since we use their index. so we overwrite everything.
+            self.__cache__[key, dtype] = self.__cache__[key] = name
+            return res
+
     logging.debug(u"{:s} : Successfully defined Hex-Rays (decompiler) microcode architecture.".format(__name__))
 
 class operands(object):
