@@ -54,8 +54,9 @@ def hex():
     version = sys.version_info.major
     F = operator.methodcaller('encode', 'hex') if version < 3 else operator.methodcaller('hex')
     integer_t = int, getattr(builtins, 'long', int)
+    cast, attributes = builtins.int, ['__int__', '__long__']
     def render(item):
-        return "{:x}".format(item) if isinstance(item, integer_t) else F(bytes(bytearray(item)))
+        return "{:x}".format(cast(item)) if isinstance(item, integer_t) or any(hasattr(item, attribute) for attribute in attributes) else F(bytes(bytearray(item)))
     return render
 hex = hex()
 
