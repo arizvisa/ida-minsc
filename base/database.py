@@ -477,6 +477,7 @@ class functions(object):
         `lumina` - Filter the functions that were detected by Lumina
         `exceptions` Filter the functions for any that either handles an exception or sets up a handler
         `tagged` - Filter the functions for any that use the specified tag(s)
+        `contents` - Filter the functions for any that use the specified tag(s) in their contents
         `predicate` - Filter the functions by passing their ``idaapi.func_t`` to a callable
 
     Some examples of how to use these keywords are as follows::
@@ -505,6 +506,7 @@ class functions(object):
     __matcher__.mapping('wrapper', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
     __matcher__.mapping('lumina', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, internal.tags.function.get, operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, internal.comment.contents.name, internal.types.set)
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))))
     __matcher__.predicate('predicate', interface.function.by_address), __matcher__.alias('pred', 'predicate')
 
@@ -1744,6 +1746,7 @@ class entries(object):
         `function` - Filter the entrypoints for any that are referencing a function
         `typed` - Filter the entrypoints for any that have type information applied to them
         `tagged` - Filter the entrypoints for any that use the specified tag(s)
+        `contents` - Filter the entrypoints for any that use the specified tag(s) in their contents
         `predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
 
     Some examples of using these keywords are as follows::
@@ -1767,6 +1770,7 @@ class entries(object):
     __matcher__.mapping('function', interface.function.has, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
+    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: internal.comment.contents.name(ea) if interface.function.has(ea) else internal.tags.address.get(ea).keys(), internal.types.set)
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal)
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), idaapi.get_entry_ordinal, idaapi.get_entry)
