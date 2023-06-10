@@ -469,6 +469,7 @@ class functions(object):
         `decorated` - Match the functions using C++ name decorations
         `arguments` or `args` - Filter the functions by the argument count or a list of counts
         `typed` - Filter the functions for any that have type information applied to them
+        `convention` or `cc` - Filter the functions for any that use the specified calling convention(s)
         `decompiled` - Filter the functions for any that have been decompiled
         `frame` - Filter the functions for any that contain a frame
         `problems` - Filter the functions for any that contain problems with their stack
@@ -509,6 +510,10 @@ class functions(object):
     __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, internal.comment.contents.name, internal.types.set)
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))))
     __matcher__.predicate('predicate', interface.function.by_address), __matcher__.alias('pred', 'predicate')
+    #__matcher__.boolean('convention', lambda parameter, convention: False if convention is None else parameter == convention if isinstance(parameter, internal.types.integer) else operator.contains(parameter, convention), interface.function.by_address, utils.fcondition(interface.function.has_typeinfo)(utils.fcompose(utils.fmap(utils.fidentity, interface.function.typeinfo), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK)), utils.fconstant(None)))
+    #__matcher__.combinator('convention', (lambda ccmap=(lambda ccmap: ccmap if [functools.reduce(utils.freverse(ccmap.setdefault), aliases, ccmap[key]) for aliases, key in map(reversed, [('__cdecl', ['cdecl']), ('__stdcall', ['std', '__std', 'stdcall']), ('__pascal', ['pascal']), ('__fastcall', ['fast', 'fastcall']), ('__thiscall', ['this', 'thiscall'])])] else ccmap)({'__cdecl': idaapi.CM_CC_CDECL, '__stdcall': idaapi.CM_CC_STDCALL, '__pascal': idaapi.CM_CC_PASCAL, '__fastcall': idaapi.CM_CC_FASTCALL, '__thiscall': idaapi.CM_CC_THISCALL}): utils.fcompose(utils.fcondition(utils.finstance(internal.types.integer, internal.types.string))(utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get), utils.fpack(internal.types.set)), utils.fcompose(utils.fpartial(utils.imap, utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get))), internal.types.set)), utils.fpartial(utils.fpartial, operator.contains)))(), interface.function.by_address, utils.fcondition(interface.function.has_typeinfo)(utils.fcompose(utils.fmap(utils.fidentity, interface.function.typeinfo), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK)), utils.fconstant({convention for convention in []})))
+    __matcher__.combinator('convention', (lambda ccmap=(lambda ccmap: ccmap if [functools.reduce(utils.freverse(ccmap.setdefault), aliases, ccmap[key]) for aliases, key in map(reversed, [('__cdecl', ['cdecl']), ('__stdcall', ['std', '__std', 'stdcall']), ('__pascal', ['pascal']), ('__fastcall', ['fast', 'fastcall']), ('__thiscall', ['this', 'thiscall'])])] else ccmap)({'__cdecl': idaapi.CM_CC_CDECL, '__stdcall': idaapi.CM_CC_STDCALL, '__pascal': idaapi.CM_CC_PASCAL, '__fastcall': idaapi.CM_CC_FASTCALL, '__thiscall': idaapi.CM_CC_THISCALL}): utils.fcompose(utils.fcondition(utils.finstance(internal.types.integer, internal.types.string))(utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get), utils.fpack(internal.types.set)), utils.fcompose(utils.fpartial(utils.imap, utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get))), internal.types.set)), utils.fpartial(utils.fpartial, operator.contains)))(), interface.function.by_address, utils.fmap(utils.fidentity, function.type), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK))
+    __matcher__.alias('cc', 'convention')
 
     if any(hasattr(idaapi, item) for item in ['is_problem_present', 'QueueIsPresent']):
         __matcher__.mapping('problems', operator.truth, utils.frpartial(function.type.problem, getattr(idaapi, 'PR_BADSTACK', 0xb)))
@@ -1744,6 +1749,7 @@ class entries(object):
         `less` or `le` - Filter the entrypoints for any before the specified address (inclusive)
         `lt` - Filter the entrypoints for any before the specified address (exclusive)
         `function` - Filter the entrypoints for any that are referencing a function
+        `convention` or `cc` - Filter the entrypoints for any that are using the specified calling convention(s)
         `typed` - Filter the entrypoints for any that have type information applied to them
         `tagged` - Filter the entrypoints for any that use the specified tag(s)
         `contents` - Filter the entrypoints for any that use the specified tag(s) in their contents
@@ -1775,6 +1781,8 @@ class entries(object):
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal), __matcher__.alias('pred', 'predicate')
+    __matcher__.combinator('convention', (lambda ccmap=(lambda ccmap: ccmap if [functools.reduce(utils.freverse(ccmap.setdefault), aliases, ccmap[key]) for aliases, key in map(reversed, [('__cdecl', ['cdecl']), ('__stdcall', ['std', '__std', 'stdcall']), ('__pascal', ['pascal']), ('__fastcall', ['fast', 'fastcall']), ('__thiscall', ['this', 'thiscall'])])] else ccmap)({'__cdecl': idaapi.CM_CC_CDECL, '__stdcall': idaapi.CM_CC_STDCALL, '__pascal': idaapi.CM_CC_PASCAL, '__fastcall': idaapi.CM_CC_FASTCALL, '__thiscall': idaapi.CM_CC_THISCALL}): utils.fcompose(utils.fcondition(utils.finstance(internal.types.integer, internal.types.string))(utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get), utils.fpack(internal.types.set)), utils.fcompose(utils.fpartial(utils.imap, utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get))), internal.types.set)), utils.fpartial(utils.fpartial, operator.contains)))(), idaapi.get_entry_ordinal, idaapi.get_entry, utils.fcondition(interface.function.has)(utils.fcompose(utils.fmap(utils.fidentity, interface.function.typeinfo), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK)), utils.fconstant({convention for convention in []})))
+    __matcher__.alias('cc', 'convention')
 
     def __new__(cls, *string, **type):
         '''Return the address of each entry point defined within the database as a list.'''
@@ -2303,6 +2311,8 @@ class imports(object):
         `bounds` - Filter the imports within the given boundaries
         `regex` - Filter the symbol names of all the imports according to a regular-expression
         `ordinal` - Filter the imports by the import hint (ordinal) or a list of hints
+        `function` - Filter the imports for any that are functions.
+        `convention` or `cc` - Filter the imports for any that using the specified calling convention(s)
         `typed` - Filter all of the imports based on whether they have a type applied to them
         `tagged` - Filter the imports for any that use the specified tag(s)
         `predicate` Filter the imports by passing the above (default) tuple to a callable
@@ -2367,6 +2377,9 @@ class imports(object):
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(0), internal.tags.address.get, operator.methodcaller('keys'), internal.types.set)
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), operator.itemgetter(0))
     __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
+    __matcher__.mapping('function', operator.methodcaller('is_funcptr'), operator.itemgetter(0), interface.address.typeinfo, utils.fdefault(idaapi.tinfo_t()))
+    __matcher__.combinator('convention', (lambda ccmap=(lambda ccmap: ccmap if [functools.reduce(utils.freverse(ccmap.setdefault), aliases, ccmap[key]) for aliases, key in map(reversed, [('__cdecl', ['cdecl']), ('__stdcall', ['std', '__std', 'stdcall']), ('__pascal', ['pascal']), ('__fastcall', ['fast', 'fastcall']), ('__thiscall', ['this', 'thiscall'])])] else ccmap)({'__cdecl': idaapi.CM_CC_CDECL, '__stdcall': idaapi.CM_CC_STDCALL, '__pascal': idaapi.CM_CC_PASCAL, '__fastcall': idaapi.CM_CC_FASTCALL, '__thiscall': idaapi.CM_CC_THISCALL}): utils.fcompose(utils.fcondition(utils.finstance(internal.types.integer, internal.types.string))(utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get), utils.fpack(internal.types.set)), utils.fcompose(utils.fpartial(utils.imap, utils.fcompose(utils.fpack(utils.fpartial(operator.mul, 2)), utils.funpack(ccmap.get))), internal.types.set)), utils.fpartial(utils.fpartial, operator.contains)))(), operator.itemgetter(0), utils.fcondition(utils.fcompose(interface.address.typeinfo, utils.fcondition(bool)(operator.methodcaller('is_funcptr'), utils.fconstant(False))))(utils.fcompose(utils.fmap(utils.fidentity, interface.address.typeinfo), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK)), utils.fconstant({convention for convention in []})))
+    __matcher__.alias('cc', 'convention')
 
     @classmethod
     def __iterate__(cls):
