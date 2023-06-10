@@ -1116,3 +1116,85 @@ class unmangled(object):
             # now we join everything back together, replacing the "<>" with "$$".
             string = '$$' + '$'.join(iterable) + '$$'
         return
+
+class convention(object):
+    """
+    This namespace exists for converting the user's specification
+    of a calling convention to the codes that the disassembler
+    uses. This way the special calling conventions used by the
+    disassembler can be interpreted by us, or specified by the
+    user in shorthand.
+    """
+
+    # 1-1 mapping of the user's choice to the convention code.
+    available = {
+        '__cdecl': idaapi.CM_CC_CDECL,
+        '__stdcall': idaapi.CM_CC_STDCALL,
+        '__thiscall': idaapi.CM_CC_THISCALL,
+        '__fastcall': idaapi.CM_CC_FASTCALL,
+        '__pascal': idaapi.CM_CC_PASCAL,
+
+        # the following conventions are special, and aren't really well supported by us.
+        #'__usercall': idaapi.CM_CC_SPECIAL,     # preserves stack
+        #'__usercall': idaapi.CM_CC_SPECIALP,    # purges stack
+        #'__usercall': idaapi.CM_CC_SPECIALE,    # includes ellipsis
+    }
+
+    # list that the user is allowed to choose from and match with.
+    choice = {
+        '__cdecl': {idaapi.CM_CC_CDECL, idaapi.CM_CC_VOIDARG, idaapi.CM_CC_ELLIPSIS},
+        '__stdcall': {idaapi.CM_CC_STDCALL, idaapi.CM_CC_VOIDARG},
+        '__thiscall': {idaapi.CM_CC_THISCALL},
+        '__fastcall': {idaapi.CM_CC_FASTCALL},
+        '__pascal': {idaapi.CM_CC_PASCAL},
+
+        # XXX: __usercall is special and we interpret it as either >= CM_CC_MANUAL, but excluding CM_CC_GOLANG if it exists
+        '__usercall': {cc & idaapi.CM_CC_MASK for cc in range(getattr(idaapi, 'CM_CC_MANUAL', 0x90), 0x100)},
+    }
+
+    # aliases that can resolve to one of our choices.
+    aliases = {
+        '__cdecl': ['cdecl'],
+        '__stdcall': ['std', 'stdcall'],
+        '__pascal': ['pascal'],
+        '__fastcall': ['fast', 'fastcall'],
+        '__thiscall': ['this', 'thiscall'],
+        idaapi.CM_CC_VOIDARG: ['void', 'voidarg'],
+        '__usercall': ['user'],
+
+    # these are all integers that the user can alias if they want.
+        idaapi.CM_CC_ELLIPSIS: ['...', 'dotdotdot', Ellipsis],
+        idaapi.CM_CC_UNKNOWN: ['?', None],
+    }
+
+    # if CM_CC_GOLANG is defined, then add it and remove it from
+    # our __usercall set. we also need to add its alias too.
+    if hasattr(idaapi, 'CM_CC_GOLANG'):
+        available['__golang'] = idaapi.CM_CC_GOLANG
+        choice['__golang'] = {idaapi.CM_CC_GOLANG}
+        choice['__usercall'] -= {idaapi.CM_CC_GOLANG}
+        aliases['__golang'] = ['go', 'golang']
+
+    # now we'll just do some functional tricks to update our
+    # list of choices and mappings with each of their aliases.
+    # XXX: we need a lambda to capture our dicts because python devers are
+    # retarded and they couldn't figure out how to avoid leaking locals.
+    # this is discussed in python/cpython#47942, but i'm not holding my breath.
+    (lambda choice, iterable: [functools.reduce(utils.freverse(choice.setdefault), aliases, choice.get(key, {key})) for key, aliases in iterable])(choice, aliases.items())
+    (lambda available, iterable: [functools.reduce(utils.freverse(available.setdefault), aliases, available.get(key, key)) for key, aliases in iterable])(available, aliases.items())
+
+    @classmethod
+    def matches(cls, *conventions):
+        '''Return a closure that when compared against an `idaapi.CM_CC_*` code will return true if matching one of the user's `conventions`.'''
+        iterable = (cls.choice.get(convention, {convention}) for convention in conventions)
+        result = functools.reduce(operator.or_, iterable, {empty for empty in []})
+        return functools.partial(operator.contains, result)
+
+    @classmethod
+    def get(cls, convention):
+        '''Return the `idaapi.CM_CC_*` code for the given `convention` provided as an integer or a string.'''
+        result = cls.available.get(convention, convention)
+        if isinstance(result, types.integer) and result & idaapi.CM_CC_MASK == result:
+            return result
+        cclookup = {item for item in cls.available if isinstance(item, types.string) and item.startswith('__')}
+        raise internal.exceptions.InvalidParameterError(u"{:s}.get({!r}) : The convention that was specified ({:s}) is not one of the known types ({:s}).".format('.'.join([__name__, cls.__name__]), convention, "{:d}".format(convention) if isinstance(convention, types.integer) else "{!r}".format(convention), ', '.join(cclookup)))
