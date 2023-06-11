@@ -3394,10 +3394,7 @@ class type(object):
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def convention(cls, func):
-        """Return the calling convention of the function `func`.
-
-        The integer returned corresponds to one of the ``idaapi.CM_CC_*`` constants.
-        """
+        '''Return the calling convention for the function `func` as an integer that corresponds to one of the ``idaapi.CM_CC_*`` constants.'''
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         try:
             _, ea = interface.addressOfRuntimeOrStatic(func)
@@ -3418,32 +3415,11 @@ class type(object):
         _, ftd = interface.tinfo.function_details(ea, ti)
         result, spoiled_count = ftd.cc & idaapi.CM_CC_MASK, ftd.cc & ~idaapi.CM_CC_MASK
         return result
-    @utils.multicase(func=(idaapi.func_t, types.integer), convention=types.string)
+    @utils.multicase(func=(idaapi.func_t, types.integer), convention=(types.string, types.none, types.ellipsis))
     @classmethod
     def convention(cls, func, convention):
-        '''Set the calling convention used by the prototype for the function `func` to the specified `convention` string.'''
-        cclookup = {
-            '__cdecl': idaapi.CM_CC_CDECL,
-            '__stdcall': idaapi.CM_CC_STDCALL,
-            '__pascal': idaapi.CM_CC_PASCAL,
-            '__fastcall': idaapi.CM_CC_FASTCALL,
-            '__thiscall': idaapi.CM_CC_THISCALL,
-        }
-
-        # Try to normalize the string so that it will match an entry in our table.
-        noncommonsuffix = {item for item in cclookup if not item.endswith('call')}
-        prefixed = convention.lower() if convention.startswith('__') else "__{:s}".format(convention).lower()
-        string = prefixed if operator.contains(noncommonsuffix, prefixed) or prefixed.endswith('call') else "{:s}call".format(prefixed)
-
-        # FIXME: we should probably use globs, or something more intelligent
-        #        to figure out what convention the user is trying apply.
-
-        # Verify that the string can be found in our lookup table, and then use it to grab our cc.
-        if not operator.contains(cclookup, string):
-            raise E.ItemNotFoundError(u"{:s}.convention({!r}, {!r}) : The convention that was specified ({!r}) is not of the known types ({:s}).".format('.'.join([__name__, cls.__name__]), func, convention, string, ', '.join(cclookup)))
-        cc = cclookup[string]
-
-        # Now we have the calling convention integer that we can use.
+        '''Set the calling convention used by the prototype for the function `func` to the string specified by `convention`.'''
+        cc = internal.declaration.convention.get(convention)
         return cls.convention(func, cc)
     @utils.multicase(func=(idaapi.func_t, types.integer), convention=types.integer)
     @classmethod
