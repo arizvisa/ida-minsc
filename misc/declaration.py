@@ -387,32 +387,26 @@ class extract(object):
         return declaration, name_segment
 
     @classmethod
-    def name_and_template(cls, string, range, segments, template='<>'):
-        '''Use the given `range` on the trimmed `string` with `segments` to return a tuple containing the template name, the segment of its parameters, and any qualifiers.'''
+    def name_and_template(cls, string, range, segments, delimiter={'::'}, template='<>'):
+        '''Use the given `range` on the trimmed `string` with `segments` to yield each component of a name delimited by `delimiter` as a tuple composed of the range for the name and its template parameters.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
-        ignored, symbols = {'', ' '}, {' ', '*', '&'}
+        ignored, delimiters = {'', ' '}, {' ', '*', '&'}
 
-        # we first need to scan for the template from the parameters (<>).
-        iterable = (string[left : right] for (left, right) in segments[::-1])
-        iterable = (index for index, item in enumerate(iterable) if item[:1] + item[-1:] == template)
-        pivot = next(iterable, len(segments))
+        # first we need to figure out where the name begins
+        # by scanning for the very first delimiter (space).
+        iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left : right] in delimiters)
+        index = next(iterable, 0)
+        selected = segments[-index:] if index else segments[:]
+        _, start = selected.pop(0) if index else (start, start)
 
-        # extract the qualifiers from the last segment, set our
-        # pivot point, and stash the qualifiers to return later.
-        _, point = (stop, stop) if not segments else segments[-pivot] if pivot else segments[-1]
-        qualifiers = (point, stop), segments[-pivot:] if pivot else []
-
-        # now we examine the last segment and ensure it's a template.
-        selected = segments[:-pivot] if pivot else segments[:]
-        parameters = left, right = selected.pop(-1) if selected else (stop, stop)
-        candidate = string[left : right]
-        assert(not selected or candidate[:1] + candidate[-1:] == template), candidate[:1] + candidate[-1:]
-
-        # whatever we didn't process is considered part of the name.
-        # the caller should've given us the exact range they wanted.
-        stop, _ = parameters
-        name_leftover = (start, stop), selected
-        return name_leftover, parameters, qualifiers
+        # now we have the range and segments for the entire name. we just need
+        # to check if it's a template, and extract its parameters if it is.
+        for (left, right), segments in token.split(string, (start, stop), selected, delimiter):
+            tail = start, stop = segments.pop() if segments else (right, right)
+            item = string[start : stop]
+            tail = point, _ = tail if item[:1] + item[-1:] == template else (right, right)
+            yield (left, point), tail
+        return
 
     @classmethod
     def function_pointer(cls, string, range, segments):
