@@ -436,6 +436,44 @@ class extract(object):
         return declaration, name_segment
 
     @classmethod
+    def beginning(cls, string, range, segments, delimiters={' ', '*', '&'}):
+        '''Use the given `string` with `range` and `segments` to return a tuple containing the selections before and after the first instance of any `delimiters`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+
+        # scan forwards until we encounter one of the given delimiters.
+        iterable = (index for index, (left, right) in enumerate(segments) if string[left : right] in delimiters)
+        index = next(iterable, len(segments))
+
+        # select our result and pivot around the discovered point (exclusive).
+        selected = segments[:index] if index < len(segments) else segments[:]
+        point, _ = segments[index] if index < len(segments) else (stop, stop)
+        result = (start, point), selected
+
+        # everything we didn't process contains the ending, so slice
+        # it up so that we can also return it with the selection.
+        ending = (point, stop), segments[len(selected):]
+        return result, ending
+
+    @classmethod
+    def ending(cls, string, range, segments, delimiters={' ', '*', '&'}):
+        '''Use the given `string` with `range` and `segments` to return a tuple containing the selections before and after the last instance of any `delimiters`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+
+        # scan backwards until we encounter one of the chosen delimiters.
+        iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left : right] in delimiters)
+        index = next(iterable, 0)
+
+        # now we can select our result and pivot around the discovered point.
+        selected = segments[-index:] if index else segments[:]
+        _, point = selected.pop(0) if index else (start, start)
+        result = (point, stop), selected
+
+        # everything in front of the point is the beginning, so
+        # we can just return that along with our selection.
+        beginning = (start, point), segments[:-len(selected)] if selected else segments[:]
+        return beginning, result
+
+    @classmethod
     def name_and_template(cls, string, range, segments, delimiter={'::'}, template='<>'):
         '''Use the given `range` on the trimmed `string` with `segments` to yield each component of a name delimited by `delimiter` as a tuple composed of the range for the name and its template parameters.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
