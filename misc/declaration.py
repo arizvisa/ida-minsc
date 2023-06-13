@@ -280,9 +280,9 @@ class nested(object):
                 stack.append(index)
             elif string[index] in close and stack and string[stack[-1]] == openers[string[index]]:
                 #segment = stack.pop(), index + 1
-                segment = stack.pop(), index + length
+                segment = left, right = stack.pop(), index + length
                 layer = tree.setdefault(stack[-1] if stack else None, [])
-                order.append(segment), layer.append(segment)
+                order.append(segment), layer.append(segment), tree.setdefault(left, [])
             else:
                 errors.append(index)
             continue
@@ -491,9 +491,9 @@ class token(nested):
                 stack.append(index)
             elif stack:
                 assert(token == tokens[1])
-                segment = stack.pop(), index + length
+                segment = left, right = stack.pop(), index + length
                 layer = tree.setdefault(stack[-1] if stack else None, [])
-                order.append(segment), layer.append(segment)
+                order.append(segment), layer.append(segment), tree.setdefault(left, [])
             else:
                 errors.append((index, index + length))
             continue
