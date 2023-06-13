@@ -360,6 +360,55 @@ class extract(object):
         return result_and_convention, name, parameters_range, qualifiers
 
     @classmethod
+    def declaration(cls, string, range, segments, qualifiers={'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '[clone]'}):
+        '''Use the given `range` and `segments` with `string` to return a tuple containing the selection for the type and a list of segments for its qualifiers.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        ignored = {item for item in itertools.chain([''], (qualifier[qualifier.rindex('('):] for qualifier in qualifiers if qualifier[-1] in ')'))}
+        symbols, requested = {'*', '&'}, {'*', '&'} | qualifiers
+
+        # most of the work is handled when stripping out the qualifiers.
+        decl, quals = cls.qualifiers(string, (start, stop), segments, qualifiers=qualifiers)
+
+        # we just need to clean up the qualifiers and convert them
+        # from a selection into the segments that we care about.
+        (start, stop), segments = quals
+        iterable = ((string[left : right], (left, right)) for left, right in segments)
+        iterable = (segment for item, segment in iterable if item[:1] + item[-1:] not in ignored)
+        result = [(left, right) for left, right in token.segments((start, stop), iterable) if string[left : right] in requested]
+
+        # now we can return the declaration along with the segments for the qualifiers.
+        return decl, result
+
+    @classmethod
+    def qualifiers(cls, string, range, segments, qualifiers={'const', 'volatile', 'throw()', 'throw(void)', 'noexcept'}):
+        '''Return a tuple containing the selections for the declaration and qualifiers using the given `range` and `segments` with `string`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        symbols, ignored = {' ', '*', '&'}, {item for item in itertools.chain([''], (qualifier[qualifier.rindex('('):] for qualifier in qualifiers if qualifier[-1] in ')'))}
+
+        # to consume qualifiers.. we need to consume tokens from our list of segments,
+        # but we need it flat with 1-char lengths since we're only looking for _exact_ tokens.
+        iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left : right] not in ignored)
+        result, index, point = 0, 0, stop
+        while point >= start:
+            index = next(iterable, 0)
+            if not index:
+                break
+            left, right = segments[-index]
+            if point > right and string[right : point] not in (qualifiers|symbols):
+                break
+            point, candidate = right, string[left : point]
+            if candidate not in (qualifiers|symbols):
+                break
+            result, point = index, left
+
+        # now everything after our index is considered a qualifier. we just need to
+        # subtract it from what we've parsed (the declaration) and return both of them.
+        point, selected = (stop, []) if not result else (point, segments[-result:]) if index else (point, segments[:])
+        qualifiers = (point, stop), selected
+        declaration = (start, point), segments[:-len(selected)] if len(selected) else segments[:]
+        return declaration, qualifiers
+
+    @classmethod
     def declaration_and_name(cls, string, range, segments):
         '''Use the given `range` on the trimmed `string` with `segments` to return a selection of its declaration and segment for its name.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
