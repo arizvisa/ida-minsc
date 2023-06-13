@@ -295,68 +295,35 @@ class extract(object):
 
     @classmethod
     def prototype(cls, tree, string, range=None):
-        '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the result type, name, list of parameters, and list of qualifiers.'''
+        '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the result type with convention, name, segment for parameters, and list of segments for qualifiers.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
-        branch, ignored, symbols = tree[start or None], {'', ' '}, {' ', '*', '&'}
+        ignored, symbols = {'', ' '}, {' ', '*', '&'}
 
-        # start by finding the assumed parameters and using it as our pivot.
-        iterable = (1 + index for index, (left, right) in enumerate(branch[::-1]) if string[left] + string[left : right][-1] == '()')
-        parameters_index = next(iterable)
+        # start by extracting away the qualifiers that we need to return and
+        # in exchange we'll have the declaration that we need to interpret.
+        declaration, qualifiers = cls.declaration(string, range, tree[start or None])
+        (start, stop), segments = declaration
 
-        # extract the qualifiers after the parameters, ignoring any
-        # empty strings or spaces that don't have any other meaning.
-        right, point = (start, stop) if not branch else branch[-parameters_index] if parameters_index else branch[-1]
-        qualifiers = (point, stop), branch[-parameters_index:][1:] if point < stop else []
+        # now the last segment of our declaration should be our parameters.
+        parameters_range = stop, _ = left, right = segments.pop() if segments else (len(string), len(string))
+        assert(string[left : left + 1] + string[right - 1 : right] == '()'), string[left : right]
 
-        # next token in the branch contains the parameters, we just need
-        # to pop it off and skip all whitespace to get to the name.
-        index, rindex, selection = 0, 1, branch[:-parameters_index] if parameters_index else branch[:]
-        (stop, _), (left, right) = branch[-parameters_index], selection[-rindex] if selection else (start, stop)
+        # since we should be being used to parse output from the disassembler,
+        # we can assume that everything up to the first whitespace is the name.
+        beginning, name = cls.ending(string, (start, stop), segments, delimiters=' ')
+        (start, stop), segments = beginning
 
-        # here we're checking both (left, right) for the token and (right, stop).
-        while rindex < len(selection) and string[right : stop] in ignored:
-            if string[left : right] not in ignored:
+        # loop in order to consume any of the trailing whitespace that's in the
+        # ignored set, that should trim the convention and we should be done.
+        point = stop
+        while segments and string[stop : point] in ignored:
+            _, point = segments[-1]
+            if point != stop:
                 break
-            index, rindex = rindex, rindex + 1
-            stop, (left, right) = left, selection[-rindex]
-
-        # if we got to the end, but "right" and "stop" are still the same, then
-        # the prototype is not well-formed and there's still whitespace to trim.
-        stop, name_index = (stop, index) if rindex < len(selection) or right != stop else (left, rindex)
-        assert(all(string[left : right] for left, right in selection[-index:]))
-
-        # first we need a list that filters away any tokens that are past
-        # the "stop" index which references the end of the prototype name.
-        iterable = selection[:] if not name_index else itertools.chain(selection[:-name_index], [selection[-name_index]]) if name_index < len(selection) else []
-        filtered = [(left, right) for left, right in iterable if left < stop]
-
-        # now that we have our list of relevant tokens, we just need to scan
-        # backwards until the first symbol. then, everything inside is the name.
-        iterable = (index for index, (left, right) in enumerate(filtered[::-1]) if string[left : right] in symbols)
-        index = next(iterable, 0)
-
-        # use the index to grab all tokens before the name. afterwards we
-        # can figure out the point in front of it and then store its tokens.
-        trimmed = filtered[:-index] if index else filtered[:]
-        _, point = trimmed[-1] if trimmed else (None, start)
-        name = (point, stop), filtered[-index:] if index else []
-
-        # everything else that we've trimmed contains the calling convention,
-        # the result type, and the scope. we only need to skip the whitespace.
-        index, rindex, stop = 0, 1, point
-        while rindex <= len(trimmed) and string[slice(*trimmed[-rindex])] in ignored:
-            left, right = trimmed[-rindex]
-            if stop != right:
-                break
-            stop, index, rindex = left, rindex, rindex + 1
-
-        # reset "stop" if it was malformed, and verify that we only trimmed whitespace.
-        stop, _ = trimmed[-index] if index else trimmed[-1] if trimmed else (start, point)
-        assert(all(string[left : right] in ignored for left, right in trimmed[-index:]))
+            stop, point = segments.pop()
 
         # that should be it.. we have every component and can return them.
-        result_and_convention = (start, stop), trimmed[:-index] if index else trimmed[:]
-        parameters_range = branch[-parameters_index]
+        result_and_convention = (start, stop), segments
         return result_and_convention, name, parameters_range, qualifiers
 
     @classmethod
