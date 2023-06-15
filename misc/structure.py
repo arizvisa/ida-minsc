@@ -1964,6 +1964,10 @@ class members_t(object):
         '''Iterate through all of the members of the structure that overlap the given `location`.'''
         return self.iterate(predicate=operator.truth, location=location)
 
+    def __call__(self, *string, **type):
+        '''Return each of the members within the structure as a list.'''
+        return [member for member in self.iterate(*string, **type)]
+
     @utils.multicase(string=(types.string, types.ordered))
     @utils.string.decorate_arguments('string', 'suffix')
     def list(self, string, *suffix):
