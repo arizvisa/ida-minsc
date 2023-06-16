@@ -1286,64 +1286,13 @@ class member_t(object):
 
     @utils.multicase()
     def tag(self):
-        '''Return the tags associated with the member.'''
-        repeatable = True
-
-        # grab the repeatable and non-repeatable comment
-        res = utils.string.of(idaapi.get_member_cmt(self.id, False))
-        d1 = internal.comment.decode(res)
-        res = utils.string.of(idaapi.get_member_cmt(self.id, True))
-        d2 = internal.comment.decode(res)
-
-        # check for duplicate keys
-        if six.viewkeys(d1) & six.viewkeys(d2):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).tag() : The repeatable and non-repeatable comment for {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.fullname), ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
-
-        # merge the dictionaries into one before adding implicit tags.
-        res = {}
-        [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
-
-        # the format of the implicit tags depend on the type of the member, which
-        # we actually extract from a combination of the name, and is_special_member.
-        specialQ = True if idaapi.is_special_member(self.id) else False
-
-        # now we need to check the name via is_dummy_member_name, and explicitly
-        # check to see if the name begins with field_ so that we don't use it if so.
-        idaname = idaapi.get_member_name(self.id) or ''
-        anonymousQ = True if any(F(idaname) for F in [idaapi.is_dummy_member_name, idaapi.is_anonymous_member_name, operator.methodcaller('startswith', 'field_')]) else False
-        name = utils.string.of(idaname)
-
-        # if the name is defined and not special in any way, then its a tag.
-        aname = '' if any([specialQ, anonymousQ]) else name
-        if aname:
-            res.setdefault('__name__', aname)
-
-        # The next tag is the type information that we'll need to explicitly check for
-        # because IDA will always figure it out and only want to include it iff the
-        # user has created the type through some explicit action.
-
-        # The documentation says that we should be checking the NALT_AFLAGS(8) or really
-        # the aflags_t of the member which works on structures (since the user will always
-        # be creating them). However, for frames we miss out on types that are applied by
-        # prototypes or ones that have been propagated to the member by Hex-Rays. So for
-        # frames it definitely seems like NSUP_TYPEINFO(0x3000) is the way to go here.
-        user_tinfoQ = idaapi.get_aflags(self.id) & idaapi.AFL_USERTI == idaapi.AFL_USERTI
-        sup_tinfoQ = internal.netnode.sup.has(self.id, idaapi.NSUP_TYPEINFO)
-        has_typeinfo = sup_tinfoQ if frame(self.parent.ptr) else user_tinfoQ
-        if has_typeinfo:
-            ti = self.typeinfo
-
-            # Now we need to attach the member name to our type. Hopefully it's not
-            # mangled in some way that will need consideration if it's re-applied.
-            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(internal.declaration.unmangled.parsable(aname) if aname else ''), '')
-            res.setdefault('__typeinfo__', ti_s)
-        return res
+        '''Return a dictionary of the tags associated with the member.'''
+        return internal.tags.member.get(self.ptr)
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
-        '''Return the tag identified by `key` belonging to the member.'''
-        res = self.tag()
+        '''Return the tag identified by `key` for the member.'''
+        res = internal.tags.member.get(self.ptr)
         if key in res:
             return res[key]
         cls = self.__class__
@@ -1352,96 +1301,12 @@ class member_t(object):
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the member.'''
-        repeatable = True
-
-        # Guard against a bunk type being used to set the value.
-        if value is None:
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.escape(key, '"'), value))
-
-        # Before we do absolutely anything, we need to check if the user is updating
-        # one of the implicit tags and act on them by assigning their new value.
-        if key == '__name__':
-            tags = self.tag()
-            result, self.name = tags.pop(key, None), value
-            return result
-
-        elif key == '__typeinfo__':
-            tags = self.tag()
-            result, self.typeinfo = tags.pop(key, None), value
-            return result
-
-        # We need to grab both types of comments so that we can figure out
-        # where the one that we're modifying is going to be located at.
-        comment_right = utils.string.of(idaapi.get_member_cmt(self.id, repeatable))
-        comment_wrong = utils.string.of(idaapi.get_member_cmt(self.id, not repeatable))
-
-        # Now we'll decode both comments and figure out which one contains the key
-        # that the user is attempting to modify. The "repeatable" variable is used
-        # to toggle which comment gets priority which modifying the member's tags.
-        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
-        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
-
-        # Check if the key is a dupe so that we can warn the user about it.
-        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
-        if key in duplicates:
-            cls = self.__class__
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.repr(self.fullname), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
-
-        # Now we just need to modify the state with the new value and re-encode it.
-        res, state[key] = state.get(key, None), value
-        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), where):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(self.fullname)))
-        return res
+        return internal.tags.member.set(self.ptr, key, value)
     @utils.multicase(key=types.string, none=types.none)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
-        '''Removes the tag specified by `key` from the member.'''
-        repeatable = True
-
-        # Check if the key is an implicit tag that we're being asked to
-        # remove so that we can remove it from whatever it represents.
-        if key == '__name__':
-            tags = self.tag()
-            result, self.name = tags.pop(key, None), None
-            return result
-
-        elif key == '__typeinfo__':
-            tags = self.tag()
-            result, self.typeinfo = tags.pop(key, None), None
-            return result
-
-        # Read both the comment types to figure out where the tag we want to remove is located at.
-        comment_right = utils.string.of(idaapi.get_member_cmt(self.id, repeatable))
-        comment_wrong = utils.string.of(idaapi.get_member_cmt(self.id, not repeatable))
-
-        # Now we need to decode them and figure out which comment the tag we need
-        # to remove is located in. This reads weird because "repeatable" is intended
-        # to toggle which comment type we give priority to during removal.
-        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
-        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
-
-        # If the key is not in the dictionary that we determined, then it's missing
-        # and so we need to bail with an exception since it doesn't exist.
-        if key not in state:
-            cls = self.__class__
-            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"'), utils.string.repr(self.fullname)))
-
-        # If there's any duplicate keys and the user's key is one of them, then warn
-        # the user about it so they'll know that they'll need to remove it twice.
-        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
-        if key in duplicates:
-            cls = self.__class__
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.repr(self.fullname), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
-
-        # The very last thing to do is to remove the key from the dictionary
-        # and then encode our updated state into the member's comment.
-        res = state.pop(key)
-        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), where):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(self.fullname)))
-        return res
+        '''Remove the tag identified by `key` from the member.'''
+        return internal.tags.member.remove(self.ptr, key, none)
 
     def refs(self):
         """Return the `(address, opnum, type)` of all the code and data references to this member within the database.
