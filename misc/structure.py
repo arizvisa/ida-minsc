@@ -414,7 +414,7 @@ class member(object):
         opinfo, unsigned = idaapi.opinfo_t(), idaapi.ea_pointer()
         opinfo.tid, _ = typeid, unsigned.assign(flag)
         if not idaapi.set_member_type(sptr, mptr.soff, unsigned.value(), opinfo, nbytes):
-            raise E.DisassemblerError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to assign the provided type ({!s}) to the {:s} member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, type, ", {:#x}".format(*map(int, offset)) if offset else '', type, 'union' if union(sptr) else 'structure', utils.string.escape(utils.string.of(fullname), '"'), mptr.id))
+            raise E.DisassemblerError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to assign the provided type ({!s}) to the {:s} member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, type, ", {:#x}".format(*map(int, offset)) if offset else '', type, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(utils.string.of(fullname), '"'), mptr.id))
 
         # XXX: On older versions of the disassembler, the structure might not have been "saved" and
         #      required us to race the member out of the database and re-verify.. To be fair, it
@@ -481,7 +481,7 @@ class member(object):
         prevti = idaapi.tinfo_t()
         ok = get_member_tinfo(prevti, mptr)
         if not ok:
-            logging.info(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to get the previous type information for the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+            logging.info(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to get the previous type information for the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
         original = prevti if ok else None
 
         # Now we can pass our tinfo_t along with the member information to the api.
@@ -494,12 +494,12 @@ class member(object):
 
         # We failed, so just raise an exception for the user to comprehend.
         elif res == idaapi.SMT_FAILED:
-            raise E.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to assign the provided type information to {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+            raise E.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to assign the provided type information to {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
 
         # If we received an alternative return code, then build a relevant message
         # that we can raise with an exception, so that the user knows what's up.
         error_name, error_description = cls.format_error_typeinfo(res)
-        raise E.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to assign the type to {:s} member \"{:s}\" due to error {:s}{:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"'), "{:s}({:d})".format(error_name, res) if error_name else "code ({:d})".format(res), ", {:s}".format(error_description) if error_description else ''))
+        raise E.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to assign the type to {:s} member \"{:s}\" due to error {:s}{:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"'), "{:s}({:d})".format(error_name, res) if error_name else "code ({:d})".format(res), ", {:s}".format(error_description) if error_description else ''))
 
     @classmethod
     def remove_typeinfo(cls, mptr):
@@ -527,7 +527,7 @@ class member(object):
         # try to create an unknown type since it's the best we can do without the api.
         ti = idaapi.tinfo_t()
         if not ti.create_simple_type(idaapi.BTF_UNK):
-            logging.warning(u"{:s}.remove_typeinfo({:#x}) : Unable to create an unknown {:s}({:d}) type to assign to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, 'BTF_UNK', idaapi.BTF_UNK, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+            logging.warning(u"{:s}.remove_typeinfo({:#x}) : Unable to create an unknown {:s}({:d}) type to assign to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, 'BTF_UNK', idaapi.BTF_UNK, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
         return cls.set_typeinfo(mptr, info)
 
     @classmethod
@@ -1759,108 +1759,19 @@ class member_t(object):
     @property
     def name(self):
         '''Return the name of the member.'''
-        res = idaapi.get_member_name(self.id) or ''
-        return utils.string.of(res)
+        return member.get_name(self.ptr)
     @name.setter
     @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the member to `string`.'''
-        if isinstance(string, types.ordered):
-            string = interface.tuplename(*string)
+        string = interface.tuplename(*string) if isinstance(string, types.ordered) else string
 
-        # Type safety is fucking valuable.
-        if not isinstance(string, (types.none, types.string)):
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).name({!r}) : Unable to assign the provided type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), self.id, string, string.__class__))
+        # Type safety is fucking valuable, and in python it's an after-thought.
+        if isinstance(string, (types.none, types.string)):
+            return member.set_name(self.ptr, string) if string else member.remove_name(self.ptr)
 
-        # If our string is empty, then we need to actually clear the name. This
-        # is actually a little tricky because the default name for a field is
-        # (field_%X) and two different ones for a frame (var_%X, arg_%X).
-        if not string:
-            sptr, mptr = self.parent.ptr, self.ptr
-
-            # Define our name formatters that we will eventually use.
-            fmtField = "field_{:X}".format
-            fmtVar = "var_{:X}".format
-            fmtArg = "arg_{:X}".format
-
-            # If it's not a function frame, then this is easy as we can just
-            # use mptr.soff to get the correct offset exactly.
-            if not frame(sptr):
-                result, self.name = self.name, fmtField(mptr.soff)
-                return result
-
-            # To process the frame, we first need the address of the function
-            # to get the func_t and the actual member offset to calculate with.
-            ea = idaapi.get_func_by_frame(sptr.id)
-            if ea == idaapi.BADADDR:
-                cls = self.__class__
-                raise E.DisassemblerError(u"{:s}({:#x}).name({!s}) : Unable to get the function for the frame ({:#x}) containing the structure member.".format('.'.join([__name__, cls.__name__]), self.id, string, sptr.id))
-
-            # We need to figure out all of the attributes we need in order to
-            # calculate the position within a frame this includes the integer size.
-            fn, moff = idaapi.get_func(ea), mptr.get_soff()
-            if fn is None:
-                cls = self.__class__
-                raise E.FunctionNotFoundError(u"{:s}({:#x}).name({!s}) : Unable to get the function at the specified address ({:#x}) which owns the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, string, ea, sptr.id))
-
-            # Now we need to figure out whether where our member is. If it's
-            # within the func_t.frsize, then we're a var_.
-            if moff < fn.frsize:
-                fmt, offset = fmtVar, fn.frsize - moff
-
-            # If it's within func_t.frregs, then we're a special ' s' name.
-            elif moff < idaapi.frame_off_retaddr(fn):
-                fmt, offset = (lambda _: ' s'), None
-
-            # If it's at the saved register, then we're a special ' r' name.
-            elif moff < idaapi.frame_off_args(fn):
-                fmt, offset = (lambda _: ' r'), None
-
-            # Anything else should be an argument so we will use 'arg_'
-            elif moff < idaapi.frame_off_args(fn) + fn.argsize:
-                fmt, offset = fmtArg, moff - idaapi.frame_off_args(fn)
-
-            # Anything else though...is a bug, it shouldn't happen unless IDA is not
-            # actually populating the fields correctly (looking at you x64). So, lets
-            # just be silently pedantic here.
-            else:
-                fmt, offset = fmtArg, moff - idaapi.frame_off_args(fn)
-                cls, mdescr = self.__class__, "index ({:d})".format(mptr.soff) if union(sptr) else "offset ({:#x})".format(mptr.soff)
-                logging.debug(u"{:s}({:#x}).name({!s}) : Treating the name for the member at {:s} as an argument due being located ({:#x}) outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, string, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
-
-            # Okay, now the last thing to do is to format our name and assign it..weeee, that was fun.
-            result, self.name = self.name, fmt(offset)
-            return result
-
-        # for the sake of being pedantic here too, we check to see if this is a special
-        # member, because if we touch it...it becomes non-special for some reason.
-        if idaapi.is_special_member(self.id):
-            cls, mdescr = self.__class__, "index ({:d})".format(mptr.soff) if union(sptr) else "offset ({:#x})".format(mptr.soff)
-            logging.warning(u"{:s}({:#x}).name({!r}) : Modifying the name for the special member at {:s} will unfortunately demote its special properties.".format('.'.join([__name__, cls.__name__]), self.id, string, mdescr))
-
-        # convert the specified string into a form that IDA can handle
-        ida_string = utils.string.to(string)
-
-        # validate the name
-        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
-        if ida_string and ida_string != res:
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure member name (\"{:s}\") resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
-            ida_string = res
-
-        # now we can set the name of the member at the specified offset
-        oldname = self.name
-        if not idaapi.set_member_name(self.parent.ptr, self.offset - self.parent.members.baseoffset, ida_string):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).name({!r}) : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(ida_string), utils.string.repr(oldname)))
-
-        # verify that the name was actually assigned properly
-        assigned = idaapi.get_member_name(self.id) or ''
-        if utils.string.of(assigned) != utils.string.of(ida_string):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
-        return oldname
+        cls = self.__class__
+        raise E.InvalidParameterError(u"{:s}({:#x}).name({!r}) : Unable to assign an unsupported type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), self.id, string, string.__class__))
 
     @property
     def comment(self, repeatable=True):
@@ -1909,21 +1820,7 @@ class member_t(object):
             info = type if isinstance(type, idaapi.tinfo_t) else internal.declaration.parse(type)
             if info is None:
                 raise E.InvalidTypeOrValueError(u"{:s}({:#x}).type({!s}) : Unable to parse the specified type declaration ({!s}) for structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(type)), utils.string.escape("{!s}".format(type), '"'), utils.string.repr(self.name)))
-
-            res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.soff, info, idaapi.SET_MEMTI_MAY_DESTROY)
-            if res in {idaapi.SMT_OK, idaapi.SMT_KEEP}:
-                return
-
-            elif res == idaapi.SMT_FAILED:
-                raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the type information ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(info)), utils.string.escape("{!s}".format(info), '"'), utils.string.repr(self.name)))
-
-            errtable = {
-                idaapi.SMT_BADARG: 'invalid parameters', idaapi.SMT_NOCOMPAT: 'incompatible type', idaapi.SMT_WORSE: 'worse type',
-                idaapi.SMT_SIZE: 'invalid type for member size', idaapi.SMT_ARRAY: 'setting function argument as an array is illegal',
-                idaapi.SMT_OVERLAP: 'the specified type would result in member overlap', idaapi.SMT_KEEP: 'the specified type is not ideal',
-            }
-            message = errtable.get(res, "unknown error {:#x}".format(res))
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the type information ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(info)), utils.string.escape("{!s}".format(info), '"'), utils.string.repr(self.name), message))
+            return member.set_typeinfo(self.ptr, info, idaapi.SET_MEMTI_MAY_DESTROY)
 
         # decompose the pythonic type into the actual information to apply.
         flag, typeid, nbytes = interface.typemap.resolve(type)
@@ -1958,101 +1855,22 @@ class member_t(object):
     @property
     def typeinfo(self):
         '''Return the type information of the current member.'''
-        ti = idaapi.tinfo_t()
+        return member.get_typeinfo(self.ptr)
 
-        # Guess the typeinfo for the current member. If we're unable to get the
-        # typeinfo then we just raise whatever we have. Let IDA figure it out.
-        ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr)
-        if not ok:
-            cls = self.__class__
-            logging.debug(u"{:s}({:#x}).typeinfo : Returning the guessed type that was determined for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
-        return ti
     @typeinfo.setter
     def typeinfo(self, info):
         '''Set the type information of the current member to `info`.'''
-        get_member_tinfo = idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
-        set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
-        tinfo_equals_to = idaapi.equal_types if idaapi.__version__ < 6.8 else lambda til, t1, t2: t1.equals_to(t2)
+        mptr = self.ptr
 
-        # Type safety is fucking valuable, and anything that doesn't match gives you an exception.
+        # Type safety is fucking valuable, and we are contractually obligated
+        # to deliver an exception for anything that doesn't match our needs.
         if not isinstance(info, (idaapi.tinfo_t, types.none, types.string)):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), info.__class__))
 
-        # If we're being asked to assign None to the type information, then we need to remove it.
-        if not info and hasattr(idaapi, 'del_member_tinfo') and idaapi.del_member_tinfo(self.parent.ptr, self.ptr):
-            return
-
-        # Otherwise the best we can do is to re-assign an empty type to clear it.
-        elif not info:
-            ti = idaapi.tinfo_t()
-
-            # Create an unknown type...since it's the best we can do without the api.
-            if not ti.create_simple_type(idaapi.BTF_UNK):
-                logging.warning(u"{:s}({:#x}).typeinfo({!s}) : Unable to create an unknown ({:s}) type to assign to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), 'BTF_UNK', utils.string.repr(self.name)))
-            info_description = "{!s}".format(info)
-
-        # Otherwise if it's a string, then we'll need to parse our info parameter into a
-        # tinfo_t, so that we can assign it to the typeinfo for the member.
-        elif isinstance(info, types.string):
-            ti = internal.declaration.parse(info)
-            if ti is None:
-                cls = self.__class__
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), utils.string.repr(info)))
-            info_description = utils.string.repr(info)
-
-        # If it's a tinfo_t, then we can just use it as-is.
-        elif isinstance(info, idaapi.tinfo_t):
-            ti, info_description = info, utils.string.repr("{!s}".format(info))
-
-        # We have no idea what kind of type this is, so we need to bitch and complain about it.
-        else:
-            cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign an unsupported type ({!s}) ot type type information for the member.".format('.'.join([__name__, cls.__name__]), self.id, info if info is None else utils.string.repr(info), info.__class__()))
-
-        # We want to detect type changes, so we need to get the previous type information of
-        # the member so that we can distinguish between an actual SMT_KEEP error or an error
-        # that occurred because the previous member type is the same as the new requested type.
-        prevti = idaapi.tinfo_t()
-        if not get_member_tinfo(prevti, self.ptr):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).typeinfo({!s}) : Unable to get the previous type information for the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, info_description, utils.string.repr(self.name)))
-
-        # Now we can pass our tinfo_t along with the member information to the api.
-        res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.soff, ti, idaapi.SET_MEMTI_COMPATIBLE)
-
-        # If we got an SMT_OK or we received SMT_KEEP with the previous member type and new
-        # member type being the same, then this request was successful and we can return.
-        if res == idaapi.SMT_OK or res == idaapi.SMT_KEEP and tinfo_equals_to(idaapi.get_idati(), ti, prevti):
-            return
-
-        # We failed, so just raise an exception for the user to handle.
-        elif res == idaapi.SMT_FAILED:
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, info_description, utils.string.repr(self.name)))
-
-        # If we received an alternative return code, then build a relevant
-        # message that we can raise with our exception.
-        if res == idaapi.SMT_BADARG:
-            message = 'invalid parameters'
-        elif res == idaapi.SMT_NOCOMPAT:
-            message = 'incompatible type'
-        elif res == idaapi.SMT_WORSE:
-            message = 'worse type'
-        elif res == idaapi.SMT_SIZE:
-            message = 'invalid type for member size'
-        elif res == idaapi.SMT_ARRAY:
-            message = 'setting function argument as an array is illegal'
-        elif res == idaapi.SMT_OVERLAP:
-            message = 'the specified type would result in member overlap'
-        elif res == idaapi.SMT_KEEP:
-            message = 'the specified type is not ideal'
-        else:
-            message = "unknown error {:#x}".format(res)
-
-        # Finally we can raise our exception so that the user knows whats up.
-        cls = self.__class__
-        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign the provided type information to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, info_description, utils.string.repr(self.name), message))
+        # If we're being asked to assign None to the type information, then we
+        # remove it..Otherwise, we'll make a compatible attempt to assign it.
+        return member.set_typeinfo(mptr, info) if info else member.remove_typeinfo(mptr)
 
     ### Private methods
     def __str__(self):
