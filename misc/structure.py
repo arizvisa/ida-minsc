@@ -157,6 +157,438 @@ class xref(object):
             continue
         return
 
+class member(object):
+    """
+    This namespace is _not_ the `member_t` class. Its purpose is to
+    expose some of the complicated disassembler-specific logic that is
+    found within that class to the outside world. It would be expected
+    that this type of namespace would be found in `internal.interface`,
+    but since the logic is only specific to structure members..it is
+    declared here instead. Similar to other namespaces, the functionality
+    within this one does not use objects of any kind.
+    """
+
+    @classmethod
+    def index(cls, mptr):
+        '''Return the index of the member specified by `mptr`.'''
+        packed = idaapi.get_member_by_id(mptr if isinstance(mptr, internal.types.integer) else mptr.id)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.index({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr if isinstance(mptr, types.integer) else mptr.id, mptr if isinstance(mptr, types.integer) else mptr.id))
+
+        # Verify that we have at least one member in the structure for sanity.
+        mptr, fullname, sptr = packed
+        if not sptr.memqty:
+            raise E.MemberNotFoundError(u"{:s}.index({:#x}) : Unable to find the member with the specified identifier ({:#x}) in a {:s} ({:#x}) with {:d} member{:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, mptr.id, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, sptr.memqty, '' if sptr.memqty == 1 else 's'))
+
+        # If the member is a union member, then we can trust the member_t.soff field.
+        elif mptr & idaapi.MF_UNIMEM:
+            return mptr.soff
+
+        # Otherwise, we need to use the sptr to figure out the index. Newer versions of the
+        # disassembler return an index of +1, so we first figure out which one we have.
+        base = idaapi.get_prev_member_idx(sptr, sptr.members[0].eoff)
+
+        # If the structure has more than two members, we check the previous index from
+        # the end of the current member. This should always succeed in newer versions.
+        if base and sptr.memqty > 2:
+            prev, next = idaapi.get_prev_member_idx(sptr, mptr.eoff), idaapi.get_next_member_idx(sptr, mptr.soff)
+            mindex = prev if prev >= 0 else next
+            return mindex - base
+
+        # If the base index is 0, then we only need to subtract one from the next member index.
+        elif sptr.memqty > 2:
+            next = idaapi.get_next_member_idx(sptr, mptr.soff)
+            mindex = sptr.memqty if next < 0 else next
+            return mindex - 1
+
+        # If there's only 1 or 2 members in the structure, then we can simply check the
+        # first index to see if it matches. If it doesn't, then it is the other index.
+        return 0 if mptr.id == sptr.get_member(0).id else 1
+
+    @classmethod
+    def get_name(cls, mptr):
+        '''Return the name of the member given by `mptr` as a string.'''
+        identifier = getattr(mptr, 'id', mptr)
+        res = idaapi.get_member_name(identifier) or ''
+        return utils.string.of(res)
+
+    @classmethod
+    def fullname(cls, mptr):
+        '''Return the full name of the member given my `mptr` as a string.'''
+        Fnetnode = getattr(idaapi, 'ea2node', utils.fidentity)
+        netnode = Fnetnode(getattr(mptr, 'id', mptr))
+        return utils.string.of(internal.netnode.name.get(netnode) if internal.netnode.name.get(netnode) else '')
+
+    @classmethod
+    def set_name(cls, mptr, string):
+        '''Set the name of the member given by `mptr` to `string` and return the original name.'''
+        string = interface.tuplename(*string) if isinstance(string, types.ordered) else string
+        if not isinstance(string, types.string):
+            raise E.InvalidParameterError(u"{:s}.set_name({:#x}, {!s}) : Unable to assign the unsupported type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), getattr(mptr, 'id', mptr), string, string.__class__))
+
+        # we need the sptr for the member to rename it. this is likely because the
+        # fullname is really a combination of the structure name and member name.
+        packed = idaapi.get_member_by_id(getattr(mptr, 'id', mptr))
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.set_name({:#x}, {!r}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), getattr(mptr, 'id', mptr), string, getattr(mptr, 'id', mptr)))
+
+        # technically we have the member name here if we extract the netnode name
+        # from sptr and subtract it from the beginning of fullname. this'd be how
+        # we could support the usage of (potentially) illegal characters.
+        mptr, fullname, sptr = packed
+
+        # for the sake of being pedantic here, we check to see if this is a special
+        # member, because if we touch it...it becomes non-special for some reason.
+        if idaapi.is_special_member(mptr.id):
+            mdescr = "index ({:d})".format(mptr.soff) if union(sptr) else "offset ({:#x})".format(mptr.soff)
+            logging.warning(u"{:s}.set_name({:#x}, {!r}) : Modifying the name for the special member \"{:s}\" at {:s} will unfortunately demote its special properties.".format('.'.join([__name__, cls.__name__]), mptr.id, string, utils.string.escape(utils.string.of(fullname), '"'), mdescr))
+
+        # convert the specified string into a form that IDA can handle
+        ida_string = utils.string.to(string)
+
+        # validate the name using the constraints for a netnode name.
+        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
+        if ida_string and ida_string != res:
+            logging.info(u"{:s}.set_name({:#x}, {!r}) : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, string, 'union' if union(sptr) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            ida_string = res
+
+        # now we can set the name of the member using its offset. another
+        # way that we can do this is to use `internal.netnode.name.set`.
+        oldname = cls.get_name(mptr)
+        if not idaapi.set_member_name(sptr, mptr.soff, ida_string):
+            raise E.DisassemblerError(u"{:s}.set_name({:#x}, {!r}) : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, string, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if union(sptr) else 'structure', utils.string.escape(fullname, '"')))
+
+        # verify that the name was actually assigned properly
+        assigned = idaapi.get_member_name(mptr.id) or ''
+        if utils.string.of(assigned) != utils.string.of(ida_string):
+            logging.info(u"{:s}.set_name({:#x}, {!r}) : The name ({:s}) that was assigned to the {:s} member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), mptr.id, string, utils.string.repr(utils.string.of(assigned)), 'union' if union(sptr) else 'structure', utils.string.repr(ida_string)))
+        return oldname
+
+    @classmethod
+    def remove_name(cls, mptr, none):
+        '''Reset the user-specified name on the member given by `mptr` and return the original name.'''
+        if not isinstance(none, types.none):
+            raise E.InvalidParameterError(u"{:s}({:#x}).name({!s}) : Unable to assign the unsupported type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), getattr(mptr, 'id', mptr), utils.string.repr(none) if isinstance(none, types.string) else none, none.__class__))
+
+        # we need the sptr for the member to reset its name since the default name
+        # actually depends on the type of the strucutre and where it's used.
+        packed = idaapi.get_member_by_id(getattr(mptr, 'id', mptr))
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.remove_name({:#x}, {!s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), getattr(mptr, 'id', mptr), none, getattr(mptr, 'id', mptr)))
+
+        # again, if we extract the netnode names from these we can combine them to confirm
+        # that they match the "fullname". we can support arbitrary characters like this.
+        mptr, fullname, sptr = packed
+
+        # if the sptr is a function frame, then this name varies based on which
+        # "segment" the offset is located in (lvars, registers, or args).
+        if frame(sptr):
+            return cls.__remove_name_frame(sptr, mptr, mptr.soff)
+
+        # otherwise, this is easy as we can just use mptr.soff to get the
+        # correct offset, and use it to format the name as "field_%X".
+        fmtField = "field_{:X}".format
+        return cls.set_name(mptr, fmtField(mptr.soff))
+
+    @classmethod
+    def __remove_name_frame(cls, sptr, mptr, offset):
+        '''Reset the user-specified name on the frame member given by `mptr` and return the original name.'''
+        fmtVar, fmtArg = "var_{:X}", "arg_{:X}"
+        fmtSpecial_s, fmtSpecial_r = (utils.fconstant(format) for format in [' s', ' r'])
+
+        # To process the frame, we first need the address of the function
+        # to get the func_t and the actual member offset to calculate with.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        if ea == idaapi.BADADDR:
+            raise E.DisassemblerError(u"{:s}.remove_name({:#x}, {!s}) : Unable to determine the address from the frame ({:#x}) containing the specified {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, None, sptr.id, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+
+        # We need to figure out all of the attributes we need in order to
+        # calculate the position within a frame this includes the integer size.
+        fn, moff = idaapi.get_func(ea), mptr.get_soff()
+        if fn is None:
+            raise E.FunctionNotFoundError(u"{:s}.remove_name({:#x}, {!s}) : Unable to get the function owning the frame ({:#x}) at the determined address ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, None, sptr.id, ea))
+
+        # Now we need to figure out where our member is. If it's within the
+        # `func_t.frsize`, then we're a "var_" relative to `func_t.frsize`.
+        if moff < fn.frsize:
+            fmt, offset = fmtVar, fn.frsize - moff
+
+        # If it's within `func_t.frregs`, then we're a special " s" name.
+        elif moff < idaapi.frame_off_retaddr(fn):
+            fmt, offset = fmtSpecial_s, None
+
+        # If it's at the saved registers, then we're a special " r" name.
+        elif moff < idaapi.frame_off_args(fn):
+            fmt, offset = fmtSpecial_r, None
+
+        # Anything else should be an argument that is relative to the sum
+        # of all the segments we chopped out. So we will use "arg_" here.
+        elif moff < idaapi.frame_off_args(fn) + fn.argsize:
+            fmt, offset = fmtArg, moff - idaapi.frame_off_args(fn)
+
+        # Anything else though...is a bug, it shouldn't happen unless IDA is not
+        # actually populating the fields correctly (looking at you x64). So, lets
+        # just be silently pedantic here.
+        else:
+            fmt, offset = fmtArg, moff - idaapi.frame_off_args(fn)
+            mdescr = "index ({:d})".format(mptr.soff) if union(sptr) else "offset ({:#x})".format(mptr.soff)
+            logging.debug(u"{:s}.remove_name({:#x}, {!s}) : Treating the name for the member at {:s} as an argument due its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, None, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
+
+        # We have our formatter and translated offset, so we can simply use it.
+        return cls.set_name(mptr, fmt(offset))
+
+    @classmethod
+    def get_type(cls, mptr, *offset):
+        '''Return the pythonic type of the member specified by `mptr` translated to the given `offset`.'''
+        opinfo = idaapi.opinfo_t()
+
+        # First, we'll need to get the structure associated with the member.
+        packed = idaapi.get_member_by_id(mptr.id if isinstance(mptr, idaapi.member_t) else mptr)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.get_type({:#x}{:s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr if isinstance(mptr, types.integer) else mptr.id, ", {:#x}".format(*map(int, offset)) if offset else '', mptr if isinstance(mptr, types.integer) else mptr.id))
+        mptr, fullname, sptr = packed
+        [moffset] = map(int, offset) if offset else [0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff]
+
+        # Now we can retrieve the information for the member in an opinfo_t.
+        flags, size = idaapi.as_uint32(mptr.flag), idaapi.get_member_size(mptr)
+        ok = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+
+        # Everything has been populated, so we need it in its pythonic form.
+        res = interface.typemap.dissolve(flags, opinfo.tid if ok else None, size, offset=moffset)
+        if isinstance(res, structure_t):
+            res = new(res.id, moffset)
+
+        elif isinstance(res, types.tuple):
+            iterable = (item for item in res)
+            item = next(iterable)
+            if isinstance(item, structure_t):
+                item = new(item.id, moffset)
+            elif isinstance(item, types.list) and isinstance(item[0], structure_t):
+                item[0] = new(item[0].id, moffset)
+            res = tuple(itertools.chain([item], iterable))
+        return res
+
+    @classmethod
+    def set_type(cls, mptr, type, *offset):
+        '''Apply the pythonic `type` at the given `offset` to the member specified by `mptr`.'''
+        flag, typeid, nbytes = interface.typemap.resolve(type)
+
+        # First, we'll need to get the structure associated with the member.
+        packed = idaapi.get_member_by_id(mptr.id)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr if isinstance(mptr, types.integer) else mptr.id, ", {:#x}".format(*map(int, offset)) if offset else '', type, mptr if isinstance(mptr, types.integer) else mptr.id))
+        mptr, fullname, sptr = packed
+        [moffset] = map(int, offset) if offset else [0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff]
+
+        # Grab the previous type from our member so we can return it later.
+        opinfo, flags, size = idaapi.opinfo_t(), idaapi.as_uint32(mptr.flag), idaapi.get_member_size(mptr)
+        ok = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+        result = interface.typemap.dissolve(flags, opinfo.tid if ok else None, size, offset=moffset)
+
+        # Now we have everything we need to apply the type that we resolved
+        # and we only need to ensure everything has the right signedness.
+        opinfo, unsigned = idaapi.opinfo_t(), idaapi.ea_pointer()
+        opinfo.tid, _ = typeid, unsigned.assign(flag)
+        if not idaapi.set_member_type(sptr, mptr.soff, unsigned.value(), opinfo, nbytes):
+            raise E.DisassemblerError(u"{:s}.set_type({:#x}, {!s}{:s}) : Unable to assign the provided type ({!s}) to the {:s} member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, type, ", {:#x}".format(*map(int, offset)) if offset else '', type, 'union' if union(sptr) else 'structure', utils.string.escape(utils.string.of(fullname), '"'), mptr.id))
+
+        # XXX: On older versions of the disassembler, the structure might not have been "saved" and
+        #      required us to race the member out of the database and re-verify.. To be fair, it
+        #      only happened when modifying in bulk. However, we're now avoiding that entirely.
+
+        # Update the reference information to handle pointers and return our result.
+        interface.address.update_refinfo(mptr.id, flag)
+        return result
+
+    @classmethod
+    def get_typeinfo(cls, mptr):
+        '''Return the type information of the member given by `mptr` guessing it if necessary.'''
+        ti = idaapi.tinfo_t()
+
+        # Guess the typeinfo for the current member. If we're unable to get the
+        # typeinfo then we just return whatever we have. Let IDA figure it out.
+        ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
+        if not ok:
+            logging.debug(u"{:s}.get_typeinfo({:#x}) : Returning the guessed type that was determined for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, utils.string.escape(cls.fullname(mptr.id), '"')))
+
+        error = idaapi.replace_ordinal_typerefs(ti.get_til(), ti) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if error < 0:
+            logging.debug(u"{:s}.get_typeinfo({:#x}) : Unable to strip the ordinals from the type associated with member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, utils.string.escape(cls.fullname(mptr.id), '"')))
+        return ti
+
+    @classmethod
+    def format_error_typeinfo(cls, code):
+        '''Return the specified error `code` as a tuple composed of the error name and its description.'''
+        descriptions, names = {}, {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('SMT_')}
+        descriptions[idaapi.SMT_BADARG] = 'bad parameters'
+        descriptions[idaapi.SMT_NOCOMPAT] = 'the new type is not compatible with the old type'
+        descriptions[idaapi.SMT_WORSE] = 'the new type is worse than the old type'
+        descriptions[idaapi.SMT_SIZE] = 'the new type is incompatible with the member size'
+        descriptions[idaapi.SMT_ARRAY] = 'arrays are forbidden as function arguments'
+        descriptions[idaapi.SMT_OVERLAP] = 'member would overlap with members that cannot be deleted'
+        descriptions[idaapi.SMT_FAILED] = 'failed to set new member type'
+        descriptions[idaapi.SMT_OK] = 'success: changed the member type'
+        descriptions[idaapi.SMT_KEEP] = 'no need to change the member type, the old type is better'
+        return names.get(code, ''), descriptions.get(code, '')
+
+    @classmethod
+    def set_typeinfo(cls, mptr, info, flags=idaapi.SET_MEMTI_COMPATIBLE):
+        '''Apply the type information in `info` to the member specified by `mptr` using the given `flags`.'''
+        if not isinstance(info, (idaapi.tinfo_t, types.string)):
+            raise E.InvalidParameterError(u"{:s}.set_typeinfo({:#x}, {!s}) : Unable to assign an unsupported type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), mptr.id, info if info is None else utils.string.repr(info), info.__class__))
+
+        # We first need to collect the correct APIs depending on the disassembler version.
+        get_member_tinfo = idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
+        set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
+        tinfo_equals_to = idaapi.equal_types if idaapi.__version__ < 6.8 else lambda til, t1, t2: t1.equals_to(t2)
+
+        # Now we need to forcefully convert our parameter to a `tinfo_t`.
+        ti, info_description = (info, utils.string.repr("{!s}".format(info))) if isinstance(info, idaapi.tinfo_t) else (internal.declaration.parse(info), utils.string.repr(info))
+
+        # Then we need the sptr for the member so that we can actually apply the type.
+        packed = idaapi.get_member_by_id(mptr.id)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, mptr.id))
+        mptr, fullname, sptr = packed
+
+        # We want to detect type changes, so we need to get the previous type information of
+        # the member so that we can distinguish between an actual SMT_KEEP error or an error
+        # that occurred because the previous member type is the same as the new requested type.
+        prevti = idaapi.tinfo_t()
+        ok = get_member_tinfo(prevti, mptr)
+        if not ok:
+            logging.info(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to get the previous type information for the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+        original = prevti if ok else None
+
+        # Now we can pass our tinfo_t along with the member information to the api.
+        res = set_member_tinfo(sptr, mptr, mptr.soff, ti, flags)
+
+        # If we got an SMT_OK or we received SMT_KEEP with the previous member type and new
+        # member type being the same, then this request was successful and we can return.
+        if res == idaapi.SMT_OK or res == idaapi.SMT_KEEP and tinfo_equals_to(idaapi.get_idati(), ti, prevti):
+            return original
+
+        # We failed, so just raise an exception for the user to comprehend.
+        elif res == idaapi.SMT_FAILED:
+            raise E.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to assign the provided type information to {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+
+        # If we received an alternative return code, then build a relevant message
+        # that we can raise with an exception, so that the user knows what's up.
+        error_name, error_description = cls.format_error_typeinfo(res)
+        raise E.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to assign the type to {:s} member \"{:s}\" due to error {:s}{:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"'), "{:s}({:d})".format(error_name, res) if error_name else "code ({:d})".format(res), ", {:s}".format(error_description) if error_description else ''))
+
+    @classmethod
+    def remove_typeinfo(cls, mptr, none):
+        '''Remove the type information from the member specified by `mptr`.'''
+        if not isinstance(info, types.none):
+            raise E.InvalidParameterError(u"{:s}.remove_typeinfo({:#x}, {!r}) : Unable to assign an unsupported type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), mptr.id, info, info.__class__))
+
+        # First we need to grab the original type, but only if it was explicitly assigned
+        # by the user. This is because our regular api _always_ guesses the type, and
+        # whenever applying or clearing the member's type we want to remain honest.
+        ti, get_member_tinfo = idaapi.tinfo_t(), idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
+        original = ti if get_member_tinfo(ti, mptr) else None
+
+        # Then we need the sptr for the member so that we can actually remove the type.
+        packed = idaapi.get_member_by_id(mptr.id)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.remove_typeinfo({:#x}, {!s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, none, mptr.id))
+        mptr, fullname, sptr = packed
+
+        # Next we need to check if the correct api for removing member type
+        # information, `idaapi.del_member_tinfo`, is available and use it if so.
+        if hasattr(idaapi, 'del_member_tinfo') and idaapi.del_member_tinfo(sptr, mptr):
+            return original
+
+        # Otherwise the best we can do is to re-assign an empty type to clear it. We
+        # try to create an unknown type since it's the best we can do without the api.
+        ti = idaapi.tinfo_t()
+        if not ti.create_simple_type(idaapi.BTF_UNK):
+            logging.warning(u"{:s}.remove_typeinfo({:#x}, {!s}) : Unable to create an unknown {:s}({:d}) type to assign to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, none, 'BTF_UNK', idaapi.BTF_UNK, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+        return cls.set_typeinfo(mptr, info)
+
+    @classmethod
+    def get_comment(cls, mptr, *repeatable):
+        """Return the comment from the member specified by `mptr` as a string, giving priority to the repeatable comment.
+
+        If `repeatable` is given as a boolean, return only that specific comment type from the member.
+        """
+        identifier = mptr.id if isinstance(mptr, idaapi.member_t) else mptr
+        res = idaapi.get_member_cmt(identifier, *repeatable) if repeatable else idaapi.get_member_cmt(identifier, True) or idaapi.get_member_cmt(identifier, False)
+        return utils.string.of(res or '')
+
+    @classmethod
+    def set_comment(cls, mptr, string, *repeatable):
+        """Assign the given `string` to the member specified by `mptr` and return the previous value, giving priority to the repeatable comment.
+
+        If `repeatable` is given as a boolean, then affect only that specific comment type of the member.
+        """
+        if not repeatable:
+            comment_r, comment_n = (utils.string.of(idaapi.get_member_cmt(mptr.id, repeatable)) for repeatable in [True, False])
+            prioritized = all([comment_r, comment_n]) or not any([comment_r, comment_n])
+            return cls.set_comment(mptr, string, True if prioritized or comment_r else comment_n)
+
+        # Now we should be able to use the repeatable parameter and raise an error if it fails.
+        result = idaapi.get_member_cmt(mptr.id, *repeatable)
+        if not idaapi.set_member_cmt(mptr, utils.string.to(string or ''), *repeatable):
+            [repeat], description = repeatable, cls.fullname(mptr)
+            raise E.DisassemblerError(u"{:s}.set_comment({:#x}, {!r}, {!s}) : Unable to assign the specified {:s}comment to the given member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, string, repeat, 'repeatable ' if repeat else '', "\"{:s}\"".format(utils.string.escape(description, '"')) if description else "{:#x}".format(mptr.id)))
+        return utils.string.of(result or '')
+
+    @classmethod
+    def contains(cls, mptr, offset):
+        '''Return whether the given `offset` resides within the member specified by `mptr`.'''
+        packed, realoffset = idaapi.get_member_by_id(mptr if isinstance(mptr, internal.types.integer) else mptr.id), int(offset)
+        if not packed:
+            return False
+
+        # Unpack the tuple we received from get_member_by_id, and check the member's boundaries.
+        mptr, fullname, sptr = packed
+        if mptr.props & idaapi.MF_UNIMEM:
+            return 0 <= realoffset < idaapi.get_member_size(mptr)
+        elif sptr.props & idaapi.SF_VAR and mptr.soff == mptr.eoff:
+            return mptr.eoff <= realoffset
+        return False if mptr.soff == mptr.eoff else mptr.soff <= realoffset < mptr.eoff
+
+    @classmethod
+    def element(cls, mptr):
+        '''Return the size for a single element belonging to the member specified by `mptr`.'''
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        opinfo, packed = idaapi.opinfo_t(), idaapi.get_member_by_id(mptr if isinstance(mptr, internal.types.integer) else mptr.id)
+        if packed:
+            mptr, fullname, sptr = packed
+            retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+            return get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None)
+        description = "{:#x}".format(mptr.id) if hasattr(mptr, 'id') else "{:#x}".format(mptr) if isinstance(mptr, internal.types.integer) else "{!s}".format(mptr)
+        identifier = mptr.id if hasattr(mptr, 'id') else mptr if isinstance(mptr, internal.types.integer) else idaapi.BADNODE
+        raise E.MemberNotFoundError(u"{:s}.element({:s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), description, identifier))
+
+    @classmethod
+    def size(cls, mptr):
+        '''Return the size for the member that is specified by `mptr`.'''
+        packed = idaapi.get_member_by_id(mptr if isinstance(mptr, internal.types.integer) else mptr.id)
+        if packed:
+            mptr, fullname, sptr = packed
+            return idaapi.get_member_size(mptr)
+        description = "{:#x}".format(mptr.id) if hasattr(mptr, 'id') else "{:#x}".format(mptr) if isinstance(mptr, internal.types.integer) else "{!s}".format(mptr)
+        identifier = mptr.id if hasattr(mptr, 'id') else mptr if isinstance(mptr, internal.types.integer) else idaapi.BADNODE
+        raise E.MemberNotFoundError(u"{:s}.size({:s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), description, identifier))
+
+    @classmethod
+    def at(cls, mptr, offset):
+        '''Return the distance of the given `offset` from the member in `mptr` as a tuple composed of an array index and element offset.'''
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        opinfo, moffset, msize = idaapi.opinfo_t(), 0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff, idaapi.get_member_size(mptr)
+
+        # Get any information about the member and use it to get the size of the type.
+        retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+        element = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None)
+
+        index, remainder = divmod(int(offset) - moffset, element)
+        return index, remainder
+
+####### The rest of this file contains only definitions of classes that may be instantiated.
+
 class structure_t(object):
     """
     This object is an abstraction around an IDA structure type. This
