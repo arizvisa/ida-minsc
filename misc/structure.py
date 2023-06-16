@@ -653,59 +653,13 @@ class structure_t(object):
 
     @utils.multicase()
     def tag(self):
-        '''Return the tags associated with the structure.'''
-        repeatable = True
-
-        # grab the repeatable and non-repeatable comment for the structure
-        res = utils.string.of(idaapi.get_struc_cmt(self.id, False))
-        d1 = internal.comment.decode(res)
-        res = utils.string.of(idaapi.get_struc_cmt(self.id, True))
-        d2 = internal.comment.decode(res)
-
-        # check for duplicate keys
-        if six.viewkeys(d1) & six.viewkeys(d2):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).tag() : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name), ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
-
-        # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
-        res = {}
-        [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
-
-        # Now we need to add implicit tags which are related to the structure.
-        sptr = self.ptr
-
-        # If we're a frame or we're unlisted, then we don't add the implicit
-        # "__name__" tag. This way the user can select for "__name__" and use
-        # it to distinguish local types and ghost types (which always have a name).
-        excluded = ['SF_FRAME', 'SF_NOLIST']
-        name = utils.string.of(idaapi.get_struc_name(sptr.id))
-        if name and not any([sptr.props & getattr(idaapi, attribute) for attribute in excluded if hasattr(idaapi, attribute)]):
-            res.setdefault('__name__', name)
-
-        # Now we need to do the '__typeinfo__' tag. This is going to be a little
-        # bit different than how we usually determine it, because we're going to
-        # use it to determine whether the user created this type themselves or it
-        # was created automatically. So, if it was copied from the type library
-        # (SF_TYPLIB), from the local types (SF_GHOST), or the user chose not to
-        # list it (SF_NOLIST), then we don't assign '__typeinfo__'.
-        excluded = ['SF_FRAME', 'SF_GHOST', 'SF_TYPLIB', 'SF_NOLIST']
-        if any([sptr.props & getattr(idaapi, attribute) for attribute in excluded if hasattr(idaapi, attribute)]):
-            pass
-
-        # SF_NOLIST is justified because if the user didn't want the structure to
-        # be listed, then we're just doing as we're told. Everything else should
-        # be justifiable because if the user did anything with the type, then
-        # the other flags should've been cleared.
-        else:
-            ti = self.typeinfo
-            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, '', '')
-            res.setdefault('__typeinfo__', ti_s)
-        return res
+        '''Return a dictionary of the tags associated with the structure.'''
+        return internal.tags.structure.get(self.ptr)
     @utils.multicase(key=types.string)
     @utils.string.decorate_arguments('key')
     def tag(self, key):
-        '''Return the tag identified by `key` belonging to the structure.'''
-        res = self.tag()
+        '''Return the tag identified by `key` for the structure.'''
+        res = internal.tags.structure.get(self.ptr)
         if key in res:
             return res[key]
         cls = self.__class__
@@ -714,83 +668,12 @@ class structure_t(object):
     @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the structure.'''
-        repeatable = True
-
-        # Guard against a bunk type being used to set the value.
-        if value is None:
-            cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.escape(key, '"'), value))
-
-        # First we need to read both comments to figure out what the user is trying to say.
-        comment_right = utils.string.of(idaapi.get_struc_cmt(self.id, repeatable))
-        comment_wrong = utils.string.of(idaapi.get_struc_cmt(self.id, not repeatable))
-
-        # Decode the tags that are written to both comment types to figure out which
-        # comment type the user actually means. The logic here reads weird because the
-        # "repeatable" variable toggles which comment to give priority. We explicitly
-        # check the "wrong" place but fall back to the "right" one.
-        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
-        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
-
-        # If there were any duplicate keys in any of the dicts, then warn the user about it.
-        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
-        if key in duplicates:
-            cls = self.__class__
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, value, utils.string.repr(self.name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
-
-        # Now we can just update the dict and re-encode to the proper comment location.
-        res, state[key] = state.get(key, None), value
-        if not idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), where):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(self.name)))
-        return res
+        return internal.tags.structure.set(self.ptr, key, value)
     @utils.multicase(key=types.string, none=types.none)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
-        '''Removes the tag specified by `key` from the structure.'''
-        repeatable = True
-
-        # First we check if the key is one of the implicit tags that we support. These
-        # aren't we can modify since they only exist in special circumstances.
-        if key in {'__name__', '__typeinfo__'} and key in self.tag():
-            message_typeinfo = 'modified by the user from the default type library'
-            message_name = 'flagged as listed by the user'
-
-            # The characteristics aren't actually documented anywhere, so we'll raise an
-            # exception that attempts to describe what causes them to exist. Hopefully
-            # the user figures out that they can use them to find structures they created.
-            cls, message = self.__class__, message_typeinfo if key == '__typeinfo__' else message_name
-            raise E.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove the implicit tag \"{:s}\" due to the structure being {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"'), message))
-
-        # We need to read both comments to figure out where the tag is that we're trying to remove.
-        comment_right = utils.string.of(idaapi.get_struc_cmt(self.id, repeatable))
-        comment_wrong = utils.string.of(idaapi.get_struc_cmt(self.id, not repeatable))
-
-        # Decode the tags that are written to both comment types, and then test them
-        # to figure out which comment the key is encoded in. In this, we want
-        # "repeatable" to be a toggle and we want to default to the selected comment.
-        state_right, state_wrong = map(internal.comment.decode, [comment_right, comment_wrong])
-        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
-
-        # If the key isn't where we expect it, then raise an exception since we can't
-        # remove it if it doesn't actually exist.
-        if key not in state:
-            cls = self.__class__
-            raise E.MissingTagError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.escape(key, '"'), utils.string.repr(self.name)))
-
-        # If the key is in both dictionaries, then be kind and warn the user about it
-        # so that they'll know that their key will still be part of the dict.
-        duplicates = six.viewkeys(state_right) & six.viewkeys(state_wrong)
-        if key in (six.viewkeys(state_right) & six.viewkeys(state_wrong)):
-            cls = self.__class__
-            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for structure {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), self.id, key, none, utils.string.repr(self.name), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
-
-        # Now we can just pop the value out of the dict and re-encode back into the comment.
-        res = state.pop(key)
-        if not idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), where):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(self.name)))
-        return res
+        '''Remove the tag identified by `key` from the structure.'''
+        return internal.tags.structure.remove(self.ptr, key, none)
 
     def destroy(self):
         '''Remove the structure from the database.'''
