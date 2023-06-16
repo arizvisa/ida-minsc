@@ -291,16 +291,14 @@ class member(object):
         return oldname
 
     @classmethod
-    def remove_name(cls, mptr, none):
+    def remove_name(cls, mptr):
         '''Reset the user-specified name on the member given by `mptr` and return the original name.'''
-        if not isinstance(none, types.none):
-            raise E.InvalidParameterError(u"{:s}({:#x}).name({!s}) : Unable to assign the unsupported type ({!s}) as the name for the member.".format('.'.join([__name__, cls.__name__]), getattr(mptr, 'id', mptr), utils.string.repr(none) if isinstance(none, types.string) else none, none.__class__))
+        packed = idaapi.get_member_by_id(getattr(mptr, 'id', mptr))
 
         # we need the sptr for the member to reset its name since the default name
-        # actually depends on the type of the strucutre and where it's used.
-        packed = idaapi.get_member_by_id(getattr(mptr, 'id', mptr))
+        # actually depends on the type of the structure and where it's used.
         if not packed:
-            raise E.MemberNotFoundError(u"{:s}.remove_name({:#x}, {!s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), getattr(mptr, 'id', mptr), none, getattr(mptr, 'id', mptr)))
+            raise E.MemberNotFoundError(u"{:s}.remove_name({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), getattr(mptr, 'id', mptr), getattr(mptr, 'id', mptr)))
 
         # again, if we extract the netnode names from these we can combine them to confirm
         # that they match the "fullname". we can support arbitrary characters like this.
@@ -326,13 +324,13 @@ class member(object):
         # to get the func_t and the actual member offset to calculate with.
         ea = idaapi.get_func_by_frame(sptr.id)
         if ea == idaapi.BADADDR:
-            raise E.DisassemblerError(u"{:s}.remove_name({:#x}, {!s}) : Unable to determine the address from the frame ({:#x}) containing the specified {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, None, sptr.id, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+            raise E.DisassemblerError(u"{:s}.remove_name({:#x}) : Unable to determine the address from the frame ({:#x}) containing the specified {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, sptr.id, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
 
         # We need to figure out all of the attributes we need in order to
         # calculate the position within a frame this includes the integer size.
         fn, moff = idaapi.get_func(ea), mptr.get_soff()
         if fn is None:
-            raise E.FunctionNotFoundError(u"{:s}.remove_name({:#x}, {!s}) : Unable to get the function owning the frame ({:#x}) at the determined address ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, None, sptr.id, ea))
+            raise E.FunctionNotFoundError(u"{:s}.remove_name({:#x}) : Unable to get the function owning the frame ({:#x}) at the determined address ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, sptr.id, ea))
 
         # Now we need to figure out where our member is. If it's within the
         # `func_t.frsize`, then we're a "var_" relative to `func_t.frsize`.
@@ -358,7 +356,7 @@ class member(object):
         else:
             fmt, offset = fmtArg, moff - idaapi.frame_off_args(fn)
             mdescr = "index ({:d})".format(mptr.soff) if union(sptr) else "offset ({:#x})".format(mptr.soff)
-            logging.debug(u"{:s}.remove_name({:#x}, {!s}) : Treating the name for the member at {:s} as an argument due its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, None, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
+            logging.debug(u"{:s}.remove_name({:#x}) : Treating the name for the member at {:s} as an argument due its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
 
         # We have our formatter and translated offset, so we can simply use it.
         return cls.set_name(mptr, fmt(offset))
@@ -504,21 +502,20 @@ class member(object):
         raise E.DisassemblerError(u"{:s}.set_typeinfo({:#x}, {!s}, {:#x}) : Unable to assign the type to {:s} member \"{:s}\" due to error {:s}{:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, info_description, flags, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"'), "{:s}({:d})".format(error_name, res) if error_name else "code ({:d})".format(res), ", {:s}".format(error_description) if error_description else ''))
 
     @classmethod
-    def remove_typeinfo(cls, mptr, none):
+    def remove_typeinfo(cls, mptr):
         '''Remove the type information from the member specified by `mptr`.'''
-        if not isinstance(info, types.none):
-            raise E.InvalidParameterError(u"{:s}.remove_typeinfo({:#x}, {!r}) : Unable to assign an unsupported type ({!s}) to the type information for the member.".format('.'.join([__name__, cls.__name__]), mptr.id, info, info.__class__))
+        ti = idaapi.tinfo_t()
 
         # First we need to grab the original type, but only if it was explicitly assigned
         # by the user. This is because our regular api _always_ guesses the type, and
         # whenever applying or clearing the member's type we want to remain honest.
-        ti, get_member_tinfo = idaapi.tinfo_t(), idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
+        get_member_tinfo = idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
         original = ti if get_member_tinfo(ti, mptr) else None
 
         # Then we need the sptr for the member so that we can actually remove the type.
         packed = idaapi.get_member_by_id(mptr.id)
         if not packed:
-            raise E.MemberNotFoundError(u"{:s}.remove_typeinfo({:#x}, {!s}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, none, mptr.id))
+            raise E.MemberNotFoundError(u"{:s}.remove_typeinfo({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mptr.id))
         mptr, fullname, sptr = packed
 
         # Next we need to check if the correct api for removing member type
@@ -530,7 +527,7 @@ class member(object):
         # try to create an unknown type since it's the best we can do without the api.
         ti = idaapi.tinfo_t()
         if not ti.create_simple_type(idaapi.BTF_UNK):
-            logging.warning(u"{:s}.remove_typeinfo({:#x}, {!s}) : Unable to create an unknown {:s}({:d}) type to assign to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, none, 'BTF_UNK', idaapi.BTF_UNK, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+            logging.warning(u"{:s}.remove_typeinfo({:#x}) : Unable to create an unknown {:s}({:d}) type to assign to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, 'BTF_UNK', idaapi.BTF_UNK, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
         return cls.set_typeinfo(mptr, info)
 
     @classmethod
