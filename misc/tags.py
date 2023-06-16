@@ -871,3 +871,89 @@ class member(object):
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(declaration.unmangled.parsable(aname) if aname else ''), '')
             res.setdefault('__typeinfo__', ti_s)
         return res
+
+    @classmethod
+    def set(cls, mptr, key, value):
+        '''Set the tag identified by `key` to `value` for the structure member specified by `mptr`.'''
+        repeatable = True
+
+        # Guard against a bunk type being used to set the value.
+        if value is None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, mptr.id, key, value, utils.string.escape(key, '"'), value))
+
+        # Before we do absolutely anything, we need to check if the user is updating
+        # one of the implicit tags and act on them by assigning their new value.
+        if key == '__name__':
+            tags, original = cls.get(mptr), internal.structure.member.set_name(mptr, value)
+            return tags.pop(key, None)
+
+        elif key == '__typeinfo__':
+            tags, original = cls.get(mptr), internal.structure.member.set_typeinfo(mptr, value)
+            return tags.pop(key, None)
+
+        # We need to grab both types of comments so that we can figure out
+        # where the one that we're modifying is going to be located at.
+        comment_right = utils.string.of(idaapi.get_member_cmt(mptr.id, repeatable))
+        comment_wrong = utils.string.of(idaapi.get_member_cmt(mptr.id, not repeatable))
+
+        # Now we'll decode both comments and figure out which one contains the key
+        # that the user is attempting to modify. The "repeatable" variable is used
+        # to toggle which comment gets priority which modifying the member's tags.
+        state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+
+        # Check if the key is a dupe so that we can warn the user about it.
+        duplicates = {item for item in state_right} & {item for item in state_wrong}
+        if key in duplicates:
+            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), mptr.id, key, value, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # Now we just need to modify the state with the new value and re-encode it.
+        res, state[key] = state.get(key, None), value
+        if not idaapi.set_member_cmt(mptr, utils.string.to(comment.encode(state)), where):
+            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, value, 'repeatable' if where else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
+        return res
+
+    @classmethod
+    def remove(cls, mptr, key, none):
+        '''Remove the tag identified by `key` from the structure member specified by `mptr`.'''
+        if none is not None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('database', ea, key, none, utils.string.escape(key, '"'), none))
+        repeatable = True
+
+        # Check if the key is an implicit tag that we're being asked to
+        # remove so that we can remove it from whatever it represents.
+        if key == '__name__':
+            tags, original = cls.get(mptr), internal.structure.member.remove_name(mptr)
+            return tags.pop(key, None)
+
+        elif key == '__typeinfo__':
+            tags, original = cls.get(mptr), internal.structure.member.remote_typeinfo(mptr)
+            return tags.pop(key, None)
+
+        # Read both the comment types to figure out where the tag we want to remove is located at.
+        comment_right = utils.string.of(idaapi.get_member_cmt(mptr.id, repeatable))
+        comment_wrong = utils.string.of(idaapi.get_member_cmt(mptr.id, not repeatable))
+
+        # Now we need to decode them and figure out which comment the tag we need
+        # to remove is located in. This reads weird because "repeatable" is intended
+        # to toggle which comment type we give priority to during removal.
+        state_right, state_wrong = map(comment.decode, [comment_right, comment_wrong])
+        state, where = (state_right, repeatable) if key in state_right else (state_wrong, not repeatable) if key in state_wrong else (state_right, repeatable)
+
+        # If the key is not in the dictionary that we determined, then it's missing
+        # and so we need to bail with an exception since it doesn't exist.
+        if key not in state:
+            raise internal.exceptions.MissingTagError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove non-existing tag \"{:s}\" from the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, utils.string.escape(key, '"'), utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
+
+        # If there's any duplicate keys and the user's key is one of them, then warn
+        # the user about it so they'll know that they'll need to remove it twice.
+        duplicates = {item for item in state_right} & {item for item in state_wrong}
+        if key in duplicates:
+            logging.warning(u"{:s}({:#x}).tag({!r}, {!r}) : The repeatable and non-repeatable comment for member {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(duplicates), 'repeatable' if where else 'non-repeatable'))
+
+        # The very last thing to do is to remove the key from the dictionary
+        # and then encode our updated state into the member's comment.
+        res = state.pop(key)
+        if not idaapi.set_member_cmt(mptr, utils.string.to(comment.encode(state)), where):
+            raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
+        return res
