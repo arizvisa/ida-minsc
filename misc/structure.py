@@ -206,6 +206,32 @@ class member(object):
         return 0 if mptr.id == sptr.get_member(0).id else 1
 
     @classmethod
+    def has_name(cls, mptr):
+        '''Return whether the name of the member specified by `mptr` is user-defined.'''
+        packed = idaapi.get_member_by_id(mptr.id)
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.has_name({:#x}) : Unable to find the member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mptr.id))
+        mptr, fullname, sptr = packed
+
+        # now we can grab the name of the member. we could also extract
+        # it from `fullname`, but this is how i've been always doing it.
+        res = idaapi.get_member_name(mptr.id) or ''
+        name = utils.string.of(res)
+
+        # if the sptr is not a function frame, then this is easy and we
+        # only have to check to see if the name matches "field_%X".
+        if not frame(sptr):
+            #return name.startswith('field_')   # XXX: this is how the disassembler does it..
+            expected = "field_{:X}".format(mptr.soff)
+            return name != expected             # but this is more accurate.
+
+        # otherwise this is a frame and we can use the disassembler api. we _could_
+        # check the member location and use it to differentiate lvars, registers,
+        # and args..but the disassembler doesn't let users use those prefixes anyways.
+        idaname = utils.string.to(name)
+        return not (idaapi.is_dummy_member_name(idaname) or idaapi.is_anonymous_member_name(idaname) or idaapi.is_special_member(mptr.id))
+
+    @classmethod
     def get_name(cls, mptr):
         '''Return the name of the member given by `mptr` as a string.'''
         identifier = getattr(mptr, 'id', mptr)
@@ -249,19 +275,19 @@ class member(object):
         # validate the name using the constraints for a netnode name.
         res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
         if ida_string and ida_string != res:
-            logging.info(u"{:s}.set_name({:#x}, {!r}) : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, string, 'union' if union(sptr) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            logging.info(u"{:s}.set_name({:#x}, {!r}) : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, string, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
         # now we can set the name of the member using its offset. another
         # way that we can do this is to use `internal.netnode.name.set`.
         oldname = cls.get_name(mptr)
         if not idaapi.set_member_name(sptr, mptr.soff, ida_string):
-            raise E.DisassemblerError(u"{:s}.set_name({:#x}, {!r}) : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, string, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if union(sptr) else 'structure', utils.string.escape(fullname, '"')))
+            raise E.DisassemblerError(u"{:s}.set_name({:#x}, {!r}) : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, string, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(fullname, '"')))
 
         # verify that the name was actually assigned properly
         assigned = idaapi.get_member_name(mptr.id) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
-            logging.info(u"{:s}.set_name({:#x}, {!r}) : The name ({:s}) that was assigned to the {:s} member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), mptr.id, string, utils.string.repr(utils.string.of(assigned)), 'union' if union(sptr) else 'structure', utils.string.repr(ida_string)))
+            logging.info(u"{:s}.set_name({:#x}, {!r}) : The name ({:s}) that was assigned to the {:s} member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), mptr.id, string, utils.string.repr(utils.string.of(assigned)), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.repr(ida_string)))
         return oldname
 
     @classmethod
