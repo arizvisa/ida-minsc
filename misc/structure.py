@@ -1939,6 +1939,9 @@ class members_t(object):
         `index` - Filter the structure members by an index or a list of indices
         `fullname` - Filter the structure members by matching its full name according to a glob
         `comment` or `comments` - Filter the structure members by applying a glob to its comment
+        `named` - Filter the structure members for any that use a name specified by the user
+        `tagged` - Filter the structure members for any that use the specified tag(s)
+        `typed` - Filter the structure members for any that have type information applied to them
         `identifier` or `id` - Filter the structure members by an identifier or a list of identifiers
         `bounds` - Match the structure members that overlap with the given boundaries
         `location` - Match the structure members that overlap with the specified location
@@ -2932,6 +2935,9 @@ class members_t(object):
     __members_matcher.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(utils.fpartial(operator.methodcaller, 'overlaps'), utils.fcompose(utils.funpack(interface.bounds_t), utils.fpartial(operator.methodcaller, 'overlaps'))), 'bounds')
     __members_matcher.combinator('location', utils.fcondition(utils.finstance(interface.location_t))(utils.fcompose(operator.attrgetter('bounds'), utils.fpartial(operator.methodcaller, 'overlaps')), utils.fcompose(utils.funpack(interface.location_t), operator.attrgetter('bounds'), utils.fpartial(operator.methodcaller, 'overlaps'))), 'bounds')
     __members_matcher.combinator('within', utils.fcondition(utils.finstance(interface.bounds_t))(utils.fcompose(utils.fpartial(operator.methodcaller, 'contains')), utils.fcompose(utils.funpack(interface.bounds_t), utils.fpartial(operator.methodcaller, 'contains'))), 'bounds')
+    __members_matcher.mapping('named', operator.truth, 'ptr', member.has_name)
+    __members_matcher.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), 'ptr', internal.tags.member.get, operator.methodcaller('keys'), internal.types.set, utils.freverse(operator.sub, {'__name__', '__typeinfo__'}))
+    __members_matcher.mapping('typed', operator.truth, 'ptr', functools.partial(idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo, idaapi.tinfo_t()))
     __members_matcher.boolean('ge', operator.le, utils.fmap(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add)), __members_matcher.alias('greater', 'ge')
     __members_matcher.boolean('gt', operator.lt, utils.fmap(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add))
     __members_matcher.boolean('le', operator.ge, 'offset')
