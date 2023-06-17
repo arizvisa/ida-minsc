@@ -7,7 +7,7 @@ function and type declarations.
 TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
-import functools, operator, itertools, string as _string
+import functools, operator, itertools, logging, string as _string
 
 import internal, idaapi
 from internal import utils, exceptions, types
@@ -1252,3 +1252,566 @@ class convention(object):
             return result
         cclookup = {item for item in cls.available if isinstance(item, types.string) and item.startswith('__')}
         raise internal.exceptions.InvalidParameterError(u"{:s}.get({!r}) : The convention that was specified ({:s}) is not one of the known types ({:s}).".format('.'.join([__name__, cls.__name__]), convention, "{:d}".format(convention) if isinstance(convention, types.integer) else "{!r}".format(convention), ', '.join(cclookup)))
+
+class mangled(object):
+    """
+    This class processes a mangled symbol in a number of
+    ways. It is intended as a base class and provides
+    general functionality to infer information from a
+    mangled and demangled symbol.
+    """
+
+    # First we need a staticmethod that can be used to identify the type
+    # of mangled name that works independent of the disassembler version.
+    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
+    type = staticmethod(utils.fcompose(utils.string.to, idaapi.get_mangled_name_type) if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.string.to, utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN)))
+
+    # Now a staticmethod that's the gateway to our disassembler api.
+    decode = staticmethod(utils.fcompose(utils.fpack(utils.fmap(utils.fcompose(operator.itemgetter(0), utils.string.to), utils.fcompose(operator.itemgetter(1), int))), utils.funpack(idaapi.demangle_name2 if hasattr(idaapi, 'demangle_name2') else idaapi.demangle_name), utils.string.of))
+
+    # This is a list of all of the types known by the disassembler's COMP_MS(1) compiler demangler.
+    #itertools.chain(*(map(fmt, string.ascii_uppercase + string.digits) for fmt in ["{:s}".format, "_{:s}".format, "__{:s}".format]))
+    _declaration_types = [
+        'signed char',
+        'char',
+        'unsigned char',
+        'short',
+        'unsigned short',
+        'int',
+        'unsigned int',
+        'long',
+        'unsigned long',
+        '__segment',
+        'float',
+        'double',
+        'long double',
+        'void',
+        '__int8',
+        'unsigned __int8',
+        '__int16',
+        'unsigned __int16',
+        '__int32',
+        'unsigned __int32',
+        '__int64',
+        'unsigned __int64',
+        '__int128',
+        'unsigned __int128',
+        'bool',
+        'char8_t',
+        'char16_t',
+        'char32_t',
+        'wchar_t',
+        'schar',
+        'char',
+        'uchar',
+        'short',
+        'ushort',
+        'int',
+        'uint',
+        'long',
+        'ulong',
+        '__segment',
+        'float',
+        'double',
+        'long double',
+        'void',
+        '__int8',
+        'unsigned __int8',
+        '__int16',
+        'unsigned __int16',
+        '__int32',
+        'unsigned __int32',
+        '__int64',
+        'unsigned __int64',
+        '__int128',
+        'unsigned __int128',
+        'bool',
+        'char8_t',
+        'char16_t',
+        'char32_t',
+        'wchar_t',
+    ]
+
+    _declaration_scopes = {
+        'private:',
+        'protected:',
+        'public:',
+        '[thunk]:',
+    }
+
+    _declaration_specifiers = {
+        '__declspec(dllimport)',    # "__imp_" prefix
+        '__declspec(dllexport)',
+        'declspec(dllimport)',
+        'declspec(dllexport)',
+        '`non-virtual thunk to\'',
+        '`virtual thunk to\'',
+        '`covariant return thunk to\'',
+    }
+
+    _declaration_operators = {
+        'operator new':         'new',
+        'operator delete':      'delete',
+        'operator new[]':       'new_array',
+        'operator delete[]':    'delete_array',
+
+        'operator=':            'assign',
+        'operator[]':           'subscript',
+        'operator->':           'pointer',
+        'operator->*':          'pointer_member',
+        'operator,':            'comma',
+        'operator()':           'call',
+
+        'operator++':           'increment',
+        'operator--':           'decrement',
+        'operator+':            'add',
+        'operator-':            'subtract',
+        'operator*':            'multiply',
+        'operator/':            'divide',
+        'operator%':            'remainder',
+        'operator<<':           'shiftleft',
+        'operator>>':           'shiftright',
+
+        'operator!':            'not',
+        'operator==':           'equal',
+        'operator!=':           'notequal',
+        'operator<':            'less',
+        'operator<=':           'lessequal',
+        'operator>':            'greater',
+        'operator>=':           'greaterequal',
+        'operator<=>':          'spaceship',
+
+        'operator&&':           'and',
+        'operator||':           'or',
+
+        'operator~':            'bnot',
+        'operator&':            'band',
+        'operator|':            'bor',
+        'operator^':            'bxor',
+
+        'operator+=':           'add_assign',
+        'operator-=':           'subtract_assign',
+        'operator*=':           'multiply_assign',
+        'operator/=':           'divide_assign',
+        'operator%=':           'remainer_assign',
+        'operator<<=':          'shiftleft_assign',
+        'operator>>=':          'shiftright_assign',
+
+        'operator&=':           'band_assign',
+        'operator|=':           'bor_assign',
+        'operator^=':           'bxor_assign',
+    }
+
+    def __init__(self, symbol, mask, Ftransform=None):
+        '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
+        self.__encoded = encoded = symbol
+        decoded = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.__extract_scope(self.__extract_specifiers(self.decode(encoded, mask)))
+        transformed = Ftransform(decoded) if Ftransform else decoded
+        self.__decoded = transformed
+        self.tokens = tokens = self.tokens[:] if hasattr(self, 'tokens') else []
+        order, result, errors = token.parse(transformed, tokens)
+        self.__tree__, self.__mangled = result, True if errors else False
+        return transformed, order, result, errors
+
+    def __extract_specifiers(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers}):
+        '''Remove a declaration specifier "__declspec" from the beginning of the unmangled `string` if it exists.'''
+        index, _ = next(token.indices(string, breaking_characters), (-1, None)) if len(breaking_characters) > 1 else (string.find(*breaking_characters), 1)
+        point = 1 + index
+        if string[:point] in self._declaration_specifiers:
+            self.__declaration_specifier = string[:point]
+            return string[point:].lstrip()
+
+        elif string.startswith(('__declspec', '`')):
+            logging.warning(u"{:s}.__extract_specifiers({!r}): Unknown declaration specifier was found at the beginning of the decoded string \"{:s}\".".format('.'.join([__name__, cls.__name__]), string, utils.string.escape(string, '"')))
+            point = 1 + string.find(' ')
+            self.__declaration_specifier = string[:point] if string[point : point + 1] == ' ' else ''
+            return string[point:].lstrip()
+
+        self.__declaration_specifier = ''
+        return string
+
+    def __extract_scope(self, string):
+        '''Remove a scope from the beginning of an unmangled `string` if it exists.'''
+        point = 1 + string.find(':')
+        if string[:point] in self._declaration_scopes:
+            self.__declaration_scope = string[:point]
+            return string[point:].lstrip()
+
+        self.__declaration_scope = ''
+        return string
+
+    @property
+    def encoded(self):
+        '''Return the mangled string before it was decoded.'''
+        return self.__encoded
+
+    @property
+    def string(self):
+        '''Return the decoded string after being demangled.'''
+        return self.__encoded if self.__mangled else self.__decoded
+
+    @property
+    def scope(self):
+        '''Return the scope of the decoded string after being demangled.'''
+        return self.__declaration_scope
+
+    @property
+    def specifier(self):
+        '''Return the declaration specifier of the decoded string after being demangled.'''
+        return self.__declaration_specifier
+
+    def has(self, index):
+        '''Return whether the specified `index` contains tokens inside of it.'''
+        return index in self.__tree__
+
+    def branch(self, index):
+        '''Return a list of the segments within the demangled string at the specified `index`.'''
+        index, _ = index if isinstance(index, tuple) else (index, index)
+        return self.__tree__.get(index, [])
+
+    def name(self):
+        '''Yield the name and a selection for the template parameters belonging to each component of the name from the decoded string.'''
+        raise NotImplementedError
+
+    def result(self):
+        '''Return the type from the decoding string after being demangled.'''
+        raise NotImplementedError
+
+class function(mangled):
+    """
+    This class processes a mangled function name in a number of ways
+    and is specific to the demangler that the disassembler provides.
+    After the name has been demangled and lexed into its segments,
+    some of the attributes about the demangled function can be inferred.
+
+    This class does not implement a full parser (for performance reasons),
+    or a full demangler to avoid having to maintain them for all of
+    the compilers supported by the disassembler.
+    """
+    tokens = ['()', '<>', '[]', '{}', "`'", ' ', ',', '*', '&', ['::']]
+
+    # Default flags that we'll use for demangling a function name.
+    flags = [
+        getattr(idaapi, 'MNG_NOPTRTYP', 0x00000007),    # fear, near, __ptr64 : no way to keep ptr64
+
+        getattr(idaapi, 'MNG_ZPT_SPACE', 0x00400000),
+        getattr(idaapi, 'MNG_SHORT_S', 0x00100000),     # signed int -> sint
+        getattr(idaapi, 'MNG_SHORT_U', 0x00200000),     # unsigned int -> uint
+
+        getattr(idaapi, 'MNG_NOECSU', 0x00002000),      # class/struct/union/enum
+        getattr(idaapi, 'MNG_NOSTVIR', 0x00001000),     # static/virtual : might want this
+        getattr(idaapi, 'MNG_NOTHROW', 0x00000800),
+        getattr(idaapi, 'MNG_NOPOSTFC', 0x00000200),    # const suffix
+
+        getattr(idaapi, 'MNG_NOCLOSUR', 0x00008000),    # __closure
+        getattr(idaapi, 'MNG_NOUNALG', 0x00010000),     # __unaligned
+        getattr(idaapi, 'MNG_NOMANAGE', 0x00020000),    # managed underscores
+    ]
+
+    # These operators have unnested spaces. So if we want to preserve parameter
+    # information it's just easier to join them together into a single token.
+    _declaration_operators_with_spaces = {
+        'operator new':         'new',
+        'operator delete':      'delete',
+        'operator new[]':       'new_array',
+        'operator delete[]':    'delete_array',
+        'operator co_await':    'coro_await',
+
+        ' *':                   'pointer_member',   # this is special, like "operator {type:s} *"
+        #'operator"" FUCKYOU':   'double_quote',     # this is another special-case, 'operator"" {type:s}'
+    }
+
+    # Add all of the known "basic" type operators...
+    _declaration_operators_with_spaces.update({"operator {:s}".format(_type) : '_'.join(['cast', _type.replace(' ', '_')]) for _type in mangled._declaration_types})
+
+    # These operators will always return an error due to them using the same tokens
+    # as a template which will be unbalanced without having a full parser. Thus this
+    # dictionary is for identifying fixing the things that we know will error.
+    _declaration_operators_with_errors = {
+
+        # we expect these operators to have exactly one error.
+        'operator->':           'pointer',
+        'operator->*':          'pointer_member',
+
+        'operator<':            'less',
+        'operator<=':           'lessequal',
+        'operator>':            'greater',
+        'operator>=':           'greaterequal',
+
+        # these operators should always have two errors.
+        'operator<<':           'shiftleft',
+        'operator>>':           'shiftright',
+        'operator<<=':          'shiftleft_assign',
+        'operator>>=':          'shiftright_assign',
+
+        # just in case the demangler wants to switch these around.
+        'operator=<<':          'shiftleft_assign',
+
+        'operator=>>':          'shiftright_assign',
+
+        # this operator is...perfect.
+        #'operator<=>':          'spaceship',
+    }
+
+    # Miscellaneous tuples that cache the different parts of a prototype.
+    __cache_prototype = __cache_result_and_convention = __cache_parameters = ()
+    __flags = functools.reduce(operator.or_, flags, getattr(idaapi, 'MNG_NOPTRTYP', 7))
+
+    def __init__(self, mangled):
+        if self.type(mangled) != self.MANGLED_CODE:
+            return super(function, self).__init__(mangled, self.__flags)
+
+        # Figure out the default flags that are needed to demangle just the name. Some
+        # compilers chosen by the disassembler will return None wihout the correct flags.
+        MNG_IGN_JMP, MNG_NODEFINIT = (getattr(idaapi, attribute, default) for attribute, default in [('MNG_IGN_JMP', 0x04000000), ('MNG_NODEFINIT', 0x00000008)])
+        name_flags = functools.reduce(operator.or_, [MNG_IGN_JMP, MNG_NODEFINIT], self.__flags & 0x00F00000)
+
+        # First we need to do a "test" demangle to determine if the "'" token has two
+        # meanings. This only happens with the "`'" segments and always ends in "''".
+        just_name = self.decode(mangled, name_flags)
+        assert(just_name), u"{:s}: Unable to demangle symbol using {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), name_flags, 2 + 8)
+        operator_string = 'operator'
+        result = just_name.rfind(operator_string)
+        index = result if result >= 0 else len(just_name)
+        just_operator = just_name[index:]
+
+        # Now we need to do some special-case checks for the single-quote meanings, operator
+        # double-meaning for "<" or ">", operators with spaces, anything with expected errors.
+        single_quote, double_quote = just_name.endswith("''"), just_operator.startswith('operator"" ')
+        expected_errors = just_operator in self._declaration_operators_with_errors
+        expected_spaces = just_operator in self._declaration_operators_with_spaces
+        null_parameters = just_name[-1:] in {'{', '}'}
+
+        # Before decoding, we need to build a dictionary of strings that we're
+        # going to expect so that we can handle them during parsing.
+        expected_operators = {}
+        if expected_errors:
+            expected_operators[just_operator] = "operator_{:s}".format(self._declaration_operators_with_errors[just_operator])
+        if expected_spaces:
+            expected_operators[just_operator] = "operator_{:s}".format(self._declaration_operators_with_spaces[just_operator])
+
+        # We also need to specially handle the situation where quotes or unbalanced characters can
+        # interfere with the name. We accomplish this by transforming the string prior to parsing.
+        kwargs = {}
+        if single_quote or double_quote:
+            kwargs['Ftransform'] = functools.partial(self.__clean_quotes, len(just_operator) if double_quote else 0)
+        elif expected_operators:
+            kwargs['Ftransform'] = functools.partial(self.__clean_unbalanced, len(just_operator), expected_operators)
+        elif null_parameters:
+            kwargs['Ftransform'] = functools.partial(self.__clean_parameters, just_name[1 + just_name.rfind(' '):])
+
+        # That should be all of the special cases, so now we just
+        # need to decode the mangled symbol and parse it.
+        decoded, order, tree, errors = super(function, self).__init__(mangled, self.__flags, **kwargs)
+
+        # If we encountered some errors, then complain about it so
+        # that the user will know why we can't do shit with it.
+        if errors:
+            just_operator, target, segment = _, _, (left, right) = self.__init__typed_operator(decoded)
+            expected_operators[just_operator] = decoded[left : right]
+            Ftransform = functools.partial(self.__clean_segment, segment, "operator_{:s}{{{:s}}}".format(self._declaration_operators_with_errors[just_operator], target))
+            decoded, order, tree, errors = super(function, self).__init__(mangled, flags, Ftransform=Ftransform)
+            self.__operator_target = just_operator, target
+
+        # If there weren't any errors, then there isn't a special case and we should be fine.
+        else:
+            self.__operator_target = ()
+
+        # If we still have an error, then it's because the prototype in unparsable (by us).
+        if errors:
+            cls = self.__class__
+            logging.warning(u"{:s}: Unable to parse the mangled string \"{:s}\" after it was decoded to \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), utils.string.escape(decoded, '"')))
+
+        # If we already figured out what operator it is, then store that too.
+        self.__operator = just_operator if double_quote or expected_operators else ''
+
+    def __init__typed_operator(self, decoded):
+        '''Initialize the class for a typed operator in `decoded` which contains unbalanced symbols.'''
+        reversed = decoded[::-1]
+
+        # I realized during testing of the `extract` namespace, that it makes more sense to
+        # do the tokenization in reverse, similar to the clockwise spiral rule, but figured
+        # I could still get away with it since I wanted to iterate through the parameters
+        # left-to-right for all types without having to hold onto a list. Now I'm realizing
+        # that was a mistake. Oh well..
+        order, rtree, errors = token.parse(reversed, [token[::-1] if len(token) > 1 else token for token in self.tokens])
+
+        # Start at the last index and find the very first point that references
+        # a segment in the tree. If none of them are in the tree, then we can
+        # make an assumption where the operator is actually located.
+        iterable = ((index, segment) for index, (_, segment) in enumerate(errors[::-1]))
+        error_index = next((1 + index for index, (point, _) in iterable if point in rtree), 0)
+
+        # The first item should definitely be a type specifier of some sort which is bounded
+        # by "<>". Once we confirm that, then we can check to see if it's an error operator.
+        iterable = ((index, reversed[left : right]) for index, (left, right) in enumerate(rtree.get(None, [])))
+        index = next((1 + index for index, rstring in iterable if rstring[-1:] + rstring[:1] == '<>'), 0)
+        assert(index), decoded
+        rsegments = rtree[None][:index]
+
+        # If we didn't find an error point within the tree, then we know that our operator
+        # and its target are within the first layer of the tree and we can simply extract it.
+        left, point = rsegments[-1]
+        if not error_index:
+            right, _ = rtree[None][index] if index < len(rtree[None]) else (len(reversed), None)
+            operator, target = reversed[point : right][::-1], reversed[left : point][::-1]
+
+        # Otherwise, this is probably a operator cast of some kind and we need to use
+        # the determined error point as a pivot between the operator and its target.
+        else:
+            _, (error_point, _) = errors[-error_index]
+            right, _ = rtree[error_point][0]
+            operator, target = reversed[point : right][::-1], reversed[left : point][::-1]
+
+        # Now unless our demangled type is seriously busted we should have
+        # the segment containing the type that the operator is targeting.
+        nsegment = len(decoded) - right, len(decoded) - left
+        return operator, target, nsegment
+
+    def __clean_quotes(self, operator_length, string):
+        '''Return a transformed `string` with its single-quotes or double-quotes fixed using the given `operator_length`.'''
+        dquote_string = 'operator"" '
+
+        # if we found some double-quotes, then we'll just use "{}" to nest the type.
+        if operator_length:
+            left = string.rindex(dquote_string)
+            assert(left >= 0), string
+            middle, right = left + len(dquote_string), left + operator_length
+            return string[:left] + 'operator""{' + string[middle : right] + '}' + string[right:]
+
+        # otherwise we have single-quotes with two different semantics,
+        # and we need to scan backwards to find it and then fix it.
+        [operator, parameters] = string.rsplit("''", 1)
+        index = operator.rindex("'")
+        return operator[:index] + '{' + operator[1 + index:] + "}'" + parameters
+
+    def __clean_unbalanced(self, operator_length, replacements, string):
+        '''Return a transformed `string` with its unbalanced symbols replaced using `operator_length` and a dictionary of `replacements`.'''
+        keyword = 'operator'
+        left = string.rindex(keyword)
+        assert(left >= 0), string
+        assert(string[max(0, left - 1) : left + len(keyword)] in {':operator', ' operator', 'operator'}), string
+        right = left + operator_length
+        return string[:left] + replacements[string[left : right]] + string[right:]
+
+    def __clean_segment(self, segment, replacement, string):
+        '''Return a transformed `string` with the specifed `segment` replaced with `replacement`.'''
+        left, right = segment
+        return string[:left] + replacement + string[right:]
+
+    def __clean_parameters(self, name, string):
+        '''Return a transformed `string` with empty parameters added after the given prototype `name`.'''
+        needs_parentheses = string[-len(name):] == name
+        return string + '()' if needs_parentheses else string
+
+    @property
+    def __prototype_components(self):
+        '''Return a cached tuple containing the extracted components of a function prototype.'''
+        if self.__cache_prototype:
+            return self.__cache_prototype
+        result_and_convention, name, parameters, qualifiers = extract.prototype(self.__tree__, self.string)
+        result = self.__cache_prototype = result_and_convention, name, parameters, qualifiers
+        return result
+
+    @property
+    def qualifiers(self):
+        '''Return a list of the qualifiers that follow the function prototype.'''
+        _, _, _, qualifiers = self.__prototype_components
+        return [self.string[left : right] for left, right in qualifiers]
+
+    @property
+    def __result_and_convention(self):
+        '''Return a cached tuple containing the extracted components of the result and calling convention.'''
+        if self.__cache_result_and_convention:
+            return self.__cache_result_and_convention
+
+        # Unpack the result and convention from the components of the prototype, and
+        # extract the segment that contains the the very last token.
+        result_and_convention, _, _, _ = self.__prototype_components
+        result_untrimmed, convention_candidate = extract.ending(self.string, *result_and_convention)
+        result = extract.trimmed(self.string, *result_untrimmed)
+
+        # If our ending token matches a convention exactly, then track its boundaries
+        # and assign a tuple that splits up the result token from the convention segment.
+        (left, right), segments = convention_candidate
+        if not segments and self.string[left : right] in convention.choice:
+            result = self.__cache_result_and_convention = result, (left, right)
+            return result
+
+        # If the convention segment represents a string that starts with "__",
+        # then just warn the user about it since it might be a candidate.
+        if self.string[left : right].startswith('__'):
+            cls, result = self.__class__, ()
+            logging.warning(u"{:s}.__result_and_convention: Ignoring candidate for calling convention \"{:s}\" due to it being unknown.".format('.'.join([__name__, cls.__name__]), utils.string.escape(self.string[left : right], '"')))
+
+        # Otherwise, there is no convention and we store an empty segment for it.
+        (left, right), _ = result_and_convention
+        result = self.__cache_result_and_convention = result_and_convention, (right, right)
+        return result
+
+    @property
+    def convention(self):
+        '''Return the calling convention of the decoded string if available.'''
+        _, (left, right) = self.__result_and_convention
+        return self.string[left : right]
+
+    @property
+    def result(self):
+        '''Return the result of the decoded string if available.'''
+        token, _ = self.__result_and_convention
+        (left, right), empty = token
+        return self.string[left : right]
+
+    def name(self):
+        '''Yield the name and a segment for the template parameters belonging to each component of the name from the decoded string.'''
+        _, prototype_name, _, _ = self.__prototype_components
+        for (left, right), parameters in extract.name_and_template(self.string, *prototype_name):
+            yield self.string[left : right], parameters
+        return
+
+    @property
+    def operator(self):
+        '''Return the operator for the decoded prototype if it describes one.'''
+        if self.__operator:
+            return self.__operator
+
+        # Unpack the name and extract all of its components into a list.
+        _, prototype_name, _, _ = self.__prototype_components
+        components = [item for item in token.split(self.string, *prototype_name, tokens={'::'})]
+
+        # If the number of components are less than 2, then we just need
+        # to check that the last token is a known operator or not.
+        if len(components) < 2:
+            return self.__extract_operator(components) if components else ''
+
+        # All we need to do is check if the last 2 components are exactly
+        # the same. If they are, it's a constructor or a destructor.
+        [namespace, method] = (self.string[left : right] for (left, right), _ in components[-2:])
+        if namespace == method:
+            return 'constructor'
+
+        elif '~' + namespace == method:
+            return 'destructor'
+
+        return self.__extract_operator(components)
+
+    def __extract_operator(self, components):
+        '''Return the operator from the selections given by the list of `components` if available.'''
+        if not components: return ''
+        (left, right), items = components[-1]
+        string = self.string[left : right]
+
+        # If it's a known operator, then we can just return it.
+        if string in self._declaration_operators:
+            return string
+
+        # If it's backticked then we can return that too.
+        elif string[:1] + string[-1:] == "`'":
+            return string
+
+        # If it's backticked, but also braced then we return it as well.
+        elif string[:1] in '`' and len(items) and (lambda string: string[:1] + string[-1:] in '{}')(string[slice(*items[-1])]):
+            return string
+
+        # Otherwise, it's nothing we know about and we use a string check.
+        return string if string.startswith('operator') else ''
