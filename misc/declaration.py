@@ -1261,10 +1261,16 @@ class mangled(object):
     mangled and demangled symbol.
     """
 
-    # First we need a staticmethod that can be used to identify the type
+    # First we need a classmethod that can be used to identify the type
     # of mangled name that works independent of the disassembler version.
+    @classmethod
+    def __type_alternative__(cls, string):
+        '''Return the type of the mangled `string` as either ``idaapi.MANGLED_DATA``, ``idaapi.MANGLED_CODE``, or ``idaapi.MANGLED_UNKNOWN``.'''
+        string = idaapi.demangle_name(utils.string.to(string), 0x06000207)  # MNG_NOPOSTFC | MNG_PTRMASK | MNG_IGN_ANYWAY | MNG_IGN_JMP
+        return cls.MANGLED_CODE if string[-1:] == ')' else cls.MANGLED_DATA if string else cls.MANGLED_UNKNOWN
+
     MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    type = staticmethod(utils.fcompose(utils.string.to, idaapi.get_mangled_name_type) if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.string.to, utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN)))
+    type = staticmethod(utils.fcompose(utils.string.to, idaapi.get_mangled_name_type)) if hasattr(idaapi, 'get_mangled_name_type') else __type_alternative__
 
     # Now a staticmethod that's the gateway to our disassembler api.
     decode = staticmethod(utils.fcompose(utils.fpack(utils.fmap(utils.fcompose(operator.itemgetter(0), utils.string.to), utils.fcompose(operator.itemgetter(1), int))), utils.funpack(idaapi.demangle_name2 if hasattr(idaapi, 'demangle_name2') else idaapi.demangle_name), utils.string.of))
@@ -1402,10 +1408,13 @@ class mangled(object):
         'operator^=':           'bxor_assign',
     }
 
+    # These flags seem to be required on earlier versions of the disassembler.
+    __required_flags = getattr(idaapi, 'MNG_IGN_ANYWAY', 0x02000000) | getattr(idaapi, 'MNG_IGN_JMP', 0x04000000)
+
     def __init__(self, symbol, mask, Ftransform=None):
         '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
         self.__encoded = encoded = symbol
-        decoded = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.__extract_scope(self.__extract_specifiers(self.decode(encoded, mask)))
+        decoded = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.__extract_scope(self.__extract_specifiers(self.decode(encoded, self.__required_flags | mask)))
         transformed = Ftransform(decoded) if Ftransform else decoded
         self.__decoded = transformed
         self.tokens = tokens = self.tokens[:] if hasattr(self, 'tokens') else []
