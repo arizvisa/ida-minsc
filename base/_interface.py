@@ -2537,6 +2537,7 @@ class strpath(object):
         # suggestion. If their suggestion is busted, then we'll later use this to flail
         # around and figure out what item they actually meant when we need a decision.
         (owner, candidates, carry) = builtins.next(resolver)
+        index, (sptr, mptr, offset) = 0, (owner, None, 0)
         try:
             # Now we can process all the crap they might've given us in their suggestion.
             for index, (sptr, mptr, offset) in enumerate(suggestion):
