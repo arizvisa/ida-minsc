@@ -2821,8 +2821,8 @@ class strpath(object):
             # current offset with it. This allows one to consolidate multiple offsets, but
             # as there's a chance of there being no member defined yet will result in an
             # error as soon as they try to transition to one.
-            if isinstance(item, internal.types.integer):
-                offset += item
+            if isinstance(item, internal.types.integer) or hasattr(item, '__int__'):
+                offset += int(item)
 
             # If we were given a structure and it's the same as the one that we're on,
             # then that means the user wants the size to be used for the member.
