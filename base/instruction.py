@@ -1165,33 +1165,58 @@ def op_structurepath(ea, opnum):
     # bytes are after properly resolving our path for the operand and delta.
     # To do this, we resolve for our target address using strpath.of_tids to
     # resolve each individual member and store it in our path.
-    path = []
+    path, members = [], interface.strpath.of_tids(target, tids)
     calculator = interface.strpath.calculate(0)
     resolver = interface.strpath.resolve(path.append, sptr, target)
 
     position = builtins.next(calculator)
     try:
         sptr, candidates, carry = builtins.next(resolver)
-        for owner, mptr, offset in interface.strpath.of_tids(target, tids):
+        for owner, mptr, offset in members:
             assert owner.id == sptr.id
-            position = calculator.send((owner, mptr, offset))
             sptr, candidates, carry = resolver.send((mptr, carry))
+            position = calculator.send((owner, mptr, offset))
 
         resolver.send((None, None))
         raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}) : Expected path to have been resolved at offset {:#x} of index {:d} with {:s}.".format(__name__, ea, opnum, builtins.next(calculator), len(path), interface.strpath.format(owner, mptr)))
 
-    # If we're done resolving, then save our position for calculating the delta later.
-    except (StopIteration, E.MemberNotFoundError):
+    # If we're done resolving, then save our position for calculating the path members.
+    except StopIteration:
         position = builtins.next(calculator)
+        base = value - carry - position
+
+    # If we failed to resolve the path, then our operand does not reference the structure
+    # and we can't trust the resolved path at all whatsoever. First check to see if it's
+    # a sizeof(), and then recalculate the entire path explicitly trusting the tid array.
+    except E.MemberNotFoundError as e:
+        size = idaapi.get_struc_size(sid)
+
+        # If we failed to resolve the path, our position and delta are 0, and the value
+        # is the same as our structure size, then this is definitely a sizeof(structure)
+        # and we return the structure with its size as a special-case.
+        if 0 == position == delta and target == size:
+            return structure.by_identifier(sptr.id), size
+
+        # Otherwise we're oob of the structure and will need to guide to the field
+        # displayed by the disassembler. Then we can do our maths with the new position.
+        calculator = interface.strpath.calculate(0); builtins.next(calculator)
+        [calculator.send((sptr, mptr, offset)) for (sptr, mptr, offset) in members]
+        position, path = interface.strpath.guide(builtins.next(calculator) % size, idaapi.get_struc(sid), members)
+
+        # We need two calcuations, the first one which is the target offset,
+        # and relative to our guided position, and the base offset which'll be
+        # used to calculate the position of each member in the returend path.
+        carry = target - position
+        base =  value - delta - position
 
     finally:
         resolver.close(), calculator.close()
         logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Resolved the path ({:d} elements) for the specified instruction operand to {:s}.".format(__name__, ea, opnum, len(path), interface.strpath.fullname(path)))
 
-    # Now we have the correct resolved path with each offset in it being correct. We
-    # need to translate it by our carried value and then we can determine the correct
-    # offset for each member of the path that we'll return.
-    calculator = interface.strpath.calculate(value + (carry - target))
+    # Now we have resolved a correct path and we only need to convert
+    # it into a list of members. We can also use our base to calculate
+    # the location of each member that is being returned in said list.
+    calculator = interface.strpath.calculate(base)
     result, position = [], builtins.next(calculator)
     for sptr, mptr, offset in path:
         st = structure.by_identifier(sptr.id, offset=position)
@@ -1199,14 +1224,9 @@ def op_structurepath(ea, opnum):
         result.append(item)
         position = calculator.send((sptr, mptr, offset))
 
-    # If we did not figure out any path, then this is likely a sizeof(structure)
-    # operand. So, we return the structure and whatever value was carried.
-    if not result:
-        return structure.by_identifier(sptr.id), carry
-
     # Just like the op_structure implementation, we need to figure out if
     # there's an array being referenced to convert our result to a list.
-    elif any(isinstance(member.type, types.list) for member in result if isinstance(member, structure.member_t)):
+    if any(isinstance(member.type, types.list) for member in result if isinstance(member, structure.member_t)):
         return result + [carry]
 
     # Otherwise it's just a path with the carried offset, so we check the
