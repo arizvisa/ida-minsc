@@ -262,7 +262,7 @@ class extract(object):
         return (left + start, right - stop), segments[+start : -stop] if stop else segments[start:]
 
     @classmethod
-    def parameters(cls, tree, string, range=None, assertion={'()', '<>'}, delimiter={','}):
+    def parameters(cls, tree, string, range=None, assertion={'()', '<>', '{}'}, delimiter={','}):
         '''Use the given `tree` to yield a token for each item within the given `range` of `string` that is separated by `delimiter` and wrapped by `assertion`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
         assert(string[start:][:+1] + string[:stop][-1:] in assertion if assertion else True), string[start:][:+1] + string[:stop][-1:]
@@ -307,6 +307,10 @@ class extract(object):
         # now the last segment of our declaration should be our parameters.
         parameters_range = stop, _ = left, right = segments.pop() if segments else (len(string), len(string))
         assert(string[left : left + 1] + string[right - 1 : right] == '()'), string[left : right]
+
+        # XXX: we're using a hack to deal with "`adjustor(x)' ", due to not being in
+        # a demangled name. we can just pop the last segment (with the " ") to deal.
+        segments.pop() if string[stop - 2 : stop] == "' " else None
 
         # since we should be being used to parse output from the disassembler,
         # we can assume that everything up to the first whitespace is the name.
@@ -1527,10 +1531,12 @@ class function(mangled):
         'operator co_await':    'coro_await',
 
         ' *':                   'pointer_member',   # this is special, like "operator {type:s} *"
-        #'operator"" FUCKYOU':   'double_quote',     # this is another special-case, 'operator"" {type:s}'
+        'operator""':           'doublequote',      # this is another special-case, 'operator"" {type:s}'
     }
 
     # Add all of the known "basic" type operators...
+    # FIXME: technically any kind of type can be declared after this and we really
+    #        should be distinguishing the complex type for the operator first...
     _declaration_operators_with_spaces.update({"operator {:s}".format(_type) : '_'.join(['cast', _type.replace(' ', '_')]) for _type in mangled._declaration_types})
 
     # These operators will always return an error due to them using the same tokens
@@ -1540,7 +1546,7 @@ class function(mangled):
 
         # we expect these operators to have exactly one error.
         'operator->':           'pointer',
-        'operator->*':          'pointer_member',
+        'operator->*':          'pointermember',
 
         'operator<':            'less',
         'operator<=':           'lessequal',
@@ -1550,17 +1556,19 @@ class function(mangled):
         # these operators should always have two errors.
         'operator<<':           'shiftleft',
         'operator>>':           'shiftright',
-        'operator<<=':          'shiftleft_assign',
-        'operator>>=':          'shiftright_assign',
+        'operator<<=':          'shiftleftassign',
+        'operator>>=':          'shiftrightassign',
 
         # just in case the demangler wants to switch these around.
-        'operator=<<':          'shiftleft_assign',
+        'operator=<<':          'shiftleftassign',
 
-        'operator=>>':          'shiftright_assign',
+        'operator=>>':          'shiftrightassign',
 
         # this operator is...perfect.
         #'operator<=>':          'spaceship',
     }
+
+    _declaration_qualified_operator = {' ' + qualifier : 1 + len(qualifier) for qualifier in {'const', 'volatile', '__unaligned', 'restrict', 'far', 'near', '*', '&'}}
 
     # Miscellaneous tuples that cache the different parts of a prototype.
     __cache_prototype = __cache_result_and_convention = __cache_parameters = ()
@@ -1583,12 +1591,16 @@ class function(mangled):
         result = just_name.rfind(operator_string)
         index = result if result >= 0 else len(just_name)
         just_operator = just_name[index:]
+        result = just_name.rfind(' ')
+        index = result if result >= 0 else len(just_name)
+        just_space = just_name[index:]
 
         # Now we need to do some special-case checks for the single-quote meanings, operator
         # double-meaning for "<" or ">", operators with spaces, anything with expected errors.
         single_quote, double_quote = just_name.endswith("''"), just_operator.startswith('operator"" ')
         expected_errors = just_operator in self._declaration_operators_with_errors
         expected_spaces = just_operator in self._declaration_operators_with_spaces
+        qualified_with_spaces = just_space in self._declaration_qualified_operator or (not any([single_quote, expected_spaces, single_quote, double_quote]) and just_operator.startswith(('operator ', 'operator"" ')))
         null_parameters = just_name[-1:] in {'{', '}'}
 
         # Before decoding, we need to build a dictionary of strings that we're
@@ -1608,6 +1620,8 @@ class function(mangled):
             kwargs['Ftransform'] = functools.partial(self.__clean_unbalanced, len(just_operator), expected_operators)
         elif null_parameters:
             kwargs['Ftransform'] = functools.partial(self.__clean_parameters, just_name[1 + just_name.rfind(' '):])
+        elif qualified_with_spaces:
+            kwargs['Ftransform'] = functools.partial(self.__clean_qualified_operator, len(just_operator))
 
         # That should be all of the special cases, so now we just
         # need to decode the mangled symbol and parse it.
@@ -1616,10 +1630,10 @@ class function(mangled):
         # If we encountered some errors, then complain about it so
         # that the user will know why we can't do shit with it.
         if errors:
-            just_operator, target, segment = _, _, (left, right) = self.__init__typed_operator(decoded)
+            just_operator, target, segment = _, _, (left, right) = self.__init__busted_operator(decoded)
             expected_operators[just_operator] = decoded[left : right]
-            Ftransform = functools.partial(self.__clean_segment, segment, "operator_{:s}{{{:s}}}".format(self._declaration_operators_with_errors[just_operator], target))
-            decoded, order, tree, errors = super(function, self).__init__(mangled, flags, Ftransform=Ftransform)
+            Ftransform = functools.partial(self.__clean_segment, segment, "operator_{:s}{:s}".format(self._declaration_operators_with_errors[just_operator], target))
+            decoded, order, tree, errors = super(function, self).__init__(mangled, self.__flags, Ftransform=Ftransform)
             self.__operator_target = just_operator, target
 
         # If there weren't any errors, then there isn't a special case and we should be fine.
@@ -1632,9 +1646,9 @@ class function(mangled):
             logging.warning(u"{:s}: Unable to parse the mangled string \"{:s}\" after it was decoded to \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), utils.string.escape(decoded, '"')))
 
         # If we already figured out what operator it is, then store that too.
-        self.__operator = just_operator if double_quote or expected_operators else ''
+        self.__operator = just_operator if double_quote or expected_operators or qualified_with_spaces else ''
 
-    def __init__typed_operator(self, decoded):
+    def __init__busted_operator(self, decoded):
         '''Initialize the class for a typed operator in `decoded` which contains unbalanced symbols.'''
         reversed = decoded[::-1]
 
@@ -1713,6 +1727,17 @@ class function(mangled):
         needs_parentheses = string[-len(name):] == name
         return string + '()' if needs_parentheses else string
 
+    def __clean_qualified_operator(self, operator_length, string):
+        keyword = 'operator'
+        left = string.rindex(keyword)
+        assert(left >= 0), string
+        assert(string[max(0, left - 1) : left + len(keyword)] in {':operator', ' operator', 'operator'}), string
+
+        # We probably should walk backwards and tally up the qualifiers, but it's
+        # easier to transform the entire operator with braces and eat the cost later.
+        type = string[left + len(keyword) + 1 : left + operator_length]
+        return string[:left] + "operator{{{:s}}}".format(type) + string[left + operator_length:]
+
     @property
     def __prototype_components(self):
         '''Return a cached tuple containing the extracted components of a function prototype.'''
@@ -1772,11 +1797,23 @@ class function(mangled):
         return self.string[left : right]
 
     def name(self):
-        '''Yield the name and a segment for the template parameters belonging to each component of the name from the decoded string.'''
+        '''Return a list for each name component from the decoding string containing both the name and segment for the component's template parameters.'''
         _, prototype_name, _, _ = self.__prototype_components
+        result = []
         for (left, right), parameters in extract.name_and_template(self.string, *prototype_name):
-            yield self.string[left : right], parameters
-        return
+            name, iterable = self.string[left : right], extract.parameters(self.__tree__, self.string, parameters) if operator.sub(*parameters) else []
+            result.append((name.rstrip(), [self.string[left : right].lstrip() for (left, right), _ in iterable]))
+
+        # If we extracted an operator from the function name, then we know the last item
+        # of our result was transformed in some way. If the user really wants to know
+        # the details, then they'll need to use the method themselves to figure it out.
+        if self.__operator and result:
+            iterable = (item for item in result[:-1])
+            string, parameters = result[-1]
+            return [item for item in itertools.chain(iterable, [(self.__operator, parameters)])]
+
+        assert(not(self.__operator)), self.string
+        return result
 
     @property
     def operator(self):
@@ -1824,3 +1861,85 @@ class function(mangled):
 
         # Otherwise, it's nothing we know about and we use a string check.
         return string if string.startswith('operator') else ''
+
+    def details(self):
+        '''Return a tuple containing the unpacked details contained by the operator or backticked function name.'''
+        operator_name = self.operator
+        _, name, _, _ = self.__prototype_components
+        (start, stop), segments = name
+        iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if self.string[left : right] == '::')
+        index = next(iterable, 0)
+        (_, point) = segments[-index] if index else (start, start)
+
+        # If we're a backticked operator with a brace, then our operator is a
+        # vcall or similar. So, we need the last 2 segments of the name...
+        if operator_name[:1] + operator_name[-1:] == '`}':
+            [operator_name, braces] = segments[-2:]
+
+            # The braces segment can simply be treated as ','-delimited parameters.
+            iterable = extract.parameters(self.__tree__, self.string, braces)
+            parameters = [self.string[left : right] for (left, right), _ in iterable]
+
+            # Now we can just return a tuple prefixed with the operator.
+            left, right = operator_name
+            return self.string[left : right], parameters
+
+        # If it's a known operator, then this is likely parameterized with angles.
+        elif operator_name in self._declaration_operators:
+            [(left, right)] = segments[-1:] if len(segments) else [(start, start)]
+            if right != stop or right - left < len(operator_name):
+                return operator_name, []
+            contents, ignored = self.string[left : right], {' ', ''}
+            assert(contents[:1] + contents[-1:] == '<>'), contents
+            iterable = extract.parameters(self.__tree__, self.string, (left, right))
+            parameters = [self.string[left : right].lstrip() for (left, right), _ in iterable]
+            return operator_name, parameters
+
+        # FIXME: These operators_with_spaces are essentially a hack, since you can
+        #        technically include any kind of complex type after the operator.
+        elif not segments or operator_name in self._declaration_operators_with_spaces or operator_name in self._declaration_operators_with_errors:
+            return (operator_name,) if operator_name else ()
+
+        # Otherwise, it should be a transformed operator and we can extract details from the braces.
+        elif self.__operator:
+            [(_, start), (point, right)] = segments[-2:] if len(segments) > 1 else [(start, start)] + segments[-1:]
+            contents, ignored = self.string[point : right], {' ', ''}
+            assert(contents[:1] + contents[-1:] == '{}'), contents
+            trimmed, qualifiers = (point + 1, right - 1), {qualifier[1:] for qualifier in self._declaration_qualified_operator}
+            declaration, qualifiers = extract.qualifiers(self.string, trimmed, self.__tree__.get(point, []), qualifiers=qualifiers)
+            iterable = [self.string[left : right] for left, right in token.segments(*qualifiers)]
+            (left, right), _ = declaration
+            return self.string[start : point], self.string[left : right], [string for string in iterable if string not in ignored]
+
+        # Now we should probably handle the special-case for constructors and destructors.
+        elif operator_name in {'constructor', 'destructor'}:
+            return operator_name,
+
+        # If we have an operator, but it's only non-nested tokens, then there's no details.
+        # FIXME: we're explicitly testing for "` (" operators here, which have details.
+        elif operator_name:
+            assert(operator_name[:1] + operator_name[-1:] in {"`'", "` "}), operator_name
+            ignored, (start, stop) = {' '}, segments[-1] if segments else (stop, stop)
+            nested = self.__tree__.get(start, [])
+            if all(self.string[left : right] in ignored for left, right in nested):
+                return operator_name,
+
+            # But if there are nested tokens, then we're likely braced and containing a type.
+            (left, right) = nested[-1]
+            brace = self.string[left : right]
+            assert(brace[:1] + brace[-1:] in {'()', '{}', "`'", '[]'})
+            return operator_name, brace[1 : -1]
+
+        # If there's no operator, then we need to check our name for what the user wants.
+        [(start, stop)] = segments[-1:]
+        string = self.string[start : stop]
+
+        # If it's backticked, then the braces are within the backtick.
+        if string[:1] + string[-1:] == "`'":
+            segments = self.__tree__.get(start, [])
+            left, right = segments[-1] if segments else (stop, stop)
+            iterable = extract.parameters(self.__tree__, self.string, (left, right)) if left != right else []
+            return self.string[start : left] + "'", [self.string[left : right] for (left, right), _ in iterable]
+
+        # If we got here, then there just aren't any details for us to extract.
+        return ()
