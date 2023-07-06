@@ -822,31 +822,26 @@ class member(object):
         repeatable, mptr = True, idaapi.get_struc(int(mptr)) if isinstance(mptr, internal.types.integer) else mptr
         mptr, fullname, sptr = idaapi.get_member_by_id(mptr.id)
 
-        # grab the repeatable and non-repeatable comment
+        # Grab the repeatable and non-repeatable comment.
         d1 = comment.decode(utils.string.of(idaapi.get_member_cmt(mptr.id, False)))
         d2 = comment.decode(utils.string.of(idaapi.get_member_cmt(mptr.id, True)))
         d1keys, d2keys = ({key for key in item} for item in [d1, d2])
 
-        # check for duplicate keys
+        # Check if decoding from both comments results in duplicate keys.
         if d1keys & d2keys:
             logging.info(u"{:s}({:#x}).tag() : The repeatable and non-repeatable comment for {:s} use the same tags ({!r}). Giving priority to the {:s} comment.".format(cls.__name__, mptr.id, utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id))), ', '.join(d1keys & d2keys), 'repeatable' if repeatable else 'non-repeatable'))
 
-        # merge the dictionaries into one before adding implicit tags.
+        # Merge the dictionaries into one before adding implicit tags.
         res = {}
         [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
 
-        # the format of the implicit tags depend on the type of the member, which
-        # we actually extract from a combination of the name, and is_special_member.
-        specialQ = True if idaapi.is_special_member(mptr.id) else False
-
-        # now we need to check the name via is_dummy_member_name, and explicitly
-        # check to see if the name begins with field_ so that we don't use it if so.
+        # Now we need to extract the name for two things. One of them is to detect if
+        # the name is not a default, and the other is to include it in the rendered type.
         idaname = idaapi.get_member_name(mptr.id) or ''
-        anonymousQ = True if any(F(idaname) for F in [idaapi.is_dummy_member_name, idaapi.is_anonymous_member_name, operator.methodcaller('startswith', 'field_')]) else False
         name = utils.string.of(idaname)
 
-        # if the name is defined and not special in any way, then its a tag.
-        aname = '' if any([specialQ, anonymousQ]) else name
+        # If the name is defined with something other than the default, then its a tag.
+        aname = name if internal.structure.member.has_name(mptr) else ''
         if aname:
             res.setdefault('__name__', aname)
 
