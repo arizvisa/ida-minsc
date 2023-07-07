@@ -6120,6 +6120,9 @@ class bounds_t(integerish):
     _operands = (internal.utils.fcurry, internal.utils.fcurry)
     _formats = "{:#x}".format, "{:#x}".format
 
+    def __same__(self, other):
+        return isinstance(other, bounds_t)
+
     def __new__(cls, *args, **kwargs):
         if len(args) == 2 and not kwargs:
             return super(bounds_t, cls).__new__(cls, *sorted(args))
