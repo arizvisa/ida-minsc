@@ -1490,6 +1490,171 @@ class mangled(object):
         '''Return the type from the decoding string after being demangled.'''
         raise NotImplementedError
 
+class selection(object):
+    """
+    This class is a base class that stores a string, a tree, and a token
+    selection. Implementors of this class can add methods to extract specific
+    attributes from the token and return them to the user. It also implements
+    the necessary abstractions so that it can be treated like a regular string.
+    """
+    def __init__(self, tree, string, range, segments):
+        self.__tree__, self.__string__ = tree, string
+        self.__selection__ = range, segments
+
+    def select(self, type, selection):
+        return type(self.__tree__, self.__string__, *selection)
+
+    def descend(self, type, segment):
+        (start, stop) = segment
+        return type(self.__tree__, self.__string__, segment, self.__tree__.get(start, []))
+
+    @property
+    def tree(self):
+        return self.__tree__
+
+    @property
+    def range(self):
+        range, _ = self.__selection__
+        return range
+
+    @property
+    def tokens(self):
+        _, tokens = self.__selection__
+        return tokens
+
+    @property
+    def segments(self):
+        string, iterable = self.__string__, token.segments(*self.__selection__)
+        return [string[left : right] for left, right in iterable]
+
+    def __bool__(self):
+        range, _ = self.__selection__
+        return operator.ne(*range)
+
+    def __str__(self):
+        (left, right), _ = self.__selection__
+        return self.__string__[left : right]
+
+    def __repr__(self):
+        cls = self.__class__
+        return "{!s} {:s} : {!r}".format(cls, "{:d}..{:d}".format(*self.range), self.segments)
+
+class name_component(selection):
+    '''
+    This class represents the individual component of a name. A
+    name component contains a string that may be potentially
+    followed by template parameters.
+    '''
+    @property
+    def __correct_selection(self):
+        (start, stop), segments = self.__selection__
+        candidate = (left, right) = segments[-1] if len(segments) else (stop, stop)
+        string = self.__string__[left : right]
+        assert(operator.eq(*candidate) or string[:1] + string[-1:] in {'<>'}), string
+        if len(segments) > 1:
+            cls = self.__class__
+            (left, right), parameters = token.trimmed(self.__string__, (start, left), segments[-1:])
+            logging.warning(u"{:s}: Discarding unnecessary segments from name component ({:s}) will enlarge name from {:d}..{:d} to {:d}..{:d}.".format('.'.join([__name__, cls.__name__]), ', '.join("{:d}..{:d}".format(*segment) for segment in segments[:-1]), start, stop, left, right))
+            return (left, right), parameters
+        return (start, stop), segments
+
+    @property
+    def name(self):
+        (start, stop), segments = self.__selection__
+        if len(segments) > 1:
+            (start, stop), segments = self.__correct_selection
+        (point, _) = segments[-1] if segments else (stop, stop)
+        return self.__string__[start : point]
+
+    @property
+    def spec(self):
+        (start, stop), segments = self.__selection__
+        if len(segments) <= 1:
+            left, right = segments[-1] if segments else (stop, stop)
+            return self.__string__[left : right]
+        _, segments = self.__correct_selection
+        left, right = segments[-1] if segments else (stop, stop)
+        return self.__string__[left : right]
+
+    @property
+    def items(self):
+        (start, stop), segments = self.__selection__
+        branch = segments[-1] if segments else (stop, stop)
+        return self.descend(angle_parameters, branch)
+
+class parameters(selection):
+    def __init__(self, tree, string, range, segments):
+        super(parameters, self).__init__(tree, string, range, segments)
+        self.__cache = [extract.trimmed(string, *selection) for selection in extract.parameters(tree, string, range)] if operator.ne(*range) else []
+
+    @property
+    def count(self):
+        return len(self.cache)
+
+    @property
+    def cache(self):
+        return self.__cache
+
+    def item(self, index):
+        string, selection = self.__string__, self.cache[index]
+        return self.select(declaration_with_qualifiers, selection)
+    __getitem__ = item
+
+    def __repr__(self):
+        cls, string, iterable = self.__class__, self.__string__, (range for range, _ in self.__cache)
+        return "{!s} {:s} : {!r}".format(cls, "{:d}..{:d}".format(*self.range), [string[left : right] for (left, right) in iterable])
+
+class angle_parameters(parameters): pass
+class group_parameters(parameters): pass
+
+class declaration_with_qualifiers(selection):
+    ignored = {' '}
+
+    # FIXME: this could be a function pointer and will require checking for trailing ")" to distinguish
+
+    @property
+    def type(self):
+        decl, _ = extract.qualifiers(self.__string__, *self.__selection__)
+        (start, stop), _ = decl
+        return self.__string__[start : stop]
+
+    @property
+    def items(self):
+        decl, _ = extract.qualifiers(self.__string__, *self.__selection__)
+        return self.select(fullname, decl)
+
+    @property
+    def quals(self):
+        _, quals = extract.qualifiers(self.__string__, *self.__selection__)
+        iterable = (self.__string__[left : right] for left, right in token.segments(*quals))
+        return [string for string in iterable if string not in self.ignored]
+
+class fullname(selection):
+    delimiter = {'::'}
+    def __init__(self, tree, string, range, segments):
+        super(fullname, self).__init__(tree, string, range, segments)
+        iterable = token.split(string, range, segments, self.delimiter)
+        #self.__cache = [extract.trimmed(string, *selection) for selection in iterable]
+        self.__cache = [selection for selection in iterable]
+
+    @property
+    def cache(self):
+        return self.__cache
+
+    @property
+    def count(self):
+        string, iterable = self.__string__, extract.name_and_template(self.__string__, *self.__selection__)
+        return sum(1 for item in iterable)
+
+    def item(self, index):
+        cache = self.__cache[index]
+        return self.select(name_component, cache)
+    __getitem__ = item
+
+    def name(self, index):
+        (start, stop), _ = self.__cache[index]
+        return self.__string__[start : stop]
+
 class function(mangled):
     """
     This class processes a mangled function name in a number of ways
@@ -1792,28 +1957,14 @@ class function(mangled):
     @property
     def result(self):
         '''Return the result of the decoded string if available.'''
-        token, _ = self.__result_and_convention
-        (left, right), empty = token
-        return self.string[left : right]
+        result, _ = self.__result_and_convention
+        return declaration_with_qualifiers(self.__tree__, self.string, *result)
 
+    @property
     def name(self):
         '''Return a list for each name component from the decoding string containing both the name and segment for the component's template parameters.'''
         _, prototype_name, _, _ = self.__prototype_components
-        result = []
-        for (left, right), parameters in extract.name_and_template(self.string, *prototype_name):
-            name, iterable = self.string[left : right], extract.parameters(self.__tree__, self.string, parameters) if operator.sub(*parameters) else []
-            result.append((name.rstrip(), [self.string[left : right].lstrip() for (left, right), _ in iterable]))
-
-        # If we extracted an operator from the function name, then we know the last item
-        # of our result was transformed in some way. If the user really wants to know
-        # the details, then they'll need to use the method themselves to figure it out.
-        if self.__operator and result:
-            iterable = (item for item in result[:-1])
-            string, parameters = result[-1]
-            return [item for item in itertools.chain(iterable, [(self.__operator, parameters)])]
-
-        assert(not(self.__operator)), self.string
-        return result
+        return fullname(self.__tree__, self.string, *prototype_name)
 
     @property
     def operator(self):
@@ -1944,19 +2095,9 @@ class function(mangled):
         # If we got here, then there just aren't any details for us to extract.
         return ()
 
+    @property
     def parameters(self):
         '''Yield each parameter of the decoded string as a list of name components and qualifiers.'''
-        ignored = {' '}
         _, _, parameters, _ = self.__prototype_components
-        for parameter in extract.parameters(self.__tree__, self.string, parameters):
-            decl, quals = extract.qualifiers(self.string, *parameter)
-
-            components = []
-            for (start, stop), template in extract.name_and_template(self.string, *decl):
-                parameters = extract.parameters(self.__tree__, self.string, template) if operator.lt(*template) else []
-                template_parameters = [self.string[left : right] for (left, right), _ in parameters]
-                components.append((self.string[start : stop], template_parameters))
-
-            iterable = (self.string[left : right] for left, right in token.segments(*quals))
-            yield components, [string for string in iterable if string not in ignored]
-        return
+        start, _ = parameters
+        return group_parameters(self.__tree__, self.string, parameters, self.__tree__.get(start, []))
