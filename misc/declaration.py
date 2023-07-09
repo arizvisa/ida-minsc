@@ -1943,3 +1943,20 @@ class function(mangled):
 
         # If we got here, then there just aren't any details for us to extract.
         return ()
+
+    def parameters(self):
+        '''Yield each parameter of the decoded string as a list of name components and qualifiers.'''
+        ignored = {' '}
+        _, _, parameters, _ = self.__prototype_components
+        for parameter in extract.parameters(self.__tree__, self.string, parameters):
+            decl, quals = extract.qualifiers(self.string, *parameter)
+
+            components = []
+            for (start, stop), template in extract.name_and_template(self.string, *decl):
+                parameters = extract.parameters(self.__tree__, self.string, template) if operator.lt(*template) else []
+                template_parameters = [self.string[left : right] for (left, right), _ in parameters]
+                components.append((self.string[start : stop], template_parameters))
+
+            iterable = (self.string[left : right] for left, right in token.segments(*quals))
+            yield components, [string for string in iterable if string not in ignored]
+        return
