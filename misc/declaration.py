@@ -2095,6 +2095,11 @@ class function(mangled):
         # If we got here, then there just aren't any details for us to extract.
         return ()
 
+    def __repr__(self):
+        '''Return the internal representation of the string that contains the function name.'''
+        cls = self.__class__
+        return "{!s} ({:s}) {!r}".format(cls, self.operator, self.string)
+
     @property
     def parameters(self):
         '''Yield each parameter of the decoded string as a list of name components and qualifiers.'''
