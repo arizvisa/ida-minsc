@@ -802,23 +802,30 @@ def instruction(ea):
     # if the starting cmnt1 character isn't defined, then we don't do anything.
     else:
         nocomment = unformatted
-
     # combine any multiple spaces into just a single space and return it
     res = utils.string.of(nocomment.strip())
     return functools.reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), res, '')
 
 @utils.multicase()
 def disassemble(**options):
-    '''Disassemble the instructions at the current address.'''
-    return disassemble(ui.current.address(), **options)
+    '''Disassemble the instructions at the current selection or address.'''
+    address, selection = ui.current.address(), ui.current.selection()
+    if operator.eq(*(interface.address.head(ea) for ea in selection)):
+        return disassemble(address, **options)
+    return disassemble(selection, **options)
 @utils.multicase(ea=internal.types.integer)
 def disassemble(ea, **options):
-    """Disassemble the instructions at the address specified by `ea`.
+    """Disassemble the instruction at the address specified by `ea`.
 
     If the integer `count` is specified, then return `count` number of instructions.
+    """
+    return disassemble(ea, options.pop('count', 1), **options)
+@utils.multicase(bounds=interface.bounds_t)
+def disassemble(bounds, **options):
+    """Disassemble the instructions within the boundaries specified by `bounds`.
+
     If the bool `comments` is true, then return the comments for each instruction as well.
     """
-    ea = interface.address.inside(ea)
     commentQ = builtins.next((options[k] for k in ['comment', 'comments'] if k in options), False)
 
     # grab the values we need in order to distinguish a comment
@@ -826,15 +833,16 @@ def disassemble(ea, **options):
     cmnt1, cmnt2 = ash.cmnt, ash.cmnt2
 
     # enter a loop that goes through the number of line items requested by the user
-    res, count = [], options.get('count', 1)
-    while count > 0:
+    res = []
+    for ea in address.iterate(bounds):
+
         # grab the instruction and remove all of IDA's tag information from it
         insn = idaapi.generate_disasm_line(ea) or ''
         unformatted = idaapi.tag_remove(insn)
 
         # check if the terminating char (cmnt2) is defined
         if cmnt2:
-            lindex = unformatted.rfind(cmnt1)
+            lindex = unformatted.find(cmnt1)
             rindex = lindex + unformatted[lindex:].find(cmnt2) + len(cmnt2)
 
             # so that we can separate the comment out of it
@@ -843,7 +851,7 @@ def disassemble(ea, **options):
 
         # if it's not, then just use the starting char (cmnt1) to find the comment
         elif cmnt1:
-            index = unformatted.rfind(cmnt1)
+            index = unformatted.find(cmnt1)
             nocomment, comment = (unformatted, unformatted[index : index]) if index < 0 else (unformatted[:index], unformatted[index:])
 
         # if this comment is undefined, then there ain't shit we can do with it,
@@ -872,11 +880,19 @@ def disassemble(ea, **options):
         # otherwise we cna simply append it to our result with the address in front
         else:
             res.append(u"{:x}: {:s}".format(ea, noextraspaces))
-
-        # move on to the next iteration
-        ea = address.next(ea) if count > 1 else address.tail(ea)
-        count -= 1
+        continue
     return '\n'.join(res)
+@utils.multicase(ea=internal.types.integer, count=internal.types.integer)
+def disassemble(ea, count, **options):
+    """Disassemble `count` instructions from the address specified by `ea`.
+
+    If the bool `comments` is true, then return the comments for each instruction as well.
+    """
+    ea = interface.address.inside(ea)
+    F, start = (address.prev, ea - 1) if count < 0 else (address.next, ea)
+    target = F(ea, abs(count))
+    bounds = interface.bounds_t(start, target)
+    return disassemble(bounds, **options)
 disasm = utils.alias(disassemble)
 
 @utils.multicase()
