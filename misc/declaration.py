@@ -560,12 +560,15 @@ class nested(object):
             elif string[index] in close and stack and string[stack[-1]] == openers[string[index]]:
                 #segment = stack.pop(), index + 1
                 segment = left, right = stack.pop(), index + length
-                layer = tree.setdefault(stack[-1] if stack else None, [])
-                order.append(segment), layer.append(segment), tree.setdefault(left, [])
+                depth, layer = len(stack), tree.setdefault(stack[-1] if stack else None, [])
+                order.append((depth, segment)), layer.append(segment), tree.setdefault(left, [])
             else:
-                errors.append(index)
+                errors.append((len(stack), index))
             continue
-        return order, tree, stack + errors
+        if stack:
+            iterable = itertools.chain(enumerate(stack), errors)
+            return order, tree, sorted(iterable, key=operator.itemgetter(1))
+        return order, tree, errors
 
     @classmethod
     def verify(cls, tree, ordered, index=None):
@@ -575,7 +578,7 @@ class nested(object):
             start, stop = item
             if start in tree:
                 ok = ok and cls.verify(tree, ordered, start)
-            slice = ordered.pop(0)
+            depth, slice = ordered.pop(0)
             ok = ok and item == slice
         return ok
 
@@ -819,7 +822,7 @@ class token(nested):
 
     @classmethod
     def parse(cls, string, tokens):
-        '''Return a list of ranges, a tree, and a list of indices for the errors when parsing the given `tokens` out of `string`.'''
+        '''Return a list of ranges, a tree, and a list of tuples for the errors when parsing the given `tokens` out of `string`.'''
         groups = {length: [{token for token in group} for group in zip(*pairs)] for length, pairs in itertools.groupby(sorted(tokens, key=len), len)}
         layer, [capture], (open, close) = (groups.pop(length, length * [()]) for length in range(3))
         assert(not groups), groups
@@ -839,19 +842,28 @@ class token(nested):
                 stack.append(index), locations[token].append(index), owner.append(index)
             elif token in close and locations[token] and locations[token][-1] == stack[-1] and string[stack[-1]] == pairs[token]:
                 segment = stack.pop(), index + length
-                layer = tree.setdefault(stack[-1] if stack else None, [])
-                order.append(segment), layer.append(segment), tree.setdefault(locations[token].pop(), []), owner.pop()
+                depth, layer = len(stack), tree.setdefault(stack[-1] if stack else None, [])
+                order.append((depth, segment)), layer.append(segment), tree.setdefault(locations[token].pop(), []), owner.pop()
             elif token in capture:
                 segment = index, index + length
                 tree.setdefault(owner[-1], []).append(segment)
             else:
-                errors.append((index, index + length))
+                error = depth, segment = len(stack), (index, index + length)
+                errors.append(error)
             continue
 
         # If the stack isn't empty, then we encountered some mismatched pairs
         # (errors) in the beginning of the string and we need to return them first.
         if stack:
-            return order, tree, sorted(itertools.chain(*([(index, index + len(token)) for index in locations[token]] for token in open))) + errors
+            iterable = ([(index, index + len(token)) for index in locations[token]] for token in open)
+            leftover = {left : (left, right) for left, right in itertools.chain(*iterable)}
+
+            # Eat the cost of a sort to ensure the errors are ordered by position. This is
+            # just in case someone wants to use the depth from the order and errors to repair
+            # the nesting issues in the tree. This is an error handling case anyways...
+            iterable = ((depth, leftover[index]) for depth, index in enumerate(stack))
+            unsorted = [item for item in iterable] + errors
+            return order, tree, sorted(unsorted, key=operator.itemgetter(1))
         return order, tree, errors
 
 class unmangled(object):
