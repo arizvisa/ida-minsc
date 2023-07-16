@@ -1429,7 +1429,8 @@ class mangled(object):
 
     def __init__(self, symbol, mask, Ftransform=None):
         '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
-        self.__init_mangled__(symbol, mask, Ftransform)
+        string, order, _, errors = self.__init_mangled__(symbol, mask, Ftransform)
+        self.__duplicates__ = {} if errors else self.__collect_duplicates__(string, order)
 
     def __init_mangled__(self, symbol, mask, Ftransform=None):
         '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
@@ -1441,6 +1442,18 @@ class mangled(object):
         order, result, errors = token.parse(transformed, tokens)
         self.__tree__, self.__mangled = result, True if errors else False
         return transformed, order, result, errors
+
+    def __collect_duplicates__(self, string, order):
+
+        # find all the unique segments within the string so that we can
+        # reduce the amount of work we'll need to do when transforming it.
+        collection = {}
+        [collection.setdefault(string[left : right], []).append((depth, left, right)) for depth, (left, right) in order]
+
+        # use our collection to build a lookup table for each and every segment. each
+        # value in the table will reference the same list if they're the same string.
+        iterable = itertools.chain(*(segments for _, segments in collection.items()))
+        return {left : collection[string[left : right]] for depth, left, right in iterable}
 
     def __extract_specifiers(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers}):
         '''Remove a declaration specifier "__declspec" from the beginning of the unmangled `string` if it exists.'''
@@ -1663,6 +1676,9 @@ class function(mangled):
 
         # If we already figured out what operator it is, then store that too.
         self.__operator = just_operator if double_quote or expected_operators or qualified_with_spaces else ''
+
+        # Identify any duplicate segments in case we need to translate this string.
+        self.__duplicates__ = {} if errors else self.__collect_duplicates__(decoded, order)
 
     def __init__busted_operator(self, decoded):
         '''Initialize the class for a typed operator in `decoded` which contains unbalanced symbols.'''
