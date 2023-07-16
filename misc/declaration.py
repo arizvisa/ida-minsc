@@ -1417,6 +1417,10 @@ class mangled(object):
 
     def __init__(self, symbol, mask, Ftransform=None):
         '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
+        self.__init_mangled__(symbol, mask, Ftransform)
+
+    def __init_mangled__(self, symbol, mask, Ftransform=None):
+        '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
         self.__encoded = encoded = symbol
         decoded = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.__extract_scope(self.__extract_specifiers(self.decode(encoded, self.__required_flags | mask)))
         transformed = Ftransform(decoded) if Ftransform else decoded
@@ -1790,7 +1794,7 @@ class function(mangled):
 
         # That should be all of the special cases, so now we just
         # need to decode the mangled symbol and parse it.
-        decoded, order, tree, errors = super(function, self).__init__(mangled, self.__flags, **kwargs)
+        decoded, order, tree, errors = self.__init_mangled__(mangled, self.__flags, **kwargs)
 
         # If we encountered some errors, then complain about it so
         # that the user will know why we can't do shit with it.
@@ -1798,7 +1802,7 @@ class function(mangled):
             just_operator, target, segment = _, _, (left, right) = self.__init__busted_operator(decoded)
             expected_operators[just_operator] = decoded[left : right]
             Ftransform = functools.partial(self.__clean_segment, segment, "operator_{:s}{:s}".format(self._declaration_operators_with_errors[just_operator], target))
-            decoded, order, tree, errors = super(function, self).__init__(mangled, self.__flags, Ftransform=Ftransform)
+            decoded, order, tree, errors = self.__init_mangled__(mangled, self.__flags, Ftransform=Ftransform)
             self.__operator_target = just_operator, target
 
         # If there weren't any errors, then there isn't a special case and we should be fine.
