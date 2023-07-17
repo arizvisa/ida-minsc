@@ -916,6 +916,10 @@ def read(bounds):
     '''Return the bytes within the specified `bounds`.'''
     bounds = ea, _ = interface.bounds_t(*bounds)
     return interface.address.read(ea, bounds.size)
+@utils.multicase(location=interface.location_t)
+def read(location):
+    '''Return the bytes at the specified `location`.'''
+    return interface.address.read(*location)
 
 @utils.multicase(data=internal.types.bytes)
 def write(data, **persist):
