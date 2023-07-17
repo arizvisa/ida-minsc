@@ -1067,8 +1067,15 @@ class structure_t(object):
 
     @property
     def bounds(self):
+        '''Return the boundaries of the entire structure.'''
         bounds, base = self.realbounds, self.members.baseoffset
         return operator.add(bounds, base)
+
+    @property
+    def location(self):
+        '''Return the location of the entire structure.'''
+        sptr, offset = self.ptr, self.members.baseoffset
+        return interface.location_t(offset, idaapi.get_struc_size(sptr))
 
     ### Private methods
     def __str__(self):
@@ -1492,6 +1499,13 @@ class member_t(object):
         parent = self.parent
         bounds, base = self.realbounds, parent.members.baseoffset
         return operator.add(bounds, base)
+    @property
+    def location(self):
+        '''Return the location of the member.'''
+        parent = self.parent
+        bounds, base = self.realbounds, parent.members.baseoffset
+        left, right = bounds
+        return interface.location_t(base + left, bounds.size)
     @property
     def parent(self):
         '''Return the structure_t that owns the member.'''
