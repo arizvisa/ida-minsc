@@ -10,7 +10,7 @@ for processing an instance of a structure and avoiding the
 definitions of these classes having to reside in a base module.
 """
 
-import builtins, functools, operator, itertools, logging, six
+import builtins, six, operator, functools, itertools, logging, math
 import re, fnmatch, pickle
 
 import idaapi, internal
@@ -1240,12 +1240,20 @@ class structure_t(object):
     def __pow__(self, index):
         '''Return an instance of the structure with its offset adjusted similar to an array element at the specified `index`.'''
         cls, sptr = self.__class__, self.ptr
-        if not isinstance(index, types.integer):
+        if not isinstance(index, (types.integer, types.float)):
             other, operation = index, operator.pow
             raise TypeError(u"{:s}({:#x}).__pow__({!s}, {!r}) : Unable to perform {:s} operation with type `{:s}` due to a dissimilarity with type `{:s}`.".format('.'.join([__name__, cls.__name__]), sptr.id, operation, other, operation.__name__, other.__class__.__name__, cls.__name__))
 
-        offset, relative = self.members.baseoffset, self.size * index
+        offset, relative = self.members.baseoffset, math.trunc(self.size * index)
         return cls(sptr, offset=offset + relative)
+
+    def __lshift__(self, count):
+        '''Return an instance of the structure shifted `count` times to a lower address.'''
+        return self.__pow__(-count)
+
+    def __rshift__(self, count):
+        '''Return an instance of the structure shifted `count` times to a higher address.'''
+        return self.__pow__(+count)
 
     # reverse operators (adjusts base offset)
     __radd__ = __add__
