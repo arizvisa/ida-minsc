@@ -6275,15 +6275,23 @@ class bounds_t(integerish):
         '''Grow the boundary `count` times in the specified direction.'''
         left, right = self
         sign, size = -1 if count < 0 else +1, right - left if left < right else left - right
-        translate = (size * count, size * sign) if count < 0 else (0, -size + size * count)
+        translate = (size * count, size * sign) if count < 0 else (0, -size + math.trunc(size * count))
         return self.__class__(*itertools.starmap(operator.add, zip(self, translate)))
     __rmul__ = __mul__
+
+    def __lshift__(self, count):
+        '''Shift the boundary `count` times to a lower address.'''
+        return self.__pow__(-count)
+
+    def __rshift__(self, count):
+        '''Shift the boundary `count` times to a higher address.'''
+        return self.__pow__(+count)
 
     def __pow__(self, index):
         '''Return the boundary translated to the specified `index` of an array.'''
         left, right = self
         size = right - left if left < right else left - right
-        translate = functools.partial(operator.add, self.size * index)
+        translate = functools.partial(operator.add, math.trunc(self.size * index))
         return self.__class__(*sorted(map(translate, self)))
 
     def __invert__(self):
@@ -6413,6 +6421,14 @@ class location_t(integerish):
         return self.bounds.contains(offset)
     __contains__ = contains
 
+    def __format__(self, spec):
+        '''Return the current location as a string containing the offset and its size.'''
+        if spec != 's':
+            cls = self.__class__
+            raise TypeError(u"unsupported format string ({!s}) passed to {:s}".format(spec, '.'.join([cls.__name__, '__format__'])))
+        offset, size = self
+        return "{:#x}{:+d}".format(offset, size)
+
     def __neg__(self):
         offset, size = self
         res = int(offset)
@@ -6427,17 +6443,25 @@ class location_t(integerish):
     def __mul__(self, count):
         '''Grow the location `count` times in the specified direction.'''
         offset, size = self
-        translate = size * count
         if count < 0:
-            offset, res = int(offset), size * count
-            return self.__class__(offset + res, abs(res))
-        res = size * count
+            offset, res = int(offset), math.trunc(size * count)
+            return self.__class__(offset + res, abs(res) + size)
+        res = math.trunc(size * count)
         return self.__class__(offset, res)
+    __rmul__ = __mul__
+
+    def __lshift__(self, count):
+        '''Shift the location `count` times to a lower address.'''
+        return self.__pow__(-count)
+
+    def __rshift__(self, count):
+        '''Shift the location `count` times to a higher address.'''
+        return self.__pow__(+count)
 
     def __pow__(self, index):
         '''Return the boundary translated to the specified `index` of an array.'''
         offset, size = self
-        return self.__class__(int(offset) + size * index, size)
+        return self.__class__(int(offset) + math.trunc(size * index), size)
 
 class phrase_t(integerish, symbol_t):
     """
