@@ -4705,6 +4705,19 @@ class instruction(object):
         ok = idaapi.is_basic_block_end(target, *bbargs) and not invalid and not feature & idaapi.CF_STOP and next(xiterable, False)
         return True if ok else False
 
+    @classmethod
+    def boundaries(cls, ea):
+        '''Return a list of boundaries for the operands belonging to the instruction at address `ea`.'''
+        heap, ops, operands, insn = [], {}, cls.operands(ea), cls.at(ea)
+        [(heapq.heappush(heap, operand.offb), ops.setdefault(operand.offb, []).append(index)) for index, operand in enumerate(operands)]
+
+        # it would be neat if we could identify modrm/sib and adjust our list
+        # of points to reference them without being architecture-specific.
+        points = [heapq.heappop(heap) for heap in len(heap) * [heap]] + [insn.size]
+        bounds = {ops[point].pop(0) : (points[index], points[index + 1]) for index, point in enumerate(points[:-1])}
+        iterable = (map(functools.partial(operator.add, insn.ea), bounds[index]) for index, _ in enumerate(operands))
+        return [bounds_t(*bounds) for bounds in iterable]
+
 class regmatch(object):
     """
     This namespace is used to assist with doing register matching
