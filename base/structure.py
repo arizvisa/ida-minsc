@@ -302,8 +302,55 @@ def has(name, *suffix):
     return has(idaapi.get_struc_id(res))
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def has(structure):
-    '''Return whether the database includes the provided `structure`.'''
+    '''Return whether the database includes the given `structure`.'''
     return has(structure.id)
+@utils.multicase(member=(idaapi.member_t, member_t))
+def has(member):
+    '''Return whether the database contains the structure used or referenced by the given `member.'''
+    DT_TYPE, FF_STRUCT = idaapi.as_uint32(idaapi.DT_TYPE), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+    packed = idaapi.get_member_by_id(member.id)
+    if not packed:
+        name = utils.string.of(idaapi.get_member_fullname(member.id))
+        raise E.MemberNotFoundError(u"{:s}.has({:#x}) : Unable to locate the given structure member (\"{:s}\").".format(__name__, member.id, utils.string.escape(name, '"')))
+    mptr, _, sptr = packed
+
+    # If the member's flag says its a structure, then we're good.
+    if mptr.flag & DT_TYPE == FF_STRUCT:
+        return True
+
+    # Otherwise, we need the type information so that we can check it.
+    name = utils.string.of(idaapi.get_member_fullname(mptr.id))
+    tinfo = internal.structure.member.get_typeinfo(mptr)
+
+    # Loop while our type has details that we can continue with. If any iteration
+    # of this loop lands us on a structure or union, then we found a structure.
+    while tinfo.has_details():
+        if tinfo.is_struct() or tinfo.is_union():
+            return True
+
+        # If we landed on an array, then we just need to unpack
+        # the type from it and then we can try again.
+        elif tinfo.is_array():
+            data = idaapi.array_type_data_t()
+            if not tinfo.get_array_details(data):
+                raise E.DisassemblerError(u"{:s}.has({:#x}) : Unable to get the array element from the type information ({!r}) within the given structure member (\"{:s}\").".format(__name__, mptr.id, "{!s}".format(tinfo), utils.string.escape(name, '"')))
+            tinfo = data.elem_type
+
+        # If we landed on a pointer, then only need to
+        # extract its target from the details, and try again.
+        elif tinfo.is_ptr():
+            data = idaapi.ptr_type_data_t()
+            if not tinfo.get_ptr_details(data):
+                raise E.DisassemblerError(u"{:s}.has({:#x}) : Unable to get the pointer target from the type information ({!r}) within the given structure member (\"{:s}\").".format(__name__, mptr.id, "{!s}".format(tinfo), utils.string.escape(name, '"')))
+            tinfo = data.obj_type
+
+        # If we don't know the details due to it being a bitfield, enumeration,
+        # or a function pointer, then it's definitely not a structure.
+        else:
+            break
+        continue
+    return False
+
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def has(tinfo):
     '''Return whether the database includes a structure for the specified `tinfo`.'''
@@ -343,6 +390,71 @@ def by(id, **offset):
 def by(sptr, **offset):
     '''Return the structure for the specified `sptr`.'''
     return internal.structure.new(sptr.id, offset.get('offset', 0))
+@utils.multicase(member=(idaapi.member_t, member_t))
+def by(member):
+    '''Return the structure used by the given `member` or the type that it points to.'''
+    DT_TYPE, FF_STRUCT = idaapi.as_uint32(idaapi.DT_TYPE), idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+    packed = idaapi.get_member_by_id(member.id)
+    if not packed:
+        name = utils.string.of(idaapi.get_member_fullname(member.id))
+        raise E.MemberNotFoundError(u"{:s}.by({:#x}) : Unable to locate the given structure member (\"{:s}\").".format(__name__, member.id, utils.string.escape(name, '"')))
+    mptr, _, sptr = packed
+    flag, dtype, offset = mptr.flag, mptr.flag & DT_TYPE, member.offset if isinstance(member, member_t) else 0 if internal.structure.union(sptr) else mptr.soff
+
+    # If the member is defined as a structure, then we'll need
+    # to construct an opinto_t to retrieve the member info.
+    if dtype == FF_STRUCT:
+        opinfo = idaapi.opinfo_t()
+        res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+        if res and res.tid != idaapi.BADADDR:
+            return internal.structure.new(res.tid, offset)
+
+        name = utils.string.of(idaapi.get_member_fullname(mptr.id))
+        raise E.DisassemblerError(u"{:s}.by({:#x}) : Unable to retrieve the structure for the given member (\"{:s}\").".format(__name__, mptr.id, utils.string.escape(name, '"')))
+
+    # Otherwise, we need to extract the type information and check that instead.
+    name = utils.string.of(idaapi.get_member_fullname(mptr.id))
+    tinfo = internal.structure.member.get_typeinfo(mptr)
+
+    # Complex types (structures, arrays, pointers, etc.) will always have details for their
+    # contents. Therefore, we'll loop while the details exist until we get to a structure/union.
+    while tinfo.has_details():
+        if tinfo.is_struct() or tinfo.is_union():
+            break
+
+        # If our type is an array, then we'll extract the element type and try again.
+        elif tinfo.is_array():
+            data = idaapi.array_type_data_t()
+            if not tinfo.get_array_details(data):
+                raise E.DisassemblerError(u"{:s}.by({:#x}) : Unable to get the array element from the type information ({!r}) within the given structure member (\"{:s}\").".format(__name__, mptr.id, "{!s}".format(tinfo), utils.string.escape(name, '"')))
+            tinfo = data.elem_type
+
+        # If it's a pointer, then dereference the type from its target and try again.
+        elif tinfo.is_ptr():
+            data = idaapi.ptr_type_data_t()
+            if not tinfo.get_ptr_details(data):
+                raise E.DisassemblerError(u"{:s}.by({:#x}) : Unable to get the pointer target from the type information ({!r}) within the given structure member (\"{:s}\").".format(__name__, mptr.id, "{!s}".format(tinfo), utils.string.escape(name, '"')))
+            tinfo = data.obj_type
+
+        # Any other type that has details should be a bitfield, enumeration or
+        # a function pointer. So, there's no way to continue and we can just bail
+        else:
+            break
+        continue
+
+    # Now we should have a type that points to a structure or something
+    # else. If it's something else, then we can just completely bail.
+    if not(tinfo.is_struct() or tinfo.is_union()):
+        raise E.StructureNotFoundError(u"{:s}.by({:#x}) : Unable to retrieve the structure from the type information for the given member (\"{:s}\").".format(__name__, mptr.id, utils.string.escape(name, '"')))
+
+    # The only thing we have left to do, is to figure out what structure
+    # our type information references, and use it to return the structure.
+    typename = tinfo.get_type_name()
+    identifier = idaapi.get_struc_id(typename)
+    if identifier == idaapi.BADADDR:
+        raise E.StructureNotFoundError(u"{:s}.by({:#x}) : Unable to find a structure using the name ({:s}) from the type information for member \"{:s}\" u.".format(__name__, mptr.id, typename, utils.string.escape(name, '"')))
+    return internal.structure.new(identifier, offset)
+
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def by(tinfo, **offset):
     '''Return the structure for the specified `tinfo`.'''
