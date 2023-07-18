@@ -1463,12 +1463,6 @@ class mangled(object):
             self.__declaration_specifier = string[:point]
             return string[point:].lstrip()
 
-        elif string.startswith(('__declspec', '`')):
-            logging.warning(u"{:s}.__extract_specifiers({!r}): Unknown declaration specifier was found at the beginning of the decoded string \"{:s}\".".format('.'.join([__name__, cls.__name__]), string, utils.string.escape(string, '"')))
-            point = 1 + string.find(' ')
-            self.__declaration_specifier = string[:point] if string[point : point + 1] == ' ' else ''
-            return string[point:].lstrip()
-
         self.__declaration_specifier = ''
         return string
 
