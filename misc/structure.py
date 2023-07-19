@@ -1346,9 +1346,35 @@ class member_t(object):
 
             # now we can collect all the xrefs to the member within the function
             res = []
-            for ea, opnum, type in interface.xref.frame(ea, mptr):
-                ref = address.access(ea, opnum)
-                res.append(interface.opref_t(ea, opnum, interface.reftype_t(type, ref.access)))
+            for ea, opnum, xtype in interface.xref.frame(ea, mptr):
+                res.append(interface.opref_t(ea, opnum, interface.access_t(xtype, True)))
+
+            # include any xrefs too in case the user (or the database) has
+            # explicitly referenced the frame variable using a structure path.
+            for ea, iscode, xtype in interface.xref.to(mptr.id, idaapi.XREF_ALL):
+                flags, access = interface.address.flags(ea, idaapi.MS_0TYPE|idaapi.MS_1TYPE), [ref.access for ref in interface.instruction.access(ea)]
+
+                # first we need to figure out which operand the reference is
+                # referring to. if we couldn't find any, then complain about it.
+                listable = [(opnum, operand, address.opinfo(ea, opnum)) for opnum, operand in enumerate(address.operands(ea)) if address.opinfo(ea, opnum)]
+                if not listable:
+                    logging.debug(u"{:s}.refs() : Skipping reference to member ({:#x}) at {:#x} with flags ({:#x}) due to no operand information.".format('.'.join([__name__, cls.__name__]), mptr.id, ea, address.flags(ea)))
+
+                # if our flags represent a structure offset (they should), then we
+                # use the structure path to find the operand that exists.
+                elif flags & FF_STROFF in {FF_STROFF, idaapi.FF_0STRO, idaapi.FF_1STRO}:
+                    logging.debug(u"{:s}.refs() : Found strpath_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, ea, address.flags(ea)))
+                    iterable = [(opnum, idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr), interface.node.get_stroff_path(ea, opnum)) for opnum, op, _ in listable]
+                    iterable = ((opnum, interface.strpath.of_tids(delta + value, tids)) for opnum, value, (delta, tids) in iterable if tids)
+                    iterable = ((opnum, {member.id for _, member, _ in path}) for opnum, path in iterable)
+                    iterable = ((opnum, access[opnum]) for opnum, identifiers in iterable if mptr.id in identifiers)
+                    res.extend(interface.opref_t(ea, opnum, interface.access_t(xtype, iscode)) for opnum, opaccess in iterable)
+
+                # if we couldn't figure it out, then we log a warning and bail.
+                # there really shouldn't be any other operand flag for a stkvar.
+                else:
+                    logging.warning(u"{:s}.refs() : Skipping reference to member ({:#x}) at {:#x} with flags ({:#x}) due to the operand type being unexpected.".format('.'.join([__name__, cls.__name__]), mptr.id, ea, address.flags(ea)))
+                continue
             return res
 
         # otherwise, it's a structure..which means we need to specify the member to get refs for
