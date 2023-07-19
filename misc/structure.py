@@ -1412,16 +1412,17 @@ class member_t(object):
 
         # now figure out which operand has the structure member applied to it
         results = []
-        for ea, _, t in refs:
-            flags = address.flags(ea, idaapi.MS_0TYPE|idaapi.MS_1TYPE)
-            listable = [(opnum, address.opinfo(ea, opnum)) for opnum, _ in enumerate(address.operands(ea)) if address.opinfo(ea, opnum)]
+        for ea, iscode, xtype in refs:
+            flags, access = interface.address.flags(ea, idaapi.MS_0TYPE|idaapi.MS_1TYPE), [item for item in interface.instruction.access(ea)]
+            listable = [(opnum, operand, address.opinfo(ea, opnum)) for opnum, operand in enumerate(address.operands(ea)) if address.opinfo(ea, opnum)]
 
             # If we have any stack operands, then figure out which ones contain it. Fortunately,
             # we don't have to filter it through our candidates because IDA seems to get this right.
             if flags & FF_STKVAR in {FF_STKVAR, idaapi.FF_0STK, idaapi.FF_1STK}:
                 logging.debug(u"{:s}.refs() : Found stkvar_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, address.flags(ea)))
                 masks = [(idaapi.MS_0TYPE, idaapi.FF_0STK), (idaapi.MS_1TYPE, idaapi.FF_1STK)]
-                results.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum, (mask, ff) in enumerate(masks) if flags & mask == ff)
+                iterable = ((opnum, access[opnum]) for opnum, (mask, ff) in enumerate(masks) if flags & mask == ff)
+                results.extend(interface.opref_t(ea, opnum, interface.access_t(xtype, iscode)) for opnum, opaccess in iterable)
 
             # Otherwise, we can skip this reference because there's no way to process it.
             elif not listable:
@@ -1430,15 +1431,17 @@ class member_t(object):
             # If our flags mention a structure offset, then we can just get the structure path.
             elif flags & FF_STROFF in {FF_STROFF, idaapi.FF_0STRO, idaapi.FF_1STRO}:
                 logging.debug(u"{:s}.refs() : Found strpath_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, address.flags(ea)))
-                iterable = [(opnum, {identifier for identifier in interface.node.get_stroff_path(ea, opnum)[1]}) for opnum, _ in listable]
-                iterable = (opnum for opnum, identifiers in iterable if identifiers & candidates)
-                results.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in iterable)
+                iterable = [(opnum, idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr), interface.node.get_stroff_path(ea, opnum)) for opnum, op, _ in listable]
+                iterable = ((opnum, interface.strpath.of_tids(delta + value, tids)) for opnum, value, (delta, tids) in iterable if tids)
+                iterable = ((opnum, {member.id for _, member, _ in path}) for opnum, path in iterable)
+                iterable = ((opnum, access[opnum]) for opnum, identifiers in iterable if identifiers & candidates)
+                results.extend(interface.opref_t(ea, opnum, interface.access_t(xtype, iscode)) for opnum, opaccess in iterable)
 
             # Otherwise, we need to extract the information from the operand's refinfo_t. We
             # filter these by only taking the ones which we can use to calculate the target.
             else:
                 logging.debug(u"{:s}.refs() : Found refinfo_t to member ({:#x}) at {:#x} with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, ea, address.flags(ea)))
-                iterable = ((opnum, info.ri, address.reference(ea, opnum)) for opnum, info in listable if info.ri.is_target_optional())
+                iterable = ((opnum, info.ri, address.reference(ea, opnum)) for opnum, _, info in listable if info.ri.is_target_optional())
 
                 # now we can do some math to determine if the operands really are pointing
                 # to our structure member by checking that the operand value is in-bounds.
@@ -1456,7 +1459,7 @@ class member_t(object):
                     # better job here and calculate the boundaries of the exact member to
                     # confirm that the offset we resolved actually points at it.
                     if address.flags(offset, idaapi.DT_TYPE) == FF_STRUCT and address.structure(offset) in candidates:
-                        results.append(interface.opref_t(ea, opnum, interface.reftype_t.of(t)))
+                        results.append(interface.opref_t(ea, opnum, interface.access_t(xtype, iscode)))
                     continue
                 continue
             continue
