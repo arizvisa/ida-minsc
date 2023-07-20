@@ -6035,6 +6035,38 @@ class function(object):
         pi.obj_type = info
         return ti if ti.create_ptr(pi) else None
 
+    @classmethod
+    def apply_typeinfo(cls, ea, info, *flags):
+        '''Apply the given type information in `info` to the function at the address `ea` with the given `flags`.'''
+        originalnames = tinfo.names(info) if info else []
+
+        # Before we apply the type, we don't want any of its names to propagate
+        # through the PIT machinery due to its ability to change the name for
+        # fields that were untouched by the user. So, we start by creating
+        # another variation of the type. One for applying, one for propagating.
+        nameless = tinfo.names(info, [''] * len(originalnames)) if originalnames else info
+
+        # Now we can apply the named type to the address of the function.
+        ok = address.apply_typeinfo(ea, info, *flags)
+
+        # If we were successful in applying the type, then we need to update
+        # all of the calling references with the propagated nameless type.
+        func, callers, errors = ea, [], []
+        if ok and info:
+            callers.extend(ea for ea in xref.to_code(func) if idaapi.get_func(ea) and instruction.is_call(ea))
+
+            # Now we can use our nameless type and apply it to all of the callers.
+            iterable = ((ea, idaapi.apply_callee_tinfo(ea, nameless)) for ea in callers)
+            errors.extend(ea for ea, ok in iterable if not ok)
+
+        # If we encountered any errors trying to update the callers,
+        # then log a warning containing whatever we encountered.
+        if errors:
+            description = "{!s}".format(info)
+            items = itertools.chain(map("{:#x}".format, errors[:-1]), map("and {:#x}".format, errors[-1:])) if len(errors) > 1 else ["{:#x}".format(*errors)]
+            logging.warning(u"{:s}({:#x}, {!r}) : Unable to apply the requested type to {:d} of {:d} caller{:s} ({:s}).".format('.'.join([cls.__name__, 'type']), func, description, len(errors), len(callers), '' if len(callers) == 1 else 's', ', '.join(items) if len(errors) > 2 else ' '.join(items)))
+        return ok
+
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
