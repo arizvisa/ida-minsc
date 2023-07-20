@@ -6037,34 +6037,41 @@ class function(object):
 
     @classmethod
     def apply_typeinfo(cls, ea, info, *flags):
-        '''Apply the given type information in `info` to the function at the address `ea` with the given `flags`.'''
-        originalnames = tinfo.names(info) if info else []
+        '''Apply the type information in `info` to the function at the address `ea` with the given `flags`'''
+        _, fn = addressOfRuntimeOrStatic(ea)
+        callers = [ref for ref in xref.to_code(fn) if idaapi.get_func(ref) and instruction.is_call(ref)]
+        ranges, marks = [(ref, idaapi.next_not_tail(ref)) for ref in callers], [idaapi.AU_USED, idaapi.AU_TYPE]
+        originalnames, has_ranged_wait = tinfo.names(info) if info else [], hasattr(idaapi, 'auto_make_step') or hasattr(idaapi, 'auto_wait_range')
 
-        # Before we apply the type, we don't want any of its names to propagate
-        # through the PIT machinery due to its ability to change the name for
-        # fields that were untouched by the user. So, we start by creating
-        # another variation of the type. One for applying, one for propagating.
+        # Now that we've pre-enumerated our callers, we need a second variation
+        # of the given type so that we can avoid the PIT machinery propagating
+        # the names throughout the database. This way no field names are changed
+        # outside of the function without the user explicitly specifying it.
         nameless = tinfo.names(info, [''] * len(originalnames)) if originalnames else info
 
-        # Now we can apply the named type to the address of the function.
-        ok = address.apply_typeinfo(ea, info, *flags)
+        # Now that we've pre-enumerated our callers, we can apply the type information from the
+        # caller. We want to apply the user's type with the names excluded, so that the names
+        # do not get propagated. Later, we'll then apply the type with its names included.
+        ok = address.apply_typeinfo(fn, nameless if has_ranged_wait else info, *flags)
 
-        # If we were successful in applying the type, then we need to update
-        # all of the calling references with the propagated nameless type.
-        func, callers, errors = ea, [], []
-        if ok and info:
-            callers.extend(ea for ea in xref.to_code(func) if idaapi.get_func(ea) and instruction.is_call(ea))
+        # Next we try to single-step each update within the callers..using the best
+        # api that is available. If it's not available, then we essentially abort.
+        if hasattr(idaapi, 'auto_make_step'):
+            [[idaapi.auto_make_step(*range) for range in ranges] for queue in marks]
+        elif hasattr(idaapi, 'auto_wait_range'):
+            [idaapi.auto_wait_range(*range) for range in ranges]
 
-            # Now we can use our nameless type and apply it to all of the callers.
-            iterable = ((ea, idaapi.apply_callee_tinfo(ea, nameless)) for ea in callers)
-            errors.extend(ea for ea, ok in iterable if not ok)
+        # If we successfully applied the type, then the disassembler should have propagated
+        # the parameters to all of the callers. Now we set the type with names to the address.
+        set_tinfo = idaapi.set_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_tinfo
+        if info and ok and not set_tinfo(ea, info):
+            return False
 
-        # If we encountered any errors trying to update the callers,
-        # then log a warning containing whatever we encountered.
-        if errors:
-            description = "{!s}".format(info)
-            items = itertools.chain(map("{:#x}".format, errors[:-1]), map("and {:#x}".format, errors[-1:])) if len(errors) > 1 else ["{:#x}".format(*errors)]
-            logging.warning(u"{:s}({:#x}, {!r}) : Unable to apply the requested type to {:d} of {:d} caller{:s} ({:s}).".format('.'.join([cls.__name__, 'type']), func, description, len(errors), len(callers), '' if len(callers) == 1 else 's', ', '.join(items) if len(errors) > 2 else ' '.join(items)))
+        # We need to immediately unmark AU_TYPE and AU_USED after setting it, since when we
+        # use set_tinfo, the disassembler doesn't wait until the database is updated. This
+        # way we complete our original goal of avoiding the parameter names being propagated.
+        if ok and info and has_ranged_wait:
+            [[idaapi.auto_unmark(*range + (queue,)) for queue in marks] for range in ranges]
         return ok
 
 def addressOfRuntimeOrStatic(func):
