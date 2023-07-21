@@ -4265,8 +4265,8 @@ class xref(object):
         '''Return a list of addresses for the parameters being passed to the function reference at address `ea`.'''
         if not (interface.xref.has_code(ea, True) and interface.instruction.is_call(ea)):
             raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the given address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
-        items = idaapi.get_arg_addrs(ea)
-        return [] if items is None else [ea for ea in items]
+        items = idaapi.get_arg_addrs(ea) or []
+        return [(None if ea == idaapi.BADADDR else ea) for ea in items]
     args = utils.alias(arguments, 'xref')
 
 x = xref    # XXX: ns alias
