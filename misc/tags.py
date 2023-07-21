@@ -25,7 +25,7 @@ class address(object):
 
     @classmethod
     def get(cls, ea):
-        '''Return a dictionary containing the tags for the item at the address `ea`.'''
+        '''Return a dictionary containing the tags for the item at address `ea`.'''
         MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
         Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7)
@@ -114,7 +114,7 @@ class address(object):
 
     @classmethod
     def set(cls, ea, key, value):
-        '''Set the tag identified by `key` to `value` at the address `ea`.'''
+        '''Set the tag specified by `key` to `value` for the item at address `ea`.'''
         if value is None:
             raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('database', ea, key, value, utils.string.escape(key, '"'), value))
         ea = interface.address.inside(int(ea))
@@ -228,8 +228,33 @@ class address(object):
         return res
 
     @classmethod
+    def clear_typeinfo(cls, ea, none):
+        '''Remove the type information from the item at address `ea`.'''
+        key = '__typeinfo__'
+        if none is not None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to remove the type information from the given address with an unsupported type {!r}.".format('database', ea, key, none, none))
+
+        try:
+            rt, ea = interface.addressOfRuntimeOrStatic(ea)
+
+        # If we hit an exception, then we're not a function and all
+        # we need to do is to apply our tinfo_t to the address.
+        except LookupError:
+            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, none)
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to remove the type information from the given address ({:#x}).".format('database', ea, key, none, ea))
+            return result
+
+        # Otherwise we're being used on a function, and we need to do
+        # the exact same thing but with the interface.function api.
+        result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, none)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to remove the type information from the given function ({:#x}).".format('database', ea, key, none, ea))
+        return result
+
+    @classmethod
     def set_typeinfo(cls, ea, value, forced=False):
-        '''Apply the type information specified by `value` to the given address.'''
+        '''Apply the type information specified by `value` to the item at address `ea`.'''
         info, key = internal.declaration.parse(value) if isinstance(value, internal.types.string) else value, '__typeinfo__'
         if info is None:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('database', ea, key, value, utils.string.repr(value), ea))
@@ -268,7 +293,7 @@ class address(object):
 
     @classmethod
     def remove(cls, ea, key, none):
-        '''Removes the tag identified by `key` at the address `ea`.'''
+        '''Remove the tag specified by `key` from the item at address `ea`.'''
         if none is not None:
             raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('database', ea, key, none, utils.string.escape(key, '"'), none))
         ea = interface.address.inside(int(ea))
@@ -455,7 +480,7 @@ class function(object):
 
     @classmethod
     def set(cls, func, key, value):
-        '''Sets the value for the tag `key` to `value` for the function `func`.'''
+        '''Set the tag specified by `key` to `value` for the function `func`.'''
         if value is None:
             raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format('function', ("{:#x}" if isinstance(func, internal.types.integer) else "{!r}").format(func), key, value, utils.string.escape(key, '"'), value))
 
@@ -553,7 +578,7 @@ class function(object):
 
     @classmethod
     def set_typeinfo(cls, func, value):
-        '''Apply the type information specified by `value` to the function at the given address.'''
+        '''Apply the type information specified by `value` to the function `func`.'''
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
         # First we'll try and parse the type if it was given to us as a string.
@@ -581,8 +606,22 @@ class function(object):
         return result
 
     @classmethod
+    def clear_typeinfo(cls, func, none):
+        '''Remove the type information from the function specified by `func`.'''
+        key = '__typeinfo__'
+        if none is not None:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to remove the type information from the given function with an unsupported type {!r}.".format('function', ea, key, none, none))
+
+        # Grab the address that we're supposed to clear and run with it.
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, none)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove the type information from the given function ({:#x}).".format('function', ea, key, none, ea))
+        return result
+
+    @classmethod
     def remove(cls, func, key, none):
-        '''Removes the tag identified by `key` from the function `func`.'''
+        '''Remove the tag specified by `key` from the function `func`.'''
         if none is not None:
             raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:s}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type ({!s}).".format('function', ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), key, none, utils.string.escape(key, '"'), none))
 
@@ -615,7 +654,7 @@ class function(object):
             _, ea = interface.addressOfRuntimeOrStatic(func)
             result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, None)
             if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!!}, {!s}) : Unable to remove the type information from the given function ({:#x}).".format('function', ea, key, none, ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove the type information from the given function ({:#x}).".format('function', ea, key, none, ea))
             return result
 
         # Decode both comment types so that we can figure out which comment type
@@ -673,7 +712,7 @@ class structure(object):
 
     @classmethod
     def get(cls, sptr):
-        '''Return a dictionary containing the tags for the structure given by `sptr`.'''
+        '''Return a dictionary containing the tags for the structure `sptr`.'''
         repeatable, sptr = True, idaapi.get_struc(int(sptr)) if isinstance(sptr, internal.types.integer) else sptr
 
         # grab the repeatable and non-repeatable comment for the structure
@@ -721,7 +760,7 @@ class structure(object):
 
     @classmethod
     def set(cls, sptr, key, value):
-        '''Set the tag identified by `key` to `value` for the structure specified by `sptr`.'''
+        '''Set the tag specified by `key` to `value` for the structure `sptr`.'''
         if value is None:
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, sptr.id, key, value, utils.string.escape(key, '"'), value))
 
@@ -754,7 +793,7 @@ class structure(object):
 
     @classmethod
     def remove(cls, sptr, key, none):
-        '''Remove the tag identified by `key` from the structure specified by `sptr`.'''
+        '''Remove the tag specified by `key` from the structure `sptr`.'''
         if none is not None:
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Tried to set the tag named \"{:s}\" with an unsupported type {!r}.".format(cls.__name__, sptr.id, key, none, utils.string.escape(key, '"'), value))
 
@@ -818,7 +857,7 @@ class member(object):
 
     @classmethod
     def get(cls, mptr):
-        '''Return a dictionary containing the tags for the structure member given by `mptr`.'''
+        '''Return a dictionary containing the tags for the structure member `mptr`.'''
         repeatable, mptr = True, idaapi.get_struc(int(mptr)) if isinstance(mptr, internal.types.integer) else mptr
         mptr, fullname, sptr = idaapi.get_member_by_id(mptr.id)
 
@@ -869,7 +908,7 @@ class member(object):
 
     @classmethod
     def set(cls, mptr, key, value):
-        '''Set the tag identified by `key` to `value` for the structure member specified by `mptr`.'''
+        '''Set the tag specified by `key` to `value` for the structure member `mptr`.'''
         repeatable = True
 
         # Guard against a bunk type being used to set the value.
@@ -910,7 +949,7 @@ class member(object):
 
     @classmethod
     def remove(cls, mptr, key, none):
-        '''Remove the tag identified by `key` from the structure member specified by `mptr`.'''
+        '''Remove the tag specified by `key` from the structure member `mptr`.'''
         if none is not None:
             raise internal.exceptions.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set the tag (\"{:s}\") to an unsupported type {!r}.".format('database', ea, key, none, utils.string.escape(key, '"'), none))
         repeatable = True
