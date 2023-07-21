@@ -597,7 +597,7 @@ class function(object):
             logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('function', ea, key, value, "{!s}".format(info), "{!s}".format(ti), ea))
 
         # and then we just need to apply the type to the given address.
-        result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, ti)
+        result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti)
         if not ok:
             raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply typeinfo ({!r}) to the {:s} ({:#x}).".format('function', ea, key, value, "{!s}".format(ti), 'address' if rt else 'function', ea))
         return result
