@@ -4366,7 +4366,11 @@ class type(object):
         If `guess` is true, then apply the type information as a guess.
         If `force` is true, then apply the type as-is regardless of its location.
         """
-        info_s = "{!s}".format(info)
+        info_s, flags = "{!s}".format(info), idaapi.TINFO_GUESSED if builtins.next((guessed[kwd] for kwd in ['guess', 'guessed'] if kwd in guessed), False) else idaapi.TINFO_DEFINITE
+
+        # Figure out if we're tampering with the type, or explicitly modifying it.
+        iterable = (guessed[kwd] for kwd in ['guess', 'guessed'] if kwd in guessed)
+        flags = [idaapi.TINFO_GUESSED if builtins.next(iterable, False) else idaapi.TINFO_DEFINITE] if any(kwd in guessed for kwd in ['guess', 'guessed']) else []
 
         # Check if we're pointing directly at a function or a runtime-linked one.
         try:
@@ -4375,7 +4379,7 @@ class type(object):
         # If we hit an exception, then we're not a function and all
         # we need to do is to apply our tinfo_t to the address.
         except LookupError:
-            result, ok = cls(ea), interface.address.apply_typeinfo(ea, info, **guessed)
+            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, info, *flags)
             if not ok:
                 raise E.DisassemblerError(u"{:s}({:#x}, {!s}{:s}) : Unable to apply the given type ({!s}) to the address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.repr(info_s), ea))
             return result
@@ -4393,8 +4397,8 @@ class type(object):
             elif ti is not info:
                 logging.warning(u"{:s}({:#x}, {!s}{:s}) : Promoted the given type (\"{:s}\") to a pointer before applying it to the runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.escape(info_s, '"'), ea))
 
-            # Now we can just apply our tinfo_t to the address.
-            result, ok = cls(ea), interface.address.apply_typeinfo(ea, ti, **guessed)
+            # Now we can just apply our tinfo_t to the address as a function.
+            result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti, **guessed)
             if not ok:
                 raise E.DisassemblerError(u"{:s}({:#x}, {!s}{:s}) : Unable to apply the given type ({!s}) to runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s), ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.repr(info_s), ea))
             return result
