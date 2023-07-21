@@ -307,10 +307,7 @@ class address(object):
         elif key == '__extra_suffix__':
             return comment.extra.delete_suffix(ea)
         elif key == '__typeinfo__':
-            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, none)
-            if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to remove the type information from the given address ({:#x}).".format('database', ea, key, none, ea))
-            return result
+            return cls.clear_typeinfo(ea, none)
         elif key == '__color__':
             DEFCOLOR = 0xffffffff
             res = interface.address.color(ea, DEFCOLOR)
@@ -651,11 +648,7 @@ class function(object):
             res = interface.function.color(fn, DEFCOLOR)
             return None if res == DEFCOLOR else res
         elif key == '__typeinfo__':
-            _, ea = interface.addressOfRuntimeOrStatic(func)
-            result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, None)
-            if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove the type information from the given function ({:#x}).".format('function', ea, key, none, ea))
-            return result
+            return cls.clear_typeinfo(func, none)
 
         # Decode both comment types so that we can figure out which comment type
         # the tag they're trying to remove is in. If it's in neither, then we just
