@@ -1469,8 +1469,8 @@ class matcher(object):
         self.__predicate__[type] = functools.partial(fcompose, attr)
     def match(self, type, value, iterable):
         if type not in self.__predicate__:
-            cls, available = self.__class__, sorted(self.__predicate__)
-            raise internal.exceptions.InvalidMatchTypeError(u"{:s}.match({!r}, {!r}, {!r}) : The requested filter (\"{:s}\") is not within the list of available filters ({:s}).".format('.'.join([__name__, cls.__name__]), type, value, iterable, string.escape(type, '"'), ', '.join(available)))
+            cls, available, description = self.__class__, sorted(self.__predicate__), "...{:d} element{:s}".format(len(iterable), '' if len(iterable) == 1 else 's') if hasattr(iterable, '__len__') else '...' if hasattr(iterable, '__iter__') else "{!r}".format(iterable)
+            raise internal.exceptions.InvalidMatchTypeError(u"{:s}.match({!r}, {!r}, {!s}) : The requested filter (\"{:s}\") is not within the list of available filters ({:s}).".format('.'.join([__name__, cls.__name__]), type, value, description, string.escape(type, '"'), ', '.join(available)))
         matcher = self.__predicate__[type](value)
         return (item for item in iterable if matcher(item))
     def alias(self, target, type):
