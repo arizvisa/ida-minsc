@@ -3055,7 +3055,7 @@ class type(object):
             logging.warning(u"{:s}({:#x}, {!r}) : Promoted type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(info), "{!s}".format(ti), ea))
 
         # and then we just need to apply the type to the given address.
-        result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, ti, *flags)
+        result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti, *flags)
         if not ok:
             raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to apply typeinfo ({!r}) to the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(ti), 'address' if rt else 'function', ea))
         return result
@@ -3063,11 +3063,10 @@ class type(object):
     @utils.string.decorate_arguments('info')
     def __new__(cls, func, info, **guessed):
         '''Parse the type information string in `info` into an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
-        TINFO_GUESSED, TINFO_DEFINITE = getattr(idaapi, 'TINFO_GUESSED', 0), getattr(idaapi, 'TINFO_DEFINITE', 1)
         MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
         Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
-        til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
+        til, parseflags = interface.tinfo.library(), functools.reduce(operator.or_, [idaapi.PT_SIL, idaapi.PT_VAR, idaapi.PT_LOWER, idaapi.PT_NDC])
 
         # Figure out what we're actually going to be applying the type information to,
         # and figure out what its real name is so that we can mangle it if necessary.
@@ -3079,11 +3078,21 @@ class type(object):
         else:
             realname = fname
 
-        # Now we can parse it and see what we have. If we couldn't parse it or it
-        # wasn't an actual function of any sort, then we need to bail.
-        ti = internal.declaration.parse(info)
-        if not ti:
-            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}, {!r}) : Unable to parse the provided string (\"{!s}\") into an actual type.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"')))
+        # Now we can terminate the string, parse it, and see what we have.
+        ti, parsedname, terminated = idaapi.tinfo_t(), None, info if info.endswith(';') else "{:s};".format(info)
+        if idaapi.__version__ < 6.9:
+            ok = idaapi.parse_decl2(til, terminated, utils.string.to(realname), ti, parseflags)
+            ti = ti if ok else None
+        elif idaapi.__version__ < 7.0:
+            parsedname = idaapi.parse_decl2(til, terminated, ti, parseflags)
+            ti = None if parsedname is None else ti
+        else:
+            parsedname = idaapi.parse_decl(ti, til, terminated, parseflags)
+            ti = None if parsedname is None else ti
+
+        # If we couldn't parse it (None) or it wasn't a function, then we need to bail.
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to parse the provided string (\"{!s}\") as a properly named function prototype.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"')))
 
         elif not any([ti.is_func(), ti.is_funcptr()]):
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-prototype (\"{!s}\") to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"'), 'address' if rt else 'function', ea))
@@ -3095,28 +3104,26 @@ class type(object):
             raise E.DisassemblerError(u"{:s}({:#x}, {!r}) : Unable to promote type to a pointer as required when applying a function type to a runtime-linked address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, ea))
 
         elif newti is not ti:
-            logging.warning(u"{:s}({:#x}, {!r}) : Promoting type ({!r}) to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, info, "{!s}".format(ti), "{!s}".format(newti), ea))
+            logging.warning(u"{:s}({:#x}, {!r}) : Promoting type \"{:s}\" to a function pointer ({!r}) due to the address ({:#x}) being runtime-linked.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(ti, '"'), "{!s}".format(newti), ea))
 
-        # Now we re-render it into a string so that it can be applied.
-        newinfo = idaapi.print_tinfo('', 0, 0, 0, newti, utils.string.to(realname), '')
+        # Now we re-render the type into a string in case we couldn't apply it.
+        rendered = idaapi.print_tinfo('', 0, 0, 0, newti, utils.string.to(parsedname) if parsedname else utils.string.to(realname), '')
 
-        # Terminate the typeinfo string with a ';' so that IDA can parse it.
-        terminated = newinfo if newinfo.endswith(';') else "{:s};".format(newinfo)
+        # Now we need to figure out whether we're adjust the type or explicitly
+        # changing it. Afterwards, we should be able to apply it to the function.
+        iterable = (guessed[kwd] for kwd in ['guess', 'guessed'] if kwd in guessed)
+        flags = [idaapi.TINFO_GUESSED if builtins.next(iterable, False) else idaapi.TINFO_DEFINITE] if any(kwd in guessed for kwd in ['guess', 'guessed']) else []
 
-        # Now we should just be able to apply it to the function.
-        result, ok = cls(ea), idaapi.apply_cdecl(til, ea, terminated, TINFO_DEFINITE)
+        # Now we should just be able to apply it to the function... or not.
+        result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, newti, *flags)
         if not ok:
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to apply the specified type declaration (\"{!s}\").".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(newinfo, '"')))
-
-        # since TINFO_GUESSED doesn't always work, we clear aflags here.
-        if guessed.get('guessed', False):
-            interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to apply the parsed type \"{!s}\" to the specifed {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(rendered, '"'), 'address' if rt else 'function', ea))
         return result
     @utils.multicase(func=(idaapi.func_t, types.integer), none=types.none)
     def __new__(cls, func, none):
         '''Remove the type information for the function `func`.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
-        result, ok = interface.function.typeinfo(ea), interface.address.apply_typeinfo(ea, None)
+        result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, None)
         if not ok:
             raise E.DisassemblerError(u"{:s}({:#x}, {!s}) : Unable to remove the type information from the given function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, none, ea))
         return result
