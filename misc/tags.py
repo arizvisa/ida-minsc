@@ -283,7 +283,7 @@ class address(object):
                 logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Promoted the given type (\"{:s}\") to a pointer before applying it to the runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
 
             # Now we can just apply our tinfo_t to the address.
-            result, ok = interface.address.typeinfo(ea), interface.address.apply_typeinfo(ea, ti)
+            result, ok = interface.function.typeinfo(ea), interface.function.apply_typeinfo(ea, ti)
             if not ok:
                 raise internal.exceptions.DisassemblerError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to apply the given type ({!s}) to runtime-linked address ({:#x}).".format('database', ea, key, value, utils.string.repr("{!s}".format(ti)), ea))
             return result
