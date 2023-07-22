@@ -2975,6 +2975,7 @@ class members_t(object):
     __members_matcher.combinator('within', utils.fcondition(utils.finstance(interface.bounds_t))(utils.fcompose(utils.fpartial(operator.methodcaller, 'contains')), utils.fcompose(utils.funpack(interface.bounds_t), utils.fpartial(operator.methodcaller, 'contains'))), 'bounds')
     __members_matcher.mapping('named', operator.truth, 'ptr', member.has_name)
     __members_matcher.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), 'ptr', internal.tags.member.get, operator.methodcaller('keys'), internal.types.set, utils.freverse(operator.sub, {'__name__', '__typeinfo__'}))
+    __members_matcher.alias('tag', 'tagged')
     __members_matcher.mapping('typed', operator.truth, 'ptr', functools.partial(idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo, idaapi.tinfo_t()))
     __members_matcher.boolean('ge', operator.le, utils.fmap(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add)), __members_matcher.alias('greater', 'ge')
     __members_matcher.boolean('gt', operator.lt, utils.fmap(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add))
