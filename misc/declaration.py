@@ -628,6 +628,21 @@ class nested(object):
         iterable = itertools.chain(*(segments for _, segments in collection.items()))
         return {left : collection[string[left : right]] for left, right in map(operator.itemgetter(-1), iterable)}
 
+    @classmethod
+    def unique(cls, duplicates):
+        '''Process a dictionary of `duplicates` and yield each unique segment in order from deepest to most shallow.'''
+        depths, unique = {}, {id(items) : index for index, items in duplicates.items()}
+        [depths.setdefault(max(map(operator.itemgetter(0), duplicates[index])), []).append(index) for _, index in unique.items()]
+
+        # iterate through each depth from the deepest to the most shallow,
+        # in order to yield its index and a sample segment of the string.
+        for depth in sorted(depths)[::-1]:
+            for index in depths[depth]:
+                _, segment = duplicates[index][-1]
+                yield segment
+            continue
+        return
+
     #def modify(string, augmented, index=None):
     #    result, pos = [], 0
     #    for skip, key, size in augmented.get(index, []):
