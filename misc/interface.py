@@ -10,7 +10,7 @@ individuals to attempt to understand this craziness.
 import six, builtins, os
 import sys, logging, contextlib
 import functools, operator, itertools
-import collections, heapq, traceback, ctypes, math, codecs, array as _array
+import collections, heapq, bisect, traceback, ctypes, math, codecs, array as _array
 
 import idaapi, internal, architecture
 
@@ -3390,6 +3390,70 @@ class strpath(object):
         # We should now have our result resolved so we can grab our delta to return it.
         delta, _ = builtins.next(calculator), calculator.close()
         return delta, result
+
+    @classmethod
+    def members(cls, sptr, slice):
+        '''Select the contiguous members of the structure `sptr` using the given `slice` and return a tuple containing the start offset, stop offset, and ordered list containing each ``idaapi.member_t`` or each size.'''
+        is_variable, is_frame = (sptr.props & prop for prop in [idaapi.SF_VAR, idaapi.SF_FRAME])
+        members = [sptr.get_member(index) for index in builtins.range(sptr.memqty)]
+        size = idaapi.get_struc_size(sptr)
+        slice = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None)
+        istart, istop, istep = slice.indices(len(members))
+        indices = [index for index in builtins.range(istart, istop, istep)]
+
+        # If the structure is a union, then there's nothing we can do.
+        if sptr.props & idaapi.SF_UNION:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.members({:#x}, {!s}, {:d}) : Unable to return contiguous members for the given structure \"{:s}\" due to it being a union ({:#x} & {:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, size, internal.utils.string.escape(internal.utils.string.of(idaapi.get_struc_name(sptr.id)), '"'), sptr.props, idaapi.SF_UNION))
+
+        # Add all the points and segments from the structure.
+        iterable = itertools.chain(*((mptr.soff, mptr.eoff) for mptr in members))
+        points = [point for point, duplicates in itertools.groupby(iterable)]
+        segments, iterable = {}, ((mptr, mptr.soff, mptr.eoff) for mptr in members)
+        points.insert(0, 0) if points and operator.lt(0, *points[:+1]) else points
+        points.append(size) if points and operator.gt(size, *points[-1:]) else points
+        for mptr, soff, eoff in iterable:
+            segments[soff] = segments[eoff] = mptr
+
+        # Now we can select the members that the user specified, and use
+        # it to select the starting and ending point of our interval.
+        selected = [members[index] for index in indices]
+        if selected:
+            start, stop = (selected[0].soff, selected[-1].eoff) if istart <= istop else (selected[-1].soff, selected[0].eoff)
+
+            # If we selected something, then we need to determine whether to include
+            # the actual members or to include the anonymous fields that surround them.
+            left = points[0] if slice.start is None else start
+            right = points[-1] if slice.stop is None else stop
+
+        # If we couldn't select anything, then use the boundaries of the
+        # members that were within the requested slice to identify the points.
+        elif members:
+            iterable = ((members[index].soff if index < len(members) else members[-1].eoff) for index in [istart, istop])
+            left = min(points) if slice.start is None else min(*iterable)
+            iterable = ((members[index].eoff if index < len(members) else members[-1].eoff) for index in [istart, istop])
+            right = max(points) if slice.stop is None else max(*iterable)
+
+        # Otherwise since there's no selection or points, we choose the lowest
+        # and the highest one. These should be 0 (for the lowest) and the structure
+        # size (for the highest). We're essentially assuming that the size is 0.
+        else:
+            left, right = 0, size
+
+        # Now we can use the boundaries to select the points with our interval.
+        start, stop = bisect.bisect_left(points, left), bisect.bisect_right(points, right)
+        step, point = -1 if istep < 0 else +1, 0 if start < 0 else points[start] if start < len(points) else size
+
+        # Last thing to do is to iterate through each point to yield each member and
+        # any holes. Each member should only be yielded once, so we track that too.
+        offset, result, available = point, [], {mptr.id : mptr for mptr in selected}
+        for point in points[start : stop]:
+            if offset < point:
+                result.append((offset, point - offset))
+            mptr = segments.get(point, None)
+            if mptr and mptr.id in available:
+                result.append((point, available.pop(mptr.id)))
+            offset = mptr.eoff if mptr else point
+        return points[start], point, result[::-1 if istep < 0 else +1]
 
 class tinfo(object):
     """
