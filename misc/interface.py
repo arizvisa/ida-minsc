@@ -3455,6 +3455,86 @@ class strpath(object):
             offset = mptr.eoff if mptr else point
         return points[start], point, result[::-1 if istep < 0 else +1]
 
+class contiguous(object):
+    """
+    This namespace contains any useful functions that can be used
+    to create and process a list of contiguous elements. This is
+    intended to simplify lining up any of the supported types such
+    structures, members, boundaries, locations, or explicit sizes.
+
+    Each function within the namespace interacts with a list where
+    each element of the list is the item that needs to be aligned,
+    and the index of the element represents where in the contiguous
+    items that the element is to be placed. None of the items in
+    the returned list are modified in any way. Instead the new
+    position of the item is returned as a tuple beginning with
+    the item's calculated offset and followed by the item residing
+    at the tuple's position.
+    """
+
+    @classmethod
+    def size(cls, items):
+        '''Return the total size of the given list of `items` containing structures, members, boundaries, locations, registers, and integers in `items`.'''
+        size = {integer_t : internal.utils.fidentity for integer_t in internal.types.integer}
+
+        # Start by building the lookup table that will map an individual item to its size.
+        size[idaapi.member_t] = idaapi.get_member_size
+        size[idaapi.struc_t] = idaapi.get_struc_size
+        size[idaapi.func_t] = size[idaapi.range_t] = size[idaapi.segment_t] = range.size
+        size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
+        size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
+        size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
+        size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
+
+        # Before doing anything, convert our parameter into a list that we can process.
+        items = [item for item in items]
+        if not all(item.__class__ in size for item in items):
+            missed = [internal.utils.pycompat.fullname(item.__class__) for item in items if item.__class__ not in size]
+            iterable = itertools.chain(missed[:-1], map("and {:s}".format, missed[-1:])) if len(missed) > 1 else missed
+            raise internal.exceptions.InvalidParameterError(u"{:s}.size({!r}) : Unable to determine the size for unsupported type{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), items, '' if len(missed) == 1 else 's', ', '.join(iterable) if len(missed) > 2 else ' '.join(iterable)))
+
+        # Then we only need to convert each item to a size, and then total the result.
+        iterable = ((size[item.__class__], item) for item in items)
+        return sum(F(item) for F, item in iterable)
+
+    @classmethod
+    def layout(cls, offset, items, direction=0):
+        '''Yield the offset and item for each of the given `items` when laid out contiguously in the specified `direction` from `offset`.'''
+        size = {integer_t : internal.utils.fidentity for integer_t in internal.types.integer}
+
+        # Start by building the lookup table that will map an individual item to its size.
+        size[idaapi.member_t] = idaapi.get_member_size
+        size[idaapi.struc_t] = idaapi.get_struc_size
+        size[idaapi.func_t] = size[idaapi.range_t] = size[idaapi.segment_t] = range.size
+        size[internal.structure.structure_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_struc_size)
+        size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
+        size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
+        size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
+
+        # Listify our items and ensure that all of them are a type that we support.
+        items = [item for item in items]
+        if not all(item.__class__ in size for item in items):
+            missed = [internal.utils.pycompat.fullname(item.__class__) for item in items if item.__class__ not in size]
+            iterable = itertools.chain(missed[:-1], map("and {:s}".format, missed[-1:])) if len(missed) > 1 else missed
+            raise internal.exceptions.InvalidParameterError(u"{:s}.layout({:d}, {!r}, {:d}) : Unable to determine the layout for the unsupported type{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), offset, items, direction, '' if len(missed) == 1 else 's', ', '.join(iterable) if len(missed) > 2 else ' '.join(iterable)))
+
+        # If we're laying the list of items in reverse, then
+        # we calculate the offset before yielding the item.
+        if direction < 0:
+            for item in items:
+                res = size[item.__class__](item)
+                offset += direction * size[item.__class__](item)
+                yield math.trunc(offset), item
+            return
+
+        # Otherwise, we start at the current offset, and
+        # adjust the offset for each item as it comes in.
+        for item in items:
+            res = size[item.__class__](item)
+            yield math.trunc(offset), item
+            offset += direction * res
+        return
+
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
