@@ -3401,9 +3401,12 @@ class strpath(object):
         istart, istop, istep = slice.indices(len(members))
         indices = [index for index in builtins.range(istart, istop, istep)]
 
-        # If the structure is a union, then there's nothing we can do.
+        # If the structure is a union, then our slice doesn't need to be
+        # contiguous. So we can simply include the index and return it.
         if sptr.props & idaapi.SF_UNION:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.members({:#x}, {!s}, {:d}) : Unable to return contiguous members for the given structure \"{:s}\" due to it being a union ({:#x} & {:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, size, internal.utils.string.escape(internal.utils.string.of(idaapi.get_struc_name(sptr.id)), '"'), sptr.props, idaapi.SF_UNION))
+            results = [members[index] for index in indices]
+            sizes = [idaapi.get_member_size(mptr) for mptr in results]
+            return min(sizes), max(sizes), [(mptr.soff, mptr) for mptr in results]
 
         # Add all the points and segments from the structure.
         iterable = itertools.chain(*((mptr.soff, mptr.eoff) for mptr in members))
