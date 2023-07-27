@@ -4585,6 +4585,13 @@ class instruction(object):
         return res
 
     @classmethod
+    def opinfo(cls, ea, opnum):
+        '''Return the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at address `ea`.'''
+        info, flags = idaapi.opinfo_t(), address.flags(ea)
+        ok = idaapi.get_opinfo(ea, opnum, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, opnum, flags)
+        return info if ok else None
+
+    @classmethod
     def access_75(cls, ea):
         '''Yield the ``opref_t`` for each operand belonging to the instruction at address `ea`.'''
         READ, WRITE, MODIFY = getattr(idaapi, 'READ_ACCESS', 2), getattr(idaapi, 'WRITE_ACCESS', 1), getattr(idaapi, 'RW_ACCESS', 3)
