@@ -543,25 +543,60 @@ class members(object):
 
     """
 
-    @utils.multicase(enum=(types.integer, types.string, types.tuple))
-    def __new__(cls, enum):
-        """Yield the name, and value of each member from the enumeration `enum`.
+    @classmethod
+    def __iterate__(cls, eid):
+        '''Iterate through all the members of the enumeration identified by `eid` and yield their values.'''
 
-        If the enumeration `enum` is a bitfield, then yield each member's name, value, and bitmask.
-        """
-        eid = by(enum)
-        for mid in cls.iterate(eid):
+        # First we need to define a closure that iterates through all of the
+        # values for the masks inside an enumeration. This is because enumerations
+        # are actually values, and we need to convert these values into identifiers.
+        def values(eid, bitmask):
 
-            # If this enumeration is a bitfield, then we need to yield the name,
-            # value, and bitmask for each member that's being returned.
-            if bitfield(eid):
-                yield member.name(mid), member.value(mid), member.mask(mid)
+            # We start with the first enumeration member (or value), and
+            # then yield it if there was no error while fetching it. If
+            # there was, then we just continue onto the next mask.
+            value = idaapi.get_first_enum_member(eid, bitmask)
+            if value == idaapi.BADADDR:
+                return
+            yield value
 
-            # If it's just a regular enumeration, then we can just return the name and value.
-            else:
-                yield member.name(mid), member.value(mid)
+            # Continue fetching and yielding values until we get to the
+            # very last one of the enumeration.
+            while value != idaapi.get_last_enum_member(eid, bitmask):
+                value = idaapi.get_next_enum_member(eid, value, bitmask)
+                yield value
+            return
+
+        # Now we need to iterate through all of the masks, feeding them
+        # to our "values" closure. Then with the values we can iterate
+        # through all of the serials, and use that to get each identifier.
+        for bitmask in masks.iterate(eid):
+            for value in values(eid, bitmask):
+
+                # Start out with the first serial for the member. We compare
+                # this against idaapi.BADNODE in order to determine if there
+                # was nothing found and we need to continue to the next value.
+                item, cid = mid, _ = idaapi.get_first_serial_enum_member(eid, value, bitmask)
+                if item == idaapi.BADNODE:
+                    continue
+                yield mid
+
+                # Now we should be able to loop until we get to the last serial
+                # number while yielding each valid identifier that we receive.
+                while [item, cid] != idaapi.get_last_serial_enum_member(eid, value, bitmask):
+                    item, cid = idaapi.get_next_serial_enum_member(mid, cid) if idaapi.__version__ < 7.0 else idaapi.get_next_serial_enum_member(cid, mid)
+                    if item == idaapi.BADNODE:
+                        break
+                    yield item
+                continue
             continue
         return
+
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
+    def __new__(cls, enum, **type):
+        '''Return a list of the identifiers for each member associated with the enumeration `enum`.'''
+        eid = by(enum)
+        return [mid for mid in cls.iterate(eid, **type)]
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
     @classmethod
@@ -823,55 +858,6 @@ class members(object):
     __members_matcher.combinator('mask', utils.fcondition(utils.finstance(types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_enum_member_bmask)
     __members_matcher.alias('bitmask', 'mask')
     __members_matcher.predicate('predicate'), __members_matcher.alias('pred', 'predicate')
-
-    @classmethod
-    def __iterate__(cls, eid):
-        '''Iterate through all the members of the enumeration identified by `eid` and yield their values.'''
-
-        # First we need to define a closure that iterates through all of the
-        # values for the masks inside an enumeration. This is because IDA
-        # gives us values, and we need to conver these values to identifiers.
-        def values(eid, bitmask):
-
-            # We start with the first enumeration member (or value), and
-            # then yield it if there was no error while fetching it. If
-            # there was, then we just continue onto the next mask.
-            value = idaapi.get_first_enum_member(eid, bitmask)
-            if value == idaapi.BADADDR:
-                return
-            yield value
-
-            # Continue fetching and yielding values until we get to the
-            # very last one of the enumeration.
-            while value != idaapi.get_last_enum_member(eid, bitmask):
-                value = idaapi.get_next_enum_member(eid, value, bitmask)
-                yield value
-            return
-
-        # Now we need to iterate through all of the masks, feeding them
-        # to our "values" closure. Then with the values we can iterate
-        # through all of the serials, and use that to get each identifier.
-        for bitmask in masks.iterate(eid):
-            for value in values(eid, bitmask):
-
-                # Start out with the first serial for the member. We compare
-                # this against idaapi.BADNODE in order to determine if there
-                # was nothing found and we need to continue to the next value.
-                item, cid = mid, _ = idaapi.get_first_serial_enum_member(eid, value, bitmask)
-                if item == idaapi.BADNODE:
-                    continue
-                yield mid
-
-                # Now we should be able to loop until we get to the last serial
-                # number while yielding each valid identifier that we receive.
-                while [item, cid] != idaapi.get_last_serial_enum_member(eid, value, bitmask):
-                    item, cid = idaapi.get_next_serial_enum_member(mid, cid) if idaapi.__version__ < 7.0 else idaapi.get_next_serial_enum_member(cid, mid)
-                    if item == idaapi.BADNODE:
-                        break
-                    yield item
-                continue
-            continue
-        return
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
