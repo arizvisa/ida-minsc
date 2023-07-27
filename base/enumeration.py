@@ -928,6 +928,24 @@ class member(object):
         > ok = enum.member.remove(mid)
 
     """
+
+    @utils.multicase(enum=(types.integer, types.string, types.tuple))
+    def __new__(cls, enum, member):
+        '''Return a tuple containing the name and value for the enumeration `member` belonging to `enum`.'''
+        eid = by(enum)
+        mid = members.by(eid, member)
+        return cls(mid)
+    @utils.multicase(mid=types.integer)
+    def __new__(cls, mid):
+        """Return a tuple containing the name and value for the enumeration member `mid`.
+
+        If the enumeration owning the member is a bitfield, then the member bitmask is included in the result.
+        """
+        eid = cls.parent(mid)
+        if bitfield(eid):
+            return cls.name(mid), cls.value(mid), cls.mask(mid)
+        return cls.name(mid), cls.value(mid)
+
     @utils.multicase(mid=types.integer)
     @classmethod
     def parent(cls, mid):
