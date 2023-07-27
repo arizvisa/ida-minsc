@@ -3723,18 +3723,18 @@ class tinfo(object):
             pi = idaapi.ptr_type_data_t()
             if not ti.get_ptr_details(pi):
                 raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the pointer target from the type ({!r}) at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
-            tinfo = pi.obj_type
+            info = pi.obj_type
 
         # If the previous case failed, then we're our type isn't related to a function
         # and we were used on a non-callable address. If this is the case, then we need
         # to raise an exception to let the user know exactly what happened.
         elif rt and ti.is_ptr():
-            tinfo = ti.get_pointed_object()
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The target of the pointer type ({!r}) at the specified address ({:#x}) is not a function.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+            info = ti.get_pointed_object()
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The target of the pointer type ({!r}) at the specified address ({:#x}) is not a function.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(info), ea))
 
         # Otherwise this a function and we just use the idaapi.tinfo_t that we got.
         elif not rt and ti.is_func():
-            tinfo = ti
+            info = ti
 
         # Anything else is a type error that we need to raise to the user.
         else:
@@ -3742,38 +3742,58 @@ class tinfo(object):
 
         # Next we need to ensure that the type information has details that
         # we can modify. If they aren't there, then we need to bail.
-        if not tinfo.has_details():
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+        if not info.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(info), ea))
 
-        # Now we can grab our function details from the tinfo.
+        # Now we can grab our function details from the snagged type information.
         ftd = idaapi.func_type_data_t()
-        if not tinfo.get_func_details(ftd):
-            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+        if not info.get_func_details(ftd):
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(info), ea))
+
+        # Concretize the type that we're yielding in case the caller wants to save it.
+        til, old, new = cls.library(info), info, cls.copy(info)
+        res = idaapi.replace_ordinal_typerefs(til, info) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.update_function_details({:#x}, {!r}) : Ignoring error {:d} while trying to concretize the type \"{:s}\" for the function at {:#x}.".format('.'.join([cls.__name__, cls.__name__]), ea, "{!s}".format(info), res, internal.utils.string.escape("{!s}".format(info), '"'), ea))
+        info = old if res < 0 else new
 
         # Yield the function type along with the details to the caller and then
         # receive one back (tit-for-tat) which we'll use to re-create the tinfo_t
         # that we'll apply back to the address.
-        ftd = (yield (tinfo, ftd))
-        if not tinfo.create_func(ftd):
-            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+        ftd = (yield (info, ftd))
+        if not info.create_func(ftd):
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(info), ea))
 
         # If we were a runtime-linked address, then we're a pointer and we need
         # to re-create it for our tinfo_t.
         if rt:
-            pi.obj_type = tinfo
+            pi.obj_type = info
             if not ti.create_ptr(pi):
-                raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(tinfo), ea))
+                raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to modify the pointer target in the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(info), ea))
             newinfo = ti
 
         # If it wasn't a runtime function, then we're fine and can just apply the
         # tinfo that we started out using.
         else:
-            newinfo = tinfo
+            newinfo = info
+
+        # Now we need to check the aflags for the address in order to determine
+        # which default flags we should use. We use AFL_USERTI to distinguish
+        # whether we apply the type with TINFO_DEFINITE or TINFO_GUESSED.
+        definitive = node.aflags(ea, idaapi.AFL_USERTI)
+        [tflags] = itertools.chain(flags if flags else [idaapi.TINFO_DEFINITE if definitive else idaapi.TINFO_GUESSED])
 
         # Finally we have a proper idaapi.tinfo_t that we can apply. After we apply it,
         # all we need to do is return the previous one to the caller and we're good.
-        if not apply_tinfo(ea, newinfo, *itertools.chain(flags if flags else [idaapi.TINFO_DEFINITE])):
+        if not apply_tinfo(ea, newinfo, tflags):
             raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to apply the new type information ({!r}) to the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), "{!s}".format(newinfo), ea))
+
+        # Same thing as every other type, we try to concretize prior to yielding it.
+        til, oldinfo, newinfo = cls.library(newinfo), newinfo, cls.copy(newinfo)
+        res = idaapi.replace_ordinal_typerefs(til, newinfo) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.update_function_details({:#x}, {!r}) : Ignoring error {:d} while trying to concretize the type \"{:s}\" for the function at {:#x}.".format('.'.join([cls.__name__, cls.__name__]), ea, "{!s}".format(info), res, internal.utils.string.escape("{!s}".format(newinfo), '"'), ea))
+        newinfo = oldinfo if res < 0 else newinfo
 
         # Spinning on that dizzy edge.. I kissed her face and kissed her head..
         # And dreamed of all the ways.. That I had to make her glow. Why are you
