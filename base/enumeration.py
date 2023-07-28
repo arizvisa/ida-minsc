@@ -153,10 +153,10 @@ def by(**type):
 
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string')
-def search(string, *suffix):
+def search(string, *suffix, **type):
     '''Return the identifier of the first enumeration that matches the glob `string`.'''
     res = (string,) + suffix
-    return by(like=interface.tuplename(*res))
+    return by(like=interface.tuplename(*res), **type)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def search(**type):
@@ -521,9 +521,10 @@ def iterate(**type):
 
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string')
-def list(string):
+def list(string, *suffix, **type):
     '''List any enumerations that match the glob in `string`.'''
-    return list(like=string)
+    res = string if isinstance(string, types.tuple) else (string,)
+    return list(like=interface.tuplename(*(res + suffix)), **type)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
