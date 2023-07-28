@@ -4638,7 +4638,7 @@ class instruction(object):
         for opnum, op in enumerate(cls.operands(ea)):
             word_sized, access = get_operand_size(op) == architecture_word_size, accesses.get(opnum, ())
             used, modified = Ffeature(cls.uses_bits[opnum]), Ffeature(cls.changes_bits[opnum])
-            adds_xrefs = idaapi.op_adds_xrefs(flags, opnum) and op.type != idaapi.o_reg
+            adds_xrefs = idaapi.op_adds_xrefs(flags, opnum) and op.type != idaapi.o_reg and not idaapi.is_enum(flags, opnum)
 
             # If this is a call, then we only need to distinguish whether it loads from
             # some address. So the only two states, are loading from an address or not.
@@ -4739,7 +4739,7 @@ class instruction(object):
         # Iterate through all of the operands and yield their access_t.
         for opnum, op in enumerate(operands):
             used, modified = Ffeature(cls.uses_bits[opnum]), Ffeature(cls.changes_bits[opnum])
-            ri, has_xrefs = address.refinfo(ea, opnum), idaapi.op_adds_xrefs(flags, opnum)
+            ri, has_xrefs = address.refinfo(ea, opnum), idaapi.op_adds_xrefs(flags, opnum) and not idaapi.is_enum(flags, opnum)
 
             # If the operand is not used or modified, then our access_t is empty. We can use
             # the USobsolete flag here since it's used-specified..but deprecated.
