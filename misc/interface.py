@@ -5184,6 +5184,9 @@ class access_t(object):
         # read, write
         idaapi.dr_R : 4, idaapi.dr_W : 2,
 
+        # symbolic constant (enum)
+        getattr(idaapi, 'dr_S', 6): 0,
+
         # neither, using a deprecated (obsolete) flag from IDA. this is used as a
         # backdoor to disable enforcing flags based on the xref type (code or data).
         idaapi.fl_USobsolete : 0,
@@ -5206,12 +5209,12 @@ class access_t(object):
         self.__xrcode = True if iscode else False
         self.__xrflag = self.__xrtable__.get(xrtype & XREF_MASK, 0)
 
-    # If we're code, then 'x' (1) will always be set.
-    # If we're not code and neither '&' (8), 'r' (4), or 'w' (2) is set, it's actually '&' (8).
+    # If we're code, then 'x' (1) should pretty much always be set.
+    # If we're not code and neither '&' (8), 'r' (4), or 'w' (2) is set, it's actually '&' (8) unless a symbolic constant (dr_S).
     # If the reftype is the fl_USobsolete backdoor, then we ignore all enforcement.
     @classmethod
     def __adjust_flags__(cls, xrtype, iscode, flag):
-        ignore_mask, required_set = (14, 8) if not iscode else (0, 1) if xrtype in cls.__xftypes__ else (0, 0)
+        ignore_mask, required_set = (14, 0 if xrtype == idaapi.dr_S else 8) if not iscode else (0, 1) if xrtype in cls.__xftypes__ else (0, 0)
         return flag if flag & ignore_mask else flag if xrtype in cls.__unktypes__ else flag | required_set
 
     def __iter__(self):
