@@ -344,82 +344,37 @@ def bitfield(enum, boolean):
     return res
 bitflag = utils.alias(bitfield)
 
-@utils.multicase(enum=(types.integer, types.string, types.tuple))
-def up(enum):
-    '''Return all structure or frame members within the database that reference the specified `enum`.'''
-    X, eid = idaapi.xrefblk_t(), by(enum)
+@utils.multicase(name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def up(name, *suffix):
+    '''Return a list of references to the enumeration with the specified `name`.'''
+    eid = by_name(name, *suffix)
+    return up(eid)
+@utils.multicase(eid=types.integer)
+def up(eid):
+    '''Return a list of references to the enumeration identified by `eid`.'''
+    if not interface.node.is_identifier(eid) or idaapi.get_enum_idx(eid) == idaapi.BADADDR:
+        raise E.EnumerationNotFoundError(u"{:s}.up({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
 
-    # IDA does not seem to create xrefs to enumeration identifiers.
-    raise E.UnsupportedCapability(u"{:s}.up({:#x}) : Unable to find any cross-references for the specified enumeration due to the disassembler not keeping track of them.".format(__name__, eid))
-
-    # Grab the first reference to the enumeration.
-    if not X.first_to(eid, idaapi.XREF_ALL):
+    # Start out by collecting all of the members for the enumeration, and then
+    # collect absolutely all of their references into a single list of xrefs.
+    mids = {mid for mid in members.__iterate__(eid)}
+    refs = [packed_frm_iscode_type for packed_frm_iscode_type in itertools.chain(*(interface.xref.to(mid, idaapi.XREF_DATA) for mid in mids))]
+    if not refs:
+        fullname = utils.string.of(idaapi.get_enum_name(eid))
+        logging.warning(u"{:s}.up({:#x}) : No references found for the {:d} member{:s} belonging to the enumeration \"{:s}\".".format(__name__, eid, len(mids), '' if len(mids) == 1 else 's', utils.string.escape(fullname, '"')))
         return []
 
-    # Continue to grab all the rest of the refs to the enumeration.
-    refs = [(X.frm, X.iscode, X.type)]
-    while X.next_to():
-        refs.append((X.frm, X.iscode, X.type))
-
-    # Iterate through each xref and figure out if the enumeration id is
-    # applied to a structure type.
+    # All we need to do is to filter our references for ones
+    # that are not pointing to an instruction of some sort.
     res = []
-    for ref, _, _ in refs:
-
-        # If the reference is not an identifier, then we don't care about
-        # it because it's pointing to code and the member.refs function
-        # should be used for grabbing those.
-        if not interface.node.is_identifier(ref):
+    for ea, xiscode, xrtype in refs:
+        flags = interface.address.flags(interface.address.head(ea))
+        if flags & idaapi.MS_CLS == idaapi.FF_CODE:
             continue
 
-        # Get mptr, full member name, and sptr for the identifier we found.
-        mpack = idaapi.get_member_by_id(ref)
-        if mpack is None:
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}.up({:#x}) : Unable to find the member identified by {:#x}.".format(__name__, eid, ref))
-
-        mptr, name, sptr = mpack
-        if not interface.node.is_identifier(sptr.id):
-            sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
-
-        # Verify the type of the mptr is correct so that we can use it.
-        if not isinstance(mptr, idaapi.member_t):
-            cls, name = self.__class__, idaapi.get_member_fullname(ref)
-            raise E.InvalidTypeOrValueError(u"{:s}.up({:#x}) : Unexpected type {!s} returned for member \"{:s}\".".format(__name__, eid, mptr.__class__, internal.utils.string.escape(name, '"')))
-
-        # Use the mptr identifier to determine if we're referencing a frame.
-        frname, _ = name.split('.', 1)
-        frid = internal.netnode.get(frname)
-        ea = idaapi.get_func_by_frame(frid)
-
-        # If we couldn't find a frame for it, then this is a structure member
-        # and we can just grab it using the structure module.
-        if ea == idaapi.BADADDR:
-            st = structure.by_identifier(sptr.id)
-            mem = st.members.by_identifier(mptr.id)
-            res.append(mem)
-            continue
-
-        # Otherwise, we know that this is a a function frame and
-        # we can just grab it using idaapi.get_frame. We also
-        # need the idaapi.func_t for it to get the frame size.
-        fr = idaapi.get_frame(ea)
-        if fr is None:
-            cls = self.__class__
-            raise E.MissingTypeOrAttribute(u"{:s}.up({:#x}) : The function at {:#x} for frame member {:#x} does not have a frame.".format(__name__, eid, ea, mptr.id))
-
-        f = idaapi.get_func(ea)
-        if f is None:
-            cls = self.__class__
-            raise E.FunctionNotFoundError(u"{:s}.up({:#x}) : Unable to find the function for frame member {:#x} with address {:#x}.".format(__name__, eid, mptr.id, ea))
-
-        # Now that we have everything we need, we use the structure
-        # module and the idaapi.func_t we fetched to instantiate the
-        # structure with the correct offset and then fetch the member
-        # to aggregate to our list of results.
-        st = structure.by_identifier(fr.id, offset=-idaapi.frame_off_args(f))
-        mem = st.members.by_identifier(mptr.id)
-        res.append(mem)
+        # Only thing to really do is to add the reference to our list.
+        res.append(interface.ref_t(ea, interface.access_t(xrtype, xiscode)))
     return res
 
 @utils.multicase(name=types.string)
