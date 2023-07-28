@@ -5290,8 +5290,8 @@ class type(object):
             # now we need to sort our results by the bitmask, exclude any member id that's
             # invalid, and then return them as a list or a single value if it's a bitfield.
             iterable = (result[mask] for mask in sorted(result) if result[mask] != idaapi.BADNODE)
-            mids = [mid for mid in iterable]
-            [result] = [mids] if bitfield else result
+            identifiers = [mid for mid in iterable]
+            [result] = [identifiers] if bitfield else identifiers if identifiers else [None]
             return result
 
     enum = enumeration   # ns alias (ida-speak)
