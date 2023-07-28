@@ -425,12 +425,12 @@ def up(enum):
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def refs(name, *suffix):
-    '''Return a list of the references to the enumeration with the specified `name`.'''
+    '''Return a list of references to any instruction operands that use the enumeration with the specified `name`.'''
     eid = by_name(name, *suffix)
     return refs(eid)
 @utils.multicase(enum=types.integer)
 def refs(enum):
-    '''Return a list of the references to the enumeration with the identifier `enum`.'''
+    '''Return a list of references to any instruction operands that use the enumeration with the identifier `enum`.'''
     if not interface.node.is_identifier(enum) or idaapi.get_enum_idx(enum) == idaapi.BADADDR:
         raise E.EnumerationNotFoundError(u"{:s}.refs({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, enum, enum))
 
@@ -443,15 +443,20 @@ def refs(enum):
         logging.warning(u"{:s}.refs({:#x}) : No references found for the {:d} member{:s} belonging to the enumeration \"{:s}\".".format(__name__, eid, len(mids), '' if len(mids) == 1 else 's', utils.string.escape(fullname, '"')))
         return []
 
-    # Now we have all of the xrefs for the enumeration members. The only thing that
-    # we really need to do is to figure out which operand number has the enumeration
-    # applied to it, and then convert our results to a list of interface.opref_t.
+    # Now we have all of the xrefs for the enumeration members and we need
+    # to filter them for addresses that are in code (as opposed to data).
     res = []
     for ea, xiscode, xrtype in refs:
-        flags = interface.address.flags(ea)
-        ops = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
-        ops = [opnum for opnum, info in ops if info and info.tid == eid]
-        res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in ops)
+        flags = interface.address.flags(interface.address.head(ea))
+        if flags & idaapi.MS_CLS != idaapi.FF_CODE:
+            continue
+
+        # Now, the only thing we really need to do is to figure out which operand number has
+        # the enumeration applied to it, and then convert our result into a list of opref_t.
+        operands = [(opnum, operand) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
+        operands = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in operands]
+        operands = [opnum for opnum, info in operands if info and info.tid == eid]
+        res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in operands)
     return res
 
 @utils.multicase(enum=(types.integer, types.string, types.tuple))
@@ -1171,7 +1176,7 @@ class member(object):
     @utils.multicase(mid=types.integer)
     @classmethod
     def refs(cls, mid):
-        '''Return the `(address, opnum, type)` of all the instructions that reference the enumeration member `mid`.'''
+        '''Return a list of references for any instruction operands that use the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         eid = cls.parent(mid)
@@ -1180,25 +1185,29 @@ class member(object):
         refs = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mid, idaapi.XREF_DATA)]
         if not refs:
             fullname = '.'.join([name(eid), cls.name(mid)])
-            logging.warning(u"{:s}.refs({:#x}) : No references found to enumeration member {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, fullname, mid))
+            logging.warning(u"{:s}.refs({:#x}) : No references found for the enumeration member {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, fullname, mid))
             return []
 
-        # Now that we have a list of xrefs, we need to convert each element
-        # into an interface.opref_t. We do this by figuring out which operand
-        # the member is in for each address. We double-verify that the member
-        # from the operand actually belongs to the enumeration.
+        # Next we need to iterate through the references to see which ones
+        # are actually referencing an instruction (code) of some sort.
         res = []
         for ea, xiscode, xrtype in refs:
-            flags = interface.address.flags(ea)
-            ops = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
-            ops = [opnum for opnum, info in ops if info and info.tid == eid]
-            res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in ops)
+            flags = interface.address.flags(interface.address.head(ea))
+            if flags & idaapi.MS_CLS != idaapi.FF_CODE:
+                continue
+
+            # The last thing to do is to figure out which operand number is referencing
+            # the enumeration, and then we can convert our results into a list of opref_t.
+            operands = [(opnum, operand) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
+            operands = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in operands]
+            operands = [opnum for opnum, info in operands if info and info.tid == eid]
+            res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in operands)
         return res
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
     def refs(cls, enum, member):
-        '''Returns the `(address, opnum, type)` of all the instructions that reference the enumeration `member` belonging to `enum`.'''
+        '''Return a list of references for any instruction operands that use the enumeration `member` belonging to `enum`.'''
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.refs(mid)
