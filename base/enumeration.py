@@ -115,7 +115,7 @@ byindex = utils.alias(by_index)
 @utils.multicase(eid=types.integer)
 def by_identifier(eid):
     '''Return the identifier for the enumeration using the specified `eid`.'''
-    if has(eid):
+    if interface.node.is_identifier(eid) and idaapi.get_enum_idx(eid) != idaapi.BADADDR:
         return eid
     raise E.EnumerationNotFoundError(u"{:s}.by_identifier({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
 byidentifier = utils.alias(by_identifier)
@@ -420,6 +420,38 @@ def up(enum):
         st = structure.by_identifier(fr.id, offset=-idaapi.frame_off_args(f))
         mem = st.members.by_identifier(mptr.id)
         res.append(mem)
+    return res
+
+@utils.multicase(name=types.string)
+@utils.string.decorate_arguments('name', 'suffix')
+def refs(name, *suffix):
+    '''Return a list of the references to the enumeration with the specified `name`.'''
+    eid = by_name(name, *suffix)
+    return refs(eid)
+@utils.multicase(enum=types.integer)
+def refs(enum):
+    '''Return a list of the references to the enumeration with the identifier `enum`.'''
+    if not interface.node.is_identifier(enum) or idaapi.get_enum_idx(enum) == idaapi.BADADDR:
+        raise E.EnumerationNotFoundError(u"{:s}.refs({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, enum, enum))
+
+    # Start out by collecting all of the members for the enumeration, and then
+    # collect absolutely all of their references into a single list of xrefs.
+    eid, mids = enum, {mid for mid in members.__iterate__(enum)}
+    refs = [packed_frm_iscode_type for packed_frm_iscode_type in itertools.chain(*(interface.xref.to(mid, idaapi.XREF_DATA) for mid in mids))]
+    if not refs:
+        fullname = utils.string.of(idaapi.get_enum_name(eid))
+        logging.warning(u"{:s}.refs({:#x}) : No references found for the {:d} member{:s} belonging to the enumeration \"{:s}\".".format(__name__, eid, len(mids), '' if len(mids) == 1 else 's', utils.string.escape(fullname, '"')))
+        return []
+
+    # Now we have all of the xrefs for the enumeration members. The only thing that
+    # we really need to do is to figure out which operand number has the enumeration
+    # applied to it, and then convert our results to a list of interface.opref_t.
+    res = []
+    for ea, xiscode, xrtype in refs:
+        flags = interface.address.flags(ea)
+        ops = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
+        ops = [opnum for opnum, info in ops if info and info.tid == eid]
+        res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in ops)
     return res
 
 @utils.multicase(enum=(types.integer, types.string, types.tuple))
