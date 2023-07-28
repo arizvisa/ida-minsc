@@ -8709,6 +8709,22 @@ class get(object):
         return cls.structure(ea, **byteorder)
     struc = struct = utils.alias(structure, 'get')
 
+    @utils.multicase()
+    @classmethod
+    def enumeration(cls):
+        '''Return the member identifiers of the enumeration applied to the current address.'''
+        return type.enumeration.get(ui.current.address())
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def enumeration(cls, ea):
+        """Return the member identifiers of the enumeration applied to the address `ea`.
+
+        If the enumeration at the specified address is a bitfield, then each of the
+        member identifiers will be returned a list sorted by their bitmask.
+        """
+        return type.enumeration.get(ea)
+    enum = utils.alias(enumeration, 'get')
+
     class switch(object):
         """
         Function for fetching an instance of a ``switch_t`` from a given address.
