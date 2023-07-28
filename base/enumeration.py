@@ -367,15 +367,20 @@ def up(eid):
 
     # All we need to do is to filter our references for ones
     # that are not pointing to an instruction of some sort.
-    res = []
+    grouped = {}
     for ea, xiscode, xrtype in refs:
         flags = interface.address.flags(interface.address.head(ea))
         if flags & idaapi.MS_CLS == idaapi.FF_CODE:
             continue
 
         # Only thing to really do is to add the reference to our list.
-        res.append(interface.ref_t(ea, interface.access_t(xrtype, xiscode)))
-    return res
+        grouped.setdefault(ea, []).append(interface.ref_t(ea, interface.access_t(xrtype, xiscode)))
+
+    # merge our grouped results, and then return everything as a list.
+    merged = {ea : functools.reduce(operator.or_, items) for ea, items in grouped.items() if items}
+    result = [merged.pop(ea) for ea, _, _ in refs if ea in merged]
+    assert(not(merged))
+    return result
 
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
@@ -400,7 +405,7 @@ def refs(enum):
 
     # Now we have all of the xrefs for the enumeration members and we need
     # to filter them for addresses that are in code (as opposed to data).
-    res = []
+    grouped, order = {}, []
     for ea, xiscode, xrtype in refs:
         flags = interface.address.flags(interface.address.head(ea))
         if flags & idaapi.MS_CLS != idaapi.FF_CODE:
@@ -411,8 +416,16 @@ def refs(enum):
         operands = [(opnum, operand) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
         operands = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in operands]
         operands = [opnum for opnum, info in operands if info and info.tid == eid]
-        res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in operands)
-    return res
+
+        # Collect all of our operands so we can group them together.
+        iterable = ((ea, int(opnum), interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode))) for opnum in operands)
+        [(order.append((ea, opnum)), grouped.setdefault((ea, opnum), []).append(ref)) for ea, opnum, ref in iterable]
+
+    # Merge our grouped results and then return everything we grabbed as a list preserving the order.
+    merged = {key : functools.reduce(operator.or_, items) for key, items in grouped.items() if items}
+    result = [merged.pop(key) for key in order if key in merged]
+    assert(not(merged));
+    return result
 
 @utils.multicase(enum=(types.integer, types.string, types.tuple))
 def repr(enum):
@@ -1145,7 +1158,7 @@ class member(object):
 
         # Next we need to iterate through the references to see which ones
         # are actually referencing an instruction (code) of some sort.
-        res = []
+        grouped, order = {}, []
         for ea, xiscode, xrtype in refs:
             flags = interface.address.flags(interface.address.head(ea))
             if flags & idaapi.MS_CLS != idaapi.FF_CODE:
@@ -1156,8 +1169,16 @@ class member(object):
             operands = [(opnum, operand) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
             operands = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in operands]
             operands = [opnum for opnum, info in operands if info and info.tid == eid]
-            res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in operands)
-        return res
+
+            # Collect all of our operands so we can group them together.
+            iterable = ((ea, int(opnum), interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode))) for opnum in operands)
+            [(order.append((ea, opnum)), grouped.setdefault((ea, opnum), []).append(ref)) for ea, opnum, ref in iterable]
+
+        # Merge our grouped results and then return everything we grabbed as a list in the same order.
+        merged = {key : functools.reduce(operator.or_, items) for key, items in grouped.items() if items}
+        result = [merged.pop(key) for key in order if key in merged]
+        assert(not(merged));
+        return result
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
     @classmethod
