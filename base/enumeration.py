@@ -1137,27 +1137,23 @@ class member(object):
             raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         eid = cls.parent(mid)
 
-        # Assign some constants that we'll use for verifying the references
-        # available for each operand.
-        NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
-        Fnetnode, Fidentifier = (getattr(idaapi, api, utils.fidentity) for api in ['ea2node', 'node2ea'])
-
-        # Collect all of the references for the enumeration member id.
-        refs = [(Xfrm, Xiscode, Xtype) for Xfrm, Xiscode, Xtype in interface.xref.to(mid)]
+        # Collect all of the data references for the enumeration member id.
+        refs = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mid, idaapi.XREF_DATA)]
         if not refs:
             fullname = '.'.join([name(eid), cls.name(mid)])
             logging.warning(u"{:s}.refs({:#x}) : No references found to enumeration member {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, fullname, mid))
             return []
 
         # Now that we have a list of xrefs, we need to convert each element
-        # into an internal.opref_t. We do this by figuring out which operand
+        # into an interface.opref_t. We do this by figuring out which operand
         # the member is in for each address. We double-verify that the member
         # from the operand actually belongs to the enumeration.
         res = []
-        for ea, _, t in refs:
-            ops = ((opnum, internal.netnode.alt.get(Fnetnode(ea), altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(Fnetnode(ea), altidx))
-            ops = (opnum for opnum, mid in ops if cls.parent(Fidentifier(mid)) == eid)
-            res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
+        for ea, xiscode, xrtype in refs:
+            flags = interface.address.flags(ea)
+            ops = [(opnum, interface.instruction.opinfo(ea, opnum)) for opnum, operand in enumerate(interface.instruction.operands(ea)) if idaapi.is_enum(flags, opnum)]
+            ops = [opnum for opnum, info in ops if info and info.tid == eid]
+            res.extend(interface.opref_t(ea, int(opnum), interface.access_t(xrtype, xiscode)) for opnum in ops)
         return res
 
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
