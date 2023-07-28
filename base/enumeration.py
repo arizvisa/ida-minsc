@@ -504,6 +504,12 @@ def __iterate__():
         yield idaapi.getn_enum(item)
     return
 
+@utils.multicase(string=types.string)
+@utils.string.decorate_arguments('string')
+def iterate(string, *suffix, **type):
+    '''Iterate through all of the enumerations in the database that match the glob in `string`.'''
+    res = string if isinstance(string, types.tuple) else (string,)
+    return iterate(like=interface.tuplename(*(res + suffix)), **type)
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the enumerations in the database that match the keyword specified by `type`.'''
