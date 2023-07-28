@@ -141,9 +141,9 @@ def by(**type):
 
     listable = [item for item in iterate(**type)]
     if len(listable) > 1:
-        messages = (u"[{:d}] {:s}{:s} ({:d} members){:s}".format(idaapi.get_enum_idx(item), idaapi.get_enum_name(item), u" & {:#x}".format(mask(item)) if bitfield(item) else u'', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else u'') for i, item in enumerate(listable))
+        messages = (u"[{:d}] {:s}{:s} ({:d} members){:s}".format(idaapi.get_enum_idx(item), utils.string.of(idaapi.get_enum_name(item)), u" & {:#x}".format(mask(item)) if bitfield(item) else u'', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else u'') for i, item in enumerate(listable))
         [ logging.info(msg) for msg in messages ]
-        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(listable), listable[0]))
+        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:s} ({:#x}).".format(__name__, searchstring, len(listable), utils.string.of(idaapi.get_enum_name(listable[0])), listable[0]))
 
     iterable = (item for item in listable)
     res = next(iterable, None)
