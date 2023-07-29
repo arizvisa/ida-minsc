@@ -5171,6 +5171,132 @@ class type(object):
         return any(cls.exception(ea, flags) for ea in interface.address.items(*bounds))
     is_exception = has_exception = utils.alias(exception, 'type')
 
+    class enumeration(object):
+        """
+        This namespace is used to get type information about an enumeration
+        located within the database. Some of its capabilities allow one to
+        check if an enumeration has been applied to an address, return the
+        identifier of the enumeration, or return the identifier of the
+        enumeration members that are at a given address.
+
+        If the enumeration is a bitfield, then returning the member identifier
+        for the enumeration will always return a list that is sorted by the
+        bitmask of the member. To identify the bitmask for an member identifier,
+        it is recommended to use the `enumeration` module.
+
+        Some of the ways to use this namespace are::
+
+            > print( database.t.enumeration.has() )
+            > print( database.t.enum.name() )
+            > eid = database.t.enum.id()
+            > mid = database.t.enum.get()
+
+        """
+        @utils.multicase()
+        def __new__(cls):
+            '''Return the identifier of the enumeration at the current address.'''
+            return cls.id(ui.current.address())
+        @utils.multicase(ea=internal.types.integer)
+        def __new__(cls, ea):
+            '''Return the identifier of the enumeration at the address `ea`.'''
+            return cls.id(ea)
+
+        @utils.multicase()
+        @classmethod
+        def id(cls):
+            '''Return the enumeration identifier applied to the item at the current address.'''
+            return cls.id(ui.current.address())
+        @utils.multicase(ea=internal.types.integer)
+        @classmethod
+        def id(cls, ea):
+            '''Return the enumeration identifier applied to the item at the address specified by `ea`.'''
+            ea = interface.address.head(ea, warn=True)
+            if not idaapi.is_enum(interface.address.flags(ea), idaapi.OPND_ALL):
+                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at the specified address is not an enumeration ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, flags))
+            id, serial = idaapi.get_enum_id(ea, idaapi.OPND_ALL)
+            if id == idaapi.BADNODE or not interface.node.is_identifier(id):
+                raise E.InvalidTypeOrValueError(u"{:s}.id({:#x}) : The type identifier ({:#x}) at the specified address is not an enumeration.".format('.'.join([__name__, 'type', cls.__name__]), ea, id))
+            return id
+
+        @utils.multicase()
+        @classmethod
+        def has(cls):
+            '''Return true if the item at the current address is an enumeration.'''
+            return cls.has(ui.current.address())
+        @utils.multicase(ea=internal.types.integer)
+        @classmethod
+        def has(cls, ea):
+            '''Return true if the item at the address specified by `ea` is an enumeration.'''
+            flags = interface.address.flags(interface.address.within(ea))
+            return True if flags & idaapi.MS_CLS != idaapi.FF_CODE and idaapi.is_enum(flags, idaapi.OPND_ALL) else False
+
+        @utils.multicase()
+        @classmethod
+        def name(cls):
+            '''Return the name of the enumeration applied to the item at the current address.'''
+            return cls.name(ui.current.address())
+        @utils.multicase(ea=internal.types.integer)
+        @classmethod
+        def name(cls, ea):
+            '''Return the name of the enumeration applied to the item at the address specified by `ea`.'''
+            ea = interface.address.head(ea, warn=True)
+            if not idaapi.is_enum(interface.address.flags(ea), idaapi.OPND_ALL):
+                raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}) : The type at the specified address is not an enumeration ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, flags))
+            id, serial = idaapi.get_enum_id(ea, idaapi.OPND_ALL)
+            if id == idaapi.BADNODE or not interface.node.is_identifier(id):
+                raise E.InvalidTypeOrValueError(u"{:s}.name({:#x}) : The type identifier ({:#x}) at the specified address is not an enumeration.".format('.'.join([__name__, 'type', cls.__name__]), ea, id))
+            return utils.string.of(idaapi.get_enum_name(id))
+
+        @utils.multicase()
+        @classmethod
+        def get(cls):
+            '''Return the identifier of the enumeration member at the current address.'''
+            return cls.get(ui.current.address())
+        @utils.multicase(ea=internal.types.integer)
+        @classmethod
+        def get(cls, ea):
+            """Return the identifier of the enumeration member at the address specified by `ea`.
+
+            If the enumeration is a bitfield, then return a list of member identifiers.
+            """
+            ea = interface.address.head(ea, warn=True)
+            if not idaapi.is_enum(interface.address.flags(ea), idaapi.OPND_ALL):
+                raise E.MissingTypeOrAttribute(u"{:s}.get({:#x}) : The type at the specified address is not an enumeration ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, flags))
+            id, serial = idaapi.get_enum_id(ea, idaapi.OPND_ALL)
+            if id == idaapi.BADNODE or not interface.node.is_identifier(id):
+                raise E.InvalidTypeOrValueError(u"{:s}.get({:#x}) : The type identifier ({:#x}) at the specified address is not an enumeration.".format('.'.join([__name__, 'type', cls.__name__]), ea, id))
+
+            # collect all of the available bitmasks for the given enumeration id if it's a bitfield.
+            eid, bitfield = id, idaapi.is_bf(id)
+            if bitfield:
+                bmask = idaapi.get_first_bmask(eid)
+                res = [idaapi.DEFMASK if bmask == idaapi.BADADDR else bmask]
+                while bmask != idaapi.get_last_bmask(eid):
+                    bmask = idaapi.get_next_bmask(eid, bmask)
+                    res.append(bmask)
+                masks = res
+
+            # otherwise, we can just use the default bitmask.
+            else:
+                masks = [idaapi.DEFMASK]
+
+            # now we need the value at the given address, and then we can use it to collect the
+            # results. we need to mask our result by the bitmask for the api to work.
+            uval = idaapi.ea_pointer()
+            if not idaapi.get_data_value(uval.cast(), ea, idaapi.get_item_size(ea)):
+                raise E.InvalidTypeOrValueError(u"{:s}.get({:#x}) : Unable to get the value of the enumeration ({:#x}) at the specified address({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, eid, ea))
+            result = {mask : idaapi.get_enum_member(eid, mask & uval.value(), serial, mask) for mask in masks}
+
+            # now we need to sort our results by the bitmask, exclude any member id that's
+            # invalid, and then return them as a list or a single value if it's a bitfield.
+            iterable = (result[mask] for mask in sorted(result) if result[mask] != idaapi.BADNODE)
+            mids = [mid for mid in iterable]
+            [result] = [mids] if bitfield else result
+            return result
+
+    enum = enumeration   # ns alias (ida-speak)
+    is_enumeration = utils.alias(enumeration.has, 'type')
+
 t = type    # XXX: ns alias
 size = utils.alias(type.size, 'type')
 is_code = utils.alias(type.code, 'type')
