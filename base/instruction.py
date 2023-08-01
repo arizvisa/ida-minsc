@@ -558,14 +558,15 @@ def op_character(ea, opnum):
     if not idaapi.set_op_type(ea, t, opnum):
         raise E.DisassemblerError(u"{:s}.op_character({:#x}, {:d}) : Unable to set the type of operand {:d} to a character.".format(__name__, ea, opnum, opnum))
 
-    # Extract the operand's op_t and its maximum value, as we'll use this to
-    # transform the value if necessary.
-    res, max = operand(ea, opnum), pow(2, op_bits(ea, opnum))
+    # Extract the operand's op_t and its size so that we can figure out
+    # its maximum value. we'll use this to transform the value as necessary.
+    res, size = operand(ea, opnum), op_size(ea, opnum)
+    bits, maximum = 8 * size, pow(2, 8 * size)
 
     # If this is an immediate value, then we can treat it normally.
     if res.type in {idaapi.o_imm}:
-        integer = res.value & (max - 1)
-        result = 0 if integer == 0 else (integer - max) if signed else integer
+        integer = res.value & (maximum - 1)
+        result = 0 if integer == 0 else (integer - maximum) if signed else integer
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
@@ -590,7 +591,7 @@ def op_character(ea, opnum):
         absolute //= 0x100
 
     # Last thing to do is to join each octet together back into some bytes
-    return bytes(bytearray(reversed(bytearray(octets))))
+    return bytes(bytearray(reversed(bytearray(octets + [0] * size)[:size])))
 op_chr = op_char = utils.alias(op_character)
 
 @utils.multicase(opnum=types.integer)
