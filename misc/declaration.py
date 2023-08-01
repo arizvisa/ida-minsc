@@ -1247,8 +1247,9 @@ class convention(object):
         '__fastcall': {idaapi.CM_CC_FASTCALL},
         '__pascal': {idaapi.CM_CC_PASCAL},
 
-        # XXX: __usercall is special and we interpret it as either >= CM_CC_MANUAL, but excluding CM_CC_GOLANG if it exists
-        '__usercall': {cc & idaapi.CM_CC_MASK for cc in range(getattr(idaapi, 'CM_CC_MANUAL', 0x90), 0x100)},
+        # XXX: __usercall is special and we interpret it as either >= CM_CC_MANUAL or
+        #      > CM_CC_SWIFT on newer versions, but excluding CM_CC_GOLANG if it exists.
+        '__usercall': {cc & idaapi.CM_CC_MASK for cc in range(idaapi.CM_CC_SWIFT if hasattr(idaapi, 'CM_CC_SWIFT') else getattr(idaapi, 'CM_CC_MANUAL', 0x90), 0x100)},
     }
 
     # aliases that can resolve to one of our choices.
@@ -1273,6 +1274,14 @@ class convention(object):
         choice['__golang'] = {idaapi.CM_CC_GOLANG}
         choice['__usercall'] -= {idaapi.CM_CC_GOLANG}
         aliases['__golang'] = ['go', 'golang']
+
+    # if CM_CC_SWIFT is defined (8.3), then add it and remove it
+    # from __usercall sorta like how we handle CM_CC_GOLANG.
+    if hasattr(idaapi, 'CM_CC_SWIFT'):
+        available['__swiftcall'] = idaapi.CM_CC_SWIFT
+        choice['__swiftcall'] = {idaapi.CM_CC_SWIFT}
+        choice['__usercall'] -= {idaapi.CM_CC_SWIFT}
+        aliases['__swiftcall'] = ['swift', 'swiftcall']
 
     # now we'll just do some functional tricks to update our
     # list of choices and mappings with each of their aliases.
