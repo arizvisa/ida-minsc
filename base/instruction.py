@@ -2113,6 +2113,22 @@ class type(object):
         '''Return true if the instruction at address `ea` is a sentinel instruction.'''
         ea = interface.address.inside(ea)
         return interface.instruction.is_sentinel(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def sentinel(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will stop execution when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_sentinel(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def sentinel(cls, bb):
+        '''Return true if the basic block `bb` will stop execution when executed.'''
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
+        return interface.instruction.is_sentinel(ea)
     is_sentinel = utils.alias(sentinel, 'type')
 
     @utils.multicase()
@@ -2125,6 +2141,24 @@ class type(object):
     def leave(cls, ea):
         '''Return true if the instruction at address `ea` will return from a function when executed.'''
         ea = interface.address.inside(ea)
+        return interface.instruction.is_return(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def leave(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will return from a function when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_return(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def leave(cls, bb):
+        '''Return true if the basic block `bb` will return from a function when executed.'''
+        if bb.type in {interface.fc_block_type_t.fcb_ret, interface.fc_block_type_t.fcb_cndret}:
+            return True
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
         return interface.instruction.is_return(ea)
     is_return = exit = utils.alias(leave, 'type')
 
@@ -2152,6 +2186,22 @@ class type(object):
         '''Return true if the instruction at address `ea` is a type of branch.'''
         ea = interface.address.inside(ea)
         return interface.instruction.is_branch(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def branch(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will branch to another block when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_branch(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def branch(cls, bb):
+        '''Return true if the basic block `bb` will branch to another block when executed.'''
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
+        return interface.instruction.is_branch(ea)
     is_branch = utils.alias(branch, 'type')
 
     @utils.multicase()
@@ -2164,6 +2214,22 @@ class type(object):
     def unconditional(cls, ea):
         '''Return true if the instruction at address `ea` is an unconditional branch.'''
         ea = interface.address.inside(ea)
+        return interface.instruction.is_unconditional(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def unconditional(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will branch unconditionally when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_unconditional(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def unconditional(cls, bb):
+        '''Return true if the basic block `bb` will branch unconditionally when executed.'''
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
         return interface.instruction.is_unconditional(ea)
     is_jmp = jmp = utils.alias(unconditional, 'type')
 
@@ -2178,6 +2244,22 @@ class type(object):
         '''Return true if the instruction at address `ea` is a conditional branch.'''
         ea = interface.address.inside(ea)
         return interface.instruction.is_conditional(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def conditional(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will branch conditionally when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_conditional(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def conditional(cls, bb):
+        '''Return true if the basic block `bb` will branch conditionally when executed.'''
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
+        return interface.instruction.is_conditional(ea)
     jcc = is_jcc = is_jxx = utils.alias(conditional, 'type')
 
     @utils.multicase()
@@ -2190,6 +2272,22 @@ class type(object):
     def unconditionali(cls, ea):
         '''Return true if the instruction at address `ea` is an unconditional (indirect) branch.'''
         ea = interface.address.inside(ea)
+        return interface.instruction.is_indirect(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def unconditionali(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will branch unconditionally (indirect) when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_indirect(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def unconditionali(cls, bb):
+        '''Return true if the basic block `bb` will branch unconditionally (indirect) when executed.'''
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
         return interface.instruction.is_indirect(ea)
     jmpi = is_jmpi = utils.alias(unconditionali, 'type')
 
@@ -2204,6 +2302,22 @@ class type(object):
         '''Return true if the instruction at address `ea` will enter a function (direct) when executed.'''
         ea = interface.address.inside(ea)
         return interface.instruction.is_call(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def enter(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will enter a function (direct) when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_call(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def enter(cls, bb):
+        '''Return true if the basic block `bb` will enter a function (direct) when executed.'''
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
+        return interface.instruction.is_call(ea)
     is_call = call = link = is_link = utils.alias(enter, 'type')
 
     @utils.multicase()
@@ -2216,6 +2330,22 @@ class type(object):
     def enteri(cls, ea):
         '''Return true if the instruction at address `ea` will enter a function (indirect) when executed.'''
         ea = interface.address.inside(ea)
+        return interface.instruction.is_calli(ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def enteri(cls, bounds):
+        '''Return true if the basic block at the given `bounds` will enter a function (indirect) when executed.'''
+        left, right = bounds
+        ea = idaapi.get_item_head(right - 1)
+        return interface.instruction.is_calli(ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def enteri(cls, bb):
+        '''Return true if the basic block `bb` will enter a function (indirect) when executed.'''
+        left, right = interface.range.bounds(bb)
+        ea = idaapi.get_item_head(right - 1)
+        if not any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch]):
+            ea = next((ea for ea in interface.address.items(left, right) if any(F(ea) for F in [interface.instruction.is_call, interface.instruction.is_sentinel, interface.instruction.is_branch])), ea)
         return interface.instruction.is_calli(ea)
     is_calli = calli = linki = is_linki = utils.alias(enteri, 'type')
 
