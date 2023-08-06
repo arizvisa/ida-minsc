@@ -200,6 +200,37 @@ class ask(object):
 
     @internal.utils.multicase()
     @classmethod
+    def identifier(cls, **default):
+        '''Request the user provide an identifier in the form of a string.'''
+        return cls.identifier(u'', **default)
+    @internal.utils.multicase(message=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
+    def identifier(cls, message, **default):
+        '''Request the user provide an identifier in the form of a string using the specified `message` as the prompt.'''
+        key = next((k for k in ['default', 'text', 'string'] if k in default), None)
+        dflt = default[key] if key in default else current.symbol()
+        result = idaapi.ask_str(internal.utils.string.to(dflt), idaapi.HIST_IDENT, internal.utils.string.to(message))
+        return internal.utils.string.of(result)
+
+    @internal.utils.multicase()
+    @classmethod
+    def type(cls, **default):
+        '''Request the user provide a type in the form of a string.'''
+        return cls.type(u'', **default)
+    @internal.utils.multicase(message=internal.types.string)
+    @classmethod
+    @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
+    def type(cls, message, **default):
+        '''Request the user provide a type in the form of a string using the specified `message` as the prompt.'''
+        dflt = next((default[k] for k in ['default', 'text', 'string'] if k in default), None) or u''
+        string = "{!s}".format(dflt) if isinstance(dflt, idaapi.tinfo_t) else dflt
+        result = idaapi.ask_str(internal.utils.string.to(string), idaapi.HIST_TYPE, internal.utils.string.to(message))
+        return internal.utils.string.of(result)
+    prototype = internal.utils.alias(type, 'ask')
+
+    @internal.utils.multicase()
+    @classmethod
     def note(cls, **default):
         '''Request the user provide a multi-lined string.'''
         return cls.note(u'', **default)
