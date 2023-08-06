@@ -182,19 +182,20 @@ class ask(object):
     @classmethod
     def string(cls, **default):
         '''Request the user provide a string.'''
-        return cls.string(u'', **default)
+        return cls.string(u'', 0, **default)
     @internal.utils.multicase(message=internal.types.string)
     @classmethod
     @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
     def string(cls, message, **default):
         '''Request the user provide a string using the specified `message` as the prompt.'''
+        return cls.string(message, 0, **default)
+    @internal.utils.multicase(message=internal.types.string, category=internal.types.integer)
+    @classmethod
+    @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
+    def string(cls, message, category, **default):
+        '''Request the user provide a string of the given `category` using the specified `message` as the prompt.'''
         dflt = next((default[k] for k in ['default', 'text', 'string'] if k in default), None) or u''
-
-        # FIXME: we should totally expose the history id to the caller in some
-        #        way.. but after some fiddling around with it, I can't seem to
-        #        make it actually do anything.
-
-        result = idaapi.ask_str(internal.utils.string.to(dflt), idaapi.HIST_IDENT, internal.utils.string.to(message))
+        result = idaapi.ask_str(internal.utils.string.to(dflt), category, internal.utils.string.to(message))
         return internal.utils.string.of(result)
 
     @internal.utils.multicase()
