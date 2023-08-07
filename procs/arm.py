@@ -275,6 +275,13 @@ class operand:
 
         return memory(addr, res - maxval if sf else res)
 
+    @catalog.operand(idaapi.PLFM_ARM, idaapi.o_far, types.type)
+    @catalog.operand(idaapi.PLFM_ARM, idaapi.o_near, types.type)
+    def address(insn, op):
+        '''Operand type decoder for address operands which return just an immediate address.'''
+        segrg, segsel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+        return op.addr
+
     @catalog.operand(idaapi.PLFM_ARM, idaapi.o_idpspec0, int)
     def flex(insn, op):
         '''Operand type decoder for returning a flexible operand (shift-op) on either the AArch32 or AArch64 architectures.'''
