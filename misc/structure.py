@@ -306,26 +306,14 @@ class member(object):
 
         # if the sptr is a function frame, then this name varies based on which
         # "segment" the offset is located in (lvars, registers, or args).
-        if frame(sptr):
-            return cls.__remove_name_frame(sptr, mptr, mptr.soff)
+        ea = idaapi.get_func_by_frame(sptr.id)
+        if frame(sptr) and ea == idaapi.BADADDR:
+            raise E.DisassemblerError(u"{:s}.remove_name({:#x}) : Unable to determine the function from the frame ({:#x}) containing the member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, None, sptr.id, utils.string.escape(internal.netnode.name.get(mptr.id), '"')))
 
         # otherwise, this is easy as we can just use mptr.soff to get the
         # correct offset, and use it to format the name as "field_%X".
-        fmtField = "field_{:X}".format
-        return cls.set_name(mptr, fmtField(mptr.soff))
-
-    @classmethod
-    def __remove_name_frame(cls, sptr, mptr, offset):
-        '''Reset the user-specified name on the frame member given by `mptr` and return the original name.'''
-        ea = idaapi.get_func_by_frame(sptr.id)
-
-        # To process the frame, we first need the address of the function
-        # to get the func_t and the actual member offset to calculate with.
-        if ea == idaapi.BADADDR:
-            raise E.DisassemblerError(u"{:s}.remove_name({:#x}) : Unable to get the function for the frame ({:#x}) containing the structure member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, sptr.id, utils.string.escape(internal.netnode.name.get(mptr.id), '"')))
-
-        res = cls.default_name(sptr, mptr, offset)
-        return cls.set_name(mptr, res)
+        default = cls.default_name(sptr, mptr, mptr.soff)
+        return cls.set_name(mptr, default)
 
     @classmethod
     def default_name(cls, sptr, mptr, *offset):
