@@ -317,14 +317,27 @@ class member(object):
     @classmethod
     def __remove_name_frame(cls, sptr, mptr, offset):
         '''Reset the user-specified name on the frame member given by `mptr` and return the original name.'''
-        fmtVar, fmtArg = "var_{:X}", "arg_{:X}"
+        ea = idaapi.get_func_by_frame(sptr.id)
+
+        # To process the frame, we first need the address of the function
+        # to get the func_t and the actual member offset to calculate with.
+        if ea == idaapi.BADADDR:
+            raise E.DisassemblerError(u"{:s}.remove_name({:#x}) : Unable to get the function for the frame ({:#x}) containing the structure member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, sptr.id, utils.string.escape(internal.netnode.name.get(mptr.id), '"')))
+
+        res = cls.default_name(sptr, mptr, offset)
+        return cls.set_name(mptr, res)
+
+    @classmethod
+    def default_name(cls, sptr, mptr, offset):
+        '''Return the default name for the member given by `mptr` belonging to the structure `sptr` at the specified `offset`.'''
+        fmtVar, fmtArg, fmtField = (fmt.format for fmt in ["var_{:X}", "arg_{:X}", "field_{:X}"])
         fmtSpecial_s, fmtSpecial_r = (utils.fconstant(format) for format in [' s', ' r'])
 
         # To process the frame, we first need the address of the function
         # to get the func_t and the actual member offset to calculate with.
         ea = idaapi.get_func_by_frame(sptr.id)
         if ea == idaapi.BADADDR:
-            raise E.DisassemblerError(u"{:s}.remove_name({:#x}) : Unable to determine the address from the frame ({:#x}) containing the specified {:s} member \"{:s}\".".format('.'.join([__name__, cls.__name__]), mptr.id, sptr.id, 'union' if union(sptr) else 'structure', utils.string.escape(cls.fullname(mptr.id), '"')))
+            return fmtField(offset)
 
         # We need to figure out all of the attributes we need in order to
         # calculate the position within a frame this includes the integer size.
@@ -358,8 +371,8 @@ class member(object):
             mdescr = "index ({:d})".format(mptr.soff) if union(sptr) else "offset ({:#x})".format(mptr.soff)
             logging.debug(u"{:s}.remove_name({:#x}) : Treating the name for the member at {:s} as an argument due its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
 
-        # We have our formatter and translated offset, so we can simply use it.
-        return cls.set_name(mptr, fmt(offset))
+        # We have our formatter and translated offset, so we can simply return it.
+        return fmt(offset)
 
     @classmethod
     def get_type(cls, mptr, *offset):
