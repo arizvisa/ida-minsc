@@ -2502,12 +2502,16 @@ class members_t(object):
         return self[index]
 
     # adding/removing members
+    @utils.multicase()
+    def add(self, **offset):
+        '''Append a member with the default type to the end of the structure.'''
+        return self.add((), int, **offset)
     @utils.multicase(name=(types.string, types.ordered))
     @utils.string.decorate_arguments('name')
-    def add(self, name):
+    def add(self, name, **offset):
         '''Append the specified member `name` with the default type to the end of the structure.'''
-        return self.add(name, int)
-    @utils.multicase(name=(types.string, types.ordered))
+        return self.add(name, int, **offset)
+    @utils.multicase(name=(types.string, types.tuple))
     @utils.string.decorate_arguments('name')
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` to the end of the structure.'''
@@ -2570,8 +2574,8 @@ class members_t(object):
         # the disassembler's regular prefix with the field's offset as the suffix.
         # FIXME: we should support default frame member names too...but we don't.
         else:
-            cls, res = self.__class__, interface.tuplename('field', index if union(owner.ptr) else realoffset)
-            logging.warning(u"{:s}({:#x}).members.add({!r}, {!r}, {:+#x}) : Name is undefined, defaulting to {:s} name \"{:s}\".".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, 'union' if union(sptr) else 'structure', utils.string.escape(res, '"')))
+            cls, res = self.__class__, member.default_name(owner.ptr, None, index if union(owner.ptr) else realoffset)
+            logging.info(u"{:s}({:#x}).members.add({!r}, {!r}, {:+#x}) : Name is undefined, defaulting to {:s} name \"{:s}\".".format('.'.join([__name__, cls.__name__]), owner.ptr.id, name, utils.string.repr(tdescr), offset, 'union' if union(owner.ptr) else 'structure', utils.string.escape(res, '"')))
             name = res
 
         # Finally we can use IDAPython to add the structure member with the
