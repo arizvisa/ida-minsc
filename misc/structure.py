@@ -328,8 +328,8 @@ class member(object):
         return cls.set_name(mptr, res)
 
     @classmethod
-    def default_name(cls, sptr, mptr, offset):
-        '''Return the default name for the member given by `mptr` belonging to the structure `sptr` at the specified `offset`.'''
+    def default_name(cls, sptr, mptr, *offset):
+        '''Return the default name for the member given by `mptr` belonging to the structure `sptr` at the given `offset` if provided.'''
         fmtVar, fmtArg, fmtField = (fmt.format for fmt in ["var_{:X}", "arg_{:X}", "field_{:X}"])
         fmtSpecial_s, fmtSpecial_r = (utils.fconstant(format) for format in [' s', ' r'])
 
@@ -337,16 +337,18 @@ class member(object):
         # to get the func_t and the actual member offset to calculate with.
         ea = idaapi.get_func_by_frame(sptr.id)
         if ea == idaapi.BADADDR:
-            return fmtField(offset)
+            fmt, moff = fmtField, mptr.get_soff() if mptr else sptr.memqty if union(sptr) else idaapi.get_struc_size(sptr)
+            return fmt(*offset) if offset else fmt(moff)
 
         # We need to figure out all of the attributes we need in order to
         # calculate the position within a frame this includes the integer size.
-        fn, moff = idaapi.get_func(ea), mptr.get_soff()
+        fn = idaapi.get_func(ea)
         if fn is None:
-            raise E.FunctionNotFoundError(u"{:s}.remove_name({:#x}) : Unable to get the function owning the frame ({:#x}) at the determined address ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, sptr.id, ea))
+            raise E.FunctionNotFoundError(u"{:s}.default_name({:#x}, {:#x}) : Unable to get the function at the specified address ({:#x}) which owns the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id if mptr else idaapi.BADNODE, ea, sptr.id))
 
         # Now we need to figure out where our member is. If it's within the
         # `func_t.frsize`, then we're a "var_" relative to `func_t.frsize`.
+        [moff] = offset if offset else [mptr.get_soff() if mptr else sptr.memqty if union(sptr) else idaapi.get_struc_size(sptr)]
         if moff < fn.frsize:
             fmt, offset = fmtVar, fn.frsize - moff
 
@@ -368,8 +370,8 @@ class member(object):
         # just be silently pedantic here.
         else:
             fmt, offset = fmtArg, moff - idaapi.frame_off_args(fn)
-            mdescr = "index ({:d})".format(mptr.soff) if union(sptr) else "offset ({:#x})".format(mptr.soff)
-            logging.debug(u"{:s}.remove_name({:#x}) : Treating the name for the member at {:s} as an argument due its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), mptr.id, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
+            mdescr = "index ({:d})".format(moff) if union(sptr) else "offset ({:#x})".format(moff)
+            logging.debug(u"{:s}.default_name({:#x}, {:#x}) : Treating the name for the member at {:s} as an argument due to its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id if mptr else idaapi.BADNODE, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
 
         # We have our formatter and translated offset, so we can simply return it.
         return fmt(offset)
