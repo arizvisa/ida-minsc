@@ -1291,21 +1291,33 @@ class convention(object):
     (lambda choice, iterable: [functools.reduce(utils.freverse(choice.setdefault), aliases, choice.get(key, {key})) for key, aliases in iterable])(choice, aliases.items())
     (lambda available, iterable: [functools.reduce(utils.freverse(available.setdefault), aliases, available.get(key, key)) for key, aliases in iterable])(available, aliases.items())
 
+    # collect a inverted table that we can use to map the CM_CC_ value to a string.
+    descriptions = (lambda choice, aliases: {value : key for value, key in itertools.chain(*(zip(choice[key], [key] * len(choice[key])) for key in choice if key in aliases or key in {'void'}))})(choice, aliases)
+
     @classmethod
     def matches(cls, *conventions):
-        '''Return a closure that when compared against an `idaapi.CM_CC_*` code will return true if matching one of the user's `conventions`.'''
+        '''Return a closure that when compared against an ``idaapi.CM_CC_*`` code will return true if matching one of the user's `conventions`.'''
         iterable = (cls.choice.get(convention, {convention}) for convention in conventions)
         result = functools.reduce(operator.or_, iterable, {empty for empty in []})
         return functools.partial(operator.contains, result)
 
     @classmethod
     def get(cls, convention):
-        '''Return the `idaapi.CM_CC_*` code for the given `convention` provided as an integer or a string.'''
+        '''Return the ``idaapi.CM_CC_*`` code for the specified `convention` given as an integer or a string.'''
         result = cls.available.get(convention, convention)
         if isinstance(result, types.integer) and result & idaapi.CM_CC_MASK == result:
             return result
         cclookup = {item for item in cls.available if isinstance(item, types.string) and item.startswith('__')}
         raise internal.exceptions.InvalidParameterError(u"{:s}.get({!r}) : The convention that was specified ({:s}) is not one of the known types ({:s}).".format('.'.join([__name__, cls.__name__]), convention, "{:d}".format(convention) if isinstance(convention, types.integer) else "{!r}".format(convention), ', '.join(cclookup)))
+
+    @classmethod
+    def describe(cls, code):
+        '''Return the given `code` as a string describing the calling convention it represents.'''
+        if code in cls.descriptions:
+            return cls.descriptions[code]
+        elif code & idaapi.CM_CC_MASK == code:
+            return "__unknown({:d})".format(code >> 4)
+        return "__error({:d})".format(code)
 
 class mangled(object):
     """
