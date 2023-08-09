@@ -1319,6 +1319,16 @@ class convention(object):
             return "__unknown({:d})".format(code >> 4)
         return "__error({:d})".format(code)
 
+    @classmethod
+    def has(cls, code):
+        '''Return whether the given `code` is an available calling convention.'''
+        return code in cls.descriptions
+
+    @classmethod
+    def general(cls, code):
+        '''Return whether the given `code` is a general calling convention used by the configured compiler.'''
+        return not(code in cls.choice['__usercall']) if code in cls.descriptions else False
+
 class mangled(object):
     """
     This class processes a mangled symbol in a number of
