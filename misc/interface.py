@@ -4026,7 +4026,7 @@ class tinfo(object):
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
-    iterable = ("{:x}".format(abs(item)) if isinstance(item, internal.types.integer) else item for item in names)
+    iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
     return '_'.join(iterable)
 
 # copied mostly from the collections.namedtuple template
