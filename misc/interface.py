@@ -3695,6 +3695,13 @@ class tinfo(object):
         elif not rt and ti.is_func():
             tinfo = ti
 
+        # If our address is runtime and our type is a function (not a pointer),
+        # then the type is incorrect. This can happen when the disassembler infers
+        # the type from the name. We support this so we can warn the user about it.
+        elif rt and ti.is_func():
+            tinfo = ti
+            logging.info(u"{:s}.function_details({:#x}, {!r}) : Ignoring non-pointer function type applied to the specified runtime address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
+
         # Anything else is a type error that we need to raise to the user.
         else:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.function_details({:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
@@ -3704,6 +3711,13 @@ class tinfo(object):
         # exception informing the user.
         if not tinfo.has_details():
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.function_details({:#x}, {!r}) : The type information ({!r}) for the specified function ({:#x}) does not contain any details.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        # Before returning the type, we concretize it as it might be exported.
+        til, old, new = cls.library(tinfo), tinfo, cls.copy(tinfo)
+        res = idaapi.replace_ordinal_typerefs(til, new) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.function_details({:#x}, {!r}) : Ignoring error {:d} while trying to concretize the type \"{:s}\" for the function at {:#x}.".format('.'.join([cls.__name__, cls.__name__]), ea, "{!s}".format(ti), res, internal.utils.string.escape("{!s}".format(tinfo), '"'), ea))
+        tinfo = old if res < 0 else new
 
         # Now we can grab our function details and return them to the caller.
         ftd = idaapi.func_type_data_t()
