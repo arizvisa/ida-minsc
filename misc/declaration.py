@@ -1246,6 +1246,7 @@ class convention(object):
         '__thiscall': {idaapi.CM_CC_THISCALL},
         '__fastcall': {idaapi.CM_CC_FASTCALL},
         '__pascal': {idaapi.CM_CC_PASCAL},
+        '__unknown': {idaapi.CM_CC_UNKNOWN, idaapi.CM_CC_INVALID},
 
         # XXX: __usercall is special and we interpret it as either >= CM_CC_MANUAL or
         #      > CM_CC_SWIFT on newer versions, but excluding CM_CC_GOLANG if it exists.
@@ -1261,6 +1262,7 @@ class convention(object):
         '__thiscall': ['this', 'thiscall'],
         idaapi.CM_CC_VOIDARG: ['void', 'voidarg'],
         '__usercall': ['user'],
+        '__unknown': ['unknown'],
 
     # these are all integers that the user can alias if they want.
         idaapi.CM_CC_ELLIPSIS: ['...', 'dotdotdot', Ellipsis],
@@ -1316,7 +1318,7 @@ class convention(object):
         if code in cls.descriptions:
             return cls.descriptions[code]
         elif code & idaapi.CM_CC_MASK == code:
-            return "__unknown({:d})".format(code >> 4)
+            return '__unknown' if code == idaapi.CM_CC_UNKNOWN else "__unknown({:d})".format(code >> 4)
         return "__error({:d})".format(code)
 
     @classmethod
@@ -1328,6 +1330,21 @@ class convention(object):
     def general(cls, code):
         '''Return whether the given `code` is a general calling convention used by the configured compiler.'''
         return not(code in cls.choice['__usercall']) if code in cls.descriptions else False
+
+    @classmethod
+    def unknown(cls, code):
+        '''Return whether the given `code` represents an invalid or unknown calling convention.'''
+        return code in {idaapi.CM_CC_INVALID, idaapi.CM_CC_UNKNOWN}
+
+    @classmethod
+    def variable(cls, code):
+        '''Return whether the given `code` is a calling convention containing a variable number of arguments.'''
+        return code in {idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_SPECIALE}
+
+    @classmethod
+    def user(cls, code):
+        '''Return whether the given `code` is a user-specified calling convention.'''
+        return code in cls.choice['__usercall']
 
 class mangled(object):
     """
