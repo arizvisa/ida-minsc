@@ -449,10 +449,11 @@ class functions(object):
 
         `+` - The function has an implicit tag (named or typed)
         `*` - The function has been explicitly tagged
+        `F` - The function is a regular callable function
         `J` - The function is a wrapper or a thunk
         `L` - The function was pattern matched as a library
         `S` - The function is declared statically
-        `^` - The function does not contain a frame
+        `v` - The function has a frame containing referenceable local variables
         `?` - The function has its stack points calculated incorrectly and may be incorrect
         `T` - The function has a prototype that was applied to it manually or via decompilation
         `t` - The function has a prototype that was guessed
@@ -589,22 +590,30 @@ class functions(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List the functions from the database that match the keywords specified by `type`.'''
-        listable = []
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        guess_tinfo = (lambda ti, ea: idaapi.guess_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo
 
         # Some utility functions for grabbing counts of function attributes
-        Fcount_lvars = utils.fcompose(function.frame.lvars, utils.count)
+        Fcount_lvars = utils.fcompose(function.frame.lvars, functools.partial(filter, utils.fcompose(operator.itemgetter(1))), utils.count)
         Fcount_avars = utils.fcompose(interface.function.typeinfo, operator.methodcaller('get_nargs')) if hasattr(idaapi.tinfo_t, 'get_nargs') else utils.fcompose(function.frame.args.iterate, utils.count)
 
         # Set some reasonable defaults here
-        maxentry = top()
+        maxentry, _ = interface.address.bounds()
         maxaddr = minaddr = maxchunks = 0
         maxname = maxunmangled = chunks = marks = blocks = exits = 0
         lvars = avars = refs = 0
 
         # First pass through the list to grab the maximum lengths of the different fields
+        ti, listable, conventions = idaapi.tinfo_t(), [], {cc for cc in []}
         for ea in cls.iterate(**type):
             func, _ = interface.function.by_address(ea), ui.navigation.procedure(ea)
             maxentry = max(ea, maxentry)
+
+            # Use the type information if it exists to collect the calling convention.
+            res = get_tinfo(ti, ea) or guess_tinfo(ti, ea)
+            if res != idaapi.GUESS_FUNC_FAILED:
+                _, ftd = interface.tinfo.function_details(ea, ti)
+                conventions.add(ftd.cc & idaapi.CM_CC_MASK)
 
             unmangled, realname = interface.function.name(func), interface.name.get(ea)
             maxname = max(len(unmangled), maxname)
@@ -618,7 +627,7 @@ class functions(object):
             blocks = max(len(builtins.list(function.blocks(func, silent=True))), blocks)
             exits = max(len(builtins.list(function.bottom(func))), exits)
             refs = max(len(xref.up(ea)), refs)
-            lvars = max(Fcount_lvars(func) if idaapi.get_frame(ea) else 0, lvars)
+            lvars = max(func.frsize, lvars)
             avars = max(Fcount_avars(func), avars)
 
             listable.append(ea)
@@ -627,8 +636,9 @@ class functions(object):
         cindex = utils.string.digits(len(listable), 10) if listable else 1
         try: cmaxoffset = utils.string.digits(offset(maxentry), 16)
         except E.OutOfBoundsError: cmaxoffset = 0
-        cmaxentry, cmaxaddr, cminaddr = (utils.string.digits(item, 16) for item in [maxentry, maxaddr, minaddr])
-        cchunks, cblocks, cexits, cavars, clvars, crefs = (utils.string.digits(item, 10) for item in [maxchunks, blocks, exits, avars, lvars, refs])
+        cmaxentry, cmaxaddr, cminaddr, clvars = (utils.string.digits(item, 16) for item in [maxentry, maxaddr, minaddr, lvars])
+        cchunks, cblocks, cexits, cavars, crefs = (utils.string.digits(item, 10) for item in [maxchunks, blocks, exits, avars, refs])
+        cconvention = max(map(len, map(internal.declaration.convention.describe, conventions))) if conventions else 0
 
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
@@ -638,7 +648,7 @@ class functions(object):
             # any flags that might be useful
             ftagged = '-' if not tags else '*' if any(not item.startswith('__') for item in tags) else '+'
             ftyped = 'D' if function.type.decompiled(ea) else '-' if not interface.function.has_typeinfo(func) else 'T' if interface.node.aflags(ea, idaapi.AFL_USERTI) else 't'
-            fframe = '?' if function.type.problem(ea, getattr(idaapi, 'PR_BADSTACK', 0xb)) else '-' if idaapi.get_frame(ea) else '^'
+            fframe = '?' if function.type.problem(ea, getattr(idaapi, 'PR_BADSTACK', 0xb)) else 'v' if idaapi.get_frame(ea) and Fcount_lvars(func) else '-'
             fgeneral = 'J' if func.flags & idaapi.FUNC_THUNK else 'L' if func.flags & idaapi.FUNC_LIB else 'S' if func.flags & idaapi.FUNC_STATICDEF else 'F'
             flags = itertools.chain(fgeneral, fframe, ftyped, ftagged)
 
@@ -648,6 +658,12 @@ class functions(object):
             # chunks and boundaries
             chunks = [interface.range.bounds(item) for item in interface.function.chunks(func)]
             bounds = interface.range.bounds(func)
+
+            # type information
+            convention, res = '', get_tinfo(ti, ea) or guess_tinfo(ti, ea)
+            if res != idaapi.GUESS_FUNC_FAILED:
+                _, ftd = interface.tinfo.function_details(ea, ti)
+                convention = internal.declaration.convention.describe(ftd.cc & idaapi.CM_CC_MASK)
 
             # try/except handlers
             if all(hasattr(idaapi, Fname) for Fname in ['tryblks_t', 'get_tryblks']):
@@ -662,16 +678,16 @@ class functions(object):
                 blkcount = trycount = ehcount = 0
 
             # now we can output everything that was found
-            six.print_(u"{:<{:d}s} {:+#0{:d}x} : {:#0{:d}x}..{:#0{:d}x} : {:<{:d}s} {:s} : {:<{:d}s} : refs:{:<{:d}d} args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
+            six.print_(u"{:<{:d}s} {:+#0{:d}x} : {:#0{:d}x}..{:#0{:d}x} : {:<{:d}s} {:s} :{:>{:d}s} {:<{:d}s} : lvars:{:0{:d}x} args:{:<{:d}d} refs:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
                 "[{:d}]".format(index), 2 + math.trunc(cindex),
                 offset(ea), 3 + math.trunc(cmaxoffset),
                 bounds[0], 2 + math.trunc(cminaddr), bounds[1], 2 + math.trunc(cmaxaddr),
                 "({:d})".format(len(chunks)), 2 + cchunks, ''.join(flags),
-                unmangled, math.trunc(maxname if internal.declaration.mangledQ(realname) else maxunmangled),
-                len(xref.up(ea)), crefs,
+                convention, cconvention + 1 if cconvention else 0,
+                unmangled, math.trunc(maxname) if internal.declaration.mangledQ(realname) and len(unmangled) > maxname else math.trunc(maxunmangled),
+                func.frsize, clvars,
                 Fcount_avars(func), cavars,
-                Fcount_lvars(func) if idaapi.get_frame(ea) else 0, clvars,
-                len(builtins.list(function.blocks(func, silent=True))), cblocks,
+                len(xref.up(ea)), crefs,
                 len(builtins.list(function.bottom(func))), cexits,
                 " exceptions:{:d}+{:d}/{:d}".format(blkcount - trycount, trycount, ehcount) if tb else ''
             ))
