@@ -112,11 +112,13 @@ def list(**type):
     # actually being used when calculating the logarithm.
     cindex = utils.string.digits(maxindex, 10)
     caddr, csize = (utils.string.digits(item, 10) for item in [maxaddr, maxsize])
+    permissions = [(idaapi.SEGPERM_READ, 'r'), (idaapi.SEGPERM_WRITE, 'w'), (idaapi.SEGPERM_EXEC, 'x')]
 
     # List all the fields for each segment that we've aggregated
     for seg in listable:
         comment, _ = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1), ui.navigation.set(interface.range.start(seg))
-        six.print_(u"[{:{:d}d}] {:#0{:d}x}..{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, math.trunc(cindex), interface.range.start(seg), 2 + math.trunc(caddr), interface.range.end(seg), 2 + math.trunc(caddr), seg.size(), 3 + math.trunc(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
+        rwx = ''.join(bit if seg.perm & perm else '-' for perm, bit in permissions)
+        six.print_(u"[{:{:d}d}] {:#0{:d}x}..{:#0{:d}x} : {:s} : {:>{:d}s} : {:<+#{:d}x} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, math.trunc(cindex), interface.range.start(seg), 2 + math.trunc(caddr), interface.range.end(seg), 2 + math.trunc(caddr), rwx, utils.string.of(get_segment_name(seg)), maxname, seg.size(), 3 + math.trunc(csize), seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
     return
 
 ## searching
@@ -204,7 +206,8 @@ def by(**type):
     if len(listable) > 1:
         maxaddr = max(builtins.map(interface.range.end, listable) if listable else [1])
         caddr = utils.string.digits(maxaddr, 16)
-        messages = ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), math.trunc(caddr), interface.range.end(seg), math.trunc(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable)
+        permissions = [(idaapi.SEGPERM_READ, 'r'), (idaapi.SEGPERM_WRITE, 'w'), (idaapi.SEGPERM_EXEC, 'x')]
+        messages = ((u"[{:d}] {:0{:d}x}..{:0{:d}x} : {:s} : {:s} {:+#x} : sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), math.trunc(caddr), interface.range.end(seg), math.trunc(caddr), ''.join(bit if seg.perm & perm else '-' for perm, bit in permissions), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable)
         [ logging.info(msg) for msg in messages ]
         logging.warning(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), math.trunc(caddr), interface.range.end(listable[0]), math.trunc(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
 
