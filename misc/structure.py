@@ -3174,8 +3174,122 @@ class members_t(object):
         return res
 
     def __delitem__(self, index):
-        '''Remove the member at the specified `index`.'''
-        return self.pop(index)
+        '''Remove the member(s) at the specified `index` non-destructively.'''
+        cls, sptr, base, index_description = self.__class__, self.owner.ptr, self.baseoffset, "{!s}".format(index)
+        _, _, selected = interface.strpath.members(sptr, index)
+
+        # If our structure is a function frame, then certain members cannot be removed.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = idaapi.get_func(ea)
+        special = idaapi.get_member(sptr, idaapi.frame_off_retaddr(fn)) if fn and idaapi.get_frame_retsize(fn) and selected else None
+        if special and any(special.id == mptr.id for _, mptr in selected if isinstance(mptr, idaapi.member_t)):
+            midx, mname = next(idx for idx in range(sptr.memqty) if sptr.members[idx].id == special.id), member.get_name(special)
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.__delitem__({:s}) : Unable to remove the special member \"{:s}\" at index {:d} of the frame belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, mname, midx, ea))
+
+        # Iterate through and collect information about the members that we're going
+        # to remove. This way we can still reference something despite the removal.
+        members, references = {}, {}
+        for offset, mptr in selected:
+            if isinstance(mptr, idaapi.member_t):
+                references[offset] = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mptr.id, idaapi.XREF_ALL)]
+                members[offset] = member.packed(base, mptr)
+            continue
+
+        # If the structure is a union then we can simply remove the member at each
+        # index, because there's no way to remove a union member non-descrutively.
+        if union(sptr):
+            order = sorted(index for index, mptr in selected if isinstance(mptr, idaapi.member_t))
+
+            # Now we need to delete each union member. We do this in reverse order
+            # so that when the indices get reordered, our copy will still reference
+            # the correct index for the ones that we haven't processed yet.
+            results = [(index, idaapi.del_struc_member(sptr, index)) for index in order[::-1]]
+            failures = {index for index, success in results if not success}
+
+        # Otherwise we need to cleanly remove each member that was selected. We just iterate
+        # through everything, remove a member, add some space if necessary, rinse, repeat.
+        else:
+            size, delta, failures = idaapi.get_struc_size(sptr), 0, {offset for offset in []}
+            for offset, mptr in sorted(selected, key=operator.itemgetter(0)):
+                identifier, msize = (mptr.id, idaapi.get_member_size(mptr)) if isinstance(mptr, idaapi.member_t) else (None, mptr)
+
+                # If we're an empty member, then our mptr is an integer size. So,
+                # in this case we can just skip it because it can't store anything.
+                if identifier is None:
+                    continue
+
+                # We need to track every time we remove a member, but are unable to
+                # expand the struc. This has the effect of shifting the member offset,
+                # and so we track the delta and adjust our offset using it.
+                realoffset = offset + delta
+
+                # Delete the member. If we did but a member still exists..then add the
+                # space back. This only happens on older versions of the disassembler.
+                ok = idaapi.del_struc_member(sptr, realoffset)
+                if ok and (idaapi.expand_struc(sptr, realoffset, msize) if idaapi.get_member(sptr, realoffset) else True):
+                    pass
+
+                # We were unable to add the empty space back into the structure.
+                elif ok and size != idaapi.get_struc_size(sptr):
+                    logging.info(u"{:s}({:#x}).members.__delitem__({:s}) : Unable to add space ({:d}) back to offset {:#x} of structure after removing member {:#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, msize, realoffset, offset, identifier))
+                    delta -= msize
+
+                # We couldn't remove the structure at all, which means that we
+                # couldn't honor the request the user has made of us.
+                else:
+                    failures.add(offset)
+                continue
+
+            # We need both the order and failures initialized in order to proceed.
+            order = sorted(offset for offset, mptr in selected)
+
+        # Before we emit any error messages, we need to collect any references to the
+        # union/structure that owns the member. This is so we can exclude any xrefs that
+        # have been promoted, and only warn about the xrefs that have been truly lost.
+        iterable = (packed_frm_iscode_type for offset, packed_frm_iscode_type in references.items() if offset not in failures)
+        processed = {xfrm for xfrm, _, _ in itertools.chain(*iterable) if idaapi.auto_make_step(xfrm, xfrm + 1)}
+        promoted = {xfrm for xfrm, xiscode, xtype in interface.xref.to(sptr.id, idaapi.XREF_ALL)}
+
+        # Now we should have a list of member indices/offsets that were processed, a set of
+        # indices/offsets that failed, references, and packed information for the members.
+        for offset, mptr in selected:
+            if offset not in members: continue
+            packed = members[offset]
+
+            # Unpack some member attributes so that we can reference them in any logs.
+            identifier, mname, _, _, _ = packed
+            location_description = "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(offset)
+
+            # If we were unable to remove a specific member, then log information about
+            # the member so that the user knows that something unexpected happened.
+            if offset in failures:
+                logging.warning(u"{:s}({:#x}).members.__delitem__({:s}) : Unable to remove member \"{:s}\" ({:#x}) that was at {:s} of {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, utils.string.escape(mname, '"'), identifier, location_description, 'union' if union(sptr) else 'structure'))
+                mreferences = []
+
+            # Otherwise, we removed the member and we need to check if any references
+            # were lost. We preloaded these, so we just need to format them properly.
+            else:
+                mreferences = references[offset]
+
+            # Now we collect our member references into a list of descriptiosn so that
+            # we can let the user know which refs have been lost in the member removal.
+            cdrefs = [((None, xfrm) if interface.node.identifier(xfrm) else (xfrm, None)) for xfrm, xiscode, xtype in mreferences if xfrm not in promoted]
+            crefs, drefs = ([ea for ea in xrefs if ea is not None] for xrefs in zip(*cdrefs)) if cdrefs else [(), ()]
+
+            # First we do the list of addresses...
+            if crefs:
+                logging.warning(u"{:s}({:#x}).members.__delitem__({:s}) : Removal of member \"{:s}\" ({:#x}) has resulted in the removal of {:d} reference{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, utils.string.escape(mname, '"'), identifier, len(crefs), '' if len(crefs) == 1 else 's', ', '.join(map("{:#x}".format, crefs))))
+
+            # ...then we can do the identifiers which includes structures/unions, members, or whatever.
+            if drefs:
+                logging.warning(u"{:s}({:#x}).members.__delitem__({:s}) : Removal of member \"{:s}\" ({:#x}) has resulted in the removal of {:d} referenced identifier{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, utils.string.escape(mname, '"'), identifier, len(drefs), '' if len(drefs) == 1 else 's', ', '.join(map("{:#x}".format, drefs))))
+                [logging.info(u"{:s}({:#x}).members.__delitem__({:s}) : Removed member \"{:s}\" ({:#x}) used to reference \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, utils.string.escape(mname, '"'), identifier, internal.netnode.name.get(id), id)) for id in drefs]
+            continue
+
+        # Finally we can just return the packed information that we deleted from the structure.
+        iterable = ((offset, mptr) for offset, mptr in selected if offset in members)
+        iterable = (members[offset] for offset, _ in iterable if offset not in failures)
+        return [(mname, type, location) for identifier, mname, type, location, comments in iterable]
 
     def __iter__(self):
         '''Yield all the members within the structure.'''
