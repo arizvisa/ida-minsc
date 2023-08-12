@@ -3540,6 +3540,24 @@ class contiguous(object):
             offset += direction * res
         return
 
+    @classmethod
+    def describe(cls, items):
+        '''Yield a description for each one of the provided `items` that are laid out contiguously.'''
+        area = idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
+        for item in items:
+            if isinstance(item, internal.types.integer):
+                yield "{:+#x}".format(item)
+            elif isinstance(item, (internal.structure.structure_t, internal.structure.member_t, internal.structure.members_t, namedtypedtuple, symbol_t)):
+                yield "{!s}".format(item if isinstance(item, (namedtypedtuple, symbol_t)) else (lambda item: "{:s}({:#x})".format(internal.netnode.name.get(item.id), item.id))(item.owner if isinstance(item, internal.structure.members_t) else item))
+            elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
+                yield "{:s}({:#x})".format(internal.utils.pycompat.fullname(item.__class__), item.id)
+            elif isinstance(item, area):
+                yield "{:s}({:s})".format(internal.utils.pycompat.fullname(item.__class__), range.bounds(item))
+            else:
+                yield "{!r}".format(item)
+            continue
+        return
+
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
