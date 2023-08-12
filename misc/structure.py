@@ -613,6 +613,40 @@ class member(object):
         index, remainder = divmod(int(offset) - moffset, element)
         return index, remainder
 
+    @classmethod
+    def packed(cls, offset, mptr):
+        '''Pack the information about the member `mptr` with its structure at the specified `offset` into a tuple in case it is to be removed.'''
+        is_union_member = True if mptr.props & idaapi.MF_UNIMEM else False
+
+        # first we'll grab the name and the size. we need the size in order
+        # to dissolve the member into an actual type of some sort.
+        mname = utils.string.of(idaapi.get_member_name(mptr.id)) or ''
+        msize = idaapi.get_member_size(mptr)
+
+        # then we'll need to figure out the offset and use it to calculate
+        # the location. the member's offset is the parameter unless we're
+        # a member of a union. if so, then we just use the parameter as-is.
+        moffset = int(offset) if is_union_member else int(offset) + mptr.soff
+        location = interface.location_t(moffset, msize)
+
+        # snag both comment types so that we can include them in our result.
+        iterable = (idaapi.get_member_cmt(mptr.id, repeatable) for repeatable in [True, False])
+        mcomment1, mcomment2 = (utils.string.of(cmt) for cmt in iterable)
+        mcomments = mcomment1, mcomment2
+
+        # now we need to grab the type information since we're going to
+        # be pythonifying our type information prior to returning it.
+        opinfo = idaapi.opinfo_t()
+        if idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr):
+            tid = opinfo.tid
+        else:
+            tid = idaapi.BADADDR
+
+        # now we can dissolve it the type, and use it to
+        # return a tuple containing everything we collected.
+        dissolved = interface.typemap.dissolve(mptr.flag, tid, msize, offset=moffset)
+        return mptr.id, mname, dissolved, location, mcomments
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
