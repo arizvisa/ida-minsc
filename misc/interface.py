@@ -141,6 +141,8 @@ class typemap(object):
         }
         if hasattr(idaapi, 'yword_flag'):
             integermap[int, 32] = getattr(idaapi, 'yword_flag')(), -1
+        if hasattr(idaapi, 'zword_flag'):
+            integermap[int, 64] = getattr(idaapi, 'zword_flag')(), -1
 
         decimalmap = {
             (float,  4):(idaapi.float_flag(), -1),    (float,  8):(idaapi.double_flag(), -1),
