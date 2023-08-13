@@ -3173,6 +3173,357 @@ class members_t(object):
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({:d}) : Unable to find a member {:s}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, where))
         return res
 
+    def __setitem__(self, index, item):
+        '''Replace the member(s) within the specified `index` with a copy of the specified `item` or list of items.'''
+        cls, sptr, base, index_description = self.__class__, self.owner.ptr, self.baseoffset, "{!s}".format(index)
+        multiple = isinstance(item, types.ordered) and not isinstance(item, interface.namedtypedtuple)
+
+        # First we need to validate our parameters to ensure we were given
+        # a slice if we're being asked to assign an iterable of items.
+        if multiple and not isinstance(index, slice):
+            iterable = interface.contiguous.describe(item if multiple else [item])
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to assign a non-iterable to a slice ({!r}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, ', '.join(iterable), index))
+
+        # Now we can convert our items to a list and use the index to select all of the
+        # contiguous members using the slice that we are being asked to assign to.
+        items = item if multiple else [item]
+        items_description = "[{:s}]".format(', '.join(interface.contiguous.describe(items)))
+        left, right, selected = interface.strpath.members(sptr, index)
+
+        # If our structure is a function frame, then certain members cannot be replaced.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = idaapi.get_func(ea)
+        special = idaapi.get_member(sptr, idaapi.frame_off_retaddr(fn)) if fn and idaapi.get_frame_retsize(fn) and selected else None
+        if special and any(special.id == mptr.id for _, mptr in selected if isinstance(mptr, idaapi.member_t)):
+            midx, mname = next(idx for idx in range(sptr.memqty) if sptr.members[idx].id == special.id), member.get_name(special)
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to replace the special member \"{:s}\" at index {:d} of the frame belonging to function {:#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, mname, midx, ea))
+
+        # Since our assignment will be desctructive, we need to calculate the
+        # original size and the new size before figuring out how to assign things.
+        iterable = (mptr for offset, mptr in selected)
+        oldsize, newsize = (interface.contiguous.size(members) for members in [iterable, items])
+
+        # Next since we want to confirm any references that get destroyed, we
+        # collect all references to any of the members that were selected.
+        iterable = ((offset, mptr, interface.xref.to(mptr.id, idaapi.XREF_ALL)) for offset, mptr in selected if isinstance(mptr, idaapi.member_t))
+        references = {offset : (mptr.id, [packed_frm_iscode_type for packed_frm_iscode_type in refs]) for offset, mptr, refs in iterable}
+        references[idaapi.get_struc_size(sptr.id)] = sptr.id, [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(sptr.id, idaapi.XREF_ALL)]
+
+        # Before we do any serious damage to the union/structure, save the
+        # selected member data that we plan on overwriting with our new items.
+        iterable = ((offset, mptr) for offset, mptr in selected if isinstance(mptr, idaapi.member_t))
+        olditems = {offset : member.packed(base, mptr) for offset, mptr in iterable}
+
+        # Now we can layout each member that we're going to assign contiguously. This
+        # way we can collect their offset and the minimum attributes into a list.
+        newitems, area_t, iterable = [], idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, interface.contiguous.layout(left, items, +1)
+        layout = ((sptr.memqty + idx, item) for idx, (_, item) in enumerate(iterable)) if union(sptr) else iterable
+        for offset, item in layout:
+            if isinstance(item, (types.integer, interface.bounds_t, area_t, interface.namedtypedtuple, interface.symbol_t)):
+                msize = interface.range.size(item) if isinstance(item, area_t) else item.size if hasattr(item, 'size') else item
+                assert(isinstance(msize, types.integer)), u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to determine member size ({!r}) for an unsupported type {!s} ({!r}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, msize, item.__class__, item)
+                mptr = msize
+
+            # If it's one of the known member types, then we can extract the mptr.
+            elif isinstance(item, (member_t, idaapi.member_t)):
+                mptr = item if isinstance(item, idaapi.member_t) else item.ptr
+
+            # If it's structure-like, then we need to convert it into its sptr.
+            elif isinstance(item, (structure_t, members_t, idaapi.struc_t)):
+                owner = item.owner if isinstance(item, idaapi.member_t) else item
+                mptr = owner if isinstance(owner, idaapi.struc_t) else owner.ptr
+
+            # Anything else, we have no idea how to handle and so we can just bail here.
+            else:
+                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to determine member attributes for an unsupported type {!s} ({!r}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, item.__class__, item))
+
+            # Now we can add the member and offset, but we first need to validate it
+            # in that we can't add the same structure to itself, and convert it into
+            # an flag, opinfo, bytes, and other stuff so and that we can add it as a member.
+            if isinstance(mptr, idaapi.struc_t):
+                opinfo, nbytes = idaapi.opinfo_t(), idaapi.get_struc_size(mptr)
+                if mptr.id == sptr.id:
+                    logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Trying to assign a {:s} ({:#x}) to itself at {:s} will result in an empty member of {:d} byte{:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, 'union' if union(sptr) else 'structure', mptr.id, "index {:d}".format(offset) if union(sptr) else "offset {:#x}".format(offset), nbytes, '' if nbytes == 1 else 's'))
+                opinfo.tid = mptr.id
+
+                # We were given a structure, so we just need to get the type and the correct flags.
+                tinfo = None if mptr.id == sptr.id else address.type(mptr.id)
+                flag = idaapi.struflag() if idaapi.__version__ < 7.0 else idaapi.stru_flag()
+
+                # Copy any repeatable comment from the structure as a non-repeatable comment.
+                cmt = idaapi.get_struc_cmt(mptr.id, True)
+                comments = [utils.string.of(cmt)]   # index 0 (False)
+
+            # Make an exact copy of the member information, comments, type information, and all.
+            elif isinstance(mptr, idaapi.member_t):
+                nbytes, tinfo, opinfo = idaapi.get_member_size(mptr), member.get_typeinfo(mptr), idaapi.opinfo_t()
+                flag, res = mptr.flag, idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+                opinfo = opinfo if res else None
+
+                # Extract the comments in order...index 0 (False) is non-repeatable, index 1 (True) is repeatable.
+                comments = [utils.string.of(idaapi.get_member_cmt(mptr.id, repeatable)) for repeatable in [False, True]]
+
+            # This should just be a size and nothing else.
+            else:
+                opinfo, flag, nbytes, tinfo, comments = None, 0, mptr, None, []
+
+            # Pack all of the member information so that we can add the information later,
+            # and verify the size to ensure we aren't trying to add a variable-sized member.
+            packed = opinfo, flag, nbytes, tinfo, comments
+            if nbytes:
+                newitems.append((offset, mptr, packed))
+            else:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Skipping the addition of member at {:s} of {:s} due to not having a valid size ({:d}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, "index {:d}".format(offset) if union(sptr) else "offset {:#x}".format(base + offset), 'union' if union(sptr) else 'structure', nbytes))
+            continue
+
+        # So, in order to ensure we don't have any errors we need to confirm that any new members
+        # we create do not have a duplicate name. This can happen when expanding or shrinking a
+        # structure without adjusting the names, or if the user explicitly specifies a default name.
+        iterable = (sptr.members[index] for index in builtins.range(sptr.memqty))
+        filtered = ((mptr, member.get_name(mptr)) for mptr in iterable if mptr.soff not in olditems)
+        used = {utils.string.of(mname) : mptr for mptr, mname in filtered if mname}
+
+        # We need to go through all of the newitems and figure out if any of the names
+        # will end up being duplicated. To accomplish this, we'll figure out the names
+        # in multiple passes. The first pass will gather all of the user-proposed names.
+        newnames = {}
+        for offset, mptr, _ in newitems:
+            mname = member.get_name(mptr) if isinstance(mptr, idaapi.member_t) else member.default_name(sptr, None, offset) if isinstance(mptr, idaapi.struc_t) else ''
+            newnames[offset] = mname
+
+        # The second pass requires us to go through each of the newnames. We check all
+        # of them to ensure that none of them match any of the names that have been
+        # used elsewhere within the structure. If so, then we give them a field name.
+        original, candidates, unavailable = {}, {}, {name for name in used} | {''}
+        for offset, mptr, _ in newitems:
+            if not isinstance(mptr, idaapi.member_t):
+                continue
+
+            # We skip all anonymous members, so we only need to determine the default
+            # name when there's a field with some type information to use.
+            mname = '' if idaapi.is_special_member(mptr.id) else newnames[offset]
+            originalname = mname or member.default_name(sptr, None, offset)
+            original[offset] = newnames[offset] = originalname
+            candidates.setdefault(mname, []).append(offset)
+
+        # Now we should have all the candidate names, so we start by figuring out
+        # which of our names are duplicates that we can't use. Any name with more
+        # than one offset or that exists within our used names needs to be fixed.
+        duplicates = {mname : offsets for mname, offsets in candidates.items() if len(offsets) > 1 or mname in used}
+        unavailable = unavailable | {mname for mname in candidates}
+        frargs = idaapi.frame_off_args(fn) if fn else 0
+        for mname, offsets in duplicates.items():
+            for offset in offsets:
+                oldname = newnames[offset]
+                assert(oldname == mname)
+
+                name, adjusted = mname, offset if not fn else offset - frargs if frargs <= offset else offset - fn.frsize
+                while name in unavailable:
+                    name = '_'.join([name, "{:X}".format(adjusted)])
+                newname = name
+
+                newnames[offset] = newname
+            continue
+
+        # Now we'll do a final pass through all of the members so that we can
+        # log what names we were able to use and what names were duplicates.
+        for offset, mptr, _ in newitems:
+            if not isinstance(mptr, idaapi.member_t):
+                continue
+
+            # We only need to log name changes for non-anonymous members.
+            oldname, newname = original[offset], newnames[offset]
+            if isinstance(mptr, idaapi.member_t) and oldname != newname:
+                new_descr = "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset)
+                old_descr = "index {:d}".format(mptr.soff) if union(sptr) else "offset {:+#x}".format(base + mptr.soff)
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Using alternative name \"{:s}\" for new member at {:s} of {:s}({:#x}) as the member ({:#x}) at {:s} is currently using the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, utils.string.escape(newname, '"'), new_descr, 'union' if union(sptr) else 'structure', sptr.id, mptr.id, old_descr, utils.string.escape(oldname, '"')))
+            continue
+
+        # If we're using a union, we need some way to identify each member since removing a
+        # member changes the index and reorders things. I tried snagging the member_t.soff,
+        # but it didn't seem to work. So instead, we grab the id and look it up every time.
+        if union(sptr):
+            res, identifiers = 0, {mptr.id for idx, mptr in selected if idx in olditems}
+            for packed in map(idaapi.get_member_by_id, identifiers):
+                if not packed:
+                    continue
+
+                # Unpack the member using its identifier and smoke-check the structure that owns it.
+                mptr, fullname, owner = packed
+                ok = owner.id == sptr.id and idaapi.del_struc_member(sptr, mptr.soff)
+
+                # If the identifier didn't match, then the identifer we used returned the
+                # wrong structure somehow. This warrants an exception, but we're in the
+                # process of modifying the structure and we need to finish our changes.
+                if not ok and owner.id != sptr.id:
+                    logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : The {:s} owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us and may result in fatal error.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, 'union' if union(owner) else 'structure', mptr.id, "index {:d}".format(mptr.soff) if union(sptr) else "offset {:+#x}".format(base + offset)))
+
+                # Now we can attempt to remove the damned thing.
+                res += 1 if ok else 0
+
+            count = res
+
+        # Now, since we've extracted all of the packed information and references for the old
+        # items, we can delete the entire range in preparation to adjust the structure size.
+        else:
+            count = idaapi.del_struc_members(sptr, left, right) if olditems else 0
+        errors = {} if count == len(olditems) else {offset : idaapi.get_member(sptr, offset) for offset in olditems}
+
+        # If we collected any errors, then here's where we'll expose our failures to the user.
+        if errors:
+            for offset, mptr in selected:
+                if errors.get(offset):
+                    logging.critical(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to remove the selected member ({:#x}) from {:s} of {:s} for replacement.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, mptr.id, "index {:d}".format(mptr.soff) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure'))
+                continue
+
+        # If we didn't remove all of the items that we expected, then we should prolly bail.
+        # FIXME: We should probably revert and restore the olditems that we've already partially removed.
+        if count != len(olditems):
+            raise E.DisassemblerError(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Expected to remove {:d} member{:s}, but {:d} were removed.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, len(olditems), '' if len(olditems) == 1 else 's', count))
+
+        # Now we need to figure out whether we're growing the structure, or shrinking it.
+        delta = 0 if union(sptr) else newsize - oldsize
+        if delta and not idaapi.expand_struc(sptr, left, delta):
+            raise E.DisassemblerError(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to {:s} the size of the structure by {:d} byte{:s} at offset {:+#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, 'decrease' if delta < 0 else 'increase', abs(delta), '' if abs(delta) == 1 else 's', left))
+
+        # If we shifted any of the members, then we need to add them to our
+        # olditems list if we still want to track their references.
+        midx = idaapi.get_next_member_idx(sptr, left)
+        if delta > 0 and 0 <= midx:
+            iterable = (sptr.members[idx] for idx in range(midx, sptr.memqty))
+            olditems.update({mptr.soff : member.packed(base, mptr) for mptr in iterable})
+
+        # That should do it.. So, we should only need to add the newitems to the structure.
+        results, oldsize = [], idaapi.get_struc_size(sptr)
+        for offset, item, packed in newitems:
+            opinfo, flag, nbytes, _, _ = packed
+
+            # Skip the member if it's just empty space.
+            if isinstance(item, types.integer):
+                logging.debug(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Skipping {!r} byte{:s} of space at {:s} of {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, nbytes, '' if nbytes == 1 else 's', "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure'))
+                err, position = idaapi.STRUC_ERROR_MEMBER_OK, offset
+
+            # Otherwise add it using the attributes that were packed into newitems.
+            else:
+                position = sptr.memqty if union(sptr) else offset
+                logging.debug(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Adding member at {:s} as {:d} byte{:s} of space with the specified flags ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), nbytes, '' if nbytes == 1 else 's', flag))
+                err = idaapi.add_struc_member(sptr, newnames[offset], idaapi.BADADDR if union(sptr) else position, flag, opinfo, nbytes)
+
+            # Check to see if we encountered an error of some sort while trying to add the member.
+            if err == idaapi.STRUC_ERROR_MEMBER_NAME:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} (\"{:s}\").".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure', 'a duplicate field name', newnames[offset]))
+            elif err == idaapi.STRUC_ERROR_MEMBER_OFFSET:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure', 'invalid offset', offset))
+            elif err == idaapi.STRUC_ERROR_MEMBER_SIZE:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} ({:d}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure', 'invalid field size', nbytes))
+            elif err == idaapi.STRUC_ERROR_MEMBER_TINFO:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure', 'invalid type id', opinfo.tid))
+            elif err == idaapi.STRUC_ERROR_MEMBER_STRUCT:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} for {:#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure', 'bad structure identifier', sptr.id))
+            elif err != idaapi.STRUC_ERROR_MEMBER_OK:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Error ({:#x}) while adding member at {:s} of {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'structure'))
+
+            # Immediately rip the identifier out of the member if we were able to add it to the
+            # structure/union succesfully. Apparently, the mptr (member_t) can completely go out
+            # of scope for no good reason (whatsoever) while we're processing the new items list.
+            mptr = idaapi.get_member(sptr, position)
+            if err == idaapi.STRUC_ERROR_MEMBER_OK and mptr:
+                results.append((position, mptr.id, packed))
+            continue
+
+        # And now the very last thing we need to do is to update the member
+        # with any metadata such as comments, type information, etc.
+        for offset, id, packed in results:
+            opinfo, _, _, tinfo, comments = packed
+
+            # Grab the member using the identifer we saved when we first added each member.
+            mptr_fullname_owner = idaapi.get_member_by_id(id)
+            if mptr_fullname_owner:
+                mptr, fullname, owner = idaapi.get_member_by_id(id)
+
+            # If we couldn't find it via its identifier, then skip onto the next one.
+            else:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Skipping the application of type information for the member ({:#x}) at {:s} due to its identifier being invalid.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, id, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset)))
+                continue
+
+            # If the member doesn't belong to our structure/union at all, then ignore it and move on.
+            if owner.id != sptr.id:
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : The {:s} owning the member ({:#x}) at {:s} that is attempting to be removed does not actually belong to us ({:#x}) and will not have its type information copied.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, 'union' if union(owner) else 'structure', mptr.id, "index {:d}".format(mptr.soff) if union(sptr) else "offset {:+#x}".format(base + offset), sptr.id))
+                continue
+
+            # Apply any type information that we were able to snag to the newly created member.
+            # XXX: we should catch any exceptions raised here so that we don't interrupt the
+            #      application of type information and other metadata to any missed members.
+            if opinfo is not None and tinfo:
+                member.set_typeinfo(mptr, tinfo)
+
+            # Apply any comments that we might've needed to copy.
+            for repeatable, string in enumerate(map(utils.string.to, comments)):
+                if string and not idaapi.set_member_cmt(mptr, string, repeatable):
+                    logging.debug(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to update member ({:s}) at {:s} with {:s} comment \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, mptr.id, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'repeatable' if repeatable else 'non-repeatable', utils.string.escape(string, '"')))
+                continue
+            continue
+
+        # XXX: The following logic updates any references that were made by the actions
+        #      of this method. This is done by tracking the original references, stepping,
+        #      the auto-queue, and then identifying which members gained which references.
+        #      This allows us to whine to the user if a reference was lost, but really
+        #      it's just so we can output everything that the action changed.
+
+        # XXX: There's probably a huge performance cost to doing this, but personally I
+        #      can't come up with a legitimate reason for wanting to script mass-assignments
+        #      to structures/unions. Thus the reason for outputting these references is so
+        #      you can verify that the assignment did exactly what you intended it to do.
+
+        # Flatten all of the references so that we can step the auto queue for them.
+        iterable = (([id] * len(refs), refs) for offset, (id, refs) in references.items())
+        old = {xfrm : id for id, (xfrm, xiscode, xtype) in itertools.chain.from_iterable(itertools.starmap(zip, iterable))}
+        [idaapi.auto_make_step(xfrm, xfrm + 1) for xfrm in old]
+
+        # Next we'll grab all of the identifiers for the members we added, and use them
+        # to filter the old references. This way we can filter those references and
+        # identify which member the reference was moved to during our reassignment.
+        name = utils.string.of(idaapi.get_struc_name(sptr.id))
+        oldmembers = {id : (name, offset) for offset, (id, name, _, location, _) in olditems.items()}
+        newmembers = {id : (member.get_name(id), offset) for offset, id, packed in results}
+        oldmembers[sptr.id] = name, oldsize
+        newmembers[sptr.id] = name, idaapi.get_struc_size(sptr)
+
+        # If we shifted any of the old members, then include their references too.
+        if delta > 0:
+            newmembers.update({id : (name, offset + delta) for id, (name, offset) in oldmembers.items()})
+
+        # Use the list of new members to grab the references that we stepped the auto-queue
+        # for. This way we can compare both the new and old refs to verify they were applied.
+        iterable = ((xfrm, interface.xref.of(xfrm, idaapi.XREF_ALL)) for xfrm in old)
+        filtered = ((xfrm, {xto for xto, xiscode, xtype in refs if xto in newmembers}) for xfrm, refs in iterable)
+        new = {xfrm : xtos for xfrm, xtos in filtered if xtos}
+
+        # Now we can just take a union of the old and the new references to
+        # figure out what has just transpired with regards to them.
+        oldrefs, newrefs = ({ea for ea in refs} for refs in [old, new])
+        for ea in oldrefs & newrefs:
+            assert(new[ea])
+            old_ea = old[ea]
+            for new_ea in new[ea]:
+                olditem, newitem = oldmembers[old[ea]], newmembers[new_ea]
+                newname, newoffset = newitem
+                oldname, oldoffset = olditem
+                old_descr, new_descr = ("structure \"{:s}\"".format(utils.string.escape(name, '"')) if id == sptr.id else "field \"{:s}\" ({:+#x})".format(utils.string.escape(name, '"'), offset) for id, offset, name in zip([old_ea, new_ea], [oldoffset, newoffset], [oldname, newname]))
+                logging.info(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Reference at address {:#x} has moved from {:s} to new {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, ea, old_descr, new_descr))
+            continue
+
+        # Any old references that aren't in the new references have been lost. This
+        # should actually never happen if the disassembler is working properly.
+        for ea in oldrefs - newrefs:
+            old_ea = old[ea]
+            oldname, oldoffset = oldmembers[old[ea]]
+            logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Reference at address {:#x} that was referencing {:s} \"{:s}\" ({:+#x}) was lost during assignment.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, ea, 'structure' if old_ea == sptr.id else 'field', utils.string.escape(oldname, '"'), oldoffset))
+
+        # Finally we can return everything that we've just removed back to the caller.
+        iterable = (olditems[offset] for offset, _ in selected if offset in olditems)
+        return [(mname, mtype, mlocation) for id, mname, mtype, mlocation, mcomments in iterable]
+
     def __delitem__(self, index):
         '''Remove the member(s) at the specified `index` non-destructively.'''
         cls, sptr, base, index_description = self.__class__, self.owner.ptr, self.baseoffset, "{!s}".format(index)
