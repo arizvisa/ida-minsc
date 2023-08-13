@@ -3287,9 +3287,10 @@ class members_t(object):
             continue
 
         # Finally we can just return the packed information that we deleted from the structure.
-        iterable = ((offset, mptr) for offset, mptr in selected if offset in members)
-        iterable = (members[offset] for offset, _ in iterable if offset not in failures)
-        return [(mname, type, location) for identifier, mname, type, location, comments in iterable]
+        iterable = ((offset, mptr) for offset, mptr in selected)
+        iterable = ((offset, members[offset] if offset in members else mptr) for offset, mptr in iterable if offset not in failures)
+        iterable = ((('', None, interface.location_t(base + offset, packed)) if isinstance(packed, types.integer) else packed[+1 : -1]) for offset, packed in iterable)
+        return [(mname, mtype, mlocation) for mname, mtype, mlocation in iterable]
 
     def __iter__(self):
         '''Yield all the members within the structure.'''
