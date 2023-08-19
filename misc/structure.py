@@ -2025,6 +2025,7 @@ class members_t(object):
         `gt` - Filter the structure members for any after the specified offset (exclusive)
         `less` or `le` - Filter the structure members for any before the specified offset (inclusive)
         `lt` - Filter the structure members for any before the specified offset (exclusive)
+        `member` - Filter the structure members by their ``member_t`` or a list of ``member_t``
         `predicate` - Filter the structure members by passing the ``member_t`` to a callable
 
     Some examples of using these keywords are as follows::
@@ -3022,6 +3023,8 @@ class members_t(object):
     __members_matcher.boolean('gt', operator.lt, utils.fmap(operator.attrgetter('offset'), utils.fcompose(operator.attrgetter('size'), utils.fpartial(operator.add, -1), utils.fpartial(max, 0))), utils.funpack(operator.add))
     __members_matcher.boolean('le', operator.ge, 'offset')
     __members_matcher.boolean('lt', operator.gt, 'offset'), __members_matcher.alias('less', 'lt')
+    __members_matcher.combinator('member', utils.fcondition(utils.finstance(idaapi.member_t, member_t))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(idaapi.member_t, member_t)), utils.fpartial(map, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
+    __members_matcher.alias('members', 'member')
     __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
 
     def __iterate__(self):
