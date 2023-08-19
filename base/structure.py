@@ -58,6 +58,7 @@ The different types that one can filter structures with are the following:
     `tagged` - Filter structures for any that use or has fields with the specified tag(s)
     `members` - Filter structures by the number of members, a name, or specified name(s)
     `contiguous` - Filter structures that are laid out contiguously (no holes)
+    `structure` - Filter the structures by their ``structure_t`` or a list of ``structure_t``
     `predicate` - Filter the structures by passing them to a callable
 
 Some examples of using these keywords are as follows::
@@ -100,6 +101,8 @@ __matcher__.boolean('tagged', lambda parameter, keys: parameter == any(not key.s
 __matcher__.alias('tag', 'tagged')
 __matcher__.boolean('members', lambda parameter, names: len(names) == parameter if isinstance(parameter, types.integer) else fnmatch.filter(names, parameter) if isinstance(parameter, types.string) else all(operator.contains(names, name) for name in parameter), operator.attrgetter('members'), functools.partial(builtins.map, operator.attrgetter('name')), types.list)
 __matcher__.mapping('contiguous', functools.partial(operator.le, 0), operator.attrgetter('ptr'), utils.fcondition(internal.structure.union)(utils.fconstant(0), utils.fcompose(utils.fmap(utils.fcompose(operator.attrgetter('members'), functools.partial(functools.partial, operator.getitem)), utils.fcompose(operator.attrgetter('memqty'), builtins.range)), utils.funpack(builtins.map), utils.freverse(functools.partial(functools.reduce, lambda eoff, member: member.eoff if member.soff == eoff else -1), 0))))
+__matcher__.combinator('structure', utils.fcondition(utils.finstance(idaapi.struc_t, internal.structure.structure_t))(utils.fcompose(operator.attrgetter('id'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(filter, utils.finstance(idaapi.struc_t, internal.structure.structure_t)), utils.fpartial(map, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), 'id')
+__matcher__.alias('structures', 'structure')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
 def __iterate__():
