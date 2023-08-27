@@ -2246,3 +2246,219 @@ class fullname(selection):
     def name(self, index):
         (start, stop), _ = self.__cache[index]
         return self.__string__[start : stop]
+
+class parseable(object):
+    """
+    This class is a base class that takes an unmangled string or instance of
+    the `mangled` class and then pre-transforms all of its unique segments
+    so that it can be rendered in a format that can be parsed by the disassembler
+    if used as a name.
+
+    Implementors of this class can then customize how to re-mangle an unmangled
+    string so that it can be easier for a user to interpret or apply a regular
+    expression to a mangled symbol name. The unique segments are cached with
+    the intention that a transformation will only need to be calculated once.
+    """
+
+    # take the pair of tokens from the `function.tokens` set and turn it into
+    # a O(1) lookup table that we can use to check if a string is cuddled.
+    #pairs = {start : stop for start, stop in {'<>', '()', '[]', '{}', "`'"}}
+    pairs = {token[:1] : token[-1:] for token in function.tokens if len(token) == 2}
+
+    def __init__(self, string, mappings={}):
+        copied = {original : transformed for original, transformed in mappings.items()}
+        self.__cache__ = copied     # map of substrings to transformed substring
+        self.__index__ = {}         # map of string indices to transformed substring
+
+        # we're good friends with instances of the mangled class, because we
+        # rely on it to ensure the nested parts are balanced and parseable.
+        if isinstance(string, mangled):
+            rendered, tree, duplicates = string.string, string.__tree__, string.__duplicates__
+            self.__string__, self.__tree__, self.__duplicates__ = rendered, tree, duplicates
+
+        # otherwise we just assume it's a string for the purposes of testing.
+        else:
+            order, tree, errors = token.parse(string, function.tokens)
+            duplicates = token.duplicates(string, order)
+            assert(not(errors)), errors
+            self.__string__, self.__tree__, self.__duplicates__ = string, tree, duplicates
+
+        # now we can identify the unique segments from our duplicates. this should
+        # greatly reduce the amount of processing work we'll have to do on the string.
+        iterable = token.unique(duplicates)
+        self.__unique__ = [segment for segment in iterable]
+
+        # FIXME: the __cache_unique__ method should probably be exposed to the user
+        #        in some way, and this class needs to be refactored so that an
+        #        implementor of it can influence the way the string gets rendered.
+
+    def __cache_unique__(self):
+        '''Process all of the unique segments within the unmangled string and cache all transformed results.'''
+        result = []
+        for left, right in self.__unique__:
+            substring = self.__string__[left : right]
+            parsed = self.send(left, substring)
+            result.append(parsed)
+        return result
+
+    def render(self):
+        '''Render the current string in its parseable form using any cached segments.'''
+        offset, result, string = 0, [], self.__string__
+        for left, key, right in token.augment(None, self.__tree__.get(None, [])):
+            offset += left
+
+            # select the current segments and append them to our result.
+            lstring, rstring = string[offset - left : offset], string[offset : offset + right]
+            result.append(lstring)
+
+            # use the current key to figure out the transformed substring via one of the caches.
+            transformed = self.send(key, rstring)
+            result.append(transformed)
+            offset += right
+        return ''.join(result)
+
+    def send(self, index, substring):
+        '''Return the prior transformed string for the `substring` at the specified `index`.'''
+        table, cache = self.__index__, self.__cache__
+
+        # if index is already in our table, then we can just use it. (fast-path)
+        if index in table:
+            return table[index]
+
+        # if the substring already exists in our cache, then update all its
+        # indices for the fastpath, and return the transformed substring.
+        elif substring in cache:
+            transformed = cache[substring]
+            #print(['sendsub', substring, transformed])
+            iterable = (segment for depth, segment in self.__duplicates__.get(index, []))
+            [table.setdefault(left, transformed) for left, right in iterable]
+            return cache[substring]
+
+        # otherwise we check if we have an index for the string inside
+        # the tree and figure out how we'll need to process/transform it.
+        elif index in self.__tree__:
+            #print(['sendproc', index, substring])
+            cache[substring] = transformed = self.process_branch(index, substring)
+            return transformed
+
+        # there's nothing we can do with this string, so return it untransformed.
+        #print(['notrans', index, substring])
+        return substring
+
+    def __process_augmented(self, augmented, substring, separators={','}):
+        '''Process the given `substring` using the `augmented` segments to split each of its tokens by `separators` and yield them.'''
+        offset, result = 0, []
+        for left, key, right in augmented:
+            offset += left
+            lstring, rstring = substring[offset - left : offset], substring[offset : offset + right]
+
+            # if the key is in our tree, then it's worth checking the cache
+            lstring and result.append(lstring)
+            if key in self.__tree__:
+                cached = self.__index__[key] if key in self.__index__ else self.__cache__[rstring] if rstring in self.__cache__ else rstring
+                result.append(cached)
+
+            # if we hit a separator, then check it against the cache and yield it.
+            elif rstring in separators:
+                yield ''.join(result)
+                result = []
+
+            # otherwise, there's nothing to do.
+            elif rstring:
+                result.append(rstring)
+            offset += right
+
+        # if there's anything left, then return it.
+        offset < len(substring) and result.append(substring[offset:])
+        if result:
+            yield ''.join(result)
+        return
+
+    def process_nopair(self, index, substring, separators={','}):
+        '''Process the uncuddled `substring` at the specified `index` split by the tokens in `separators`.'''
+        assert(index in self.__tree__)
+        augmented = token.augment(index, self.__tree__[index])
+
+        joined = self.__cache__[substring] if substring in self.__cache__ else ','.join(self.__cache__.get(item, item) for item in self.__process_augmented(augmented, substring, separators=separators))
+        #print(['cached', substring, joined])
+        return self.__cache__.setdefault(substring, joined)
+
+    def process_pair(self, index, substring, separators):
+        '''Process the cuddled `substring` at the specified `index` split by the tokens in `separators`.'''
+        assert(index in self.__tree__)
+        augmented = token.augment(index, self.__tree__[index])
+        pairs, stripped, uncuddled = self.__uncuddle_augmented_string(substring, augmented)
+
+        # Once the characters cuddling the substring have been removed, update the
+        # cache with the transformed string so we can avoid processing it again.
+        transformed = self.__cache__[stripped] if stripped in self.__cache__ else ','.join(self.__cache__.get(item, item) for item in self.__process_augmented(uncuddled, stripped, separators=separators))
+        #print(['uncuddle', pairs, substring, stripped, transformed])
+        self.__cache__[substring] = transformed = pairs[0] + transformed + pairs[-1]
+        return transformed
+
+    def process_branch(self, index, substring, separators={','}):
+        '''Process the given `substring` at the specified `index` split by the tokens in `separators`.'''
+        if self.pairs.get(substring[:1]) != substring[-1:]:
+            transformed = self.process_nopair(index, substring, separators=separators)
+        else:
+            transformed = self.process_pair(index, substring, separators=separators)
+
+        # After processing a branch, update all references to it in the index.
+        iterable = (segment for depth, segment in self.__duplicates__.get(index, []))
+        [self.__index__.setdefault(left, transformed) for left, right in iterable]
+        return transformed
+
+    def __uncuddle_augmented_string(self, string, augmented):
+        '''Return a tuple composed of the grouping characters, the ungrouped `string`, and an iterable containing each `augmented` segment.'''
+        begin, end = string[:+1], string[-1:]
+        if end != self.pairs.get(begin):
+            return '', string, (item for item in augmented)
+
+        # otherwise we're safe to shave off the first and last characters.
+        elif len(augmented) > 1:
+            [(left, index, right)] = augmented[:+1]
+            first = max(0, left - 1), index, right
+            [(left, index, right)] = augmented[-1:]
+            last = left, index, right - 1
+            return begin + end, string[+1 : -1], itertools.chain([first], augmented[+1 : -1], [last])
+
+        # if it's a single element, then tweak it a bit.
+        elif augmented:
+            [(left, index, right)] = augmented
+            first, last = max(0, left - 1), max(0, right - 1)
+            return begin + end, string[+1 : -1], (item for item in [(first, index, last)])
+
+        # if there's nothing in our augmented list, then just trim the string.
+        return begin + end, string[+1 : -1], (item for item in augmented)
+
+    def __repr__(self):
+        '''Return a multiple-line description of the attributes belonging to the object.'''
+        res, cls, string = [], super(parseable, self).__repr__(), self.__string__
+
+        res.append("length: {:d}".format(len(string)))
+        res.append("nested: {:d}".format(len(self.__tree__)))
+        res.append('')
+
+        res.append("<unique segments> {:d}".format(len(self.__unique__)))
+        token_table = {}
+        for index, (left, right) in enumerate(self.__unique__):
+            res.append("[{:d}] {:d} reference{:s} : {:d}..{:d} {!r}".format(index, len(self.__duplicates__[left]), '' if len(self.__duplicates__[left]) == 1 else 's', left, right, string[left : right]))
+            token_table[string[left : right]] = left
+        res.append('')
+
+        res.append("<cached tokens> {:d}/{:d}".format(sum(1 for string, transformed in self.__cache__.items() if string != transformed), len(self.__cache__)))
+        for index, string in enumerate(self.__cache__):
+            transformed = self.__cache__[string]
+            if string == transformed:
+                pass
+
+            elif string in token_table and any(left in self.__tree__ for left, right in self.__tree__[token_table[string]]):
+                res.append("[{:d}] {!r}".format(index, string))
+                res.append("[{:d}] -> {!r}".format(index, transformed))
+
+            else:
+                res.append("[{:d}] {!r} -> {!r}".format(index, string, transformed))
+            continue
+        res.append('')
+
+        return '\n'.join(itertools.chain([cls], res))
