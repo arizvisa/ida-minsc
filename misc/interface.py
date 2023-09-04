@@ -491,15 +491,14 @@ class typemap(object):
         return address.update_refinfo(identifier, flag)
 
     @classmethod
-    def size(cls, pythonType):
-        '''Return the size of the provided `pythonType` discarding the array length if one was provided.'''
-        structure = sys.modules.get('structure', __import__('structure'))
+    def element(cls, pythonType):
+        '''Return the element size of the provided `pythonType` discarding the array component if one was provided.'''
 
         # If we were given a list (for an array), then unpack it since
         # its length is entirely irrelevant to us.
         if isinstance(pythonType, internal.types.list):
             element, _ = [item for item in itertools.chain(pythonType, 2 * [0])][:2]
-            return cls.size(element) if len(pythonType) == 2 else 0
+            return cls.element(element) if len(pythonType) == 2 else 0
 
         # If it's a tuple, then we can just unpack our size from the type and then return it.
         if isinstance(pythonType, internal.types.tuple):
@@ -507,11 +506,37 @@ class typemap(object):
             return max(0, size) if isinstance(size, internal.types.integer) and len(pythonType) in {2, 3} else 0
 
         # If it's one of our structure types, then we can extract their sptr and use it.
-        if isinstance(pythonType, (idaapi.struc_t, structure.structure_t)):
+        if isinstance(pythonType, (idaapi.struc_t, internal.structure.structure_t)):
             sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
             return idaapi.get_struc_size(sptr)
 
         # Otherwise, we need to do a default type lookup to get the number of bytes.
+        opinfo, table = idaapi.opinfo_t(), cls.typemap.get(pythonType, {}) if getattr(pythonType, '__hash__', None) else {}
+        flag, typeid = table.get(None, (-1, -1))
+        opinfo.tid = idaapi.BADADDR if typeid < 0 else typeid
+        return idaapi.get_data_elsize(idaapi.BADADDR, flag, opinfo) if None in table else 0
+
+    @classmethod
+    def size(cls, pythonType):
+        '''Return the total expected size of the provided `pythonType`.'''
+
+        # If we have a list, then calculate the array size using the element type and length.
+        if isinstance(pythonType, internal.types.list):
+            element, unchecked = [item for item in itertools.chain(pythonType, 2 * [0])][:2]
+            length = max(0, unchecked) if isinstance(unchecked, internal.types.integer) else 0
+            return cls.size(element) * length if len(pythonType) == 2 else 0
+
+        # If it's a tuple, then we can unpack our size from the type and return it.
+        if isinstance(pythonType, internal.types.tuple):
+            _, size, _ = [item for item in itertools.chain(pythonType, 3 * [0])][:3]
+            return max(0, size) if isinstance(size, internal.types.integer) and len(pythonType) in {2, 3} else 0
+
+        # If it's not a tuple, then it might be a structure to snag the size from.
+        if isinstance(pythonType, (idaapi.struc_t, internal.structure.structure_t)):
+            sptr = pythonType if isinstance(pythonType, idaapi.struc_t) else pythonType.ptr
+            return idaapi.get_struc_size(sptr)
+
+        # If it wasn't either, then we need to do a default type lookup for the size.
         opinfo, table = idaapi.opinfo_t(), cls.typemap.get(pythonType, {}) if getattr(pythonType, '__hash__', None) else {}
         flag, typeid = table.get(None, (-1, -1))
         opinfo.tid = idaapi.BADADDR if typeid < 0 else typeid
