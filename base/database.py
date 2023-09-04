@@ -7779,7 +7779,7 @@ class set(object):
 
         # Grab our desired size and the original type so that we can determine if
         # we're going to be updating or changing the array.
-        info, size, flags = idaapi.opinfo_t(), interface.typemap.size(type), interface.address.flags(ea)
+        info, size, flags = idaapi.opinfo_t(), interface.typemap.element(type), interface.address.flags(ea)
         addresses = [ea + address for address in builtins.range(size)]
 
         # XXX: We could probably use `can_define_item(ea_t, asize_t, flags_t)`, but I'm not sure
@@ -8354,7 +8354,7 @@ class get(object):
     def array(cls, bounds, type, **byteorder):
         '''Return the values within the provided `bounds` as an array of the pythonic element `type`.'''
         start, stop = sorted(bounds)
-        expected, element = stop - start, interface.typemap.size(type)
+        expected, element = stop - start, interface.typemap.element(type)
 
         # First we'll sanity-test the type we were given is not a list (array)
         # so that we can complain to the user that we were given two lengths.
@@ -8419,8 +8419,8 @@ class get(object):
 
         # Now we just need to verify that the resolved size and the element
         # size are the same to ensure we weren't given an array of some sort.
-        if interface.typemap.size(type) != size:
-            raise E.InvalidParameterError(u"{:s}.array({:#x}, {!s}, {:+d}) : Expected the given type ({!s}) to have a size ({:+d}) that is the same as the calculated size ({:+d}).".format('.'.join([__name__, cls.__name__]), ea, type, length, type, size, interface.typemap.size(type)))
+        if interface.typemap.element(type) != size:
+            raise E.InvalidParameterError(u"{:s}.array({:#x}, {!s}, {:+d}) : Expected the given type ({!s}) to have a size ({:+d}) that is the same as the calculated size ({:+d}).".format('.'.join([__name__, cls.__name__]), ea, type, length, type, size, interface.typemap.element(type)))
 
         # All we need to do since we've resolved the type is to use the length
         # to calculate the amount of data to read, and then decode the array.
