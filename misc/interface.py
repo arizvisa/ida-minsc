@@ -3517,7 +3517,7 @@ class contiguous(object):
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
 
         # Before doing anything, convert our parameter into a list that we can process.
-        items = [item for item in items]
+        items = [(item if item.__class__ in size else typemap.size(item)) for item in items]
         if not all(item.__class__ in size for item in items):
             missed = [internal.utils.pycompat.fullname(item.__class__) for item in items if item.__class__ not in size]
             iterable = itertools.chain(missed[:-1], map("and {:s}".format, missed[-1:])) if len(missed) > 1 else missed
@@ -3542,7 +3542,7 @@ class contiguous(object):
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
 
         # Listify our items and ensure that all of them are a type that we support.
-        items = [item for item in items]
+        items = [(item if item.__class__ in size else typemap.size(item)) for item in items]
         if not all(item.__class__ in size for item in items):
             missed = [internal.utils.pycompat.fullname(item.__class__) for item in items if item.__class__ not in size]
             iterable = itertools.chain(missed[:-1], map("and {:s}".format, missed[-1:])) if len(missed) > 1 else missed
@@ -3553,7 +3553,7 @@ class contiguous(object):
         if direction < 0:
             for item in items:
                 res = size[item.__class__](item)
-                offset += direction * size[item.__class__](item)
+                offset += direction * res
                 yield math.trunc(offset), item
             return
 
