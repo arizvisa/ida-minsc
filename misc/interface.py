@@ -6738,19 +6738,22 @@ class partialregister_t(namedtypedtuple, symbol_t):
     def size(self):
         '''Return the size of the register part in bytes.'''
         _, _, bits = self
-        return bits // 8
+        bytes, extra = divmod(bits, 8)
+        return 1 + bytes if extra else bytes
 
     @property
     def type(self):
         '''Return the pythonic type of the current register part.'''
         _, _, bits = self
-        return builtins.int, bits // 8
+        bytes, extra = divmod(bits, 8)
+        return builtins.int, 1 + bytes if extra else bytes
 
     @property
     def bytes(self):
         '''Return the bytes that make up the value of the current register part.'''
         register, position, bits = self
-        index, size = position // 8, bits // 8
+        count, extra = divmod(bits, 8)
+        index, size = position // 8, 1 + count if extra else count
         return register.bytes[index : index + size]
 
     def __int__(self):
