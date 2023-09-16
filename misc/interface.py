@@ -3542,26 +3542,26 @@ class contiguous(object):
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
 
         # Listify our items and ensure that all of them are a type that we support.
-        items = [(item if item.__class__ in size else typemap.size(item)) for item in items]
-        if not all(item.__class__ in size for item in items):
-            missed = [internal.utils.pycompat.fullname(item.__class__) for item in items if item.__class__ not in size]
+        items = [(item if item.__class__ in size else typemap.size(item), item) for item in items]
+        if not all(item.__class__ in size for item, _ in items):
+            missed = [internal.utils.pycompat.fullname(item.__class__) for item, _ in items if item.__class__ not in size]
             iterable = itertools.chain(missed[:-1], map("and {:s}".format, missed[-1:])) if len(missed) > 1 else missed
-            raise internal.exceptions.InvalidParameterError(u"{:s}.layout({:d}, {!r}, {:d}) : Unable to determine the layout for the unsupported type{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), offset, items, direction, '' if len(missed) == 1 else 's', ', '.join(iterable) if len(missed) > 2 else ' '.join(iterable)))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.layout({:d}, {!r}, {:d}) : Unable to determine the layout for the unsupported type{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), offset, [original for _, original in items], direction, '' if len(missed) == 1 else 's', ', '.join(iterable) if len(missed) > 2 else ' '.join(iterable)))
 
         # If we're laying the list of items in reverse, then
         # we calculate the offset before yielding the item.
         if direction < 0:
-            for item in items:
+            for item, original in items:
                 res = size[item.__class__](item)
                 offset += direction * res
-                yield math.trunc(offset), item
+                yield math.trunc(offset), original if isinstance(item, internal.types.integer) and isinstance(original, symbol_t) else item
             return
 
         # Otherwise, we start at the current offset, and
         # adjust the offset for each item as it comes in.
-        for item in items:
+        for item, original in items:
             res = size[item.__class__](item)
-            yield math.trunc(offset), item
+            yield math.trunc(offset), original if isinstance(item, internal.types.integer) and isinstance(original, symbol_t) else item
             offset += direction * res
         return
 
