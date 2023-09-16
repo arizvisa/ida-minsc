@@ -4517,8 +4517,8 @@ class register_t(symbol_t):
     @property
     def size(self):
         '''Return the size of the register in bytes.'''
-        res = math.ceil(self.__size__ / 8)
-        return math.trunc(res)
+        bytes, bits = divmod(self.__size__, 8)
+        return 1 + bytes if bits else bytes
     @property
     def position(self):
         '''Return the binary offset of the current register into its full register that contains it.'''
@@ -4526,7 +4526,8 @@ class register_t(symbol_t):
     @property
     def type(self):
         '''Return the pythonic type of the register.'''
-        return self.__ptype__, self.__size__ // 8
+        bytes, bits = divmod(self.__size__, 8)
+        return self.__ptype__, 1 + bytes if bits else bytes
 
     def __description__(self):
         '''Return a short description of the current register using its class and name.'''
