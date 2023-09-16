@@ -2269,6 +2269,94 @@ class block(object):
         # Now we just need to figure out which operand it is and return it.
         return next(ref for ref in interface.instruction.access(ea) if 'x' in ref.access)
 
+    class type(object):
+        """
+        This namespace is for determining the type of a basic block in the
+        ``idaapi.FlowChart`` belonging to a function. This is performed by
+        returning attributes directly from instances of the ``idaapi.BasicBlock``
+        type. In the author's opinion, most of the information attached to this
+        object is thoroughly useless outside its associated graph. Despite this
+        deficiency, some flags are exposed in case there's actual need for it.
+
+        This namespace is also aliased as ``function.block.t``.
+        """
+
+        # FIXME: this namespace can definitely support cases other than `idaapi.BasicBlock`.
+
+        # FIXME: we should implement a ton of the instruction types, such as .call(),
+        #        .branchcc(), .branch(), .unconditional(), etc. fortunately, most of the
+        #        instruction.type namespace already supports basic-blocks. however, it's more
+        #        likely that a user would find those in this namespace rather than that one.
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def normal(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a normal block with no special attributes.'''
+            return bb.type in {interface.fc_block_type_t.fcb_normal}
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def linear(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a block that will execute its next block linearly.'''
+            return bb.type in {interface.fc_block_type_t.fcb_normal} and sum(1 for succ in bb.succs()) == 1
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def cyclic(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a block that can branch to itself directly.'''
+            return bb.type in {interface.fc_block_type_t.fcb_normal} and any(succ.id == bb.id for succ in bb.succs())
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def condition(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a block that will execute its next block conditionally.'''
+            return bb.type in {interface.fc_block_type_t.fcb_normal} and sum(1 for succ in bb.succs()) > 1
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def indirect(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a block that will indirectly branch to another block.'''
+            return bb.type in {interface.fc_block_type_t.fcb_indjump}
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def leave(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a block that leaves its function.'''
+            return bb.type in {interface.fc_block_type_t.fcb_ret}
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def leavecc(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a block that conditionally leaves its function.'''
+            return bb.type in {interface.fc_block_type_t.fcb_cndret}
+        leavecondition = utils.alias(leavecc, 'block.type')
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def sentinel(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is a block that terminates execution of its function.'''
+            return bb.type in {interface.fc_block_type_t.fcb_noret}
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def externalsentinel(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is an external block that terminates execution and does not belong to its function.'''
+            return bb.type in {interface.fc_block_type_t.fcb_enoret}
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def external(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is an external block that continues execution and does not belong to its function.'''
+            return bb.type in {interface.fc_block_type_t.fcb_extern}
+
+        @utils.multicase(bb=idaapi.BasicBlock)
+        @classmethod
+        def error(cls, bb):
+            '''Return whether the ``idaapi.BasicBlock`` identified by `bb` is an error block that continues execution outside its function.'''
+            return bb.type in {interface.fc_block_type_t.fcb_error}
+
+    t = type # XXX: ns alias
+
     # FIXME: implement .decompile for an idaapi.BasicBlock type too
     @utils.multicase()
     @classmethod
