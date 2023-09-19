@@ -1125,15 +1125,17 @@ class blocks(object):
 
         # start out with the basic-block we were given, and use it for each decision.
         available = {interface.range.bounds(bb) : bb}
-        choices = [item for item in available]
+        choices = [interface.range.bounds(item) for item in [bb]]
 
-        # continue while we still have choices to choose from.
+        # continue while we still have choices to choose from. sort the choices so that the
+        # next block will always be the first one and the rest will start from the lowest.
         while len(choices):
             selected = (yield choices if len(choices) > 1 else choices[0])
             choice = Fchoose(selected, choices)
-            items, _ = predicate(available[choice]), visited.add(choice)
-            available = {interface.range.bounds(item) : item for item in items}
-            choices = [item for item in available]
+            iterable, _ = predicate(available[choice]), visited.add(choice)
+            items = [(interface.range.bounds(item), item) for item in iterable]
+            available = {bounds : item for bounds, item in items}
+            choices = [bounds for bounds, _ in items if choice.right == bounds.left] + [bounds for bounds, _ in sorted(items, key=operator.itemgetter(0)) if choice.right != bounds.left]
         return
 
     @utils.multicase()
