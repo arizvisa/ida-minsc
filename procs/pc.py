@@ -80,9 +80,14 @@ class Intel(internal.architecture.architecture_t):
         # kr registers
         [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), database.config.bits())) for _ in range(8) ]
 
-        # flags
+        # 64-bit flags
         setitem('rflags', self.new('rflags', 64))
         setitem('eflags', self.child(self.by_name('rflags'), 'eflags', 0, 32, idaname='efl'))
+
+        # NOTE: we don't include the 16-bit "flags" register, because hex-rays
+        #       actually lays these out directly under the "eflags" register.
+
+        # 16-bit flags
         setitem('cf', self.child(self.by_name('eflags'), 'cf',  0, 1))
         setitem('pf', self.child(self.by_name('eflags'), 'pf',  2, 1))
         setitem('af', self.child(self.by_name('eflags'), 'af',  4, 1))
@@ -92,6 +97,17 @@ class Intel(internal.architecture.architecture_t):
         setitem('if', self.child(self.by_name('eflags'), 'if',  9, 1))
         setitem('df', self.child(self.by_name('eflags'), 'df', 10, 1))
         setitem('of', self.child(self.by_name('eflags'), 'of', 11, 1))
+        setitem('iopl', self.child(self.by_name('eflags'), 'iopl', 12, 2))
+        setitem('nt', self.child(self.by_name('eflags'), 'nt', 14, 1))
+        setitem('md', self.child(self.by_name('eflags'), 'md', 15, 1))
+
+        # 32-bit flags
+        setitem('rf', self.child(self.by_name('eflags'), 'rf', 16, 1))
+        setitem('vm', self.child(self.by_name('eflags'), 'vm', 17, 1))
+        setitem('ac', self.child(self.by_name('eflags'), 'ac', 18, 1))
+        setitem('vif', self.child(self.by_name('eflags'), 'vif', 19, 1))
+        setitem('vip', self.child(self.by_name('eflags'), 'vip', 20, 1))
+        setitem('id', self.child(self.by_name('eflags'), 'id', 21, 1))
 
         # fpstat (fpsr)
         setitem('fpsw', self.new('fpsw', 16, idaname='fpstat'))
