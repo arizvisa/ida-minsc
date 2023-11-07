@@ -994,8 +994,9 @@ class prioritybase(object):
         else:
             self.__cache__[target][:] = []
 
-        # Now we can return whatever it was they removed.
+        # Now we can return whatever was removed, and clear it from the traceback.
         priority, result = item
+        self.__traceback.pop((target, result))
         return result
 
     def discard(self, target, callable):
@@ -1022,6 +1023,8 @@ class prioritybase(object):
         else:
             self.__cache__[target][:] = []
 
+        # Silently remove the callable out of the traceback.
+        self.__traceback.pop((target, callable), None)
         return True if found else False
 
     def remove(self, target, priority):
@@ -1054,8 +1057,9 @@ class prioritybase(object):
         else:
             self.__cache__[target][:] = []
 
-        # We have an item that we can now return.
+        # We have an item that we can now return once we clear its traceback.
         priority, result = item
+        self.__traceback.pop((target, result), None)
         return result
 
     def __apply__(self, target):
