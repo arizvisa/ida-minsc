@@ -8,7 +8,7 @@ to be used by the average user.
 """
 
 import six
-import sys, logging
+import builtins, sys, logging, heapq, traceback
 import functools, operator, itertools
 
 import database, function, ui
@@ -2216,19 +2216,139 @@ class Scheduler(object):
     are enabled by correlating them with the current database state.
     The database can either be initialized, loaded, ready, or not
     available. Once an instance is created, the caller may use the
-    object to attach hooks to one of these 3 states.
+    object to attach callables of their choosing, or hooks that are
+    to be enabled when transitioning to one of these states.
 
     After the hooks have been attached, the instance can be used to
     modulate the object to either of these states or to check the
     current state. When a new state is being transitioned to, the
-    object will disable all of the targets from the prior state
-    before enabling all of the targets for the new one.
+    object will disable all of the hooks from the prior state before
+    executing any of the attached callables and then enabling the
+    hooks for the target state.
     """
     state = SchedulerState
     def __init__(self):
         self.__state, states = self.state.unavailable, [getattr(self.state, name) for name in dir(self.state) if not name.startswith('__')]
         self.__hooks = {state: {empty for empty in []} for state in states}
         self.__used = {empty for empty in []}
+        self.__transitions, self.__tracebacks = {}, {}
+
+    def list(self):
+        '''List all of the available states that can be used by this class.'''
+        six.print_(u"List of database states for {:s}:".format(self.__class__.__name__))
+        available = [name for name in dir(self.state) if not name.startswith('__')]
+        for name in sorted(available):
+            six.print_(name)
+        return
+
+    def add(self, state, callable, priority=0):
+        '''Add the `callable` to the queue for execution at the given `priority` when the database transitions to the specified `state`.'''
+        [source, target] = state if hasattr(state, '__iter__') and not isinstance(state, internal.types.string) else [None, state]
+
+        # verify the parameters before we do anything hasty.
+        if not builtins.callable(callable):
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a non-callable ({!s}) for the requested target with the given priority ({!r}).".format('.'.join(['hook', 'scheduler']), state, callable, priority, callable, format(priority)))
+        elif not isinstance(priority, internal.types.integer):
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({:s}) for the requested transition with a non-integer priority ({!r}).".format('.'.join(['hook', 'scheduler']), state, callable, priority, internal.utils.pycompat.fullname(callable), format(priority)))
+        elif not all(any([item is None, isinstance(item, SchedulerState), isinstance(item, internal.types.string)]) for item in [source, target]):
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable to the for the requested transition due to the state{:s} being an unsupported type ({:s}).".format('.'.join(['hook', 'scheduler']), state, callable, priority, '' if isinstance(state, internal.types.string) else 's' if hasattr(state, '__iter__') and len(state) != 1 else '', state if isinstance(state, internal.types.string) else ', '.join(item.__class__.__name__ for item in [source, target]) if hasattr(state, '__iter__') else state.__class__.__name__))
+        elif any(item.startswith('__') or not hasattr(self.state, item) for item in [source, target] if isinstance(item, internal.types.string)):
+            cls, format, busted = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format, [item for item in [source, target] if isinstance(item, internal.types.string) and any([item.startswith('__'), not hasattr(self.state, item)])]
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable to the for the given unknown state{:s} ({:s}).".format('.'.join(['hook', 'scheduler']), state, callable, priority, '' if len(busted) == 1 else 's', ', '.join(busted)))
+
+        # now we need to normalize the states that we were given since they should be valid.
+        [source, target] = [(item if isinstance(item, (SchedulerState, internal.types.none)) else getattr(self.state, item)) for item in [source, target]]
+        transition_description = [(lambda state: 'any' if state is None else state.__name__)(item) for item in [source, target]]
+
+        # and then we can add an entry in our priority queue for the callable.
+        queue = self.__transitions.setdefault((source, target), [])
+        heapq.heappush(queue, internal.utils.priority_tuple(priority, callable))
+
+        # save a traceback for this callable in case its execution fails.
+        self.__tracebacks[source, target, callable] = traceback.extract_stack()[:-1]
+        return True
+
+    def discard(self, state, callable):
+        '''Discard the `callable` from the queue for the specified `state` transition.'''
+        [source, target] = state if hasattr(state, '__iter__') and not isinstance(state, internal.types.string) else [None, state]
+        [source, target] = [(item if isinstance(item, (SchedulerState, internal.types.none)) else getattr(self.state, item) if isinstance(item, internal.types.string) and hasattr(self.state, item) else item) for item in [source, target]]
+
+        # Search through the specified queue for whatever callable we were given.
+        counter, retained = 0, []
+        for index, (priority, F) in enumerate(self.__transitions[source, target]):
+            if F == callable:
+                counter += 1
+            else:
+                retained.append((priority, F))
+            continue
+
+        # If anything was collected, then replace our transitions with it (in-place).
+        if retained:
+            self.__transitions[source, target][:] = [internal.utils.priorty_tuple(priority, F) for priority, F in retained]
+
+        # Otherwise we can just remove the entire quere from the specified transition.
+        else:
+            self.__transitions.pop((source, target))
+
+        self.__tracebacks.pop((source, target, callable), None)
+        return True if counter else False
+
+    def __apply_transition(self, source, destination):
+        '''Execute all of the registered callables when transitioning from the `source` state to the `destination` state.'''
+
+        # Create a dictionary containing the parameter choices for any of the callables.
+        parameter_choice = {0: [], 1: [destination], 2: [source, destination]}
+
+        # Use our current state and our target state to execute the contents of each queue.
+        # We need to merge 3 queues for each state to support the None (any) transition.
+        for priority, callable in heapq.merge(*(self.__transitions.get(pair, []) for pair in [(source, destination), (None, destination), (source, None)])):
+            is_method = isinstance(callable, internal.types.method) and not isinstance(callable, staticmethod)
+            function = internal.utils.pycompat.method.function(callable) if is_method else callable
+
+            # Count out the number of parameters the callable wants
+            # so that we can figure out which parameters to use.
+            code = internal.utils.pycompat.function.code(function)
+            parameter_count = internal.utils.pycompat.code.argcount(code)
+            _, _, (wild, _) = internal.utils.pycompat.function.arguments(function)
+            real_count = 2 if wild else parameter_count - 1 if is_method else parameter_count
+
+            # Finally we can dispatch to the callable with the correct number of parameters.
+            logging.debug(u"{:s}.modulate({:s}) : Dispatching {:d} parameter{:s} to {:s} ({:s}) with priority {:+d}.".format('.'.join(['hook', 'scheduler']), destination.__name__, real_count, '' if real_count == 1 else 's', internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable)), priority))
+            try:
+                result = callable(*parameter_choice[real_count])
+                if result is not None:
+                    logging.debug(u"{:s}.modulate({:s}) : Discarding unused result {!r} returned from {:s} ({:s}) with priority {:+d}.".format('.'.join(['hook', 'scheduler']), destination.__name__, result, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable)), priority))
+
+            # If we caught an exception, then we need to complain about it. To
+            # accomplish this, we'll first need the current backtrace.
+            except:
+                backtrace = u''.join(traceback.format_exception(*sys.exc_info()))
+
+                # Then we'll need the callable's backtrace and a user-friendly description.
+                if (source, destination, callable) in self.__tracebacks:
+                    bt = traceback.format_list(self.__tracebacks[source, destination, callable])
+                    transition_description = [item for item in itertools.chain([source.__name__, destination.__name__])]
+                elif (None, destination, callable) in self.__tracebacks:
+                    bt = traceback.format_list(self.__tracebacks[None, destination, callable])
+                    transition_description = [item for item in itertools.chain(['any'], [destination.__name__])]
+                elif (source, None, callable) in self.__tracebacks:
+                    bt = traceback.format_list(self.__tracebacks[source, None, callable])
+                    transition_description = [item for item in itertools.chain([source.__name__], ['any'])]
+                else:
+                    bt = []
+                    transition_description = [item for item in itertools.chain([source.__name__, destination.__name__])]
+
+                # Now we just need to output the exception that happened.
+                format = functools.partial(u"{:s}.modulate({:s}) : {:s}".format, '.'.join(['hook', 'scheduler']), destination.__name__)
+                logging.fatal(format(u"Transition {:s} using {:s} with priority {:+d} raised an exception while executing.".format(' -> '.join(transition_description), internal.utils.pycompat.fullname(callable), priority)))
+                logging.warning(format(u"Traceback ({:s} was attached at):".format(' -> '.join(transition_description))))
+                [ logging.warning(format(item)) for item in u''.join(bt).split('\n') ]
+                [ logging.warning(format(item)) for item in backtrace.split('\n') ]
+            continue
+        return
 
     def __guard_closure(self, required_state, callable):
         '''Return a closure that only executes `callable` if the scheduler state matches `required_state`.'''
@@ -2338,7 +2458,8 @@ class Scheduler(object):
             raise internal.exceptions.InvalidParameterError(u"{:s}.modulate({!r}) : Unable to modulate to the suggested state due to it being of the wrong type ({!r}).".format('.'.join(['hook', 'scheduler']), state, state.__class__))
         current, self.__state = self.__state, state
         [ hook.disable(target) for hook, target in self.__hooks[current] if target in hook.enabled ]
-        [ hook.enable(target) for hook, target in itertools.chain(self.__hooks[None], self.__hooks[state]) if target in hook.disabled ]
+        self.__apply_transition(current, state)
+        [ hook.enable(target) for hook, target in itertools.chain(self.__hooks.get(None, []), self.__hooks[state]) if target in hook.disabled ]
         return current
 
     def reset(self):
