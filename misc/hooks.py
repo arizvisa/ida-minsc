@@ -2481,6 +2481,68 @@ class Scheduler(object):
         '''Return the current monitored state for the purpose of debugging.'''
         return self.__state
 
+    def __repr__(self):
+        count = sum(len(queue) for transition, queue in self.__transitions.items())
+        if not count:
+            return "Events currently being monitored by {:s}: {:s}".format('.'.join(['hook', 'scheduler']), 'No transitions are being monitored.')
+
+        # This logic is straight-up copied out of internal.interface.prioritybase. I should consolidate it
+        # into internal.utils, but it'd be for any kind of callable. That's an issue because there really
+        # isn't any other reusable functionality I can come up with, other then "describing" a callable.
+        def ripped_parameters(func):
+            args, defaults, (star, starstar) = internal.utils.pycompat.function.arguments(func)
+            for item in args:
+                yield "{:s}={!s}".format(item, defaults[item]) if item in defaults else item
+            if star:
+                yield "*{:s}".format(star)
+            if starstar:
+                yield "**{:s}".format(starstar)
+            return
+
+        def ripped_repr_callable(object, pycompat=internal.utils.pycompat, parameters=ripped_parameters):
+            if isinstance(object, (internal.types.method, internal.types.descriptor)):
+                cls = pycompat.method.type(object)
+                func = pycompat.method.function(object)
+                module, name = func.__module__, pycompat.function.name(func)
+                iterable = parameters(func)
+                None if isinstance(object, internal.types.staticmethod) else next(iterable)
+                return '.'.join([module, cls.__name__, name]), tuple(iterable)
+            elif isinstance(object, internal.types.function):
+                module, name = object.__module__, pycompat.function.name(object)
+                iterable = parameters(object)
+                return '.'.join([module, name]), tuple(iterable)
+            elif callable(object):
+                symbols, module, name = object.__dict__, object.__module__, object.__name__
+                cons = symbols.get('__init__', symbols.get('__new__', None))
+                iterable = parameters(cons) if cons else []
+                next(iterable)
+                return '.'.join([module, name]), tuple(iterable)
+            return "{!r}".format(object), None
+
+        # We have a couple of transitions to go and collect. Each state has a triplet associated
+        # with it in order to monitor wildcards. To collect, we just go through all of them.
+        names = [ name for name in dir(self.state) if not name.startswith('__') ]
+        states = [ getattr(self.state, name) for name in sorted(names) ]
+
+        # Our names should be sorted, so we just do them left-to-right, starting with "any".
+        items, Fdescribe_state = [], lambda state: 'any' if state is None else state.__name__
+        for source, destination in itertools.chain(itertools.permutations(states + [None], 2), [(state, state) for state in states], [(None, None)]):
+            transition_description = ' -> '.join(map(Fdescribe_state, [source, destination]))
+
+            # Collect the description of each callable that was added.
+            descriptions = []
+            for priority, F in self.__transitions.get((source, destination), []):
+                name, args = ripped_repr_callable(F)
+                descriptions.append("{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))))
+
+            # Stash it in our list of items that we'll format at the end.
+            descriptions and items.append((transition_description, descriptions))
+
+        # Now we can calculate the max length of the transition description, and return our results.
+        max_transition_length = max(len(transition) for transition, _ in items) if items else 0
+        res = "Transitions currently being monitored by {:s}:".format('.'.join(['hook', 'scheduler']))
+        return '\n'.join([res] + ["{:<{:d}s} {:s}".format("{:s}:".format(transition), max_transition_length + len(':'), ','.join(descriptions)) for transition, descriptions in items])
+
 class singleton_descriptor(object):
     '''
     This object is a descriptor that simply wraps a callable and manages its scope.
