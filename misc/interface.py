@@ -8,7 +8,7 @@ individuals to attempt to understand this craziness.
 """
 
 import six, builtins, os
-import sys, logging, contextlib, threading
+import sys, logging, contextlib, threading, weakref
 import functools, operator, itertools
 import collections, heapq, bisect, traceback, ctypes, math, codecs, array as _array
 
@@ -742,6 +742,12 @@ class prioritybase(object):
 
     def __init__(self):
         self.__cache, self.__traceback = {}, {}
+
+        # cache for the scope that is allocated for each target. we call this "scope",
+        # but really it's the three closures that capture the scope for each target.
+        self.__target_scopes = {}
+
+        # Set containing the targets that are currently disabled.
         self.__disabled = {item for item in []}
 
     def __iter__(self):
@@ -770,7 +776,7 @@ class prioritybase(object):
         # Otherwise we need to initialize the cache with a mutex and a list, then
         # we can return the callable that should be attached by the implementation.
         self.__cache[target] = threading.Lock(), []
-        start, resume, stop = self.__apply__(target)
+        start, resume, stop = self.__scope__(target)
         return True, resume
 
     def detach(self, target):
@@ -1150,7 +1156,50 @@ class prioritybase(object):
             yield ok, callable
         return
 
-    def __apply__(self, target):
+    def __unscope__(self, target):
+        '''Remove the currently allocated scope for the given `target` (if it is not referenced) and return it to the caller.'''
+        cls = self.__class__
+
+        # if the scope doesn't exist, there's nothing to do here.
+        if target not in self.__target_scopes:
+            return False
+
+        # grab each component that composes the scope for the selected target.
+        state, (start, resume, stop) = self.__target_scopes.pop(target)
+
+        # count the number of references for the state namespace.
+        state_count = sys.getrefcount(state)
+
+        # everything that inherits from `object` is also referenced by it.
+        state_count-= 1 if state in object.__subclasses__() else 0
+
+        # if it's a subclass, then it has a method-resolution order.
+        state_count-= 1 if state in getattr(state, '__mro__', []) else 0
+
+        # if it has a `__weakrefoffset__`, then it's also self-ref'd by `__weakref__`.
+        state_count-= 1 if getattr(state, '__weakrefoffset__', 0) > 0 else 0
+
+        # count the number of references for each closure. each closure resides
+        # within each others' scope, which means referenced by their 2 peers.
+        start_count = sys.getrefcount(start)
+        resume_count = sys.getrefcount(resume)
+        stop_count = sys.getrefcount(stop)
+
+        # tally up the total number of references that we're currently referencing.
+        inuse = [ id(item) for _, item in locals().items() ]
+        tracked = id(start), id(resume), id(stop)
+        start_count -= inuse.count(tracked[0])
+        resume_count -= inuse.count(tracked[1])
+        stop_count -= inuse.count(tracked[2])
+
+        # if any of them are greater than 1, then we really can't remove anything as
+        # it's still being used. we really should be using weakref.finalize for this.
+        if any(count > 1 for count in [state_count, start_count, resume_count, stop_count]):
+            self.__target_scopes[target] = state, (start, resume, stop)
+            return False
+        return True
+
+    def __scope__(self, target):
         """Return a tuple of three closures the given `target` that are used to control the execution of all the callables attached to the specified `target`.
 
         Each closure is intended to be attached to whatever is being hooked by each
@@ -1160,15 +1209,25 @@ class prioritybase(object):
         """
         cls = self.__class__
 
+        # If this target has had its scope already created, then return
+        # return the closures that use it instead of recreating them.
+        cached = self.__target_scopes.get(target)
+        if cached is not None:
+            state, closures = cached
+            return closures
+
+        ## Begin the scope for each of the closures returned by this method.
         class Signal(object):
             '''This class is just for creating signals for tracking the beginning and ending of a coroutine's execution.'''
+            __slots__ = []
 
         class State(object):
             '''This class is for maintaining any state shared by the closures defined within this function.'''
+            __slots__ = ['BEGIN', 'END', 'running_queue']
 
         State.BEGIN = Signal()
         State.END = Signal()
-        State.running = {}
+        State.running_queue = {}
 
         ## Utilities for dealing with parameters like comparisons and formatting them so that they're readable.
         def format_parameters(*args, **kwargs):
@@ -1310,7 +1369,7 @@ class prioritybase(object):
 
             # First grab our coroutine from our running state. This way we can proceed to empty it since
             # we "should" be starting it over. If it doesn't exist, then just use None to distinguish.
-            running_queue = State.running.setdefault(parameters_hash, [])
+            running_queue = State.running_queue.setdefault(parameters_hash, [])
             coro = running_queue[-1] if running_queue else None
 
             # This next line is a little tricky. What it's actually doing is checking if the coroutine
@@ -1367,7 +1426,7 @@ class prioritybase(object):
 
             # Use our parameters to grab the current runninq queue. If it's empty, then
             # we were called in error which requires us to complain and then bail.
-            running_queue = State.running.get(parameters_hash, [])
+            running_queue = State.running_queue.get(parameters_hash, [])
             if not running_queue:
                 logging.warning(u"{:s}.CLOSE({:s}) : Unable to close coroutine due to the run queue for {:s} being completely empty.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
                 return State.END
@@ -1408,7 +1467,7 @@ class prioritybase(object):
             parameters_hash = hash_parameters(*args, **kwargs)
 
             # If the coroutine is not actually attached to our state, then there's nothing to do.
-            running_queue = State.running.get(parameters_hash, [])
+            running_queue = State.running_queue.get(parameters_hash, [])
             if not running_queue:
                 return
 
@@ -1440,7 +1499,7 @@ class prioritybase(object):
                 running_queue.pop(-1)
 
             if not running_queue:
-                State.running.pop(parameters_hash)
+                State.running_queue.pop(parameters_hash)
             return
 
         # This closure is responsible for resuming execution of the currently running
@@ -1453,7 +1512,7 @@ class prioritybase(object):
 
             # First check to see if our running queue has something inside it. If it doesn't, then we
             # can hand off execution to closure_start which should initialize it and then call us back.
-            running_queue = State.running.get(parameters_hash, [])
+            running_queue = State.running_queue.get(parameters_hash, [])
             if not running_queue:
                 logging.debug(u"{:s}.RESUME({:s}) : No coroutines for {:s} currently exist within the run queue and will require us to create one.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
                 return closure_start(*args, **kwargs)
@@ -1606,10 +1665,12 @@ class prioritybase(object):
         def closure_none(*args, **kwargs):
             return
 
-        # That's it, and we just need to return the closures for starting, resuming, and stopping.
-        return closure_none, closure, closure_none
-        #return closure_start, closure_resume, closure_stop
-        #return closure_none, closure_backwards_compatible, closure_none
+        # That's it. We just need to cache the closures that capture our current scope and
+        # process the callables assigned to the specified target, and then we can return them.
+        self.__target_scopes[target] = state, result = State, (closure_none, closure, closure_none)
+        #self.__target_scopes[target] = state, result = State, (closure_none, closure_backwards_compatible, closure_none)
+        #self.__target_scopes[target] = state, result = State, (closure_start, closure_resume, closure_stop)
+        return result
 
 class priorityhook(prioritybase):
     """
@@ -2037,9 +2098,9 @@ class priorityhxevent(prioritybase):
         # Add the callable to our current events to call.
         return super(priorityhxevent, self).add(event, callable, priority)
 
-    def __apply__(self, event):
+    def __scope__(self, event):
         '''Return a tuple containing the closures that are used to control the execution of all the callables for the specified `event`.'''
-        start, resume, stop = super(priorityhxevent, self).__apply__(event)
+        start, resume, stop = super(priorityhxevent, self).__scope__(event)
 
         # We need to define these closures because Hex-Rays absolutely requires
         # you to return a 0 unless the event type explicitly specifies otherwise.
