@@ -1152,6 +1152,385 @@ class prioritybase(object):
 
     def __apply__(self, target):
         '''Return a closure that will execute all of the callables for the specified `target`.'''
+        cls = self.__class__
+
+        class Signal(object):
+            '''This class is just for creating signals for tracking the beginning and ending of a coroutine's execution.'''
+
+        class State(object):
+            '''This class is for maintaining any state shared by the closures defined within this function.'''
+
+        State.BEGIN = Signal()
+        State.END = Signal()
+        State.running = {}
+
+        ## Utilities for dealing with parameters like comparisons and formatting them so that they're readable.
+        def format_parameters(*args, **kwargs):
+            '''Return the provided parameters formatted as a string.'''
+            ordered = ', '.join(map("{!r}".format, args))
+            keywords = ["{:s}={!r}".format(key, kwargs[key]) for key in sorted(kwargs)]
+            return "{:s}, {:s}".format(ordered, ', '.join(keywords)) if kwargs else ordered
+
+        def same_parameters(parameters_old, parameters_new):
+            '''Compare the tuple of `parameters_old` with the tuple of `parameters_new`.'''
+            old_args, old_kwargs = parameters_old
+            new_args, new_kwargs = parameters_new
+            old_iterable = itertools.chain([item for item in old_args], [(key, old_kwargs[value]) for key in sorted(old_kwargs)])
+            new_iterable = itertools.chain([item for item in new_args], [(key, new_kwargs[value]) for key in sorted(new_kwargs)])
+            old, new = ([item for item in iterable] for iterable in [old_iterable, new_iterable])
+            return len(old) == len(new) and all(oldarg == newarg for oldarg, newarg in zip(old, new))
+
+        def hash_parameters(*args, **kwargs):
+            '''Return a unique-ish hash for the provided parameters as an integer.'''
+            Fhash_or_address = lambda object: id(object) if hasattr(object, '__swig_destroy__') else hash(object) if object.__hash__ else id(object)
+            hashable_args = [Fhash_or_address(arg) for arg in args]
+            sorted_kwargs = ((key, kwargs[key]) for key in sorted(kwargs))
+            hashable_kwargs = [(key, Fhash_or_address(value)) for key, value in sorted_kwargs]
+            hashable = map(tuple, [hashable_args, hashable_kwargs])
+            return hash(tuple(hashable))
+
+        ## Coroutine-specific utilities for determining their current execution state.
+        def is_coroutine_stopped(coro):
+            '''Return whether the coroutine specified by `coro` has completed execution.'''
+            return coro.gi_frame is None
+
+        def is_coroutine_running(coro):
+            '''Return whether the coroutine specified by `coro` is actively running.'''
+            return coro.gi_running
+
+        def is_coroutine_started_py2(coro):
+            '''Return whether the coroutine specified by `coro` has already been started.'''
+            if coro.gi_frame is None:
+                return False
+            return coro.gi_running or coro.gi_frame.f_lasti > -1
+
+        def is_coroutine_started_py3(coro):
+            '''Return whether the coroutine specified by `coro` has already been started.'''
+            if coro.gi_frame is None:
+                return False
+            return coro.gi_running or getattr(coro, 'gi_suspended', coro.gi_frame.f_lasti > 0)
+
+        is_coroutine_started = is_coroutine_started_py2 if sys.version_info.major < 3 else is_coroutine_started_py3
+
+        ## The actual coroutines that process the contents of a queue. There is one
+        ## for when a target is enabled, and another for when the target is disabled.
+
+        def coroutine_when_enabled(hookq):
+            '''This coroutine is responsible for actually processing the contents of the `hookq` that is given.'''
+            logging.debug(u"{:s} : Coroutine has been started for target {:s} with queue containing {:d} item{:s} to be executed.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target), len(hookq), '' if len(hookq) == 1 else 's'))
+            counter, old_args, old_kwargs, parameters = 0, [], {}, (yield State.BEGIN)
+            for index, (priority, callable) in enumerate(hookq):
+                args, kwargs = parameters
+                parameters_description = format_parameters(*args, **kwargs)
+
+                # unpack the parameters and compare them with whatever we received previously. this way we
+                # can issue a warning if the parameters have changed between the execution of each hook.
+                if index > 0 and not same_parameters((old_args, old_kwargs), parameters):
+                    logging.warning(u"{:s}.callable({:s}) : Callback parameters for target {:s} have changed from ({:s}) during execution of {:s} ({:s}) with priority {:+d}.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target), format_parameters(*old_args, **old_kwargs), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable)), priority))
+
+                # execute the callable with the parameters we were given.
+                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) with priority {:+d} to {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), parameters_description, parameters_description, priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
+                try:
+                    result = callable(*args, **kwargs)
+
+                # if we caught an exception, then inform the user about it and stop processing our queue
+                except:
+                    bt = traceback.format_list(self.__traceback[target, callable])
+                    current = str().join(traceback.format_exception(*sys.exc_info()))
+
+                    # log a backtrace and exit our loop since we caught an exception that interrupted
+                    # our execution here. technically, we've stopped walking through our priority queue.
+                    format = functools.partial(u"{:s}.callable({:s}) : {:s}".format, '.'.join([__name__, cls.__name__]), parameters_description)
+                    logging.fatal(format(u"Target {:s} for {:s} with priority {:+d} raised an exception while executing.".format(self.__formatter__(target), internal.utils.pycompat.fullname(callable), priority)))
+                    logging.warning(format(u"Traceback ({:s} was attached at):".format(self.__formatter__(target))))
+                    [ logging.warning(format(item)) for item in str().join(bt).split('\n') ]
+                    [ logging.warning(format(item)) for item in current.split('\n') ]
+                    break
+
+                # save the parameters we successfully processed, so that we can verify them next iteration.
+                counter, old_args, old_kwargs, parameters = counter + 1, args, kwargs, (yield result)
+
+            # now we need to spin in a loop indefinitely until we're explicitly closed.
+            try:
+                result = State.END
+                while True:
+                    parameters = (yield result)
+
+                    # verify that our parameters haven't changed so that we can warn the user about it.
+                    if not same_parameters((old_args, old_kwargs), parameters):
+                        logging.info(u"{:s}.callable({:s}) : Callback parameters for target {:s} have unexpectedly changed from ({:s}) after queue has completed execution.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target), format_parameters(*old_args, **old_kwargs)))
+                    continue
+
+            # at this point, we should be able to clean up everything if anything.
+            except GeneratorExit:
+                logging.debug(u"{:s} : Coroutine has completed execution of its queue ({:d} item{:s}) for target {:s} successfully.".format('.'.join([__name__, self.__class__.__name__]), len(hookq), '' if len(hookq) == 1 else 's', self.__formatter__(target)))
+            return
+
+        def coroutine_when_disabled(hookq):
+            '''This coroutine is only used to process callables when the target has been disabled.'''
+            original = (yield State.BEGIN)
+
+            # capture our parameters and log them for the sake of debugging.
+            args, kwargs = original
+            original_description = format_parameters(*args, **kwargs)
+            logging.debug(u"{:s}.DISABLED({:s}) : Coroutine has been started for disabled target {:s} with a queue containing {:d} item{:s}.".format('.'.join([__name__, self.__class__.__name__]), original_description, self.__formatter__(target), len(hookq), '' if len(hookq) == 1 else 's'))
+
+            # spin indefinitely, always returning the END state.
+            try:
+                result = State.END
+                while True:
+                    parameters = (yield result)
+
+                    # for sanity, we'll keep checking our parameters so we can warn the user if they changed.
+                    if not same_parameters(original, parameters):
+                        args, kwargs = parameters
+                        logging.info(u"{:s}.DISABLED({:s}) : Callback parameters for disabled target {:s} have unexpectedly changed to ({:s}).".format('.'.join([__name__, self.__class__.__name__]), original_description, self.__formatter__(target), format_parameters(*args, **kwargs)))
+                    continue
+
+            # nothing left to do here but leave.
+            except GeneratorExit:
+                logging.debug(u"{:s}.DISABLED({:s}) : Coroutine for disabled target {:s} was closed by the caller.".format('.'.join([__name__, self.__class__.__name__]), original_description, self.__formatter__(target)))
+            return
+
+        ## These are the closures that manage the scope of one of the prior 2 coroutines.
+
+        # This first one is responsible for creating and initializing the coroutine which
+        # is what actually gets everything started.
+        def closure_start(*args, **kwargs):
+            '''This closure is responsible for initializing execution of the coroutine and is the very-first callable that needs to be attached.'''
+            parameters = args, kwargs
+            parameters_description = format_parameters(*args, **kwargs)
+            parameters_hash = hash_parameters(*args, **kwargs)
+
+            # First grab our coroutine from our running state. This way we can proceed to empty it since
+            # we "should" be starting it over. If it doesn't exist, then just use None to distinguish.
+            running_queue = State.running.setdefault(parameters_hash, [])
+            coro = running_queue[-1] if running_queue else None
+
+            # This next line is a little tricky. What it's actually doing is checking if the coroutine
+            # has been started, but is not currently running which will only occur if we've recursed
+            # into our closure with the exact same target and parameters. If we haven't recursed, then
+            # we should be okay to close out the current closure, and create a new one to use.
+            result = closure_close(*args, **kwargs) if coro is not None and all([is_coroutine_started(coro), not is_coroutine_running(coro)]) else State.END
+
+            # Before instantiating the new coroutine, we'll need to grab the priority queue
+            # of callables that we'll need to execute and sort them by their priority.
+            if target in self.__cache__:
+                mutex, queue_ = self.__cache__[target]
+                with mutex: queue = queue_[:]
+                hookq = heapq.nsmallest(len(queue), queue, key=operator.attrgetter('priority'))
+
+            else:
+                hookq = []
+
+            # Then we can instantiate the coroutine using this hookq. After instantiating it, we
+            # append it to our current runninq queue in case we've recursed. This way, after our
+            # new coroutine completes, we can pop the next one off, and then complete that one too.
+            coro = coroutine_when_enabled(hookq) if target in self.__cache__ and target not in self.__disabled else coroutine_when_disabled(hookq)
+            running_queue.append(coro)
+
+            # Now we can start this coroutine and ensure it gives us the correct signal.
+            ok, result = True, next(coro)
+            if not isinstance(result, Signal):
+                logging.critical(u"{:s}.BEGIN({:s}) : Coroutine #{:d} for target {:s} returned a non-signal ({!r}) which will be used as an explicit result.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, len(running_queue), self.__formatter__(target), result))
+                ok = False
+
+            elif result != State.BEGIN:
+                logging.critical(u"{:s}.BEGIN({:s}) : Failure trying to initialize coroutine #{:d} for target {:s} due to it returning an unexpected signal ({!r}).".format('.'.join([__name__, self.__class__.__name__]), parameters_description, len(running_queue), self.__formatter__(target), result))
+                ok = False
+
+            # If starting that coroutine actually failed, then we shouldn't
+            # have added it to the running queue and we need to bail here.
+            if not ok:
+                logging.warning(u"{:s}.BEGIN({:s}) : Coroutine #{:d} for target {:s} was not created due to previous critical error.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, len(running_queue), self.__formatter__(target)))
+                coro = running_queue.pop()
+                return None if isinstance(result, Signal) else result
+
+            # Our coroutine has been successfully started, so we can just act as-if the
+            # coroutine is being resumed and hand-off execution to the correct closure.
+            logging.debug(u"{:s}.BEGIN({:s}) : Coroutine #{:d} for target {:s} was successfully started and will now resume execution.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, len(running_queue), self.__formatter__(target)))
+            return closure_resume(*args, **kwargs)
+
+        # This closure is responsible for cleaning up the coroutine before starting it.
+        # It is an internal closure, and is only intended to be used by closure_start.
+        def closure_close(*args, **kwargs):
+            '''This closure is responsible for forcefully closing an already started, but currently suspended coroutine.'''
+            parameters = args, kwargs
+            parameters_description = format_parameters(*args, **kwargs)
+            parameters_hash = hash_parameters(*args, **kwargs)
+
+            # Use our parameters to grab the current runninq queue. If it's empty, then
+            # we were called in error which requires us to complain and then bail.
+            running_queue = State.running.get(parameters_hash, [])
+            if not running_queue:
+                logging.warning(u"{:s}.CLOSE({:s}) : Unable to close coroutine due to the run queue for {:s} being completely empty.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
+                return State.END
+
+            # Grab whatever coroutine we're supposed to close from the run queue. If the latest coroutine has
+            # been started, then we're good to go. If the coroutine is currently running, though, then don't
+            # do shit. This is because we've actually been called in error, and the caller should've checked.
+            coro = running_queue[-1]
+            result = coro.send(parameters) if coro is not None and all([is_coroutine_started(coro), not is_coroutine_running(coro)]) else State.END
+
+            # If the result we got back from the already-existing coroutine is not
+            # State.END, then our last execution did not complete for some reason.
+            if result != State.END:
+                logging.debug(u"{:s}.CLOSE({:s}) : Coroutine #{:d} did not complete on the last run for target {:s} and will require its queue being emptied before start.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, len(running_queue), self.__formatter__(target)))
+
+                logging.info(u"{:s}.CLOSE({:s}) : Discarding first result ({!r}) from coroutine #{:d} for target {:s} due to reset.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, result, len(running_queue), self.__formatter__(target)))
+                while result != State.END:
+                    result = coro.send(parameters)
+                    logging.info(u"{:s}.CLOSE({:s}) : Discarding next result ({!r}) from coroutine #{:d} for target {:s} due to reset.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, result, len(running_queue), self.__formatter__(target)))
+
+                assert(result == State.END)
+
+            # If the coroutine is not running, then we can close this
+            # thing, remove it from our running queue, and move on.
+            if not is_coroutine_running(coro):
+                coro.close()
+
+            if is_coroutine_stopped(coro):
+                running_queue.pop(-1)
+            return result
+
+        # This closure is responsible for stopping the coroutine, and is intended to be
+        # the last thing that gets called when the coroutine returns its END state.
+        def closure_stop(*args, **kwargs):
+            '''This closure is responsible for finishing execution of the coroutine and should be called to complete execution of the coroutine.'''
+            parameters = args, kwargs
+            parameters_description = format_parameters(*args, **kwargs)
+            parameters_hash = hash_parameters(*args, **kwargs)
+
+            # If the coroutine is not actually attached to our state, then there's nothing to do.
+            running_queue = State.running.get(parameters_hash, [])
+            if not running_queue:
+                return
+
+            # First we'll grab the last coroutine from our current running queue. This is specifically
+            # to deal with recursion, where the callable for a handler results in another handler
+            # being dispatched. We'll give it our parameters in order to check if it's really done.
+            coro = running_queue[-1]
+            result = coro.send(parameters)
+
+            # If the result we got back from the coroutine is not State.END, then we're apparently not
+            # really done. Still, our job is to close it out and so we proceed to empty the coroutine.
+            if result != State.END:
+                logging.debug(u"{:s}.END({:s}) : Coroutine #{:d} did not complete execution of its priority queue for target {:s} and will require emptying {:d} item{:s}.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, len(running_queue), self.__formatter__(target), len(self.__cache__.get(target, [])), '' if self.__cache__.get(target, []) == 1 else 's'))
+
+                logging.info(u"{:s}.END({:s}) : Discarding first result ({!r}) from coroutine #{:d} for target {:s} due to requested stop.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, result, len(running_queue), self.__formatter__(target)))
+                while result != State.END:
+                    result = coro.send(parameters)
+                    logging.info(u"{:s}.END({:s}) : Discarding next result ({!r}) from coroutine #{:d} for target {:s} due to requested stop.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, result, len(running_queue), self.__formatter__(target)))
+
+                assert(result == State.END)
+
+            # We should now be safe to close it since we received the correct signal.
+            coro.close()
+
+            # If the coroutine has been properly stopped, then we can remove it from the
+            # running queue. If for some reason it didn't stop, which should NEVER happen,
+            # then let someone else remove it from our closures' shared state.
+            if is_coroutine_stopped(coro):
+                running_queue.pop(-1)
+
+            if not running_queue:
+                State.running.pop(parameters_hash)
+            return
+
+        # This closure is responsible for resuming execution of the currently running
+        # coroutine. It continues to execute callables until one of them returns something.
+        def closure_resume(*args, **kwargs):
+            '''This closure is responsible for resuming execution of the coroutine and should be attached in order to allow better hooking.'''
+            parameters = args, kwargs
+            parameters_description = format_parameters(*args, **kwargs)
+            parameters_hash = hash_parameters(*args, **kwargs)
+
+            # First check to see if our running queue has something inside it. If it doesn't, then we
+            # can hand off execution to closure_start which should initialize it and then call us back.
+            running_queue = State.running.get(parameters_hash, [])
+            if not running_queue:
+                logging.debug(u"{:s}.RESUME({:s}) : No coroutines for {:s} currently exist within the run queue and will require us to create one.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
+                return closure_start(*args, **kwargs)
+
+            # Then we can grab our very latest coroutine and confirm that it was actually started.
+            coro = running_queue[-1]
+            if not is_coroutine_started(coro):
+                logging.critical(u"{:s}.RESUME({:s}) : Unable to resume execution of coroutine #{:d} for target {:s} due to a failure trying to start it.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, len(running_queue), self.__formatter__(target)))
+                return
+
+            # Before we do anything, though, we need to verify that the target has not
+            # been explicitly disabled. If it has been, then we can just return nothing.
+            if target not in self.__cache__ or target in self.__disabled:
+                return
+
+            # Now, we're safe to continuously feed it things until it actually gives up a result.
+            logging.info(u"{:s}.RESUME({:s}) : Sending parameters ({:s}) to coroutine #{:d} for target {:s}.".format('.'.join([__name__, cls.__name__]), parameters_description, parameters_description, len(running_queue), self.__formatter__(target)))
+            result = coro.send(parameters)
+            while isinstance(result, internal.types.none):
+                logging.info(u"{:s}.RESUME({:s}) : Sending parameters ({:s}) to coroutine #{:d} for target {:s}.".format('.'.join([__name__, cls.__name__]), parameters_description, parameters_description, len(running_queue), self.__formatter__(target)))
+                result = coro.send(parameters)
+
+            # If our result is an instance of a Signal type, then we're done executing.
+            if isinstance(result, Signal):
+                logging.info(u"{:s}.RESUME({:s}) : Coroutine #{:d} for target {:s} completed successfully without a result to return to the caller.".format('.'.join([__name__, cls.__name__]), parameters_description, len(running_queue), self.__formatter__(target)))
+                return
+
+            # Otherwise this is an actual result that we captured from an
+            # executed callable, and we need to return it to the caller.
+            logging.info(u"{:s}.RESUME({:s}) : Captured a result ({!s}) for target {:s} from coroutine #{:d} to return to the caller.".format('.'.join([__name__, cls.__name__]), parameters_description, result, self.__formatter__(target), len(running_queue)))
+            return result
+
+        ## This closure is just a wrapper around the prior coroutine-driven methods for executing callables out of
+        ## the priority queue. It is purely intended to be backwards compatibile with the original implementation.
+        def closure_backwards_compatible(*parameters):
+            '''This closure is a backwards compatible implementation of the original ``prioritybase.__apply__`` closure using the coroutine-based logic.'''
+            parameters_description = format_parameters(*parameters)
+            logging.debug(u"{:s}.closure({:s}) : Received parameters ({:s}) to be used with the backwards-compatible closure for {:s}.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, parameters_description, self.__formatter__(target)))
+
+            # First we'll initialize everything and use it to capture the first result.
+            result = closure_start(*parameters)
+
+            # If initially we're being asked to stop, then just go ahead and do as we're told.
+            if result == self.STOP:
+                return result
+
+            # If we received an unexpected type, then throw up an exception.
+            elif isinstance(result, self.result):
+                cls = self.__class__
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure({:s}) : Unable to determine the type of result ({!r}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result))
+
+            # Now we can resume execution until we're told not to.
+            captured, running = result, True
+            while running:
+                result = closure_resume(*parameters)
+                running = False if result is None else True
+
+                # Check if it's one of our valid return types. If we're being
+                # asked to continue, then move onto the next one.
+                if result == self.CONTINUE:
+                    continue
+
+                # If we're being asked to stop, then break the loop and terminate.
+                elif result == self.STOP:
+                    break
+
+                # If we received an unexpected type, then throw up an exception.
+                elif isinstance(result, self.result):
+                    cls = self.__class__
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure({:s}) : Unable to determine the type of result ({!r}).".format('.'.join([__name__, cls.__name__]), parameters_description, result))
+
+                # Otherwise we need to save what we got. If it was different, then
+                # warn the user that someone is trying to interfere with results.
+                elif result != captured:
+                    cls = self.__class__
+                    logging.warning(u"{:s}.closure({:s}) : Captured a result ({!s}) for target {:s} that is different than the previous result ({!s}).".format('.'.join([__name__, cls.__name__]), parameters_description, result, captured))
+
+                # Assign the captured return code now that we know what it is.
+                captured = captured if result is None else result
+
+            # Stop executing the coroutine and return whatever we captured.
+            closure_stop(*parameters)
+            return captured
 
         ## Define the closure that we'll hand off to attach
         def closure(*parameters):
