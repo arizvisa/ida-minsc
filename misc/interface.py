@@ -8,7 +8,7 @@ individuals to attempt to understand this craziness.
 """
 
 import six, builtins, os
-import sys, logging, contextlib
+import sys, logging, contextlib, threading
 import functools, operator, itertools
 import collections, heapq, bisect, traceback, ctypes, math, codecs, array as _array
 
@@ -741,7 +741,7 @@ class prioritybase(object):
     STOP = type('stop', (result,), {})()
 
     def __init__(self):
-        self.__cache__ = collections.defaultdict(list)
+        self.__cache__ = {}
         self.__disabled = {item for item in []}
         self.__traceback = {}
 
@@ -768,21 +768,38 @@ class prioritybase(object):
             logging.warning(u"{:s}.attach({!r}) : Unable to attach to target ({:s}) due to it already being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
             return False, internal.utils.fidentity
 
-        # Otherwise we need to ping the cache so that it creates a list, and then
+        # Otherwise we need to initialize the cache with a mutex and a list, then
         # we can return the callable that should be attached by the implementation.
-        self.__cache__[target]
+        self.__cache__[target] = threading.Lock(), []
         return True, self.__apply__(target)
 
     def detach(self, target):
         '''Intended to be called as a supermethod for the specified `target` that removes the target from the cache.'''
-        if target in self.__cache__:
-            if len(self.__cache__[target]):
-                logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to callable items still existing in its cache.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
-                return False
-            self.__cache__.pop(target, None)
-            return True
-        logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to it not being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
-        raise False
+        if target not in self.__cache__:
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to it not being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+            return False
+
+        # grab the mutex and check if there's any callables left. if there are, then we're
+        # unable to detach the target. otherwise, we can remove it since it's empty anyways.
+        mutex, queue_ = self.__cache__[target]
+        with mutex:
+            queue, count = queue_, len(queue_)
+            popped = None if queue else self.__cache__.pop(target)
+            ok = False if popped is None else True
+
+            # if we were able to detach callables from the cache, then
+            # we can proceed to remove their tracebacks too.
+            discarded = []
+            while ok and queue:
+                priority, callable = queue.pop()
+                res = self.__traceback.pop((target, callable), None)
+                discarded.append((target, priority, callable, res))
+
+            assert(len(discarded) == count if ok else len(queue) == count)
+
+        if not ok:
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to {:d} callable{:s} still existing in its cache.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), count, '' if count == 1 else 's'))
+        return ok
 
     def close(self):
         '''Disconnect from all of the targets that are currently attached'''
@@ -891,15 +908,15 @@ class prioritybase(object):
 
         # First gather all our enabled hooks.
         for target in sorted(enabled):
-            items = self.__cache__[target]
-            hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
+            _, queue_ = self.__cache__[target]
+            hooks = sorted([(priority, callable) for priority, callable in queue_], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
             res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items) if items else '...nothing attached...'))
 
         # Now we can append all the disabled ones.
         for target in sorted(self.__disabled):
-            items = self.__cache__[target]
-            hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
+            _, queue_ = self.__cache__[target]
+            hooks = sorted([(priority, callable) for priority, callable in queue_], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
             res.append("{:<{:d}s} : {!s}".format("{:s} (disabled)".format(self.__formatter__(target)), alignment_disabled, ' '.join(items) if items else '...nothing attached...'))
 
@@ -920,7 +937,8 @@ class prioritybase(object):
         self.__disabled.discard(target)
 
         # But if there were no entries in the cache, then warn the user about it.
-        if not len(self.__cache__[target]):
+        _, queue_ = self.__cache__[target]
+        if not queue_:
             logging.warning(u"{:s}.enable({!r}) : The requested target ({:s}) does not have any callables to enable.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target)))
             return True
         return True
@@ -951,15 +969,35 @@ class prioritybase(object):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise NameError(u"{:s}.add({!r}, {!s}, priority={:s}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, callable, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no currently attached targets to add to.'))
 
-        # discard any callables already attached to the specified target
-        self.discard(target, callable)
+        # grab the mutex for the target queue that we're going to add something to.
+        mutex, queue_ = self.__cache__[target]
+        with mutex:
+            queue = queue_
 
-        # add the callable to our priority queue
-        queue = self.__cache__[target]
-        heapq.heappush(queue, internal.utils.priority_tuple(priority, callable))
+            # remove any already existing instances of the callable and priority to be added.
+            indices = {index for index, (order, item) in enumerate(queue) if order == priority and item == callable}
+            if indices:
+                cls, items = self.__class__, [item for item in map("{:d}".format, sorted(indices))]
+                iterable = itertools.chain(items[:-1], ["and {:s}".format(*items[-1:])]) if len(items) > 2 else [' and '.join(items)] if len(items) == 2 else items
+                logging.warning(u"{:s}.add({!r}, {!s}, priority={:+d}) : Removing duplicate instance{:s} of callable ({!s}) with priority {:+d} from target ({:s}) at ind{:s} {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, '' if len(indices) ==1 else 's', callable, priority, self.__formatter__(target), 'ex' if len(indices) == 1 else 'ices', ', '.join(iterable)))
+                queue[:] = [priority_tuple for index, priority_tuple in enumerate(queue) if index not in indices]
 
-        # preserve a backtrace so we can track where our callable is at
-        self.__traceback[(target, callable)] = traceback.extract_stack()[:-1]
+            # collect any other priorities in the queue that the same callable might
+            # be being used for, so that we inform the user if it wasn't intentnional.
+            duplicate_priorities = {order for order, item in queue if item == callable}
+
+            # add the callable to our priority queue
+            heapq.heappush(queue, internal.utils.priority_tuple(priority, callable))
+
+            # preserve a backtrace so we can track where our callable is at
+            self.__traceback[(target, callable)] = traceback.extract_stack()[:-1]
+
+        # if there were any duplicated instances of the callable, then log it
+        # with a warning just in case it might've actually been intentional.
+        if duplicate_priorities:
+            cls, items = self.__class__, [item for item in map("{:+d}".format, sorted(duplicate_priorities))]
+            iterable = itertools.chain(items[:-1], ["and {:s}".format(*items[-1:])]) if len(items) > 2 else [' and '.join(items)] if len(items) == 2 else items
+            logging.warning(u"{:s}.add({!r}, {!s}, priority={:+d}) : The newly added callable ({!s}) for the given target ({:s}) is also attached at priorit{:s} {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, self.__formatter__(target), 'y' if len(duplicate_priorities) == 1 else 'ies', ', '.join(iterable)))
         return True
 
     def get(self, target):
@@ -969,34 +1007,42 @@ class prioritybase(object):
             raise NameError(u"{:s}.get({!r}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no currently attached targets to get from.'))
 
         # Return the callables attached to the specified target.
-        res = self.__cache__[target]
-        return tuple(callable for _, callable in res)
+        mutex, queue_ = self.__cache__[target]
+        with mutex:
+            result = tuple(callable for _, callable in queue_)
+        return result
 
-    def pop(self, target, index):
+    def pop(self, target, index=-1):
         '''Pop the item at the specified `index` from the given `target`.'''
         if target not in self.__cache__:
             cls, format = self.__class__, "{:d}".format if isinstance(index, internal.types.integer) else "{!r}".format
             raise NameError(u"{:s}.pop({!r}, {:d}) : The requested target ({:s}) is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, format(index), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no targets currently attached to pop from.'))
         state = []
 
-        # Iterate through the cache for the specified target and collect
-        # each callable so we can figure out which one to remove.
-        for (priority, F) in self.__cache__[target][:]:
-            state.append((priority, F))
+        # Snapshot our current queue for the specified target.
+        mutex, queue_ = self.__cache__[target]
+        with mutex:
+            queue = queue_
 
-        # Pop off the result the user requested, and then combine our
-        # state back into the cache we took it from.
-        item = state.pop(index)
-        if state:
-            self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
+            # Iterate through the cache for the specified target and collect
+            # each callable so we can figure out which one to remove.
+            for (priority, F) in queue:
+                state.append((priority, F))
 
-        # Otherwise our target will need to be emptied.
-        else:
-            self.__cache__[target][:] = []
+            # Pop off the result the user requested, and then combine our
+            # state back into the cache we took it from.
+            item = state.pop(index)
+            if state:
+                queue[:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # Now we can return whatever was removed, and clear it from the traceback.
-        priority, result = item
-        self.__traceback.pop((target, result))
+            # Otherwise our target will need to be emptied.
+            else:
+                queue[:] = []
+
+            # Now we can return whatever was removed, and clear it from the traceback.
+            priority, result = item
+            self.__traceback.pop((target, result))
+
         return result
 
     def discard(self, target, callable):
@@ -1005,26 +1051,32 @@ class prioritybase(object):
             return False
         state = []
 
-        # Filter through our cache for the specified target, and collect
-        # each callable except for the one the user provided.
-        found = 0
-        for index, (priority, F) in enumerate(self.__cache__[target][:]):
-            if F == callable:
-                found += 1
-                continue
-            state.append((priority, F))
+        # Snapshot our current queue for the specified target.
+        mutex, queue_ = self.__cache__[target]
+        with mutex:
+            queue = queue_
 
-        # If we aggregated some items, then replace our cache with everything
-        # except for the item the user discarded.
-        if state:
-            self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
+            # Filter through our cache for the specified target, and collect
+            # each callable except for the one the user provided.
+            found = 0
+            for index, (priority, F) in enumerate(queue):
+                if F == callable:
+                    found += 1
+                    continue
+                state.append((priority, F))
 
-        # Otherwise we found nothing and we should just empty the target.
-        else:
-            self.__cache__[target][:] = []
+            # If we aggregated some items, then replace our cache with everything
+            # except for the item the user discarded.
+            if state:
+                queue[:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # Silently remove the callable out of the traceback.
-        self.__traceback.pop((target, callable), None)
+            # Otherwise we found nothing and we should just empty the target.
+            else:
+                queue[:] = []
+
+            # Silently remove the callable out of the traceback.
+            self.__traceback.pop((target, callable), None)
+
         return True if found else False
 
     def remove(self, target, priority):
@@ -1034,33 +1086,69 @@ class prioritybase(object):
             raise NameError(u"{:s}.remove({!r}, {:s}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache__))) if self.__cache__ else 'There are no targets currently attached to remove from.'))
         state, table = [], {}
 
-        # Iterate through our cache for the specified target and save
-        # both the state and the index of every single priority.
-        for index, (prio, F) in enumerate(self.__cache__[target][:]):
-            state.append((prio, F))
-            table.setdefault(prio, []).append(index)
+        # First we'll need to snapshot the queue for our current target.
+        mutex, queue_ = self.__cache__[target]
+        with mutex:
+            queue = queue_
 
-        # Before we do anything, we need to ping the priority we're searching for
-        # in the table and then we grab the first index for the given priority.
-        if priority not in table:
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise internal.exceptions.ItemNotFoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the specific priority ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(priority), format(priority)))
-        index = table[priority].pop(0)
+            # Iterate through our cache for the specified target and save
+            # both the state and the index of every single priority.
+            for index, (prio, F) in enumerate(queue):
+                state.append((prio, F))
+                table.setdefault(prio, []).append(index)
 
-        # We now can pop the index directly out of the state. Afterwards, we
-        # need to shove our state back into the cache for the target.
-        item = state.pop(index)
-        if state:
-            self.__cache__[target][:] = [internal.utils.priority_tuple(*item) for item in state]
+            # Before we do anything, we need to ping the priority we're searching for
+            # in the table and then we grab the first index for the given priority.
+            if priority not in table:
+                cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+                raise internal.exceptions.ItemNotFoundError(u"{:s}.remove({!r}, {:s}) : Unable to locate a callable with the specific priority ({:s}).".format('.'.join([__name__, cls.__name__]), target, format(priority), format(priority)))
+            index = table[priority].pop(0)
 
-        # If our state is empty, then we go ahead and empty the target.
-        else:
-            self.__cache__[target][:] = []
+            # We now can pop the index directly out of the state. Afterwards, we
+            # need to shove our state back into the cache for the target.
+            item = state.pop(index)
+            if state:
+                queue[:] = [internal.utils.priority_tuple(*item) for item in state]
 
-        # We have an item that we can now return once we clear its traceback.
-        priority, result = item
-        self.__traceback.pop((target, result), None)
+            # If our state is empty, then we go ahead and empty the target.
+            else:
+                queue[:] = []
+
+            # We have an item that we can now return once we clear its traceback.
+            priority, result = item
+            self.__traceback.pop((target, result), None)
+
         return result
+
+    def empty(self, target):
+        '''Iterate through the queue for the specified `target` safely discarding each callable before yielding it.'''
+        if target not in self.__cache:
+            cls = self.__class__
+            raise NameError(u"{:s}.empty({!r}) : The requested target ({:s}) is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to empty.'))
+
+        # Grab the queue we're supposed to empty for the specified target.
+        mutex, queue_ = self.__cache__[target]
+        with mutex:
+            queue = queue_
+
+            # Start at the head, remove each element from the queue, and
+            # capture the callable we removed. This way we can yield it.
+            items = []
+            while queue:
+                priority, callable = queue.pop(0)
+                backtrace = self.__traceback.pop((target, callable), None)
+                items.append((callable, backtrace))
+
+            # XXX: At the current moment, we always succeed (hence our item always being set as
+            #      True). In the future, though, there could be situations where we're unable to
+            #      remove the callable due to it being still attached to some resource that the
+            #      disassembler refused to release it from.
+            result = [(True, callable) for callable, backtrace in items]
+
+        # And we can yield them to the caller in the order they were removed.
+        for ok, callable in result:
+            yield ok, callable
+        return
 
     def __apply__(self, target):
         '''Return a closure that will execute all of the callables for the specified `target`.'''
@@ -1070,9 +1158,13 @@ class prioritybase(object):
             if target not in self.__cache__ or target in self.__disabled:
                 return
 
+            # First we need to snapshot the callables that we're going to execute.
+            mutex, queue_ = self.__cache__[target]
+            with mutex: hookq = queue_[:]
+
             # Iterate through our priorityqueue extracting each callable and
-            # executing it with the parameters we received
-            hookq, captured = self.__cache__[target][:], None
+            # executing it with whatever we were given as the parameters.
+            captured = None
             for priority, callable in heapq.nsmallest(len(hookq), hookq, key=operator.attrgetter('priority')):
                 logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) with priority {:+d} to {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
 
@@ -1333,8 +1425,7 @@ class priorityhook(prioritybase):
 
         # When detaching, we need to empty the cache for the provided target
         # before we actually unhook things.
-        for callable in self.get(name):
-            ok = self.discard(name, callable)
+        for ok, callable in self.empty(name):
             Flogging = logging.info if ok else logging.warning
             Flogging(u"{:s}.detach({!r}) : {:s} the callable ({!s}) attached to the requested target ({:s}).".format('.'.join([__name__, cls.__name__]), name, 'Discarded' if ok else 'Unable to discard', callable, self.__formatter__(name)))
 
@@ -1408,12 +1499,11 @@ class prioritynotification(prioritybase):
         # Iterate through all of our callables, and empty the cache since we're
         # actually shutting everything down here.
         cls = self.__class__
-        for callable in self.get(notification):
-            ok = self.discard(notification, callable)
+        for ok, callable in self.empty(notification):
             Flogging = logging.info if ok else logging.warning
             Flogging(u"{:s}.detach({:#x}) : {:s} the callable ({:s}) attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(notification)))
 
-        # Define a dummy closure to pass to the api to avoid a dereference.
+        # Define a dummy closure to pass to the api to avoid a bad dereference.
         def closure(*parameters):
             return True
 
@@ -1521,8 +1611,7 @@ class priorityhxevent(prioritybase):
 
         # When detaching, we need to empty the cache for the provided target
         # before we can remove the hexrays callback.
-        for callable in self.get(event):
-            ok = self.discard(event, callable)
+        for ok, callable in self.empty(event):
             Flogging = logging.info if ok else logging.warning
             Flogging(u"{:s}.detach({!r}) : {:s} the callable ({:s}) attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(event)))
 
