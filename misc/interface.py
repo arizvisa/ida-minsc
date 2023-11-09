@@ -1165,39 +1165,19 @@ class prioritybase(object):
             return False
 
         # grab each component that composes the scope for the selected target.
-        state, (start, resume, stop) = self.__target_scopes.pop(target)
+        state = self.__target_scopes.pop(target)
 
-        # count the number of references for the state namespace.
-        state_count = sys.getrefcount(state)
+        # if all our references are none, then we can can let the
+        # state go out of scope due to the closures still being used.
+        if all(ref() is None for ref in state.references):
+            return True
 
-        # everything that inherits from `object` is also referenced by it.
-        state_count-= 1 if state in object.__subclasses__() else 0
-
-        # if it's a subclass, then it has a method-resolution order.
-        state_count-= 1 if state in getattr(state, '__mro__', []) else 0
-
-        # if it has a `__weakrefoffset__`, then it's also self-ref'd by `__weakref__`.
-        state_count-= 1 if getattr(state, '__weakrefoffset__', 0) > 0 else 0
-
-        # count the number of references for each closure. each closure resides
-        # within each others' scope, which means referenced by their 2 peers.
-        start_count = sys.getrefcount(start)
-        resume_count = sys.getrefcount(resume)
-        stop_count = sys.getrefcount(stop)
-
-        # tally up the total number of references that we're currently referencing.
-        inuse = [ id(item) for _, item in locals().items() ]
-        tracked = id(start), id(resume), id(stop)
-        start_count -= inuse.count(tracked[0])
-        resume_count -= inuse.count(tracked[1])
-        stop_count -= inuse.count(tracked[2])
-
-        # if any of them are greater than 1, then we really can't remove anything as
-        # it's still being used. we really should be using weakref.finalize for this.
-        if any(count > 1 for count in [state_count, start_count, resume_count, stop_count]):
-            self.__target_scopes[target] = state, (start, resume, stop)
-            return False
-        return True
+        # otherwise there's still a closure attached, and we need to reassign the scope back
+        # into our cache. we subtract 1 from the reference count for the list comprehension.
+        self.__target_scopes[target] = state
+        counts = [0 if ref() is None else sys.getrefcount(ref()) - 1 for ref in state.references]
+        logging.warning(u"{:s}.__unscope__({!r}) : Refusing to remove the scope associated with target {:s} due to it still being referenced by {:d} object{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), sum(counts), '' if sum(counts) == 1 else 's', ', '.join(map("{:d}".format, counts))))
+        return False
 
     def __scope__(self, target):
         """Return a tuple of three closures the given `target` that are used to control the execution of all the callables attached to the specified `target`.
@@ -1213,8 +1193,8 @@ class prioritybase(object):
         # return the closures that use it instead of recreating them.
         cached = self.__target_scopes.get(target)
         if cached is not None:
-            state, closures = cached
-            return closures
+            iterable = (ref() for ref in cached.references)
+            return tuple(iterable)
 
         ## Begin the scope for each of the closures returned by this method.
         class Signal(object):
@@ -1223,11 +1203,12 @@ class prioritybase(object):
 
         class State(object):
             '''This class is for maintaining any state shared by the closures defined within this function.'''
-            __slots__ = ['BEGIN', 'END', 'running_queue']
+            __slots__ = ['BEGIN', 'END', 'running_queue', 'references']
 
         State.BEGIN = Signal()
         State.END = Signal()
         State.running_queue = {}
+        State.references = []
 
         ## Utilities for dealing with parameters like comparisons and formatting them so that they're readable.
         def format_parameters(*args, **kwargs):
@@ -1667,10 +1648,12 @@ class prioritybase(object):
 
         # That's it. We just need to cache the closures that capture our current scope and
         # process the callables assigned to the specified target, and then we can return them.
-        self.__target_scopes[target] = state, result = State, (closure_none, closure, closure_none)
-        #self.__target_scopes[target] = state, result = State, (closure_none, closure_backwards_compatible, closure_none)
-        #self.__target_scopes[target] = state, result = State, (closure_start, closure_resume, closure_stop)
-        return result
+        self.__target_scopes[target] = State
+        #result = closure_start, closure_resume, closure_stop
+        #result = closure_none, closure_backwards_compatible, closure_none
+        result = closure_none, closure, closure_none
+        State.references = [weakref.ref(item) for item in result]
+        return tuple(ref() for ref in State.references)
 
 class priorityhook(prioritybase):
     """
