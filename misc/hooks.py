@@ -778,9 +778,9 @@ def on_close():
     # Database was closed, so we need to reset our state.
     ok, state = any([scheduler.is_initialized(), hook.scheduler.is_loaded(), scheduler.is_ready()]), scheduler.reset()
     if not ok:
-        logging.debug(u"{:s}.on_close() : Received unexpected state transition from state {!s} to {!s}.".format(__name__, state, scheduler.state.unavailable))
+        logging.debug(u"{:s}.on_close() : Received unexpected state transition from state {!s} to {!s}.".format(__name__, state, scheduler.database.unavailable))
     else:
-        logging.debug(u"{:s}.on_close() : Transition from {!s} to {!s} due to database being closed.".format(__name__, state, scheduler.state.unavailable))
+        logging.debug(u"{:s}.on_close() : Transition from {!s} to {!s} due to database being closed.".format(__name__, state, scheduler.database.unavailable))
     return
 
 def on_init(idp_modname):
@@ -789,11 +789,11 @@ def on_init(idp_modname):
     scheduler = hook.scheduler
 
     # Database has just been opened, setup the initial state.
-    state = scheduler.modulate(scheduler.state.init)
-    if state is not scheduler.state.unavailable:
-        logging.debug(u"{:s}.on_init({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(idp_modname), state, scheduler.state.init))
+    state = scheduler.modulate(scheduler.database.initialized)
+    if state is not scheduler.database.unavailable:
+        logging.debug(u"{:s}.on_init({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(idp_modname), state, scheduler.database.initialized))
     else:
-        logging.debug(u"{:s}.on_init({!s}) : Transitioned from {!s} to {!s} during initialization of database.".format(__name__, utils.string.repr(idp_modname), state, scheduler.state.init))
+        logging.debug(u"{:s}.on_init({!s}) : Transitioned from {!s} to {!s} during initialization of database.".format(__name__, utils.string.repr(idp_modname), state, scheduler.database.initialized))
     return
 
 def nw_on_init(nw_code, is_old_database):
@@ -807,10 +807,10 @@ def on_newfile(fname):
 
     # Database has been created, switch the state to loaded.
     if scheduler.is_initialized():
-        state = scheduler.modulate(scheduler.state.loaded)
-        logging.debug(u"{:s}.on_newfile({!s}) : Transitioned from {!s} to {!s}.".format(__name__, utils.string.repr(fname), state, scheduler.state.loaded))
+        state = scheduler.modulate(scheduler.database.loaded)
+        logging.debug(u"{:s}.on_newfile({!s}) : Transitioned from {!s} to {!s}.".format(__name__, utils.string.repr(fname), state, scheduler.database.loaded))
     else:
-        logging.debug(u"{:s}.on_newfile({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(fname), scheduler.get(), scheduler.state.loaded))
+        logging.debug(u"{:s}.on_newfile({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(fname), scheduler.get(), scheduler.database.loaded))
 
     # FIXME: save current state like base addresses and such
     __execute_rcfile()
@@ -828,11 +828,11 @@ def on_oldfile(fname):
 
     # Database has been loaded, switch the state to ready.
     if scheduler.is_initialized():
-        state = scheduler.modulate(scheduler.state.ready)
-        logging.debug(u"{:s}.on_oldfile({!s}) : Transitioned from state {!s} to {!s} while opening up old database.".format(__name__, utils.string.repr(fname), state, scheduler.state.ready))
+        state = scheduler.modulate(scheduler.database.ready)
+        logging.debug(u"{:s}.on_oldfile({!s}) : Transitioned from state {!s} to {!s} while opening up old database.".format(__name__, utils.string.repr(fname), state, scheduler.database.ready))
         __check_functions()
     else:
-        logging.debug(u"{:s}.on_oldfile({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(fname), scheduler.get(), scheduler.state.ready))
+        logging.debug(u"{:s}.on_oldfile({!s}) : Received unexpected state transition from {!s} to {!s}.".format(__name__, utils.string.repr(fname), scheduler.get(), scheduler.database.ready))
 
     # FIXME: save current state like base addresses and such
     __execute_rcfile()
@@ -854,16 +854,16 @@ def on_ready():
 
     # Queues have just been emptied, so now we can enable the relevant hooks.
     if scheduler.is_loaded():
-        state = scheduler.modulate(scheduler.state.ready)
-        logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty.".format(__name__, state, scheduler.state.ready))
+        state = scheduler.modulate(scheduler.database.ready)
+        logging.debug(u"{:s}.on_ready() : Transitioned from {!s} to {!s} due to the auto queue being empty.".format(__name__, state, scheduler.database.ready))
 
         # update tagcache using function state
         __process_functions()
 
     elif scheduler.is_ready():
-        logging.debug(u"{:s}.on_ready() : Ignoring request to transition to {!s} as database is currently at {!s}.".format(__name__, scheduler.state.ready, scheduler.get()))
+        logging.debug(u"{:s}.on_ready() : Ignoring request to transition to {!s} as database is currently at {!s}.".format(__name__, scheduler.database.ready, scheduler.get()))
     else:
-        logging.debug(u"{:s}.on_ready() : Received unexpected transition from {!s} to {!s}.".format(__name__, scheduler.get(), scheduler.state.ready))
+        logging.debug(u"{:s}.on_ready() : Received unexpected transition from {!s} to {!s}.".format(__name__, scheduler.get(), scheduler.database.ready))
     return
 
 def auto_queue_empty(type):
@@ -2197,18 +2197,12 @@ def ida_is_busy_sucking_cocks(*args, **kwargs):
     return -1
 
 ### database state
-class SchedulerState(object):
+class DatabaseState(object):
     '''This base class is used to represent the different states a disassembler database can be in.'''
     def __init__(self, name, documentation=None):
         self.__name__, self.__doc__ = name, documentation
     def __repr__(self):
         return "{:s} ({:s})".format(self.__name__, self.__doc__) if self.__doc__ else self.__name__
-
-# the available states that the database could be in.
-SchedulerState.unavailable = SchedulerState('state.unavailable')
-SchedulerState.init = SchedulerState('state.init', 'initialized')
-SchedulerState.loaded = SchedulerState('state.loaded')
-SchedulerState.ready = SchedulerState('state.ready')
 
 class Scheduler(object):
     """
@@ -2226,9 +2220,35 @@ class Scheduler(object):
     executing any of the attached callables and then enabling the
     hooks for the target state.
     """
-    state = SchedulerState
+    class database(object):
+        """
+        This namespace contains each of the states that are available
+        for a database being used by the disassembler. Each of the
+        states can be accessed by this class using their name. The
+        default function for this namespace will yield each of them.
+        """
+        __slots__ = []
+
+        def __new__(cls):
+            '''Yield the name for each the states that are available for a database.'''
+            used = {item for item in []}
+            for name in sorted(cls.__dict__):
+                object = cls.__dict__[name]
+                if name.startswith('__'):
+                    continue
+                elif object not in used:
+                    yield name
+                used.add(object)
+            return
+
+        # the available states that the database could be in.
+        unavailable = DatabaseState('database.unavailable')
+        initialized = DatabaseState('database.initialized')
+        loaded = DatabaseState('database.loaded')
+        ready = DatabaseState('database.ready')
+
     def __init__(self):
-        self.__state, states = self.state.unavailable, [getattr(self.state, name) for name in dir(self.state) if not name.startswith('__')]
+        self.__state, states = self.database.unavailable, [getattr(self.database, name) for name in self.database()]
         self.__hooks = {state: {empty for empty in []} for state in states}
         self.__used = {empty for empty in []}
         self.__transitions, self.__tracebacks = {}, {}
@@ -2236,8 +2256,7 @@ class Scheduler(object):
     def list(self):
         '''List all of the available states that can be used by this class.'''
         six.print_(u"List of database states for {:s}:".format(self.__class__.__name__))
-        available = [name for name in dir(self.state) if not name.startswith('__')]
-        for name in sorted(available):
+        for name in self.database():
             six.print_(name)
         return
 
@@ -2252,15 +2271,15 @@ class Scheduler(object):
         elif not isinstance(priority, internal.types.integer):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({:s}) for the requested transition with a non-integer priority ({!r}).".format('.'.join(['hook', 'scheduler']), state, callable, priority, internal.utils.pycompat.fullname(callable), format(priority)))
-        elif not all(any([item is None, isinstance(item, SchedulerState), isinstance(item, internal.types.string)]) for item in [source, target]):
+        elif not all(any([item is None, isinstance(item, DatabaseState), isinstance(item, internal.types.string)]) for item in [source, target]):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable to the for the requested transition due to the state{:s} being an unsupported type ({:s}).".format('.'.join(['hook', 'scheduler']), state, callable, priority, '' if isinstance(state, internal.types.string) else 's' if hasattr(state, '__iter__') and len(state) != 1 else '', state if isinstance(state, internal.types.string) else ', '.join(item.__class__.__name__ for item in [source, target]) if hasattr(state, '__iter__') else state.__class__.__name__))
-        elif any(item.startswith('__') or not hasattr(self.state, item) for item in [source, target] if isinstance(item, internal.types.string)):
-            cls, format, busted = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format, [item for item in [source, target] if isinstance(item, internal.types.string) and any([item.startswith('__'), not hasattr(self.state, item)])]
+        elif any(not isinstance(getattr(self.database, item, None), DatabaseState) for item in [source, target] if isinstance(item, internal.types.string)):
+            cls, format, busted = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format, [item for item in [source, target] if isinstance(item, internal.types.string) and any([item.startswith('__'), not hasattr(self.database, item)])]
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable to the for the given unknown state{:s} ({:s}).".format('.'.join(['hook', 'scheduler']), state, callable, priority, '' if len(busted) == 1 else 's', ', '.join(busted)))
 
         # now we need to normalize the states that we were given since they should be valid.
-        [source, target] = [(item if isinstance(item, (SchedulerState, internal.types.none)) else getattr(self.state, item)) for item in [source, target]]
+        [source, target] = [(item if isinstance(item, (DatabaseState, internal.types.none)) else getattr(self.database, item)) for item in [source, target]]
         transition_description = [(lambda state: 'any' if state is None else state.__name__)(item) for item in [source, target]]
 
         # and then we can add an entry in our priority queue for the callable.
@@ -2274,7 +2293,7 @@ class Scheduler(object):
     def discard(self, state, callable):
         '''Discard the `callable` from the queue for the specified `state` transition.'''
         [source, target] = state if hasattr(state, '__iter__') and not isinstance(state, internal.types.string) else [None, state]
-        [source, target] = [(item if isinstance(item, (SchedulerState, internal.types.none)) else getattr(self.state, item) if isinstance(item, internal.types.string) and hasattr(self.state, item) else item) for item in [source, target]]
+        [source, target] = [(item if isinstance(item, (DatabaseState, internal.types.none)) else getattr(self.database, item) if isinstance(item, internal.types.string) and hasattr(self.database, item) else item) for item in [source, target]]
 
         # Search through the specified queue for whatever callable we were given.
         counter, retained = 0, []
@@ -2352,7 +2371,7 @@ class Scheduler(object):
 
     def __guard_closure(self, required_state, callable):
         '''Return a closure that only executes `callable` if the scheduler state matches `required_state`.'''
-        if not isinstance(required_state, SchedulerState):
+        if not isinstance(required_state, DatabaseState):
             raise internal.exceptions.InvalidParameterError(u"{:s}.__guard_closure({!r}, {:s}) : Unable to create a guarded closure for the given state due to it being of the wrong type ({!r}).".format('.'.join(['hook', 'scheduler']), required_state, utils.pycompat.fullname(callable), required_state.__class__))
 
         def closure(*parameters):
@@ -2382,8 +2401,8 @@ class Scheduler(object):
 
     def initialized(self, hook, target, callable, priority):
         '''Assign the specified `hook` and `target` to only be enabled when the database has been initialized.'''
-        self.__hooks.setdefault(self.state.init, {empty for empty in []}).add((hook, target))
-        F = self.__guard_closure(self.state.init, callable)
+        self.__hooks.setdefault(self.database.initialized, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.database.initialized, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
             logging.warning(u"{:s}.initialized({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
@@ -2395,13 +2414,13 @@ class Scheduler(object):
         # Add the hook and target to our list of already used targets, and then we
         # just need to check if we're in the correct state to enable or disable it.
         self.__used.add((hook, target))
-        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.init} else (hook.disable, hook.enabled)
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.database.initialized} else (hook.disable, hook.enabled)
         return Fmodulate(target) if target in required_state else True
 
     def loaded(self, hook, target, callable, priority):
         '''Assign the specified `hook` and `target` to only be enabled when the database is being loaded.'''
-        self.__hooks.setdefault(self.state.loaded, {empty for empty in []}).add((hook, target))
-        F = self.__guard_closure(self.state.loaded, callable)
+        self.__hooks.setdefault(self.database.loaded, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.database.loaded, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
             logging.warning(u"{:s}.loaded({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
@@ -2413,13 +2432,13 @@ class Scheduler(object):
         # Mark the hook and target that was added as used, and then we check the
         # current state to determine if we should enable it or not.
         self.__used.add((hook, target))
-        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.loaded} else (hook.disable, hook.enabled)
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.database.loaded} else (hook.disable, hook.enabled)
         return Fmodulate(target) if target in required_state else True
 
     def ready(self, hook, target, callable, priority):
         '''Assign the specified `hook` and `target` to only be enabled when the database is ready.'''
-        self.__hooks.setdefault(self.state.ready, {empty for empty in []}).add((hook, target))
-        F = self.__guard_closure(self.state.ready, callable)
+        self.__hooks.setdefault(self.database.ready, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.database.ready, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
             logging.warning(u"{:s}.ready({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
@@ -2431,13 +2450,13 @@ class Scheduler(object):
         # Add the current hook and target, and then enable it if we're currently
         # in the correct state or disable it if we're not.
         self.__used.add((hook, target))
-        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.ready} else (hook.disable, hook.enabled)
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.database.ready} else (hook.disable, hook.enabled)
         return Fmodulate(target) if target in required_state else True
 
     def unavailable(self, hook, target, callable, priority):
         '''Assign the specified `hook` and `target` to only be enabled when the database is unavailable or has been unloaded.'''
-        self.__hooks.setdefault(self.state.unavailable, {empty for empty in []}).add((hook, target))
-        F = self.__guard_closure(self.state.unavailable, callable)
+        self.__hooks.setdefault(self.database.unavailable, {empty for empty in []}).add((hook, target))
+        F = self.__guard_closure(self.database.unavailable, callable)
         if not hook.add(target, F, priority):
             hook_descr, target_descr, callable_descr = utils.pycompat.fullname(hook), hook.__formatter__(target), utils.pycompat.fullname(callable)
             logging.warning(u"{:s}.unavailable({!r}, {:s}, {:s}, {!s}) : Unable to add the specified callable ({:s}) to {} for the given target ({:s}).".format('.'.join([__name__, cls.__name__]), hook_descr, target_descr, callable_descr, priority, callable_descr, hook_descr, target_descr))
@@ -2449,12 +2468,12 @@ class Scheduler(object):
         # Set the current hook and target as used, and then enable it if we're
         # presently in the correct state. If we're not, then just disable it.
         self.__used.add((hook, target))
-        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.state.unavailable} else (hook.disable, hook.enabled)
+        Fmodulate, required_state = (hook.enable, hook.disabled) if self.__state in {self.database.unavailable} else (hook.disable, hook.enabled)
         return Fmodulate(target) if target in required_state else True
 
     def modulate(self, state):
         '''Modulate the current state of the database to `state` and enable the hooks associated with it.'''
-        if not isinstance(state, SchedulerState):
+        if not isinstance(state, DatabaseState):
             raise internal.exceptions.InvalidParameterError(u"{:s}.modulate({!r}) : Unable to modulate to the suggested state due to it being of the wrong type ({!r}).".format('.'.join(['hook', 'scheduler']), state, state.__class__))
         current, self.__state = self.__state, state
         [ hook.disable(target) for hook, target in self.__hooks[current] if target in hook.enabled ]
@@ -2464,19 +2483,19 @@ class Scheduler(object):
 
     def reset(self):
         '''Reset the current perceived state of the database and return the state that is being transitioned from.'''
-        return self.modulate(self.state.unavailable)
+        return self.modulate(self.database.unavailable)
     def is_initialized(self):
         '''Return true if the database is initialized.'''
-        return self.__state in {self.state.init}
+        return self.__state in {self.database.initialized}
     def is_loaded(self):
         '''Return true if the database has been loaded.'''
-        return self.__state in {self.state.loaded}
+        return self.__state in {self.database.loaded}
     def is_ready(self):
         '''Return true if the database is ready.'''
-        return self.__state in {self.state.ready}
+        return self.__state in {self.database.ready}
     def is_unavailable(self):
         '''Return true if the database is unavailable or unloaded.'''
-        return self.__state in {self.state.unavailable}
+        return self.__state in {self.database.unavailable}
     def get(self):
         '''Return the current monitored state for the purpose of debugging.'''
         return self.__state
@@ -2521,8 +2540,7 @@ class Scheduler(object):
 
         # We have a couple of transitions to go and collect. Each state has a triplet associated
         # with it in order to monitor wildcards. To collect, we just go through all of them.
-        names = [ name for name in dir(self.state) if not name.startswith('__') ]
-        states = [ getattr(self.state, name) for name in sorted(names) ]
+        states = [ getattr(self.database, name) for name in self.database() ]
 
         # Our names should be sorted, so we just do them left-to-right, starting with "any".
         items, Fdescribe_state = [], lambda state: 'any' if state is None else state.__name__
