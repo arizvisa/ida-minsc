@@ -771,7 +771,8 @@ class prioritybase(object):
         # Otherwise we need to initialize the cache with a mutex and a list, then
         # we can return the callable that should be attached by the implementation.
         self.__cache__[target] = threading.Lock(), []
-        return True, self.__apply__(target)
+        start, resume, stop = self.__apply__(target)
+        return True, resume
 
     def detach(self, target):
         '''Intended to be called as a supermethod for the specified `target` that removes the target from the cache.'''
@@ -1151,7 +1152,13 @@ class prioritybase(object):
         return
 
     def __apply__(self, target):
-        '''Return a closure that will execute all of the callables for the specified `target`.'''
+        """Return a tuple of three closures the given `target` that are used to control the execution of all the callables attached to the specified `target`.
+
+        Each closure is intended to be attached to whatever is being hooked by each
+        callable. The first closure is used to initialize execution and is intended
+        to be executed first. The second closure will execute each individual callable,
+        and the third closure will reset execution so that they can be called again.
+        """
         cls = self.__class__
 
         class Signal(object):
@@ -1596,8 +1603,14 @@ class prioritybase(object):
                 captured = captured if result is None else result
             return captured
 
-        # That's it!
-        return closure
+        # Define a placeholder that can take parameters but return nothing.
+        def closure_none(*args, **kwargs):
+            return
+
+        # That's it, and we just need to return the closures for starting, resuming, and stopping.
+        return closure_none, closure, closure_none
+        #return closure_start, closure_resume, closure_stop
+        #return closure_none, closure_backwards_compatible, closure_none
 
 class priorityhook(prioritybase):
     """
@@ -2026,16 +2039,21 @@ class priorityhxevent(prioritybase):
         return super(priorityhxevent, self).add(event, callable, priority)
 
     def __apply__(self, event):
-        '''Return a closure that will execute all of the callables for the specified `event`.'''
-        original = super(priorityhxevent, self).__apply__(event)
+        '''Return a tuple containing the closures that are used to control the execution of all the callables for the specified `event`.'''
+        start, resume, stop = super(priorityhxevent, self).__apply__(event)
 
-        # We need to define this closure because Hex-Rays absolutely requires
-        # you to return a 0 unless the event type specifies otherwise.
-        def closure(ev, *parameters):
-            if ev == event:
-                return original(*parameters) or 0
-            return 0
-        return closure
+        # We need to define these closures because Hex-Rays absolutely requires
+        # you to return a 0 unless the event type explicitly specifies otherwise.
+        def closure_start(ev, *parameters):
+            result = start(*parameters) if ev == event else None
+            return result or 0
+        def closure_resume(ev, *parameters):
+            result = resume(*parameters) if ev == event else None
+            return result or 0
+        def closure_stop(ev, *parameters):
+            result = stop(*parameters) if ev == event else None
+            return result or 0
+        return closure_start, closure_resume, closure_stop
 
     def __repr__(self):
         if len(self):
