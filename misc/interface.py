@@ -1913,6 +1913,14 @@ class prioritynotification(prioritybase):
         super(prioritynotification, self).__init__()
         self.__lookup = { getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('NW_') }
 
+        # Keep a dict of the 3 callables that manage the scope for a notification.
+        self.__attached__ = {}
+
+        # We also need to keep a list of all the callables that we
+        # attach because the notify_when api doesn't allow us to
+        # assign the same callable to a notification more than once.
+        self.__attached_callables = {}
+
     def __format__(self, spec):
         return internal.utils.pycompat.fullname(idaapi.notify_when)
 
@@ -1928,12 +1936,123 @@ class prioritynotification(prioritybase):
 
     def attach(self, notification):
         '''Attach to the specified `notification` in order to receive events from it.'''
-        ok, packed = super(prioritynotification, self).attach(notification)
+        cls = self.__class__
+
+        # First we need to check if we haven't been attached to the notification yet.
+        if notification not in self.__attached__:
+            ok, packed = super(prioritynotification, self).attach(notification)
+            if not ok:
+                return False
+
+            # We have our closures, so attach them if we can.
+            start, resume, stop = packed
+
+            if not idaapi.notify_when(notification, start):
+                logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} notification with the start callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), internal.utils.pycompat.fullname(start)))
+                ignored = super(prioritynotification, self).detach(notification)
+                return False
+
+            ok = idaapi.notify_when(notification, stop)
+            if not ok:
+                logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} notification with the stop callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), internal.utils.pycompat.fullname(stop)))
+
+            # If we failed at attaching the stop notification, then we need to try
+            # try to remove the start notification and bail if we couldn't do that.
+            if not ok and idaapi.notify_when(notification | idaapi.NW_REMOVE, start):
+                logging.critical(u"{:s}.attach({!r}) : Unable to recover from error and detach the start callable ({:s}) from the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
+
+            # Since we failed anyway, we only need to ask our
+            # parent class to detach and then return False.
+            if not ok:
+                ignored = super(prioritynotification, self).detach(notification)
+                return False
+
+            logging.debug(u"{:s}.attach({!r}) : Successfully attached start ({:s}) and stop ({:s} callables to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+            self.__attached__[notification] = start, resume, stop
+
+        # Now we know that the notification has been attached to, so we
+        # only need to add references to the "resume" callable to continue.
+        packed, references = self.__attached__[notification], self.__attached_callables.setdefault(notification, [])
         start, resume, stop = packed
-        return ok and idaapi.notify_when(notification, resume)
+
+        count = len(references)
+        if not idaapi.notify_when(notification | idaapi.NW_REMOVE, stop):
+            logging.warning(u"{:s}.attach({!r}) : Refusing to attach {:+d} reference to the {:s} notification ({:d} reference{:s}) due to being unable to temporarily remove stop callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, 1, self.__formatter__(notification), count, '' if count == 1 else 's', internal.utils.pycompat.fullname(stop)))
+            return False
+
+        logging.debug(u"{:s}.attach({!r}) : Temporarily removed the stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+
+        # Next we just need to create a copy of "resume" that looks different due to
+        # the disassembler not allowing the same callable to be used more than once.
+        def notification_wrapper_callable(*args, **kwargs):
+            return resume(*args, **kwargs)
+
+        # Now we can add the new notification using our wrapper, and also
+        # include the "stop" callable that we temporarily removed.
+        ok = idaapi.notify_when(notification, notification_wrapper_callable)
+        restored = idaapi.notify_when(notification, stop)
+
+        if ok:
+            logging.info(u"{:s}.attach({!r}) : Successfully attached the wrapper ({:s}) for callable ({:s}) to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(notification_wrapper_callable), internal.utils.pycompat.fullname(resume), self.__formatter__(notification)))
+            references.append(notification_wrapper_callable)
+
+        if restored:
+            logging.debug(u"{:s}.attach({!r}) : Successfully re-attached a replacement stop callable ({:s}) to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+
+        # If everything is okay, then we've restored everything and only
+        # need to add the callable to our list before returning success.
+        if ok and restored:
+            return True
+
+        # If could not restore the "stop" callable then we need to
+        # do all the work to disable the notification and bail.
+        elif not restored:
+            logging.critical(u"{:s}.attach({!r}) : Critical failure trying to restore stop callable ({:s}) for the {:s} notification. The notification will be completely disabled.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+            disabled, (start, resume, stop) = self.disable(notification), self.__attached__.pop(notification)
+
+            references = self.__attached_callables.pop(notification)
+            for index, ref in enumerate(references):
+                ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, ref)
+                if not ok:
+                    logging.warning(u"{:s}.attach({!r}) : Unable to remove callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'is' if len(references) == 1 else 'are', self.__formatter__(notification)))
+                else:
+                    logging.info(u"{:s}.attach({!r}) : Removed callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'was' if len(references) == 1 else 'were', self.__formatter__(notification)))
+                continue
+
+            # Now we just need to remove the start and stop callables.
+            if not idaapi.notify_when(notification | idaapi.NW_REMOVE, start):
+                logging.warning(u"{:s}.attach({!r}) : Unable to remove start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(event)))
+            else:
+                logging.info(u"{:s}.attach({!r}) : Removed start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
+
+            if not idaapi.notify_when(notification | idaapi.NW_REMOVE, stop):
+                logging.warning(u"{:s}.attach({!r}) : Unable to remove stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+            else:
+                logging.info(u"{:s}.attach({!r}) : Removed stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+
+            # If there are any callables in the priority queue, then remove those too.
+            cls = self.__class__
+            for ok, callable in self.empty(notification):
+                Flogging = logging.info if ok else logging.warning
+                Flogging(u"{:s}.detach({:#x}) : {:s} the callable ({:s}) from the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(notification)))
+
+            logging.debug(u"{:s}.attach({!r}) : Successfully removed {:d} reference{:s} from the {:s} notification due to critical error.".format('.'.join([__name__, cls.__name__]), notification, len(references), '' if len(references) == 1 else 's', self.__formatter__(notification)))
+
+        # If we couldn't add a reference, but was still able to restore the "stop" callable,
+        # then we can simply return a failure because everything should still work okay.
+        elif not ok:
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach the wrapper ({:s}) for callable ({:s}) to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(notification_wrapper_callable), internal.utils.pycompat.fullname(resume), self.__formatter__(notification)))
+
+        return False
 
     def detach(self, notification):
         '''Detach from the specified `notification` so that events from it will not be received.'''
+        cls = self.__class__
+
+        # If it's not connected, then we need to freak out at the user.
+        if notification not in self.__attached__:
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from the {:s} notification as it is not currently attached.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification)))
+            return False
 
         # Iterate through all of our callables, and empty the cache since we're
         # actually shutting everything down here.
@@ -1946,20 +2065,41 @@ class prioritynotification(prioritybase):
         def closure(*parameters):
             return True
 
-        # Now we can actually pass the correct flag to remove the notification.
-        ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
-        return ok and super(prioritynotification, self).detach(notification)
+        # Now we can remove our attachments and references and
+        # begin to remove each of them one-by-one using the api.
+        start, resume, stop = self.__attached__.pop(notification)
+
+        references = self.__attached_callables.pop(notification)
+        for index, ref in enumerate(references):
+            ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, ref)
+            if not ok:
+                logging.warning(u"{:s}.detach({!r}) : Unable to remove callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'is' if len(references) == 1 else 'are', self.__formatter__(notification)))
+            else:
+                logging.info(u"{:s}.detach({!r}) : Removed callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'was' if len(references) == 1 else 'were', self.__formatter__(notification)))
+            continue
+
+        # Then we can detach both the start and stop callables from the notification.
+        if not idaapi.notify_when(notification | idaapi.NW_REMOVE, start):
+            logging.warning(u"{:s}.attach({!r}) : Unable to remove start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(event)))
+        else:
+            logging.info(u"{:s}.attach({!r}) : Removed start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
+
+        if not idaapi.notify_when(notification | idaapi.NW_REMOVE, stop):
+            logging.warning(u"{:s}.attach({!r}) : Unable to remove stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+        else:
+            logging.info(u"{:s}.attach({!r}) : Removed stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+
+        # Now we should be free to completely detach the priority queue from the notification.
+        return super(prioritynotification, self).detach(notification)
 
     def add(self, notification, callable, priority=0):
         '''Add the `callable` to the queue with the given `priority` for the specified `notification`.'''
-        if notification in self:
-            return super(prioritynotification, self).add(notification, callable, priority)
 
         # Notifications are always attached and enabled.
         ok = self.attach(notification)
         if not ok:
             cls = self.__class__
-            raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the notification {:s}.".format('.'.join([__name__, cls.__name__]), notification, callable, priority, self.__formatter__(notification)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, callable, priority, self.__formatter__(notification)))
 
         # Add the callable to our attached notification.
         return super(prioritynotification, self).add(notification, callable, priority)
