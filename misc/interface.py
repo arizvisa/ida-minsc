@@ -770,7 +770,7 @@ class prioritybase(object):
     def attach(self, target):
         '''Intended to be called as a supermethod for the specified `target` that returns True or False along with the callable that should be applied to the hook.'''
         if target in self.__cache:
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to target ({:s}) due to it already being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to target {:s} due to it already being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
             return False, internal.utils.fidentity
 
         # Otherwise we need to initialize the cache with a mutex and a list, then
@@ -782,7 +782,7 @@ class prioritybase(object):
     def detach(self, target):
         '''Intended to be called as a supermethod for the specified `target` that removes the target from the cache.'''
         if target not in self.__cache:
-            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to it not being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target {:s} due to it not being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
             return False
 
         # grab the mutex and check if there's any callables left. if there are, then we're
@@ -804,7 +804,7 @@ class prioritybase(object):
             assert(len(discarded) == count if ok else len(queue) == count)
 
         if not ok:
-            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target ({:s}) due to {:d} callable{:s} still existing in its cache.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), count, '' if count == 1 else 's'))
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target {:s} due to {:d} callable{:s} still existing in its priority queue.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), count, '' if count == 1 else 's'))
         return ok
 
     def close(self):
@@ -814,7 +814,7 @@ class prioritybase(object):
         # Simply detach every available target one-by-one.
         for target in items:
             if not self.detach(target):
-                logging.warning(u"{:s}.close() : Error trying to detach from the specified target ({:s}).".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
+                logging.warning(u"{:s}.close() : Error while attempting to detach from the specified target {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
                 ok = False
             continue
         return ok
@@ -933,10 +933,10 @@ class prioritybase(object):
         '''Enable any callables for the specified `target` that have been previously disabled.'''
         cls = self.__class__
         if target not in self.__cache:
-            logging.fatal(u"{:s}.enable({!r}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently disabled targets are: {:s}".format(', '.join(map(self.__formatter__, self.__disabled))) if self.__disabled else 'There are no disabled targets that may be enabled.'))
+            logging.fatal(u"{:s}.enable({!r}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently disabled targets are: {:s}".format(', '.join(map(self.__formatter__, self.__disabled))) if self.__disabled else 'There are no disabled targets that may be enabled.'))
             return False
         if target not in self.__disabled:
-            logging.fatal(u"{:s}.enable({!r}) : The requested target ({:s}) is not disabled. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently disabled targets are: {:s}".format(', '.join(map(self.__formatter__, self.__disabled))) if self.__disabled else 'There are no disabled targets that may be enabled.'))
+            logging.fatal(u"{:s}.enable({!r}) : The requested target {:s} is not disabled. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently disabled targets are: {:s}".format(', '.join(map(self.__formatter__, self.__disabled))) if self.__disabled else 'There are no disabled targets that may be enabled.'))
             return False
 
         # Always explicitly do what we're told...
@@ -945,7 +945,7 @@ class prioritybase(object):
         # But if there were no entries in the cache, then warn the user about it.
         _, queue_ = self.__cache[target]
         if not queue_:
-            logging.warning(u"{:s}.enable({!r}) : The requested target ({:s}) does not have any callables to enable.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target)))
+            logging.warning(u"{:s}.enable({!r}) : The requested target {:s} does not have any callables in its priority queue to enable.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target)))
             return True
         return True
 
@@ -953,10 +953,10 @@ class prioritybase(object):
         '''Disable execution of all the callables for the specified `target`.'''
         cls, enabled = self.__class__, {item for item in self.__cache} - self.__disabled
         if target not in self.__cache:
-            logging.fatal(u"{:s}.disable({!r}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently enabled targets are: {:s}".format(', '.join(map(self.__formatter__, enabled))) if enabled else 'All targets have already been disabled.' if self.__disabled else 'There are no currently attached targets to disable.'))
+            logging.fatal(u"{:s}.disable({!r}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently enabled targets are: {:s}".format(', '.join(map(self.__formatter__, enabled))) if enabled else 'All targets have already been disabled.' if self.__disabled else 'There are no currently attached targets to disable.'))
             return False
         if target in self.__disabled:
-            logging.warning(u"{:s}.disable({!r}) : The requested target ({:s}) has already been disabled. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently enabled targets are: {:s}".format(', '.join(map(self.__formatter__, enabled))) if enabled else 'All targets have already been disabled.'))
+            logging.warning(u"{:s}.disable({!r}) : The requested target {:s} has already been disabled. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently enabled targets are: {:s}".format(', '.join(map(self.__formatter__, enabled))) if enabled else 'All targets have already been disabled.'))
             return False
         self.__disabled.add(target)
         return True
@@ -965,15 +965,15 @@ class prioritybase(object):
         '''Add the `callable` to the queue for the specified `target` with the given `priority`.'''
         if not builtins.callable(callable):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a non-callable ({!s}) for the requested target with the given priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, format(priority)))
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a non-callable ({!s}) for the requested target {:s} with the given priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, self.__formatter__(target), format(priority)))
         elif not isinstance(priority, internal.types.integer):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({:s}) for the requested target with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, internal.utils.pycompat.fullname(callable), format(priority)))
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({:s}) for the requested target {:s} with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, internal.utils.pycompat.fullname(callable), self.__formatter__(target), format(priority)))
 
         # attach to the requested target if possible
         if target not in self.__cache:
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise NameError(u"{:s}.add({!r}, {!s}, priority={:s}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, callable, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no currently attached targets to add to.'))
+            raise NameError(u"{:s}.add({!r}, {!s}, priority={:s}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, callable, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no currently attached targets to add to.'))
 
         # grab the mutex for the target queue that we're going to add something to.
         mutex, queue_ = self.__cache[target]
@@ -985,7 +985,7 @@ class prioritybase(object):
             if indices:
                 cls, items = self.__class__, [item for item in map("{:d}".format, sorted(indices))]
                 iterable = itertools.chain(items[:-1], ["and {:s}".format(*items[-1:])]) if len(items) > 2 else [' and '.join(items)] if len(items) == 2 else items
-                logging.warning(u"{:s}.add({!r}, {!s}, priority={:+d}) : Removing duplicate instance{:s} of callable ({!s}) with priority {:+d} from target ({:s}) at ind{:s} {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, '' if len(indices) ==1 else 's', callable, priority, self.__formatter__(target), 'ex' if len(indices) == 1 else 'ices', ', '.join(iterable)))
+                logging.warning(u"{:s}.add({!r}, {!s}, priority={:+d}) : Removing duplicate instance{:s} of callable ({!s}) with priority {:+d} from target {:s} at ind{:s} {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, '' if len(indices) ==1 else 's', callable, priority, self.__formatter__(target), 'ex' if len(indices) == 1 else 'ices', ', '.join(iterable)))
                 queue[:] = [priority_tuple for index, priority_tuple in enumerate(queue) if index not in indices]
 
             # collect any other priorities in the queue that the same callable might
@@ -1003,14 +1003,14 @@ class prioritybase(object):
         if duplicate_priorities:
             cls, items = self.__class__, [item for item in map("{:+d}".format, sorted(duplicate_priorities))]
             iterable = itertools.chain(items[:-1], ["and {:s}".format(*items[-1:])]) if len(items) > 2 else [' and '.join(items)] if len(items) == 2 else items
-            logging.warning(u"{:s}.add({!r}, {!s}, priority={:+d}) : The newly added callable ({!s}) for the given target ({:s}) is also attached at priorit{:s} {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, self.__formatter__(target), 'y' if len(duplicate_priorities) == 1 else 'ies', ', '.join(iterable)))
+            logging.warning(u"{:s}.add({!r}, {!s}, priority={:+d}) : The newly added callable ({!s}) for the target {:s} is also attached at priorit{:s} {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, callable, self.__formatter__(target), 'y' if len(duplicate_priorities) == 1 else 'ies', ', '.join(iterable)))
         return True
 
     def get(self, target):
         '''Return all of the callables that are attached to the specified `target`.'''
         if target not in self.__cache:
             cls = self.__class__
-            raise NameError(u"{:s}.get({!r}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no currently attached targets to get from.'))
+            raise NameError(u"{:s}.get({!r}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no currently attached targets to get from.'))
 
         # Return the callables attached to the specified target.
         mutex, queue_ = self.__cache[target]
@@ -1022,7 +1022,7 @@ class prioritybase(object):
         '''Pop the item at the specified `index` from the given `target`.'''
         if target not in self.__cache:
             cls, format = self.__class__, "{:d}".format if isinstance(index, internal.types.integer) else "{!r}".format
-            raise NameError(u"{:s}.pop({!r}, {:d}) : The requested target ({:s}) is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, format(index), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to pop from.'))
+            raise NameError(u"{:s}.pop({!r}, {:d}) : The requested target {:s} is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, format(index), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to pop from.'))
         state = []
 
         # Snapshot our current queue for the specified target.
@@ -1089,7 +1089,7 @@ class prioritybase(object):
         '''Remove the first callable from the specified `target` that has the provided `priority`.'''
         if target not in self.__cache:
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise NameError(u"{:s}.remove({!r}, {:s}) : The requested target ({:s}) is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to remove from.'))
+            raise NameError(u"{:s}.remove({!r}, {:s}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to remove from.'))
         state, table = [], {}
 
         # First we'll need to snapshot the queue for our current target.
@@ -1130,7 +1130,7 @@ class prioritybase(object):
         '''Iterate through the queue for the specified `target` safely discarding each callable before yielding it.'''
         if target not in self.__cache:
             cls = self.__class__
-            raise NameError(u"{:s}.empty({!r}) : The requested target ({:s}) is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to empty.'))
+            raise NameError(u"{:s}.empty({!r}) : The requested target {:s} is not attached. Currently attached targets are {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no targets currently attached to empty.'))
 
         # Grab the queue we're supposed to empty for the specified target.
         mutex, queue_ = self.__cache[target]
@@ -1275,7 +1275,7 @@ class prioritybase(object):
                     logging.warning(u"{:s}.callable({:s}) : Callback parameters for target {:s} have changed from ({:s}) during execution of {:s} ({:s}) with priority {:+d}.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target), format_parameters(*old_args, **old_kwargs), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable)), priority))
 
                 # execute the callable with the parameters we were given.
-                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) with priority {:+d} to {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), parameters_description, parameters_description, priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
+                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) to target {:s} with priority {:+d} using {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), parameters_description, parameters_description, self.__formatter__(target), priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
                 try:
                     result = callable(*args, **kwargs)
 
@@ -1409,7 +1409,7 @@ class prioritybase(object):
             # we were called in error which requires us to complain and then bail.
             running_queue = State.running_queue.get(parameters_hash, [])
             if not running_queue:
-                logging.warning(u"{:s}.CLOSE({:s}) : Unable to close coroutine due to the run queue for {:s} being completely empty.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
+                logging.warning(u"{:s}.CLOSE({:s}) : Unable to close coroutine due to the running queue for target {:s} being completely empty.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
                 return State.END
 
             # Grab whatever coroutine we're supposed to close from the run queue. If the latest coroutine has
@@ -1495,7 +1495,7 @@ class prioritybase(object):
             # can hand off execution to closure_start which should initialize it and then call us back.
             running_queue = State.running_queue.get(parameters_hash, [])
             if not running_queue:
-                logging.debug(u"{:s}.RESUME({:s}) : No coroutines for {:s} currently exist within the run queue and will require us to create one.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
+                logging.debug(u"{:s}.RESUME({:s}) : No coroutines currently exist within the running queue for target {:s} and will require us to create one.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, self.__formatter__(target)))
                 return closure_start(*args, **kwargs)
 
             # Then we can grab our very latest coroutine and confirm that it was actually started.
@@ -1531,7 +1531,7 @@ class prioritybase(object):
         def closure_backwards_compatible(*parameters):
             '''This closure is a backwards compatible implementation of the original ``prioritybase.__apply__`` closure using the coroutine-based logic.'''
             parameters_description = format_parameters(*parameters)
-            logging.debug(u"{:s}.closure({:s}) : Received parameters ({:s}) to be used with the backwards-compatible closure for {:s}.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, parameters_description, self.__formatter__(target)))
+            logging.debug(u"{:s}.closure({:s}) : Received parameters ({:s}) to be used with the backwards-compatible closure for target {:s}.".format('.'.join([__name__, self.__class__.__name__]), parameters_description, parameters_description, self.__formatter__(target)))
 
             # First we'll initialize everything and use it to capture the first result.
             result = closure_start(*parameters)
@@ -1543,7 +1543,7 @@ class prioritybase(object):
             # If we received an unexpected type, then throw up an exception.
             elif isinstance(result, self.result):
                 cls = self.__class__
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure({:s}) : Unable to determine the type of result ({!r}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result))
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure({:s}) : Unable to determine the type of result ({!r}) to return for target {:s}.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target)))
 
             # Now we can resume execution until we're told not to.
             captured, running = result, True
@@ -1563,13 +1563,13 @@ class prioritybase(object):
                 # If we received an unexpected type, then throw up an exception.
                 elif isinstance(result, self.result):
                     cls = self.__class__
-                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure({:s}) : Unable to determine the type of result ({!r}).".format('.'.join([__name__, cls.__name__]), parameters_description, result))
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure({:s}) : Unable to determine the type of result ({!r}) returned for target {:s}.".format('.'.join([__name__, cls.__name__]), parameters_description, result, self.__formatter__(target)))
 
                 # Otherwise we need to save what we got. If it was different, then
                 # warn the user that someone is trying to interfere with results.
                 elif result != captured:
                     cls = self.__class__
-                    logging.warning(u"{:s}.closure({:s}) : Captured a result ({!s}) for target {:s} that is different than the previous result ({!s}).".format('.'.join([__name__, cls.__name__]), parameters_description, result, captured))
+                    logging.warning(u"{:s}.closure({:s}) : Captured a result ({!s}) for target {:s} that is different than the previous result ({!s}).".format('.'.join([__name__, cls.__name__]), parameters_description, result, self.__formatter__(target), captured))
 
                 # Assign the captured return code now that we know what it is.
                 captured = captured if result is None else result
@@ -1591,7 +1591,7 @@ class prioritybase(object):
             # executing it with whatever we were given as the parameters.
             captured = None
             for priority, callable in heapq.nsmallest(len(hookq), hookq, key=operator.attrgetter('priority')):
-                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) with priority {:+d} to {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
+                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) to target {:s} with priority {:+d} using {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), self.__formatter__(target), priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
 
                 try:
                     result = callable(*parameters)
@@ -1622,7 +1622,7 @@ class prioritybase(object):
                 # If we received an unexpected type, then throw up an exception.
                 elif isinstance(result, self.result):
                     cls = self.__class__
-                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callable({:s}) : Unable to determine the type of result ({!r}) returned from {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callable({:s}) : Unable to determine the type of result ({!r}) returned for target {:s} from {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
 
                 # If there was no result, then just continue on like nothing happened.
                 elif result is None:
