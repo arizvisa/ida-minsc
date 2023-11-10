@@ -1708,15 +1708,11 @@ class priorityhook(prioritybase):
         cls = self.__klass__
         return '.'.join([cls.__name__, name])
 
-    @contextlib.contextmanager
-    def __instance__(self):
-        '''Return a dictionary upon context entry, and then attach its items to a new hook object upon context exit.'''
-        klass, attributes = self.__klass__, {}
+    def __new_instance__(self, attributes):
+        '''Create a new instance of the hook object with the callables in `attributes` attached as methods.'''
+        klass = self.__klass__
 
-        # First we need to yield the attributes to the caller for them to modify.
-        yield attributes
-
-        # Then we need to iterate through all of the attributes in order to
+        # First we need to iterate through all of the attributes in order to
         # gather the items that we'll use to generate a closure.
         methods = {}
         for name, callable in attributes.items():
@@ -1749,10 +1745,7 @@ class priorityhook(prioritybase):
         # Now we can use the methods we generated and stored in our dictionary to
         # create a new type and use it to instantiate a new hook object.
         klass_t = type(klass.__name__, (klass,), {attribute : callable for attribute, callable in methods.items()})
-        instance = klass_t()
-
-        # Then we just stash away our object and then let someone else install the hooks.
-        self.object = instance
+        return klass_t()
 
     @property
     def available(self):
@@ -1830,8 +1823,8 @@ class priorityhook(prioritybase):
 
             # now we can create a new instance of the hook object and update it
             # with the currently attached methods.
-            with self.__instance__() as attach:
-                attach.update(self.__attached__)
+            instance = self.__new_instance__(self.__attached__)
+            self.object = instance
 
             # it's been modified, so now we can just install the new hooks that were attached.
             instance = self.object
@@ -1880,8 +1873,9 @@ class priorityhook(prioritybase):
             cls = self.__class__
             logging.warning(u"{:s}.detach({!r}) : Unable to disconnect the current instance ({!s}) during modification of target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance.__class__, self.__formatter__(name)))
 
-        with self.__instance__() as attach:
-            attach.update(self.__attached__)
+        # Recreate the instance of the same class for the object that we just unhooked.
+        instance = self.__new_instance__(self.__attached)
+        self.object = instance
 
         # Now we can take our updated object, and install the hooks that were modified.
         instance = self.object
