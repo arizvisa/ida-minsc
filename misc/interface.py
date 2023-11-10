@@ -1713,13 +1713,7 @@ class priorityhook(prioritybase):
         '''Return a dictionary upon context entry, and then attach its items to a new hook object upon context exit.'''
         klass, attributes = self.__klass__, {}
 
-        # Check that our object was unhooked, and raise an exception if it
-        # not. This way we don't tamper with any hooks that are in use.
-        if not self.object.unhook():
-            cls = self.__class__
-            logging.warning(u"{:s}.__instance__() : Unable to disconnect the current instance ({!s}) during modification.".format('.'.join([__name__, cls.__name__]), self.object.__class__))
-
-        # Now we need to yield the attributes to the caller for them to modify.
+        # First we need to yield the attributes to the caller for them to modify.
         yield attributes
 
         # Then we need to iterate through all of the attributes in order to
@@ -1754,14 +1748,11 @@ class priorityhook(prioritybase):
 
         # Now we can use the methods we generated and stored in our dictionary to
         # create a new type and use it to instantiate a new hook object.
-        cls = type(klass.__name__, (klass,), {attribute : callable for attribute, callable in methods.items()})
-        instance = cls()
+        klass_t = type(klass.__name__, (klass,), {attribute : callable for attribute, callable in methods.items()})
+        instance = klass_t()
 
-        # Then we just stash away our object and then install the hooks.
+        # Then we just stash away our object and then let someone else install the hooks.
         self.object = instance
-        if not instance.hook():
-            logging.critical(u"{:s}.__instance__() : Unable to reconnect new instance ({!s}) during modification.".format('.'.join([__name__, cls.__name__]), instance.__class__))
-        return
 
     @property
     def available(self):
@@ -1830,10 +1821,22 @@ class priorityhook(prioritybase):
             start, resume, stop = packed
             self.__attached__[name] = resume
 
+            # before creating a new instance of our hook object, unhook all
+            # of the hooks that were attached from the previous instance.
+            instance = self.object
+            if not instance.unhook():
+                cls = self.__class__
+                logging.warning(u"{:s}.attach({!r}) : Unable to disconnect the current instance ({!s}) during modification of target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance.__class__, self.__formatter__(name)))
+
             # now we can create a new instance of the hook object and update it
             # with the currently attached methods.
             with self.__instance__() as attach:
                 attach.update(self.__attached__)
+
+            # it's been modified, so now we can just install the new hooks that were attached.
+            instance = self.object
+            if not instance.hook():
+                logging.critical(u"{:s}.attach({!r}) : Unable to reconnect new instance ({!s}) during modification of target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance.__class__, self.__formatter__(name)))
 
             # log some information and then leave because we were successful.
             logging.info(u"{:s}.attach({!r}) : Attached to the specified target ({:s}).".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
@@ -1870,8 +1873,21 @@ class priorityhook(prioritybase):
         # Now we just need to detach the target name from our attachable
         # state, and then apply it to a new instance of the hook object.
         self.__attached__.pop(name)
+
+        # Before updating our hooks, unhook everything first.
+        instance = self.object
+        if not instance.unhook():
+            cls = self.__class__
+            logging.warning(u"{:s}.detach({!r}) : Unable to disconnect the current instance ({!s}) during modification of target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance.__class__, self.__formatter__(name)))
+
         with self.__instance__() as attach:
             attach.update(self.__attached__)
+
+        # Now we can take our updated object, and install the hooks that were modified.
+        instance = self.object
+        if not instance.hook():
+            logging.critical(u"{:s}.detach({!r}) : Unable to reconnect new instance ({!s}) during modification of target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance.__class__, self.__formatter__(name)))
+
         return super(priorityhook, self).detach(name)
 
     def add(self, name, callable, priority=0):
