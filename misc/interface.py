@@ -768,16 +768,18 @@ class prioritybase(object):
         raise NotImplementedError
 
     def attach(self, target):
-        '''Intended to be called as a supermethod for the specified `target` that returns True or False along with the callable that should be applied to the hook.'''
+        '''Intended to be called as a supermethod for the specified `target` that returns True or False along with a tuple containing callables managing the scope of the hook.'''
         if target in self.__cache:
             logging.warning(u"{:s}.attach({!r}) : Unable to attach to target {:s} due to it already being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
-            return False, internal.utils.fidentity
+            packed = internal.utils.fidentity, internal.utils.fidentity, internal.utils.fidentity
+            return False, packed
 
         # Otherwise we need to initialize the cache with a mutex and a list, then
         # we can return the callable that should be attached by the implementation.
         self.__cache[target] = threading.Lock(), []
         start, resume, stop = self.__scope__(target)
-        return True, resume
+        packed = start, resume, stop
+        return True, packed
 
     def detach(self, target):
         '''Intended to be called as a supermethod for the specified `target` that removes the target from the cache.'''
@@ -1823,9 +1825,10 @@ class priorityhook(prioritybase):
 
         # attach the super class to grab the callable. if successful, then we
         # generate the supermethod for the target in preparation for a closure.
-        ok, callable = super(priorityhook, self).attach(name)
+        ok, packed = super(priorityhook, self).attach(name)
         if ok:
-            self.__attached__[name] = callable
+            start, resume, stop = packed
+            self.__attached__[name] = resume
 
             # now we can create a new instance of the hook object and update it
             # with the currently attached methods.
@@ -1925,8 +1928,9 @@ class prioritynotification(prioritybase):
 
     def attach(self, notification):
         '''Attach to the specified `notification` in order to receive events from it.'''
-        ok, callable = super(prioritynotification, self).attach(notification)
-        return ok and idaapi.notify_when(notification, callable)
+        ok, packed = super(prioritynotification, self).attach(notification)
+        start, resume, stop = packed
+        return ok and idaapi.notify_when(notification, resume)
 
     def detach(self, notification):
         '''Detach from the specified `notification` so that events from it will not be received.'''
@@ -2017,7 +2021,7 @@ class priorityhxevent(prioritybase):
             return True
 
         # Attach using the super class to figure out what callable we should use.
-        ok, callable = super(priorityhxevent, self).attach(event)
+        ok, packed = super(priorityhxevent, self).attach(event)
 
         # We failed...nothing to see here.
         if not ok:
@@ -2025,12 +2029,13 @@ class priorityhxevent(prioritybase):
             return False
 
         # Now we have a callable to use, so we just need to install it.
-        if not self.__module.install_hexrays_callback(callable):
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} with the specified callable ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(callable)))
+        start, resume, stop = packed
+        if not self.__module.install_hexrays_callback(resume):
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} with the specified callable ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(resume)))
             return False
 
         # Last thing to do is to save our state so that we can remove it later.
-        self.__attached__[event] = callable
+        self.__attached__[event] = resume
         return True
 
     def detach(self, event):
