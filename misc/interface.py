@@ -1990,10 +1990,14 @@ class priorityhxevent(prioritybase):
             cls = self.__class__
             raise internal.exceptions.DisassemblerError(u"{:s} : Failure while trying initialize the Hex-Rays plugin ({:s}).".format('.'.join([__name__, cls.__name__]), 'init_hexrays_plugin'))
 
-        # Stash our events so that we can pretty-print them and keep a dict
-        # that contains the callable that is currently attached to the event.
+        # Stash our events so that we can pretty-print all of them to the user.
         self.__events__ = { getattr(ida_hexrays, name) : name for name in dir(ida_hexrays) if name.startswith(('hxe_', 'lxe_')) }
+
+        # Keep a dict of the 3 callables that manage the scope for an event's
+        # callback. We also keep a reference count of the hooks so we know how
+        # many times the event has been attached, and how many'll need removal.
         self.__attached__ = {}
+        self.__attached_count = {}
 
     def __format__(self, spec):
         res = self.__module.install_hexrays_callback
@@ -2015,51 +2019,161 @@ class priorityhxevent(prioritybase):
         if event not in self.__events__:
             raise NameError(u"{:s}.attach({!r}) : Unable to attach to the event {:s} due to the event being unavailable.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
 
-        # If the event is already there, then the target has been attached
+        # If the event is already attached, then we only need to add another
+        # reference to our resume callable and update our attached counter.
         if event in self.__attached__:
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} as it has already been attached to.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
-            return True
+            current = self.__attached_count[event]
+            start, resume, stop = self.__attached__[event]
+
+            # The "stop" callable always needs to be the last one that's
+            # dispatched, so we first need to remove the old instance.
+            count = self.__module.remove_hexrays_callback(stop)
+            logging.debug(u"{:s}.attach({!r}) : Temporarily removed {:d} callback{:s} for the stop callback ({:s}) that was attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+
+            # If we couldn't remove the "stop" callable, then there's
+            # nothing we can do and we need to completely bail.
+            if not count:
+                logging.warning(u"{:s}.attach({!r}) : Refusing to attach {:+d} reference to the {:s} event ({:d} reference{:s}) due to being unable to temporarily remove stop callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, 1, self.__formatter__(event), current, '' if current == 1 else 's', internal.utils.pycompat.fullname(stop)))
+                return False
+
+            # Now we can add another instance of the "resume" callable.
+            ok = self.__module.install_hexrays_callback(resume)
+
+            # Then we can add the "stop" callable back again.
+            critical = False
+            if not self.__module.install_hexrays_callback(stop):
+                logging.warning(u"{:s}.attach({!r}) : Unable to re-attach stop callback ({:s}) for the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+                critical = True
+
+            # If we couldn't update the reference, then we need to complain.
+            if not ok:
+                logging.warning(u"{:s}.attach({!r}) : Unable to attach the specified callback ({:s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+
+            # If we couldn't add the "stop" callable at the end, then this is
+            # a critical failure and we need to disable the event entirely.
+            elif critical:
+                logging.critical(u"{:s}.attach({!r}) : Critical failure trying to attach a callback ({:s}) to the {:s} event. The event will be completely disabled.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+
+                # First we'll disable the entire event, and then we'll unsubscribe
+                # each of our closures from the hexrays callbacks one-by-one.
+                disabled, (start, resume, stop) = self.disable(event), self.__attached__.pop(event)
+
+                counter, expected = 0, current
+                while counter < expected:
+                    count = self.__module.remove_hexrays_callback(resume)
+                    left = expected - counter
+
+                    # If we couldn't remove an instance of the callback, then we
+                    # might've removed everything, but still need to complain.
+                    if not count:
+                        logging.warning(u"{:s}.attach({!r}) : Unable to remove callback {:d} of {:d} callback{:s} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 1 + counter, left, '' if left == 1 else 's', 'is' if left == 1 else 'are', self.__formatter__(event)))
+                        break
+
+                    logging.info(u"{:s}.attach({!r}) : Removed {:d} callback{:s} of {:d} callback{:s} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', left, '' if left == 1 else 's', 'was' if left == 1 else 'were', self.__formatter__(event)))
+                    counter += count
+                self.__attached_count[event] -= counter
+
+                # Now we can remove the start and stop callbacks.
+                expected, count = 1, self.__module.remove_hexrays_callback(start)
+                logging.info(u"{:s}.attach({!r}) : Removed {:d} start callback{:s} of {:d} callback{:s} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, '' if expected == 1 else 's', 'was' if expected == 1 else 'were', self.__formatter__(event)))
+
+                expected, count = 1, self.__module.remove_hexrays_callback(stop)
+                logging.info(u"{:s}.attach({!r}) : Removed {:d} stop callback{:s} of {:d} callback{:s} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, '' if expected == 1 else 's', 'was' if expected == 1 else 'were', self.__formatter__(event)))
+
+                # Last thing to do is to completely empty the priority queue.
+                if not super(priorityhxevent, self).detach(event):
+                    logging.critical(u"{:s}.attach({!r}) : Unable to completely detach from the {:s} event due to critical error.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+
+                # We have no callbacks currently attached, so we should now be able to clean up everything.
+                count = self.__attached_count.pop(event)
+                count and logging.debug(u"{:s}.attach({!r}) : Reference count ({:d}) for the {:s} event should have been set to {:d} due to critical error.".format('.'.join([__name__, cls.__name__]), event, count, self.__formatter__(event), 0))
+
+            # otherwise we're good and can just update our reference count.
+            if ok:
+                self.__attached_count[event] = current + 1
+                logging.info(u"{:s}.attach({!r}) : Successfully attached a callback ({:s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(resume), self.__formatter__(event)))
+
+            if not critical:
+                logging.debug(u"{:s}.attach({!r}) : Successfully re-attached a replacement stop callback ({:s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+            return ok
 
         # Attach using the super class to figure out what callable we should use.
         ok, packed = super(priorityhxevent, self).attach(event)
 
         # We failed...nothing to see here.
         if not ok:
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+            ignored = super(priorityhxevent, self).detach(event)
             return False
 
-        # Now we have a callable to use, so we just need to install it.
+        # Now we have a callables to use, so we just need to install the relevant ones.
         start, resume, stop = packed
-        if not self.__module.install_hexrays_callback(resume):
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the event {:s} with the specified callable ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(resume)))
+
+        if not self.__module.install_hexrays_callback(start):
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event with the start callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(start)))
+            ignored = super(priorityhxevent, self).detach(event)
             return False
 
-        # Last thing to do is to save our state so that we can remove it later.
-        self.__attached__[event] = resume
-        return True
+        ok = self.__module.install_hexrays_callback(stop)
+        if not ok:
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event with the stop callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(stop)))
+
+        # if we were successful at installing both, then we only need to reset
+        # our state and then we can recurse in order to complete the attachment.
+        if ok:
+            self.__attached__[event] = packed
+            self.__attached_count[event] = 0
+            return self.attach(event)
+
+        # if we couldn't install the stop callback, then we need to uninstall
+        # the one that did succeed and then we can return our failure.
+        expected, count = 1, self.__module.remove_hexrays_callback(start)
+        logging.info(u"{:s}.attach({!r}) : Removed {:d} start callback{:s} of {:d} callback{:s} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, '' if expected == 1 else 's', 'was' if expected == 1 else 'were', self.__formatter__(event)))
+
+        ignored = super(priorityhxevent, self).detach(event)
+        return False
 
     def detach(self, event):
-        '''Detach from the specified `event` so that they will not be received by Hex-Rays.'''
+        '''Detach from the specified `event` so that they will not be received by the decompiler.'''
         cls = self.__class__
         if event not in self.__events__:
-            raise NameError(u"{:s}.detach({!r}) : Unable to detach from the event {:s} due to the event being unavailable.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+            raise NameError(u"{:s}.detach({!r}) : Unable to detach from the {:s} event due to the event being unavailable.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
 
         # If it's not connected, then we need to freak out at the user.
         if event not in self.__attached__:
-            logging.warning(u"{:s}.detach({!r}) : Unable to detach from the event {:s} as it is not currently attached.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from the {:s} event as it is not currently attached.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
             return False
 
-        # When detaching, we need to empty the cache for the provided target
-        # before we can remove the hexrays callback.
-        for ok, callable in self.empty(event):
-            Flogging = logging.info if ok else logging.warning
-            Flogging(u"{:s}.detach({!r}) : {:s} the callable ({:s}) attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(event)))
+        # Because the Hex-Rays callback API wants the original callables that
+        # we gave it, we need to rip it out of our state so we can remove it.
+        start, resume, stop = self.__attached__.pop(event)
 
-        # Because Hex-Rays callback API wants the original callable that we gave it,
-        # we need to rip it out of our state so we can remove it.
-        callable = self.__attached__.pop(event)
-        count = self.__module.remove_hexrays_callback(callable)
-        logging.info(u"{:s}.detach({!r}) : Removed {:d} callback{:s} for the callable ({:s}) attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', internal.utils.pycompat.fullname(callable), self.__formatter__(event)))
+        # Remove each callable that is attached to the decompiler one-by-one.
+        counter, expected = 0, self.__attached_count[event]
+        while counter < expected:
+            count = self.__module.remove_hexrays_callback(resume)
+            left = expected - counter
+
+            # If we couldn't remove an instance of the callback, then although we
+            # might've removed everything we will still need a warning about it.
+            if not count:
+                logging.warning(u"{:s}.detach({!r}) : Unable to remove callback {:d} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 1 + counter, left, 'is' if left == 1 else 'are', self.__formatter__(event)))
+                break
+
+            logging.info(u"{:s}.detach({!r}) : Removed {:d} callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', left, 'was' if left == 1 else 'were', self.__formatter__(event)))
+            counter += count
+
+        self.__attached_count[event] -= counter
+
+        # Then we can remove the start and stop callbacks that scope everything.
+        expected, count = 1, self.__module.remove_hexrays_callback(start)
+        logging.info(u"{:s}.detach({!r}) : Removed {:d} start callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, 'was' if expected == 1 else 'were', self.__formatter__(event)))
+
+        expected, count = 1, self.__module.remove_hexrays_callback(stop)
+        logging.info(u"{:s}.detach({!r}) : Removed {:d} stop callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, 'was' if expected == 1 else 'were', self.__formatter__(event)))
+
+        count = self.__attached_count.pop(event)
+        count and logging.debug(u"{:s}.detach({!r}) : Reference count ({:d}) for the {:s} event should have been set to {:d}.".format('.'.join([__name__, cls.__name__]), event, count, self.__formatter__(event), 0))
 
         return super(priorityhxevent, self).detach(event)
 
@@ -2068,20 +2182,18 @@ class priorityhxevent(prioritybase):
         cls = self.__class__
         if not super(priorityhxevent, self).close():
             logging.critical(u"{:s}.close() : Error trying to detach from all of the events that are attached.".format('.'.join([__name__, cls.__name__])))
-            [logging.debug(u"{:s}.close() : Event {:s} is still attached{:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event), " by callable {!s}".format(self.__attached__[event]) if event in self.__attached__ else '')) for event in self]
+            [logging.debug(u"{:s}.close() : Event {:s} is still attached{:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event), " by {:d} callback{:s}".format(self.__attached_count[event], '' if self.__attached_count[event] == 1 else 's') if event in self.__attached__ else '')) for event in self]
 
         # We only fail here if our state is not empty.
         return False if self.__attached__ else True
 
     def add(self, event, callable, priority=0):
         '''Add the `callable` to the queue with the given `priority` for the specified `event`.'''
-        if event in self:
-            return super(priorityhxevent, self).add(event, callable, priority)
 
         # Attach to the event so that we can actually do stupid things with it.
         if not self.attach(event):
             cls = self.__class__
-            raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the event {:s}.".format('.'.join([__name__, cls.__name__]), event, callable, priority, self.__formatter__(event)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, callable, priority, self.__formatter__(event)))
 
         # Add the callable to our current events to call.
         return super(priorityhxevent, self).add(event, callable, priority)
