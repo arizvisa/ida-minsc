@@ -1907,35 +1907,34 @@ class priorityhook(prioritybase):
 
         assert(all(name in what for what in [self.__attached__, self.__attached_scope]))
 
-        # Start out by hooking with the instance that starts processing the priority queue.
+        # The disassembler seems to execute the hooks backwards. It appears like it pushes them
+        # onto a stack, and then consumes the stack when running them. This means that we need
+        # to start by hooking the stop instance first, with the start instance being the last.
         start, stop = self.__attached_scope[name]
-        if not start.hook():
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the start instance ({!s}) for managing the target {:s} which will result in the hooks appearing disabled.".format('.'.join([__name__, cls.__name__]), name, start, self.__formatter__(name)))
+
+        if not stop.hook():
+            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the stop instance ({!s}) for target {:s} which will result in the hooks for target {:s} being disabled.".format('.'.join([__name__, cls.__name__]), name, stop, self.__formatter__(name), self.__formatter__(name)))
             return False
 
         # Next we go through and hook all instances associated with the target. If we failed
-        # at this, we're somewhat okay as we only need to get the "stop" callable working.
+        # at this, we're somewhat okay as the stop callable was the most important thing.
         failures, count = {index for index in []}, len(self.__attached_instances[name])
         for index, instance in enumerate(self.__attached_instances[name]):
             if instance.hook():
                 continue
 
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook instance ({!s}) {:d} of {:d} for managing the target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, 1 + index, count, self.__formatter__(name)))
+            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook instance ({!s}) {:d} of {:d} for the requested target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, 1 + index, count, self.__formatter__(name)))
             failures.add(index)
 
-        # Finally we can proceed to add the final hooks for stopping each target.
+        # Finally we can proceed to add the final hook that actually starts each target.
         start, stop = self.__attached_scope[name]
 
-        ok = stop.hook()
+        ok = start.hook()
         if not ok:
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the stop instance ({!s}) for managing the target {:s}.".format('.'.join([__name__, cls.__name__]), name, stop, self.__formatter__(name)))
+            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the start instance ({!s}) for target {:s} which will result in the hooks for target {:s} being unreliable.".format('.'.join([__name__, cls.__name__]), name, start, self.__formatter__(name), self.__formatter__(name)))
 
-        # Now we just need to tally up our results and figure out what happened.
-        if ok and failures:
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook {:d} of {:d} instances for the target {:s} which will result in hooks being unreliable.".format('.'.join([__name__, cls.__name__]), name, len(falures), len(self.__attached_instances[name]), self.__formatter__(name)))
-
-        elif not ok:
-            logging.critical(u"{:s}._hook_order({!r}) : Unable to hook the stop instance ({!s}) for the target {:s} which will result in hooks being unreliable.".format('.'.join([__name__, cls.__name__]), name, stop, self.__formatter__(name)))
+        elif failures:
+            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook {:d} of {:d} instances for the target {:s} which will result in the hooks for target {:s} being unreliable.".format('.'.join([__name__, cls.__name__]), name, len(falures), len(self.__attached_instances[name]), self.__formatter__(name), self.__formatter__(name)))
 
         # If we encountered no failures then this method was successful.
         return True if ok and not failures else False
