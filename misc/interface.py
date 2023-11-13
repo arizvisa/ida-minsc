@@ -1692,7 +1692,7 @@ class priorityhook(prioritybase):
             used = sorted({name for name in itertools.chain(self.__attached__, self.__attached_scope, self.__attached_instances)})
             iterable = itertools.chain(used[:-1], map("and {:s}".format, used[-1:])) if len(used) > 2 else used
             description = ', '.join(iterable) if len(used) > 2 else ' and '.join(iterable)
-            logging.critical(u"{:s}.close() : Error trying to close the the hook object due to {:d} target{:s} ({:s}) still being connected.".format('.'.join([__name__, cls.__name__]), len(used), '' if len(used) == 1 else 's', description))
+            logging.critical(u"{:s}.close() : Error trying to close the hook object due to {:d} target{:s} ({:s}) still being connected.".format('.'.join([__name__, cls.__name__]), len(used), '' if len(used) == 1 else 's', description))
         return False if self.__attached__ else True
 
     def __unhook_order(self, name):
@@ -1855,15 +1855,15 @@ class priorityhook(prioritybase):
             continue
 
         # Next, we need to detach the "start" and "stop" instances for the target.
-        start, stop = self.__attached_scope[name]
+        start_instance, stop_instance = self.__attached_scope[name]
 
-        start_unhooked = start.unhook()
+        start_unhooked = start_instance.unhook()
         if not start_unhooked:
-            logging.warning(u"{:s}.detach({!r}) : Unable to unhook the start instance ({!s}) that is attached to target {:s}.".format('.'.join([__name__, cls.__name__]), name, start, self.__formatter__(name)))
+            logging.warning(u"{:s}.detach({!r}) : Unable to unhook the start instance ({!s}) that is attached to target {:s}.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name)))
 
-        stop_unhooked = stop.unhook()
+        stop_unhooked = stop_instance.unhook()
         if not stop_unhooked:
-            logging.warning(u"{:s}.detach({!r}) : Unable to unhook the stop instance ({!s}) attached to target {:s}.".format('.'.join([__name__, cls.__name__]), name, stop, self.__formatter__(name)))
+            logging.warning(u"{:s}.detach({!r}) : Unable to unhook the stop instance ({!s}) attached to target {:s} which will appear as if the hooks for target {:s} are disabled.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name), self.__formatter__(name)))
 
         # Figure out what happened and log a useful error message that describes the error symptom.
         if all([not start_unhooked, failures, not stop_unhooked]):
@@ -1878,14 +1878,22 @@ class priorityhook(prioritybase):
             description = "the start instance ({!s})".format(start) if not start_unhooked else "{:d} of {:d} instance{:s} ({:s})".format(count, expected, '' if expected == 1 else 's', ', '.join(iterable) if count > 2 else ' and '.join(iterable))
             logging.critical(u"{:s}.detach({!r}) : Unable to unhook {:s} attached to target {:s} which will result the hooks for target {:s} appearing unreliable.".format('.'.join([__name__, cls.__name__]), name, count, '' if count == 1 else 's', description, self.__formatter__(name), self.__formatter__(name)))
 
-        elif stop_unhooked:
-            logging.warning(u"{:s}.detach({!r}) : Unable to unhook the stop instance ({!s}) from target {:s} which will appear as if the hooks for target {:s} are disabled.".format('.'.join([__name__, cls.__name__]), name, stop, self.__formatter__(name), self.__formatter__(name)))
+        # If we couldn't unhook everything, then we need to abort.
+        if not all([start_unhooked, not failures, stop_unhooked]):
+            return False
 
         # That should be everything, so we can complete it by adjusting our dicts.
-        start, stop = self.__attached_scope.pop(name)
+        start_instance, stop_instance = self.__attached_scope.pop(name)
         instances = self.__attached_instances.pop(name)
+        packed = self.__attached__.pop(name)
 
-        return all([start_unhooked, not failures, stop_unhooked])
+        # Then we can empty all the callables that were added.
+        for ok, callable in self.empty(name):
+            Flogging = logging.info if ok else logging.warning
+            Flogging(u"{:s}.detach({!r}) : {:s} the callable ({:s}) from the target {:s}.".format('.'.join([__name__, cls.__name__]), name, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(name)))
+
+        # Finally call our parent class to complete the detach.
+        return super(priorityhook, self).detach(name)
 
     def add(self, name, callable, priority=0):
         '''Add the `callable` to the queue for the specified `name` with the given `priority`.'''
