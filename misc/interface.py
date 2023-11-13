@@ -736,10 +736,6 @@ class string(object):
         return result
 
 class prioritybase(object):
-    result = type('result', (object,), {})
-    CONTINUE = type('continue', (result,), {})()
-    STOP = type('stop', (result,), {})()
-
     def __init__(self):
         self.__cache, self.__traceback = {}, {}
 
@@ -1537,132 +1533,10 @@ class prioritybase(object):
             logging.debug(u"{:s}.closure_resume({!r}) : Coroutine #{:d} for the {:s}target {:s} finished with a captured result ({!s}) to return to the caller.".format('.'.join([__name__, cls.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result))
             return result
 
-        ## This closure is just a wrapper around the prior coroutine-driven methods for executing callables out of
-        ## the priority queue. It is purely intended to be backwards compatibile with the original implementation.
-        def closure_backwards_compatible(*parameters):
-            '''This closure is a backwards compatible implementation of the original ``prioritybase.__apply__`` closure using the coroutine-based logic.'''
-            parameters_description = format_parameters(*parameters)
-            logging.debug(u"{:s}.closure_backwards_compatible({!r}) : Received parameters ({:s}) to be used with the backwards-compatible closure for target {:s}.".format('.'.join([__name__, self.__class__.__name__]), target, parameters_description, self.__formatter__(target)))
-
-            # First we'll initialize everything and use it to capture the first result.
-            result = closure_start(*parameters)
-
-            # If initially we're being asked to stop, then just go ahead and do as we're told.
-            if result == self.STOP:
-                return result
-
-            # If we received an unexpected type, then throw up an exception.
-            elif isinstance(result, self.result):
-                cls = self.__class__
-                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure_backwards_compatible({!r}) : Unable to determine the type of result ({!r}) to return for the target {:s} with parameters ({:s}).".format('.'.join([__name__, cls.__name__]), target, result, self.__formatter__(target), parameters_description))
-
-            # Now we can resume execution until we're told not to.
-            captured, running = result, True
-            while running:
-                result = closure_resume(*parameters)
-                running = False if result is None else True
-
-                # Check if it's one of our valid return types. If we're being
-                # asked to continue, then move onto the next one.
-                if result == self.CONTINUE:
-                    continue
-
-                # If we're being asked to stop, then break the loop and terminate.
-                elif result == self.STOP:
-                    break
-
-                # If we received an unexpected type, then throw up an exception.
-                elif isinstance(result, self.result):
-                    cls = self.__class__
-                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.closure_backwards_compatible({!r}) : Unable to determine the type of result ({!r}) returned for target {:s} with parameters ({:s}).".format('.'.join([__name__, cls.__name__]), target, result, self.__formatter__(target), parameters_description))
-
-                # Otherwise we need to save what we got. If it was different, then
-                # warn the user that someone is trying to interfere with results.
-                elif result != captured:
-                    cls = self.__class__
-                    logging.warning(u"{:s}.closure_backwards_compatible({!r}) : Captured a result ({!s}) for target {:s} with parameters ({:s}) that is different than the previous result ({!s}).".format('.'.join([__name__, cls.__name__]), target, result, self.__formatter__(target), parameters_description, captured))
-
-                # Assign the captured return code now that we know what it is.
-                captured = captured if result is None else result
-
-            # Stop executing the coroutine and return whatever we captured.
-            closure_stop(*parameters)
-            return captured
-
-        ## Define the closure that we'll hand off to attach
-        def closure(*parameters):
-            if target not in self.__cache or target in self.__disabled:
-                return
-
-            # First we need to snapshot the callables that we're going to execute.
-            mutex, queue_ = self.__cache[target]
-            with mutex: hookq = queue_[:]
-
-            # Iterate through our priorityqueue extracting each callable and
-            # executing it with whatever we were given as the parameters.
-            captured = None
-            for priority, callable in heapq.nsmallest(len(hookq), hookq, key=operator.attrgetter('priority')):
-                logging.debug(u"{:s}.callable({:s}) : Dispatching parameters ({:s}) to target {:s} with priority {:+d} using {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), self.__formatter__(target), priority, internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
-
-                try:
-                    result = callable(*parameters)
-
-                # if we caught an exception, then inform the user about it and stop processing our queue
-                except:
-                    cls = self.__class__
-                    bt = traceback.format_list(self.__traceback[target, callable])
-                    current = str().join(traceback.format_exception(*sys.exc_info()))
-
-                    format = functools.partial(u"{:s}.callable({:s}) : {:s}".format, '.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)))
-                    logging.fatal(format(u"Target {:s} for {:s} with priority {:+d} raised an exception while executing.".format(self.__formatter__(target), internal.utils.pycompat.fullname(callable), priority)))
-                    logging.warning(format(u"Traceback ({:s} was attached at):".format(self.__formatter__(target))))
-                    [ logging.warning(format(item)) for item in str().join(bt).split('\n') ]
-                    [ logging.warning(format(item)) for item in current.split('\n') ]
-
-                    result = self.STOP
-
-                # Check if it's one of our valid return types. If we're being
-                # asked to continue, then move onto the next one.
-                if result == self.CONTINUE:
-                    continue
-
-                # If we're being asked to stop, then break the loop and terminate.
-                elif result == self.STOP:
-                    break
-
-                # If we received an unexpected type, then throw up an exception.
-                elif isinstance(result, self.result):
-                    cls = self.__class__
-                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.callable({:s}) : Unable to determine the type of result ({!r}) returned for target {:s} from {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
-
-                # If there was no result, then just continue on like nothing happened.
-                elif result is None:
-                    continue
-
-                # Otherwise we need to save what we got. If it was different, then
-                # warn the user that someone is trying to interfere with results.
-                elif captured is None:
-                    cls = self.__class__
-                    logging.info(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({:s}) to return to the caller.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), internal.utils.pycompat.fullname(callable)))
-
-                elif result != captured:
-                    cls = self.__class__
-                    logging.warning(u"{:s}.callable({:s}) : Captured a result ({!s}) for target {:s} from callable ({:s}) that is different than the previous result ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, self.__formatter__(target), internal.utils.pycompat.fullname(callable), captured))
-
-                # Assign the captured return code now that we know what it is.
-                captured = captured if result is None else result
-            return captured
-
-        # Define a placeholder that can take parameters but return nothing.
-        def closure_none(*args, **kwargs):
-            return
-
         # That's it. We just need to cache the closures that capture our current scope and
         # process the callables assigned to the specified target, and then we can return them.
         self.__target_scopes[target] = State
-        #result = closure_start, closure_resume, closure_stop
-        #result = closure_none, closure_backwards_compatible, closure_none
-        result = closure_none, closure, closure_none
+        result = closure_start, closure_resume, closure_stop
         State.references = [weakref.ref(item) for item in result]
         return tuple(ref() for ref in State.references)
 
