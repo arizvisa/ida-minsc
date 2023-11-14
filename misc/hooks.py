@@ -2313,12 +2313,71 @@ class Scheduler(object):
         if retained:
             self.__transitions[source, target][:] = [internal.utils.priorty_tuple(priority, F) for priority, F in retained]
 
-        # Otherwise we can just remove the entire quere from the specified transition.
+        # Otherwise we can just remove the entire queue from the specified transition.
         else:
             self.__transitions.pop((source, target))
 
         self.__tracebacks.pop((source, target, callable), None)
         return True if counter else False
+
+    def pop(self, state, index=-1):
+        '''Pop the item at the specified `index` from the given `state` transition.'''
+        [source, target] = state if hasattr(state, '__iter__') and not isinstance(state, internal.types.string) else [None, state]
+        [source, target] = [(item if isinstance(item, (DatabaseState, internal.types.none)) else getattr(self.database, item) if isinstance(item, internal.types.string) and hasattr(self.database, item) else item) for item in [source, target]]
+
+        # Search through the specified queue for whatever elements match the given priority.
+        retained = []
+        for index, (priority, F) in enumerate(self.__transitions[source, target]):
+            retained.append((priority, F))
+
+        # Pop off whatever result the user asked for and then put everything
+        # back into the transition queue without what they asked for.
+        item = retained.pop(index)
+        if retained:
+            self.__transitions[source, target][:] = [internal.utils.priorty_tuple(priority, F) for priority, F in retained]
+
+        # Otherwise the transition queue is empty and we can remove it entirely.
+        else:
+            self.__transitions.pop((source, target))
+
+        # Unpack whatever we just removed, clear it from the traceback, and return it.
+        priority, result = item
+        self.__traceback__((source, target, result), None)
+        return result
+
+    def remove(self, state, priority):
+        '''Remove the first callable from the specified `state` transition that has the given `priority`.'''
+        [source, target] = state if hasattr(state, '__iter__') and not isinstance(state, internal.types.string) else [None, state]
+        [source, target] = [(item if isinstance(item, (DatabaseState, internal.types.none)) else getattr(self.database, item) if isinstance(item, internal.types.string) and hasattr(self.database, item) else item) for item in [source, target]]
+        transition_description = [(lambda state: 'any' if state is None else state.__name__)(item) for item in [source, target]]
+
+        # Search through the specified queue for whatever elements match the given priority.
+        retained, priority_table = [], {}
+        for index, (priority, F) in enumerate(self.__transitions[source, target]):
+            retained.append((priority, F))
+            priority_table.setdefault(priority, []).append(index)
+
+        # If the priority doesn't exist, then throw up an exception so they know what's up.
+        if priority not in priority_table:
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.remove({:s}, {:s}) : Unable to locate a callable with the specified priority ({:s}).".format('.'.join([__name__, cls.__name__]), ' -> '.join(transition_description), format(priority), format(priority)))
+
+        # Figure out the element that we're going to remove.
+        index = priority_table[priority].pop(0)
+        item = retained.pop(index)
+
+        # Combine the items that we retained back into the transitions list.
+        if retained:
+            self.__transitions[source, target][:] = [internal.utils.priorty_tuple(priority, F) for priority, F in retained]
+
+        # Otherwise it's empty and we can remove the transition entirely.
+        else:
+            self.__transitions.pop((source, target))
+
+        # Now we can remove the item from our tracebacks.
+        priority, result = item
+        self.__tracebacks.pop((source, target, result), None)
+        return result
 
     def __apply_transition(self, source, destination):
         '''Execute all of the registered callables when transitioning from the `source` state to the `destination` state.'''
