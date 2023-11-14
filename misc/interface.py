@@ -1213,10 +1213,10 @@ class prioritybase(object):
                 # unpack the parameters and compare them with whatever we received previously. this way we
                 # can issue a warning if the parameters have changed between the execution of each hook.
                 if index > 0 and not same_parameters((old_args, old_kwargs), parameters):
-                    logging.warning(u"{:s}.coroutine_when_enabled({!r}) : Parameters received for the target {:s} ({:+d}) have unexpectedly changed from ({:s}) to ({:s}) during execution of {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), priority, parameters_description, format_parameters(*old_args, **old_kwargs), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
+                    logging.debug(u"{:s}.coroutine_when_enabled({!r}) : Parameters received for the target {:s} ({:+d}) have unexpectedly changed from ({:s}) to ({:s}) during execution of {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), priority, parameters_description, format_parameters(*old_args, **old_kwargs), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
 
                 # execute the callable with the parameters we were given.
-                logging.debug(u"{:s}.coroutine_when_enabled({!r}) : Dispatching parameters ({:s}) for target {:s} ({:+d}) to callable {:d} of {:d} at {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), target, parameters_description, self.__formatter__(target), priority, 1 + index, len(hookq), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
+                logging.info(u"{:s}.coroutine_when_enabled({!r}) : Dispatching parameters ({:s}) for target {:s} ({:+d}) to callable {:d} of {:d} at {:s} ({:s}).".format('.'.join([__name__, self.__class__.__name__]), target, parameters_description, self.__formatter__(target), priority, 1 + index, len(hookq), internal.utils.pycompat.fullname(callable), "{:s}:{:d}".format(*internal.utils.pycompat.file(callable))))
                 try:
                     result = callable(*args, **kwargs)
 
@@ -1244,11 +1244,11 @@ class prioritybase(object):
                 while True:
                     parameters = (yield result)
                     args, kwargs = parameters
-                    logging.debug(u"{:s}.coroutine_when_enabled({!r}) : Coroutine for the target {:s} has received parameters ({:s}) and is still waiting for termination.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), format_parameters(*args, **kwargs)))
+                    logging.info(u"{:s}.coroutine_when_enabled({!r}) : Coroutine for the target {:s} has received parameters ({:s}) and is still waiting for termination.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), format_parameters(*args, **kwargs)))
 
                     # verify that our parameters haven't changed so that we can warn the user about it.
                     if not same_parameters((old_args, old_kwargs), parameters):
-                        logging.info(u"{:s}.coroutine_when_enabled({!r}) : Parameters received for the target {:s} have unexpectedly changed from ({:s}) to ({:s}) while waiting for termination.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), parameters_description, format_parameters(*args, **kwargs)))
+                        logging.debug(u"{:s}.coroutine_when_enabled({!r}) : Parameters received for the target {:s} have unexpectedly changed from ({:s}) to ({:s}) while waiting for termination.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), parameters_description, format_parameters(*args, **kwargs)))
                     continue
 
             # at this point, we should be able to clean up everything if anything.
@@ -1311,7 +1311,7 @@ class prioritybase(object):
             # Then we can start this coroutine and ensure it gives us the start signal.
             ok, result = True, next(coro)
             if not isinstance(result, Signal):
-                logging.critical(u"{:s}.closure_start({!r}) : Coroutine #{:d} for the {:s}target {:s} returned a non-signal ({!r}) which will be returned explicitly.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result))
+                logging.critical(u"{:s}.closure_start({!r}) : Coroutine #{:d} for the {:s}target {:s} returned a non-signal ({!r}) which will be explicitly returned.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result))
                 ok = False
 
             elif result != State.BEGIN:
@@ -1366,10 +1366,10 @@ class prioritybase(object):
             if result != State.END:
                 logging.debug(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} returned an unexpected signal ({!r}) and will require consuming {:d} item{:s} from its queue.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result, len(self.__cache.get(target, [])), '' if self.__cache.get(target, []) == 1 else 's'))
 
-                logging.info(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the first {:s} due to being canceled.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
+                logging.debug(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the first {:s} due to being canceled.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
                 while result != State.END:
                     result = coro.send(parameters)
-                    logging.info(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the next {:s} due to being canceled.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
+                    logging.debug(u"{:s}.closure_cancel({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the next {:s} due to being canceled.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
 
                 assert(result == State.END)
 
@@ -1409,10 +1409,10 @@ class prioritybase(object):
             if result != State.END:
                 logging.debug(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} returned an unexpected signal ({!r}) and will require consuming {:d} item{:s} from its queue.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), result, len(self.__cache.get(target, [])), '' if self.__cache.get(target, []) == 1 else 's'))
 
-                logging.info(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the first {:s} due to requested stop.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
+                logging.debug(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the first {:s} due to requested stop.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
                 while result != State.END:
                     result = coro.send(parameters)
-                    logging.info(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the next {:s} due to requested stop.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
+                    logging.debug(u"{:s}.closure_stop({!r}) : Coroutine #{:d} for the {:s}target {:s} has discarded the next {:s} due to requested stop.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target), "ignored result ({!r})".format(result) if isinstance(result, (Signal, internal.types.none)) else "result ({!r})".format(result)))
 
                 assert(result == State.END)
 
@@ -1440,13 +1440,13 @@ class prioritybase(object):
             # First check to see if our running queue has something inside it. If it doesn't, then we
             # can hand off execution to closure_start which should initialize it and then call us back.
             if not State.running_queue:
-                logging.info(u"{:s}.closure_resume({!r}) : No coroutines for the {:s}target {:s} exist within the running queue and will require manual start".format('.'.join([__name__, self.__class__.__name__]), target, 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
+                logging.info(u"{:s}.closure_resume({!r}) : No coroutines for the {:s}target {:s} exist within the running queue and will require manually being started.".format('.'.join([__name__, self.__class__.__name__]), target, 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
                 return closure_start(*args, **kwargs)
 
             # Then we can grab our very latest coroutine and confirm that it was actually started.
             coro = State.running_queue[-1]
             if not is_coroutine_started(coro):
-                logging.critical(u"{:s}.closure_resume({!r}) : Coroutine #{:d} for the {:s}target {:s} was unable to be resumed due to a start failure.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
+                logging.critical(u"{:s}.closure_resume({!r}) : Coroutine #{:d} for the {:s}target {:s} was unable to be resumed due to startup failure.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
                 return
 
             # Before we do anything, though, we need to verify that the target has not
