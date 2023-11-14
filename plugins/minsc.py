@@ -928,6 +928,7 @@ def startup(namespace=None):
     try:
         import hook
         hook.notification
+        hook.scheduler
 
     except ImportError:
         logging.critical("{:s} : An error occured while trying to import the \"{:s}\" module.".format(__name__, 'hook'), exc_info=True)
@@ -963,7 +964,7 @@ def startup(namespace=None):
     # set of importable python modules. Log a warning and try the user's dotfile.
     except AttributeError:
         logging.warning("{:s} : An error occured while trying to access the \"{:s}\" module which will result in missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
-        namespace and dotfile(namespace)
+        namespace and dotfile(namespace) and hook.scheduler.modulate(hook.scheduler.database.unavailable)
         return
 
     # Finally we can register the functions that will actually be responsible for
@@ -972,6 +973,7 @@ def startup(namespace=None):
     try:
         hook.notification.add(idaapi.NW_INITIDA, internal.hooks.make_ida_not_suck_cocks, -1000)
         namespace and hook.notification.add(idaapi.NW_INITIDA, execute_user_dotfile, 0)
+        hook.notification.add(idaapi.NW_INITIDA, (lambda *args: hook.scheduler.modulate(hook.scheduler.database.unavailable)), +1000)
 
     # If installing that hook failed, then check if we're running in batch mode. If
     # we are, then just immediately register things and load the user dotfile.
@@ -996,6 +998,9 @@ def startup(namespace=None):
             idaapi.register_timer(TIMEOUT, load_plugin_and_execute_user_dotfile)
             six.print_('=' * 86)
         del(TIMEOUT)
+
+        # Modulate the scheduler once we've done everything that was necessary.
+        hook.scheduler.modulate(hook.scheduler.database.unavailable)
 
     # If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
     else:
@@ -1142,6 +1147,10 @@ class MINSC(idaapi.plugin_t):
         else:
             logging.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(__name__))
             self.state = self.__class__.state = 'disabled'
+
+        # Modulate the scheduler now that we're loaded.
+        scheduler = __import__('hook').scheduler
+        scheduler.modulate(scheduler.database.unavailable)
 
         return idaapi.PLUGIN_KEEP
 
