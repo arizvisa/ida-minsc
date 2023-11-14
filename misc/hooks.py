@@ -2171,6 +2171,11 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.default(hook.idb, 'extra_cmt_changed', extra_cmt.changed, 0)
         # XXX: we schedule extra comments by default because they give us segment boundaries.
 
+    # add any hooks that are tied to the existence of any plugins.
+    if hasattr(hook, 'hx'):
+        hook.ui.add('plugin_loaded', hook.hx.__plugin_loaded__, -10000)
+        hook.ui.add('plugin_unloading', hook.hx.__plugin_unloading__, +10000)
+
     ## just some debugging notification hooks
     #[ hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
     #[ hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
