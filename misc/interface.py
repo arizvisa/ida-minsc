@@ -763,48 +763,6 @@ class prioritybase(object):
     def __formatter__(self, target):
         raise NotImplementedError
 
-    def attach(self, target):
-        '''Intended to be called as a supermethod for the specified `target` that returns True or False along with a tuple containing callables managing the scope of the hook.'''
-        if target in self.__cache:
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to target {:s} due to it already being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
-            packed = internal.utils.fidentity, internal.utils.fidentity, internal.utils.fidentity
-            return False, packed
-
-        # Otherwise we need to initialize the cache with a mutex and a list, then
-        # we can return the callable that should be attached by the implementation.
-        self.__cache[target] = threading.Lock(), []
-        start, resume, stop = self.__scope__(target)
-        packed = start, resume, stop
-        return True, packed
-
-    def detach(self, target):
-        '''Intended to be called as a supermethod for the specified `target` that removes the target from the cache.'''
-        if target not in self.__cache:
-            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target {:s} due to it not being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
-            return False
-
-        # grab the mutex and check if there's any callables left. if there are, then we're
-        # unable to detach the target. otherwise, we can remove it since it's empty anyways.
-        mutex, queue_ = self.__cache[target]
-        with mutex:
-            queue, count = queue_, len(queue_)
-            popped = None if queue else self.__cache.pop(target)
-            ok = False if popped is None else True
-
-            # if we were able to detach callables from the cache, then
-            # we can proceed to remove their tracebacks too.
-            discarded = []
-            while ok and queue:
-                priority, callable = queue.pop()
-                res = self.__traceback.pop((target, callable), None)
-                discarded.append((target, priority, callable, res))
-
-            assert(len(discarded) == count if ok else len(queue) == count)
-
-        if not ok:
-            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target {:s} due to {:d} callable{:s} still existing in its priority queue.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target), count, '' if count == 1 else 's'))
-        return ok
-
     def close(self):
         '''Disconnect from all of the targets that are currently attached'''
         ok, items = True, {item for item in self.__cache}
@@ -1154,45 +1112,31 @@ class prioritybase(object):
             yield ok, callable
         return
 
-    def __unscope__(self, target):
-        '''Remove the currently allocated scope for the given `target` (if it is not referenced) and return it to the caller.'''
-        cls = self.__class__
-
-        # if the scope doesn't exist, there's nothing to do here.
-        if target not in self.__target_scopes:
-            return False
-
-        # grab each component that composes the scope for the selected target.
-        state = self.__target_scopes.pop(target)
-
-        # if all our references are none, then we can can let the
-        # state go out of scope due to the closures still being used.
-        if all(ref() is None for ref in state.references):
-            return True
-
-        # otherwise there's still a closure attached, and we need to reassign the scope back
-        # into our cache. we subtract 1 from the reference count for the list comprehension.
-        self.__target_scopes[target] = state
-        counts = [0 if ref() is None else sys.getrefcount(ref()) - 1 for ref in state.references]
-        logging.warning(u"{:s}.__unscope__({!r}) : Refusing to remove the scope associated with target {:s} due to it still being referenced by {:d} object{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), sum(counts), '' if sum(counts) == 1 else 's', ', '.join(map("{:d}".format, counts))))
-        return False
-
-    def __scope__(self, target):
-        """Return a tuple of three closures the given `target` that are used to control the execution of all the callables attached to the specified `target`.
+    def attach(self, target):
+        """Return a tuple containing a count and a set of closures for the given `target` that are used to control the execution of the attached callables.
 
         Each closure is intended to be attached to whatever is being hooked by each
         callable. The first closure is used to initialize execution and is intended
         to be executed first. The second closure will execute each individual callable,
         and the third closure will reset execution so that they can be called again.
+
+        This method is intended to be called as a supermethod for the specified `target`.
         """
         cls = self.__class__
 
-        # If this target has had its scope already created, then return
-        # return the closures that use it instead of recreating them.
+        # First grab the specified target and count how many callables
+        # that it needs to execute in order for it to work properly.
         cached = self.__target_scopes.get(target)
+
+        mutex, queue_ = self.__cache.setdefault(target, (threading.Lock(), []))
+        with mutex:
+            count = len(queue_)
+
+        # If this target has had its scope already created, then we can return
+        # return the count and the closures that use it instead of recreating them.
         if cached is not None:
             iterable = (ref() for ref in cached.references)
-            return tuple(iterable)
+            return count, tuple(iterable)
 
         ## Begin the scope for each of the closures returned by this method.
         class Signal(object):
@@ -1538,7 +1482,36 @@ class prioritybase(object):
         self.__target_scopes[target] = State
         result = closure_start, closure_resume, closure_stop
         State.references = [weakref.ref(item) for item in result]
-        return tuple(ref() for ref in State.references)
+        return count, tuple(ref() for ref in State.references)
+
+    def detach(self, target):
+        """Detach the given `target` and return whether or not the target was removed successfully.
+
+        This method is intended to be called as a supermethod for the specified `target`.
+        """
+        cls = self.__class__
+
+        # First count the number of references that we're going to return later.
+        mutex, queue_ = self.__cache.get(target, (threading.Lock(), []))
+        with mutex:
+            count = len(queue_)
+
+        # If the target hasn't been attached, then there's really nothing to do.
+        if target not in self.__target_scopes:
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from target {:s} due to it not being attached.".format('.'.join([__name__, self.__class__.__name__]), target, self.__formatter__(target)))
+            return False
+
+        # Grab each component that composes the scope for the selected target,
+        # and check their references. If they're all none, then we can pop them
+        # from our scopes and return success. Otherwise they're still in use.
+        state = self.__target_scopes.pop(target)
+        if all(ref() is None for ref in state.references):
+            return True
+
+        # Otherwise we'll log a debug message describing how many references are left.
+        references = [0 if ref() is None else sys.getrefcount(ref()) - 1 for ref in state.references]
+        logging.debug(u"{:s}.detach({!r}) : Target {:s} is still being referenced by {:d} object{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), sum(references), '' if sum(references) == 1 else 's', ', '.join(map("{:d}".format, references))))
+        return True
 
 class priorityhook(prioritybase):
     """
@@ -1684,7 +1657,9 @@ class priorityhook(prioritybase):
 
                 continue
 
-            logging.info(u"{:s}.close() : Hooks for target {:s} were not able to be completely closed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target)))
+            names = [name for name in sorted(self.__attached__) if any([name in self.__attached_scope, name in self.__attached_instances])]
+            iterable = itertools.chain(map(self.__formatter__, names[:-1]), ("and {:s}".format(self.__formatter__(name)) for name in names[-1:])) if len(names) > 2 else [' and '.join(map(self.__formatter__, names))]
+            logging.info(u"{:s}.close() : Hooks for target{:s} {:s} were not able to be completely closed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), '' if len(names) == 1 else 's', ', '.join(iterable)))
 
         # That was all we needed to do. If there's still some shit left in any of our attached
         # dictionaries, we need to log a warning since we couldn't disconnect some of them.
@@ -1761,10 +1736,10 @@ class priorityhook(prioritybase):
         # The disassembler seems to execute the hooks backwards. It appears like it pushes them
         # onto a stack, and then consumes the stack when running them. This means that we need
         # to start by hooking the stop instance first, with the start instance being the last.
-        start, stop = self.__attached_scope[name]
+        _, stop_instance = self.__attached_scope[name]
 
-        if not stop.hook():
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the stop instance ({!s}) for target {:s} which will result in the hooks for target {:s} being disabled.".format('.'.join([__name__, cls.__name__]), name, stop, self.__formatter__(name), self.__formatter__(name)))
+        if not stop_instance.hook():
+            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the stop instance ({!s}) for the target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name), self.__formatter__(name)))
             return False
 
         # Next we go through and hook all instances associated with the target. If we failed
@@ -1774,21 +1749,40 @@ class priorityhook(prioritybase):
             if instance.hook():
                 continue
 
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook instance ({!s}) {:d} of {:d} for the requested target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, 1 + index, count, self.__formatter__(name)))
+            logging.info(u"{:s}._hook_order({!r}) : Unable to hook instance ({!s}) {:d} of {:d} for the requested target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, 1 + index, count, self.__formatter__(name)))
             failures.add(index)
 
         # Finally we can proceed to add the final hook that actually starts each target.
-        start, stop = self.__attached_scope[name]
+        start_instance, _ = self.__attached_scope[name]
 
-        ok = start.hook()
+        ok = start_instance.hook()
         if not ok:
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the start instance ({!s}) for target {:s} which will result in the hooks for target {:s} being unreliable.".format('.'.join([__name__, cls.__name__]), name, start, self.__formatter__(name), self.__formatter__(name)))
+            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the start instance ({!s}) for target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name), self.__formatter__(name)))
 
         elif failures:
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook {:d} of {:d} instances for the target {:s} which will result in the hooks for target {:s} being unreliable.".format('.'.join([__name__, cls.__name__]), name, len(falures), len(self.__attached_instances[name]), self.__formatter__(name), self.__formatter__(name)))
+            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook {:d} of {:d} instances for the target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, len(falures), len(self.__attached_instances[name]), self.__formatter__(name), self.__formatter__(name)))
 
-        # If we encountered no failures then this method was successful.
-        return True if ok and not failures else False
+        # If we encountered no errors, then we can return success.
+        else:
+            return True
+
+        # If we failed attaching hooks, then we need to undo everything we did.
+        if not start_instance.unhook():
+            logging.critical(u"{:s}._hook_order({!r}) : Error while trying unhook the start instance ({!s}) from the target {:s} due to previous failure.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name)))
+
+        failed = []
+        for index, instance in enumerate(self.__attached_instances[name]):
+            if instance.unhook():
+                continue
+            failed.append(index)
+
+        if failed:
+            logging.critical(u"{:s}._hook_order({!r}) : Error while trying to unhook {:d} of {:d} instances from the target {:s} due to previous failure.".format('.'.join([__name__, cls.__name__]), name, len(falures), len(self.__attached_instances[name]), self.__formatter__(name)))
+
+        if not stop_instance.unhook():
+            logging.critical(u"{:s}._hook_order({!r}) : Error while trying unhook the stop instance ({!s}) from the target {:s} due to previous failure.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name)))
+
+        return False
 
     def attach(self, name):
         '''Attach the target specified by `name` to the hook object.'''
@@ -1796,37 +1790,51 @@ class priorityhook(prioritybase):
         if name not in self.__attachable__:
             raise NameError(u"{:s}.attach({!r}) : Unable to attach to the target {:s} due to the target being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
+        # First we'll call our supermethod to figure out how many references
+        # that we'll need to create in order to properly attach to the target.
+        count, packed = super(priorityhook, self).attach(name)
+
         # If the attribute has not yet been attached, then we need to
         # grab our callables from the caller and then assign them.
         if name not in self.__attached__:
-            ok, packed = super(priorityhook, self).attach(name)
-            if not ok:
-                return False
+            start, _, stop = packed
 
-            # Start unpacking our closures from the caller, and then create two objects
+            # After unpacking our closures from the caller, we instantiate two objects
             # that are intended to manage the scope of the hooks we're going to attach.
-            start, resume, stop = packed
-
             instance_start = self.__new_instance__({name : start})
             instance_stop = self.__new_instance__({name : stop})
 
             # Now we can assign our instances that manage the scope for our
-            # hook, and stach our callables within our "attached" dictionary.
-            self.__attached__[name] = start, resume, stop
+            # hook, and stash our callables within our "attached" dictionary.
+            self.__attached__[name] = packed
             self.__attached_scope[name] = instance_start, instance_stop
 
         # Before doing absolutely anything, we'll need to remove our current hooks.
         if not self.__unhook_order(name):
             logging.warning(u"{:s}.attach({!r}) : Unexpected error trying to unhook the current callables prior to attaching to target {:s}.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
+            return False
 
-        # Next, we can unpack our callables and create an instance of the hook object.
-        start, resume, stop = self.__attached__[name]
+        # Next, we can unpack our callables that we're going to use.
+        _, resume, _ = self.__attached__[name]
 
+        # If the current number of instances is smaller than
+        # our count, then we create instances until they match.
         instances = self.__attached_instances.setdefault(name, [])
-        instances.append(self.__new_instance__({name : resume}))
+        current = len(instances)
+        if len(instances) < count:
+            while len(instances) < count:
+                instance = self.__new_instance__({name : resume})
+                instances.append(instance)
+            logging.debug(u"{:s}.attach({!r}) : Created {:d} instance{:s} for hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, len(instances) - current, '' if len(instances) - current == 1 else 's', self.__formatter__(name)))
+
+        # If we have too many instances, then we remove until they match.
+        elif len(instances) > count:
+            while len(instances) > count:
+                instance = instances.pop()
+            logging.debug(u"{:s}.attach({!r}) : Removed {:d} instance{:s} from hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, current - len(instances), '' if current - len(instances) == 1 else 's', self.__formatter__(name)))
 
         # Our instances should all be ready, so we just need enable all the hooks in order.
-        if self.__hook_order(name):
+        if len(instances) == count and self.__hook_order(name):
             return True
 
         # If we couldn't enable the hooks, then this method was not successful.
@@ -1846,53 +1854,28 @@ class priorityhook(prioritybase):
 
         assert(name in self.__attached_scope)
 
-        # Start at the very beginning by detaching instances for our target.
-        failures, count = {}, len(self.__attached_instances[name])
-        for index, instance in enumerate(self.__attached_instances[name]):
-            if not instance.unhook():
-                logging.warning(u"{:s}.detach({!r}) : Unable to unhook instance ({!s}) {:d} of {:d} that is attached to the target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, self.__formatter__(name)))
-                failures.setdefault(name, []).append(instance)
-            continue
-
-        # Next, we need to detach the "start" and "stop" instances for the target.
-        start_instance, stop_instance = self.__attached_scope[name]
-
-        start_unhooked = start_instance.unhook()
-        if not start_unhooked:
-            logging.warning(u"{:s}.detach({!r}) : Unable to unhook the start instance ({!s}) that is attached to target {:s}.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name)))
-
-        stop_unhooked = stop_instance.unhook()
-        if not stop_unhooked:
-            logging.warning(u"{:s}.detach({!r}) : Unable to unhook the stop instance ({!s}) attached to target {:s} which will appear as if the hooks for target {:s} are disabled.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name), self.__formatter__(name)))
-
-        # Figure out what happened and log a useful error message that describes the error symptom.
-        if all([not start_unhooked, failures, not stop_unhooked]):
-            count = 2 + len(failures)
-            iterable = itertools.chain(['start', 'stop'], map("{:d}".format, failures[:-1]), map("and {:d}".format, failures[-1:])) if failures else ['start', 'stop']
-            description = ', '.join(iterable) if len(failures) else ' and '.join(iterable)
-            logging.critical(u"{:s}.detach({!r}) : Unable to unhook {:d} instance{:s} ({:s}) attached to target {:s} which will result in instability.".format('.'.join([__name__, cls.__name__]), name, count, '' if count == 1 else 's', description, self.__formatter__(name)))
-
-        elif any([not start_unhooked, failures]):
-            count, expected = len(failures), len(self.__attached_instances[name])
-            iterable = itertools.chain(map("{:d}".format, failures[:-1]), map("and {:d}".format, failures[-1:])) if count > 2 else map("{:d}".format, failures)
-            description = "the start instance ({!s})".format(start) if not start_unhooked else "{:d} of {:d} instance{:s} ({:s})".format(count, expected, '' if expected == 1 else 's', ', '.join(iterable) if count > 2 else ' and '.join(iterable))
-            logging.critical(u"{:s}.detach({!r}) : Unable to unhook {:s} attached to target {:s} which will result the hooks for target {:s} appearing unreliable.".format('.'.join([__name__, cls.__name__]), name, count, '' if count == 1 else 's', description, self.__formatter__(name), self.__formatter__(name)))
-
-        # If we couldn't unhook everything, then we need to abort.
-        if not all([start_unhooked, not failures, stop_unhooked]):
+        # First we'll unhook everything. This is required so that we free up references.
+        if not self.__unhook_order(name):
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from the target {:s} due to being unable to completely unhook all attached instances.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
             return False
 
-        # That should be everything, so we can complete it by adjusting our dicts.
+        # Now that everything was unhooked, we can start emptying out instances.
+        instances = self.__attached_instances[name]
+        while instances:
+            instance = instances.pop()
+            del(instance)
+
+        # Next we need to remove the "start" and "stop" instances for the target.
         start_instance, stop_instance = self.__attached_scope.pop(name)
+        del(start_instance, stop_instance)
+
+        # With luck, that should be everything. So we can pop the target
+        # from our attached_instances and our "attached" dictionary.
         instances = self.__attached_instances.pop(name)
         packed = self.__attached__.pop(name)
+        del(instances, packed)
 
-        # Then we can empty all the callables that were added.
-        for ok, callable in self.empty(name):
-            Flogging = logging.info if ok else logging.warning
-            Flogging(u"{:s}.detach({!r}) : {:s} the callable ({:s}) from the target {:s}.".format('.'.join([__name__, cls.__name__]), name, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(name)))
-
-        # Finally call our parent class to complete the detach.
+        # Then we can finally call our parent class to complete the detach.
         return super(priorityhook, self).detach(name)
 
     def add(self, name, callable, priority=0):
@@ -1956,110 +1939,114 @@ class prioritynotification(prioritybase):
         '''Attach to the specified `notification` in order to receive events from it.'''
         cls = self.__class__
 
-        # First we need to check if we haven't been attached to the notification yet.
+        if not isinstance(notification, internal.types.integer):
+            logging.warning(u"{:s}.detach({!r}) : Unable to attach to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification)))
+            return False
+
+        # First we'll call our supermethod to figure out how many references
+        # that we'll need to create in order to properly attach to the target.
+        count, packed = super(prioritynotification, self).attach(notification)
+
+        # Then we need to check if we haven't been attached to the notification yet.
         if notification not in self.__attached__:
-            ok, packed = super(prioritynotification, self).attach(notification)
-            if not ok:
-                return False
+            start, _, stop = packed
 
-            # We have our closures, so attach them if we can.
-            start, resume, stop = packed
-
+            # Notifications get attached in order, so we use the "start" callable first.
             if not idaapi.notify_when(notification, start):
                 logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} notification with the start callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), internal.utils.pycompat.fullname(start)))
-                ignored = super(prioritynotification, self).detach(notification)
                 return False
 
+            # Then we can attach the "stop" callable for the notification.
             ok = idaapi.notify_when(notification, stop)
             if not ok:
                 logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} notification with the stop callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), internal.utils.pycompat.fullname(stop)))
 
-            # If we failed at attaching the stop notification, then we need to try
-            # try to remove the start notification and bail if we couldn't do that.
+            # If we failed at attaching the "stop" callable, then we need to try
+            # try to remove the "start" callable and bail if we couldn't do that.
             if not ok and idaapi.notify_when(notification | idaapi.NW_REMOVE, start):
                 logging.critical(u"{:s}.attach({!r}) : Unable to recover from error and detach the start callable ({:s}) from the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
 
-            # Since we failed anyway, we only need to ask our
-            # parent class to detach and then return False.
+            # If we failed at attaching either of the callables to the notification, then bail.
             if not ok:
-                ignored = super(prioritynotification, self).detach(notification)
                 return False
 
             logging.debug(u"{:s}.attach({!r}) : Successfully attached start ({:s}) and stop ({:s} callables to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
-            self.__attached__[notification] = start, resume, stop
+            self.__attached__[notification] = packed
+            self.__attached_callables[notification] = []
 
-        # Now we know that the notification has been attached to, so we
-        # only need to add references to the "resume" callable to continue.
-        packed, references = self.__attached__[notification], self.__attached_callables.setdefault(notification, [])
+        # Now we've guaranteed that the notification has been attached to. So, we
+        # only need to add references to the "resume" callable in order to continue.
+        packed, references = self.__attached__[notification], self.__attached_callables[notification]
         start, resume, stop = packed
 
-        count = len(references)
         if not idaapi.notify_when(notification | idaapi.NW_REMOVE, stop):
-            logging.warning(u"{:s}.attach({!r}) : Refusing to attach {:+d} reference to the {:s} notification ({:d} reference{:s}) due to being unable to temporarily remove stop callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, 1, self.__formatter__(notification), count, '' if count == 1 else 's', internal.utils.pycompat.fullname(stop)))
+            logging.warning(u"{:s}.attach({!r}) : Refusing to attach {:+d} reference to the {:s} notification ({:d} reference{:s}) due to being unable to temporarily remove stop callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, 1, self.__formatter__(notification), len(references), '' if len(references) == 1 else 's', internal.utils.pycompat.fullname(stop)))
             return False
 
         logging.debug(u"{:s}.attach({!r}) : Temporarily removed the stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
 
         # Next we just need to create a copy of "resume" that looks different due to
         # the disassembler not allowing the same callable to be used more than once.
-        def notification_wrapper_callable(*args, **kwargs):
+        def notification_wrapper_callable(resume, *args, **kwargs):
             return resume(*args, **kwargs)
 
-        # Now we can add the new notification using our wrapper, and also
-        # include the "stop" callable that we temporarily removed.
-        ok = idaapi.notify_when(notification, notification_wrapper_callable)
-        restored = idaapi.notify_when(notification, stop)
+        # We need to figure out whether we're supposed to add references
+        # to the "resume" callable or adjust our list by removing them.
+        referenced = len(references)
 
+        if len(references) < count:
+            while len(references) < count:
+                Fnotification_wrapper_callable = functools.partial(notification_wrapper_callable, resume)
+                if not idaapi.notify_when(notification, Fnotification_wrapper_callable):
+                    break
+                references.append(Fnotification_wrapper_callable)
+
+            logging.debug(u"{:s}.attach({!r}) : Attached {:d} reference{:s} to the {:s} notification out of the required {:d} reference{:s}.".format('.'.join([__name__, cls.__name__]), notification, len(references) - referenced, '' if len(references) - referenced == 1 else 's', self.__formatter__(notification), count, '' if count == 1 else 's'))
+
+        elif len(references) > count:
+            while len(references) > count:
+                Fnotification_wrapper_callable = references[-1]
+                if not idaapi.notify_when(notification | idaapi.NW_REMOVE, Fnotification_wrapper_callable):
+                    break
+                references.pop()
+
+            logging.debug(u"{:s}.attach({!r}) : Detached {:d} reference{:s} from the {:s} notification out of the total {:d} reference{:s}.".format('.'.join([__name__, cls.__name__]), notification, referenced - len(references), '' if referenced - len(references) == 1 else 's', self.__formatter__(notification), count, '' if count == 1 else 's'))
+
+        if len(references) != count:
+            logging.warning(u"{:s}.attach({!r}) : The {:s} notification has {:d} reference{:s} attached out of the required {:d} reference{:s} which will result in the {:s} notification being unreliable.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), len(references), '' if len(references) == 1 else 's', count, '' if count == 1 else 's', self.__formatter__(notification)))
+
+        # Now we can attach the "stop" callable that was temporarily removed to the notification.
+        ok = idaapi.notify_when(notification, stop)
         if ok:
-            logging.info(u"{:s}.attach({!r}) : Successfully attached the wrapper ({:s}) for callable ({:s}) to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(notification_wrapper_callable), internal.utils.pycompat.fullname(resume), self.__formatter__(notification)))
-            references.append(notification_wrapper_callable)
+            logging.debug(u"{:s}.attach({!r}) : Successfully re-attached the temporarily removed stop callable ({:s}) to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
 
-        if restored:
-            logging.debug(u"{:s}.attach({!r}) : Successfully re-attached a replacement stop callable ({:s}) to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
-
-        # If everything is okay, then we've restored everything and only
-        # need to add the callable to our list before returning success.
-        if ok and restored:
+        # If the number of references match and we re-attached the "stop"
+        # callable, then we were successful and can return True for success.
+        if ok and len(references) == count:
             return True
 
-        # If could not restore the "stop" callable then we need to
-        # do all the work to disable the notification and bail.
-        elif not restored:
-            logging.critical(u"{:s}.attach({!r}) : Critical failure trying to restore stop callable ({:s}) for the {:s} notification. The notification will be completely disabled.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
-            disabled, (start, resume, stop) = self.disable(notification), self.__attached__.pop(notification)
+        # Otherwise we need to remove everything that we just attached.
+        references = self.__attached_callables[notification]
+        logging.critical(u"{:s}.attach({!r}) : Error while trying to attach to the {:s} notification will result in the removal of {:d} callable{:s}.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), len(references), '' if len(references) == 1 else 's'))
 
-            references = self.__attached_callables.pop(notification)
-            for index, ref in enumerate(references):
-                ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, ref)
-                if not ok:
-                    logging.warning(u"{:s}.attach({!r}) : Unable to remove callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'is' if len(references) == 1 else 'are', self.__formatter__(notification)))
-                else:
-                    logging.info(u"{:s}.attach({!r}) : Removed callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'was' if len(references) == 1 else 'were', self.__formatter__(notification)))
-                continue
-
-            # Now we just need to remove the start and stop callables.
-            if not idaapi.notify_when(notification | idaapi.NW_REMOVE, start):
-                logging.warning(u"{:s}.attach({!r}) : Unable to remove start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(event)))
+        # Start by removing all of our references attached to the notification.
+        while self.__attached_callables[notification]:
+            index, reference = len(self.__attached_callables[notification]), self.__attached_callables[notification].pop()
+            if idaapi.notify_when(notification | idaapi.NW_REMOVE, reference):
+                logging.info(u"{:s}.attach({!r}) : Removed callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, count, '' if count == 1 else 's', 'was' if count == 1 else 'were', self.__formatter__(notification)))
             else:
-                logging.info(u"{:s}.attach({!r}) : Removed start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
+                logging.warning(u"{:s}.attach({!r}) : Unable to remove callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, count, '' if count == 1 else 's', 'is' if count == 1 else 'are', self.__formatter__(notification)))
+            del(reference)
 
-            if not idaapi.notify_when(notification | idaapi.NW_REMOVE, stop):
-                logging.warning(u"{:s}.attach({!r}) : Unable to remove stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
-            else:
-                logging.info(u"{:s}.attach({!r}) : Removed stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+        # Then we can remove the "start" and "stop" callables that are attached.
+        start, _, stop = packed
+        packed, references = self.__attached__[notification], self.__attached_callables[notification]
 
-            # If there are any callables in the priority queue, then remove those too.
-            cls = self.__class__
-            for ok, callable in self.empty(notification):
-                Flogging = logging.info if ok else logging.warning
-                Flogging(u"{:s}.detach({:#x}) : {:s} the callable ({:s}) from the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(notification)))
+        if not idaapi.notify_when(notification | idaapi.NW_REMOVE, start):
+            logging.critical(u"{:s}.attach({!r}) : Error removing start callable ({:s}) from the {:s} notification due to previous failure.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
 
-            logging.debug(u"{:s}.attach({!r}) : Successfully removed {:d} reference{:s} from the {:s} notification due to critical error.".format('.'.join([__name__, cls.__name__]), notification, len(references), '' if len(references) == 1 else 's', self.__formatter__(notification)))
-
-        # If we couldn't add a reference, but was still able to restore the "stop" callable,
-        # then we can simply return a failure because everything should still work okay.
-        elif not ok:
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach the wrapper ({:s}) for callable ({:s}) to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(notification_wrapper_callable), internal.utils.pycompat.fullname(resume), self.__formatter__(notification)))
+        if not idaapi.notify_when(notification | idaapi.NW_REMOVE, stop):
+            logging.critical(u"{:s}.attach({!r}) : Error removing stop callable ({:s}) from the {:s} notification due to previous failure.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
 
         return False
 
@@ -2067,47 +2054,57 @@ class prioritynotification(prioritybase):
         '''Detach from the specified `notification` so that events from it will not be received.'''
         cls = self.__class__
 
-        # If it's not connected, then we need to freak out at the user.
+        # If it's not attached, then we need to freak out at the user.
         if notification not in self.__attached__:
             logging.warning(u"{:s}.detach({!r}) : Unable to detach from the {:s} notification as it is not currently attached.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification)))
             return False
 
-        # Iterate through all of our callables, and empty the cache since we're
-        # actually shutting everything down here.
-        cls = self.__class__
-        for ok, callable in self.empty(notification):
-            Flogging = logging.info if ok else logging.warning
-            Flogging(u"{:s}.detach({:#x}) : {:s} the callable ({:s}) attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(notification)))
-
-        # Define a dummy closure to pass to the api to avoid a bad dereference.
-        def closure(*parameters):
-            return True
-
-        # Now we can remove our attachments and references and
-        # begin to remove each of them one-by-one using the api.
-        start, resume, stop = self.__attached__.pop(notification)
-
-        references = self.__attached_callables.pop(notification)
-        for index, ref in enumerate(references):
-            ok = idaapi.notify_when(notification | idaapi.NW_REMOVE, ref)
-            if not ok:
-                logging.warning(u"{:s}.detach({!r}) : Unable to remove callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'is' if len(references) == 1 else 'are', self.__formatter__(notification)))
+        # Now we can start to remove our references one-by-one.
+        count, missed = len(self.__attached_callables[notification]), []
+        while self.__attached_callables[notification]:
+            index, reference = count - len(self.__attached_callables[notification]), self.__attached_callables[notification].pop()
+            if idaapi.notify_when(notification | idaapi.NW_REMOVE, reference):
+                logging.info(u"{:s}.detach({!r}) : Detached callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, count, '' if count == 1 else 's', 'was' if count == 1 else 'were', self.__formatter__(notification)))
             else:
-                logging.info(u"{:s}.detach({!r}) : Removed callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, len(references), '' if len(references) == 1 else 's', 'was' if len(references) == 1 else 'were', self.__formatter__(notification)))
-            continue
+                logging.warning(u"{:s}.detach({!r}) : Unable to detach callable {:d} of {:d} callable{:s} that {:s} attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, 1 + index, count, '' if count == 1 else 's', 'is' if count == 1 else 'are', self.__formatter__(notification)))
+                missed.append(reference)
+            del(reference)
+
+        # If we couldn't remove a reference, then we couldn't detach.
+        self.__attached_callables[notification].extend(missed)
+        if missed:
+            logging.critical(u"{:s}.detach({!r}) : Unable to detach the {:s} notification due to {:d} reference{:s} still being attached.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), len(missed), '' if len(missed) == 1 else 's'))
+            return False
 
         # Then we can detach both the start and stop callables from the notification.
-        if not idaapi.notify_when(notification | idaapi.NW_REMOVE, start):
-            logging.warning(u"{:s}.attach({!r}) : Unable to remove start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(event)))
-        else:
-            logging.info(u"{:s}.attach({!r}) : Removed start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
+        start, resume, stop = self.__attached__[notification]
 
-        if not idaapi.notify_when(notification | idaapi.NW_REMOVE, stop):
-            logging.warning(u"{:s}.attach({!r}) : Unable to remove stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
+        start_detached = idaapi.notify_when(notification | idaapi.NW_REMOVE, start)
+        if start_detached:
+            logging.info(u"{:s}.detach({!r}) : Detached start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
         else:
-            logging.info(u"{:s}.attach({!r}) : Removed stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach start callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(start), self.__formatter__(notification)))
 
-        # Now we should be free to completely detach the priority queue from the notification.
+        stop_detached = idaapi.notify_when(notification | idaapi.NW_REMOVE, stop)
+        if stop_detached:
+            logging.info(u"{:s}.detach({!r}) : Detached stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+        else:
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach stop callable ({:s}) that was attached to the {:s} notification.".format('.'.join([__name__, cls.__name__]), notification, internal.utils.pycompat.fullname(stop), self.__formatter__(notification)))
+
+        missed = sum(0 if detached else 1 for detached in [start_detached, stop_detached])
+        if missed:
+            logging.critical(u"{:s}.detach({!r}) : Unable to detach the {:s} notification due to {:d} scope reference{:s} still being attached.".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), len(missed), '' if len(missed) == 1 else 's'))
+            return False
+
+        del(start, resume, stop)
+
+        # We should be able to delete all references and then call the supermethod to finish.
+        callables = self.__attached_callables.pop(notification)
+        del(callables)
+
+        attached = self.__attached__.pop(notification)
+        del(attached)
+
         return super(prioritynotification, self).detach(notification)
 
     def add(self, notification, callable, priority=0):
@@ -2178,100 +2175,109 @@ class priorityhxevent(prioritybase):
             message = '' if isinstance(event, internal.types.integer) else '(event needs to be an integer)'
             raise NameError(u"{:s}.attach({!r}) : Unable to attach to the event {:s} due to the event being unavailable{:s}.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), message))
 
-        # If the event is already attached, then we only need to add another
-        # reference to our current counter and then reinstall the hooks.
-        if event in self.__attached__:
-            current = self.__attached_count[event]
-            start, resume, stop = self.__attached__[event]
+        # We need to get the number of references to attach from our supermethod.
+        count, packed = super(priorityhxevent, self).attach(event)
 
-            # The "start" callable always needs to be the last one that's
-            # dispatched, so we first need to remove the old instance.
-            count = self.__module.remove_hexrays_callback(start)
-            logging.debug(u"{:s}.attach({!r}) : Temporarily removed {:d} start callback{:s} ({:s}) that was attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', internal.utils.pycompat.fullname(start), self.__formatter__(event)))
+        # First we need to define these closures because the decompiler requires
+        # you to return a 0 unless the event type explicitly specifies otherwise.
+        def closure_start(ev, *parameters):
+            start, _, _ = packed
+            result = start(*parameters) if ev == event else None
+            return 0 if result is None else result
 
-            # If we couldn't remove the "start" callable, then there's
-            # nothing we can do and we need to completely bail.
-            if not count:
-                logging.warning(u"{:s}.attach({!r}) : Refusing to attach {:+d} reference to the {:s} event ({:d} reference{:s}) due to being unable to temporarily remove start callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, 1, self.__formatter__(event), current, '' if current == 1 else 's', internal.utils.pycompat.fullname(start)))
+        def closure_resume(ev, *parameters):
+            _, resume, _ = packed
+            result = resume(*parameters) if ev == event else None
+            return 0 if result is None else result
+
+        def closure_stop(ev, *parameters):
+            _, _, stop = packed
+            result = stop(*parameters) if ev == event else None
+            return 0 if result is None else result
+
+        # If the event is not yet attached, then we need to use the callables
+        # we defined and install only the ones that are actually relevant.
+        if event not in self.__attached__:
+            closure_packed = closure_start, closure_resume, closure_stop
+
+            if not self.__module.install_hexrays_callback(closure_stop):
+                logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event with the stop callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(closure_stop)))
                 return False
 
-            # Now we can add another instance of the "resume" callable.
-            ok = self.__module.install_hexrays_callback(resume)
+            # If we were successful at installing both, then we only need to reset
+            # our state and then we can recurse in order to complete the attachment.
+            if self.__module.install_hexrays_callback(closure_start):
+                self.__attached__[event] = closure_packed
+                self.__attached_count[event] = 0
+                return self.attach(event)
 
-            # Then we can add the "start" callable back again.
-            restored = True
-            if not self.__module.install_hexrays_callback(start):
-                logging.warning(u"{:s}.attach({!r}) : Unable to re-attach start callback ({:s}) for the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(start), self.__formatter__(event)))
-                restored = False
+            # If not, then we need to uninstall the one that
+            # did succeed (stop) before turning our failure.
+            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event with the start callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(closure_start)))
 
-            # If we couldn't update the reference, then we need to complain.
-            if not ok:
-                logging.warning(u"{:s}.attach({!r}) : Unable to attach the specified callback ({:s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(resume), self.__formatter__(event)))
+            expected, res = 1, self.__module.remove_hexrays_callback(closure_stop)
+            if res:
+                logging.info(u"{:s}.attach({!r}) : Removed {:d} stop callback{:s} that was attached to the {:s} event despite previous error.".format('.'.join([__name__, cls.__name__]), event, res, '' if res == 1 else 's', self.__formatter__(event)))
+            else:
+                logging.critical(u"{:s}.attach({!r}) : Error trying to remove {:d} stop callback{:s} that was attached to the {:s} event despite previous error.".format('.'.join([__name__, cls.__name__]), event, res, '' if res == 1 else 's', self.__formatter__(event)))
 
-            # If we couldn't add the "start" callable at the end, then this is
-            # a critical failure and we need to disable the event entirely.
-            elif not restored:
-                logging.critical(u"{:s}.attach({!r}) : Critical error when attempting to attach a callback ({:s}) to the {:s} event. The event will be completely disabled.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(start), self.__formatter__(event)))
-
-                # First we'll disable the entire event and then empty the priority queue.
-                disabled = self.disable(event)
-
-                if not super(priorityhxevent, self).detach(event):
-                    logging.critical(u"{:s}.attach({!r}) : Encountered another error while attempting to completely detach from the {:s} event.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
-
-                # Then we'll uninstall each of our callbacks from hexrays.
-                if not self.__remove_callbacks(event):
-                    logging.critical(u"{:s}.attach({!r}) : Encountered another error while attempting to remove currently attached callbacks from the {:s} event.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
-
-                # We should have no callbacks currently attached, so we should be able to clean up everything.
-                count = self.__attached_count.pop(event)
-                count and logging.debug(u"{:s}.attach({!r}) : Reference count ({:d}) for the {:s} event should have been set to {:d} due to critical error.".format('.'.join([__name__, cls.__name__]), event, count, self.__formatter__(event), 0))
-
-                # Remove the references to the attached callbacks since they should've been removed.
-                (start, resume, stop) = self.__attached__.pop(event)
-
-            # otherwise we're good and can just update our reference count.
-            if ok:
-                self.__attached_count[event] = current + 1
-                logging.info(u"{:s}.attach({!r}) : Successfully attached a callback ({:s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(resume), self.__formatter__(event)))
-
-            if restored:
-                logging.debug(u"{:s}.attach({!r}) : Successfully re-attached a replacement stop callback ({:s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(stop), self.__formatter__(event)))
-            return ok and restored
-
-        # Otherwise, we need to create the necessary callables and attach
-        # them. We use our super-class to get the callables we need to use.
-        ok, packed = super(priorityhxevent, self).attach(event)
-        if not ok:
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
-            ignored = super(priorityhxevent, self).detach(event)
             return False
 
-        # Now we have a callables to use, so we just need to install the relevant ones.
-        start, resume, stop = packed
+        # If the event has already been attached, then we only need to update the
+        # references so that they match our current counter and reinstall the hooks.
+        current = self.__attached_count[event]
+        closure_start, closure_resume, closure_stop = self.__attached__[event]
 
-        if not self.__module.install_hexrays_callback(stop):
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event with the stop callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(stop)))
-            ignored = super(priorityhxevent, self).detach(event)
+        # The "start" callable always needs to be the last one that's
+        # dispatched, so we first need to remove the old instance.
+        res = self.__module.remove_hexrays_callback(closure_start)
+        logging.debug(u"{:s}.attach({!r}) : Temporarily removed {:d} start callback{:s} ({:s}) that was attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, res, '' if res == 1 else 's', internal.utils.pycompat.fullname(closure_start), self.__formatter__(event)))
+
+        # If we couldn't remove the "start" callable, then there's
+        # nothing we can do and we need to completely bail.
+        if not res:
+            logging.warning(u"{:s}.attach({!r}) : Refusing to attach {:+d} reference to the {:s} event ({:d} reference{:s}) due to being unable to temporarily remove start callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, 1, self.__formatter__(event), current, '' if current == 1 else 's', internal.utils.pycompat.fullname(closure_start)))
             return False
 
-        ok = self.__module.install_hexrays_callback(start)
+        # Now we can figure out whether we need to attach or detach
+        # references to the callable to process the event correctly.
+        current = self.__attached_count[event]
+        if current < count:
+            while self.__attached_count[event] < count:
+                res = self.__module.install_hexrays_callback(closure_resume)
+                if not res:
+                    break
+                self.__attached_count[event] += res
+
+            attached = self.__attached_count[event]
+            logging.debug(u"{:s}.attach({!r}) : Installed {:d} callback{:s} for the {:s} event.".format('.'.join([__name__, cls.__name__]), event, attached - current, '' if attached - current == 1 else 's', self.__formatter__(event)))
+
+        elif current > count:
+            while self.__attached_count[event] > count:
+                res = self.__module.remove_hexrays_callback(closure_resume)
+                if not res:
+                    break
+                self.__attached_count[event] -= res
+
+            attached = self.__attached_count[event]
+            logging.debug(u"{:s}.attach({!r}) : Removed {:d} callback{:s} from the {:s} event.".format('.'.join([__name__, cls.__name__]), event, current - attached, '' if current - attached == 1 else 's', self.__formatter__(event)))
+
+        if self.__attached_count[event] != count:
+            logging.warning(u"{:s}.attach({!r}) : The {:s} event has {:d} callback{:s} attached out of the required {:d} callback{:s} which will result in the {:s} event being unreliable.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), self.__attached_count[event], '' if self.__attached_count[event] == 1 else 's', count, '' if count == 1 else 's', self.__formatter__(event)))
+
+        # Then we can add the "start" callable back again and return success.
+        elif self.__module.install_hexrays_callback(closure_start):
+            logging.debug(u"{:s}.attach({!r}) : Successfully re-attached the temporarily removed start callback ({:s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(closure_start), self.__formatter__(event)))
+            return True
+
+        # If we couldn't reattach the "start" callback, then log an error.
+        else:
+            logging.warning(u"{:s}.attach({!r}) : Unable to re-attach start callback ({:s}) for the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(closure_start), self.__formatter__(event)))
+
+        # If we didn't attach the correct number of callbacks then we need to undo what was done.
+        ok = True if self.__attached_count[event] == count else self.__remove_callbacks(event)
         if not ok:
-            logging.warning(u"{:s}.attach({!r}) : Unable to attach to the {:s} event with the start callback ({:s}).".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event), internal.utils.pycompat.fullname(start)))
-
-        # if we were successful at installing both, then we only need to reset
-        # our state and then we can recurse in order to complete the attachment.
-        if ok:
-            self.__attached__[event] = packed
-            self.__attached_count[event] = 0
-            return self.attach(event)
-
-        # if we couldn't install the stop callback, then we need to uninstall
-        # the one that did succeed and then we can return our failure.
-        expected, count = 1, self.__module.remove_hexrays_callback(start)
-        logging.info(u"{:s}.attach({!r}) : Removed {:d} start callback{:s} of {:d} callback{:s} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, '' if expected == 1 else 's', 'was' if expected == 1 else 'were', self.__formatter__(event)))
-
-        ignored = super(priorityhxevent, self).detach(event)
+            logging.critical(u"{:s}.attach({!r}) : Error trying to detach {:d} callbacks from previous error for the {:s} event.".format('.'.join([__name__, cls.__name__]), event, internal.utils.pycompat.fullname(closure_start), self.__formatter__(event)))
         return False
 
     def detach(self, event):
@@ -2286,26 +2292,23 @@ class priorityhxevent(prioritybase):
             logging.warning(u"{:s}.detach({!r}) : Unable to detach from the {:s} event as it is not currently attached.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
             return False
 
-        # Then we can remove all of the related hexrays callbacks.
+        # Then we can remove all of the decompiler-related callbacks.
         if not self.__remove_callbacks(event):
             logging.warning(u"{:s}.detach({!r}) : Unable to detach from the {:s} event due to being unable to remove currently installed callbacks.".format('.'.join([__name__, cls.__name__]), event, self.__formatter__(event)))
             return False
 
-        # Now we can clean up our attached state.
-        self.__attached__.pop(event)
-
         # If there's still any references that are attached, then log something
-        # about it. It's not too critical anyways, since we're being forceful.
+        # about it and fail because we don't have another way to clean this up.
+        if self.__attached_count[event]:
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach {:d} callback{:s} that are still installed for the {:s} event.".format('.'.join([__name__, cls.__name__]), event, self.__attached_count[event], '' if self.__attached_count[event] == 1 else 's', self.__formatter__(event)))
+            return False
+
+        # Everything should be removed, so we now only need to remove references.
         count = self.__attached_count.pop(event)
-        count and logging.debug(u"{:s}.detach({!r}) : Reference count ({:d}) for the {:s} event should have been set to {:d}.".format('.'.join([__name__, cls.__name__]), event, count, self.__formatter__(event), 0))
+        packed = self.__attached__.pop(event)
+        del(packed)
 
-        # Iterate through all of our callables, and empty the cache
-        # since we're actually shutting everything down here.
-        for ok, callable in self.empty(event):
-            Flogging = logging.info if ok else logging.warning
-            Flogging(u"{:s}.detach({!r}) : {:s} the callable ({:s}) attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 'Discarded' if ok else 'Unable to discard', internal.utils.pycompat.fullname(callable), self.__formatter__(event)))
-
-        # Now we can empty out our priority queue for the event.
+        # Now we can finish everything up with our detach supermethod.
         return super(priorityhxevent, self).detach(event)
 
     def close(self):
@@ -2318,43 +2321,6 @@ class priorityhxevent(prioritybase):
         # We only fail here if our state is not empty.
         return False if self.__attached__ else True
 
-    def __install_callbacks(self, event):
-        '''Install the required callbacks into the decompiler for the specified `event`.'''
-        cls = self.__class__
-
-        # If the event hasn't been attached, then there's nothing to install.
-        if event not in self.__attached__:
-            return False
-
-        # The disassembler seems to use a stack for the hexrays callbacks, so
-        # we need to add these in reverse if we want them to be ordered correctly.
-        start, resume, stop = self.__attached__[event]
-        assert(event in self.__attached_count)
-
-        # If we can't install the "stop" callback, there's really nothing we can do.
-        count = self.__module.install_hexrays_callback(stop)
-        if not count:
-            logging.warning(u"{:s}.__install_callbacks({!r}) : Unable to install the stop callback ({!s}) for the {:s} event which will result in the {:s} event being unreliable.".format('.'.join([__name__, cls.__name__]), event, stop, self.__formatter__(event), self.__formatter__(event)))
-            return False
-
-        # Now we just attach all of the "resume" callbacks in the middle.
-        attached, expected = 0, self.__attached_count[event]
-        for index in builtins.range(expected):
-            count = self.__module.install_hexrays_callback(resume)
-            if not count:
-                logging.info(u"{:s}._install_callbacks({!r}) : Unable to install callback {:d} of {:d} ({!s}) to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 1 + index, expected, internal.utils.pycompat.fullname(resume), self.__formatter__(event)))
-            attached += count
-
-        if attached < expected:
-            logging.warning(u"{:s}.__install_callbacks({!r}) : Unable to install {:d} of {:d} callbacks for the {:s} event which will result in the {:s} event being unreliable.".format('.'.join([__name__, cls.__name__]), event, expected - attached, expected, self.__formatter__(event), self.__formatter__(event)))
-
-        # Last thing to do is install the "start" callback which gets everything working.
-        elif not self.__module.install_hexrays_callback(start):
-            logging.warning(u"{:s}.__install_callbacks({!r}) : Unable to install the start callback ({!s}) for the {:s} event which will result in the {:s} event appearing disabled.".format('.'.join([__name__, cls.__name__]), event, stop, self.__formatter__(event), self.__formatter__(event)))
-            return False
-
-        return False if attached < expected else True
-
     def __remove_callbacks(self, event):
         '''Remove the installed callbacks for the specified `event` from the decompiler.'''
         cls = self.__class__
@@ -2363,38 +2329,37 @@ class priorityhxevent(prioritybase):
         if event not in self.__attached__:
             return False
 
-        start, resume, stop = self.__attached__[event]
+        closure_start, closure_resume, closure_stop = self.__attached__[event]
         assert(event in self.__attached_count)
 
         # Remove each callable that is attached to the decompiler one-by-one.
-        removed, needed = 0, self.__attached_count[event]
-        while removed < needed:
-            count = self.__module.remove_hexrays_callback(resume)
-            left = needed - removed
+        needed = self.__attached_count[event]
+        while self.__attached_count[event] > 0:
+            index, res = needed - self.__attached_count[event], self.__module.remove_hexrays_callback(closure_resume)
 
             # If we couldn't remove an instance of the callback, then although we
             # might've removed everything we will still need a warning about it.
-            if not count:
-                logging.warning(u"{:s}.__remove_callbacks({!r}) : Unable to remove callback {:d} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 1 + removed, left, 'is' if count == 1 else 'are', self.__formatter__(event)))
+            if not res:
+                logging.warning(u"{:s}.__remove_callbacks({!r}) : Unable to remove callback {:d} of {:d} that is attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, 1 + index, needed, self.__formatter__(event)))
                 break
 
-            logging.info(u"{:s}.__remove_callbacks({!r}) : Removed {:d} callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', left, 'was' if count == 1 else 'were', self.__formatter__(event)))
-            removed += count
+            logging.info(u"{:s}.__remove_callbacks({!r}) : Removed {:d} callback{:s} from {:d} out of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, res, '' if res == 1 else 's', self.__attached_count[event], needed, 'was' if res == 1 else 'were', self.__formatter__(event)))
+            self.__attached_count[event] -= res
 
         # Then we can remove the start and stop callbacks that scope everything.
-        expected, start_count = 1, self.__module.remove_hexrays_callback(start)
+        expected, start_count = 1, self.__module.remove_hexrays_callback(closure_start)
         if start_count:
-            logging.info(u"{:s}.__remove_callbacks({!r}) : Removed {:d} start callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, 'was' if expected == 1 else 'were', self.__formatter__(event)))
+            logging.info(u"{:s}.__remove_callbacks({!r}) : Removed {:d} start callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, start_count, '' if start_count == 1 else 's', expected, 'was' if expected == 1 else 'were', self.__formatter__(event)))
         else:
-            logging.warning(u"{:s}.__remove_callbacks({!r}) : Unable to remove start callback ({!s}) that is attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, start, self.__formatter__(event)))
+            logging.warning(u"{:s}.__remove_callbacks({!r}) : Unable to remove start callback ({!s}) that is attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, closure_start, self.__formatter__(event)))
 
-        expected, stop_count = 1, self.__module.remove_hexrays_callback(stop)
+        expected, stop_count = 1, self.__module.remove_hexrays_callback(closure_stop)
         if stop_count:
-            logging.info(u"{:s}.__remove_callbacks({!r}) : Removed {:d} stop callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, count, '' if count == 1 else 's', expected, 'was' if expected == 1 else 'were', self.__formatter__(event)))
+            logging.info(u"{:s}.__remove_callbacks({!r}) : Removed {:d} stop callback{:s} of {:d} that {:s} attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, stop_count, '' if stop_count == 1 else 's', expected, 'was' if expected == 1 else 'were', self.__formatter__(event)))
         else:
-            logging.warning(u"{:s}.__remove_callbacks({!r}) : Unable to remove stop callback ({!s}) that is attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, stop, self.__formatter__(event)))
+            logging.warning(u"{:s}.__remove_callbacks({!r}) : Unable to remove stop callback ({!s}) that is attached to the {:s} event.".format('.'.join([__name__, cls.__name__]), event, closure_stop, self.__formatter__(event)))
 
-        return True if all([removed == needed, start_count, stop_count]) else False
+        return True if all([self.__attached_count[event] == 0, start_count, stop_count]) else False
 
     def add(self, event, callable, priority=0):
         '''Add the `callable` to the queue with the given `priority` for the specified `event`.'''
@@ -2406,23 +2371,6 @@ class priorityhxevent(prioritybase):
 
         # Add the callable to our current events to call.
         return super(priorityhxevent, self).add(event, callable, priority)
-
-    def __scope__(self, event):
-        '''Return a tuple containing the closures that are used to control the execution of all the callables for the specified `event`.'''
-        start, resume, stop = super(priorityhxevent, self).__scope__(event)
-
-        # We need to define these closures because Hex-Rays absolutely requires
-        # you to return a 0 unless the event type explicitly specifies otherwise.
-        def closure_start(ev, *parameters):
-            result = start(*parameters) if ev == event else None
-            return 0 if result is None else result
-        def closure_resume(ev, *parameters):
-            result = resume(*parameters) if ev == event else None
-            return 0 if result is None else result
-        def closure_stop(ev, *parameters):
-            result = stop(*parameters) if ev == event else None
-            return 0 if result is None else result
-        return closure_start, closure_resume, closure_stop
 
     def __repr__(self):
         if len(self):
