@@ -2395,6 +2395,44 @@ class priorityhxevent(prioritybase):
             return '\n'.join([res] + items[1:])
         return "Events currently {:s}: {:s}".format(message, 'No events are being monitored.')
 
+    ## Callbacks to enable class when the decompiler plugin has been loaded.
+    __plugin_required = {'Hex-Rays Decompiler'}
+    def __plugin_loaded__(self, plugin_info):
+        if plugin_info.name not in self.__plugin_required:
+            return
+
+        module = self.__hexrays_module__
+
+        # Initialize the hexrays plugin so that we be sure that it's usable.
+        if not module.init_hexrays_plugin():
+            cls = self.__class__
+            raise internal.exceptions.DisassemblerError(u"{:s} : Failure while trying initialize the Hex-Rays plugin ({:s}).".format('.'.join([__name__, cls.__name__]), 'init_hexrays_plugin'))
+
+        # Assign our protected properties that enable the class to do things.
+        self.__hexrays_module__ = module
+        self.__hexrays_ready__ = True
+
+        # Now we can attach all currently monitored events.
+        for event in self:
+            if not self.attach(event):
+                logging.warning(u"{:s} : Unable to attach the {:s} event during the loading process of the Hex-Rays plugin.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event)))
+            continue
+        return
+
+    def __plugin_unloading__(self, plugin_info):
+        plugin_name = {'Hex-Rays Decompiler'}
+        if plugin_info.name not in self.__plugin_required:
+            return
+
+        # Go through and detach everything that we're monitoring.
+        for event in self:
+            if not self.detach(event):
+                logging.warning(u"{:s} : Unable to detach the {:s} event during the unloading process of the Hex-Rays plugin.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event)))
+            continue
+
+        # Now we can modify our state that disables our class.
+        self.__hexrays_ready__ = False
+
 class database(object):
     """
     This namespace provides tools that can be used to get specific
