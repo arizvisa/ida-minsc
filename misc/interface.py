@@ -926,13 +926,8 @@ class prioritybase(object):
             cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={!r}) : Refusing to add a callable ({:s}) for the requested target {:s} with a non-integer priority ({!r}).".format('.'.join([__name__, cls.__name__]), target, callable, priority, internal.utils.pycompat.fullname(callable), self.__formatter__(target), format(priority)))
 
-        # attach to the requested target if possible
-        if target not in self.__cache:
-            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise NameError(u"{:s}.add({!r}, {!s}, priority={:s}) : The requested target {:s} is not attached. {:s}".format('.'.join([__name__, cls.__name__]), target, callable, format(priority), self.__formatter__(target), "Currently attached targets are: {:s}".format(', '.join(map(self.__formatter__, self.__cache))) if self.__cache else 'There are no currently attached targets to add to.'))
-
         # grab the mutex for the target queue that we're going to add something to.
-        mutex, queue_ = self.__cache[target]
+        mutex, queue_ = self.__cache.setdefault(target, (threading.Lock(), []))
         with mutex:
             queue = queue_
 
