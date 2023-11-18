@@ -1440,13 +1440,13 @@ class prioritybase(object):
             # First check to see if our running queue has something inside it. If it doesn't, then we
             # can hand off execution to closure_start which should initialize it and then call us back.
             if not State.running_queue:
-                logging.info(u"{:s}.closure_resume({!r}) : No coroutines for the {:s}target {:s} exist within the running queue and will require manually being started.".format('.'.join([__name__, self.__class__.__name__]), target, 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
-                return closure_start(*args, **kwargs)
+                logging.info(u"{:s}.closure_resume({!r}) : Ignoring the {:s}target {:s} due to the running queue being empty.".format('.'.join([__name__, self.__class__.__name__]), target, 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
+                return
 
             # Then we can grab our very latest coroutine and confirm that it was actually started.
             coro = State.running_queue[-1]
             if not is_coroutine_started(coro):
-                logging.critical(u"{:s}.closure_resume({!r}) : Coroutine #{:d} for the {:s}target {:s} was unable to be resumed due to startup failure.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
+                logging.critical(u"{:s}.closure_resume({!r}) : Coroutine #{:d} for the {:s}target {:s} was unable to be resumed due to it not having been started.".format('.'.join([__name__, self.__class__.__name__]), target, len(State.running_queue), 'disabled ' if target in self.__disabled else '', self.__formatter__(target)))
                 return
 
             # Before we do anything, though, we need to verify that the target has not
