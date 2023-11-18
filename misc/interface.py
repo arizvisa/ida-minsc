@@ -1644,17 +1644,17 @@ class priorityhook(prioritybase):
             for name in sorted(self.__attached__):
                 if name in self.__attached_scope:
                     start, stop = self.__attached_scope[name]
-                    logging.debug(u"{:s}.close() : Detaching target {:s} still resulted in the start instance ({!s}) and stop instance ({!s}) still being attached to target {:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), start, stop, self.__formatter__(target)))
+                    logging.debug(u"{:s}.close() : Detaching target {:s} still resulted in both management instances ({!s} and {!s}) being hooked to the target {:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), start, stop, self.__formatter__(target)))
 
                 elif self.__attached_instances.get(name, []):
                     count = len(self.__attached_instances.get(name, []))
-                    logging.debug(u"{:s}.close() : Detaching target {:s} left {:d} instance{:s} still being attached to target {:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), count, '' if count == 1 else 's', self.__formatter__(target)))
+                    logging.debug(u"{:s}.close() : Detaching target {:s} left {:d} instance{:s} still being hook to the target {:s}.".format('.'.join([__name__, cls.__name__]), self.__formatter__(target), count, '' if count == 1 else 's', self.__formatter__(target)))
 
                 continue
 
             names = [name for name in sorted(self.__attached__) if any([name in self.__attached_scope, name in self.__attached_instances])]
             iterable = itertools.chain(map(self.__formatter__, names[:-1]), ("and {:s}".format(self.__formatter__(name)) for name in names[-1:])) if len(names) > 2 else [' and '.join(map(self.__formatter__, names))]
-            logging.info(u"{:s}.close() : Hooks for target{:s} {:s} were not able to be completely closed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), '' if len(names) == 1 else 's', ', '.join(iterable)))
+            logging.info(u"{:s}.close() : Hooks for target{:s} {:s} were not able to be completely closed.".format('.'.join([__name__, cls.__name__]), '' if len(names) == 1 else 's', ', '.join(iterable)))
 
         # That was all we needed to do. If there's still some shit left in any of our attached
         # dictionaries, we need to log a warning since we couldn't disconnect some of them.
@@ -1665,119 +1665,139 @@ class priorityhook(prioritybase):
             logging.critical(u"{:s}.close() : Error trying to close the hook object due to {:d} target{:s} ({:s}) still being connected.".format('.'.join([__name__, cls.__name__]), len(used), '' if len(used) == 1 else 's', description))
         return False if self.__attached__ else True
 
-    def __unhook_order(self, name):
-        '''Iterate through the known instances for the target `name` and remove their hooks in the correct order.'''
+    def __attach_managers(self, name):
+        '''Create and attach the necessary objects for managing the hook specified by `name`.'''
+        assert(all(name not in attached for attached in [self.__attached__, self.__attached_scope, self.__attached_instances]))
+
+        # First we'll call our supermethod to get the callables that manage the scope.
+        count, packed = super(priorityhook, self).attach(name)
+
+        # Then we'll unpack our callables, and instantiate the two required objects.
+        start_attributes, resume_attributes, stop_attributes = ({name : callable} for callable in packed)
+        instance_start, instance_stop = (self.__new_instance__(attributes) for attributes in [start_attributes, stop_attributes])
+
+        # Now we'll try to start them. The disassembler's hooks appear to be
+        # stored in a stack, so we need to enable them in reverse order.
         cls = self.__class__
+        if not instance_stop.hook():
+            logging.debug(u"{:s}._attach_managers({!r}) : Unable to hook the management instance ({!s}) for the target {:s} which will result in the target remaining detached.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name)))
+            return False
 
-        # First check that our target is attached. If it isn't, then nothing
-        # is attached and technically we were successful in detaching from it.
-        if name not in self.__attached__:
-            return True
+        # If we failed at enabling the starting hook, then we need to
+        # remove the hook that did succeed and then return failure.
+        if not instance_start.hook():
+            logging.debug(u"{:s}._attach_managers({!r}) : Unable to hook the management instance ({!s}) for the target {:s} which will result in the target remaining detached.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name)))
 
-        assert(all(name in what for what in [self.__attached__, self.__attached_scope]))
+            if not instance_stop.unhook():
+                logging.warning(u"{:s}._attach_managers({!r}) : Another error occurred while trying to detach the management instance ({!s}) from the target {:s}.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name)))
 
-        # Iterate through all known instances for the target and unhook them.
-        failures, instances = [], self.__attached_instances.get(name, [])
+            return False
+
+        # Now we can assign our instances that manage the scope for our
+        # hook, and stash our callables within our "attached" dictionary.
+        self.__attached__[name] = packed
+        self.__attached_scope[name] = instance_start, instance_stop
+        self.__attached_instances[name] = []
+
+        return True
+
+    def __attach_update(self, name):
+        '''Update the number of hooks that are attached to the hook specified by `name`.'''
+        assert(all(name in attached for attached in [self.__attached__, self.__attached_scope, self.__attached_instances]))
+
+        # First we'll call our supermethod to get the number of hooks for
+        # the target that will need to be attached for things to work.
+        count, packed = super(priorityhook, self).attach(name)
+        assert(all(attached == required for attached, required in zip(self.__attached__[name], packed)))
+
+        # Now we can unpack all of the packed callables. We stash them into a
+        # diciontary that we can use directly as the attributes for a new instance.
+        start_attributes, resume_attributes, stop_attributes = ({name : callable} for callable in self.__attached__[name])
+
+        # If the current number of instances is smaller than
+        # our count, then we create instances until they match.
+        cls, current, hook, unhook = self.__class__, len(self.__attached_instances[name]), [], []
+        if current < count:
+            while current + len(hook) < count:
+                instance = self.__new_instance__(resume_attributes)
+                hook.append(instance)
+            logging.debug(u"{:s}.__attach_update({!r}) : Created {:d} instance{:s} for the hook target {:s} which requires {:d} instance{:s}.".format('.'.join([__name__, cls.__name__]), name, len(hook), '' if len(hook) else 's', self.__formatter__(name), count, '' if count == 1 else 's'))
+
+        # If we have too many instances, then we remove until they match.
+        elif current > count:
+            while current - len(unhook) > count:
+                instance = self.__attached_instances[name].pop()
+                unhook.append(instance)
+            logging.debug(u"{:s}.__attach_update({!r}) : Removed {:d} instance{:s} from the hook target {:s} which requires {:d} instancce{:s}.".format('.'.join([__name__, cls.__name__]), name, len(unhook), '' if len(unhook) == 1 else 's', self.__formatter__(name), count, '' if count == 1 else 's'))
+
+        # Now we'll need to try and disable everything because we'll
+        # need to re-enable all the hooks in the correct order.
+        remaining, instances = [], [instance for instance in itertools.chain(self.__attached_instances[name], unhook)]
         for index, instance in enumerate(instances):
             if not instance.unhook():
-                logging.warning(u"{:s}._unhook_order({!r}) : Unable to unhook instance ({!s}) {:d} of {:d} for the target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, 1 + index, len(instances), self.__formatter__(name)))
-                failures.append(index)
+                remaining.append(index)
             continue
 
-        # If we couldn't unhook them, then we bail before doing anything serious.
-        if failures:
-            iterable = itertools.chain(map("{:d}".format, failures[:-1]), map("and {:d}".format, failures[-1:])) if len(failures) > 2 else map("{:d}".format, failures)
-            description = ' and '.join(iterable) if len(failures) == 2 else ', '.join(iterable)
-            logging.critical(u"{:s}._unhook_order({!r}) : Unable to unhook {:d} instance{:s} ({:s}) that {:s} currently managing the target {:s}.".format('.'.join([__name__, cls.__name__]), name, len(failures), '' if len(failures) == 1 else 's', description, 'is' if len(failures) == 1 else 'are', self.__formatter__(name)))
+        if remaining:
+            logging.warning(u"{:s}.__attach_update({!r}) : Error trying to unhook {:d} out of {:d} instance{:s} from the hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, len(remaining), len(instances), '' if len(instances) == 1 else 's', self.__formatter__(name)))
+
+        # Then we can try and disable the management hooks. If we fail
+        # at anything, then we actually failed the whole attachment.
+        errors, managers = [], self.__attached_scope[name]
+        for index, instance in enumerate(managers):
+            if instance is not None and not instance.unhook():
+                errors.append(instance)
+            continue
+
+        if errors:
+            logging.warning(u"{:s}.__attach_update({!r}) : Error trying to unhook {:d} out of {:d} management instance{:s} for the hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, len(errors), len(scope), '' if len(scope) == 1 else 's', self.__formatter__(name)))
+
+        # If anything failed, then we can just put everything that we couldn't
+        # hook back into our dictionaries, and then we can bail with a failure.
+        if remaining or errors:
+            self.__attached_instances[name][:] = [instances[index] for index in remaining]
+            self.__attached_scope[name] = tuple(instance if any(error == instance for error in errors) else None for instance in managers)
             return False
 
-        # Now we can go through and unhook the instances that manage the scope.
-        start, stop = self.__attached_scope[name]
+        # Otherwise we were succesful, and we can empty out all of our
+        # dictionaries so that it appears as if the target is unattached.
+        packed = self.__attached__.pop(name)
+        managers = start_instance, stop_instance = self.__attached_scope.pop(name)
+        available = self.__attached_instances.pop(name)
 
-        start_removed = start.unhook()
-        if not start_removed:
-            logging.warning(u"{:s}._unhook_order({!r}) : Unable to unhook the start instance ({!s}) for the target {:s}.".format('.'.join([__name__, cls.__name__]), name, start, self.__formatter__(name)))
-
-        stop_removed = stop.unhook()
-        if not stop_removed:
-            logging.warning(u"{:s}._unhook_order({!r}) : Unable to unhook the stop instance ({!s}) for the target {:s}.".format('.'.join([__name__, cls.__name__]), name, stop, self.__formatter__(name)))
-
-        # If both were successful, then we did good and can exit cleanly.
-        if start_removed and stop_removed:
-            return True
-
-        # If we couldn't do either, then technically our hooks are still attached. However,
-        # since the intermediary hooks have been removed, the hooks aren't guaranteed execution.
-        if all([not start_removed, not stop_removed]):
-            logging.critical(u"{:s}._unhook_order({!r}) : Unable to unhook the scope hooks ({:s} and {:s}) for the target {:s} which will result in hooks being unreliable.".format('.'.join([__name__, cls.__name__]), name, start, stop, self.__formatter__(name)))
-
-        elif any([not stop_removed, not start_removed]):
-            description = "{:s} callable ({!s})".format('stop', stop) if not stop_removed else "{:s} callable ({!s})".format('start', start) if not start_removed else "start ({!s}) and stop ({!s}) callables".format(start, stop)
-            logging.warning(u"{:s}._unhook_order({!r}) : Unable to unhook the {:s} from target {:s} which will result in the appearance of the target being disabled.".format('.'.join([__name__, cls.__name__]), name, description, self.__formatter__(name)))
-
-        return False
-
-    def __hook_order(self, name):
-        '''Iterate through the known instances for the target `name` and enable their hooks in the correct order.'''
-        cls = self.__class__
-
-        # First check that our target is attached. If it isn't, then we
-        # really can't do anything as there's no attached hooks to disable.
-        if name not in self.__attached__:
-            return False
-
-        assert(all(name in what for what in [self.__attached__, self.__attached_scope]))
-
-        # The disassembler seems to execute the hooks backwards. It appears like it pushes them
-        # onto a stack, and then consumes the stack when running them. This means that we need
-        # to start by hooking the stop instance first, with the start instance being the last.
-        _, stop_instance = self.__attached_scope[name]
-
+        # Then we can start over and attach each instance in their reversed order.
         if not stop_instance.hook():
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the stop instance ({!s}) for the target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name), self.__formatter__(name)))
+            logging.warning(u"{:s}.__attach_update({!r}) : Unable to hook the management instance ({!s}) for the hook target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name), self.__formatter__(name)))
             return False
 
-        # Next we go through and hook all instances associated with the target. If we failed
-        # at this, we're somewhat okay as the stop callable was the most important thing.
-        failures, count = {index for index in []}, len(self.__attached_instances[name])
-        for index, instance in enumerate(self.__attached_instances[name]):
-            if instance.hook():
-                continue
+        # Then we'll try and hook all the instances that we have.
+        unavailable, instances = [], [instance for instance in itertools.chain(available, hook)]
+        for index, instance in enumerate(instances):
+            if not instance.hook():
+                unavailable.append(index)
+            continue
 
-            logging.info(u"{:s}._hook_order({!r}) : Unable to hook instance ({!s}) {:d} of {:d} for the requested target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, 1 + index, count, self.__formatter__(name)))
-            failures.add(index)
+        if unavailable:
+            logging.warning(u"{:s}.__attach_update({!r}) : Error trying to hook {:d} out of {:d} instance{:s} for hook target {:s} which will result in the target {:s} being unreliable.".format('.'.join([__name__, cls.__name__]), name, len(unavailable), len(instances), '' if len(instances) == 1 else 's', self.__formatter__(name), self.__formatter__(name)))
 
-        # Finally we can proceed to add the final hook that actually starts each target.
-        start_instance, _ = self.__attached_scope[name]
-
+        # For last, we can try to enable the starting hook. If this ends up failing
+        # for some strange reason, then we need to update our dictionaries and bail.
         ok = start_instance.hook()
         if not ok:
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook the start instance ({!s}) for target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name), self.__formatter__(name)))
+            logging.warning(u"{:s}.__attach_update({!r}) : Unable to hook the management instance ({!s}) for the hook target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name), self.__formatter__(name)))
 
-        elif failures:
-            logging.warning(u"{:s}._hook_order({!r}) : Unable to hook {:d} of {:d} instances for the target {:s} which will result in the target {:s} being detached.".format('.'.join([__name__, cls.__name__]), name, len(falures), len(self.__attached_instances[name]), self.__formatter__(name), self.__formatter__(name)))
+        if unavailable or not ok:
+            failed = {index for index in unavailable}
+            self.__attached_instances[name][:] = [instance for index, instance in enumerate(instances) if index not in failed]
+            self.__attached_scope[name] = (start_instance, stop_instance) if ok else (None, stop_instance)
+            self.__attached__[name] = packed
+            return False
 
-        # If we encountered no errors, then we can return success.
-        else:
-            return True
-
-        # If we failed attaching hooks, then we need to undo everything we did.
-        if not start_instance.unhook():
-            logging.critical(u"{:s}._hook_order({!r}) : Error while trying unhook the start instance ({!s}) from the target {:s} due to previous failure.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name)))
-
-        failed = []
-        for index, instance in enumerate(self.__attached_instances[name]):
-            if instance.unhook():
-                continue
-            failed.append(index)
-
-        if failed:
-            logging.critical(u"{:s}._hook_order({!r}) : Error while trying to unhook {:d} of {:d} instances from the target {:s} due to previous failure.".format('.'.join([__name__, cls.__name__]), name, len(falures), len(self.__attached_instances[name]), self.__formatter__(name)))
-
-        if not stop_instance.unhook():
-            logging.critical(u"{:s}._hook_order({!r}) : Error while trying unhook the stop instance ({!s}) from the target {:s} due to previous failure.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name)))
-
-        return False
+        # Otherwise everything was successful and we can update our dictionaries.
+        self.__attached_instances[name] = instances
+        self.__attached_scope[name] = managers
+        self.__attached__[name] = packed
+        return True
 
     def attach(self, name):
         '''Attach the target specified by `name` to the hook object.'''
@@ -1789,52 +1809,65 @@ class priorityhook(prioritybase):
         # that we'll need to create in order to properly attach to the target.
         count, packed = super(priorityhook, self).attach(name)
 
-        # If the attribute has not yet been attached, then we need to
-        # grab our callables from the caller and then assign them.
-        if name not in self.__attached__:
-            start, _, stop = packed
+        # If the target has not yet been attached, we'll need to create
+        # instances of the hook objects for managing the target's scope.
+        ok = True if name in self.__attached__ else self.__attach_managers(name)
 
-            # After unpacking our closures from the caller, we instantiate two objects
-            # that are intended to manage the scope of the hooks we're going to attach.
-            instance_start = self.__new_instance__({name : start})
-            instance_stop = self.__new_instance__({name : stop})
+        # Now we can give the target an update and hope that it succeeds.
+        if ok:
+            assert(all(name in attached for attached in [self.__attached__, self.__attached_scope, self.__attached_instances]))
+            return self.__attach_update(name)
 
-            # Now we can assign our instances that manage the scope for our
-            # hook, and stash our callables within our "attached" dictionary.
-            self.__attached__[name] = packed
-            self.__attached_scope[name] = instance_start, instance_stop
-
-        # Before doing absolutely anything, we'll need to remove our current hooks.
-        if not self.__unhook_order(name):
-            logging.warning(u"{:s}.attach({!r}) : Unexpected error trying to unhook the current callables prior to attaching to target {:s}.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
-            return False
-
-        # Next, we can unpack our callables that we're going to use.
-        _, resume, _ = self.__attached__[name]
-
-        # If the current number of instances is smaller than
-        # our count, then we create instances until they match.
-        instances = self.__attached_instances.setdefault(name, [])
-        current = len(instances)
-        if len(instances) < count:
-            while len(instances) < count:
-                instance = self.__new_instance__({name : resume})
-                instances.append(instance)
-            logging.debug(u"{:s}.attach({!r}) : Created {:d} instance{:s} for hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, len(instances) - current, '' if len(instances) - current == 1 else 's', self.__formatter__(name)))
-
-        # If we have too many instances, then we remove until they match.
-        elif len(instances) > count:
-            while len(instances) > count:
-                instance = instances.pop()
-            logging.debug(u"{:s}.attach({!r}) : Removed {:d} instance{:s} from hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, current - len(instances), '' if current - len(instances) == 1 else 's', self.__formatter__(name)))
-
-        # Our instances should all be ready, so we just need enable all the hooks in order.
-        if len(instances) == count and self.__hook_order(name):
-            return True
-
-        # If we couldn't enable the hooks, then this method was not successful.
-        logging.warning(u"{:s}.attach({!r}) : Unexpected error trying to rehook the assigned hooks after attaching to target {:s}.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
+        # Otherwise we failed miserably and so we can just bail here.
+        logging.warning(u"{:s}.attach({!r}) : Unable to attach {:d} hook instance{:s} ({:s}) to the specified target {:s}.".format('.'.join([__name__, cls.__name__]), name, count, '' if count == 1 else 's', internal.utils.pycompat.fullname(self.__klass__), self.__formatter__(name)))
         return False
+
+    def __detach_unhook(self, name):
+        '''Iterate through the known instances for the target `name` and remove their hooks in the correct order.'''
+        assert(all(name in attached for attached in [self.__attached__, self.__attached_scope, self.__attached_instances]))
+
+        # Iterate through all known instances for the target and unhook them.
+        cls, failed, instances = self.__class__, [], self.__attached_instances[name]
+        for index, instance in enumerate(instances):
+            if not instance.unhook():
+                logging.warning(u"{:s}.__detach_unhook({!r}) : Unable to unhook instance ({!s}) {:d} of {:d} for the hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, instance, 1 + index, len(instances), self.__formatter__(name)))
+                failed.append(index)
+            continue
+
+        # If we couldn't unhook them, then log a warning to let the user know.
+        if failed:
+            iterable = itertools.chain(map("{:d}".format, failures[:-1]), map("and {:d}".format, failures[-1:])) if len(failures) > 2 else map("{:d}".format, failures)
+            description = ' and '.join(iterable) if len(failures) == 2 else ', '.join(iterable)
+            logging.critical(u"{:s}.__detach_unhook({!r}) : Unable to unhook {:d} instance{:s} ({:s}) that {:s} hooking the target {:s}.".format('.'.join([__name__, cls.__name__]), name, len(failures), '' if len(failures) == 1 else 's', description, 'is' if len(failures) == 1 else 'are', self.__formatter__(name)))
+
+        # Update our dictionary of instances that are currently still attached.
+        remaining = {index for index in failed}
+        self.__attached_instances[name][:] = [instance for index, instance in enumerate(instances) if index in remaining]
+
+        # Now we can go through and unhook the instances that manage the scope.
+        managers = start_instance, stop_instance = self.__attached_scope[name]
+
+        start_removed = start_instance.unhook()
+        if not start_removed:
+            logging.warning(u"{:s}.__detach_unhook({!r}) : Unable to unhook the management instance ({!s}) for the hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name)))
+
+        stop_removed = stop_instance.unhook()
+        if not stop_removed:
+            logging.warning(u"{:s}.__detach_unhook({!r}) : Unable to unhook the management instance ({!s}) for the hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name)))
+
+        # If we couldn't do either, then technically our hooks are still attached. However,
+        # since the intermediary hooks have been removed, the hooks aren't guaranteed execution.
+        if all([not start_removed, not stop_removed]):
+            logging.critical(u"{:s}.__detach_unhook({!r}) : Unable to unhook the management instances ({:s} and {:s}) for the hook target {:s} which will result in hooks being unreliable.".format('.'.join([__name__, cls.__name__]), name, start_instance, stop_instance, self.__formatter__(name)))
+
+        elif any([not stop_removed, not start_removed]):
+            description = "management instance ({!s})".format(stop_instance) if not stop_removed else "management instance ({!s})".format(start_instance) if not start_removed else "management instances ({!s} and {!s})".format(start_instance, stop_instance)
+            logging.warning(u"{:s}.__detach_unhook({!r}) : Unable to unhook the {:s} from target {:s} which will result in the appearance of the target being disabled.".format('.'.join([__name__, cls.__name__]), name, description, self.__formatter__(name)))
+
+        # Now we can update our dictionary and return whether we succeeded or not.
+        iterable = (None if removed else instance for instance, removed in zip(managers, [start_removed, stop_removed]))
+        self.__attached_scope[name] = managers = tuple(iterable)
+        return False if remaining or any(managers) else True
 
     def detach(self, name):
         '''Detach the target specified by `name` from the hook object.'''
@@ -1843,15 +1876,16 @@ class priorityhook(prioritybase):
             raise NameError(u"{:s}.detach({!r}) : Unable to detach from the target {:s} due to the target being unavailable.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
 
         # Check that the target name is currently attached.
-        if name not in self.__attached__:
+        elif name not in self.__attached__:
             logging.warning(u"{:s}.detach({!r}) : Unable to detach from the target {:s} as it is not currently attached.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
             return False
 
         assert(name in self.__attached_scope)
+        assert(name in self.__attached_instances)
 
         # First we'll unhook everything. This is required so that we free up references.
-        if not self.__unhook_order(name):
-            logging.warning(u"{:s}.detach({!r}) : Unable to detach from the target {:s} due to being unable to completely unhook all attached instances.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name)))
+        if not self.__detach_unhook(name):
+            logging.warning(u"{:s}.detach({!r}) : Unable to detach from the target {:s} due to being unable to completely unhook {:d} attached instance{:s}.".format('.'.join([__name__, cls.__name__]), name, self.__formatter__(name), len(self.__attached_instances[name]), '' if len(self.__attached_instances[name]) == 1 else 's'))
             return False
 
         # Now that everything was unhooked, we can start emptying out instances.
@@ -1880,7 +1914,7 @@ class priorityhook(prioritybase):
         # Try and attach to the target name with a closure.
         if not self.attach(name):
             format = "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
-            raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:s}) : Unable to attach to the specified target {:s}.".format('.'.join([__name__, cls.__name__]), name, callable, format(priority), self.__formatter__(name)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({!r}, {!s}, {:s}) : Unable to attach to the specified hook target {:s}.".format('.'.join([__name__, cls.__name__]), name, callable, format(priority), self.__formatter__(name)))
 
         # We should've attached, so all that's left is to add it for
         # tracking using the parent method.
