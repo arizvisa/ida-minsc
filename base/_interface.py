@@ -4115,7 +4115,7 @@ class location_t(integerish):
     def __same__(self, other):
         thisoffset, thissize = self
         thatoffset, thatsize = other
-        return all([thisoffset == thatoffset], [thissize == thatsize])
+        return all([thisoffset == thatoffset, thissize == thatsize])
 
     @property
     def bits(self):
