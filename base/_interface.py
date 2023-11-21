@@ -2635,9 +2635,10 @@ class tinfo(object):
     # A lookup table for how to process locations types within tinfo_t.
     location_table = {
         idaapi.ALOC_STACK: operator.methodcaller('stkoff'),
-        idaapi.ALOC_STATIC: operator.methodcaller('stkoff'),
+        idaapi.ALOC_STATIC: operator.methodcaller('get_ea'),
         idaapi.ALOC_REG1: operator.methodcaller('get_reginfo'),
         idaapi.ALOC_REG2: operator.methodcaller('get_reginfo'),
+        idaapi.ALOC_RREL: internal.utils.fcompose(operator.methodcaller('get_rrel'), internal.utils.fmap(operator.attrgetter('reg'), operator.attrgetter('off'))),
     }
 
     # Define a throwaway closure that we use for entering and recursing
@@ -2700,7 +2701,8 @@ class tinfo(object):
             try: reg2 = architecture.by_indexsize(ridx2, size // 2)
             except KeyError: reg2 = architecture.by_index(ridx2)
 
-            return [reg1, reg2]
+            # The 2nd register is the most-significant with the 1st being the least.
+            return [reg2, reg1]
 
         # Seems to be a value relative to a register (reg+off) which we return
         # as a phrase_t if there's an offset, otherwise just the register.
@@ -2746,7 +2748,8 @@ class tinfo(object):
         # FIXME: We're not supporting this because I've never used this fucker.
         elif loctype in {idaapi.ALOC_CUSTOM}:
             ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
-            raise NotImplementedError(u"{:s}.location({!r}, {!r}, {:d}, {!r}, ...) : Unable to decode location of type {:s} that uses the specified information ({!s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), architecture, loctype, locinfo, "{:s}({:d})".format(ltypes[loctype], loctype) if loctype in ltypes else "{:d}".format(loctype), locinfo))
+            custom = locinfo.get_custom() if hasattr(locinfo, 'get_custom') else locinfo
+            raise NotImplementedError(u"{:s}.location({:d}, {!r}, {:d}, {!r}, ...) : Unable to decode location of type {:s} that uses the specified information ({!s}).".format('.'.join([__name__, cls.__name__]), size, architecture, loctype, locinfo, "{:s}({:d})".format(ltypes[loctype], loctype) if loctype in ltypes else "{:d}".format(loctype), custom))
 
         # Anything else we just return, because we have no context to even
         # raise an exception that can inform the user about what happened.
