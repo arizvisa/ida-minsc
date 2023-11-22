@@ -16,6 +16,7 @@ follows:
     `name` - Filter the segments by a name or a list of names
     `like` - Filter the segment names according to a glob
     `regex` - Filter the function names according to a regular-expression
+    `iregex` - Filter the function names according to a case-insensitive regular-expression
     `index` - Filter the segments by an index or a list of indices
     `identifier` - Filter the segments by an integer identifier or a list of identifiers
     `selector` - Filter the segments by a selector or a list of selectors
@@ -43,7 +44,8 @@ from internal import utils, interface, types, exceptions as E
 
 ## enumerating
 __matcher__ = utils.matcher()
-__matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
+__matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
+__matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
 __matcher__.attribute('index', 'index')     # XXX: dirty attribute added to segment_t
 __matcher__.attribute('identifier', 'name'), __matcher__.attribute('id', 'name')
 __matcher__.attribute('selector', 'sel')
@@ -69,7 +71,7 @@ def __iterate__(string):
     string = interface.tuplename(*fullname)
     return __iterate__(like=string)
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def __iterate__(**type):
     '''Iterate through each segment defined in the database that match the keywords specified by `type`.'''
     def newsegment(index):
@@ -87,7 +89,7 @@ def list(string):
     '''List all of the segments whose name matches the glob specified by `string`.'''
     return list(like=string)
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def list(**type):
     '''List all of the segments in the database that match the keyword specified by `type`.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -196,7 +198,7 @@ def by():
     '''Return the current segment.'''
     return ui.current.segment()
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def by(**type):
     '''Return the segment matching the specified keywords in `type`.'''
     searchstring = utils.string.kwargs(type)
@@ -225,7 +227,7 @@ def search(name, *suffix):
     string = interface.tuplename(*res)
     return by(like=string)
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def search(**type):
     '''Search through all the segments and return the first one that matches the keyword specified by `type`.'''
     return by(**type)
