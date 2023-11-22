@@ -5259,6 +5259,23 @@ class tinfo(object):
             return cls.get(library, type, fields, encoded)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.comments({!s}, {!r}) : Unable to set the comments for the given type information using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(description, '"'), items, items.__class__.__name__))
 
+    @classmethod
+    def compare(cls, type, other, *flags):
+        '''Compares the specified `type` to `other` for castability using the given `flags`.'''
+        if idaapi.__version__ < 6.8:
+            til = cls.library(type)
+            return idaapi.is_castable2(til, type, other)
+        [tcflags] = flags if flags else [idaapi.TCMP_AUTOCAST]
+        return type.compare_with(other, tcflags)
+
+    @classmethod
+    def equals(cls, type, other):
+        '''Return whether the specified `type` is the same as `other`.'''
+        if idaapi.__version__ < 6.8:
+            til = cls.library(type)
+            return idaapi.equal_types(til, type, other)
+        return type.equals_to(other)
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
