@@ -486,7 +486,8 @@ else:
         @utils.multicase(index=types.integer, size=types.integer)
         def by_partial(self, index, size):
             '''Return a `register_t` or `partialregister_t` for the register at the specified `index` up to the maximum `size`.'''
-            midx, maximum = index, size
+            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+            midx, maximum, dtype = index, size, dtype_by_size(size)
 
             # define a closure that yields all of the available promotions for a register.
             def mreg_promotions(midx):
@@ -527,7 +528,7 @@ else:
             candidates = [size for size in mreg_candidates(midx)]
             if any(size == maximum for size in candidates):
                 try:
-                    result = self.by_indexsize(midx, maximum)
+                    result = self.by_indextype(midx, dtype)
                 except (internal.exceptions.RegisterNotFoundError, KeyError):
                     result = interface.partialregister_t(self.by_index(midx), 0, 8 * maximum)
                 return result
@@ -612,10 +613,16 @@ else:
         byindextype = internal.utils.alias(by_indextype)
 
         def by_indexsize(self, index, size):
-            '''Return the (complete) microregister for the given `index` and `size`.'''
+            '''Return the (complete or partial) microregister for the given `index` and `size`.'''
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
             dtype = dtype_by_size(size)
-            return self.by_indextype(index, dtype)
+
+            # if the register exists in the cache, then we can return the whole thing.
+            if (index, dtype) in self.__cache__:
+                return self.by_indextype(index, dtype)
+
+            # otherwise, this is a part of a uregister and we need to return that.
+            return self.by_partial(index, size)
         byindexsize = internal.utils.alias(by_indexsize)
 
         def __init__(self, architecture, **cache):
@@ -785,9 +792,12 @@ else:
         @utils.multicase(register=interface.register_t, size=types.integer)
         def by(self, register, size):
             '''Return the (complete) microregister for the specified `size` based on the given `register`.'''
+            dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+            dtype = dtype_by_size(size)
+
             if isinstance(register.realname, types.string):
                 realname = ida_hexrays.reg2mreg(register.id)
-                return self.by_indexsize(realname, size)
+                return self.by_indextype(realname, dtype)
 
             # If we were given a uarchitecture register, then just scale it up
             # according to whatever the requested size is.
@@ -796,7 +806,7 @@ else:
                 realname = idaapi.ph.regnames[ridx]
                 basereg = self.by_name(realname)
                 realname = basereg.id
-                return self.by_indexsize(realname, size)
+                return self.by_indextype(realname, dtype)
 
             # If we're too small, then promote it as far as we can.
             elif register.size < size:
