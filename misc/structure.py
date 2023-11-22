@@ -2011,6 +2011,7 @@ class members_t(object):
         `offset` - Match the structure member by its offset
         `like` - Filter the structure members according to a glob
         `regex` - Filter the structure members according to a regular-expression
+        `iregex` - Filter the structure members according to a case-insensitive regular-expression
         `index` - Filter the structure members by an index or a list of indices
         `fullname` - Filter the structure members by matching its full name according to a glob
         `comment` or `comments` - Filter the structure members by applying a glob to its comment
@@ -2083,7 +2084,7 @@ class members_t(object):
         '''List any members that overlap the specified `location`.'''
         return self.list(predicate=operator.truth, location=location)
     @utils.multicase()
-    @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
+    @utils.string.decorate_arguments('regex', 'iregex', 'name', 'like', 'fullname', 'comment', 'comments')
     def list(self, **type):
         '''List all the members within the structure that match the keyword specified by `type`.'''
         res = [item for item in self.iterate(**type)]
@@ -2100,7 +2101,7 @@ class members_t(object):
         return
 
     @utils.multicase()
-    @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
+    @utils.string.decorate_arguments('regex', 'iregex', 'name', 'like', 'fullname', 'comment', 'comments')
     def by(self, **type):
         '''Return the member that matches the keyword specified by `type`.'''
         searchstring = utils.string.kwargs(type)
@@ -3002,7 +3003,8 @@ class members_t(object):
 
     ## Matching
     __members_matcher = utils.matcher()
-    __members_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
+    __members_matcher.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
+    __members_matcher.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), 'name')
     __members_matcher.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), 'index')
     __members_matcher.combinator('identifier', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), 'id')
     __members_matcher.alias('id', 'identifier')
