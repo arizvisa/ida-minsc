@@ -467,7 +467,6 @@ class member(object):
         # We first need to collect the correct APIs depending on the disassembler version.
         get_member_tinfo = idaapi.get_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.get_member_tinfo
         set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
-        tinfo_equals_to = idaapi.equal_types if idaapi.__version__ < 6.8 else lambda til, t1, t2: t1.equals_to(t2)
 
         # Now we need to forcefully convert our parameter to a `tinfo_t`.
         ti, info_description = (info, utils.string.repr("{!s}".format(info))) if isinstance(info, idaapi.tinfo_t) else (internal.declaration.parse(info), utils.string.repr(info))
@@ -492,7 +491,7 @@ class member(object):
 
         # If we got an SMT_OK or we received SMT_KEEP with the previous member type and new
         # member type being the same, then this request was successful and we can return.
-        if res == idaapi.SMT_OK or res == idaapi.SMT_KEEP and tinfo_equals_to(idaapi.get_idati(), ti, prevti):
+        if res == idaapi.SMT_OK or res == idaapi.SMT_KEEP and interface.tinfo.equals(ti, prevti):
             return original
 
         # We failed, so just raise an exception for the user to comprehend.
@@ -2263,6 +2262,48 @@ class members_t(object):
         '''Return whether any members exist within the specified `bounds`.'''
         start, stop = sorted(bounds)
         return self.has(start, stop)
+    @utils.multicase(structure=(idaapi.struc_t, structure_t))
+    def has(self, structure):
+        '''Return whether any members uses the specified `structure` as a field or references it as a pointer.'''
+        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        owner, tid, tinfo = self.owner.ptr, None if sptr.id == idaapi.BADADDR else sptr.id, address.type(sptr.id)
+        stype = None if tinfo is None else interface.tinfo.structure(tinfo)
+        for midx in range(owner.memqty):
+            mptr = owner.get_member(midx)
+
+            # First retrieve the type and check if the type-id matches.
+            opinfo = idaapi.opinfo_t()
+            res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+            if res and res.tid == tid:
+                return True
+
+            # Otherwise we need to check if we're able to compare the type
+            # and then we can extract the type information and compare.
+            mtype = address.type(mptr.id)
+            if any([mtype is None, stype is None]):
+                continue
+
+            # Try to resolve the member's type. We use the exception
+            # to assign "None" to candidate if we couldn't resolve it.
+            try: candidate = interface.tinfo.structure(mtype)
+            except (E.DisassemblerError, TypeError): candidate = None
+
+            # If the types actually matched, then we can return success.
+            if candidate and interface.tinfo.equals(stype, candidate):
+                return True
+            continue
+        return False
+    @utils.multicase(info=idaapi.tinfo_t)
+    def has(self, info):
+        '''Return whether the types of any of the members are the same as the type information in `info`.'''
+        owner = self.owner.ptr
+        for midx in range(owner.memqty):
+            mptr = owner.get_member(midx)
+            mtype = address.type(mptr.id)
+            if mtype is not None and interface.tinfo.equals(mtype, info):
+                return True
+            continue
+        return False
 
     @utils.string.decorate_arguments('name', 'suffix')
     def by_name(self, name, *suffix):
