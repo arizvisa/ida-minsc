@@ -24,6 +24,7 @@ as follows:
     `name` - Filter the enumerations by a name or a list of names
     `like` - Filter the enumeration names according to a glob
     `regex` - Filter the enumeration names according to a regular-expression
+    `iregex` - Filter the enumeration names according to a case-insensitive regular-expression
     `index` - Match the enumeration by its index
     `identifier` or `id` - Filter the enumerations by an identifier or a list of identifers
     `predicate` - Filter the enumerations by passing their identifier to a callable
@@ -134,7 +135,7 @@ def by(fullname):
     '''Return the identifier for the enumeration with the packed `fullname`.'''
     return by_name(*fullname)
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def by(**type):
     '''Return the identifier for the first enumeration matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
@@ -158,7 +159,7 @@ def search(string, *suffix, **type):
     res = (string,) + suffix
     return by(like=interface.tuplename(*res), **type)
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def search(**type):
     '''Return the identifier of the first enumeration that matches the keyword specified by `type`.'''
     return by(**type)
@@ -464,7 +465,8 @@ def repr(enum):
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
-__matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
+__matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
+__matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
 __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_name, utils.string.of, operator.methodcaller('lower'))
 __matcher__.boolean('bitfield', operator.eq, idaapi.is_bf, operator.truth)
@@ -483,7 +485,7 @@ def iterate(string, *suffix, **type):
     '''Iterate through all of the enumerations in the database that match the glob in `string`.'''
     res = string if isinstance(string, types.tuple) else (string,)
     return iterate(like=interface.tuplename(*(res + suffix)), **type)
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the enumerations in the database that match the keyword specified by `type`.'''
     if not type: type = {'predicate': lambda item: True}
@@ -499,7 +501,7 @@ def list(string, *suffix, **type):
     res = string if isinstance(string, types.tuple) else (string,)
     return list(like=interface.tuplename(*(res + suffix)), **type)
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def list(**type):
     '''List all of the enumerations within the database that match the keyword specified by `type`.'''
     res = [item for item in iterate(**type)]
@@ -537,6 +539,7 @@ class members(object):
         `name` - Match the members by their name or a list of names
         `like` - Filter the member names according to a glob
         `regex` - Filter the member names according to a regular-expression
+        `iregex` - Filter the member names according to a case-insensitive regular-expression
         `comment` - Filter the members with a comment or by applying a glob to its comment
         `repeatable` - Filter the members with a repeatable comment or by applying a glob
         `value` - Match members that have a specific value or a list of values
@@ -862,7 +865,8 @@ class members(object):
     __members_matcher = utils.matcher()
     __members_matcher.combinator('name', utils.fcondition(utils.finstance(types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_enum_member_name, utils.string.of, operator.methodcaller('lower'))
     __members_matcher.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
-    __members_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
+    __members_matcher.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
+    __members_matcher.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_enum_member_name, utils.string.of)
     __members_matcher.combinator('comment', utils.fcondition(utils.finstance(types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcondition(operator.truth)(utils.fconstant(operator.truth), utils.fconstant(operator.not_))), utils.frpartial(idaapi.get_enum_member_cmt, False), utils.string.of, utils.fdefault(''))
     __members_matcher.alias('comments', 'comment')
     __members_matcher.combinator('repeatable', utils.fcondition(utils.finstance(types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcondition(operator.truth)(utils.fconstant(operator.truth), utils.fconstant(operator.not_))), utils.frpartial(idaapi.get_enum_member_cmt, True), utils.string.of, utils.fdefault(''))
