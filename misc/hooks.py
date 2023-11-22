@@ -2006,6 +2006,11 @@ def make_ida_not_suck_cocks(nw_code):
     '''Start hooking all of IDA's API.'''
     import hook
 
+    # first we try to delete the leftover garbage from idapython's init.py script.
+    if '__main__' in sys.modules:
+        remove = ['signal', 'site', 'sp']
+        [ sys.modules['__main__'].__dict__.pop(item, None) for item in remove ]
+
     # at this point, the hook classes should already have been instantiated by the
     # loader. so we just verify that the necessary attributes exist to be safe.
     for attribute in ['notification', 'idp', 'idb', 'ui']:
