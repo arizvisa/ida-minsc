@@ -42,6 +42,7 @@ The different types that one can filter structures with are the following:
     `name` - Filter the structures by a name or a list of names
     `like` - Filter the structure names according to a glob
     `regex` - Filter the structure names according to a regular-expression
+    `iregex` - Filter the structure names according to a case-insensitive regular-expression
     `index` - Filter the structures by an index or a list of indices
     `identifier` or `id` - Match the structure by its id which is an ``idaapi.uval_t``
     `size` - Filter the structures for any matching a size or a list of sizes
@@ -81,7 +82,8 @@ from internal import utils, interface, types, exceptions as E
 structure_t, member_t = internal.structure.structure_t, internal.structure.member_t
 
 __matcher__ = utils.matcher()
-__matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
+__matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
+__matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), 'name')
 __matcher__.attribute('index', 'id', idaapi.get_struc_idx)
 __matcher__.attribute('identifier', 'id'), __matcher__.alias('id', 'identifier')
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
@@ -127,7 +129,7 @@ def iterate(string, *suffix):
     res = string if isinstance(string, types.tuple) else (string,)
     return iterate(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
     if not type: type = {'predicate': lambda item: True}
@@ -143,7 +145,7 @@ def list(string, *suffix):
     res = string if isinstance(string, types.tuple) else (string,)
     return list(like=interface.tuplename(*(res + suffix)))
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def list(**type):
     '''List all the structures within the database that match the keyword specified by `type`.'''
     listable = [item for item in iterate(**type)]
@@ -492,7 +494,7 @@ def by(tinfo, **offset):
     return by(recurse_tinfo, **offset)
 
 @utils.multicase()
-@utils.string.decorate_arguments('regex', 'like', 'name')
+@utils.string.decorate_arguments('regex', 'iregex', 'like', 'name')
 def by(**type):
     '''Return the structure matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
