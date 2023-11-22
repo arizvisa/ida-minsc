@@ -5276,6 +5276,141 @@ class tinfo(object):
             return idaapi.equal_types(til, type, other)
         return type.equals_to(other)
 
+    @classmethod
+    def resolve(cls, type):
+        '''Return the type for the target that is being referenced by the specified nested pointer `type`.'''
+        tinfo = type
+
+        # If there are no details, then technically we're already there.
+        if not tinfo.has_details():
+            return cls.copy(tinfo)
+
+        # If our type is a pointer, then we need to extract the pointer details
+        # from it so that we can dereference the type and recurse into ourselves.
+        elif tinfo.is_ptr():
+            pi = idaapi.ptr_type_data_t()
+            if not tinfo.get_ptr_details(pi):
+                raise internal.exceptions.DisassemblerError(u"{:s}.resolve({!r}) : Unable to get the pointer type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(tinfo)))
+            return cls.resolve(pi.obj_type)
+
+        # Last thing to do is to concretize the type prior to returning it.
+        til, resolved = cls.library(tinfo), cls.copy(tinfo)
+        res = idaapi.replace_ordinal_typerefs(til, resolved) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.resolve({!r}) : Ignoring error {:d} while trying to concretize the provided type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+        return tinfo if res < 0 else resolved
+
+    @classmethod
+    def array(cls, type):
+        '''Return a tuple containing the element type and length of the array specified by `type`.'''
+        ai = idaapi.array_type_data_t()
+
+        # If there's no details, then this is definitely not an array.
+        if not type.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.array({!r}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # If it's not an array, then this is definitely not an array.
+        elif not type.is_array():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.array({!r}) : The specified type information ({!r}) is not an array.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # If there's no array details, then this is definitely not an array.
+        elif not type.get_array_details(ai):
+            raise internal.exceptions.DisassemblerError(u"{:s}.array({!r}) : Unable to get the array type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # If we got here, then this definitely is an array and we only
+        # need to concretize the element type prior to returning it.
+        til, element = cls.library(ai.elem_type), cls.copy(ai.elem_type)
+        res = idaapi.replace_ordinal_typerefs(til, element) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.array({!r}) : Ignoring error {:d} while trying to concretize the element type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(ai.elem_type), '"')))
+        return ai.elem_type if res < 0 else element, ai.nelems
+
+    @classmethod
+    def structure(cls, type):
+        '''Return the structure or union that is referenced by the specified array or pointer `type`.'''
+        tinfo = type
+
+        # If there's no details, then this is definitely not an array or a structure.
+        if not tinfo.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.structure({!r}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(tinfo), '"'), "{!s}".format(tinfo)))
+
+        # If our type is a pointer, then we need to use the pointer details to recurse.
+        elif tinfo.is_ptr():
+            pi = idaapi.ptr_type_data_t()
+            if not tinfo.get_ptr_details(pi):
+                raise internal.exceptions.DisassemblerError(u"{:s}.structure({!r}) : Unable to get the pointer type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), "{!s}".format(tinfo)))
+            return cls.structure(pi.obj_type)
+
+        # If it's an array, then we need to extract the array element and then recurse.
+        elif tinfo.is_array():
+            ai = idaapi.array_type_data_t()
+            if not tinfo.get_array_details(ai):
+                raise internal.exceptions.DisassemblerError(u"{:s}.structure({!r}) : Unable to get the array type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), "{!s}".format(tinfo)))
+            return cls.structure(ai.elem_type)
+
+        # If it's still not a structure, then we have something else.
+        elif not any([tinfo.is_struct(), tinfo.is_union()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.structure({!r}) : Unable to determine the structure from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), "{!s}".format(tinfo)))
+
+        # That's it and we only need to resolve its ordinals before returning it.
+        til, resolved = cls.library(tinfo), cls.copy(tinfo)
+        res = idaapi.replace_ordinal_typerefs(til, resolved) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.structure({!r}) : Ignoring error {:d} while trying to concretize the structuire type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(tinfo), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+        return tinfo if res < 0 else resolved
+
+    @classmethod
+    def members(cls, type):
+        '''Yield a tuple for each member in the structure, union, or array that is specified by `type`.'''
+        if not type.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.members({!r}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # We only support udt and array types with this function.
+        elif not any([type.is_udt(), type.is_array()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.members({!r}) : The specified type information ({!r}) does not contain any members.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # If our type is an array, then our job is fairly easy here.
+        if type.is_array():
+            ai = idaapi.array_type_data_t()
+            if not type.get_array_details(ai):
+                raise internal.exceptions.DisassemblerError(u"{:s}.members({!r}) : Unable to get the array type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+            # Get the relevant attributes for the array that we'll use in our iterator.
+            base, element, esize = ai.base, ai.elem_type, ai.elem_type.get_size()
+            size, unpadded, count = type.get_size(), type.get_unpadded_size(), ai.nelems
+
+            effective_alignment, declared_alignment, pack_alignment = 0, pow(2, element.get_declalign()), pow(2, 0)
+
+            # Now we can create our iterator that gets returned to the caller.
+            index_offset = ((base + index, index * element.get_size()) for index in builtins.range(count))
+            iterable = ((index, offset, element.get_size(), element, declared_alignment) for index, offset in index_offset)
+
+        # Otherwise we need to extract the members differently.
+        elif type.is_udt():
+            utd = idaapi.udt_type_data_t()
+            if not type.get_udt_details(utd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.members({!r}) : Unable to get the member type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+            # Grab literally all the fields just in case we might need them.
+            effective_alignment, declared_alignment, pack_alignment = utd.effalign, pow(2, utd.sda - 1) if utd.sda else 0, pow(2, utd.pack)
+            size, unpadded, count = utd.total_size, utd.unpadded_size, utd.size()
+
+            # Now we can create an iterator that returns information about each member.
+            index_member = ((index, utd[index]) for index in builtins.range(count))
+            iterable = ((internal.utils.string.of(member.name), member.offset >> 3, member.size >> 3, member.type, pow(2, member.fda)) for index, member in index_member)
+
+        # Any other type is pretty much unknown and so we just bail the search.
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.members({!r}) : Unable to determine the members from an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # Now we need to process our iterable to concretize each type being returned.
+        # To do this, we first make an iterable with a copy of the original that we'll
+        # attempt to resolve. If we didn't succeed, then we fall back to the original.
+        Fstrip_ordinals = idaapi.replace_ordinal_typerefs if hasattr(idaapi, 'replace_ordinal_typerefs') else lambda library, ti: 0
+        iterable = ((mname, moffset, msize, cls.library(mtype), mtype, cls.copy(mtype), malign) for mname, moffset, msize, mtype, malign in iterable)
+        resolved = ((mname, moffset, msize, moldtype if Fstrip_ordinals(til, mnewtype) < 0 else mnewtype, malign) for mname, moffset, msize, til, moldtype, mnewtype, malign in iterable)
+        return [(mname, moffset, msize, mtype, malign) for mname, moffset, msize, mtype, malign in resolved]
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
