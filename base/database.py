@@ -6086,35 +6086,22 @@ class types(object):
     @classmethod
     def declare(cls, string, library, flags):
         '''Parse the given `string` into an ``idaapi.tinfo_t`` for the specified type `library` with `flags` and return it.'''
-        ti, flag = idaapi.tinfo_t(), flags | idaapi.PT_SIL
-
-        # Firstly we need to ';'-terminate the type the user provided in order
-        # for IDA's parser to understand it.
-        terminated = string if string.rstrip().endswith(';') else "{:s};".format(string)
-
-        # Ask IDA to parse this into a tinfo_t for us. We default to the silent flag so
-        # that we're responsible for handling it if there's a parsing error of some sort.
-        if idaapi.__version__ < 6.9:
-            ok, name = idaapi.parse_decl2(library, terminated, None, ti, flag), None
-        elif idaapi.__version__ < 7.0:
-            ok, name = idaapi.parse_decl2(library, terminated, ti, flag), None
-        else:
-            name = idaapi.parse_decl(ti, library, terminated, flag)
-            ok = name is not None
+        flag = flags | idaapi.PT_SIL
+        result = interface.tinfo.parse(library, string, flag)
 
         # If we were explicitly asked to be silent (using the "flags" parameter),
         # then we avoid raising an exception entirely and return None on failure.
-        if not ok and flags & idaapi.PT_SIL:
+        if result is None and flags & idaapi.PT_SIL:
             return None
 
         # If we couldn't parse the type we were given, then simply bail.
-        elif not ok:
+        elif result is None:
             raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}, {:#x}) : Unable to parse the provided string into a valid type.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags))
 
         # If we were given the idaapi.PT_VAR flag, then we return the parsed name too.
-        string = utils.string.of(name)
-        logging.info(u"{:s}.declare({!r}, {:s}, {:#x}) : Successfully parsed the given string into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, " ({:s})".format(string) if string else ''))
-        return (string or u'', ti) if flag & idaapi.PT_VAR else ti
+        name, ti = result if flag & idaapi.PT_VAR else ('', result)
+        logging.info(u"{:s}.declare({!r}, {:s}, {:#x}) : Successfully parsed the given string into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, " ({:s})".format(name) if name else ''))
+        return result
     parse = utils.alias(declare, 'types')
 
     @utils.multicase(info=idaapi.tinfo_t)
