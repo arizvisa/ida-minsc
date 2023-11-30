@@ -3156,7 +3156,7 @@ class type(object):
         MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
         Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
-        til, parseflags = interface.tinfo.library(), functools.reduce(operator.or_, [idaapi.PT_SIL, idaapi.PT_VAR, idaapi.PT_LOWER, idaapi.PT_NDC])
+        parseflags = functools.reduce(operator.or_, [idaapi.PT_SIL, idaapi.PT_VAR, idaapi.PT_LOWER, idaapi.PT_NDC])
 
         # Figure out what we're actually going to be applying the type information to,
         # and figure out what its real name is so that we can mangle it if necessary.
@@ -3168,21 +3168,12 @@ class type(object):
         else:
             realname = fname
 
-        # Now we can terminate the string, parse it, and see what we have.
-        ti, parsedname, terminated = idaapi.tinfo_t(), None, info if info.endswith(';') else "{:s};".format(info)
-        if idaapi.__version__ < 6.9:
-            ok = idaapi.parse_decl2(til, terminated, utils.string.to(realname), ti, parseflags)
-            ti = ti if ok else None
-        elif idaapi.__version__ < 7.0:
-            parsedname = idaapi.parse_decl2(til, terminated, ti, parseflags)
-            ti = None if parsedname is None else ti
-        else:
-            parsedname = idaapi.parse_decl(ti, til, terminated, parseflags)
-            ti = None if parsedname is None else ti
-
-        # If we couldn't parse it (None) or it wasn't a function, then we need to bail.
-        if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to parse the provided string (\"{!s}\") as a properly named function prototype.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"')))
+        # Now we can parse it and see what we have. If we couldn't parse it or it
+        # wasn't an actual function of any sort, then we need to bail.
+        packed = interface.tinfo.parse(None, info, parseflags)
+        parsedname, ti = packed if packed else (realname, None)
+        if not ti:
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Unable to parse the provided string \"{!s}\" as a properly named function prototype.".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"')))
 
         elif not any([ti.is_func(), ti.is_funcptr()]):
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}) : Refusing to apply a non-prototype (\"{!s}\") to the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, info, utils.string.escape(info, '"'), 'address' if rt else 'function', ea))
@@ -3595,7 +3586,7 @@ class type(object):
             '''Modify the result type for the function `func` to the type information provided as a string in `info`.'''
 
             # FIXME: figure out the proper way to parse a type instead of as a declaration
-            tinfo = internal.declaration.parse(info)
+            tinfo = interface.tinfo.parse(None, info, idaapi.PT_SIL)
             if tinfo is None:
                 raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), func, info, info))
             return cls(func, tinfo)
@@ -3716,7 +3707,7 @@ class type(object):
         @utils.string.decorate_arguments('info')
         def __new__(cls, func, index, info):
             '''Modify the type information for the parameter at the specified `index` of the function `func` to the string in `info`.'''
-            tinfo = internal.declaration.parse(info)
+            tinfo = interface.tinfo.parse(None, info, idaapi.PT_SIL)
             if tinfo is None:
                 raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), func, index, info, info))
             return cls(func, index, tinfo)
@@ -3903,7 +3894,7 @@ class type(object):
             ftd.resize(len(types))
             for index, item in enumerate(types):
                 aname, ainfo = item if isinstance(item, internal.types.tuple) else ('', item)
-                ftd[index].name, ftd[index].type = utils.string.to(aname), internal.declaration.parse(ainfo) if isinstance(ainfo, internal.types.string) else ainfo
+                ftd[index].name, ftd[index].type = utils.string.to(aname), interface.tinfo.parse(None, ainfo, idaapi.PT_SIL) if isinstance(ainfo, internal.types.string) else ainfo
             updater.send(ftd), updater.close()
 
             # The very last thing we need to do is to return our results. Even though we collected
@@ -4092,7 +4083,7 @@ class type(object):
 
             # Convert all our parameters and update the index we allocated space for.
             res = name if isinstance(name, internal.types.tuple) else (name,)
-            aname, ainfo = interface.tuplename(*(res + suffix)), internal.declaration.parse(info) if isinstance(info, internal.types.string) else info
+            aname, ainfo = interface.tuplename(*(res + suffix)), interface.tinfo.parse(None, info, idaapi.PT_SIL) if isinstance(info, internal.types.string) else info
             ftd[index].name, ftd[index].type = utils.string.to(aname), ainfo
 
             # We should be good to go and we just need to return the index.
