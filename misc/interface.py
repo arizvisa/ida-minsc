@@ -3230,7 +3230,7 @@ class address(object):
         if res != idaapi.GUESS_FUNC_OK:
             fl = idaapi.PRTYPE_1LINE
             info_s = idaapi.print_type(ea, fl)
-            ti = None if info_s is None else internal.declaration.parse(info_s)
+            ti = None if info_s is None else tinfo.parse(None, info_s, idaapi.PT_SIL)
             if info_s is not None and ti is None:
                 raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.typeinfo({:#x}) : Unable to parse the type declaration (\"{:s}\") returned from the requested address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, internal.utils.string.escape(info_s, '"'), ea))
             return tinfo.concretize(ti)
@@ -5410,6 +5410,37 @@ class tinfo(object):
         iterable = ((mname, moffset, msize, cls.library(mtype), mtype, cls.copy(mtype), malign) for mname, moffset, msize, mtype, malign in iterable)
         resolved = ((mname, moffset, msize, moldtype if Fstrip_ordinals(til, mnewtype) < 0 else mnewtype, malign) for mname, moffset, msize, til, moldtype, mnewtype, malign in iterable)
         return [(mname, moffset, msize, mtype, malign) for mname, moffset, msize, mtype, malign in resolved]
+
+    @classmethod
+    def parse(cls, library, string, flags=0):
+        '''Use the given `flags` to parse the given `string` into an ``idaapi.tinfo_t`` for the specified type `library` and return it.'''
+        ti, flag, til = idaapi.tinfo_t(), flags | idaapi.PT_SIL, cls.library() if library is None else library
+
+        # Now we ';'-terminate the type in order for the disassembler to understand it.
+        terminated = string if string.rstrip().endswith(';') else "{:s};".format(string)
+
+        # Ask the disassembler to parse this into a tinfo_t for us. We default to the
+        # silent flag so that we're responsible for handling it if there's an error.
+        if idaapi.__version__ < 6.9:
+            ok, name = idaapi.parse_decl2(til, internal.utils.string.to(terminated), None, ti, flag), None
+        elif idaapi.__version__ < 7.0:
+            ok, name = idaapi.parse_decl2(til, internal.utils.string.to(terminated), ti, flag), None
+        else:
+            name = idaapi.parse_decl(ti, til, internal.utils.string.to(terminated), flag)
+            ok = name is not None
+
+        # If we were unable to parse the string we were given, then return nothing.
+        if not ok:
+            return
+
+        # Now we just need to strip out of the ordinals of the type we return.
+        old, new = ti, cls.copy(ti)
+        res = idaapi.replace_ordinal_typerefs(til, new) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        ti = old if res < 0 else new
+
+        # If we were given the idaapi.PT_VAR flag, then we return the parsed name too.
+        string = internal.utils.string.of(name)
+        return (string or u'', ti) if flag & idaapi.PT_VAR else ti
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
