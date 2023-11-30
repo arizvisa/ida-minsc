@@ -82,7 +82,7 @@ class address(object):
     @utils.string.decorate_arguments('string')
     def type(cls, ea, string):
         '''Parse the type information in `string` into an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
-        info = internal.declaration.parse(string)
+        info = interface.tinfo.parse(None, string, idaapi.PT_SIL)
         if info is None:
             raise E.InvalidTypeOrValueError(u"{:s}.type({:#x}, {!r}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ea, string, utils.string.repr(string)))
         return cls.type(ea, info)
@@ -469,7 +469,7 @@ class member(object):
         set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
 
         # Now we need to forcefully convert our parameter to a `tinfo_t`.
-        ti, info_description = (info, utils.string.repr("{!s}".format(info))) if isinstance(info, idaapi.tinfo_t) else (internal.declaration.parse(info), utils.string.repr(info))
+        ti, info_description = (info, utils.string.repr("{!s}".format(info))) if isinstance(info, idaapi.tinfo_t) else (interface.tinfo.parse(None, info, idaapi.PT_SIL), utils.string.repr(info))
 
         # Then we need the sptr for the member so that we can actually apply the type.
         packed = idaapi.get_member_by_id(mptr.id)
@@ -1639,7 +1639,7 @@ class member_t(object):
         # if we were given a tinfo_t or a string to use, then we pretty much use
         # it with the typeinfo api, but allow it the ability to destroy other members.
         if isinstance(type, (types.string, idaapi.tinfo_t)):
-            info = type if isinstance(type, idaapi.tinfo_t) else internal.declaration.parse(type)
+            info = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
             if info is None:
                 raise E.InvalidTypeOrValueError(u"{:s}({:#x}).type({!s}) : Unable to parse the specified type declaration ({!s}) for structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(type)), utils.string.escape("{!s}".format(type), '"'), utils.string.repr(self.name)))
             return member.set_typeinfo(self.ptr, info, idaapi.SET_MEMTI_MAY_DESTROY)
@@ -1925,8 +1925,8 @@ class member_t(object):
         # to parse it. if we succeed, then we likely can apply it later.
         if isinstance(ti, types.list) and len(ti) == 2:
             tname, tinfo = ti
-            typeinfo = internal.declaration.parse(tname) if tname else None
-            typeinfo = typeinfo if typeinfo else internal.declaration.parse(tinfo)
+            typeinfo = interface.tinfo.parse(None, tname, idaapi.PT_SIL) if tname else None
+            typeinfo = typeinfo if typeinfo else interface.tinfo.parse(None, tinfo, idaapi.PT_SIL)
             None if typeinfo is None else logging.info(u"{:s}({:#x}, index={:d}): Successfully parsed type information for field \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), typeinfo))
 
         # otherwise it's the old version (a tuple), and it shouldn't need to
@@ -2613,7 +2613,7 @@ class members_t(object):
 
         # Figure out whether we're adding a pythonic type or we were given a tinfo_t.
         # If we were given a tinfo_t, then use the size of the type as a placeholder.
-        res = internal.declaration.parse(type) if isinstance(type, types.string) else type
+        res = interface.tinfo.parse(None, type, idaapi.PT_SIL) if isinstance(type, types.string) else type
         type, tinfo, tdescr = ([None, res.get_size()], res, "{!s}".format(res)) if isinstance(res, idaapi.tinfo_t) else (res, None, "{!s}".format(res))
         flag, typeid, nbytes = interface.typemap.resolve(type if tinfo is None or 0 < tinfo.get_size() < idaapi.BADSIZE else None)
 
