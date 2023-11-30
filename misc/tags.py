@@ -255,7 +255,7 @@ class address(object):
     @classmethod
     def set_typeinfo(cls, ea, value, forced=False):
         '''Apply the type information specified by `value` to the item at address `ea`.'''
-        info, key = internal.declaration.parse(value) if isinstance(value, internal.types.string) else value, '__typeinfo__'
+        info, key = interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value, '__typeinfo__'
         if info is None:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('database', ea, key, value, utils.string.repr(value), ea))
 
@@ -579,7 +579,7 @@ class function(object):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
         # First we'll try and parse the type if it was given to us as a string.
-        info, key = internal.declaration.parse(value) if isinstance(value, internal.types.string) else value, '__typeinfo__'
+        info, key = interface.tinfo.parse(None, value, idaapi.PT_SIL) if isinstance(value, internal.types.string) else value, '__typeinfo__'
         if info is None:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.tag({:#x}, {!r}, {!r}) : Unable to parse the provided string ({!s}) into a type declaration.".format('function', ea, key, value, utils.string.repr("{!s}".format(value)), ea))
 
