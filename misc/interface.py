@@ -4546,6 +4546,8 @@ class contiguous(object):
         size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
         size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
+        size[idaapi.tinfo_t] = operator.methodcaller('get_size')
+        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(functools.partial(tinfo.parse, None), internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
 
         # Before doing anything, convert our parameter into a list that we can process.
         items = [(item if item.__class__ in size else typemap.size(item)) for item in items]
@@ -4571,6 +4573,8 @@ class contiguous(object):
         size[internal.structure.members_t] = internal.utils.fcompose(operator.attrgetter('owner'), operator.attrgetter('ptr'), idaapi.get_struc_size)
         size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
+        size[idaapi.tinfo_t] = operator.methodcaller('get_size')
+        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(functools.partial(tinfo.parse, None), internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
 
         # Listify our items and ensure that all of them are a type that we support.
         items = [(item if item.__class__ in size else typemap.size(item), item) for item in items]
@@ -4609,6 +4613,8 @@ class contiguous(object):
                 yield "{:s}({:#x})".format(internal.utils.pycompat.fullname(item.__class__), item.id)
             elif isinstance(item, area):
                 yield "{:s}({:s})".format(internal.utils.pycompat.fullname(item.__class__), range.bounds(item))
+            elif isinstance(item, (idaapi.tinfo_t, internal.types.string)):
+                yield "{:s}(\"{:s}\")".format(internal.utils.pycompat.fullname(idaapi.tinfo_t), internal.utils.string.escape("{!s}".format(item), '"'))
             else:
                 yield "{!r}".format(item)
             continue
