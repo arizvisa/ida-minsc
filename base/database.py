@@ -4447,7 +4447,7 @@ class type(object):
         '''Parse the type information in `string` into an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
         # We just need to ask IDA to parse this into a tinfo_t for us and then recurse
         # into ourselves. If we received None, then that's pretty much a parsing error.
-        ti = internal.declaration.parse(string)
+        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {!r}{:s}) : Unable to parse the provided string (\"{:s}\") into a type declaration.".format('.'.join([__name__, cls.__name__]), ea, string, ", {:s}".format(utils.string.kwargs(guessed)) if guessed else '', utils.string.escape(string, '"')))
         return cls(ea, ti, **guessed)
@@ -5881,7 +5881,7 @@ class types(object):
     @utils.string.decorate_arguments('name', 'string')
     def set(cls, ordinal, name, string, library, **mangled):
         '''Assign the type information in `string` with the specified `name` to the specified `ordinal` of the given type `library`.'''
-        ti = internal.declaration.parse(string)
+        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.set({:d}, {!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ordinal, name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(string)))
         return cls.set(ordinal, name, ti, library, **mangled)
@@ -5999,7 +5999,7 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def add(cls, name, string, library, **mangled):
         '''Add the type information in `string` to the specified type `library` using the provided `name`.'''
-        ti = internal.declaration.parse(string)
+        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({:s}).".format('.'.join([__name__, cls.__name__]), name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(string)))
         return cls.add(name, ti, library, **mangled)
@@ -6096,11 +6096,11 @@ class types(object):
 
         # If we couldn't parse the type we were given, then simply bail.
         elif result is None:
-            raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}, {:#x}) : Unable to parse the provided string into a valid type.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags))
+            raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}, {:#x}) : Unable to parse the provided string (\"{:s}\") into a valid type.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, utils.string.escape(string, '"')))
 
         # If we were given the idaapi.PT_VAR flag, then we return the parsed name too.
         name, ti = result if flag & idaapi.PT_VAR else ('', result)
-        logging.info(u"{:s}.declare({!r}, {:s}, {:#x}) : Successfully parsed the given string into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, " ({:s})".format(name) if name else ''))
+        logging.info(u"{:s}.declare({!r}, {:s}, {:#x}) : Successfully parsed the given string (\"{:s}\") into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, utils.string.escape(string, '"'), " ({:s})".format(name) if name else ''))
         return result
     parse = utils.alias(declare, 'types')
 
@@ -6145,7 +6145,7 @@ class types(object):
     @utils.string.decorate_arguments('string')
     def pointer(cls, string, size, attributes, **fields):
         '''Create a pointer of `size` bytes that references the type specified by `string` with the given `size` and extended `attributes`.'''
-        ti = internal.declaration.parse(string)
+        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.pointer({!r}, {:d}, {:#x}{:s}) : Unable to parse the given type declaration (\"{!s}\") for the pointer target.".format('.'.join([__name__, cls.__name__]), string, size, attributes, ", {:s}".format(utils.string.kwargs(fields)) if fields else '', utils.string.escape(string, '"')))
         return cls.pointer(ti, size, attributes, **fields)
@@ -6205,7 +6205,7 @@ class types(object):
     @utils.string.decorate_arguments('string')
     def array(cls, string, length, base):
         '''Create an array of the element specified by `string` with the given `length` and `base`.'''
-        ti = internal.declaration.parse(string)
+        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.array({!r}, {:d}, {:d}) : Unable to parse the given type declaration (\"{!s}\") for the array element.".format('.'.join([__name__, cls.__name__]), string, length, base, utils.string.escape(string, '"')))
         return cls.array(ti, length, base)
