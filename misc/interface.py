@@ -4547,7 +4547,11 @@ class contiguous(object):
         size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
         size[idaapi.tinfo_t] = operator.methodcaller('get_size')
-        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(functools.partial(tinfo.parse, None), internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
+
+        # If we were given a string, then we need to try to parse it. We try it first with
+        # a variable and if that doesn't work, we fallback to parsing it as a regular type.
+        Fparse_type_declaration = lambda string: tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR) else tinfo.parse(None, string, idaapi.PT_SIL)
+        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(Fparse_type_declaration, internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
 
         # Before doing anything, convert our parameter into a list that we can process.
         items = [(item if item.__class__ in size else typemap.size(item)) for item in items]
@@ -4574,7 +4578,11 @@ class contiguous(object):
         size[internal.structure.member_t] = internal.utils.fcompose(operator.attrgetter('ptr'), idaapi.get_member_size)
         size[bounds_t] = size[location_t] = size[register_t] = size[partialregister_t] = operator.attrgetter('size')
         size[idaapi.tinfo_t] = operator.methodcaller('get_size')
-        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(functools.partial(tinfo.parse, None), internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
+
+        # If we were given a string, then we need to try to parse it. We first attempt to parse
+        # it with a variable name first, and if that doesn't work we fall back to a regular type.
+        Fparse_type_declaration = lambda string: tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if tinfo.parse(None, string, idaapi.PT_SIL|idaapi.PT_VAR) else tinfo.parse(None, string, idaapi.PT_SIL)
+        size[u''.__class__] = size[''.__class__] = internal.utils.fcompose(Fparse_type_declaration, internal.utils.fcondition(operator.truth)(operator.methodcaller('get_size'), 0))
 
         # Listify our items and ensure that all of them are a type that we support.
         items = [(item if item.__class__ in size else typemap.size(item), item) for item in items]
