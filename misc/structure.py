@@ -3233,6 +3233,7 @@ class members_t(object):
         '''Replace the member(s) within the specified `index` with a copy of the specified `item` or list of items.'''
         cls, sptr, base, index_description = self.__class__, self.owner.ptr, self.baseoffset, "{!s}".format(index)
         multiple = isinstance(item, types.ordered) and not isinstance(item, interface.namedtypedtuple)
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
         # First we need to validate our parameters to ensure we were given
         # a slice if we're being asked to assign an iterable of items.
@@ -3289,6 +3290,13 @@ class members_t(object):
                 owner = item.owner if isinstance(item, idaapi.member_t) else item
                 mptr = owner if isinstance(owner, idaapi.struc_t) else owner.ptr
 
+            # If it's a type of some sort, then we need to see if we can actually parse it.
+            elif isinstance(item, (idaapi.tinfo_t, types.string)):
+                ti = item if isinstance(item, idaapi.tinfo_t) else interface.tinfo.parse(None, item, idaapi.PT_SIL|idaapi.PT_VAR) or interface.tinfo.parse(None, item, idaapi.PT_SIL)
+                if not ti:
+                    raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to parse the given string (\"{:s}\") into a valid type.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, utils.string.escape("{!s}".format(item), '"')))
+                mptr = item
+
             # Anything else, we have no idea how to handle and so we can just bail here.
             else:
                 raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Unable to determine member attributes for an unsupported type {!s} ({!r}).".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, item.__class__, item))
@@ -3319,6 +3327,17 @@ class members_t(object):
                 # Extract the comments in order...index 0 (False) is non-repeatable, index 1 (True) is repeatable.
                 comments = [utils.string.of(idaapi.get_member_cmt(mptr.id, repeatable)) for repeatable in [False, True]]
 
+            # If we received a type or a string, then we'll need to figure out
+            # the flags so that we can properly assign things to the structure.
+            elif isinstance(mptr, (idaapi.tinfo_t, types.string)):
+                has_name = interface.tinfo.parse(None, "{!s}".format(mptr), idaapi.PT_SIL|idaapi.PT_VAR)
+                tinfo = mptr if isinstance(mptr, idaapi.tinfo_t) else interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if has_name else interface.tinfo.parse(None, mptr, idaapi.PT_SIL)
+
+                # Figure out the operand info and flags using the type we received.
+                opinfo, comments, nbytes = idaapi.opinfo_t(), [], tinfo.get_size()
+                sid = opinfo.tid = idaapi.get_struc_id(tinfo.get_type_name() or '')
+                flag = idaapi.get_flags_by_size(tinfo.get_size()) if sid == idaapi.BADADDR else FF_STRUCT
+
             # This should just be a size and nothing else.
             else:
                 opinfo, flag, nbytes, tinfo, comments = None, 0, mptr, None, []
@@ -3344,7 +3363,14 @@ class members_t(object):
         # in multiple passes. The first pass will gather all of the user-proposed names.
         newnames = {}
         for offset, mptr, _ in newitems:
-            mname = member.get_name(mptr) if isinstance(mptr, idaapi.member_t) else member.default_name(sptr, None, offset) if isinstance(mptr, idaapi.struc_t) else ''
+            if isinstance(mptr, idaapi.member_t):
+                mname = member.get_name(mptr)
+            elif isinstance(mptr, idaapi.struc_t):
+                mname = member.default_name(sptr, None, offset)
+            elif isinstance(mptr, types.string) and interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR):
+                mname, _ = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)
+            else:
+                mname = ''
             newnames[offset] = mname
 
         # The second pass requires us to go through each of the newnames. We check all
@@ -3352,15 +3378,22 @@ class members_t(object):
         # used elsewhere within the structure. If so, then we give them a field name.
         original, candidates, unavailable = {}, {}, {name for name in used} | {''}
         for offset, mptr, _ in newitems:
-            if not isinstance(mptr, idaapi.member_t):
-                continue
+            if isinstance(mptr, (idaapi.tinfo_t, types.string)):
+                has_name = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR) if isinstance(mptr, types.string) else False
+                ti = mptr if isinstance(mptr, idaapi.tinfo_t) else interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if has_name else interface.tinfo.parse(None, mptr, idaapi.PT_SIL)
+                mname = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)[0] if isinstance(mptr, types.string) and has_name else newnames[offset]
+                originalname = mname or member.default_name(sptr, None, offset)
+                original[offset] = newnames[offset] = originalname
+                candidates.setdefault(originalname, []).append(offset)
 
             # We skip all anonymous members, so we only need to determine the default
             # name when there's a field with some type information to use.
-            mname = '' if idaapi.is_special_member(mptr.id) else newnames[offset]
-            originalname = mname or member.default_name(sptr, None, offset)
-            original[offset] = newnames[offset] = originalname
-            candidates.setdefault(mname, []).append(offset)
+            elif isinstance(mptr, idaapi.member_t):
+                mname = '' if idaapi.is_special_member(mptr.id) else newnames[offset]
+                originalname = mname or member.default_name(sptr, None, offset)
+                original[offset] = newnames[offset] = originalname
+                candidates.setdefault(mname, []).append(offset)
+            continue
 
         # Now we should have all the candidate names, so we start by figuring out
         # which of our names are duplicates that we can't use. Any name with more
@@ -3384,7 +3417,7 @@ class members_t(object):
         # Now we'll do a final pass through all of the members so that we can
         # log what names we were able to use and what names were duplicates.
         for offset, mptr, _ in newitems:
-            if not isinstance(mptr, idaapi.member_t):
+            if not isinstance(mptr, (idaapi.member_t, idaapi.tinfo_t, types.string)):
                 continue
 
             # We only need to log name changes for non-anonymous members.
@@ -3392,7 +3425,13 @@ class members_t(object):
             if isinstance(mptr, idaapi.member_t) and oldname != newname:
                 new_descr = "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset)
                 old_descr = "index {:d}".format(mptr.soff) if union(sptr) else "offset {:+#x}".format(base + mptr.soff)
-                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Using alternative name \"{:s}\" for new member at {:s} of {:s}({:#x}) as the member ({:#x}) at {:s} is currently using the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, utils.string.escape(newname, '"'), new_descr, 'union' if union(sptr) else 'structure', sptr.id, mptr.id, old_descr, utils.string.escape(oldname, '"')))
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Using alternative name \"{:s}\" for new member at {:s} of {:s}({:#x}) as the member ({:#x}) at {:s} is currently using the requested name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, utils.string.escape(newname, '"'), new_descr, 'union' if union(sptr) else 'structure', sptr.id, mptr.id, old_descr, utils.string.escape(oldname, '"')))
+
+            elif isinstance(mptr, (idaapi.tinfo_t, types.string)) and oldname != newname:
+                conflict = idaapi.get_member_by_name(sptr, utils.string.to(oldname))
+                new_descr = "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset)
+                old_descr = "member ({:#x}) at {:s} is currently using the requested name \"{:s}\"".format(conflict.id, "index {:d}".format(conflict.soff) if union(sptr) else "offset {:+#x}".format(base + conflict.soff), utils.string.escape(oldname, '"')) if conflict else "original name \"{:s}\" is currenty being used".format(utils.string.escape(oldname, '"'))
+                logging.warning(u"{:s}({:#x}).members.__setitem__({:s}, {:s}) : Using alternative name \"{:s}\" for new member at {:s} of {:s}({:#x}) as the {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, index_description, items_description, utils.string.escape(newname, '"'), new_descr, 'union' if union(sptr) else 'structure', sptr.id, old_descr))
             continue
 
         # If we're using a union, we need some way to identify each member since removing a
