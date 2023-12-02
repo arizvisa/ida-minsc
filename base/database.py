@@ -5447,19 +5447,18 @@ class types(object):
     @classmethod
     def __iterate__(cls):
         '''Iterate through the types within the current type library.'''
-        til = idaapi.get_idati()
-        return cls.__iterate__(til)
+        return cls.__iterate__(interface.tinfo.library())
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     def __iterate__(cls, library):
         '''Iterate through the types within the specified type `library`.'''
         count, errors = idaapi.get_ordinal_qty(library), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
         for ordinal in builtins.range(1, count):
-            name, serialized = idaapi.get_numbered_type_name(library, ordinal), idaapi.get_numbered_type(library, ordinal)
+            name, serialized = idaapi.get_numbered_type_name(library, ordinal), interface.tinfo.get_numbered_type(library, ordinal)
 
             # if we didn't get any information returned, then this ordinal was deleted.
             if serialized is None:
-                logging.warning(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it having been deleted.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
+                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it having been deleted.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
                 continue
 
             # try and create a new type from the serialized information. if we
@@ -5471,7 +5470,7 @@ class types(object):
 
             # if the type is empty, then we can just issue a warning and skip it.
             elif ti.empty():
-                logging.warning(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it being empty.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
+                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it being empty.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
                 continue
 
             yield ordinal, utils.string.of(name or ''), ti
@@ -5482,8 +5481,7 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def iterate(cls, name):
         '''Iterate through the types within the current type library that match the glob specified by `name`.'''
-        til = idaapi.get_idati()
-        return cls.iterate(til, like=name)
+        return cls.iterate(interface.tinfo.library(), like=name)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5495,8 +5493,7 @@ class types(object):
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def iterate(cls, **type):
         '''Iterate through the types within the current type library that match the keywords specified by `type`.'''
-        til = idaapi.get_idati()
-        return cls.iterate(til, **type)
+        return cls.iterate(interface.tinfo.library(), **type)
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
@@ -5506,9 +5503,10 @@ class types(object):
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
         for ordinal, name, tinfo in iterable:
-            res, td = idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
-            if not res.create_typedef(td):
+            res, ti, td = interface.tinfo.reference(ordinal, library), idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True) 
+            if not res:
                 logging.warning(u"{:s}.iterate({:s}{:s}) : Unable to create a type that references the ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
+                res = ti if ti.create_typedef(td) else ti
             yield ordinal, name, res
         return
 
@@ -5673,20 +5671,18 @@ class types(object):
     @classmethod
     def has(cls, ordinal):
         '''Return whether the current type library has a type at the given `ordinal`.'''
-        til = idaapi.get_idati()
-        return cls.has(ordinal, til)
+        return cls.has(ordinal, interface.tinfo.library())
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def has(cls, name):
         '''Return whether the current type library has a type with the specified `name`.'''
-        til = idaapi.get_idati()
-        return cls.has(name, til)
+        return cls.has(name, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def has(cls, ordinal, library):
         '''Return whether the provided type `library` has a type at the given `ordinal`.'''
-        serialized = idaapi.get_numbered_type(library, ordinal)
+        serialized = interface.tinfo.get_numbered_type(library, ordinal)
         return True if serialized else False
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
@@ -5794,21 +5790,19 @@ class types(object):
     @classmethod
     def get(cls, ordinal):
         '''Get the type information at the given `ordinal` of the current type library and return it.'''
-        til = idaapi.get_idati()
-        return cls.get(ordinal, til)
+        return cls.get(ordinal, interface.tinfo.library())
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def get(cls, name):
         '''Get the type information with the given `name` from the current type library and return it.'''
-        til = idaapi.get_idati()
-        return cls.get(name, til)
+        return cls.get(name, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def get(cls, ordinal, library):
         '''Get the type information at the given `ordinal` of the specified type `library` and return it.'''
         if 0 < ordinal < idaapi.get_ordinal_qty(library):
-            serialized = idaapi.get_numbered_type(library, ordinal)
+            serialized = interface.tinfo.get_numbered_type(library, ordinal)
             return interface.tinfo.get(library, *serialized)
         raise E.ItemNotFoundError(u"{:s}.get({:d}, {:s}) : No type information was found for the specified ordinal ({:d}) in the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
@@ -5829,8 +5823,7 @@ class types(object):
     @classmethod
     def get(cls, serialized):
         '''Convert the `serialized` type information from the current type library and return it.'''
-        til = idaapi.get_idati()
-        return cls.get(serialized, til)
+        return cls.get(serialized, interface.tinfo.library())
     @utils.multicase(serialized=internal.types.tuple, library=idaapi.til_t)
     @classmethod
     def get(cls, serialized, library):
