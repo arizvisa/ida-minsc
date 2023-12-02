@@ -5168,7 +5168,7 @@ class tinfo(object):
 
         # since it's using a typename, we need to search the type library for it.
         name = internal.utils.string.of(ti.get_type_name())
-        serialized = idaapi.get_named_type(til if til else cls.library(type), internal.utils.string.to(name), idaapi.NTF_TYPE)
+        serialized = cls.get_named_type(til if til else cls.library(type), internal.utils.string.to(name), idaapi.NTF_TYPE)
         if not serialized:
             return ti.get_final_ordinal()
 
@@ -5508,6 +5508,67 @@ class tinfo(object):
 
             # ...and then pack everything we got into a tuple.
             result = tuple(res) if res else None
+        finally:
+            owned and til and ida.free_til(til)
+        return result
+
+    @classmethod
+    def get_named_type(cls, library, name, flags):
+        '''Return the serialized type information for the type with the given `name` and `flags` from the specified type `library`.'''
+        til = library if library else cls.library()
+
+        # attempt to use the regular api.. this should generally work.
+        try:
+            return idaapi.get_named_type(til, internal.utils.string.to(name), flags)
+
+        # if we encountered a UnicodeDecodeError as per idapython/src#57,
+        # then we fall back to using ctypes to perform the workaround.
+        except (RuntimeError, UnicodeDecodeError):
+            import ida
+
+        # create the parameters and assign them to get_named_type.
+        til_t, type_t, sclass_t, p_list, value_t = ctypes.POINTER(ctypes.c_void_p), ctypes.c_char_p, ctypes.c_long, ctypes.c_char_p, ctypes.c_uint32
+        if not getattr(ida.get_named_type, 'argtypes', None):
+            ida.get_named_type.restype = ctypes.c_int
+            ida.get_named_type.argtypes = til_t, ctypes.c_char_p, ctypes.c_int, ctypes.POINTER(type_t), ctypes.POINTER(p_list), ctypes.POINTER(ctypes.c_char_p), ctypes.POINTER(p_list), ctypes.POINTER(sclass_t), ctypes.POINTER(value_t)
+
+        # we need to get the current type library, so assign those too.
+        if not getattr(ida.get_idati, 'argtypes', None):
+            ida.get_idati.restype = til_t
+            ida.get_idati.argtypes = ()
+
+        if not getattr(ida.new_til, 'argtypes', None):
+            ida.new_til.restype = til_t
+            ida.new_til.argtypes = ctypes.c_char_p, ctypes.c_char_p
+
+        if not getattr(ida.free_til, 'argtypes', None):
+            ida.free_til.restype = ctypes.c_bool    # actually void
+            ida.free_til.argtypes = til_t,
+
+        # to start out, we need a type library of the right type since the one
+        # from idapython is a swiggy type. we snag the default type library here.
+        libname, libdesc = (internal.utils.string.of(library.name), internal.utils.string.of(library.desc)) if library else (u'', u'Temporary type definitions')
+        owned, result = False, None
+
+        try:
+            res, encoded_name = ida.get_idati(), name if isinstance(name, bytes) else name.encode('utf-8')
+            owned, til = (True, ida.new_til(libname.encode('utf-8'), libdesc.encode('utf-8'))) if not res else (False, res)
+
+            # similar to get_numbered_type, we need to allocate space for
+            # the variables that will be written to when we call the api.
+            type, fields, cmt, fieldcmts, sclass, value = type_t(), p_list(), ctypes.c_char_p(), p_list(), sclass_t(), value_t()
+            retcode = ida.get_named_type(til, encoded_name, flags, ctypes.pointer(type), ctypes.pointer(fields), ctypes.pointer(cmt), ctypes.pointer(fieldcmts), ctypes.pointer(sclass), ctypes.pointer(value))
+
+            # if the retcode from get_named_type was 0, idapython returns None.
+            if retcode == 0:
+                return None
+
+            # now we need to snag all the referenced values that were written to.
+            referenced_values = (item.value if item else None for item in [type, fields, cmt, fieldcmts, sclass, value])
+
+            # then we pack the return code with the referenced values into a tuple.
+            result = tuple(itertools.chain([retcode], referenced_values))
+
         finally:
             owned and til and ida.free_til(til)
         return result
