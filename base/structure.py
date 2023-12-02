@@ -603,7 +603,7 @@ class structure_t(object):
 
             # So we can instantiate the structure with the correct offset
             # and then grab the member that was being referenced.
-            st = by_identifier(fr.id, offset=-f.frsize)
+            st = by_identifier(fr.id, offset=-idaapi.frame_off_args(f))
             mem = st.members.by_identifier(mptr.id)
             res.append(mem)
         return res
@@ -2689,9 +2689,6 @@ class member_t(object):
 
             # We need to figure out all of the attributes we need in order to
             # calculate the position within a frame this includes the integer size.
-            information = idaapi.get_inf_structure()
-            integersize = 8 if information.is_64bit() else 4 if information.is_32bit() else 2
-
             fn, soff = idaapi.get_func(ea), mptr.get_soff()
             if fn is None:
                 cls = self.__class__
@@ -2699,28 +2696,28 @@ class member_t(object):
 
             # Now we need to figure out whether where our member is. If it's
             # within the func_t.frsize, then we're a var_.
-            if soff < sum([fn.frsize]):
+            if soff < fn.frsize:
                 fmt, offset = fmtVar, fn.frsize - soff
 
             # If it's within func_t.frregs, then we're a special ' s' name.
-            elif soff < sum([fn.frsize, fn.frregs]):
+            elif soff < idaapi.frame_off_retaddr(fn):
                 fmt, offset = (lambda _: ' s'), None
 
             # If it's at the saved register, then we're a special ' r' name.
-            elif soff < sum([fn.frsize, fn.frregs, integersize]):
+            elif soff < idaapi.frame_off_args(fn):
                 fmt, offset = (lambda _: ' r'), None
 
             # Anything else should be an argument so we will use 'arg_'
-            elif soff < sum([fn.frsize, fn.frregs, integersize, fn.fpd, fn.argsize]):
-                fmt, offset = fmtArg, soff - sum([fn.frsize, fn.frregs, integersize])
+            elif soff < idaapi.frame_off_args(fn) + fn.argsize:
+                fmt, offset = fmtArg, soff - idaapi.frame_off_args(fn)
 
             # Anything else though...is a bug, it shouldn't happen unless IDA is not
             # actually populating the fields correctly (looking at you x64). So, lets
             # just be silently pedantic here.
             else:
-                fmt, offset = fmtArg, soff - sum([fn.frsize, fn.frregs, integersize])
+                fmt, offset = fmtArg, soff - idaapi.frame_off_args(fn)
                 cls = self.__class__
-                logging.debug(u"{:s}({:#x}).name({!s}) : Treating the name for the member at offset ({:#x}) as an argument due being located outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, string, soff, sum([fn.frsize, fn.frregs, integersize, fn.fpd, fn.argsize])))
+                logging.debug(u"{:s}({:#x}).name({!s}) : Treating the name for the member at offset ({:#x}) as an argument due being located outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), self.id, string, soff, sum([idaapi.frame_off_args(fn), fn.argsize])))
 
             # Okay, now the last thing to do is to format our name and assign it..weeee, that was fun.
             result, self.name = self.name, fmt(offset)
