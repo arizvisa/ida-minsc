@@ -2275,7 +2275,8 @@ class frame(object):
     This namespace is for getting information about the selected
     function's frame. By default, this namespace will return a
     ``structure_t`` representing the frame belonging to the specified
-    function.
+    function. The returned frame will include any preserved registers
+    so that offset 0 will point at the beginning of the parameters.
 
     Some ways of using this can be::
 
@@ -2295,21 +2296,22 @@ class frame(object):
         fn = by(func)
         res = idaapi.get_frame(interface.range.start(fn))
         if res is not None:
-            return structure.by_identifier(res.id, offset=-fn.frsize)
+            size = idaapi.frame_off_args(fn)
+            return structure.by_identifier(res.id, offset=-size)
         raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
     @utils.multicase()
     @classmethod
     def new(cls):
         '''Add an empty frame to the current function.'''
-        _r = database.config.bits() // 8
-        return cls.new(ui.current.function(), 0, _r, 0)
+        fn = ui.current.function()
+        return cls.new(fn, 0, idaapi.get_frame_retsize(fn), 0)
     @utils.multicase(lvars=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, lvars, args):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
-        _r = database.config.bits() // 8
-        return cls.new(ui.current.function(), lvars, _r, args)
+        fn = ui.current.function()
+        return cls.new(fn, lvars, idaapi.get_frame_retsize(fn), args)
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, lvars, regs, args):
@@ -2323,7 +2325,7 @@ class frame(object):
         When specifying the size of the registers (`regs`) the size of the saved instruction pointer must also be included.
         """
         fn = by(func)
-        _r = database.config.bits() // 8
+        _r = idaapi.get_frame_retsize(fn)
         ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
             raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), lvars, regs - _r, args, interface.range.start(fn), lvars, regs - _r, args))
@@ -2447,7 +2449,7 @@ class frame(object):
 
             # once we have our locations, we can grab a fragment from the frame
             # and yield all of the members that are considered as arguments.
-            current, base = 0, sum([fn.frsize, fn.frregs, database.config.bits() // 8])
+            current, base = 0, idaapi.frame_off_args(fn)
             for offset, size, content in structure.fragment(fr.id, base, structure.size(fr.id) - base):
                 stkoff = offset - base
 
@@ -2608,7 +2610,7 @@ class frame(object):
 
                 # If we have a frame, then we do our best to figure out the parameters from it.
                 if fn and idaapi.get_frame(ea):
-                    fr, asize, rsize = frame(ea), cls.size(ea), bits // 8 + fn.frregs
+                    fr, asize, rsize = frame(ea), cls.size(ea), fn.frregs + idaapi.get_frame_retsize(fn)
 
                     # Before we start checking the frame, though, we need to make sure that IDA
                     # didn't have any problems calculating the stackpoints. If so, then we need
@@ -2667,12 +2669,11 @@ class frame(object):
                 # find where the member is located at. This becomes our result
                 # if we have a frame. Otherwise we return the location.
                 if isinstance(loc, interface.location_t):
-                    translated = operator.add(loc, bits // 8 + (fn.frregs if fn else 0))
-                    aname = name or interface.tuplename('arg', translated.offset - bits // 8)
+                    aname = name or interface.tuplename('arg', loc.offset)
                     try:
-                        item = fr.members.by(translated) if fr else translated
+                        item = fr.members.by(loc) if fr else loc
                     except (E.MemberNotFoundError, E.OutOfBoundsError):
-                        item, name = translated, aname
+                        item, name = loc, aname
                     else:
                         name = item.name if fr else aname
                     finally:
@@ -2749,7 +2750,7 @@ class frame(object):
 
             results = []
             for off, size, content in structure.fragment(fr.id, 0, fn.frsize):
-                results.append((off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size))
+                results.append((off - idaapi.frame_off_savregs(fn), content.get('__name__', None), size))
             return results
 
         @utils.multicase()
@@ -2790,9 +2791,10 @@ class frame(object):
             if fr is None:  # unable to figure out arguments
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
-            results = []
-            for off, size, content in structure.fragment(fr.id, fn.frsize, sum([fn.frregs, database.config.bits() // 8])):
-                results.append((off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size))
+            results, regsize, delta = [], sum([fn.frregs, idaapi.get_frame_retsize(fn)]), idaapi.frame_off_args(fn)
+            iterable = structure.fragment(fr.id, idaapi.frame_off_savregs(fn), regsize) if regsize else []
+            for off, size, content in iterable:
+                results.append((off - delta, content.get('__name__', None), size))
             return results
 
         @utils.multicase()
@@ -2805,8 +2807,7 @@ class frame(object):
         def size(cls, func):
             '''Returns the number of bytes occupied by the saved registers for the function `func`.'''
             fn = by(func)
-            # include the size of a word for the pc because ida doesn't count it
-            return fn.frregs + database.config.bits() // 8
+            return fn.frregs + idaapi.get_frame_retsize(fn)
 
 get_frameid = utils.alias(frame.id, 'frame')
 get_args_size = utils.alias(frame.args.size, 'frame.args')
