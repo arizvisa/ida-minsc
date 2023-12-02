@@ -1434,15 +1434,24 @@ class address(object):
         # First we'll grab the size and make sure that we actually support it.
         # We should.. because we support all of IDA's native types. Then we
         # generate a list of all of the available operands to apply the ref to.
-        ptype, (_, size) = type, typemap.inverted[dsize]
-        ritype = ptype, size
-        ptrmask, _ = typemap.ptrmap[ritype]
-        operands = [index for index, opmask in enumerate(opmasks) if dtype & ptrmask & opmask]
+        if dsize in typemap.inverted:
+            ptype, (_, size) = type, typemap.inverted[dsize]
+            ritype = ptype, size
+            ptrmask, _ = typemap.ptrmap[ritype]
+            operands = [index for index, opmask in enumerate(opmasks) if dtype & ptrmask & opmask]
+
+        # Anything else means that there's no references to update. If the flags say
+        # that it is a string, then we already know that there's nothing to update.
+        else:
+            FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+            if dsize != FF_STRLIT:
+                logging.warning(u"{:s}.update_refinfo({:#x}, {:#x}) : Unable to determine the default reference type size due to the type ({:#0{:d}x}) from the flags ({:#0{:d}x}) being unsupported..".format('.'.join([__name__, cls.__name__]), ea, flag, dsize, 2 + 8, flag, 2 + 8))
+            return 0
 
         # Before we change anything, do a smoke-test to ensure that we actually
         # are able to choose a default reference size if we're going to update.
         if len(operands) > 0 and ritype not in typemap.refinfomap:
-            logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : Unable to determine a default reference type for the given size ({:d}).".format('.'.join([__name__, cls.__name__]), ea, flag, size))
+            logging.warning(u"{:s}.update_refinfo({:#x}, {:#x}) : Unable to determine a default reference type for the given size ({:d}).".format('.'.join([__name__, cls.__name__]), ea, flag, size))
             return 0
 
         # Now we can choose our type from the refinfomap, and apply it to each
@@ -1451,7 +1460,7 @@ class address(object):
         api = [set_refinfo.__module__, set_refinfo.__name__] if hasattr(set_refinfo, '__module__') else [set_refinfo.__name__]
         for opnum in operands:
             if not set_refinfo(ea, opnum, typemap.refinfomap[ritype]):
-                logging.warning(u"{:s}.refinfo({:#x}, {:#x}) : The api call to `{:s}(ea={:#x}, n={:d}, ri={:d})` returned failure.".format('.'.join([__name__, cls.__name__]), ea, flag, '.'.join(api), ea, opnum, typemap.refinfomap[ritype]))
+                logging.warning(u"{:s}.update_refinfo({:#x}, {:#x}) : The api call to `{:s}(ea={:#x}, n={:d}, ri={:d})` returned failure.".format('.'.join([__name__, cls.__name__]), ea, flag, '.'.join(api), ea, opnum, typemap.refinfomap[ritype]))
             continue
 
         # FIXME: figure out how to update the ui so that it references the new
