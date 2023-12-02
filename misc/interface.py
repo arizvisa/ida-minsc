@@ -5156,7 +5156,7 @@ class tinfo(object):
         # first try to get the ordinal naturally and verify that it exists.
         ordinal = ti.get_ordinal()
         if ordinal and til:
-            return ordinal if idaapi.get_numbered_type(til, ordinal) else 0
+            return ordinal if cls.get_numbered_type(til, ordinal) else 0
 
         elif ordinal:
             return ordinal
@@ -5455,6 +5455,62 @@ class tinfo(object):
         # If we were given the idaapi.PT_VAR flag, then we return the parsed name too.
         string = internal.utils.string.of(name)
         return (string or u'', ti) if flag & idaapi.PT_VAR else ti
+
+    @classmethod
+    def get_numbered_type(cls, library, ordinal):
+        '''Return the serialized type information for the given `ordinal` from the specified type `library`.'''
+        til = library if library else cls.library()
+
+        # attempt to use the regular api.. this should generally work.
+        try:
+            return idaapi.get_numbered_type(til, ordinal)
+
+        # if we encountered a UnicodeDecodeError as per idapython/src#57,
+        # then we'll just use ctypes to perform a workaround.
+        except (RuntimeError, UnicodeDecodeError):
+            import ida
+
+        # first the parameters for get_numbered_type.
+        til_t, type_t, sclass_t, p_list = ctypes.POINTER(ctypes.c_void_p), ctypes.c_char_p, ctypes.c_long, ctypes.c_char_p
+        if not getattr(ida.get_numbered_type, 'argtypes', None):
+            ida.get_numbered_type.restype = ctypes.c_bool
+            ida.get_numbered_type.argtypes = til_t, ctypes.c_uint32, ctypes.POINTER(type_t), ctypes.POINTER(p_list), ctypes.POINTER(ctypes.c_char_p), ctypes.POINTER(p_list), ctypes.POINTER(sclass_t)
+
+        # then the parameters for getting the current type library.
+        if not getattr(ida.get_idati, 'argtypes', None):
+            ida.get_idati.restype = til_t
+            ida.get_idati.argtypes = ()
+
+        # then the parameters for managing the scope of a type library
+        if not getattr(ida.new_til, 'argtypes', None):
+            ida.new_til.restype = til_t
+            ida.new_til.argtypes = ctypes.c_char_p, ctypes.c_char_p
+
+        if not getattr(ida.free_til, 'argtypes', None):
+            ida.free_til.restype = ctypes.c_bool    # actually void
+            ida.free_til.argtypes = til_t,
+
+        # first we need a type library of some sort. we can't actually use the library we were given
+        # as a parameter, so we'll need to try and grab the default one or create a temporary one.
+        name, desc = (internal.utils.string.of(library.name), internal.utils.string.of(library.desc)) if library else (u'', u'Temporary type definitions')
+        owned, result = False, None
+        try:
+            res = ida.get_idati()
+            owned, til = (True, ida.new_til(name.encode('utf-8'), desc.encode('utf-8'))) if not res else (False, res)
+
+            # now we'll allocate space for the variables that will be written to.
+            type, fields, cmt, fieldcmts, sclass = type_t(), p_list(), ctypes.c_char_p(), p_list(), sclass_t()
+
+            # hopefully we can now use the api safely and pack everything we got into a tuple.
+            res = ()
+            if ida.get_numbered_type(til, ordinal, ctypes.pointer(type), ctypes.pointer(fields), ctypes.pointer(cmt), ctypes.pointer(fieldcmts), ctypes.pointer(sclass)):
+                res = (item.value if item else None for item in [type, fields, cmt, fieldcmts, sclass])
+
+            # ...and then pack everything we got into a tuple.
+            result = tuple(res) if res else None
+        finally:
+            owned and til and ida.free_til(til)
+        return result
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
@@ -8705,7 +8761,7 @@ class name(object):
 
         # get the name and type by ordinal so that we can temporarily replace them.
         original = idaapi.get_numbered_type_name(library, ordinal)
-        serialized = idaapi.get_numbered_type(library, ordinal)
+        serialized = tinfo.get_numbered_type(library, ordinal)
 
         # if we were able to get the type, then replace it with our temporary name. if we
         # failed at either, then we assign an error code which will result in non-action.
