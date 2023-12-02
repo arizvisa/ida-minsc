@@ -344,7 +344,7 @@ def up(enum):
         # module and the idaapi.func_t we fetched to instantiate the
         # structure with the correct offset and then fetch the member
         # to aggregate to our list of results.
-        st = structure.by_identifier(fr.id, offset=-f.frsize)
+        st = structure.by_identifier(fr.id, offset=-idaapi.frame_off_args(f))
         mem = st.members.by_identifier(mptr.id)
         res.append(mem)
     return res
