@@ -184,7 +184,7 @@ class config(object):
         if idaapi.__version__ < 7.0:
             raise E.UnsupportedVersion(u"{:s}.is_sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
         return True if cls.lflags(idaapi.LFLG_IS_DLL) else False
-    sharedobject = is_shared = sharedQ = utils.alias(is_sharedobject, 'config')
+    sharedobject = is_shared = is_dll = sharedQ = utils.alias(is_sharedobject, 'config')
 
     @classmethod
     def is_kernelspace(cls):
