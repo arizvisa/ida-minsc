@@ -3202,16 +3202,37 @@ class type(object):
     def __new__(cls, func):
         '''Return the type information for the function `func` as an ``idaapi.tinfo_t``.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
+        fn = idaapi.get_func(ea)
 
-        # Guess the type information for the function ahead of time because
-        # they should _always_ have type information associated with them.
-        ti = idaapi.tinfo_t()
-        if idaapi.GUESS_FUNC_FAILED == idaapi.guess_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea):
-            logging.debug(u"{:s}({:#x}) : Ignoring failure ({:d}) when trying to guess the `{:s}` for the specified function.".format('.'.join([__name__, cls.__name__]), ea, idaapi.GUESS_FUNC_FAILED, ti.__class__.__name__))
+        # Start out by pre-creating a manual function type just in case
+        # we're not able to snag one for the specified function address.
+        missing, ftd = idaapi.tinfo_t(), idaapi.func_type_data_t()
+        ftd.rettype = idaapi.tinfo_t(idaapi.BT_VOID if fn and fn.flags & idaapi.FUNC_NORET else idaapi.BT_INT)
+        ftd.cc = idaapi.CM_CC_UNKNOWN | idaapi.BFA_NORET if fn and fn.flags & idaapi.FUNC_NORET else idaapi.CM_CC_UNKNOWN
+        missing = missing if missing.create_func(ftd) else None
 
-        # If we can find a proper typeinfo then use that, otherwise return
-        # whatever it was that was guessed.
-        return database.type(ea) or ti
+        # Then we'll grab the type for the address. Prior to this we were guessing
+        # the function type, but issue #175 demonstrated that there's a condition
+        # which results in both the guess_tinfo and get_tinfo functions failing.
+        guessed, nsupped = idaapi.tinfo_t(), database.type(ea)
+
+        # Now we'll take a guess at the type in case there's a situation
+        # where there's no type available for the given address.
+        error = idaapi.guess_tinfo2(ea, guessed) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(guessed, ea)
+        guessed = None if error == idaapi.GUESS_FUNC_FAILED else guessed
+
+        # Then we'll return each type that we fetched while prioritizing the one that is
+        # stored in NSUP_, then the guessed one, and then falling back to the missing one.
+        if nsupped or guessed:
+            return nsupped or guessed
+
+        # If we weren't able to create the missing type, then we need to abort. This shouldn't
+        # be possible at all whatsoever, but perhaps some database state is preventing us.
+        if not missing:
+            raise E.DisassemblerError(u"{:s}({:#x}) : Unable to create a dummy function type to return for the for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        logging.warning(u"{:s}({:#x}) : Unable to guess the missing type for the function at {:#x} due to error ({:d}) which will result in an empty function type (\"{:s}\") being returned.".format('.'.join([__name__, cls.__name__]), ea, ea, idaapi.GUESS_FUNC_FAILED, utils.string.escape("{!s}".format(missing), '"')))
+        return missing
     @utils.multicase(info=idaapi.tinfo_t)
     def __new__(cls, func, info, **guessed):
         '''Apply the ``idaapi.tinfo_t`` in `info` to the function `func`.'''
