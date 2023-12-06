@@ -496,7 +496,7 @@ class functions(object):
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), interface.function.by_address, interface.function.name)
     __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), interface.function.by_address, interface.function.name)
     __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), interface.function.by_address, interface.function.name)
-    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer, interface.integerish))(utils.fcompose(utils.fcondition(interface.function.has)(interface.function.owners, utils.fpack(utils.fidentity)), utils.fpartial(builtins.map, builtins.int), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(builtins.map, interface.function.owners), utils.funpack(itertools.chain), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))))
     __matcher__.alias('ea', 'address')
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_func_num)
     __matcher__.combinator('mangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else utils.fpartial(utils.fcompose, utils.fmap(utils.fidentity, internal.declaration.demangle), utils.funpack(operator.ne)))), idaapi.get_true_name if idaapi.__version__ < 6.8 else idaapi.get_ea_name, utils.string.of)
@@ -997,9 +997,9 @@ class names(object):
 
     """
     __matcher__ = utils.matcher()
-    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_nlist_ea)
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer, interface.integerish))(utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(builtins.map, builtins.int), utils.fpartial(builtins.map, idaapi.get_item_head), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_nlist_ea)
     __matcher__.alias('ea', 'address')
-    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_nlist_name, internal.declaration.demangle)
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(builtins.map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
@@ -1806,7 +1806,7 @@ class entries(object):
     """
 
     __matcher__ = utils.matcher()
-    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer, interface.integerish))(utils.fcompose(utils.fcondition(interface.function.has)(interface.function.owners, utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpack(utils.fidentity))), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(builtins.map, utils.fcondition(interface.function.has)(interface.function.owners, utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpack(utils.fidentity)))), utils.funpack(itertools.chain), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.alias('ea', 'address')
     __matcher__.boolean('ge', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry), __matcher__.alias('greater', 'ge')
     __matcher__.boolean('gt', operator.lt, idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -2410,7 +2410,7 @@ class imports(object):
     __format__ = __formatl__
 
     __matcher__ = utils.matcher()
-    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer, interface.integerish))(utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(builtins.map, builtins.int), utils.fpartial(builtins.map, idaapi.get_item_head), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(0))
     __matcher__.alias('ea', 'address')
     __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1), __formats__.__func__, operator.methodcaller('lower'))
     __matcher__.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __formatl__.__func__)
