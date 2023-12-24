@@ -36,7 +36,7 @@ to augment their reversing endeavors without distraction.
 
 Installation should be pretty simple and requires simply cloning the repository
 directly into the user's IDA user directory. On the Windows platform, this is
-typically located at `$APPDATA/Roaming/Hex-Rays/IDA Pro`. Whereas on the Linux
+typically located at `%APPDATA%/Hex-Rays/IDA Pro`. Whereas on the Linux
 platform this can be found at `$HOME/.idapro`. This contents of this repository
 should actually replace that directory. If you have any files that presently
 reside there, simply move them into the repository's directory. After
