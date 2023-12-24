@@ -55,7 +55,7 @@ is in the root of the repository as `requirements.txt`.
 
 To install the required Python dependencies, one can run `pip` as so:
 
-    $ pip install -r 'requirements.txt'
+    $ pip install -r "requirements.txt"
 
 At this point when the user starts IDA Pro, IDA-minsc will replace IDAPython's
 namespace with its own at which point can be used immediately. To verify that
