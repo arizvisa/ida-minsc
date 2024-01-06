@@ -474,3 +474,46 @@ ida_hexrays = new_partial_api('ida_hexrays', ida_hexrays_template, hexrays_descr
 del(ida_hexrays_template)
 del(hexrays_descriptor)
 del(new_partial_api)
+
+### The following class is intended to be used by pattern-matching
+### so that importing a plugin module for Hex-Rays can still work
+### regardless of whether or not the "ida_hexrays" module exists.
+class ida_hexrays_types(object):
+    """
+    This class is just the types from the "ida_hexrays" module and
+    is used when defining multi-cased functions. Each of these need
+    to be types in order to for the functions to be matched correctly.
+    If the type doesn't exist (as per "ida_hexrays_template), then we
+    return a `callable` so that the type matching still sorta works.
+    """
+    Fget_type_from_module = lambda module, name: (lambda value: value if isinstance(value, type) else callable)(getattr(module, name))
+    cexpr_t             = Fget_type_from_module(ida_hexrays, 'cexpr_t')
+    cfuncptr_t          = Fget_type_from_module(ida_hexrays, 'cfuncptr_t')
+    cfunc_t             = Fget_type_from_module(ida_hexrays, 'cfunc_t')
+    cinsn_t             = Fget_type_from_module(ida_hexrays, 'cinsn_t')
+    citem_t             = Fget_type_from_module(ida_hexrays, 'citem_t')
+    cnumber_t           = Fget_type_from_module(ida_hexrays, 'cnumber_t')
+    ctree_item_t        = Fget_type_from_module(ida_hexrays, 'ctree_item_t')
+    gco_info_t          = Fget_type_from_module(ida_hexrays, 'gco_info_t')
+    hexrays_failure_t   = Fget_type_from_module(ida_hexrays, 'hexrays_failure_t')
+    ivlset_t            = Fget_type_from_module(ida_hexrays, 'ivlset_t')
+    lvar_locator_t      = Fget_type_from_module(ida_hexrays, 'lvar_locator_t')
+    lvar_ref_t          = Fget_type_from_module(ida_hexrays, 'lvar_ref_t')
+    lvar_saved_info_t   = Fget_type_from_module(ida_hexrays, 'lvar_saved_info_t')
+    lvars_t             = Fget_type_from_module(ida_hexrays, 'lvars_t')
+    lvar_t              = Fget_type_from_module(ida_hexrays, 'lvar_t')
+    mba_ranges_t        = Fget_type_from_module(ida_hexrays, 'mba_ranges_t')
+    mba_t               = Fget_type_from_module(ida_hexrays, 'mba_t')
+    mblock_t            = Fget_type_from_module(ida_hexrays, 'mblock_t')
+    minsn_t             = Fget_type_from_module(ida_hexrays, 'minsn_t')
+    mlist_t             = Fget_type_from_module(ida_hexrays, 'mlist_t')
+    mop_t               = Fget_type_from_module(ida_hexrays, 'mop_t')
+    op_parent_info_t    = Fget_type_from_module(ida_hexrays, 'op_parent_info_t')
+    rlist_t             = Fget_type_from_module(ida_hexrays, 'rlist_t')
+    stkvar_ref_t        = Fget_type_from_module(ida_hexrays, 'stkvar_ref_t')
+    treeloc_t           = Fget_type_from_module(ida_hexrays, 'treeloc_t')
+    var_ref_t           = Fget_type_from_module(ida_hexrays, 'var_ref_t')
+    vdloc_t             = Fget_type_from_module(ida_hexrays, 'vdloc_t')
+    vivl_t              = Fget_type_from_module(ida_hexrays, 'vivl_t')
+    voff_t              = Fget_type_from_module(ida_hexrays, 'voff_t')
+    del(Fget_type_from_module)
