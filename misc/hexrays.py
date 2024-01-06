@@ -11,6 +11,31 @@ import functools, operator, itertools, logging
 import idaapi, database, internal
 from internal import utils, interface, types, exceptions
 
+### some decorators to help guard the available of certain functions.
+def guarded(callable):
+    '''This decorator is just responsible for guarding a function so that it only works when the Hex-Rays Decompiler is initialized.'''
+    def wrapper(F, *args, **kwargs):
+        if not ida_hexrays.init_hexrays_plugin():
+            fullname = '.'.join([getattr(F, attribute) for attribute in ['__module__', '__name__'] if hasattr(F, attribute)])
+            raise internal.exceptions.UnsupportedCapability(u"{:s} : Hex-rays is either unable to be initialized or unsupported for the current database.".format(fullname))
+        return F(*args, **kwargs)
+    def result(F):
+        return utils.wrap(F, wrapper)
+    return result(callable)
+
+### general utilities to interact with the global state of the decompiler.
+@guarded
+def version():
+    '''Return the version of the decompiler as a 4-element tuple that can be compared.'''
+    Fmake_number = utils.fcatch(unparseable=None)(unparseable=0.0)(float)
+    Fattempt_integer = utils.fcondition(lambda number: int(number) == number)(int, float)
+
+    version = ida_hexrays.get_hexrays_version() or '0.0.0.0'
+    components = version.split('.', 3)
+    numerical = map(Fmake_number, components)
+    integers_and_floats = map(Fattempt_integer, numerical)
+    return tuple(integers_and_floats)
+
 ### this closure returns a descriptor which will give priority to one object when fetching a
 ### specific attribute, and fall back to the other object when if the attribute was not found.
 def missing_descriptor(module, missing):
@@ -367,6 +392,7 @@ class ida_hexrays_template(object):
     vivl_t = missing_class
 
     init_hexrays_plugin = use_callable(utils.fconstant(False))
+    get_hexrays_version = use_callable(utils.fconstant('0.0.0.0'))
     decompile = use_callable(utils.fconstant(None))
 
     def __decompile_func(pfn, hf, decomp_flags):
