@@ -517,3 +517,22 @@ class ida_hexrays_types(object):
     vivl_t              = Fget_type_from_module(ida_hexrays, 'vivl_t')
     voff_t              = Fget_type_from_module(ida_hexrays, 'voff_t')
     del(Fget_type_from_module)
+
+class region(object):
+    """
+    This namespace is for interacting with regions from Hex-Rays.
+    Since regions aren't available in older versions of Hex-Rays,
+    we include a number of utilities in case they are necessary.
+    """
+
+    __descriptions = {getattr(ida_hexrays, attribute) : attribute for attribute in dir(ida_hexrays) if attribute.startswith('MMIDX_')}
+    __descriptions[ida_hexrays.MMIDX_GLBHIGH] = 'global'
+    __descriptions[ida_hexrays.MMIDX_GLBLOW] = 'bottom-stack'
+
+    @classmethod
+    def format(cls, index):
+        '''Return the description of the region specified by `index` as a string.'''
+        descriptions = cls.__descriptions
+        if index in descriptions:
+            return "{:s}({:d})".format(descriptions.get(index), index)
+        return "{:#x}".format(index)
