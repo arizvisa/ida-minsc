@@ -750,45 +750,47 @@ class chunk(object):
     @classmethod
     def points(cls, func, ea):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea` belonging to the function `func`.'''
-        ch = idaapi.get_fchunk(ea)
+        fn, ch = by(func), idaapi.get_fchunk(ea)
 
         # If we were unable to get the function chunk for the provided address,
         # then IDA didn't calculate any stack deltas for what was requested.
         if ch is None:
             return
 
-        # If this is a function tail, then we need to get its owners so that we
-        # can figure out which chunk will contain the address and calc'd delta.
-        if ch.flags & idaapi.FUNC_TAIL:
-            bounds, owners = interface.range.bounds(ch), (chunk for chunk in map(idaapi.get_fchunk, cls.owners(ea)) if chunk)
+        # If this is a function tail, then we need to use the function we got
+        # to filter out just the desired addresses and get their stackpoints.
+        if ch.flags & idaapi.FUNC_TAIL and hasattr(getattr(fn, 'points', None), '__getitem__'):
+            Fcontains, owner = interface.range.bounds(ch).contains, fn
 
-            # Now that we've grabbed each chunk, we need to filter each chunk
-            # by its stack point so that we only grab the one referencing the
-            # chunk the caller provided us.
-            Fcontains = bounds.contains
-            filtered = (chunk for chunk in owners if any(Fcontains(chunk.points[index].ea) for index in builtins.range(chunk.pntqty)))
+            # Now all we need to do is to grab all of the stack points for
+            # the function, and filter them by our chunk's boundaries.
+            points = (owner.points[index] for index in builtins.range(owner.pntqty))
+            iterable = ((point.ea, point.spd) for point in points if Fcontains(point.ea))
 
-            # We have a list of chunks that has been filtered for the specific
-            # point within our chunk boundary. There really should be only one
-            # chunk, but just in case we store them into a dict so that we can
-            # use their address as a key to sort.
-            items = itertools.chain(*(map(chunk.points.__getitem__, builtins.range(chunk.pntqty)) for chunk in filtered))
-            available = {item.ea : item for item in items if Fcontains(item.ea)}
+        # A non-tail just requires us to iterate through the points stored in the
+        # chunk, so we can yield the address and delta for each individual point.
+        elif hasattr(ch, 'points') and hasattr(ch.points, '__getitem__'):
+            points = (ch.points[index] for index in builtins.range(ch.pntqty))
+            iterable = ((point.ea, point.spd) for point in points)
 
-            # That was it. We have the sorted addresses of the points that we want,
-            # and we need to just convert them back into an iterable so that we
-            # can yield each point back to the caller.
-            iterable = (available[ea] for ea in sorted(available))
-
-        # Now we just need to iterate through all of the stack change points,
-        # and then yield their address and the delta that was calculated.
+        # If we were completely unable to access the correct attributes, then we
+        # need to do all of the work ourselves. We walk the entire function, filter
+        # for deltas in our chunk, sort them, and then yield each of them one-by-one.
         else:
-            iterable = (ch.points[index] for index in builtins.range(ch.pntqty))
+            spd, points = 0, {}
+            for ea in chunks.iterate(fn):
+                res = idaapi.get_spd(fn, ea)
+                if res == spd:
+                    continue
+                points[ea], spd = res, spd
+
+            filtered = filter(interface.range.bounds(ch).contains, points)
+            iterable = ((ea, points[ea]) for ea in sorted(filtered))
 
         # We have our iterator of points, so all we need to do is to unpack each
         # one and yield it to our caller.
-        for point in iterable:
-            yield point.ea, point.spd
+        for ea, spd in iterable:
+            yield ea, spd
         return
     stackpoints = utils.alias(points, 'chunk')
 
