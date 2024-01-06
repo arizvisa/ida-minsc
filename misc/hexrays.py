@@ -92,15 +92,370 @@ class ida_hexrays_template(object):
     is used to generate a namespace that can be substitued in place
     of the module in case there's any attrbutes that might be missing.
     """
-    MMIDX_GLBLOW, MMIDX_GLBHIGH = 0x0, 0x5
 
-    ___ = callable
-    mop_t, minsn_t, mop_z = ___, ___, 0x0
+    mop_z = 0x0
     mop_r, mop_n, mop_str = 0x1, 0x2, 0x3
     mop_d, mop_S, mop_v   = 0x4, 0x5, 0x6
     mop_b, mop_f, mop_l   = 0x7, 0x8, 0x9
     mop_a, mop_h, mop_c   = 0xa, 0xb, 0xc
     mop_fn, mop_p, mop_sc = 0xd, 0xe, 0xf
+
+    m_nop = 0x00
+    m_stx = 0x01
+    m_ldx = 0x02
+    m_ldc = 0x03
+    m_mov = 0x04
+    m_neg = 0x05
+    m_lnot = 0x06
+    m_bnot = 0x07
+    m_xds = 0x08
+    m_xdu = 0x09
+    m_low = 0x0a
+    m_high = 0x0b
+    m_add = 0x0c
+    m_sub = 0x0d
+    m_mul = 0x0e
+    m_udiv = 0x0f
+    m_sdiv = 0x10
+    m_umod = 0x11
+    m_smod = 0x12
+    m_or = 0x13
+    m_and = 0x14
+    m_xor = 0x15
+    m_shl = 0x16
+    m_shr = 0x17
+    m_sar = 0x18
+    m_cfadd = 0x19
+    m_ofadd = 0x1a
+    m_cfshl = 0x1b
+    m_cfshr = 0x1c
+    m_sets = 0x1d
+    m_seto = 0x1e
+    m_setp = 0x1f
+    m_setnz = 0x20
+    m_setz = 0x21
+    m_setae = 0x22
+    m_setb = 0x23
+    m_seta = 0x24
+    m_setbe = 0x25
+    m_setg = 0x26
+    m_setge = 0x27
+    m_setl = 0x28
+    m_setle = 0x29
+    m_jcnd = 0x2a
+    m_jnz = 0x2b
+    m_jz = 0x2c
+    m_jae = 0x2d
+    m_jb = 0x2e
+    m_ja = 0x2f
+    m_jbe = 0x30
+    m_jg = 0x31
+    m_jge = 0x32
+    m_jl = 0x33
+    m_jle = 0x34
+    m_jtbl = 0x35
+    m_ijmp = 0x36
+    m_goto = 0x37
+    m_call = 0x38
+    m_icall = 0x39
+    m_ret = 0x3a
+    m_push = 0x3b
+    m_pop = 0x3c
+    m_und = 0x3d
+    m_ext = 0x3e
+    m_f2i = 0x3f
+    m_f2u = 0x40
+    m_i2f = 0x41
+    m_u2f = 0x42
+    m_f2f = 0x43
+    m_fneg = 0x44
+    m_fadd = 0x45
+    m_fsub = 0x46
+    m_fmul = 0x47
+    m_fdiv = 0x48
+
+    MMIDX_GLBLOW = 0
+    MMIDX_LVARS = 1
+    MMIDX_RETADDR = 2
+    MMIDX_SHADOW = 3
+    MMIDX_ARGS = 4
+    MMIDX_GLBHIGH = 5
+
+    DECOMP_NO_WAIT = 1
+    DECOMP_NO_CACHE = 2
+    DECOMP_NO_FRAME = 4
+    DECOMP_WARNINGS = 8
+    DECOMP_ALL_BLKS = 0x10
+    DECOMP_NO_HIDE = 0x20
+    DECOMP_NO_XREFS = 0x40
+    DECOMP_VOID_MBA = 0x100
+
+    MMAT_ZERO = 0
+    MMAT_GENERATED = 1
+    MMAT_PREOPTIMIZED = 2
+    MMAT_LOCOPT = 3
+    MMAT_CALLS = 4
+    MMAT_GLBOPT1 = 5
+    MMAT_GLBOPT2 = 6
+    MMAT_GLBOPT3 = 7
+    MMAT_LVARS = 8
+
+    MERR_OK = 0
+    MERR_BLOCK = 1
+    MERR_INTERR = -1
+    MERR_INSN = -2
+    MERR_MEM = -3
+    MERR_BADBLK = -4
+    MERR_BADSP = -5
+    MERR_PROLOG = -6
+    MERR_SWITCH = -7
+    MERR_EXCEPTION = -8
+    MERR_HUGESTACK = -9
+    MERR_LVARS = -10
+    MERR_BITNESS = -11
+    MERR_BADCALL = -12
+    MERR_BADFRAME = -13
+    MERR_UNKTYPE = -14
+    MERR_BADIDB = -15
+    MERR_SIZEOF = -16
+    MERR_REDO = -17
+    MERR_CANCELED = -18
+    MERR_RECDEPTH = -19
+    MERR_OVERLAP = -20
+    MERR_PARTINIT = -21
+    MERR_COMPLEX = -22
+    MERR_LICENSE = -23
+    MERR_ONLY32 = -24
+    MERR_ONLY64 = -25
+    MERR_BUSY = -26
+    MERR_FARPTR = -27
+    MERR_EXTERN = -28
+    MERR_FUNCSIZE = -29
+    MERR_BADRANGES = -30
+
+    USE_KEYBOARD = 0
+    USE_MOUSE = 1
+    USE_CURLY_BRACES = 2
+
+    MLI_NAME = 1
+    MLI_TYPE = 2
+    MLI_CMT = 4
+    MLI_SET_FLAGS = 8
+    MLI_CLR_FLAGS = 16
+
+    SVW_INT = 0
+    SVW_FLOAT = 1
+    SVW_SOFT = 2
+
+    MBL_NONFAKE = 0
+    MBL_PRIV = 1
+    MBL_FAKE = 2
+    MBL_GOTO = 4
+    MBL_TCAL = 8
+    MBL_PUSH = 16
+    MBL_DMT64 = 32
+    MBL_COMB = 64
+    MBL_PROP = 128
+    MBL_DEAD = 256
+    MBL_LIST = 512
+    MBL_INCONST = 1024
+    MBL_CALL = 2048
+    MBL_BACKPROP = 4096
+    MBL_NORET = 8192
+    MBL_DSLOT = 16384
+    MBL_VALRANGES = 32768
+    MBL_KEEP = 65536
+
+    BLT_NONE = 0
+    BLT_STOP = 1
+    BLT_0WAY = 2
+    BLT_1WAY = 3
+    BLT_2WAY = 4
+    BLT_NWAY = 5
+    BLT_XTRN = 6
+
+    MUST_ACCESS = 0
+    MAY_ACCESS = 1
+    MAYMUST_ACCESS_MASK = 1
+
+    INCLUDE_SPOILED_REGS = 64
+    INCLUDE_UNUSED_SRC = 2048
+    INCLUDE_DEAD_RETREGS = 4096
+    INCLUDE_RESTRICTED = 8192
+
+    GC_REGS_AND_STKVARS = 0
+    GC_ASR = 1
+    GC_XDSU = 2
+    GC_END = 3
+    GC_DIRTY_ALL = 63
+
+    ROLE_UNK = 0x00
+    ROLE_EMPTY = 0x01
+    ROLE_MEMSET = 0x02
+    ROLE_MEMSET32 = 0x03
+    ROLE_MEMSET64 = 0x04
+    ROLE_MEMCPY = 0x05
+    ROLE_STRCPY = 0x06
+    ROLE_STRLEN = 0x07
+    ROLE_STRCAT = 0x08
+    ROLE_TAIL = 0x09
+    ROLE_BUG = 0x0a
+    ROLE_ALLOCA = 0x0b
+    ROLE_BSWAP = 0x0c
+    ROLE_PRESENT = 0x0d
+    ROLE_CONTAINING_RECORD = 0x0e
+    ROLE_FASTFAIL = 0x0f
+    ROLE_READFLAGS = 0x10
+    ROLE_IS_MUL_OK = 0x11
+    ROLE_SATURATED_MUL = 0x12
+    ROLE_BITTEST = 0x13
+    ROLE_BITTESTANDSET = 0x14
+    ROLE_BITTESTANDRESET = 0x15
+    ROLE_BITTESTANDCOMPLEMENT = 0x16
+    ROLE_VA_ARG = 0x17
+    ROLE_VA_COPY = 0x18
+    ROLE_VA_START = 0x19
+    ROLE_VA_END = 0x1a
+    ROLE_ROL = 0x1b
+    ROLE_ROR = 0x1c
+    ROLE_CFSUB3 = 0x1d
+    ROLE_OFSUB3 = 0x1e
+    ROLE_ABS = 0x1f
+    ROLE_3WAYCMP0 = 0x20
+    ROLE_3WAYCMP1 = 0x21
+    ROLE_WMEMCPY = 0x22
+    ROLE_WMEMSET = 0x23
+    ROLE_WCSCPY = 0x24
+    ROLE_WCSLEN = 0x25
+    ROLE_WCSCAT = 0x26
+    ROLE_SSE_CMP4 = 0x27
+    ROLE_SSE_CMP8 = 0x28
+
+    FCI_PROP = 0x1
+    FCI_DEAD = 0x2
+    FCI_FINAL = 0x4
+    FCI_NORET = 0x8
+    FCI_PURE = 0x10
+    FCI_NOSIDE = 0x20
+    FCI_SPLOK = 0x40
+    FCI_HASCALL = 0x80
+    FCI_HASFMT = 0x100
+    FCI_EXPLOCS = 0x400
+
+    hexrays_failure_t = missing_class
+    mba_ranges_t = missing_class
+    mlist_t = missing_class
+    gco_info_t = missing_class
+    mba_t = missing_class
+    mop_t = missing_class
+    minsn_t = missing_class
+    lvar_t = missing_class
+    stkvar_ref_t = missing_class
+    rlist_t = missing_class
+    ivlset_t = missing_class
+    lvars_t = missing_class
+    lvar_locator_t = missing_class
+    var_ref_t = missing_class
+    lvar_ref_t = missing_class
+    cfunc_t = missing_class
+    cfuncptr_t = missing_class
+    vdloc_t = missing_class
+    lvar_saved_info_t = missing_class
+    mblock_t = missing_class
+    op_parent_info_t = missing_class
+    voff_t = missing_class
+    vivl_t = missing_class
+
+    init_hexrays_plugin = use_callable(utils.fconstant(False))
+    decompile = use_callable(utils.fconstant(None))
+
+    def __decompile_func(pfn, hf, decomp_flags):
+        ea = interface.range.start(pfn)
+        return idaapi.decompile(pfn, hf)
+    decompile_func = use_callable(__decompile_func)
+
+    gen_microcode = simulate_missing_callable(logging.WARNING, utils.fconstant(None))
+    get_widget_vdui = missing_callable
+    get_current_operand = missing_callable
+    modify_user_lvar_info = missing_callable
+
+    def __get_merror_desc(code, mba):
+        error_description = {
+            0: 'ok',
+            1: 'no error, switch to new block',
+            -1: 'internal error',
+            -2: 'cannot convert to microcode',
+            -3: 'not enough memory',
+            -4: 'bad block found',
+            -5: 'positive sp value has been found',
+            -6: 'prolog analysis failed',
+            -7: 'wrong switch idiom',
+            -8: 'exception analysis failed',
+            -9: 'stack frame is too big',
+            -10: 'local variable allocation failed',
+            -11: '16-bit functions cannot be decompiled',
+            -12: 'could not determine call arguments',
+            -13: 'function frame is wrong',
+            -14: 'undefined type %s (currently unused error code)',
+            -15: 'inconsistent database information',
+            -16: 'wrong basic type sizes in compiler settings',
+            -17: 'redecompilation has been requested',
+            -18: 'decompilation has been cancelled',
+            -19: 'max recursion depth reached during lvar allocation',
+            -20: 'variables would overlap: %s',
+            -21: 'partially initialized variable %s',
+            -22: 'too complex function',
+            -23: 'no license available',
+            -24: 'only 32-bit functions can be decompiled for the current database',
+            -25: 'only 64-bit functions can be decompiled for the current database',
+            -26: 'already decompiling a function',
+            -27: 'far memory model is supported only for pc',
+            -28: 'special segments cannot be decompiled',
+            -29: 'too big function',
+            -30: 'bad input ranges',
+        }
+        return error_description.get(code, "error {:d}".format(code))
+
+    get_merror_desc = use_callable(__get_merror_desc)
+
+    get_mreg_name = missing_callable
+    reg2mreg = missing_callable
+    mreg2reg = missing_callable
+    is_kreg = missing_callable
+
+    VDI_NONE = 0
+    VDI_EXPR = 1
+    VDI_LVAR = 2
+    VDI_FUNC = 3
+    VDI_TAIL = 4
+
+    RETRIEVE_ONCE = 0
+    RETRIEVE_ALWAYS = 1
+
+    ITP_EMPTY = 0
+    ITP_ARG1 = 1
+    ITP_ARG64 = 64
+    ITP_BRACE1 = 65
+    ITP_INNER_LAST = 65
+    ITP_ASM = 66
+    ITP_ELSE = 67
+    ITP_DO = 68
+    ITP_SEMI = 69
+    ITP_CURLY1 = 70
+    ITP_CURLY2 = 71
+    ITP_BRACE2 = 72
+    ITP_COLON = 73
+    ITP_BLOCK1 = 74
+    ITP_BLOCK2 = 75
+    ITP_SIGN = 536870912
+    ITP_CASE = 1073741824
+
+    citem_t = missing_class
+    cnumber_t = missing_class
+    cinsn_t = missing_class
+    cexpr_t = missing_class
+    ctree_item_t = missing_class
+    treeloc_t = missing_class
 
 # Try and import the module. If we can, then all the attributes from our descriptor
 # should end up being forwarded directly to the module as they originally were.
