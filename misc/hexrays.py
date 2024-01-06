@@ -45,10 +45,12 @@ def missing_descriptor(module, missing):
     """
     class descriptor(object):
         def __init__(self, attribute):
+            missing_attribute = getattr(missing, attribute, None)
             if hasattr(module, attribute):
                 self.__result__ = getattr(module, attribute)
             elif hasattr(missing, attribute) and callable(getattr(missing, attribute)):
-                self.__result__ = getattr(missing, attribute)(module, attribute)
+                Fmissing_attribute = utils.pycompat.function.extract(missing_attribute)
+                self.__result__ = Fmissing_attribute(module, attribute)
             else:
                 self.__result__ = getattr(missing, attribute)
             return
