@@ -562,3 +562,77 @@ class region(object):
         if index in descriptions:
             return "{:s}({:d})".format(descriptions.get(index), index)
         return "{:#x}".format(index)
+
+class variables(object):
+    """
+    This namespace contains utilities that are related to the local
+    variables from a function produced by the decompiler. Generally,
+    it tries to avoid dealing with both the ``ida_hexrays.lvar_t`` and
+    ``ida_hexrays.lvars_t`` types since both of them can become de-scoped
+    when the microcode for the function they belong to is refreshed.
+
+    This is an internal namespace and is intended to be similar
+    to the contents of the ``internal.interface`` module.
+    """
+
+    @classmethod
+    def copy_vdloc(cls, atype, alocinfo):
+        '''Return a new instance of ``ida_hexrays.vdloc_t`` using the given `atype` and `alocinfo`.'''
+        result = ida_hexrays.vdloc_t()
+        if atype in {idaapi.ALOC_REG1}:
+            result.set_reg1(alocinfo & 0x0000FFFF)
+
+        elif atype in {idaapi.ALOC_STATIC}:
+            result.set_ea(alocinfo)
+
+        elif atype in {idaapi.ALOC_STACK}:
+            result.set_stkoff(alocinfo)
+
+        elif atype in {idaapi.ALOC_RREL}:
+            rrel = idaapi.rrel_t()
+            rrel.reg, rrel.off = alocinfo
+            result.consume_rrel(rrel)
+
+        # If the type is ALOC_DIST, then we need to recurse for each of its members.
+        elif atype in {idaapi.ALOC_DIST}:
+            assert(isinstance(alocinfo, types.ordered))
+            scattered_aloc = idaapi.scattered_aloc_t()
+            for satype, (item, offset, size) in alocinfo:
+                vdloc = cls.copy_vdloc(satype, item)
+                argpart = idaapi.argpart_t(vdloc)
+                argpart.off, argpart.size = offset, size
+                scattered_aloc.push_back(argpart)
+            result.consume_scattered(scattered_aloc)
+
+        else:
+            ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.copy_vdloc({:d}, {!r}) : Unable to duplicate a location of type {:s} for the specified location information ({!r}).".format('.'.join([__name__, cls.__name__]), atype, alocinfo, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype), alocinfo))
+        return result
+
+    @classmethod
+    def new_locator(cls, ea, location):
+        '''Return the ``ida_hexrays.lvar_locator_t`` for a variable defined at the address `ea` using the given `location` as its type.'''
+        atype, alocinfo = location.atype(), interface.tinfo.location_raw(location)
+        if atype == idaapi.ALOC_REG2:
+            ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.new_locator({:#x}, {!r}) : Unable to create a locator for the variable at address {:#x} using an unsupported type {:s}.".format('.'.join([__name__, cls.__name__]), ea, location, ea, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype)))
+
+        # use the location info that we extracted with interface.tinfo, and
+        # use its result  to create a new instance of the decompiler's vdloc_t.
+        vdloc = cls.copy_vdloc(*alocinfo)
+        return ida_hexrays.lvar_locator_t(vdloc, ea)
+
+    @classmethod
+    def get_locator(cls, reference):
+        '''Return the ``ida_hexrays.lvar_locator_t`` for the variable described by the specified `reference`.'''
+        types = ida_hexrays_types.lvar_ref_t, ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_t, ida_hexrays_types.lvar_locator_t
+        if not isinstance(reference, types):
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.get_locator({!r}) : Unable to fetch the variable locator from the requested reference ({!r}) due to it being an unsupported type {:s}.".format('.'.join([__name__, cls.__name__]), reference, reference, utils.pycompat.fullname(reference.__class__)))
+
+        elif isinstance(reference, ida_hexrays_types.lvar_locator_t):
+            return cls.new_locator(reference.defea, reference.location)
+
+        # extract the lvar_t from the reference, and use it to create a
+        # completely new (and hopefully safe) instance of lvar_locator_t.
+        lvar = reference if isinstance(reference, ida_hexrays_types.lvar_t) else reference.getv()
+        return cls.new_locator(lvar.defea, lvar.location)
