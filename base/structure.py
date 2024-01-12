@@ -870,3 +870,31 @@ def remove(**type):
     res = by(**type)
     return remove(res)
 delete = utils.alias(remove)
+
+@utils.multicase(offset=types.integer, contiguous=types.ordered)
+def left(offset, contiguous):
+    '''Return the given `contiguous` items with the beginning of the first item aligned to the specified `offset`.'''
+    iterable = interface.contiguous.left(offset, contiguous)
+    return [item for item in iterable]
+@utils.multicase(layout=types.ordered)
+def left(anchor, layout):
+    """Return the items in `layout` aligned contiguously to the end of the specified `anchor`.
+
+    This will preserve the offset of `anchor` and result in it becoming the first element of the returned list.
+    """
+    iterable = interface.contiguous.left(itertools.chain([anchor], layout))
+    return [item for item in iterable]
+
+@utils.multicase(offset=types.integer, contiguous=types.ordered)
+def right(offset, contiguous):
+    '''Return the given `contiguous` items with the end of the last item aligned to the specified `offset`.'''
+    iterable = interface.contiguous.right(offset, contiguous)
+    return [item for item in iterable]
+@utils.multicase(layout=types.ordered)
+def right(anchor, layout):
+    """Return the items in `layout` aligned contiguously to the beginning of the specified `anchor`.
+
+    This will preserve the offset of `anchor` and result in it becoming the last element of the returned list.
+    """
+    iterable = interface.contiguous.right(itertools.chain(layout, [anchor]))
+    return [item for item in iterable]
