@@ -4628,100 +4628,6 @@ class contiguous(object):
             continue
         return
 
-    @internal.utils.multicase()
-    @classmethod
-    def left(cls, items):
-        '''Bind the specified list of `items` contiguously to the end of the first element and return them as a list.'''
-        type_has_offset = (idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, internal.structure.structure_t, internal.structure.members_t, internal.structure.member_t, bounds_t, location_t)
-        items = [item for item in items]
-
-        # figure out the very first item in our list with an offset we can extract.
-        iterable = (1 + index for index, item in enumerate(items) if isinstance(item, type_has_offset))
-        index = next(iterable, 0)
-
-        # if we found one that has an offset, collect it with its prior elements to calculate the offset.
-        if index:
-            selected = items[:index]
-            item = selected.pop(-1)
-
-        # if we couldn't find one, then issue a warning and use offset 0 since we have nothing to go by.
-        else:
-            logging.warning(u"{:s}.left({:s}) : Assuming the beginning of the specified {:s} at offset {:d} due to {:s} having a known offset.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), 'element starts' if len(items) == 1 else "{:d} elements start".format(len(items)), 0, 'it not' if len(items) == 1 else 'none of them'))
-            return cls.left(0, items)
-
-        # if the first elements didn't have an offset, then let the user know that they've essentially asked
-        # us to return a useless layout where the first element is discarded and so we're going to ignore them.
-        if index > 1:
-            logging.warning(u"{:s}.left({:s}) : Due to the first element{:s} ({:s}) not having a known offset, the returned elements will begin at offset {:d}.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), '' if len(selected) == 1 else 's', ', '.join(cls.describe(selected)), 0))
-            return cls.left(0, items)
-
-        # figure out the offset for the left side of the item.
-        if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
-            offset = item.baseoffset if isinstance(item, internal.structure.members_t) else item.members.baseoffset
-        elif isinstance(item, internal.structure.member_t):
-            offset = item.offset
-        elif isinstance(item, (bounds_t, location_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t)):
-            offset, _ = item if isinstance(item, namedtypedtuple) else range.unpack(item)
-        elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
-            mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
-            ea, moffset = idaapi.get_func_by_frame(mowner.id), 0 if not mptr or mowner.props & idaapi.SF_UNION else mptr.soff
-            offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
-        else:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.left({:s}) : Unable to determine the offset for the unknown item ({!r}) at index {:d}.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, len(selected)))
-
-        # use the size of the selected elements with the offset to calculate
-        # where all the elements begin at. any elements with an indeterminable
-        # offset have no effect on anything when we lay out the list of elements.
-        return cls.left(offset - cls.size(selected), items)
-
-    @internal.utils.multicase()
-    @classmethod
-    def right(cls, items):
-        '''Bind the specified list of `items` contiguously to the beginning of the last element and return them as a list.'''
-        type_has_offset = (idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, internal.structure.structure_t, internal.structure.members_t, internal.structure.member_t, bounds_t, location_t)
-        items = [item for item in items]
-        reversed = items[::-1]
-
-        # find the point which includes the last item in our list with an offset we can extract.
-        iterable = (1 + index for index, item in enumerate(reversed) if isinstance(item, type_has_offset))
-        index = next(iterable, 0)
-
-        # if we found one with an offset, then we'll need it with its trailing elements.
-        if index:
-            selected = items[-index:]
-            item = selected.pop(0)
-
-        # if we couldn't find one, then complain about it and use offset 0 to calculate the layout.
-        else:
-            logging.warning(u"{:s}.right({:s}) : Assuming the end of the specified {:s} at offset {:d} due to {:s} having a known offset.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), 'element stops' if len(items) == 1 else "{:d} elements stop".format(len(items)), 0, 'it not' if len(items) == 1 else 'none of them'))
-            return cls.right(0, items)
-
-        # if the last element didn't have an offset, then let the user know that they asked us to do
-        # something that doesn't actually make sense, and return all of the elements bound to offset 0.
-        if index > 1:
-            logging.warning(u"{:s}.right({:s}) : Due to the last element{:s} ({:s}) not having a known offset, the returned elements will end at offset {:d}.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), '' if len(selected) == 1 else 's', ', '.join(cls.describe(selected)), 0))
-            return cls.right(0, items)
-
-        # figure out the offset for the right side of the item.
-        if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
-            offset = sum([item.baseoffset, item.owner.size]) if isinstance(item, internal.structure.members_t) else sum([item.members.baseoffset, item.size])
-        elif isinstance(item, internal.structure.member_t):
-            offset = item.offset + item.size
-        elif isinstance(item, (bounds_t, location_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t)):
-            _, offset = item if isinstance(item, namedtypedtuple) else range.unpack(item)
-        elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
-            mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
-            ea, moffset = idaapi.get_func_by_frame(mowner.id), mptr.eoff if mptr else idaapi.get_struc_size(item)
-            offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
-        else:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.right({:s}) : Unable to determine the offset for the unknown item ({!r}) at index {:d}.".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, len(items) + -index))
-
-        # we'll need to use the size of the selected elements with the known offset
-        # to calculate where all the elements should end at. the elements with an
-        # indeterminable offset should have no effect on the layout of each element.
-        return cls.right(offset + cls.size(selected), items)
-
-    @internal.utils.multicase(offset=internal.types.integer, items=internal.types.ordered)
     @classmethod
     def left(cls, offset, items):
         '''Bind the specified list of `items` contiguously as a list with the beginning of the first item aligned to the given `offset`.'''
@@ -4741,13 +4647,6 @@ class contiguous(object):
             continue
         return result
 
-    @internal.utils.multicase(offset=internal.types.integer)
-    @classmethod
-    def left(cls, offset, items):
-        '''Bind the specified `items` contiguously as a list with the beginning of the first item aligned to the given `offset`.'''
-        return cls.left(offset, [item for item in items])
-
-    @internal.utils.multicase(offset=internal.types.integer, items=internal.types.ordered)
     @classmethod
     def right(cls, offset, items):
         '''Bind the specified list of `items` contiguously as a list with the end of the last item aligned to the given `offset`.'''
@@ -4766,12 +4665,6 @@ class contiguous(object):
                 result.append(item)
             continue
         return result[::-1]
-
-    @internal.utils.multicase(offset=internal.types.integer)
-    @classmethod
-    def right(cls, offset, items):
-        '''Bind the specified `items` contiguously as a list with the end of the last item aligned to the given `offset`.'''
-        return cls.right(offset, [item for item in items])
 
     @classmethod
     def has(cls, item):
