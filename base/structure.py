@@ -876,25 +876,21 @@ def left(offset, contiguous):
     '''Return the given `contiguous` items with the beginning of the first item aligned to the specified `offset`.'''
     iterable = interface.contiguous.left(offset, contiguous)
     return [item for item in iterable]
-@utils.multicase(layout=types.ordered)
+@utils.multicase(layout=types.list)
 def left(anchor, layout):
-    """Return the items in `layout` aligned contiguously to the end of the specified `anchor`.
-
-    This will preserve the offset of `anchor` and result in it becoming the first element of the returned list.
-    """
-    iterable = interface.contiguous.left(itertools.chain([anchor], layout))
+    '''Return the items in `layout` aligned contiguously to the end of the specified `anchor`, preserving its ending offset.'''
+    offset, size = interface.contiguous.start(anchor), interface.contiguous.size(anchor if isinstance(anchor, types.list) else [anchor])
+    iterable = interface.contiguous.left(offset, itertools.chain(anchor if isinstance(anchor, types.list) else [anchor], layout))
     return [item for item in iterable]
 
-@utils.multicase(offset=types.integer, contiguous=types.ordered)
+@utils.multicase(offset=types.integer, contiguous=types.list)
 def right(offset, contiguous):
     '''Return the given `contiguous` items with the end of the last item aligned to the specified `offset`.'''
     iterable = interface.contiguous.right(offset, contiguous)
     return [item for item in iterable]
-@utils.multicase(layout=types.ordered)
+@utils.multicase(layout=types.list)
 def right(anchor, layout):
-    """Return the items in `layout` aligned contiguously to the beginning of the specified `anchor`.
-
-    This will preserve the offset of `anchor` and result in it becoming the last element of the returned list.
-    """
-    iterable = interface.contiguous.right(itertools.chain(layout, [anchor]))
+    '''Return the items in `layout` aligned contiguously to the beginning of the specified `anchor`, preserving its starting offset.'''
+    offset, size = interface.contiguous.start(anchor), interface.contiguous.size(anchor if isinstance(anchor, types.list) else [anchor])
+    iterable = interface.contiguous.right(offset + size, itertools.chain(layout, anchor if isinstance(anchor, types.list) else [anchor]))
     return [item for item in iterable]
