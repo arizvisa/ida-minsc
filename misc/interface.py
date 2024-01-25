@@ -4777,6 +4777,80 @@ class contiguous(object):
             return False if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else True
         return False
 
+    @classmethod
+    def start(cls, items):
+        '''Return the starting offset for a list of `items` to be used for a contiguous layout.'''
+        items = [item for item in items] if isinstance(items, internal.types.list) else [items]
+
+        # if the first element in the list has an offset, then extract it.
+        if items and all(map(cls.has, items[:+1])):
+            [item] = items[:+1]
+
+        # if there were no elements in the list or the first item
+        # did not have an offset, then just assume that it is 0.
+        else:
+            return 0
+
+        # figure out the offset for the extracted item and then return it.
+        if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
+            offset = item.baseoffset if isinstance(item, internal.structure.members_t) else item.members.baseoffset
+        elif isinstance(item, (internal.structure.member_t, idaapi.member_t)):
+            offset = item.offset if isinstance(item, internal.structure.member_t) else 0 if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else item.soff
+        elif isinstance(item, (bounds_t, location_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t)):
+            offset, _ = item.bounds if isinstance(item, location_t) else item if isinstance(item, namedtypedtuple) else range.unpack(item)
+
+        # if the item is a structure member, then use its offset unless it's a union member.
+        elif isinstance(item, idaapi.member_t):
+            offset = 0 if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else item.soff
+
+        # if it's a frame, then use the frame size (without the parameters) for the starting offset.
+        elif isinstance(item, idaapi.struc_t):
+            ea = idaapi.get_func_by_frame(item.id)
+            offset = -idaapi.frame_off_args(idaapi.get_func(ea)) if item.props & idaapi.SF_FRAME and idaapi.get_func(ea) else 0
+
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.start({:s}) : Unable to determine the offset for the first item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
+        return offset
+
+    @classmethod
+    def stop(cls, items):
+        '''Return the ending offset for a list of `items` to be used for a contiguous layout.'''
+        items = [item for item in items] if isinstance(items, internal.types.list) else [items]
+
+        # if the last element in the list has an offset, then extract it.
+        if items and all(map(cls.has, items[-1:])):
+            [item] = items[-1:]
+
+        # if there were no elements in the list or the last item
+        # did not have an offset, then we can just use the size.
+        else:
+            return cls.size(items)
+
+        # figure out the offset for the right side of the first item with an offset, and
+        # add it to the total size of the selected elements that don't have an offset.
+        if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
+            offset = sum([item.baseoffset, item.owner.size]) if isinstance(item, internal.structure.members_t) else sum([item.members.baseoffset, item.size])
+        elif isinstance(item, (internal.structure.member_t, idaapi.member_t)):
+            size = idaapi.get_member_size(item.ptr if isinstance(item, internal.structure.member_t) else item)
+            offset = size + (item.offset if isinstance(item, internal.structure.member_t) else 0 if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else item.soff)
+        elif isinstance(item, (bounds_t, location_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t)):
+            _, offset = item.bounds if isinstance(item, location_t) else item if isinstance(item, namedtypedtuple) else range.unpack(item)
+
+        # if it's a structure member, then use its ending offset unless it's part of a union.
+        elif isinstance(item, idaapi.member_t):
+            size = idaapi.get_member_size(item)
+            offset = size if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else item.soff + size
+
+        # if it's a frame, then use the argument size for the function
+        # as the ending offset. otherwise we return the structure size.
+        elif isinstance(item, idaapi.struc_t):
+            ea = idaapi.get_func_by_frame(item.id)
+            offset = idaapi.get_func(ea).argsize if item.props & idaapi.SF_FRAME and idaapi.get_func(ea) else idaapi.get_struc_size(item)
+
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.stop({:s}) : Unable to determine the offset for the last item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
+        return offset
+
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
