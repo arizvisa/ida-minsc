@@ -4785,6 +4785,73 @@ class contiguous(object):
             return False if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else True
         return False
 
+    @classmethod
+    def start(cls, items):
+        '''Return the starting offset for a list of `items` to be used for a contiguous layout.'''
+        items = [item for item in items] if isinstance(items, internal.types.list) else [items]
+
+        # if the first element in the list has an offset, then extract it.
+        if items and all(map(cls.has, items[:+1])):
+            [item] = items[:+1]
+
+        # if there were no elements in the list or the first item
+        # did not have an offset, then just assume that it is 0.
+        else:
+            return 0
+
+        # figure out the offset for the extracted item and then return it.
+        if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
+            offset = item.baseoffset if isinstance(item, internal.structure.members_t) else item.members.baseoffset
+        elif isinstance(item, internal.structure.member_t):
+            offset = item.offset
+        elif isinstance(item, (bounds_t, location_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t)):
+            offset, _ = item.bounds if isinstance(item, location_t) else item if isinstance(item, namedtypedtuple) else range.unpack(item)
+
+        # if the item is a structure or a member, then we need to check if it
+        # is part of a frame. if it is, then we calculate its actual offset.
+        elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
+            mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
+            ea, moffset = idaapi.get_func_by_frame(mowner.id), 0 if not mptr or mowner.props & idaapi.SF_UNION else mptr.soff
+            offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
+
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.start({:s}) : Unable to determine the offset for the first item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
+        return offset
+
+    @classmethod
+    def stop(cls, items):
+        '''Return the ending offset for a list of `items` to be used for a contiguous layout.'''
+        items = [item for item in items] if isinstance(items, internal.types.list) else [items]
+
+        # if the last element in the list has an offset, then extract it.
+        if items and all(map(cls.has, items[-1:])):
+            [item] = items[-1:]
+
+        # if there were no elements in the list or the last item
+        # did not have an offset, then we can just use the size.
+        else:
+            return cls.size(items)
+
+        # figure out the offset for the right side of the first item with an offset, and
+        # add it to the total size of the selected elements that don't have an offset.
+        if isinstance(item, (internal.structure.structure_t, internal.structure.members_t)):
+            offset = sum([item.baseoffset, item.owner.size]) if isinstance(item, internal.structure.members_t) else sum([item.members.baseoffset, item.size])
+        elif isinstance(item, internal.structure.member_t):
+            offset = item.offset + idaapi.get_member_size(item.ptr)
+        elif isinstance(item, (bounds_t, location_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t)):
+            _, offset = item.bounds if isinstance(item, location_t) else item if isinstance(item, namedtypedtuple) else range.unpack(item)
+
+        # if we're dealing with a native structure or member, then we have to
+        # check whether it's referencing a frame to calculate its real offset.
+        elif isinstance(item, (idaapi.struc_t, idaapi.member_t)):
+            mowner, mindex, mptr = internal.structure.members.by_identifier(None, item.id) if isinstance(item, idaapi.member_t) else (item, 0, None)
+            ea, moffset = idaapi.get_func_by_frame(mowner.id), mptr.eoff if mptr else idaapi.get_struc_size(item)
+            offset = function.frame_offset(ea, moffset) if mowner.props & idaapi.SF_FRAME and ea != idaapi.BADADDR else moffset
+
+        else:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.stop({:s}) : Unable to determine the offset for the last item ({!r}) due to being an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(cls.describe(items))), item, item.__class__))
+        return offset
+
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
