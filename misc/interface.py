@@ -4773,6 +4773,18 @@ class contiguous(object):
         '''Bind the specified `items` contiguously as a list with the end of the last item aligned to the given `offset`.'''
         return cls.right(offset, [item for item in items])
 
+    @classmethod
+    def has(cls, item):
+        '''Return whether the specified `item` has an offset that can be used for a contiguous layout.'''
+        type_has_offset = (idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, internal.structure.structure_t, internal.structure.members_t, internal.structure.member_t, bounds_t, location_t)
+        if isinstance(item, type_has_offset):
+            return True
+        elif isinstance(item, idaapi.struc_t):
+            return True if item.props & idaapi.SF_FRAME else False
+        elif isinstance(item, idaapi.member_t):
+            return False if item.flag & getattr(idaapi, 'MF_UNIMEM', 2) else True
+        return False
+
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
