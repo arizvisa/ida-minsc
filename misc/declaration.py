@@ -1446,6 +1446,7 @@ class mangled(object):
         '`non-virtual thunk to\'',
         '`virtual thunk to\'',
         '`covariant return thunk to\'',
+        'inline', 'virtual', 'explicit', 'static',
     }
 
     _declaration_operators = {
@@ -1512,7 +1513,7 @@ class mangled(object):
     def __init_mangled__(self, symbol, mask, Ftransform=None):
         '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
         self.__encoded = encoded = symbol
-        decoded = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.__extract_scope(self.__extract_specifiers(self.decode(encoded, self.__required_flags | mask)))
+        decoded = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.__extract_specifiers(self.__extract_scope(self.decode(encoded, self.__required_flags | mask)))
         transformed = Ftransform(decoded) if Ftransform else decoded
         self.__decoded = transformed
         self.tokens = tokens = self.tokens[:] if hasattr(self, 'tokens') else []
@@ -1520,14 +1521,22 @@ class mangled(object):
         self.__tree__, self.__mangled = result, True if errors else False
         return transformed, order, result, errors
 
-    def __extract_specifiers(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers}):
+    def __extract_specifiers(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers if string[-1:] not in _string.ascii_letters}, specifier_tokens={string for string in _declaration_specifiers if string[-1:] in _string.ascii_letters}):
         '''Remove a declaration specifier "__declspec" from the beginning of the unmangled `string` if it exists.'''
         index, _ = next(token.indices(string, breaking_characters), (-1, None)) if len(breaking_characters) > 1 else (string.find(*breaking_characters), 1)
+
         point = 1 + index
         if string[:point] in self._declaration_specifiers:
             self.__declaration_specifier = string[:point]
             return string[point:].lstrip()
 
+        # try the whitespace next...
+        index = string.find(' ')
+        if 0 <= index and string[:index] in self._declaration_specifiers:
+            self.__declaration_specifier = string[:index]
+            return string[index:].lstrip()
+
+        # ...and then we give up.
         self.__declaration_specifier = ''
         return string
 
@@ -1600,7 +1609,7 @@ class function(mangled):
         getattr(idaapi, 'MNG_SHORT_U', 0x00200000),     # unsigned int -> uint
 
         getattr(idaapi, 'MNG_NOECSU', 0x00002000),      # class/struct/union/enum
-        getattr(idaapi, 'MNG_NOSTVIR', 0x00001000),     # static/virtual : might want this
+        #getattr(idaapi, 'MNG_NOSTVIR', 0x00001000),    # static/virtual : decided to keep this.
         getattr(idaapi, 'MNG_NOTHROW', 0x00000800),
         getattr(idaapi, 'MNG_NOPOSTFC', 0x00000200),    # const suffix
 
