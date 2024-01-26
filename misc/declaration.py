@@ -1673,7 +1673,8 @@ class function(mangled):
 
     def __init__(self, mangled):
         if self.type(mangled) != self.MANGLED_CODE:
-            return super(function, self).__init__(mangled, self.__flags)
+            cls = self.__class__
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}(\"{:s}\") : Unable to demangle the given string as a function due to it being a non-code type ({:d}).".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), self.type(mangled)))
 
         # Figure out the default flags that are needed to demangle just the name. Some
         # compilers chosen by the disassembler will return None wihout the correct flags.
@@ -1683,7 +1684,7 @@ class function(mangled):
         # First we need to do a "test" demangle to determine if the "'" token has two
         # meanings. This only happens with the "`'" segments and always ends in "''".
         just_name = self.decode(mangled, name_flags)
-        assert(just_name), u"{:s}: Unable to demangle symbol using {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), name_flags, 2 + 8)
+        assert(just_name), u"{:s}(\"{:s}\") : Unable to demangle symbol using {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), name_flags, 2 + 8)
         operator_string = 'operator'
         result = just_name.rfind(operator_string)
         index = result if result >= 0 else len(just_name)
@@ -1740,7 +1741,7 @@ class function(mangled):
         # If we still have an error, then it's because the prototype in unparsable (by us).
         if errors:
             cls = self.__class__
-            logging.warning(u"{:s}: Unable to parse the mangled string \"{:s}\" after it was decoded to \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), utils.string.escape(decoded, '"')))
+            logging.warning(u"{:s}(\"{:s}\") : Unable to parse the mangled string \"{:s}\" after it was decoded to \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), utils.string.escape(mangled, '"'), utils.string.escape(decoded, '"')))
 
         # If we already figured out what operator it is, then store that too.
         self.__operator = just_operator if double_quote or expected_operators or qualified_with_spaces else ''
