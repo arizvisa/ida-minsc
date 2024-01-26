@@ -6122,8 +6122,9 @@ class instruction(object):
 
         # Get the register accesses for the instruction.
         ra, insn, flags = idaapi.reg_accesses_t(), instruction.at(ea), address.flags(ea)
-        sflags = idaapi.sval_pointer(); sflags.assign(flags)
-        if not idaapi.ph_get_reg_accesses(ra, insn, sflags.value()):
+        sflags = idaapi.sval_pointer(); sflags.assign(idaapi.extend_sign(flags, 4, True))
+        iflags = idaapi.int_pointer(); iflags.assign(sflags.value())
+        if not idaapi.ph_get_reg_accesses(ra, insn, iflags.value()):
             return
 
         # Grab the features and create some tools for accesing them.
