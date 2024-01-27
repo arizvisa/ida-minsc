@@ -5485,6 +5485,66 @@ class tinfo(object):
         return result
 
     @classmethod
+    def format_type_error(cls, code):
+        '''Return the specified error `code` as a tuple composed of the error name and its description.'''
+        descriptions, names = {}, {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('TERR_')}
+        descriptions[idaapi.TERR_OK] = 'ok'
+        descriptions[idaapi.TERR_SAVE] = 'failed to save'
+        descriptions[idaapi.TERR_SERIALIZE] = 'failed to serialize'
+        descriptions[getattr(idaapi, 'TERR_TOOLONGNAME', getattr(idaapi, 'TERR_WRONGNAME', -3))] = 'name is too long' if hasattr(idaapi, 'TERR_TOOLONGNAME') else 'name is not acceptable'
+        descriptions[getattr(idaapi, 'TERR_BADSYNC', -4)] = 'failed to synchronize with IDB'
+        return names.get(code, ''), descriptions.get(code, '')
+
+    @classmethod
+    def set_numbered_type(cls, library, ordinal, name, type, *flags):
+        '''Set the type at the specified `ordinal` for a type `library` using the given `name` and serialized `type` information.'''
+        description = "{!s}".format(type) if isinstance(type, idaapi.tinfo_t) else "{!r}".format(type)
+        serialized, til = type.serialize() if isinstance(type, idaapi.tinfo_t) else type, cls.library(type) if library is None and isinstance(type, idaapi.tinfo_t) else library
+        type, fields, cmt, fieldcmts, sclass = itertools.chain(serialized, [b'\x01', b'', b'', b'', getattr(idaapi, 'sc_unk', 0)][len(serialized) - 5:] if len(serialized) < 5 else [])
+
+        # now we can allocate a slot for the ordinal within the type library if necessary.
+        index = ordinal if ordinal and ordinal > 0 else idaapi.alloc_type_ordinals(til, 1)
+        if index < 1:
+            raise internal.exceptions.DisassemblerError(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to allocate an ordinal within the specified type library.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else ''))
+
+        # set the default flags that we're going to use when using set_numbered_type.
+        [flag] = flags if flags else [idaapi.NTF_CHKSYNC | idaapi.NTF_TYPE]
+        flag |= idaapi.NTF_REPLACE if ordinal > 0 else 0
+
+        # last thing we need to do is correct the name we were given to a valid one
+        # since IDA wants these to follow the format (character set) for a general C
+        # identifier. so we'll simply do the first character, then finish the rest.
+        iterable = (item for item in name)
+        item = builtins.next(iterable, '_')
+        identifier = item if idaapi.is_valid_typename(internal.utils.string.to(item)) else '_'
+        identifier+= str().join(item if idaapi.is_valid_typename(identifier + internal.utils.string.to(item)) else '_' for item in iterable)
+
+        # we can now assign the serialized data that we got, making sure that
+        # the comments are properly being passed as bytes before checking for error.
+        result = idaapi.set_numbered_type(library, index, flag, internal.utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, internal.types.bytes) else cmt, fieldcmts if isinstance(fieldcmts, internal.types.bytes) else fieldcmts.encode('latin1'), sclass)
+        if result == idaapi.TERR_OK:
+            return index
+
+        # if we got an error, then we need to delete the ordinal we just added
+        # and then we can just raise an exception for the user to deal with.
+        if ordinal <= idaapi.TERR_OK and not idaapi.del_numbered_type(library, ordinal):
+            logging.fatal(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to delete the recently added ordinal ({:d}) from the specified type library.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', index))
+
+        # now we can check the error code and log the error before returning it.
+        error_name, error_description = cls.format_type_error(result)
+        if result == getattr(idaapi, 'TERR_WRONGNAME', getattr(idaapi, 'TERR_TOOLONGNAME', -3)):
+            logging.info(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', index, identifier, "{:s}({:d})".format(error_name, result) if result else "code ({:d})".format(result)))
+        else:
+            logging.info(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', ordinal, "{:s}({:d})".format(error_name, result) if result else "code ({:d})".format(result)))
+
+        # our result should be less than 0, so we bail here as a sanity-check.
+        if result < 0:
+            return result
+
+        error_name, error_description = cls.format_type_error(result)
+        raise internal.exceptions.AssertionError(u"{:s}.set_numbered_type({!s}, {!s}, {!r}, {!r}{:s}) : Received an unexpected error {:s} that should have been less than {:d}.".format('.'.join([__name__, cls.__name__]), library, ordinal, name, description, u", {!s}".format(*flags) if flags else '', "{:s}({:d})".format(error_name, result) if error_name else "code ({:d})".format(result), 0))
+
+    @classmethod
     def get_named_type(cls, library, name, flags):
         '''Return the serialized type information for the type with the given `name` and `flags` from the specified type `library`.'''
         til = library if library else cls.library()
@@ -5544,6 +5604,24 @@ class tinfo(object):
         finally:
             owned and til and ida.free_til(til)
         return result
+
+    @classmethod
+    def function(cls, type):
+        '''Return a list containing the return type followed by each argument for the function that is specified by `type`.'''
+        if not any([type.is_func(), type.is_funcptr()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.function(\"{:s}\") : The specified type information ({!r}) is not a function and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(type)))
+
+        # If it's a function type, then get the result and number of args
+        # so that all the types which compose it can be returned as a list.
+        result, count = type.get_rettype(), type.get_nargs()
+        iterable = itertools.chain([result], (type.get_nth_arg(n) for n in builtins.range(count)))
+
+        # Before returning them, though, we need to remove any ordinals so that each
+        # type is concretized. So we make a copy of each, strip them, and return it.
+        Fstrip_ordinals = idaapi.replace_ordinal_typerefs if hasattr(idaapi, 'replace_ordinal_typerefs') else lambda library, ti: 0
+        copied = [(item, cls.copy(item)) for item in iterable]
+        resolved = [(old if Fstrip_ordinals(cls.library(new), new) < 0 else new) for old, new in copied]
+        return [item for item in resolved]
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
