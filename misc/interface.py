@@ -5623,6 +5623,69 @@ class tinfo(object):
         resolved = [(old if Fstrip_ordinals(cls.library(new), new) < 0 else new) for old, new in copied]
         return [item for item in resolved]
 
+    @classmethod
+    def lower_function_type(cls, type):
+        '''If the given `type` has the high-level attribute (``idaapi.BFA_HIGH``), correct the types it depends on and return its lowered type.'''
+        if type.is_correct() and not type.is_high_func():
+            return type
+
+        # We can only handle function pointers here.
+        if not any([type.is_func(), type.is_funcptr()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) is not a function and cannot be lowered.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(type)))
+
+        # Create a table used to determine the string template that
+        # we'll use for creating a "correct" placeholder type.
+        table = [
+            ('is_decl_enum', "enum {:s} {{}}".format),
+            ('is_decl_struct', "struct {:s} {{}}".format),
+            ('is_decl_union', "union {:s} {{}}".format),
+        ]
+
+        # Iterate through all of the "incorrect" types that belong to this
+        # function, and add any partial and undefined types types to it.
+        library, results = cls.library(type), []
+        for item in cls.function(type):
+            if item.is_correct():
+                continue
+
+            # Make sure itś not a pointer so that we can add its contents.
+            item = cls.resolve(item) if item.is_ptr() else item
+
+            # Our type should have a name of some sort for the specific condition we're testing for.
+            tname = item.get_type_name()
+            if not tname:
+                logging.warning(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) has no name and cannot be added to the type library.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(item)))
+                continue
+
+            # After snagging it, we'll re-parse it use it to create a dummy type.
+            iterable = ((format, operator.methodcaller(attribute)(item)) for attribute, format in table if hasattr(item, attribute))
+            available = (format(tname) for format, ok in iterable if ok)
+
+            # Now we can use the formatspec that we extracted and render a dummy type to parse.
+            definition = builtins.next(available, "{!s} {{}}".format(item))
+            ti = cls.parse(library, definition, idaapi.PT_SIL)
+            if not ti:
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) is an unsupported type and cannot be added to the type library as \"{:s}\".".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(item), definition))
+
+            # Next we'll try and add it to the type library so that the function type is well-formed.
+            ordinal = cls.set_numbered_type(library, idaapi.get_type_ordinal(library, internal.utils.string.to(tname)), tname, ti)
+            results.append((ordinal, item, tname, definition))
+
+        # Finally we will make a copy of the original type, and then we can actually lower it.
+        copy = cls.get(library, *type.serialize())
+        lowered = type if idaapi.lower_type(library, copy) < 0 else copy
+
+        # Now we go through our results and check if we succeeded. If we didn't, then we need to complain about it.
+        if all(ordinal > 0 for ordinal, _, _, _ in results) and lowered.is_correct():
+            return lowered
+
+        errors = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('TERR_')}
+        for code, item, tname, string in results:
+            if code > 0:
+                continue
+            logging.warning(u"{:s}.lower_function_type(\"{:s}\") : Encountered error {:s} while trying to attach the specified type information ({!r}) to the determined name \"{:s}\".".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{:s}({:d})".format(errors[code], code) if code in errors else "code ({:d})".format(code), "{!s}".format(string), internal.utils.string.escape(tname, '"')))
+        return lowered
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
