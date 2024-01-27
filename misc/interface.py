@@ -4926,10 +4926,16 @@ class tinfo(object):
             logging.debug(u"{:s}.function_details({:#x}, {!r}) : Ignoring error {:d} while trying to concretize the type \"{:s}\" for the function at {:#x}.".format('.'.join([cls.__name__, cls.__name__]), ea, "{!s}".format(ti), res, internal.utils.string.escape("{!s}".format(tinfo), '"'), ea))
         tinfo = old if res < 0 else new
 
-        # Now we can grab our function details and return them to the caller.
+        # Now we can grab our function details and return them to the caller. If we
+        # couldn't get them the first time, then it's probably due to the layout.
         ftd = idaapi.func_type_data_t()
-        if not tinfo.get_func_details(ftd):
-            raise internal.exceptions.DisassemblerError(u"{:s}.function_details({:#x}, {!s}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+        if tinfo.get_func_details(ftd):
+            return tinfo, ftd
+
+        elif not tinfo.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS):
+            raise internal.exceptions.DisassemblerError(u"{:s}.function_details({:#x}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
+
+        logging.info(u"{:s}.function_details({:#x}, {!r}) : Unable to calculate the argument locations from the type ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(tinfo), ea))
         return tinfo, ftd
 
     @classmethod
@@ -4968,8 +4974,12 @@ class tinfo(object):
 
         # Now we can grab our function details from the snagged type information.
         ftd = idaapi.func_type_data_t()
-        if not info.get_func_details(ftd):
+        ok = info.get_func_details(ftd)
+        if not ok and not info.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS):
             raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!r}) : Unable to get the details from the type information ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(info), ea))
+
+        elif not ok:
+            logging.info(u"{:s}.update_function_details({:#x}, {!r}) : Unable to calculate the argument locations from the type ({!r}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(info), ea))
 
         # Concretize the type that we're yielding in case the caller wants to save it.
         til, old, new = cls.library(info), info, cls.copy(info)
