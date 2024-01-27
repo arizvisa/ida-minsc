@@ -5886,25 +5886,20 @@ class types(object):
 
         If the boolean `mangled` is specified, then the given name is mangled.
         """
-        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
+        serialized = info.serialize()
 
-        # first try to get the type information at the given ordinal so that we can return it.
+        # first try to get the type information at the given ordinal so that we can return it at the end.
         try:
             ti = cls.get(ordinal, library)
+
         except Exception:
             ti = None
 
-        # serialize the type information that we're being asked to assign.
-        serialized = info.serialize()
+        # check that we were able to serialize the type information we were given.
         if serialized is None:
             raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}{:s}) : Unable to serialize the given type information to assign to the ordinal ({:d}) of the type library.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
 
-        # we aren't given all of the necessary parameters for set_numbered_type,
-        # so we assign some defaults so we can actually set it.
-        type, fields, fieldcmts = serialized
-        cmt, sclass, fieldcmts = b'', idaapi.sc_unk, fieldcmts or b''
-
-        # set the default flags that we're going to use when using set_numbered_type.
+        # set the default flags that we're going to use for set_numbered_type.
         flags = mangled.get('flags', idaapi.NTF_CHKSYNC)
         flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
 
@@ -5916,15 +5911,15 @@ class types(object):
         identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
         identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
 
-        # we need to now assign the serialized data we were given, making sure
-        # that any of the any of the comments are properly being passed as bytes
-        # and then we can check to see if it returned an error.
-        res = idaapi.set_numbered_type(library, ordinal, idaapi.NTF_REPLACE | flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, internal.types.bytes) else cmt, fieldcmts if isinstance(fieldcmts, internal.types.bytes) else fieldcmts.encode('latin1'), sclass)
+        # we need to now assign the serialized data we were given, and check if it error'd.
+        res = interface.tinfo.set_numbered_type(library, ordinal, identifier, serialized, flags=idaapi.NTF_REPLACE | flags)
+        if res > idaapi.TERR_OK:
+            return ti
+
+        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
         if res == idaapi.TERR_WRONGNAME:
             raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the type library with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
-        elif res != idaapi.TERR_OK:
-            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
-        return ti
+        raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
@@ -6004,22 +5999,11 @@ class types(object):
 
         If the boolean `mangled` is specified, then the given name is mangled.
         """
-        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
+        serialized = info.serialize()
 
         # first we'll try to serialize the type before we make any perma-changes.
-        serialized = info.serialize()
         if serialized is None:
             raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to serialize the type information that will be added to the type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else ''))
-
-        # serialization does not give us all of the parameters required to actually
-        # use set_numbered_type, so we assign some defaults to use.
-        type, fields, fieldcmts = serialized
-        cmt, sclass, fieldcmts = b'', idaapi.sc_unk, fieldcmts or b''
-
-        # now we can allocate a slot for the ordinal within the type library.
-        ordinal = idaapi.alloc_type_ordinals(library, 1)
-        if not ordinal:
-            raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to allocate an ordinal within the specified type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else ''))
 
         # set the default flags that we're going to use when using set_numbered_type.
         flags = mangled.get('flags', idaapi.NTF_CHKSYNC | idaapi.NTF_TYPE)
@@ -6033,18 +6017,14 @@ class types(object):
         identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
         identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
 
-        # we can now assign the serialized data that we got, making sure that
+        # we can now assign the serialized data that we got and check for an error.
         # the comments are properly being passed as bytes before checking for error.
-        res = idaapi.set_numbered_type(library, ordinal, flags, utils.string.to(identifier), type, fields, cmt.decode('latin1') if isinstance(cmt, internal.types.bytes) else cmt, fieldcmts if isinstance(fieldcmts, internal.types.bytes) else fieldcmts.encode('latin1'), sclass)
-        if res == idaapi.TERR_OK:
+        res = ordinal = interface.tinfo.set_numbered_type(library, 0, identifier, serialized, flags=flags)
+        if res > idaapi.TERR_OK:
             return ordinal
 
-        # if we got an error, then we need to delete the ordinal we just added
-        # and then we can just raise an exception for the user to deal with.
-        if not idaapi.del_numbered_type(library, ordinal):
-            logging.fatal(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to delete the recently added ordinal ({:d}) from the specified type library.".format('.'.join([__name__, cls.__name__]), name, info, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
-
-        # now we can check the error code and fail properly with an exception.
+        # check the error code and raise an exception if it is at all necessary.
+        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
         if res == idaapi.TERR_WRONGNAME:
             raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
         raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
