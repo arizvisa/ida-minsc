@@ -3477,26 +3477,16 @@ class type(object):
     @classmethod
     def convention(cls):
         '''Return the calling convention of the current function.'''
-        # we avoid ui.current.function() so that we can also act on pointers.
+        # we avoid ui.current.function() so that we can also act on runtime-linked functions.
         return cls.convention(ui.current.address())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def convention(cls, func):
         '''Return the calling convention for the function `func` as an integer that corresponds to one of the ``idaapi.CM_CC_*`` constants.'''
-        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-        try:
-            _, ea = interface.addressOfRuntimeOrStatic(func)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
 
-        # If we couldn't resolve the function, then consider our parameter
-        # as the calling convention that we're going to apply to the current address.
-        except E.FunctionNotFoundError:
-            return cls.convention(ui.current.address(), func)
-
-        # Grab the type information from the address that we resolved. We avoid
-        # doing any "guessing" here and only work with an explicitly applied type.
-        ti = idaapi.tinfo_t()
-        if not get_tinfo(ti, ea):
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({:#x}) : Specified function {:#x} does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        # Grab the type information for the specified function, guessing it if necessary.
+        ti = interface.function.typeinfo(func)
 
         # Now we can just grab the function details for this type, use it to extract
         # the convention and the spoiled count, and then return what we found.
@@ -3514,12 +3504,9 @@ class type(object):
     def convention(cls, func, convention):
         '''Set the calling convention used by the prototype for the function `func` to the specified `convention`.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
-        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
 
-        # Grab the type information from the resolved address.
-        ti = idaapi.tinfo_t()
-        if not get_tinfo(ti, ea):
-            raise E.MissingTypeOrAttribute(u"{:s}.convention({:#x}, {:#x}) : The specified function ({:#x}) does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), ea, convention, ea))
+        # Grab the type information from the resolved address, guessing if at all necessary.
+        ti = interface.function.typeinfo(func)
 
         # Now we just need to create the strpath.update_function_details
         # coroutine. Our first result will contain the function details
@@ -3594,12 +3581,9 @@ class type(object):
         def __new__(cls, func, info):
             '''Modify the result type for the function `func` to the type information provided as an ``idaapi.tinfo_t`` in `info`.'''
             _, ea = interface.addressOfRuntimeOrStatic(func)
-            get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
 
-            # Grab the type information from the function that we'll update with.
-            ti = idaapi.tinfo_t()
-            if not get_tinfo(ti, ea):
-                raise E.MissingTypeOrAttribute(u"{:s}.result({:#x}, {!r}) : Specified function {:#x} does not contain a prototype declaration.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(info), ea))
+            # Grab the function type information that we plan on updating.
+            ti = interface.function.typeinfo(func)
 
             # Now we can create an updater, and grab the details out of it.
             updater = interface.tinfo.update_function_details(ea, ti)
