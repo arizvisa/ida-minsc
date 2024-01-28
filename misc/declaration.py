@@ -276,9 +276,9 @@ class extract(object):
         segment, items = listable.pop(0)
         left, right = segment
         if listable:
-            yield (left + adjustment, right), items or [(left + adjustment, right)]
+            yield (left + adjustment, right), items
         else:
-            yield (left + adjustment, right - adjustment), items or [(left + adjustment, right - adjustment)]
+            yield (left + adjustment, right - adjustment), items
 
         # continue consuming items until we have at least one element left.
         while len(listable) > 1:
@@ -292,7 +292,7 @@ class extract(object):
             segment, items = listable.pop(0)
             left, right = segment
             if right - adjustment > left:
-                yield (left, right - adjustment), items or [(left, right - adjustment)]
+                yield (left, right - adjustment), items
             continue
         return
 
