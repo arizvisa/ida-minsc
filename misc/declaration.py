@@ -2095,6 +2095,10 @@ class selection(object):
         string, iterable = self.__string__, token.segments(*self.__selection__)
         return [string[left : right] for left, right in iterable]
 
+    def string(self):
+        (left, right), _ = self.__selection__
+        return self.__string__[left : right]
+
     def __bool__(self):
         range, _ = self.__selection__
         return operator.ne(*range)
