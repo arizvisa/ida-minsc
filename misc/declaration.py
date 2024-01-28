@@ -2261,8 +2261,9 @@ class declaration_with_qualifiers(selection):
 
     @property
     def name(self):
-        decl, _ = extract.qualifiers(self.__string__, *self.__selection__)
-        return self.select(fullname, decl)
+        declaration_untrimmed, _ = extract.qualifiers(self.__string__, *self.__selection__)
+        declaration_trimmed = extract.trimmed(self.__string__, *declaration_untrimmed)
+        return self.select(fullname, declaration_trimmed)
 
     @property
     def qualifiers(self):
