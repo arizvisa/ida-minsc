@@ -1879,13 +1879,13 @@ class function(mangled):
         # extract the segment that contains the the very last token.
         result_and_convention, _, _, _ = self.__prototype_components
         result_untrimmed, convention_candidate = extract.ending(self.string, *result_and_convention)
-        result = extract.trimmed(self.string, *result_untrimmed)
 
         # If our ending token matches a convention exactly, then track its boundaries
         # and assign a tuple that splits up the result token from the convention segment.
         (left, right), segments = convention_candidate
-        if not segments and self.string[left : right] in convention.choice:
-            result = self.__cache_result_and_convention = result, (left, right)
+        if not segments and self.string[left : right] in self._declaration_conventions:
+            result_trimmed = extract.trimmed(self.string, *result_untrimmed)
+            result = self.__cache_result_and_convention = result_trimmed, (left, right)
             return result
 
         # If the convention segment represents a string that starts with "__",
