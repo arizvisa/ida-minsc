@@ -1053,7 +1053,7 @@ class unmangled(object):
     }
 
     # scopes
-    _declaration_scopes = { 'private: ', 'protected: ', 'public: ' , '[thunk]: '}
+    _declaration_scopes = { 'private: ', 'protected: ', 'public: ' , '[thunk]: ', '[thunk]:private: ', '[thunk]:protected: ', '[thunk]:public: ' }
 
     @classmethod
     def keyword(cls, string):
@@ -1178,7 +1178,7 @@ class unmangled(object):
             assert(parameters), parameters
 
             # go through all of the parameters separated by a ',' to strip out qualifiers and types.
-            parameters = [item.replace(' ', '').replace(' *', '_ptr') for item in unmangled.parameters(parameters[+1 : -1])]
+            parameters = [item.replace(' ', '').replace(' *', '_ptr') for item in cls.parameters(parameters[+1 : -1])]
 
             # split up the type and pointer by deleting the pointer and removing spaces.
             left, right = nested.last(type_and_pointer, '()')
@@ -1443,6 +1443,9 @@ class mangled(object):
         'protected:',
         'public:',
         '[thunk]:',
+        '[thunk]:private:',
+        '[thunk]:protected:',
+        '[thunk]:public:',
     }
 
     _declaration_specifiers = {
@@ -1549,7 +1552,7 @@ class mangled(object):
 
     def __extract_scope(self, string):
         '''Remove a scope from the beginning of an unmangled `string` if it exists.'''
-        point = 1 + string.find(':')
+        point = 1 + string.find(': ')
         if string[:point] in self._declaration_scopes:
             self.__declaration_scope = string[:point]
             return string[point:].lstrip()
