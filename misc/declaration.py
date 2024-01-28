@@ -320,14 +320,21 @@ class extract(object):
         # loop in order to consume any of the trailing whitespace that's in the
         # ignored set, that should trim the convention and we should be done.
         point = stop
-        while segments and string[stop : point] in ignored:
-            _, point = segments[-1]
-            if point != stop:
+        while segments:
+            left, right = segments[-1]
+            if string[right : point] not in ignored:
                 break
-            stop, point = segments.pop()
+
+            # consume all whitespace within a segment.
+            _, point = segments[-1]
+            if string[left : right] not in ignored:
+                break
+
+            # remove the last segment, and set the pointer to its beginning.
+            point, _ = segments.pop()
 
         # that should be it.. we have every component and can return them.
-        result_and_convention = (start, stop), segments
+        result_and_convention = (start, point), segments
         return result_and_convention, name, parameters_range, qualifiers
 
     @classmethod
