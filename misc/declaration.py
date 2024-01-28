@@ -2131,7 +2131,8 @@ class name_component(selection):
         (start, stop), segments = self.__selection__
         if len(segments) > 1:
             (start, stop), segments = self.__correct_selection
-        (point, _) = segments[-1] if segments else (stop, stop)
+        filtered = [(left, right) for left, right in segments if self.__string__[left : right] not in {' '}]
+        (point, _) = filtered[-1] if filtered else (stop, stop)
         return self.__string__[start : point]
 
     @property
