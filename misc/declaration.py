@@ -259,7 +259,10 @@ class extract(object):
         start, stop = (len(original) - len(F(*whitespace)) for F in [original.lstrip, original.rstrip])
         assert(all(string[left : right] in whitespace for left, right in segments[:start]))
         assert(all(string[left : right] in whitespace for left, right in segments[-stop:]) if stop else True)
-        return (left + start, right - stop), segments[+start : -stop] if stop else segments[start:]
+        if all(len(original) > item for item in [start, stop]):
+            return (left + start, right - stop), segments[+start : -stop] if stop else segments[start:]
+        bounds = (left, right - stop) if len(original) <= stop else (left + start, right)
+        return bounds, segments[+start : -stop] if stop else segments[start:]
 
     @classmethod
     def parameters(cls, tree, string, range=None, assertion={'()', '<>', '{}'}, delimiter={','}):
