@@ -1462,6 +1462,8 @@ class mangled(object):
         'inline', 'virtual', 'explicit', 'static',
     }
 
+    _declaration_conventions = (lambda candidates: {item for item in candidates if isinstance(item, internal.types.string) and item.startswith('__')})(convention.choice)
+
     _declaration_operators = {
         'operator new':         'new',
         'operator delete':      'delete',
