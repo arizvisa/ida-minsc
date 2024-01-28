@@ -1699,7 +1699,11 @@ class function(mangled):
         # First we need to do a "test" demangle to determine if the "'" token has two
         # meanings. This only happens with the "`'" segments and always ends in "''".
         just_name = self.decode(mangled, name_flags)
-        assert(just_name), u"{:s}(\"{:s}\") : Unable to demangle symbol using {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), name_flags, 2 + 8)
+        if not just_name:
+            logging.info(u"{:s}(\"{:s}\") : Unable to demangle symbol using {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), name_flags, 2 + 8))
+            just_name = self.__init__guess_name(mangled, self.__flags)
+        if not just_name:
+            raise internal.exceptions.AssertionError(u"{:s}(\"{:s}\") : Unable to parse out the name from the demangled symbol returned by {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), self.__flags, 2 + 8))
         operator_string = 'operator'
         result = just_name.rfind(operator_string)
         index = result if result >= 0 else len(just_name)
@@ -1763,6 +1767,20 @@ class function(mangled):
 
         # Identify any duplicate segments in case we need to translate this string.
         self.__duplicates__ = {} if errors else token.duplicates(decoded, order)
+
+    def __init__guess_name(self, mangled, flags):
+        '''Attempt to guess the function name from the decoded string specified by `mangled`.'''
+        decoded = self.decode(mangled, flags)
+
+        # We pre-parse all of the tokens, just so we can pass the tree directly
+        # to extract.prototype and assume that it correctly figured out the name.
+        order, result, errors = token.parse(decoded, self.tokens)
+        result_and_convention, name, parameters, qualifiers = extract.prototype(result, decoded)
+
+        # Now we should have the range and segments for the name. Unpack the
+        # range and use it with the decoded string to return the proper name.
+        (left, right), segments = name
+        return decoded[left : right]
 
     def __init__busted_operator(self, decoded):
         '''Initialize the class for a typed operator in `decoded` which contains unbalanced symbols.'''
@@ -2095,6 +2113,7 @@ class selection(object):
         string, iterable = self.__string__, token.segments(*self.__selection__)
         return [string[left : right] for left, right in iterable]
 
+    @property
     def string(self):
         (left, right), _ = self.__selection__
         return self.__string__[left : right]
