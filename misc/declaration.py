@@ -2182,7 +2182,7 @@ class name_component(selection):
         return self.__string__[start : point]
 
     @property
-    def spec(self):
+    def specifier(self):
         (start, stop), segments = self.__selection__
         if len(segments) <= 1:
             left, right = segments[-1] if segments else (stop, stop)
