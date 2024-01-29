@@ -364,29 +364,52 @@ class extract(object):
     def qualifiers(cls, string, range, segments, qualifiers={'const', 'volatile', 'throw()', 'throw(void)', 'noexcept'}):
         '''Return a tuple containing the selections for the declaration and qualifiers using the given `range` and `segments` with `string`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
-        symbols, ignored = {' ', '*', '&'}, {item for item in itertools.chain([''], (qualifier[qualifier.rindex('('):] for qualifier in qualifiers if qualifier[-1] in ')'))}
+        symbols, cuddled = {'', ' ', '*', '&'}, {item for item in itertools.chain((qualifier[qualifier.rindex('('):] for qualifier in qualifiers if qualifier[-1] in ')'))}
 
-        # to consume qualifiers.. we need to consume tokens from our list of segments,
-        # but we need it flat with 1-char lengths since we're only looking for _exact_ tokens.
-        iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if string[left : right] not in ignored)
-        result, index, point = 0, 0, stop
-        while point >= start:
-            index = next(iterable, 0)
-            if not index:
-                break
-            left, right = segments[-index]
-            if point > right and string[right : point] not in (qualifiers|symbols):
-                break
-            point, candidate = right, string[left : point]
-            if candidate not in (qualifiers|symbols):
-                break
-            result, point = index, left
+        # special case: if the whole string is a qualifier, then return it.
+        if string[start : stop] in qualifiers:
+            declaration = (start, start), []
+            qualifiers = (start, stop), segments
+            return declaration, qualifiers
 
-        # now everything after our index is considered a qualifier. we just need to
-        # subtract it from what we've parsed (the declaration) and return both of them.
-        point, selected = (stop, []) if not result else (point, segments[-result:]) if index else (point, segments[:])
-        qualifiers = (point, stop), selected
-        declaration = (start, point), segments[:-len(selected)] if len(selected) else segments[:]
+        # loop while each element is contiguous and a symbol or a candidate.
+        rindex, leftover = 0, segments[:]
+        point = left = stop
+        while left > start:
+            left, right = leftover.pop() if leftover else (start, start)
+
+            # if it's a valid qualifier, then adjust our point to the next contiguous
+            # one so that the following contiguity(?) check will actually pass.
+            if string[right : point] in qualifiers:
+                point = right
+
+            # if the segment is non-contiguous, then it's either a qualifier or
+            # it's not. in this case, due to the previous check, it's not one.
+            if point != right:
+                break
+
+            # if it's a symbol, then shift to the next contigous position.
+            elif string[left : right] in symbols:
+                point, pivot = left, right
+
+            # if it's a candidate qualifier, then peek at the next segment and try
+            # to confirm it. if we didn't confirm, then we can abort processing.
+            elif string[left : right] in cuddled:
+                pivot, left = leftover[-1] if leftover else (start, start)
+                if string[left : right] not in qualifiers:
+                    point = right
+                    break
+                point = right = left
+
+            # if it was nothing we know about, then we can also just abort.
+            else:
+                point = right
+                break
+            rindex += 1
+
+        # now we can use the determined point as a pivot, and slice up the segments.
+        declaration = (start, point), segments[:-rindex] if rindex else segments
+        qualifiers = (point, stop), segments[-rindex:] if rindex else []
         return declaration, qualifiers
 
     @classmethod
