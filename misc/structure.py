@@ -646,6 +646,491 @@ class member(object):
         dissolved = interface.typemap.dissolve(mptr.flag, tid, msize, offset=moffset)
         return mptr.id, mname, dissolved, location, mcomments
 
+class members(object):
+    """
+    This namespace is _not_ the `members_t` class. Its purpose is to
+    expose any disassembler-specific logic related to the members
+    associated with a structure. The offsets within the functions
+    belonging to this namespace are not translated and are instead
+    always guaranteed to be relative to the top of the structure.
+
+    This namespace is similar to the `member` namespace and is
+    intended to be used for searching through members in a given
+    structure, or recursively through its members. It explicitly
+    avoids handling the holes that can be found within a structure.
+
+    When returning an individual member, the functions within this
+    namespace will always return it as a 3-element tuple composed
+    of the ``idaapi.struc_t``, an integer for its index, and the
+    ``idaapi.member_t`` which contains its database identifier.
+    """
+
+    @classmethod
+    def iterate(cls, sptr, *slice):
+        '''Yield each member specified by `slice` from the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        [selection] = slice if slice else [builtins.slice(None)]
+        for index in range(*selection.indices(sptr.memqty)):
+            mptr = sptr.get_member(index)
+            yield sptr, index, mptr
+        return
+
+    @classmethod
+    def index(cls, sptr, mptr):
+        '''Return the index of the member `mptr` in the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+
+        # We assume that the member actually belongs to the specified structure to
+        # avoid having to do a get_member_by_id every time this gets called. If the
+        # member and structure are from a union, we can just return member_t.soff.
+        if union(sptr) and mptr.props & idaapi.MF_UNIMEM:
+            return mptr.soff
+
+        # Now we can use the member offset to ask the disassembler about the
+        # index. However, we will need to adjust the result by a base index
+        # due to newer versions not returning an index of 0 for the first member.
+        base = idaapi.get_prev_member_idx(sptr, sptr.members[0].eoff)
+
+        # If our structure has more than two members, we ask the disassembler. Due to
+        # checking the end of the member, the result should always be the previous
+        # index unless it failed. If it fails, then it definitely should be the next.
+        if base and sptr.memqty > 2:
+            prev, next = idaapi.get_prev_member_idx(sptr, mptr.eoff), idaapi.get_next_member_idx(sptr, mptr.soff)
+            mindex = next if prev < 0 else prev
+            return mindex - base
+
+        # Otherwise, we need to deal with previous versions which requires us to
+        # always take the previous of the next index in order to figure it out.
+        elif sptr.memqty > 2:
+            next = idaapi.get_next_member_idx(sptr, mptr.soff)
+            mindex = sptr.memqty if next < 0 else next
+            return mindex - 1
+
+        # Otherwise, there's only one or two members and we can simply check the member
+        # against the first from the structure since it can only be one or the other.
+        return 0 if mptr.id == sptr.get_member(0).id else 1
+
+    @classmethod
+    def index_after(cls, sptr, offset):
+        '''Return the index of a member at the given `offset` or after from the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        is_variable, size = sptr.props & idaapi.SF_VAR, idaapi.get_struc_size(sptr.id)
+
+        # Grab the last member of the structure so that we can distinguish whether
+        # the offset is pointing to it, or goes past the length of the structure.
+        last = sptr.get_member(sptr.memqty - 1) if sptr.memqty else None
+        right = last.eoff + 1 if is_variable and last.soff == last.eoff else last.eoff if last else size
+
+        # If the offset comes after the last member, then we can use the number of
+        # members to determine the index. We only need to adjust for variable-length.
+        if right <= offset:
+            return sptr.memqty
+
+        # If the offset comes before the entire structure, then we return 0 as
+        # this function should always select the first element if available.
+        elif offset < 0:
+            return 0
+
+        # Now we can use the get_next_member_idx function, which isn't busted.
+        index = idaapi.get_next_member_idx(sptr, offset)
+        return sptr.memqty if index < 0 else index
+
+    @classmethod
+    def index_before(cls, sptr, offset):
+        '''Return the index of a member at the given `offset` or before from the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        is_variable, size = sptr.props & idaapi.SF_VAR, idaapi.get_struc_size(sptr.id)
+
+        # First grab the ends of the structure. This is because newer versions of the
+        # disassembler seem to have borked up the get_prev_member_idx function.
+        first, last = (sptr.get_member(0), sptr.get_member(sptr.memqty - 1)) if sptr.memqty else (None, None)
+        left, right = first.eoff if first else 0, last.eoff if last else size
+
+        # Now we'll check the get_prev_member_idx function, by asking it to return
+        # the index of the member that comes before the end of the first member.
+        broken = idaapi.get_prev_member_idx(sptr, first.eoff if first else size) > 0
+
+        # If the offset comes before the end of the first member, then return index 0.
+        if offset < left:
+            return 0
+
+        # If the offset goes past the end of the last member, then we return the
+        # number of members unless the last member has a variable-length size.
+        elif right <= offset:
+            return sptr.memqty - 1 if last and is_variable and last.soff == last.eoff else sptr.memqty
+
+        # Now we'll check to see if there's a member at the specified offset. If
+        # there is, then we can use the broken function. If there wasn't a member
+        # at the requested offset, then get_prev_member_idx should work correctly.
+        mptr = idaapi.get_member(sptr, offset)
+        if broken:
+            return max(0, idaapi.get_prev_member_idx(sptr, mptr.soff if mptr else offset))
+        return max(0, idaapi.get_prev_member_idx(sptr, mptr.eoff) if mptr else idaapi.get_next_member_idx(sptr, offset))
+
+    @classmethod
+    def contains(cls, sptr, offset):
+        '''Return whether the given `offset` is within the boundaries of the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        size, realoffset = idaapi.get_struc_size(sptr), int(offset)
+
+        # If it's a variable-length structure, then we only need to check the
+        # lower bounds. Otherwise, we check the offset against the size.
+        if sptr.props & idaapi.SF_VAR:
+            return 0 <= realoffset
+        return 0 <= realoffset < size
+
+    @classmethod
+    def has_name(cls, sptr, name):
+        '''Return whether a member with the specified `name` exists within the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        string = name if isinstance(name, types.ordered) else [name]
+        return idaapi.get_member_by_name(sptr, utils.string.to(interface.tuplename(*string))) is not None
+
+    @classmethod
+    def has_offset(cls, sptr, offset):
+        '''Return whether a member exists at the `offset` of the structure identified by `sptr`.'''
+        realoffset, sptr = int(offset), idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        is_union, is_variable = union(sptr), True if sptr.props & idaapi.SF_VAR else False
+
+        # First verify that the offset is within the bounds of the structure.
+        if not cls.contains(sptr, realoffset):
+            return False
+
+        # Iterate through all of our members and figure out which one contains us.
+        for index in range(sptr.memqty):
+            mptr = sptr.get_member(index)
+
+            # Unpack the boundaries from the member at the current index.
+            # If it's a union, then the lower bounds should always be 0.
+            mleft, mright, msize = 0 if is_union else mptr.soff, mptr.eoff, idaapi.get_member_size(mptr)
+
+            # If it's a union, then it just needs to overlap with the size.
+            if is_union and 0 <= realoffset < msize:
+                return True
+
+            # If it exists within the boundaries of the member, then we're done.
+            elif mleft <= realoffset < mright:
+                return True
+
+            # Otherwise, if our member has no size and we're using a variable-length structure,
+            # then the offset is always "within" the member as long as it comes afterwards.
+            elif is_variable and mleft == mright and mright == min(mright, realoffset):
+                return True
+            continue
+        return False
+
+    @classmethod
+    def has_bounds(cls, sptr, start, stop):
+        '''Return whether any members exist in the structure identified by `sptr` from the offset `start` to `stop`.'''
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
+        left, right = sorted(map(int, [start, stop]))
+
+        # Check for early termination by confirming if both boundaries come before or after the
+        # structure. If the boundaries are the same, then they also can't contain anything.
+        if all(point < 0 for point in [left, right]) or left == right:
+            return False
+
+        # If both boundaries come after the structure, then the structure isn't containing
+        # them. If it's a variable-length structure, though, then as long the length of
+        # the boundaries are larger than 0, then they overlaps with the last member.
+        elif all(point >= size for point in [left, right]):
+            return True if is_variable and left != right else False
+
+        # Iterate through all of our members and figure out which one contains us.
+        for index in range(sptr.memqty):
+            mptr, opinfo = sptr.get_member(index), idaapi.opinfo_t()
+            retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+
+            # Snag the current member's boundaries. If the structure is
+            # a union, then the left boundary should always start at 0.
+            mleft, mright = 0 if is_union else mptr.soff, mptr.eoff
+            msize, melement = idaapi.get_member_size(mptr), get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None)
+
+            # If it's a union, then we check the boundaries against the size.
+            if is_union and left <= mleft and msize <= right:
+                return True
+
+            # Otherwise, check if the given bounds contains the member's boundaries.
+            elif mleft < mright and left <= mleft and mright <= right:
+                return True
+
+            # If our member has no size and we're using a variable-length structure, then
+            # the bounds cover it as long as it covers at least one member afterwards.
+            elif is_variable and mleft == mright and left <= mleft and mright + melement <= right:
+                return True
+            continue
+        return False
+
+    @classmethod
+    def by_identifier(cls, sptr, identifier):
+        '''Return the member with the given `identifier` belonging to the structure identified by `sptr`.'''
+        sptr = sptr and idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        identifier = identifier if isinstance(identifier, types.integer) else identifier.id
+
+        # We can just ask the API to give us the member for the given identifier.
+        result = idaapi.get_member_by_id(identifier)
+        if not result:
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to locate the member using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(sptr.id) if sptr else None, identifier, identifier))
+
+        # Now we unpack the information that we retrieved. We also sanity check the
+        # sptr to ensure that it is not different from the parameter we were given.
+        mptr, fullname, sptr_ = result
+        if sptr and sptr.id != sptr_.id:
+            this = 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure'
+            that = 'union' if union(sptr_) else 'frame' if frame(sptr_) else 'structure'
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : The member for the specified identifier ({:#x}) is owned by a {:s} ({:#x}) that is different from the requested {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(sptr.id) if sptr else None, identifier, identifier, that, sptr_.id, this, sptr.id))
+
+        # The `idaapi.struc_t` can be racy in some conditions, so we validate the
+        # identifier for the sptr and fetch it again using the full name if it is
+        # necessary. We also check which get_prev_member_idx/get_next_member_idx
+        # we've got since newer versions will actually return 1 for the first member.
+        sptr = sptr_ if not sptr or interface.node.identifier(sptr.id) else idaapi.get_member_struc(utils.string.to(fullname))
+        base = idaapi.get_prev_member_idx(sptr, sptr.members[0].eoff)
+
+        # Now we need to figure out the index for the member. If our structure
+        # is a union, the index is found in the member_t.soff and we can use it.
+        if union(sptr):
+            mindex = mptr.soff
+
+        # Otherwise, we will need to use the member offset to determine the index. For performance
+        # reasons, we ask the disassembler. However, we need to adjust the result by the base index
+        # due to newer versions of the disassembler not returning an index of 0 for the first member.
+        elif sptr.memqty > 2:
+            prev, next = idaapi.get_prev_member_idx(sptr, mptr.eoff), idaapi.get_next_member_idx(sptr, mptr.soff)
+            res = prev if next < 0 else next
+            mindex = res - base
+
+        # Otherwise, there's only one or two members and we can simply check it since
+        # get_member_by_id shouldn't have returned anything if there weren't any members.
+        else:
+            mindex = 0 if mptr.id == sptr.get_member(0).id else 1
+
+        # Before returning our result, we do one final sanity check just in case.
+        if not(0 <= mindex < sptr.memqty) or mptr.id != sptr.get_member(mindex).id:
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({:#x}, {:#x}) : Unable to determine the index ({:d} of {:d}) for the member using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, identifier, mindex, sptr.memqty, identifier))
+        return sptr, mindex, mptr
+
+    @classmethod
+    def by_index(cls, sptr, index):
+        '''Return the member at the specified `index` of the structure identified by `sptr`.'''
+        if not(0 <= index < sptr.memqty):
+            is_union, sid = union(sptr), sptr.id if isinstance(sptr, idaapi.struc_t) else sptr
+            raise E.MemberNotFoundError(u"{:s}.by_index({:#x}, {:d}) : Unable to find a member at the specified index ({:d}) of the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, index, index, 'union' if is_union else 'frame' if frame(sptr) else 'structure', sid))
+
+        mptr = sptr.get_member(index)
+        return sptr, index, mptr
+
+    @classmethod
+    def by_name(cls, sptr, name):
+        '''Return the member with the given `name` belonging to the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        string = name if isinstance(name, types.ordered) else [name]
+        packed_string = interface.tuplename(*string)
+        mptr = idaapi.get_member_by_name(sptr, utils.string.to(packed_string))
+        if not mptr:
+            raise E.MemberNotFoundError(u"{:s}.by_name({:#x}, {!r}) : Unable to locate a member with the specified name \"{:s}\" for the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, name, utils.string.escape(packed_string, '"'), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+        return cls.by_identifier(sptr, mptr.id)
+
+    @classmethod
+    def by_fullname(cls, name):
+        '''Return the member with the given full `name` which is composed of both the structure and member names.'''
+        string = name if isinstance(name, types.ordered) else [name]
+        packed_string = interface.tuplename(*string)
+        packed = idaapi.get_member_by_fullname(utils.string.to(packed_string))
+        if not packed:
+            raise E.MemberNotFoundError(u"{:s}.by_fullname({!r}) : Unable to locate a member with the specified name \"{:s}\".".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(packed_string, '"')))
+        mptr, sptr = packed
+        return cls.by_identifier(sptr, mptr.id)
+
+    @classmethod
+    def at_offset(cls, sptr, offset):
+        '''Yield the members at the specified `offset` of the structure or union identified by `sptr`.'''
+        realoffset, sptr = int(offset), idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
+
+        # First verify that our structure can actually contain the offset and bail if it can't.
+        if not cls.contains(sptr, realoffset):
+            return
+
+        # If it's not a variable-length structure or union, then we can simply
+        # trust the API since there'll only be one member at any given offset.
+        elif not any([is_union, is_variable]):
+            mptr = idaapi.get_member(sptr, realoffset)
+            if mptr:
+                yield cls.by_identifier(sptr, mptr)
+            return
+
+        # If it's a variable-length structure, then we should be able to just clamp
+        # the offset by the size and trust the API. To be sure, we sanity-check the
+        # member boundaries if the offset is larger or equal to the structure size.
+        elif is_variable and not is_union:
+            mptr = idaapi.get_member(sptr, min(size, realoffset))
+
+            # This is just a passthrough that checks the offset is within the member's bounds.
+            if any([realoffset < size, size <= realoffset and mptr and mptr.soff == mptr.eoff]):
+                pass
+
+            # If the offset is larger than the structure and there wasn't a member
+            # or it has a size, then we log a warning about it as a sanity-check.
+            elif size <= realoffset:
+                description = "instead of member ({:#x}) of size {:+#x}".format(mptr.id, mptr.eoff - mptr.soff) if mptr else ''
+                logging.warning(u"{:s}.at_offset({:+#x}, {:s}) : Expected a non-sized member{:s} at the requested offset ({:+#x}) for the variable-length structure ({:#x}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, "{:#x}".format(offset) if isinstance(offset, types.integer) else "{!s}".format(offset), " {:s}".format(description) if description else '', realoffset, sptr.id, size))
+
+            # At this point, we trust the API and return the member if one was found.
+            if mptr:
+                yield cls.by_identifier(sptr, mptr)
+            return
+
+        # If both flags are set, then technically we should raise an error as they're supposed to be
+        # mutally-exclusive. Despite this, this should actually be possible and just wasn't implemented.
+        elif all([is_union, is_variable]):
+            logging.warning(u"{:s}.at_offset({:+#x}, {:s}) : Disassembler returned a union ({:#x}) with properties ({:#x}) and size (+{:#x}) that is also a variable-length structure.".format('.'.join([__name__, cls.__name__]), sptr.id, "{:#x}".format(offset) if isinstance(offset, types.integer) else "{!s}".format(offset), sptr.id, sptr.props, size))
+
+        # Now we can iterate through the union from the very first index. We filter
+        # each member by its bounds and then we discard anything that doesn't match.
+        for packed in cls.iterate(sptr):
+            sptr, index, mptr = packed
+            msize = idaapi.get_member_size(mptr)
+
+            # If the requested offset is within the boundaries of our union member,
+            # then we're good and this matches what we were looking for.
+            if 0 <= realoffset < msize:
+                yield packed
+
+            # This should never happen.. but in case it does, we check the offset
+            # against the end of the variable-length member and then yield it.
+            elif is_variable and mptr.eoff <= min(mptr.eoff, realoffset):
+                yield packed
+            continue
+        return
+
+    @classmethod
+    def at_bounds(cls, sptr, start, stop):
+        '''Yield the members from the offset `start` to `stop` within the structure or union identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
+        left, right = sorted(map(int, [start, stop]))
+
+        # If the boundaries are the same, then we can immediately bail because of it
+        # being impossible for anything to exist within a 0-length segment.
+        if left == right:
+            return
+
+        # If it's a union, then we capture the members and sort them by size. This way we
+        # can filter them and support returning them in reverse order if we were asked to.
+        elif is_union:
+            members, direction = {}, +1 if start <= stop else -1
+            for packed in cls.iterate(sptr):
+                _, _, mptr = packed
+                msize = idaapi.get_member_size(mptr)
+                members.setdefault(msize, []).append(packed)
+
+            # Now that we've collected them with their sizes, we can traverse them in
+            # order and exclude the members that are not within the requested boundaries.
+            for msize in sorted(members)[::direction]:
+                ordered = members[msize][::direction]
+
+                # If it's not a variable-length member, then we only need to
+                # check its boundaries to determine if it should be skipped.
+                if not is_variable and not(left <= 0 and msize <= right):
+                    continue
+
+                # If the member is variable length, and the boundaries do not
+                # encompass the entire member, then we can go ahead and skip it.
+                elif is_variable and not(left <= 0 and mptr.eoff <= min(mptr.eoff, right)):
+                    continue
+
+                # Now we just have to yield each member (in the correct order).
+                for packed in ordered:
+                    yield packed
+                continue
+            return
+
+        # First we need to know what indices are used to represent each member
+        # within the given boundaries. This way we can create a slice for iteration.
+        lindex = cls.index_before(sptr, left) if left >= 0 else None
+        rindex = cls.index_after(sptr, right) if start <= stop else cls.index_before(sptr, right)
+        ordering = slice(lindex, rindex, +1) if start <= stop else slice(rindex, lindex - 1 if lindex else None, -1)
+
+        # Iterate through all of the members and check their boundaries one-by-one.
+        # We also need to calculate the member size differently if the member is
+        # variable-length'd in order to determine whether it should be included.
+        for packed in cls.iterate(sptr, ordering):
+            sptr, index, mptr = packed
+            mleft, mright, msize = mptr.soff, mptr.eoff, idaapi.get_data_elsize(mptr.id, mptr.flag) if is_variable and mptr.soff == mptr.eoff else idaapi.get_member_size(mptr)
+
+            if is_variable and mleft == mright and right >= mright + msize:
+                yield packed
+
+            elif mright > mleft and left <= mleft and right >= mright:
+                yield packed
+            continue
+        return
+
+    @classmethod
+    def overlaps(cls, sptr, start, stop):
+        '''Yield the members belong to the structure or union identified by `sptr` that overlap the given offset from `start` to `stop`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        size, is_union, is_variable = idaapi.get_struc_size(sptr), union(sptr), True if sptr.props & idaapi.SF_VAR else False
+        left, right = sorted(map(int, [start, stop]))
+
+        # If the boundares are not different from one another, then technically
+        # they're a zero-sized segment and are unable to overlap with anything.
+        if left == right:
+            return
+
+        # If it's a union, then we need to order the members so that we can determine
+        # which direction to process them in and yield them in reverse if desired.
+        elif is_union:
+            members, direction = {}, +1 if start <= stop else -1
+            for packed in cls.iterate(sptr):
+                _, _, mptr = packed
+                msize = idaapi.get_member_size(mptr)
+                members.setdefault(msize, []).append(packed)
+
+            # Now we can sort the members by their size, traverse them and
+            # exclude any of the members that aren't overlapping our segment.
+            for msize in sorted(members)[::direction]:
+                ordered = members[msize][::direction]
+
+                # Although this condition should be impossible, if nothing
+                # exists past the union member then this doesn't overlap.
+                if is_variable and not(msize <= left):
+                    continue
+
+                # If nothing overlaps the boundaries of the member, skip it.
+                elif not(left < msize and right > 0):
+                    continue
+
+                # Traverse the members we collected in the correct order.
+                for packed in members[msize][::direction]:
+                    yield packed
+                continue
+            return
+
+        # We can reduce the number of members that we'll need to iterate through
+        # if we know which indices to use so that we can build a slice. This has
+        # the added benefit of yielding elements in the same order as was requested.
+        lindex = cls.index_before(sptr, left) if left >= 0 else None
+        rindex = cls.index_after(sptr, right) if start <= stop else cls.index_before(sptr, right)
+        ordering = slice(lindex, rindex, +1) if start <= stop else slice(rindex, lindex - 1 if lindex else None, -1)
+
+        # This is a little different than at_bounds in that we don't really need to calculate the
+        # member size correctly since we're only trying to find an intersection with the member.
+        for packed in cls.iterate(sptr, ordering):
+            _, _, mptr = packed
+            mleft, mright = mptr.soff, mptr.eoff
+
+            if is_variable and mptr.soff == mptr.eoff and min(left, mright) <= mright and min(right, mright + 1) > mleft:
+                yield packed
+
+            elif left < mright and right > mleft:
+                yield packed
+            continue
+        return
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
