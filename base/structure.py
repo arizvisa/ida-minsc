@@ -272,7 +272,7 @@ def by_name(name, *suffix, **offset):
     # try and find the structure id according to its name
     id = idaapi.get_struc_id(res)
     if id == idaapi.BADADDR:
-        raise E.StructureNotFoundError(u"{:s}.by_name(\"{:s}\"{:s}) : Unable to locate structure with given name.".format(__name__, utils.string.escape(res, '"'), u", {:s}".format(utils.string.kwargs(offset)) if offset else ''))
+        raise E.StructureNotFoundError(u"{:s}.by_name(\"{:s}\"{:s}) : Unable to locate a structure with the specified name.".format(__name__, utils.string.escape(res, '"'), u", {:s}".format(utils.string.kwargs(offset)) if offset else ''))
 
     # grab an instance of the structure by its id that we found
     return internal.structure.new(id, offset.get('offset', 0))
@@ -280,17 +280,18 @@ byname = utils.alias(by_name)
 
 def by_index(index, **offset):
     '''Return an instance of a structure by its index.'''
-    id = idaapi.get_struc_by_idx(index)
-    if id == idaapi.BADADDR:
-        raise E.StructureNotFoundError(u"{:s}.by_index({:d}{:s}) : Unable to locate structure at given index.".format(__name__, index, u", {:s}".format(utils.string.kwargs(offset)) if offset else ''))
-
-    # grab an instance of the structure by the id we found
-    return internal.structure.new(id, offset.get('offset', 0))
+    sptr = internal.structure.by_index(index)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.by_index({:d}{:s}) : Unable to locate a structure with the specified index ({:#x}).".format(__name__, index, u", {:s}".format(utils.string.kwargs(offset)) if offset else '', index))
+    return internal.structure.new(sptr.id, offset.get('offset', 0))
 byindex = utils.alias(by_index)
 
 def by_identifier(identifier, **offset):
     '''Return an instance of the structure identified by `identifier`.'''
-    return internal.structure.new(identifier, offset.get('offset', 0))
+    sptr = internal.structure.by_index(identifier)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.by_identifier({:#x}{:s}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, identifier, u", {:s}".format(utils.string.kwargs(offset)) if offset else '', identifier))
+    return internal.structure.new(sptr.id, offset.get('offset', 0))
 
 by_id = byidentifier = byId = utils.alias(by_identifier)
 
@@ -513,9 +514,11 @@ def by(**type):
 
 @utils.multicase(id=types.integer)
 def name(id):
-    '''Return the name of the structure identified by `id`.'''
-    res = idaapi.get_struc_name(id)
-    return utils.string.of(res)
+    '''Return the name of the structure with the specified `id`.'''
+    sptr = internal.structure.by_index(id)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.name({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+    return utils.string.of(idaapi.get_struc_name(sptr.id))
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def name(structure):
     '''Return the name of the given `structure`.'''
@@ -533,11 +536,14 @@ def name(id, string, *suffix):
     # validate the name
     res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
     if ida_string and ida_string != res:
-        logging.info(u"{:s}.name({!r}, {!r}) : Stripping invalid chars from the structure name \"{:s}\" resulted in \"{:s}\".".format(__name__, id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+        logging.info(u"{:s}.name({:d}, {!r}) : Stripping invalid chars from the structure name \"{:s}\" resulted in \"{:s}\".".format(__name__, id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
         ida_string = res
 
     # now we can set the name of the structure
-    return idaapi.set_struc_name(id, ida_string)
+    sptr = internal.structure.by_index(id)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.name({:#x}, {!r}) : Unable to locate structure with the specified identifier ({:#x}).".format(__name__, id, string, id))
+    return idaapi.set_struc_name(sptr.id, ida_string)
 @utils.multicase(structure=(idaapi.struc_t, structure_t), string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(structure, string, *suffix):
@@ -561,30 +567,35 @@ def comment(id, **repeatable):
 
     If the bool `repeatable` is specified, return the repeatable comment.
     """
-    res = idaapi.get_struc_cmt(id, repeatable.get('repeatable', True))
+    sptr = internal.structure.by_index(id)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.comment({:#x}{:s}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, id, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', id))
+    res = idaapi.get_struc_cmt(sptr.id, repeatable.get('repeatable', True))
     return utils.string.of(res)
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def comment(structure, **repeatable):
     '''Return the comment for the specified `structure`.'''
     return comment(structure.id, **repeatable)
-@utils.multicase(structure=(idaapi.struc_t, structure_t), cmt=types.string)
-@utils.string.decorate_arguments('cmt')
-def comment(structure, cmt, **repeatable):
-    '''Set the comment to `cmt` for the specified `structure`.'''
-    return comment(structure.id, cmt, **repeatable)
+@utils.multicase(structure=(idaapi.struc_t, structure_t), string=types.string)
+@utils.string.decorate_arguments('string')
+def comment(structure, string, **repeatable):
+    '''Set the comment for the specified `structure` to `string`.'''
+    return comment(structure.id, string, **repeatable)
 @utils.multicase(structure=(idaapi.struc_t, structure_t), none=types.none)
 def comment(structure, none, **repeatable):
     '''Remove the comment from the specified `structure`.'''
     return comment(structure.id, none or '', **repeatable)
-@utils.multicase(id=types.integer, cmt=types.string)
-@utils.string.decorate_arguments('cmt')
-def comment(id, cmt, **repeatable):
-    """Set the comment of the structure identified by `id` to `cmt`.
+@utils.multicase(id=types.integer, string=types.string)
+@utils.string.decorate_arguments('string')
+def comment(id, string, **repeatable):
+    """Set the comment of the structure identified by `id` to the specified `string`.
 
     If the bool `repeatable` is specified, set the repeatable comment.
     """
-    res = utils.string.to(cmt)
-    return idaapi.set_struc_cmt(id, res, repeatable.get('repeatable', True))
+    sptr = internal.structure.by_index(id)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.comment({:#x}, {!r}, {:s}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, id, string, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', id))
+    return idaapi.set_struc_cmt(sptr.id, utils.string.to(string), repeatable.get('repeatable', True))
 @utils.multicase(id=types.integer, none=types.none)
 def comment(id, none, **repeatable):
     '''Remove the comment from the structure identified by `id`.'''
@@ -603,7 +614,10 @@ def comment(tinfo, cmt, **repeatable):
 @utils.multicase(id=types.integer)
 def index(id):
     '''Return the position of the structure identified by `id`.'''
-    return idaapi.get_struc_idx(id)
+    sptr = internal.structure.by_index(id)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.index({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+    return idaapi.get_struc_idx(sptr.id)
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def index(structure):
     '''Return the position of the specified `structure`.'''
@@ -611,7 +625,10 @@ def index(structure):
 @utils.multicase(id=types.integer, position=types.integer)
 def index(id, position):
     '''Move the structure identified by `id` to the specified `position` of the structure list.'''
-    return idaapi.set_struc_idx(id, position)
+    sptr = internal.structure.by_index(id)
+    if not sptr:
+        raise E.StructureNotFoundError(u"{:s}.index({:#x}, {:d}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, id, position, id))
+    return idaapi.set_struc_idx(sptr, position)
 @utils.multicase(structure=(idaapi.struc_t, structure_t), position=types.integer)
 def index(structure, position):
     '''Move the specified `structure` to the specified `position` of the structure list.'''
@@ -627,14 +644,12 @@ def index(tinfo, position):
     structure = by(tinfo)
     return index(structure.ptr, position)
 
-@utils.multicase(structure=(idaapi.struc_t, structure_t, types.integer))
+@utils.multicase(structure=(idaapi.struc_t, structure_t))
 def size(structure):
     '''Return the size of the specified `structure`.'''
-    res = structure.id if isinstance(structure, (idaapi.struc_t, structure_t)) else structure
-    id = res if interface.node.identifier(res) else idaapi.get_struc_by_idx(res)
-    if id == idaapi.BADADDR:
-        number, description = ("{:#x}".format(res), 'with the given identifier') if isinstance(structure, (idaapi.struc_t, structure_t)) else ("{:d}".format(res), 'at the specified index')
-        raise E.StructureNotFoundError(u"{:s}.size({:s}) : Unable to locate the structure {:s} ({:s}).".format(__name__, number, description, number))
+    id = structure.id
+    if not interface.node.identifier(id):
+        raise E.StructureNotFoundError(u"{:s}.size({:#x}) : Unable to locate the structure with the specified identifier ({:#x}).".format(__name__, id, id))
     return idaapi.get_struc_size(id)
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
@@ -647,6 +662,14 @@ def size(name, *suffix):
         description = (("{:#x}".format(item) if isinstance(item, types.integer) else "{!r}".format(item)) for item in suffix)
         raise E.StructureNotFoundError(u"{:s}.size({!r}) : Unable to locate a structure with the name \"{:s}\".".format(__name__, name, ", {:s}".format(', '.join(description)) if suffix else '', utils.string.escape(res, '"')))
     return idaapi.get_struc_size(id)
+@utils.multicase(index=types.integer)
+def size(index):
+    '''Return the size of the structure at the specified `index`.'''
+    sptr = internal.structure.by_index(index)
+    if not sptr:
+        number, description = ("{:#x}".format(index), 'with the given identifier') if interface.node.identifier(index) else ("{:d}".format(index), 'at the specified index')
+        raise E.StructureNotFoundError(u"{:s}.size({:s}) : Unable to locate a structure {:s} ({:s}).".format(__name__, number, description, number))
+    return idaapi.get_struc_size(sptr.id)
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def size(tinfo):
     '''Return the size of the structure represented by `tinfo`.'''
@@ -859,10 +882,10 @@ def remove(tinfo):
     return remove(structure.ptr)
 @utils.multicase(id=types.integer)
 def remove(id):
-    '''Remove a structure by its index or `id`.'''
-    sptr = idaapi.get_struc(id)
+    '''Remove the structure at the specified index or `id` from the database.'''
+    sptr = internal.structure.by_index(id)
     if not sptr:
-        raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to find a structure with the specified identifier ({:#x}).".format(__name__, id, id))
+        raise E.StructureNotFoundError(u"{:s}.remove({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, id, id))
     return remove(sptr)
 @utils.multicase()
 def remove(**type):
