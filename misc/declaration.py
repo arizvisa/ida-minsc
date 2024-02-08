@@ -1538,6 +1538,24 @@ class mangled(object):
         'operator&=':           'band_assign',
         'operator|=':           'bor_assign',
         'operator^=':           'bxor_assign',
+
+        # XXX: IDA's demangler seems to swap the operator symbols around, so
+        #      we include both in case they decide to fix it or leave it as-is.
+        'operator=!':           'notequal',
+        'operator=<':           'lessequal',
+        'operator=>':           'greaterequal',
+
+        'operator=+':           'add_assign',
+        'operator=-':           'subtract_assign',
+        'operator=*':           'multiply_assign',
+        'operator=/':           'divide_assign',
+        'operator=%':           'remainer_assign',
+        'operator=<<':          'shiftleft_assign',
+        'operator=>>':          'shiftright_assign',
+
+        'operator=&':           'band_assign',
+        'operator=|':           'bor_assign',
+        'operator=^':           'bxor_assign',
     }
 
     # These flags seem to be required on earlier versions of the disassembler.
