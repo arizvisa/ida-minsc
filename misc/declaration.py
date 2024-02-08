@@ -1735,6 +1735,10 @@ class function(mangled):
         index = result if result >= 0 else len(just_name)
         just_space = just_name[index:]
 
+        # If we cleanly extracted the operator and it's in our dictionary of known
+        # operators, then save its transformation so that we can replace it later.
+        clean_operator = self._declaration_operators.get(just_operator, '')
+
         # Now we need to do some special-case checks for the single-quote meanings, operator
         # double-meaning for "<" or ">", operators with spaces, anything with expected errors.
         single_quote, double_quote = just_name.endswith("''"), just_operator.startswith('operator"" ')
@@ -1763,6 +1767,13 @@ class function(mangled):
         elif qualified_with_spaces:
             kwargs['Ftransform'] = functools.partial(self.__clean_qualified_operator, len(just_operator))
 
+        # If we were able to extract the operator cleanly, then we can just
+        # replace it. If we don't have a match, then it's definitely typed.
+        elif clean_operator:
+            kwargs['Ftransform'] = functools.partial(self.__clean_replacement, just_operator, "operator_{:s}".format(clean_operator))
+        elif just_operator:
+            pass    # FIXME: this should probably be implemented at some point.
+
         # That should be all of the special cases, so now we just
         # need to decode the mangled symbol and parse it.
         decoded, order, tree, errors = self.__init_mangled__(mangled, self.__flags, **kwargs)
@@ -1786,7 +1797,7 @@ class function(mangled):
             logging.warning(u"{:s}(\"{:s}\") : Unable to parse the mangled string \"{:s}\" after it was decoded to \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), utils.string.escape(mangled, '"'), utils.string.escape(decoded, '"')))
 
         # If we already figured out what operator it is, then store that too.
-        self.__operator = just_operator if double_quote or expected_operators or qualified_with_spaces else ''
+        self.__operator = just_operator if double_quote or expected_operators or qualified_with_spaces or clean_operator else ''
 
         # Identify any duplicate segments in case we need to translate this string.
         self.__duplicates__ = {} if errors else token.duplicates(decoded, order)
@@ -1894,6 +1905,11 @@ class function(mangled):
         # easier to transform the entire operator with braces and eat the cost later.
         type = string[left + len(keyword) + 1 : left + operator_length]
         return string[:left] + "operator{{{:s}}}".format(type) + string[left + operator_length:]
+
+    def __clean_replacement(self, keyword, replacement, string):
+        '''Return a transformed `string` with the specifed `keyword` substituted by `replacement`.'''
+        point = string.rindex(keyword)
+        return string[:point] + replacement + string[point + len(keyword):]
 
     @property
     def __prototype_components(self):
