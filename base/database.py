@@ -1449,6 +1449,7 @@ def go(ea):
         ea = search.by_name(None, ea)
     idaapi.jumpto(interface.address.inside(ea))
     return ea
+jump = jump_to = jumpto = utils.alias(go)
 
 def go_offset(offset):
     '''Jump to the specified `offset` within the database.'''
