@@ -1686,7 +1686,7 @@ class function(mangled):
         getattr(idaapi, 'MNG_SHORT_S', 0x00100000),     # signed int -> sint
         getattr(idaapi, 'MNG_SHORT_U', 0x00200000),     # unsigned int -> uint
 
-        getattr(idaapi, 'MNG_NOECSU', 0x00002000),      # class/struct/union/enum
+        #getattr(idaapi, 'MNG_NOECSU', 0x00002000),     # class/struct/union/enum : decided to keep this.
         #getattr(idaapi, 'MNG_NOSTVIR', 0x00001000),    # static/virtual : decided to keep this.
         getattr(idaapi, 'MNG_NOTHROW', 0x00000800),
         getattr(idaapi, 'MNG_NOPOSTFC', 0x00000200),    # const suffix
