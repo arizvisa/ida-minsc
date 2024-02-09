@@ -1591,7 +1591,11 @@ class mangled(object):
     def __init_mangled__(self, symbol, mask, Ftransform=None):
         '''Initialize an object for the mangled `symbol` using the flags specified by `mask`.'''
         self.__encoded = encoded = symbol
-        decoded = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.__extract_specifiers(self.__extract_scope(self.decode(encoded, self.__required_flags | mask)))
+        attempt = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.decode(encoded, self.__required_flags | mask)
+        if not attempt:
+            cls = self.__class__
+            raise internal.exceptions.DisassemblerError(u"{:s}(\"{:s}\", {:#x}{:s}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(symbol, '"'), mask, '' if Ftransform is None else utils.string.kwargs({'Ftransform': Ftransform}), self.type(symbol)))
+        decoded = self.__extract_specifiers(self.__extract_scope(attempt))
         transformed = Ftransform(decoded) if Ftransform else decoded
         self.__decoded = transformed
         self.tokens = tokens = self.tokens[:] if hasattr(self, 'tokens') else []
@@ -1847,6 +1851,9 @@ class function(mangled):
     def __init__guess_name(self, mangled, flags):
         '''Attempt to guess the function name from the decoded string specified by `mangled`.'''
         decoded = self.decode(mangled, flags)
+        if not decoded:
+            cls = self.__class__
+            raise internal.exceptions.DisassemblerError(u"{:s}(\"{:s}\", {:#x}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), flags, self.type(mangled)))
 
         # We pre-parse all of the tokens, just so we can pass the tree directly
         # to extract.prototype and assume that it correctly figured out the name.
