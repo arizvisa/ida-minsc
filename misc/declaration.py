@@ -1756,7 +1756,7 @@ class function(mangled):
 
         # Figure out the default flags that are needed to demangle just the name. Some
         # compilers chosen by the disassembler will return None wihout the correct flags.
-        MNG_IGN_JMP, MNG_NODEFINIT = (getattr(idaapi, attribute, default) for attribute, default in [('MNG_IGN_JMP', 0x04000000), ('MNG_NODEFINIT', 0x00000008)])
+        MNG_IGN_JMP, MNG_NODEFINIT, MNG_NOECSU = (getattr(idaapi, attribute, default) for attribute, default in [('MNG_IGN_JMP', 0x04000000), ('MNG_NODEFINIT', 0x00000008), ('MNG_NOECSU', 0x00002000)])
         name_flags = functools.reduce(operator.or_, [MNG_IGN_JMP, MNG_NODEFINIT], self.__flags & 0x00F00000)
 
         # First we need to do a "test" demangle to determine if the "'" token has two
@@ -1804,7 +1804,9 @@ class function(mangled):
             kwargs['Ftransform'] = functools.partial(self.__clean_unbalanced, len(just_operator), expected_operators)
         elif null_parameters:
             kwargs['Ftransform'] = functools.partial(self.__clean_parameters, just_name[1 + just_name.rfind(' '):])
-        elif qualified_with_spaces:
+        elif qualified_with_spaces and not(self.__flags & MNG_NOECSU):
+            kwargs['Ftransform'] = functools.partial(self.__guess_qualified_operator, just_operator)
+        elif qualified_with_spaces and self.__flags & MNG_NOECSU:
             kwargs['Ftransform'] = functools.partial(self.__clean_qualified_operator, len(just_operator))
 
         # If we were able to extract the operator cleanly, then we can just
@@ -1945,6 +1947,28 @@ class function(mangled):
         # easier to transform the entire operator with braces and eat the cost later.
         type = string[left + len(keyword) + 1 : left + operator_length]
         return string[:left] + "operator{{{:s}}}".format(type) + string[left + operator_length:]
+
+    def __guess_qualified_operator(self, operator_name, string):
+        keyword = 'operator'
+        start = string.rindex(keyword)
+        assert(start >= 0), string
+        assert(string[max(0, start - 1) : start + len(keyword)] in {':operator', ' operator', 'operator'}), string
+
+        # FIXME: This is pretty inefficient since we're doing this twice, and we
+        #        essentially repeat the exact same logic later for a third time.
+        height, _, errors = token.parse(operator_name, self.tokens)
+        assert(not(errors)), operator_name
+        count = sum(1 for index, segment in height if index == 0)
+
+        height, _, errors = token.parse(string, self.tokens)
+        assert(not(errors)), string
+        filtered_heights = [segment for index, segment in height if index == 0]
+        point, right = filtered_heights.pop()
+        parameters = string[point : right]
+        assert(parameters[:1] + parameters[-1:] in {'()'}), string
+
+        target = string[start + len(keyword) + 1 : point]
+        return string[:start] + "operator{{{:s}}}".format(target) + string[point:]
 
     def __clean_replacement(self, keyword, replacement, string):
         '''Return a transformed `string` with the specifed `keyword` substituted by `replacement`.'''
