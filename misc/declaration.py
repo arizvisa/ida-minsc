@@ -440,6 +440,28 @@ class extract(object):
         return declaration, name_segment
 
     @classmethod
+    def keyword(cls, string, range, segments, delimiters={' '}, keywords={'class', 'struct', 'union', 'enum'}):
+        '''Use the given `string` with `range` and `segments` to return a tuple with the requested `keywords` prior to `delimiters` and the resulting selection.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+
+        # scan for the very first delimiter and grab its index.
+        iterable = (index for index, (left, right) in enumerate(segments) if string[left : right] in delimiters)
+        index = next(iterable, len(segments))
+
+        # use the index of the delimiter to check if we start with a valid
+        # keyword. if we found one, then we need to strip it from the selection.
+        point, _ = segments[index] if index < len(segments) else (start, start)
+        candidate = string[start : point]
+        if candidate in keywords:
+            _, point = segments[index] if index < len(segments) else (stop, stop)
+            result = (point, stop), segments[index + 1:]
+            return candidate, result
+
+        # otherwise we just return exactly what we were given.
+        selection = (start, stop), segments
+        return '', selection
+
+    @classmethod
     def beginning(cls, string, range, segments, delimiters={' ', '*', '&'}):
         '''Use the given `string` with `range` and `segments` to return a tuple containing the selections before and after the first instance of any `delimiters`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
