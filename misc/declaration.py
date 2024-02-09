@@ -2332,6 +2332,7 @@ class function_pointer_with_qualifiers(selection):
 
 class declaration_with_qualifiers(selection):
     ignored = {' '}
+    __modifiers__ = {'class', 'struct', 'union', 'enum', 'signed', 'unsigned'}
 
     @property
     def declaration(self):
@@ -2340,9 +2341,15 @@ class declaration_with_qualifiers(selection):
 
     @property
     def name(self):
-        declaration_untrimmed, _ = extract.qualifiers(self.__string__, *self.__selection__)
+        _, without_keyword = extract.keyword(self.__string__, *self.__selection__, keywords=self.__modifiers__)
+        declaration_untrimmed, _ = extract.qualifiers(self.__string__, *without_keyword)
         declaration_trimmed = extract.trimmed(self.__string__, *declaration_untrimmed)
         return self.select(fullname, declaration_trimmed)
+
+    @property
+    def modifier(self):
+        keyword, _ = extract.keyword(self.__string__, *self.__selection__, keywords=self.__modifiers__)
+        return keyword
 
     @property
     def qualifiers(self):
