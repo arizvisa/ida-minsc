@@ -2330,6 +2330,10 @@ class function_pointer_with_qualifiers(selection):
         self.__cache_convention = convention, tree.get(start, [])
 
     @property
+    def __correct_selection_for_missing_convention(self):
+        (start, stop), segments = self.__selection__
+
+    @property
     def declaration(self):
         decl, _ = extract.qualifiers(self.__string__, *self.__selection__)
         (start, stop), _ = decl
@@ -2337,7 +2341,20 @@ class function_pointer_with_qualifiers(selection):
 
     @property
     def result(self):
+        (left, right), iterable = self.__cache_convention
         result, _, _ = self.__cache
+        if left < right:
+            return self.select(qualified_declaration_or_function_pointer, result)
+
+        (left, right), segments = self.__selection__
+        point, _ = segments[-1]
+        if self.__string__[:point].endswith(' '):
+            result, _ = extract.ending(self.__string__, (left, point), segments[:-1])
+            return self.select(qualified_declaration_or_function_pointer, extract.trimmed(self.__string__, *result))
+
+        result_untrimmed, _ = extract.ending(self.__string__, *result)
+        (left, right), _ = result_untrimmed
+        result = extract.trimmed(self.__string__, *result if left == right else result_untrimmed)
         return self.select(qualified_declaration_or_function_pointer, result)
 
     @property
@@ -2347,19 +2364,31 @@ class function_pointer_with_qualifiers(selection):
 
     @property
     def convention(self):
-        convention, _, _ = extract.function_pointer_convention(self.__string__, *self.__cache_convention)
-        left, right = convention
+        (left, right), _ = self.__cache_convention
+        if left < right:
+            convention, _, _ = extract.function_pointer_convention(self.__string__, *self.__cache_convention)
+            left, right = convention
         return self.__string__[left : right]
 
     @property
     def qualifiers(self):
-        _, symbols, _ = extract.function_pointer_convention(self.__string__, *self.__cache_convention)
+        (left, right), iterable = self.__cache_convention
+        if left < right:
+            _, symbols, _ = extract.function_pointer_convention(self.__string__, *self.__cache_convention)
+        else:
+            symbols = []
         iterable = (self.__string__[left : right] for left, right in symbols)
         return [string for string in iterable if string not in self.ignored]
 
     @property
     def name(self):
-        _, _, name = extract.function_pointer_convention(self.__string__, *self.__cache_convention)
+        (left, right), iterable = self.__cache_convention
+        if left < right:
+            _, _, name = extract.function_pointer_convention(self.__string__, *self.__cache_convention)
+        else:
+            (left, right), segments = self.__selection__
+            point, _ = segments[-1]
+            _, name = extract.ending(self.__string__, (left, point), segments[:-1])
         return self.select(fullname, name)
 
 class declaration_with_qualifiers(selection):
