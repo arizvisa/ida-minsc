@@ -2398,6 +2398,12 @@ class declaration_with_qualifiers(selection):
     ignored = {' '}
     __modifiers__ = {'class', 'struct', 'union', 'enum', 'signed', 'unsigned'}
 
+    def __init__(self, tree, string, range, segments):
+        super(declaration_with_qualifiers, self).__init__(tree, string, range, segments)
+        start, stop = range
+        token = string[start : stop]
+        self.__with_index = segments[-1] if segments and token[-1:] in ']' else (stop, stop)
+
     @property
     def declaration(self):
         (start, stop), _ = self.__selection__
@@ -2405,8 +2411,8 @@ class declaration_with_qualifiers(selection):
 
     @property
     def name(self):
-        _, without_keyword = extract.keyword(self.__string__, *self.__selection__, keywords=self.__modifiers__)
-        declaration_untrimmed, _ = extract.qualifiers(self.__string__, *without_keyword)
+        _, without_keyword = extract.keyword(self.__string__, *self.__correct_selection_for_array, keywords=self.__modifiers__)
+        declaration_untrimmed, _ = extract.qualifiers(self.__string__, *without_keyword, qualifiers=self.__qualifiers__)
         declaration_trimmed = extract.trimmed(self.__string__, *declaration_untrimmed)
         return self.select(fullname, declaration_trimmed)
 
@@ -2416,8 +2422,21 @@ class declaration_with_qualifiers(selection):
         return keyword
 
     @property
+    def array(self):
+        _, segments = self.__selection__
+        left, right = self.__with_index
+        return self.descend(bracket_parameters, (left, right))
+
+    @property
+    def __correct_selection_for_array(self):
+        left, right = self.__with_index
+        (start, stop), segments = self.__selection__
+        return ((start, left), segments[:-1]) if left < right else ((start, stop), segments)
+
+    __qualifiers__ = {'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '(&)'}
+    @property
     def qualifiers(self):
-        _, quals = extract.qualifiers(self.__string__, *self.__selection__)
+        _, quals = extract.qualifiers(self.__string__, *self.__correct_selection_for_array, qualifiers=self.__qualifiers__)
         iterable = (self.__string__[left : right] for left, right in token.segments(*quals))
         return [string for string in iterable if string not in self.ignored]
 
