@@ -297,6 +297,27 @@ class extract(object):
         return
 
     @classmethod
+    def elements(cls, string, range, segments, pairs={'[]'}):
+        '''Yield each segment from a `string` selected bv the provided `range` and `segments` that is aligned contiguously and cuddled by any of the specified `pairs`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        iterable = ((1 + index, string[left : right]) for index, (left, right) in enumerate(segments[::-1]))
+        filtered = (rindex for rindex, item in iterable if item[:+1] + item[-1:] in pairs)
+
+        # Loop through filtered while each segment is contiguous to the previous one.
+        count, rindex, point = 0, next(filtered, 0), stop
+        left, right = segments[-rindex] if rindex else (stop, stop)
+        while rindex and point == right:
+            point, count = left, count + 1
+            rindex = next(filtered, 0)
+            left, right = segments[-rindex] if rindex else (start, start)
+
+        # Now we should have a count that we can use to yield each segment.
+        selected = segments[-count:] if count else []
+        for left, right in selected:
+            yield left, right
+        return
+
+    @classmethod
     def prototype(cls, tree, string, range=None):
         '''Use the given `tree` with `range` on the prototype in `string` to return a tuple containing the result type with convention, name, segment for parameters, and list of segments for qualifiers.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
