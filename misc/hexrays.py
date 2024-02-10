@@ -638,3 +638,129 @@ class variables(object):
         # completely new (and hopefully safe) instance of lvar_locator_t.
         lvar = reference if isinstance(reference, ida_hexrays_types.lvar_t) else reference.getv()
         return cls.new_locator(lvar.defea, lvar.location)
+
+class function(object):
+    """
+    This namespace contains tools for a function that is produced by the
+    decompiler. It intends to consolidate support for ``ida_hexrays.cfunc_t``,
+    ``ida_hexrays.cfuncptr_t``, ``idaapi.func_t``, and addresses. This is
+    similar to the ``internal.interface.function`` namespace and its only
+    difference is that it acts on output from the decompiler.
+
+    This is an internal namespace and is intended to be similar to the
+    contents of the ``internal.interface`` module.
+    """
+
+    @classmethod
+    def address(cls, function):
+        '''Return the address of the entry point for the given `function`.'''
+        res = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t)) else function
+        fn = res if isinstance(res, idaapi.func_t) else idaapi.get_func(int(res))
+        if not fn:
+            raise interface.function.missing(res, caller=['hexrays', 'function', 'address'])
+        return interface.range.start(fn)
+
+    @classmethod
+    def decompile(cls, function, flags):
+        '''Return the decompiler output for the specified `function`.'''
+        ea = cls.address(function)
+        Fdecompile, target = (ida_hexrays.decompile_func, function) if isinstance(function, idaapi.func_t) else (ida_hexrays.decompile, ea)
+
+        # Verify that the address is actually a function.
+        if not interface.function.has(ea):
+            raise interface.function.missing(ea, caller=['hexrays', 'function', 'decompile'])
+
+        # Now we can just decompile the function we were given.
+        failure = ida_hexrays.hexrays_failure_t()
+        res = Fdecompile(target, failure) if utils.pycompat.code.argcount(utils.pycompat.function.code(Fdecompile)) < 3 else Fdecompile(target, failure, flags)
+
+        # Check whether we failed and raise an exception if so.
+        if res is None:
+            raise exceptions.DisassemblerError(u"{:#x}: Unable to decompile function due to error {:#x} ({:s}).".format(failure.errea, failure.code, utils.string.to(failure.desc())))
+        return res
+
+    @classmethod
+    def has(cls, function):
+        '''Return if the `function` has been cached by the decompiler.'''
+        ea = cls.address(function)
+        return ida_hexrays.has_cached_cfunc(ea)
+
+    @classmethod
+    def clear(cls, function):
+        '''Clear the decompiler cache for the given `function`.'''
+        ea = cls.address(function)
+        return ida_hexrays.mark_cfunc_dirty(ea)
+
+    @classmethod
+    def user_comments(cls, comments):
+        '''Yield each user-defined label belonging to the specified `comments`.'''
+        user_cmts = comments
+        for treeloc, citem in user_cmts.items():
+            ea, itp, used = tloc.ea, tloc.itp, citem.used
+            string = citem.c_str()
+            yield ea, itp, utils.string.of(string)
+        return
+
+    @classmethod
+    def user_iterate(cls, user, Fstart, Fnext, Fend, Ffirst, Fsecond):
+        '''Yield each key and value for the specified `user`-defined members using the given callables.'''
+        iterator, end = Fstart(user), Fend(user)
+        while iterator.x != end.x:
+            key, value = Ffirst(iterator), Fsecond(iterator)
+            yield key, value
+        return
+
+    @classmethod
+    def user_labels(cls, labels):
+        '''Yield each user-defined label belonging to the specified `labels`.'''
+        Fstart, Fend = ida_hexrays.user_labels_begin, ida_hexrays.user_labels_end
+        Fnext = ida_hexrays.user_labels_next
+        Ffirst, Fsecond = ida_hexrays.user_labels_first, ida_hexrays.user_labels_second
+        return cls.user_iterate(labels, Fstart, Fnext, Fend, Ffirst, Fsecond)
+
+    #@classmethod
+    #def user_formats(cls, formats):
+    #    '''Yield each user-defined number format belonging to the specified `formats`.'''
+    #    Fstart, Fend = ida_hexrays.user_numforms_begin, ida_hexrays.user_numforms_end
+    #    Fnext = ida_hexrays.user_numforms_next
+    #    Ffirst, Fsecond = ida_hexrays.user_numforms_first, ida_hexrays.user_numforms_second
+    #    iterable = cls.user_iterate(formats, Fstart, Fnext, Fend, Ffirst, Fsecond)
+    #    return ((oploc.ea, oploc.opnum, format) for oploc, format in iterable)
+
+    @classmethod
+    def user_itemflags(cls, itemflags):
+        '''Yield each user-defined item flag belonging to the specified `itemflags`.'''
+        Fstart, Fend = ida_hexrays.user_iflags_begin, ida_hexrays.user_iflags_end
+        Fnext = ida_hexrays.user_iflags_next
+        Ffirst, Fsecond = ida_hexrays.user_iflags_first, ida_hexrays.user_iflags_second
+        iterable = cls.user_iterate(itemflags, Fstart, Fnext, Fend, Ffirst, Fsecond)
+        return ((iloc.ea, iloc.op, iflags) for iloc, iflags in iterable)
+
+    @classmethod
+    def user_unions(cls, unions):
+        '''Yield each user-selected union member belonging to the specified `unions`.'''
+        Fstart, Fend = ida_hexrays.user_unions_begin, ida_hexrays.user_unions_end
+        Fnext = ida_hexrays.user_unions_next
+        Ffirst, Fsecond = ida_hexrays.user_unions_first, ida_hexrays.user_unions_second
+        iterable = cls.user_iterate(unions, Fstart, Fnext, Fend, Ffirst, Fsecond)
+        return ((ea, [intvec[index] for index in range(intvec.size())]) for ea, intvec in iterable)
+
+    @classmethod
+    def comments(cls, cfunc):
+        '''Yield each of the user-defined comments belonging to the decompiled function represented by `cfunc`.'''
+        return cls.user_comments(cfunc.user_cmts)
+
+    @classmethod
+    def labels(cls, cfunc):
+        '''Yield each of the user-defined labels belonging to the decompiled function represented by `cfunc`.'''
+        return cls.user_labels(cfunc.user_labels)
+
+    @classmethod
+    def itemflags(cls, cfunc):
+        '''Yield each of the user-defined item flags belonging to the decompiled function represented by `cfunc`.'''
+        return cls.user_itemflags(cfunc.user_iflags)
+
+    @classmethod
+    def unions(cls, cfunc):
+        '''Yield each of the user-selected unions belonging to the decompiled function represented by `cfunc`.'''
+        return cls.user_unions(cfunc.user_unions)
