@@ -2290,9 +2290,10 @@ class name_component(selection):
         return self.descend(angle_parameters, branch)
 
 class parameters(selection):
+    __pairs__ = {}
     def __init__(self, tree, string, range, segments):
         super(parameters, self).__init__(tree, string, range, segments)
-        self.__cache = [extract.trimmed(string, *selection) for selection in extract.parameters(tree, string, range)] if operator.ne(*range) else []
+        self.__cache = [extract.trimmed(string, *selection) for selection in extract.parameters(tree, string, range, assertion=self.__pairs__)] if operator.ne(*range) else []
 
     @property
     def count(self):
@@ -2311,8 +2312,10 @@ class parameters(selection):
         cls, string, iterable = self.__class__, self.__string__, (range for range, _ in self.__cache)
         return "{!s} {:s} : {!r}".format(cls, "{:d}..{:d}".format(*self.range), [string[left : right] for (left, right) in iterable])
 
-class angle_parameters(parameters): pass
-class group_parameters(parameters): pass
+class angle_parameters(parameters): __pairs__ = {'<>'}
+class group_parameters(parameters): __pairs__ = {'()'}
+class bracket_parameters(parameters): __pairs__ = {'[]'}
+class brace_parameters(parameters): __pairs__ = {'{}'}
 
 def qualified_declaration_or_function_pointer(tree, string, range, segments):
     (start, stop) = range
