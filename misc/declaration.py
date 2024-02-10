@@ -532,8 +532,9 @@ class extract(object):
         parameters_index = next(iterable)
         assert(all(string[left : right] in ignored for left, right in segments[-parameters_index:][1:]))
 
-        # then we continue to find the convention, pointer, and name.
-        pointer_index = next(iterable)
+        # then we continue to find the convention, pointer, and name. if we couldn't
+        # find another pair of parentheses, then this is a functor and has no convention.
+        pointer_index = next(iterable, parameters_index)
         assert(all(string[left : right] in ignored for left, right in segments[-pointer_index : -parameters_index:][1:]))
 
         # next we need to skip any whitespace to find the range of the result.
@@ -547,7 +548,7 @@ class extract(object):
 
         # that was it, just need to pack the result and return each part.
         result = (start, stop), result_segments[:-index] if index else result_segments[:]
-        return result, segments[-pointer_index], segments[-parameters_index]
+        return result, (stop, stop) if pointer_index == parameters_index else segments[-pointer_index], segments[-parameters_index]
 
     @classmethod
     def function_pointer_convention(cls, string, range, segments, assertion={'()'}, symbols={'*', '&'}, whitespace={' '}):
@@ -1594,7 +1595,7 @@ class mangled(object):
         attempt = encoded if self.type(encoded) == self.MANGLED_UNKNOWN else self.decode(encoded, self.__required_flags | mask)
         if not attempt:
             cls = self.__class__
-            raise internal.exceptions.DisassemblerError(u"{:s}(\"{:s}\", {:#x}{:s}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(symbol, '"'), mask, '' if Ftransform is None else utils.string.kwargs({'Ftransform': Ftransform}), self.type(symbol)))
+            raise internal.exceptions.DisassemblerError(u"{:s}(\"{:s}\", {:#x}{:s}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(symbol, '"'), mask, '' if Ftransform is None else utils.string.kwargs({'Ftransform': utils.pycompat.fullname(Ftransform)}), self.type(symbol)))
         decoded = self.__extract_specifiers(self.__extract_scope(attempt))
         transformed = Ftransform(decoded) if Ftransform else decoded
         self.__decoded = transformed
