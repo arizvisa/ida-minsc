@@ -2422,8 +2422,11 @@ class declaration_with_qualifiers(selection):
     def __init__(self, tree, string, range, segments):
         super(declaration_with_qualifiers, self).__init__(tree, string, range, segments)
         start, stop = range
-        token = string[start : stop]
-        self.__with_index = segments[-1] if segments and token[-1:] in ']' else (stop, stop)
+
+        # Use the string we selected to extract any trailing array elements.
+        candidates = [(left, right) for left, right in extract.elements(string, range, segments)]
+        (point, _) = candidates[0] if candidates else (stop, stop)
+        self.__with_index = (point, stop), candidates
 
     @property
     def declaration(self):
@@ -2444,15 +2447,15 @@ class declaration_with_qualifiers(selection):
 
     @property
     def array(self):
-        _, segments = self.__selection__
-        left, right = self.__with_index
-        return self.descend(bracket_parameters, (left, right))
+        iterable = ((left, right) for left, right in token.segments(*self.__with_index))
+        elements = (self.__string__[left : right] for left, right in iterable)
+        return [string[+1 : -1] for string in elements]
 
     @property
     def __correct_selection_for_array(self):
-        left, right = self.__with_index
+        (left, right), elements = self.__with_index
         (start, stop), segments = self.__selection__
-        return ((start, left), segments[:-1]) if left < right else ((start, stop), segments)
+        return ((start, left), segments[:-len(elements)] if elements else segments)
 
     __qualifiers__ = {'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '(&)'}
     @property
