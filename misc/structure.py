@@ -11,7 +11,7 @@ definitions of these classes having to reside in a base module.
 """
 
 import builtins, six, operator, functools, itertools, logging, math
-import re, fnmatch, pickle
+import re, fnmatch, pickle, heapq
 
 import idaapi, internal
 from internal import utils, interface, types, exceptions as E
@@ -1013,6 +1013,92 @@ class members(object):
             elif is_variable and mptr.eoff <= min(mptr.eoff, realoffset):
                 yield packed
             continue
+        return
+
+    @classmethod
+    def in_offset(cls, sptr, offset):
+        '''Yield the members from the union identified by `sptr` at the given `offset`.'''
+        get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+        FF_MASKSIZE = idaapi.as_uint32(idaapi.DT_TYPE)
+        candidates = [(sptr, mindex, mptr) for sptr, mindex, mptr in cls.at_offset(sptr, offset)]
+
+        # XXX: We do special handling for unions so that we prioritize members that start
+        #      at the _exact_ offset and members are more recent. This way if the caller
+        #      just asks for the member for an offset, we can hopefully guess the exact
+        #      member that they were referring to. This requires us to handle arrays, and
+        #      dig into any members that are structures to see if the offset is accurate.
+
+        # XXX: The intention of this complicated logic is so that when we try to resolve
+        #      the union path for an operand, we choose the most accurate members for it.
+
+        # First we give out the mandatory warning that we're making a decision for them.
+        iterable = (idaapi.get_member_fullname(mptr.id) for _, _, mptr in candidates)
+        if len(candidates) > 1:
+            logging.warning(u"{:s}.in_offset({:#x}, {:+#x}) : The specified offset ({:#x}) is currently occupied by more than one member ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, offset, ', '.join(map(utils.string.to, iterable))))
+
+        # Then we grab the operand information for each member so that we can check them.
+        typeinfo = []
+        for _, _, mptr in candidates:
+            opinfo = idaapi.opinfo_t()
+            ok = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+            typeinfo.append((mptr.flag, opinfo.tid if ok else None, idaapi.get_member_size(mptr)))
+
+        # Now we iterate through our candidates so that we can select the best order.
+        selected = []
+        for candidate, packed_type in zip(candidates, typeinfo):
+            sptr, mindex, mptr = candidate
+            opinfo, realoffset = idaapi.opinfo_t(), offset - (0 if union(sptr) else mptr.soff)
+
+            # First thing is that we need to grab the member's type information. We'll
+            # be using this to determine what score this candidate will get in our heap.
+            FF, retrieved = mptr.flag & FF_MASKSIZE, idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+            melement, msize = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None), idaapi.get_member_size(mptr)
+
+            # Now we'll check to see if it's an array, because this might actually be
+            # an array of structures that if so then we can fall through to handle it.
+            # First check if it's a structure because we need to dig into it to
+            # see if the offset references the beginning of one of its members.
+            index, inexactness = divmod(realoffset, melement)
+
+            # This is a base type, so we simply prioritize it high.
+            if not retrieved:
+                priority = -2 if msize == melement and not inexactness else -1 if not inexactness else 0
+
+            # If this is a structure, then set it to a value that we can scale based on accuracy.
+            elif retrieved and FF in {FF_STRUCT, FF_STRLIT}:
+                priority = -3 if msize == melement and not inexactness else -2 if not inexactness else -1
+
+            # This is an unknown, so it's probably a custom type. We choose these as the very last.
+            else:
+                priority = 3 if msize == melement and not inexactness else 4 if not inexactness else 5
+
+            # Now if we found a structure, we increase the priority if the offset references
+            # one of its members. It would be better if we traversed the structure in case
+            # it's a union, but our goal is to just be better than the disassembler.
+            mstruc = idaapi.get_sptr(mptr)
+            if mstruc:
+                mchild = idaapi.get_member(mstruc, realoffset)
+                moffset = realoffset - (0 if union(mstruc) else mchild.soff)
+                index, inexactness = member.at(mchild, moffset) if mchild else (0, 0)
+                priority *= 3 if mchild and not moffset and not inexactness else 2 if mchild and not inexactness else 1
+
+            # Then we can add it to the heap and continue onto the next member.
+            heapq.heappush(selected, (priority, candidate))
+
+        # Now we log the order of the members that we prioritized, just in case this
+        # "algorithm" is totally busted when used, and so that we can figure out where
+        # it's busted. It probably is, because I'm not 100% what it's actually doing.
+        ordered = [candidate for priority, candidate in heapq.nsmallest(len(selected), selected)]
+        iterable = ((sptr, mptr, idaapi.get_member_fullname(mptr.id)) for sptr, mindex, mptr in ordered)
+        messages = (u"[{:d}] {:s} {:#x}{:+#x}".format(1 + index, fullname, 0 if union(sptr) else mptr.soff, mptr.eoff) for index, (sptr, mptr, fullname) in enumerate(iterable))
+        [ logging.info(msg) for msg in messages ]
+
+        # Finally we can yield our candidates with the hope that if a
+        # structure path is built from them, it "might" appear intuitive.
+        for sptr, mindex, mptr in ordered:
+            yield sptr, mindex, mptr
         return
 
     @classmethod
