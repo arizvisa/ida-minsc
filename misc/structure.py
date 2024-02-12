@@ -2818,25 +2818,6 @@ class members_t(object):
         return self[index]
     byname = utils.alias(by_name, 'members_t')
 
-    @utils.string.decorate_arguments('fullname', 'suffix')
-    def by_fullname(self, fullname, *suffix):
-        '''Return the member with the specified `fullname`.'''
-        string = fullname if isinstance(fullname, types.ordered) else (fullname,)
-        res = utils.string.to(interface.tuplename(*itertools.chain(string, suffix)))
-        owner = self.owner
-
-        # grab the member_t of the structure by its fullname
-        member = idaapi.get_member_by_fullname(res)
-        mem, _ = (None, None) if member is None else member
-        if mem is None:
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_fullname({!r}) : Unable to find member with full name.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, fullname))
-
-        # figure out the index of the member so we can return the member_t we've cached
-        index = self.index(mem)
-        return self[index]
-    byfullname = utils.alias(by_fullname, 'members_t')
-
     def by_offset(self, offset):
         '''Return the member at the specified `offset` from the base offset of the structure.'''
         cls, owner = self.__class__, self.owner
