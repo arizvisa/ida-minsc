@@ -718,6 +718,28 @@ class member(object):
         return mptr.id, mname, dissolved, location, mcomments
 
     @classmethod
+    def has_references(cls, mptr):
+        '''Return whether the member specified by `mptr` is referenced by an address within the database.'''
+        identifier = mptr if isinstance(mptr, types.integer) else mptr.id
+        packed = idaapi.get_member_by_id(identifier)
+        if not packed:
+            return False
+        mptr, fullname, owner = packed
+
+        # Figure out whether we need check an xref list for a frame or just use the regular xrefs.
+        fn, is_union, is_frame = idaapi.get_func_by_frame(owner.id), union(owner), frame(owner)
+
+        # If it's a function frame, collect an xref list and return true if it's not empty.
+        if interface.node.identifier(owner.id) and is_frame and fn != idaapi.BADADDR:
+            iterable = (True for ea, opnum, xtype in interface.xref.frame(fn, mptr))
+            return next(iterable, False)
+
+        # Otherwise, we just need an xref that points to a valid address in the database. For
+        # performance, we determine this by assuming an address if it's not an identifier.
+        iterable = (ea for ea, iscode, xtype in interface.xref.to(mptr.id, idaapi.XREF_ALL))
+        return next((True for ea in iterable if not interface.node.identifier(ea)), False)
+
+    @classmethod
     def references(cls, mptr):
         '''Return a list of all the operand references in the database for the member specified by `mptr`.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
