@@ -166,6 +166,68 @@ class xref(object):
             continue
         return
 
+    @classmethod
+    def structure(cls, sptr):
+        '''Yield each structure or frame member referencing the structure identified by `sptr` as a tuple composed of the offset and reference type.'''
+        results, this = [], idaapi.get_struc(sptr if isinstance(sptr, types.integer) else sptr.id)
+
+        # Iterate through each reference for the structure to determine what it was
+        # actually applied to. If the reference is an identifier, then we need to know
+        # the mptr, full name, and sptr to identify what is actually being referenced.
+        for xrfrom, xriscode, xrtype in interface.xref.to(this.id, idaapi.XREF_ALL):
+            if interface.node.identifier(xrfrom):
+                mpack = idaapi.get_member_by_id(xrfrom)
+                if mpack is None:
+                    raise E.MemberNotFoundError(u"{:s}.structure({:#x}) : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), this.id, xrfrom))
+
+                mptr, name, sptr = mpack
+                if not interface.node.identifier(sptr.id):
+                    sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
+
+                # Validate that the type of the mptr is what we're expecting.
+                if not isinstance(mptr, idaapi.member_t):
+                    name = utils.string.of(idaapi.get_member_fullname(xrfrom))
+                    raise E.InvalidTypeOrValueError(u"{:s}.structure({:#x}) : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), this.id, mptr.__class__, utils.string.escape(name, '"')))
+
+                # Try and fetch the frame's address (which should fail if not a frame),
+                # and then use it to get the func_t that owns the member.
+                ea = idaapi.get_func_by_frame(sptr.id)
+                func = idaapi.get_func(ea)
+
+                # If we were unable to get the function frame, then we're referencing a
+                # member from a different structure and we already have everything.
+                if ea == idaapi.BADADDR:
+                    sptr, soffset = sptr, 0
+
+                # If we couldn't grab the func, then we just bail.
+                elif not func:
+                    raise E.FunctionNotFoundError(u"{:s}.structure({:#x}) : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), this.id, mptr.id, ea))
+
+                # If we couldn't grab the frame, then we bail on that too.
+                elif not idaapi.get_frame(func):
+                    raise E.MissingTypeOrAttribute(u"{:s}.structure({:#x})) : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), this.id, ea, mptr.id))
+
+                # Otherwise we're referencing a frame member, and we need to figure out
+                # the structure and the base that we'll be creating its structure at.
+                else:
+                    sptr, soffset = idaapi.get_frame(func), interface.function.frame_offset(func)
+
+                # Now we need to figure out the index of the member and then we can yield it.
+                packed = mowner, mindex, mcandidate = sptr, members.index(sptr, mptr), mptr
+                yield soffset, packed
+
+            # If it's not code, then we're just a reference to an address and so we
+            # need to yield the address it's for along with its reference type.
+            elif not address.code(xrfrom):
+                yield xrfrom, interface.ref_t(xrfrom, interface.reftype_t.of(xrtype))
+
+            # If it's code, then we skip this because structure_t.up only returns
+            # data references to the structure and operands are for structure_t.refs.
+            else:
+                logging.debug(u"{:s}.structure({:#x}) : Skipping {:s}({:d}) reference at {:#x} with the type ({:d}) due to the reference address not marked as data.".format('.'.join([__name__, cls.__name__]), this.id, 'code' if xriscode else 'data', xriscode, xrfrom, xrtype))
+            continue
+        return
+
 class member(object):
     """
     This namespace is _not_ the `member_t` class. Its purpose is to
