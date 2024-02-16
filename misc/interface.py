@@ -3568,6 +3568,8 @@ class node(object):
         '''Given the provided `offset` and list of identifiers as a `suggestion`, return the delta along with the full structure path as a list of ``idaapi.struc_t``and ``idaapi.member_t` pairs.'''
         items = suggestion[:]
 
+        # XXX: This is pretty much deprecated and shouldn't ever be used.
+
         # After we get the list of member ids, then we can use it to
         # compose the path that we will match against later. We grab
         # the first member (which is the structure id) and convert it
@@ -3605,11 +3607,13 @@ class node(object):
         # Now we can fetch the delta and path for the requested offset,
         # and then convert it into a list of sptrs and mptrs in order
         # to return it to the caller.
-        path, delta = st.members.__walk_to_realoffset__(offset, filter=Ffilter)
-
-        # That was it, so we just need to convert the path into a list
-        # of sptrs and mptrs to return to the caller.
-        return delta, [(item.parent.ptr, item.ptr) for item in path]
+        path, moffset, realoffset = [], 0, 0
+        for realoffset, packed in internal.structure.members.at(st.ptr, offset):
+            mowner, mindex, mptr = packed
+            path.append((mowner, mptr))
+            moffset = 0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff
+        delta = offset - (realoffset + moffset)
+        return delta, path
 
     @classmethod
     def get_stroff_path(cls, ea, opnum):
