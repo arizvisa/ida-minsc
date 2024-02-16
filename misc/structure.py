@@ -1621,6 +1621,18 @@ class members(object):
             yield base + index * melement, choice
         return
 
+    @classmethod
+    def slice(cls, sptr, slice):
+        '''Return a `slice` of the contiguous list of members belonging to the structure identified by `sptr`.'''
+        slice = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice)
+        start, stop, selected = interface.strpath.members(sptr, slice)
+
+        # Now we just need to transform the elements we selected into the
+        # member that was included or a size representing the empty space.
+        iterable = (member_or_size for offset, member_or_size in selected)
+        results = ((cls.by_identifier(sptr, member_or_size) if isinstance(member_or_size, idaapi.member_t) else member_or_size) for member_or_size in iterable)
+        return [packed_or_size for packed_or_size in results]
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
