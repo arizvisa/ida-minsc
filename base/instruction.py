@@ -1972,12 +1972,18 @@ def op_references(ea, opnum):
                     logging.warning(u"{:s}.op_references({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, insn.ea, opnum, refopnum, ea))
                     continue
 
-                # Instantiate a structure_t in order to grab its members_t. From
-                # this we can then use the actual value to carve a path straight
-                # through the member.
-                st = structure.by_identifier(msptr.id)
-                path, delta = st.members.__walk_to_realoffset__(offset)
-                ids = [msptr.id] + [member.ptr.id for member in path]
+                # Carve a path through the members that overlap with the offset.
+                path, moffset, realoffset = [], 0, 0
+                for realoffset, packed in internal.structure.members.at(mowner, offset):
+                    mowner, mindex, mptr = packed
+                    path.append((mowner, mptr))
+                    moffset = 0 if mptr.flsg & idaapi.MF_UNIMEM else mptr.soff
+
+                delta = offset - (realoffset + moffset)
+
+                # Now that we have all the members in the path, we go through and
+                # collect all of their identifiers as a filter for the candidates.
+                ids = [msptr.id] + [mptr.id for mowner, mptr in path]
                 candidates.append((refopnum, {id for id in ids}))
 
             # If we didn't find any candidates, then that means this is a global
