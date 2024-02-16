@@ -1170,19 +1170,97 @@ def op_structurepath(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_structurepath(ea, opnum):
     '''Return the structure and members applied to the operand `opnum` for the instruction at address `ea`.'''
+    FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
     F, insn, op, ri = interface.address.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
 
-    # If it's a stack variable, then this is also the wrong API and we should be
-    # using the op_structure function. Log it and continue onto the right one.
+    # If it's a stack variable, then we need to know its function before doing anything.
     if idaapi.is_stkvar(F, opnum) and function.has(insn.ea):
-        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a stack variable operand.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
-        return op_structure(ea, opnum)
+        fn = interface.function.by(insn.ea)
 
-    # If it's a memory address, then this is the wrong API and we should be using
-    # the op_structure function. Log something, and then chain to the correct one.
-    elif not idaapi.is_stroff(F, opnum) and ri:
-        logging.info(u"{:s}.op_structurepath({:#x}, {:d}) : Using the `{:s}` function instead to return the path for a reference.".format(__name__, ea, opnum, '.'.join([getattr(op_structure, attribute) for attribute in ['__module__', '__name__'] if hasattr(op_structure, attribute)])))
-        return op_structure(ea, opnum)
+        # Then we can demand that the disassembler tells us its mptr and offset.
+        res = idaapi.get_stkvar(insn, op, op.addr)
+        if not res:
+            raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, op.addr))
+        mptr, actval = res
+
+        # Then we'll grab its frame along with everything related to the member.
+        frame = idaapi.get_frame(interface.range.start(fn))
+        mowner, mindex, mptr = internal.structure.members.by_identifier(frame, mptr)
+        framebase = interface.function.frame_offset(fn)
+
+        # Traverse through each member for the actual value, and collect the full path.
+        path, is_array, realoffset, moffset = [], False, 0, 0
+        for realoffset, packed in internal.structure.members.at(mowner, actval):
+            mowner, mindex, mptr = packed
+
+            # Now we create a new structure at the real offset and grab the member by its index.
+            member = internal.structure.new(mowner.id, framebase + realoffset).members[mindex]
+            path.append(member)
+
+            # Check if any of the members are an array, because we promote to a list if so.
+            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
+            is_array, moffset = is_array if is_array else melement < msize, 0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff
+
+        # Calculate the delta based on the member location and the last member from the path.
+        delta = actval - (realoffset + moffset)
+
+        # We didn't need to adjust the path due to the frame already being a structure. We still
+        # have to determine whether the path contains an array, though. Also, since each member
+        # should have an adjusted offset, we can exclude a non-zero delta from the result.
+        Fmake_ordered = builtins.list if is_array else builtins.tuple
+        if delta > 0:
+            return Fmake_ordered(item for item in itertools.chain(path, [delta]))
+        return Fmake_ordered(path) if len(path) > 1 else path[0]
+
+    # If it's a memory address, then we need to verify that that the operand points to a
+    # structure. If it is, then we need to figure out the exact field being referenced.
+    elif not idaapi.is_stroff(F, opnum):
+        value = op_reference(ea, opnum)
+        address = interface.address.head(value)
+        flags = interface.address.flags(address)
+
+        # Extract the type that is being referenced along with its size and operand
+        # information. We will be using this to calculate the correct path to use.
+        offset, element = value - address, interface.address.element(address, flags)
+        index, bytes = divmod(offset, element)
+        info, count, base = idaapi.opinfo_t(), interface.address.size(address) // element, index * element
+        ok = idaapi.get_opinfo(address, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, address, idaapi.OPND_ALL, flags)
+
+        # Check that the address being pointed to is actually a structure of some sort.
+        if idaapi.as_uint32(flags & idaapi.DT_TYPE) not in {FF_STRUCT}:
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the required flags ({:#x}) for a structure.".format(__name__, ea, opnum, opnum, address, flags))
+        elif not ok:
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the necessary information for a structure.".format(__name__, ea, opnum, opnum, address))
+        elif not idaapi.get_struc(info.tid):
+            raise E.StructureNotFoundError(u"{:s}.op_structurepath({:#x}, {:d}) : Operand {:d} is referencing an identifier ({:#x}) that is not a structure.".format(__name__, ea, opnum, opnum, info.tid))
+        sptr = idaapi.get_struc(info.tid)
+
+        # Now we'll use everything we gathered to determine the path using the real
+        # offset into the structure. Each member of the path should be translated
+        # to the correct address representing the index that was actually selected.
+        path, is_array, moffset = [], False, 0
+        for realoffset, packed in internal.structure.members.at(sptr, bytes):
+            mowner, mindex, mptr = packed
+
+            # We're using the real offset so that each structure starts at the correct
+            # address. This way each path member has a real address that can be used.
+            member = internal.structure.new(mowner.id, address + base + realoffset).members[mindex]
+            path.append(member)
+
+            # Check if any of the members are an array, because we promote to a list if so.
+            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
+            is_array, moffset = is_array if is_array else melement < msize, 0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff
+
+        # Calculate the delta using the adjustment we made for the array and the last element.
+        delta = offset - (base + moffset)
+
+        # Now we need to figure out whether to return an array or a regular path. This is a
+        # structure path, so the indices should already be resolved and represented by the
+        # offset for each member. This means we can exclude the non-zero delta for either one.
+        Fmake_ordered = builtins.list if is_array else builtins.tuple
+        if delta > 0:
+            return Fmake_ordered(item for item in itertools.chain(path, [delta]))
+        return Fmake_ordered(path) if len(path) > 1 else path[0]
 
     # If it wasn't a stack variable, then check that the operand is actually a
     # structure offset. If it isn't, then bail because we have no idea what to do.
