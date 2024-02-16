@@ -1199,6 +1199,17 @@ class members(object):
         return cls.by_identifier(sptr, mptr.id)
 
     @classmethod
+    def nearest(cls, sptr, offset):
+        '''Return the member from the structure identified by `sptr` that is at or before the given `offset`.'''
+        available = [packed for packed in cls.iterate(sptr)]
+        while len(available) > 1:
+            index = len(available) // 2
+            sptr, mindex, mptr = available[index]
+            pivot = 0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff
+            available = available[:index] if offset < pivot else available[index:]
+        return available[0] if available else None
+
+    @classmethod
     def at_offset(cls, sptr, offset):
         '''Yield the members at the specified `offset` of the structure or union identified by `sptr`.'''
         realoffset, sptr = int(offset), idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
