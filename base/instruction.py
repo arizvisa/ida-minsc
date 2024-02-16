@@ -817,72 +817,107 @@ def op_structure(reference):
 @utils.multicase(ea=types.integer, opnum=types.integer)
 def op_structure(ea, opnum):
     '''Return the structure and members pointed to by the operand `opnum` for the instruction at address `ea`.'''
+    FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
     F, insn, op, ri = interface.address.flags(ea), at(ea), operand(ea, opnum), interface.address.refinfo(ea, opnum)
 
     # Start out by checking if the operand is a stack variable, because
     # we'll need to handle it differently if so.
-    if idaapi.is_stkvar(F, opnum) and function.has(insn.ea):
-        fn = function.by(insn.ea)
+    if idaapi.is_stkvar(F, opnum) and interface.function.has(insn.ea):
+        fn = interface.function.by(insn.ea)
 
-        # Now we can ask IDA what's up with it.
+        # Now we can ask the disassembler what's up with it.
         res = idaapi.get_stkvar(insn, op, op.addr)
         if not res:
             raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, op.addr))
         mptr, actval = res
 
         # First we grab our frame, and then find the starting member by its id.
-        frame = function.frame(fn)
-        member = frame.members.by_identifier(mptr.id)
+        frame = idaapi.get_frame(interface.range.start(fn))
+        mowner, mindex, mptr = internal.structure.members.by_identifier(frame, mptr)
+        framebase = interface.function.frame_offset(fn)
 
-        # Use the real offset of the member so that we can figure out which
-        # members of the structure are actually part of the path.
-        path, delta = member.parent.members.__walk_to_realoffset__(actval)
+        # Iterate through all of the members searching for the actual operand value.
+        path, is_array, total = [], False, 0
+        for realoffset, packed in internal.structure.members.at(mowner, actval):
+            mowner, mindex, mptr = packed
 
-        # If we got a list as a result, then we encountered an array which
-        # requires us to return a list and include the offset.
-        if isinstance(path, types.list):
-            return path + [delta]
+            # We use the total so that offsets from the path match what's displayed by the disassembler.
+            # Essentially, the sum of the delta and the last path member should match the operand.
+            member = internal.structure.new(mowner.id, framebase + total).members[mindex]
+            path.append(member)
+
+            # Check if any of the members are an array, because we promote to a list if so.
+            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
+            is_array, total = is_array if is_array else melement < msize, total + (0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff)
+
+        # Calculate the delta using the difference of the delta
+        # from the path and the actual value of the operand.
+        delta = actval - total
+
+        # If our result is an array, then we need to return a list and include the offset.
+        if is_array:
+            return [item for item in itertools.chain(path, [delta])]
 
         # Otherwise it's just a regular path, and we need to determine whether
         # to include the offset in the result or not.
-        results = tuple(path)
         if delta > 0:
-            return results + (delta,)
-        return tuple(results) if len(results) > 1 else results[0]
+            return tuple(item for item in itertools.chain(path, [delta]))
+        return tuple(path) if len(path) > 1 else path[0]
 
     # Otherwise, we check if our operand is not a structure offset, but pointing
-    # to memory by having a reference. If it is then we'll need to figure the field
-    # being referenced by calculating the offset into structure ourselves.
-    elif not idaapi.is_stroff(F, opnum) and ri:
+    # to memory by having a reference. If it is then we'll need to figure out the
+    # field being referenced by calculating the offset into structure ourselves.
+    elif not idaapi.is_stroff(F, opnum):
         value = op_reference(ea, opnum)
         address = interface.address.head(value)
-        t, count = database.type.array(address)
-        offset = value - address
+        flags = interface.address.flags(address)
+
+        # Extract the type from the given address and then use its size to
+        # calculate the actual member offset that the operand is pointing at.
+        info, offset, element = idaapi.opinfo_t(), value - address, interface.address.element(address, flags)
+        index, bytes = divmod(offset, element)
+        ok = idaapi.get_opinfo(address, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, address, idaapi.OPND_ALL, flags)
 
         # Verify that the type as the given address is a structure
-        if not isinstance(t, structure.structure_t):
-            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not pointing to a structure.".format(__name__, ea, opnum, opnum))
+        if idaapi.as_uint32(flags & idaapi.DT_TYPE) not in {FF_STRUCT}:
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the required flags ({:#x}) for a structure.".format(__name__, ea, opnum, opnum, address, flags))
+        elif not ok:
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not referencing an address ({:#x}) containing the necessary information for a structure.".format(__name__, ea, opnum, opnum, address))
+        elif not idaapi.get_struc(info.tid):
+            raise E.StructureNotFoundError(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is referencing an identifier ({:#x}) that is not a structure.".format(__name__, ea, opnum, opnum, info.tid))
+        sptr = idaapi.get_struc(info.tid)
 
         # FIXME: check if the operand contains any member xrefs, because
         #        if it doesn't then we don't actually need a path.
 
-        # Figure out the index and the real offset into the structure,
-        # and then hand them off to the walk_to_realoffset method. From
-        # this value, we calculate the array member offset and then
-        # process it to get the actual path to return.
-        index, byte = divmod(offset, t.size)
-        path, realdelta = t.members.__walk_to_realoffset__(byte)
-        delta = index * t.size + realdelta
+        # Iterate through the structure members looking for actual member offset.
+        total, path, is_array = 0, [], interface.address.size(address) // element > 1
+        for _, packed in internal.structure.members.at(sptr, bytes):
+            mowner, mindex, mptr = packed
 
-        # If we received a list, then we can just return it with the delta.
-        if isinstance(path, types.list) or count > 1:
-            return [item for item in path] + [delta]
+            # Here, we use the total so that the offsets for the entire path correlate to what
+            # the disassembler displays. This works, except for when the disassembler is wrong.
+            member = internal.structure.new(mowner.id, address + total).members[mindex]
+            path.append(member)
+
+            # Check if any of the members are an array, because we promote to a list if so.
+            msize, melement = internal.structure.member.size(mptr), internal.structure.member.element(mptr)
+            is_array, total = is_array if is_array else melement < msize, total + (0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff)
+
+        # Calculate the delta based on the length of the path. The sum of the offset for the
+        # very last member with the delta should result in the operand address. It's also
+        # worth noting that the disassembler doesn't always display the correct member.
+        delta = value - (address + total)
+
+        # If we encountered an element that's an array, then we
+        # return the path as a list with the delta attached to it.
+        if is_array:
+            return [item for item in itertools.chain(path, [delta])]
 
         # Figure out whether we need to include the offset in the result.
-        results = tuple(path)
         if delta > 0:
-            return results + (delta,)
-        return tuple(results) if len(results) > 1 else results[0]
+            return tuple(item for item in itertools.chain(path, [delta]))
+        return tuple(path) if len(path) > 1 else path[0]
 
     # If it doesn't have a reference, then there's absolutely nothing we can do.
     elif not idaapi.is_stroff(F, opnum):
@@ -931,30 +966,32 @@ def op_structure(ea, opnum):
     calculator = interface.strpath.calculate(0)
     result, position, leftover = [], builtins.next(calculator), 0
     for sptr, mptr, offset in path:
+        owner = internal.structure.new(sptr.id, position)
 
         # Start out by finding the exact structure that was resolved,
         # and then use it to find the exact member being referenced.
-        st = structure.by_identifier(sptr.id, offset=position)
         if mptr:
-            member = st.members.by_identifier(mptr.id)
-            offset = member.realoffset
+            mindex = internal.structure.members.index(sptr, mptr)
+            moffset = 0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff
+            member, offset = internal.structure.member_t(owner, mindex), mptr.soff
 
         # If there wasn't a member, then there's at least a member
         # that's being displayed. So, we can figure out which one is
         # being displayed by the operand (via dref) and use that one.
         elif operator.contains(displayed, sptr.id):
-            mptr = displayed[sptr.id]
-            member, offset = st.members.by_identifier(mptr.id), offset
+            mptr, mindex = displayed[sptr.id], internal.structure.members.index(sptr, displayed[sptr.id])
+            moffset = 0 if mptr.props & idaapi.MF_UNIMEM else mptr.soff
+            member, offset = internal.structure.member_t(owner, mindex), offset
 
         # If it's not referenced at all, then we're in a very weird
         # situation and it absolutely has got to be the structure size.
         else:
-            member, offset = st, 0
+            member, offset, moffset = owner, 0, 0
 
         # Now that we figured out the right item that's being displayed,
         # update our position using its realoffset, keep track of our
         # carried value, and then add them member before continuing.
-        position, leftover = calculator.send((sptr, None, member.realoffset)), sum([leftover, offset])
+        position, leftover = calculator.send((sptr, None, moffset)), leftover + offset
         result.append(member)
 
     # Now that we have the carried bytes (leftover) of the path, we can
