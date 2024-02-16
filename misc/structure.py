@@ -1553,6 +1553,74 @@ class members(object):
         merged = {ea : functools.reduce(operator.or_, items) for ea, items in results.items()}
         return [merged[ea] for ea in sorted(results)]
 
+    @classmethod
+    def at(cls, sptr, offset, *filter):
+        """Traverse into the structure identified by `sptr` yielding each member located at the specified `offset`.
+
+        If a closure is passed as the `filter` parameter, then use the function to filter the chosen candidates during descent.
+        """
+        base, selected = 0, [packed for packed in members.at_offset(sptr, int(offset))]
+        candidates = [mptr for mowner, mindex, mptr in selected]
+        table = {mptr.id : index for index, (_, _, mptr) in enumerate(selected)}
+
+        # Filter all of our candidates and begin our traversal through them.
+        count, [F] = 0, filter if filter else [lambda sptr, items: items]
+        result, filtered = [], F(sptr, candidates) if len(candidates) > 1 else candidates
+        while filtered:
+            if len(filtered) == 1:
+                [mptr] = filtered
+
+                # If this member doesn't contain the offset for some reason, then bail.
+                if not member.contains(mptr, offset):
+                    break
+
+                # Figure out the actual location into the member pointed to by the offset.
+                index, remainder = member.at(mptr, offset)
+                melement = member.element(mptr)
+                res, mtype = index * melement, idaapi.get_sptr(mptr)
+
+            # If we have more than one member to choose from and we're
+            # in a union, then we immediately stop our traversal here.
+            elif filtered and union(sptr):
+                break
+
+            # If it's not a union, then we assume the neareset member in
+            # front of the offset. This way the full path is relative to it.
+            elif filtered:
+                choice = members.nearest(sptr, offset)
+                if not choice:
+                    break
+                mowner, mindex, mptr = choice
+
+                # Grab the location of the offset into the member.
+                index, remainder = member.at(mptr, offset)
+                melement = member.element(mptr)
+                res, mtype = index * melement, idaapi.get_sptr(mptr)
+
+            # Now we have a member to yield and can adjust our offset.
+            base, offset, moffset, count = base, remainder, 0 if mptr.flag & idaapi.MF_UNIMEM else mptr.soff, count + 1
+            yield base, selected[table[mptr.id]]
+
+            # If we can't descend any farther, then we can leave.
+            if not mtype:
+                break
+
+            # Adjust for the next iteration, and descend into the structure for the selected member.
+            sptr, base = mtype, base + res + moffset
+            selected = [packed for packed in members.at_offset(mtype, offset)]
+            candidates = [mptr for mowner, mindex, mptr in selected]
+            table = {mptr.id : index for index, (_, _, mptr) in enumerate(selected)}
+            filtered = F(sptr, candidates) if len(candidates) > 1 else candidates
+
+        # If we didn't return anything yet, then use the nearest member.
+        if not count:
+            choice = members.nearest(sptr, offset)
+            mowner, mindex, mptr = choice
+            index, remainder = member.at(mptr, offset)
+            melement = member.element(mptr)
+            yield base + index * melement, choice
+        return
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
