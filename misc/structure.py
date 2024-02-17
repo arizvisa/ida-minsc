@@ -4179,14 +4179,8 @@ class members_t(object):
             res = self.by_name(index)
 
         elif isinstance(index, slice):
-            start, stop, items = interface.strpath.members(owner.ptr, index)
-            iterable = itertools.chain([] if union(owner.ptr) else [start] if start and index.start is None else [], (member for offset, member in items))
-            res = [member for member in iterable]
-            offset, last = items[-1] if items else (stop, 0)
-            size = idaapi.get_member_size(last) if isinstance(last, idaapi.member_t) else last
-            point = offset + size
-            res.append(stop - point) if index.stop is None and stop > point else point
-            res = [(self.by_identifier(mptr.id) if isinstance(mptr, idaapi.member_t) else mptr) for mptr in res]
+            sliced = members.slice(owner.ptr, index)
+            res = [(owner_index_member if isinstance(owner_index_member, types.integer) else member_t(owner, owner_index_member[1])) for owner_index_member in sliced]
 
         else:
             cls = self.__class__
