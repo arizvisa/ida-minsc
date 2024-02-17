@@ -292,15 +292,29 @@ class member(object):
         # if the sptr is not a function frame, then this is easy and we
         # only have to check to see if the name matches "field_%X".
         if not frame(sptr):
-            #return name.startswith('field_')   # XXX: this is how the disassembler does it..
-            expected = "field_{:X}".format(mptr.soff)
-            return name != expected             # but this is more accurate.
+            #return name.startswith('field_')               # XXX: this is how the disassembler does it..
+            field, offset = name.split('_', 1) if '_' in name else (name, '')
+            expected = "{:x}".format(mptr.soff)
+            return (field, offset.lower()) != ('field', expected)
 
-        # otherwise this is a frame and we can use the disassembler api. we _could_
-        # check the member location and use it to differentiate lvars, registers,
-        # and args..but the disassembler doesn't let users use those prefixes anyways.
+        # first we'll check that it's not one of the names we can check with the disassembler api.
         idaname = utils.string.to(name)
-        return not (idaapi.is_dummy_member_name(idaname) or idaapi.is_anonymous_member_name(idaname) or idaapi.is_special_member(mptr.id))
+        if idaapi.is_anonymous_member_name(idaname) or idaapi.is_special_member(mptr.id):
+            return False
+
+        # now we need to figure out the function and the boundaries of the frame
+        # so that we can distinguish between variables, args, and preserved regs.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = idaapi.get_func(ea)
+        if ea == idaapi.BADADDR or not fn:
+            return any(name.startswith(prefix) for prefix in {'arg_', 'var_'})
+
+        # we're now free to figure out which the frame part that this member
+        # belongs to. we render the expected offset and do a comparison.
+        args, frsize = idaapi.frame_off_args(fn), fn.frsize
+        var, offset = name.split('_', 1) if '_' in name else (name, '')
+        prefix, expected = ('var', "{:x}".format(frsize - mptr.soff)) if mptr.soff < args else ('arg', "{:x}".format(mptr.soff - args))
+        return (var, offset.lower()) != (prefix, expected)
 
     @classmethod
     def get_name(cls, mptr):
