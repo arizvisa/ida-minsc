@@ -4479,33 +4479,42 @@ class strpath(object):
         for mptr, soff, eoff in iterable:
             segments[soff] = segments[eoff] = mptr
 
-        # Now we can select the members that the user specified, and use
-        # it to select the starting and ending point of our interval.
+        # Now we can select the members that the user specified and use it to find out the
+        # interval. We adjust it with another member in order to capture additional space.
         selected = [members[index] for index in indices]
-        if selected:
-            start, stop = (selected[0].soff, selected[-1].eoff) if istart <= istop else (selected[-1].soff, selected[0].eoff)
 
-            # If we selected something, then we need to determine whether to include
-            # the actual members or to include the anonymous fields that surround them.
-            left = points[0] if slice.start is None else start
-            right = points[-1] if slice.stop is None else stop
+        # If our selection is from left to right (ordered), then we treat it as
+        # normal and be sure to include the empty space in front of the last member.
+        if selected and istart <= istop:
+            imaximum = 1 + max(indices)
+            maximum = members[imaximum].soff if imaximum < len(members) else points[-1]
+            start = bisect.bisect_left(points, points[0] if slice.start is None else selected[0].soff)
+            stop = bisect.bisect_left(points, points[-1] if slice.stop is None else maximum) + 1
+
+        # If the selection is from right to left (reversed), then we need to
+        # invert our tests against the slice and adjust for the minimum point.
+        elif selected:
+            iminimum = min(indices)
+            minimum = members[iminimum - 1].eoff if iminimum > 0 else points[0]
+            start = bisect.bisect_left(points, points[0] if slice.stop is None else minimum)
+            stop = bisect.bisect_left(points, points[-1] if slice.start is None else selected[0].eoff)
 
         # If we couldn't select anything, then use the boundaries of the
         # members that were within the requested slice to identify the points.
         elif members:
+            sleft, sright = (slice.start, slice.stop) if istart <= istop else (slice.stop, slice.start)
             iterable = ((members[index].soff if index < len(members) else members[-1].eoff) for index in [istart, istop])
-            left = min(points) if slice.start is None else min(*iterable)
+            minimum = min(points) if sleft is None else min(*iterable)
             iterable = ((members[index].eoff if index < len(members) else members[-1].eoff) for index in [istart, istop])
-            right = max(points) if slice.stop is None else max(*iterable)
+            maximum = max(points) if sright is None else max(*iterable)
+            start = bisect.bisect_left(points, minimum)
+            stop = bisect.bisect_left(points, maximum) + 1 if istart < istop else bisect.bisect_left(points, maximum)
 
-        # Otherwise since there's no selection or points, we choose the lowest
-        # and the highest one. These should be 0 (for the lowest) and the structure
-        # size (for the highest). We're essentially assuming that the size is 0.
+        # Otherwise since there's no selection or even members, we have nothing to return.
         else:
-            left, right = 0, size
+            return 0, size, []
 
-        # Now we can use the boundaries to select the points with our interval.
-        start, stop = bisect.bisect_left(points, left), bisect.bisect_right(points, right)
+        # Now we need to figure out which direction to slice the elements in.
         step, point = -1 if istep < 0 else +1, 0 if start < 0 else points[start] if start < len(points) else size
 
         # Last thing to do is to iterate through each point to yield each member and
@@ -4518,6 +4527,10 @@ class strpath(object):
             if mptr and mptr.id in available:
                 result.append((point, available.pop(mptr.id)))
             offset = mptr.eoff if mptr else point
+
+        # Verify that the slice we were given is able to select something.
+        if not any([istart <= istop and istep > 0, istart > istop and istep < 0]) and not available:
+            return points[start], point, []
         return points[start], point, result[::-1 if istep < 0 else +1]
 
 class contiguous(object):
