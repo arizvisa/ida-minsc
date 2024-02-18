@@ -2144,11 +2144,13 @@ class function(mangled):
             peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
             point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
             object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+            transformed = self._declaration_operators[operator_name]
+            operator_result = operator_name, "operator_{:s}".format(transformed)
 
             contents, ignored = self.string[left : right], {' ', ''}
             if contents[:1] + contents[-1:] == '<>':
-                return operator_name, object, angle_parameters(self.__tree__, self.string, (left, right), self.__tree__.get(left, []))
-            return operator_name, object, angle_parameters(self.__tree__, self.string, (right, right), [])
+                return operator_result, object, angle_parameters(self.__tree__, self.string, (left, right), self.__tree__.get(left, []))
+            return operator_result, object, angle_parameters(self.__tree__, self.string, (right, right), [])
 
         # FIXME: This is a hack and should've been caught by the previous condition. The
         #        operator_name attribute used to return the known operator as listed in
@@ -2161,10 +2163,14 @@ class function(mangled):
             point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
             object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
 
+            iterable = (operator_name[:hack] for hack in map(functools.partial(operator.add, len('operator')), [1,2,3]) if operator_name[:hack] in self._declaration_operators)
+            transformed = self._declaration_operators[next(iterable)]
+            operator_result = operator_name, "operator_{:s}".format(transformed)
+
             contents, ignored = self.string[left : right], {' ', ''}
             if contents[:1] + contents[-1:] == '<>':
-                return operator_name, object, angle_parameters(self.__tree__, self.string, (left, right), self.__tree__.get(left, []))
-            return operator_name, object, angle_parameters(self.__tree__, self.string, (right, right), [])
+                return operator_result, object, angle_parameters(self.__tree__, self.string, (left, right), self.__tree__.get(left, []))
+            return operator_result, object, angle_parameters(self.__tree__, self.string, (right, right), [])
 
         # FIXME: These operators_with_spaces are essentially a hack, since you can
         #        technically include any kind of complex type after the operator.
@@ -2174,16 +2180,19 @@ class function(mangled):
             point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
             object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
 
+            transformed = next(lookup[operator_name] for lookup in [self._declaration_operators_with_spaces, self._declaration_operators_with_errors] if operator_name in lookup)
+            operator_result = (operator_name, "operator_{:s}".format(transformed)) if segments else (operator_name, operator_name)
+
             # FIXME: We really should be extracting the target type from these operators.
             if operator_name in self._declaration_operators_with_spaces:
-                return operator_name, object, self._declaration_operators_with_spaces[operator_name], operator_name.split(' ', 1)[-1]
+                return operator_result, object, self._declaration_operators_with_spaces[operator_name], operator_name.split(' ', 1)[-1]
 
             elif operator_name in self._declaration_operators_with_errors:
-                return operator_name, object, self._declaration_operators_with_errors[operator_name]
+                return operator_result, object, self._declaration_operators_with_errors[operator_name]
 
             elif ' ' in operator_name:
-                return operator_name, object, operator_name.split(' ', 1)[-1]
-            return operator_name, object, ''
+                return operator_result, object, operator_name.split(' ', 1)[-1]
+            return operator_result, object, ''
 
         # Otherwise, it should be a transformed operator and we can extract details from the braces.
         elif self.__operator:
