@@ -2117,8 +2117,8 @@ class function(mangled):
     def details(self):
         '''Return a tuple containing the unpacked details contained by the operator or backticked function name.'''
         operator_name = self.operator
-        _, name, _, _ = self.__prototype_components
-        (start, stop), segments = name
+        _, prototype_name, _, _ = self.__prototype_components
+        (start, stop), segments = prototype_name
         iterable = (1 + index for index, (left, right) in enumerate(segments[::-1]) if self.string[left : right] == '::')
         index = next(iterable, 0)
         (_, point) = segments[-index] if index else (start, start)
@@ -2139,18 +2139,51 @@ class function(mangled):
         # If it's a known operator, then this is likely parameterized with angles.
         elif operator_name in self._declaration_operators:
             [(left, right)] = segments[-1:] if len(segments) else [(start, start)]
-            if right != stop or right - left < len(operator_name):
-                return operator_name, []
+
+            newsegments = [range for range in segments[:-1]]
+            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
+            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
+            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+
             contents, ignored = self.string[left : right], {' ', ''}
-            assert(contents[:1] + contents[-1:] == '<>'), contents
-            iterable = extract.parameters(self.__tree__, self.string, (left, right))
-            parameters = [self.string[left : right].lstrip() for (left, right), _ in iterable]
-            return operator_name, parameters
+            if contents[:1] + contents[-1:] == '<>':
+                return operator_name, object, angle_parameters(self.__tree__, self.string, (left, right), self.__tree__.get(left, []))
+            return operator_name, object, angle_parameters(self.__tree__, self.string, (right, right), [])
+
+        # FIXME: This is a hack and should've been caught by the previous condition. The
+        #        operator_name attribute used to return the known operator as listed in
+        #        _declaration_operators instead of returning the entire operator string.
+        elif any(operator_name[:hack] in self._declaration_operators for hack in map(functools.partial(operator.add, len('operator')), [1,2,3])):
+            [(left, right)] = segments[-1:] if len(segments) else [(start, start)]
+
+            newsegments = [range for range in segments[:-1]]
+            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
+            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
+            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+
+            contents, ignored = self.string[left : right], {' ', ''}
+            if contents[:1] + contents[-1:] == '<>':
+                return operator_name, object, angle_parameters(self.__tree__, self.string, (left, right), self.__tree__.get(left, []))
+            return operator_name, object, angle_parameters(self.__tree__, self.string, (right, right), [])
 
         # FIXME: These operators_with_spaces are essentially a hack, since you can
         #        technically include any kind of complex type after the operator.
         elif not segments or operator_name in self._declaration_operators_with_spaces or operator_name in self._declaration_operators_with_errors:
-            return (operator_name,) if operator_name else ()
+            newsegments = [range for range in segments[:-1]]
+            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
+            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
+            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+
+            # FIXME: We really should be extracting the target type from these operators.
+            if operator_name in self._declaration_operators_with_spaces:
+                return operator_name, object, self._declaration_operators_with_spaces[operator_name], operator_name.split(' ', 1)[-1]
+
+            elif operator_name in self._declaration_operators_with_errors:
+                return operator_name, object, self._declaration_operators_with_errors[operator_name]
+
+            elif ' ' in operator_name:
+                return operator_name, object, operator_name.split(' ', 1)[-1]
+            return operator_name, object, ''
 
         # Otherwise, it should be a transformed operator and we can extract details from the braces.
         elif self.__operator:
@@ -2165,7 +2198,11 @@ class function(mangled):
 
         # Now we should probably handle the special-case for constructors and destructors.
         elif operator_name in {'constructor', 'destructor'}:
-            return operator_name,
+            newsegments = [range for range in segments[:-1]]
+            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
+            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
+            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+            return operator_name, object
 
         # If we have an operator, but it's only non-nested tokens, then there's no details.
         # FIXME: we're explicitly testing for "` (" operators here, which have details.
@@ -2173,14 +2210,42 @@ class function(mangled):
             assert(operator_name[:1] + operator_name[-1:] in {"`'", "` "}), operator_name
             ignored, (start, stop) = {' '}, segments[-1] if segments else (stop, stop)
             nested = self.__tree__.get(start, [])
+
+            (left, right), segments = prototype_name
+            newsegments = [range for range in segments[:-1]]
+            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
+            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
+
             if all(self.string[left : right] in ignored for left, right in nested):
-                return operator_name,
+                return operator_name, declaration_with_qualifiers(self.__tree__, self.string, (left, point), newsegments)
 
             # But if there are nested tokens, then we're likely braced and containing a type.
             (left, right) = nested[-1]
             brace = self.string[left : right]
             assert(brace[:1] + brace[-1:] in {'()', '{}', "`'", '[]'})
-            return operator_name, brace[1 : -1]
+
+            # FIXME: These are some terrible hacks that are probably incredibly unnecessary as
+            #        I'm pretty certain that the `extract` namespace has a way to do this properly.
+
+            (left, right), segments = prototype_name
+            if newsegments and operator.getitem(self.string, slice(*newsegments[-1])) == '::':
+                point, begin = newsegments.pop()
+                end = begin
+            elif 1 < len(newsegments) and operator.getitem(self.string, slice(*newsegments[-2])) == '::':
+                _, end = newsegments.pop()
+                point, begin = newsegments.pop()
+            else:
+                point, begin = segments[-1] if segments else (right, right)
+                end = begin
+
+            object = declaration_with_qualifiers(self.__tree__, self.string, (left, point), newsegments)
+
+            # FIXME: This is accessing a namespace that is completely deprecated.
+            candidate = self.string[begin : end]
+            transformed = unmangled._declaration_rules[candidate] if candidate in unmangled._declaration_rules else ''
+            operator_result = (operator_name, transformed) if transformed else (operator_name, operator_name)
+
+            return operator_result, object, brace[1 : -1]
 
         # If there's no operator, then we need to check our name for what the user wants.
         [(start, stop)] = segments[-1:]
