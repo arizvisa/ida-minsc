@@ -2212,6 +2212,18 @@ class function(mangled):
         index = next(iterable, 0)
         (_, point) = segments[-index] if index else (start, start)
 
+        # Define a closure that pops off the operator from the name, and returns
+        # a declaration fro the object that the operator belongs to.
+        def guess_declaration(segments, count):
+            adjusted = segments[:-count] if count else segments[:]
+            beginning, selected_operator = extract.ending(self.string, (start, stop), adjusted, delimiters={'::'})
+            (_, point), newsegments = beginning
+            left, right = newsegments.pop() if newsegments else (start, start)
+            assert(self.string[left : right] in {'::', ''}), [self.string[left : right] for left, right in token.segments(*prototype_name)]
+
+            object = declaration_with_qualifiers(self.__tree__, self.string, (start, left), newsegments)
+            return object, selected_operator
+
         # If we're a backticked operator with a brace, then our operator is a
         # vcall or similar. So, we need the last 2 segments of the name...
         if operator_name[:1] + operator_name[-1:] == '`}':
@@ -2223,10 +2235,7 @@ class function(mangled):
 
             # We know the last 2 components are backticked and braced, so we
             # can simply skip back from it in order to extract the owning object.
-            newsegments = segments[:-2]
-            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
-            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
-            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+            object, selected = guess_declaration(segments, 2)
 
             # Now we can just return a tuple prefixed with the operator.
             left, right = operator_name
@@ -2237,12 +2246,9 @@ class function(mangled):
 
         # If it's a known operator, then this is likely parameterized with angles.
         elif operator_name in self._declaration_operators:
-            [(left, right)] = segments[-1:] if len(segments) else [(start, start)]
+            [(left, right)] = segments[-1:] if segments else [(start, start)]
+            object, selected = guess_declaration(segments, 0)
 
-            newsegments = [range for range in segments[:-1]]
-            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
-            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
-            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
             transformed = self._declaration_operators[operator_name]
             operator_result = operator_name, "operator_{:s}".format(transformed)
 
@@ -2256,13 +2262,9 @@ class function(mangled):
         #        _declaration_operators instead of returning the entire operator string.
         elif any(operator_name[:hack] in self._declaration_operators for hack in map(functools.partial(operator.add, len('operator')), [1,2,3])):
             [(left, right)] = segments[-1:] if len(segments) else [(start, start)]
+            object, selected = guess_declaration(segments, 1)
 
-            newsegments = [range for range in segments[:-1]]
-            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
-            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
-            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
-
-            iterable = (operator_name[:hack] for hack in map(functools.partial(operator.add, len('operator')), [1,2,3]) if operator_name[:hack] in self._declaration_operators)
+            iterable = (operator_name[:hack] for hack in map(functools.partial(operator.add, len('operator')), [3,2,1]) if operator_name[:hack] in self._declaration_operators)
             transformed = self._declaration_operators[next(iterable)]
             operator_result = operator_name, "operator_{:s}".format(transformed)
 
@@ -2274,10 +2276,7 @@ class function(mangled):
         # FIXME: These operators_with_spaces are essentially a hack, since you can
         #        technically include any kind of complex type after the operator.
         elif not segments or operator_name in self._declaration_operators_with_spaces or operator_name in self._declaration_operators_with_errors:
-            newsegments = [range for range in segments[:-1]]
-            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
-            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
-            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+            object, selected = guess_declaration(segments, 0)
 
             transformed = next(lookup[operator_name] for lookup in [self._declaration_operators_with_spaces, self._declaration_operators_with_errors] if operator_name in lookup)
             operator_result = (operator_name, "operator_{:s}".format(transformed)) if segments else (operator_name, operator_name)
@@ -2299,21 +2298,12 @@ class function(mangled):
             contents, ignored = self.string[point : right], {' ', ''}
             assert(contents[:1] + contents[-1:] == '{}'), contents
             target = declaration_with_qualifiers(self.__tree__, self.string, (point + 1, right - 1), self.__tree__.get(point, []))
-
-            (left, right), segments = prototype_name
-            newsegments = [range for range in segments[:-2]]
-            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
-            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else (stop, stop)
-            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
-
+            object, selected = guess_declaration(segments, 1)
             return operator_name, object, target
 
         # Now we should probably handle the special-case for constructors and destructors.
         elif operator_name in {'constructor', 'destructor'}:
-            newsegments = [range for range in segments[:-1]]
-            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
-            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
-            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+            object, selected = guess_declaration(segments, 0)
             return operator_name, object
 
         # If we have an operator, but it's only non-nested tokens, then there's no details.
@@ -2329,7 +2319,10 @@ class function(mangled):
             point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
 
             if all(self.string[left : right] in ignored for left, right in nested):
-                return operator_name, declaration_with_qualifiers(self.__tree__, self.string, (left, point), newsegments)
+                candidate = self.string[start : stop]
+                transformed = self._declaration_backticks[candidate] if candidate in self._declaration_backticks else ''
+                operator_result = (operator_name, transformed) if transformed else (operator_name, operator_name)
+                return operator_result, declaration_with_qualifiers(self.__tree__, self.string, (left, point), newsegments)
 
             # But if there are nested tokens, then we're likely braced and containing a type.
             (left, right) = nested[-1]
@@ -2349,10 +2342,8 @@ class function(mangled):
             else:
                 point, begin = segments[-1] if segments else (right, right)
                 end = begin
-
             object = declaration_with_qualifiers(self.__tree__, self.string, (left, point), newsegments)
 
-            # FIXME: This is accessing a namespace that is completely deprecated.
             candidate = self.string[begin : end]
             transformed = self._declaration_backticks[candidate] if candidate in self._declaration_backticks else ''
             operator_result = (operator_name, transformed) if transformed else (operator_name, operator_name)
