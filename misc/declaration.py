@@ -2295,14 +2295,18 @@ class function(mangled):
 
         # Otherwise, it should be a transformed operator and we can extract details from the braces.
         elif self.__operator:
-            [(_, start), (point, right)] = segments[-2:] if len(segments) > 1 else [(start, start)] + segments[-1:]
+            [(_, stop), (point, right)] = segments[-2:] if len(segments) > 1 else [(start, start)] + segments[-1:]
             contents, ignored = self.string[point : right], {' ', ''}
             assert(contents[:1] + contents[-1:] == '{}'), contents
-            trimmed, qualifiers = (point + 1, right - 1), {qualifier[1:] for qualifier in self._declaration_qualified_operator}
-            declaration, qualifiers = extract.qualifiers(self.string, trimmed, self.__tree__.get(point, []), qualifiers=qualifiers)
-            iterable = [self.string[left : right] for left, right in token.segments(*qualifiers)]
-            (left, right), _ = declaration
-            return self.string[start : point], self.string[left : right], [string for string in iterable if string not in ignored]
+            target = declaration_with_qualifiers(self.__tree__, self.string, (point + 1, right - 1), self.__tree__.get(point, []))
+
+            (left, right), segments = prototype_name
+            newsegments = [range for range in segments[:-2]]
+            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
+            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else (stop, stop)
+            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+
+            return operator_name, object, target
 
         # Now we should probably handle the special-case for constructors and destructors.
         elif operator_name in {'constructor', 'destructor'}:
