@@ -1609,6 +1609,88 @@ class mangled(object):
         'operator=^':           'bxor_assign',
     }
 
+    # Mapping containing the rules to transform the known backticked operator types.
+    # XXX: Most of these are non-terminated and the full names depends on the typename.
+    _declaration_backticks = {
+        "`anonymous namespace'":                            'anonymous',
+        "`base-instance'":                                  'base_instance',
+        "`class constructor`":                              'constructor',
+        "`class destructor`":                               'destructor',
+        "`construction vtable for'":                        'construction_vtable_',
+        "`copy constructor closure'":                       'copy_constructor_closure',
+        "`copy-region-'":                                   'copy_region_',
+        "`covariant return thunk to'":                      'covariant_return_',
+        "`default constructor closure'":                    'constructor_closure',
+        "`dynamic atexit destructor for '":                 'dynamic_atexit_',
+        "`dynamic initializer for '":                       'initializer_',
+        "`eh vector constructor iterator'":                 'eh::__vec_ctor',
+        "`eh vector copy constructor iterator'":            'eh::__vec_copy',
+        "`eh vector destructor iterator'":                  'eh::__vec_dtor',
+        "`eh vector vbase constructor iterator'":           'eh::__vec_ctor_vb',
+        "`eh vector vbase copy constructor iterator'":      'eh::__vec_copy_vb',
+        "`global constructor keyed to'":                    'constructor_',
+        "`global destructor keyed to'":                     'destructor_',
+        "`guard variable for'":                             'guard_variable_',
+        "`local static destructor helper'":                 'static_destructor_helper',
+        "`local static guard'":                             'static_guard',
+        "`local static thread guard'":                      'static_thread_guard',
+        "`local vftable constructor closure'":              'vftable_constructor_closure',
+        "`local vftable'":                                  'vftable',
+        "`managed vector constructor iterator'":            'managed::__vec_ctor',
+        "`managed vector copy constructor iterator'":       'managed::__vec_copy',
+        "`managed vector destructor iterator'":             'managed::__vec_dtor',
+        "`non-virtual thunk to'":                           'static_thunk_',
+        "`omni callsig'":                                   'omni_callsig',
+        "`placement delete[] closure'":                     'placement_delete_array_closure',
+        "`placement delete closure'":                       'placement_delete_closure',
+        "`scalar deleting destructor'":                     'scalar_deleting_destructor',
+        "`static-initialization-fun'":                      'static_initialization',
+        "`static-termination-fun'":                         'static_termination',
+        "`string literal'":                                 'string',
+        "`string'":                                         'string',
+        "`template-parameter'":                             'template_parameter',
+        "`template static data member constructor helper'": 'static_template_helper_constructor',
+        "`template static data member destructor helper'":  'static_template_helper_destructor',
+        "`temp-'":                                          'temp_',
+        "`typeinfo for'":                                   'typeinfo_',
+        "`typeinfo name for'":                              'typename_',
+        "`typeof'":                                         'typeof',
+        "`udt returning'":                                  'udt_returning',
+        "`vbase destructor'":                               'vbase_destructor',
+        "`vbtable'":                                        'vbtable',
+        "`vcall'":                                          'vcall',
+        "`vector constructor iterator'":                    '__vec_ctor',
+        "`vector copy constructor iterator'":               '__vec_copy',
+        "`vector deleting destructor'":                     '__vec_dtor',
+        "`vector destructor iterator'":                     '__vec_dtor',
+        "`vector vbase constructor iterator'":              '__vec_ctor_vb',
+        "`vector vbase copy constructor iterator'":         '__vec_copy_vb',
+        "`vftable'":                                        'vftable',
+        "`virtual-base-instance'":                          'vbaseinstance',
+        "`virtual-base-ptr'":                               'vbaseptr',
+        "`virtual displacement map'":                       'vdispmap',
+        "`virtual-fn-table-ptr-table'":                     'vfunctable_ptrt',
+        "`virtual-fn-table-ptr'":                           'vfunctable_ptr',
+        "`virtual thunk to'":                               'thunk_',
+        "`vtable for'":                                     'vtable_',
+        "`vtbl'":                                           'vtable',
+        "`VTT for'":                                        'vtt_',
+
+        # runtime-type information
+        #"`RTTI ":                               'rtti_',
+        "`RTTI Base Class Descriptor at ":      'rtti_base_descriptor_',
+        "`RTTI Base Class Array'":              'rtti_base_array_',
+        "`RTTI Class Hierarchy Descriptor'":    'rtti_descriptor',
+        "`RTTI Complete Object Locator'":       'rtti_locator',
+
+        # unknown
+        "`__vdthk__'": '__vdthk__',
+
+        # XXX: pragmas i guess?
+        #"`adjustor{": '',
+        #"`vtordisp{": '',
+    }
+
     # These flags seem to be required on earlier versions of the disassembler.
     __required_flags = getattr(idaapi, 'MNG_IGN_ANYWAY', 0x02000000) | getattr(idaapi, 'MNG_IGN_JMP', 0x04000000)
 
