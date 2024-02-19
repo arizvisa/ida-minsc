@@ -580,34 +580,24 @@ class extract(object):
                 break
             point, index = left, index + 1
 
-        # that should give us the convention at least, so now we need to setup
-        # in order to distinguish pointer-to-member, which looks exactly like
-        # a function pointer, but isn't one at all. I fucking hate C++...
+        # that should've given us the convention, so now we need to setup the
+        # range and remaining segments so that we can extract the qualifiers.
         selected = segments[:index]
         selected_convention = (start, point), selected[:-1]
         remaining = segments[index:] if index < len(segments) else segments[:]
+        left, right = segments[index] if index < len(segments) else (point, point)
+        point = left if string[point : left] in whitespace else point
 
-        # now we start by consuming tokens that are contiguous symbols or
-        # whitespace. the name is after, except for pointer-to-member.
-        left, right = selected[-1] if selected else (point, point)
-        index, point, start = 0, right, right
-        while index < len(remaining) and string[left : right] in ignored:
-            left, right = remaining[index]
-            if point != left:
-                break
-            point, index = right, index + 1
+        # now, whatever we have left should be the name. function pointers look
+        # exactly like pointer-to-member operators. so unfortunately, the name
+        # that we return as a selection can also be the target of that operator.
+        selected_name, selected_qualifiers = cls.qualifiers(string, (point, stop), remaining)
 
-        # so, everything we just took, should've been just pointers. if
-        # we didn't consume anything, then this is a pointer-to-member.
-        # both of these get returned in the name regardless, so we're done.
-        selected_name = (point, stop), remaining[index:]
-        selected_pointers = (start, point), remaining[:index]
-
-        # everything we skipped is the pointer definition where each
-        # segment is contiguous and we only need it filtered to return.
+        # that should give us the name along with any valid qualifiers. we just
+        # need to return both the convention and qualifiers as lists of segments.
         convention = [(left, right) for left, right in token.segments(*selected_convention)]
-        pointers = [(left, right) for left, right in remaining[:index] if string[left : right] not in whitespace]
-        return convention, pointers, selected_name
+        qualifiers = [(left, right) for left, right in token.segments(*selected_qualifiers)]
+        return convention, qualifiers, selected_name
 
 class nested(object):
     """
