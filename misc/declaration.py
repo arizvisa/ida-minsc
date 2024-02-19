@@ -181,18 +181,6 @@ def unmangle_arguments(ea, info):
         res.append((t.strip(), name.strip()))
     return res
 
-## examples to test below code with
-#"??_U@YAPAXI@Z"
-#"?_BADOFF_func@std@@YAABJXZ"
-#"??$_Div@N@?$_Complex_base@NU_C_double_complex@@@std@@IAEXABV?$complex@N@1@@Z"
-#"??6?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEAAV01@PBX@Z"
-#"??1?$basic_ostream@DU?$char_traits@D@std@@@std@@UAE@XZ"
-#"??_F?$basic_stringstream@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QAEXXZ"
-#"??1type_info@@UAE@XZ"
-#"sub_784B543B"
-#"?_Atexit@@YAXP6AXXZ@Z"
-#"?__ArrayUnwind@@YGXPAXIHP6EX0@Z@Z"
-
 class extract(object):
     """
     This namespace is responsible for extracting specific parts of an
@@ -576,31 +564,50 @@ class extract(object):
         '''Use the given `range` on both `string` and `segments` to return a tuple containing the calling convention, the segments of each symbol, and the tokens that compose the name.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
         assert(string[start:][:+1] + string[:stop][-1:] in assertion if assertion else True), string[start:][:+1] + string[:stop][-1:]
-        adjustment, ignored = 1 if assertion else 0, {item for item in symbols} | whitespace
+        adjustment, ignored, spaces = 1 if assertion else 0, {item for item in symbols} | whitespace | {''}, whitespace | {''}
 
         # now we can shrink our range excluding the parentheses, and then extract
-        # the convention from the start up to the very first symbol of some sort.
+        # the convention from the start up to the very first space or symbol.
         start, stop = start + adjustment, stop - adjustment
         left, right = segments[0] if segments else (start, start)
-        convention, start = (start, left), left
 
-        # next, we keep consuming tokens while they're contiguous and they're
-        # symbols. this should give us the reference depth of the pointer.
-        index, point = 0, left
-        while index < len(segments) and string[left : right] in ignored:
+        # next, we keep consuming tokens while they're whitespace, this should
+        # give us any space-separated conventions found at the beginning.
+        index, point = 0, start
+        while index < len(segments) and string[left : right] in spaces:
             left, right = segments[index]
+            if string[left : right] not in spaces:
+                break
+            point, index = left, index + 1
+
+        # that should give us the convention at least, so now we need to setup
+        # in order to distinguish pointer-to-member, which looks exactly like
+        # a function pointer, but isn't one at all. I fucking hate C++...
+        selected = segments[:index]
+        selected_convention = (start, point), selected[:-1]
+        remaining = segments[index:] if index < len(segments) else segments[:]
+
+        # now we start by consuming tokens that are contiguous symbols or
+        # whitespace. the name is after, except for pointer-to-member.
+        left, right = selected[-1] if selected else (point, point)
+        index, point, start = 0, right, right
+        while index < len(remaining) and string[left : right] in ignored:
+            left, right = remaining[index]
             if point != left:
                 break
             point, index = right, index + 1
 
-        # now we have the starting point that the name begins
-        # at along with all of the segments that compose it.
-        name = (point, stop), segments[index:]
+        # so, everything we just took, should've been just pointers. if
+        # we didn't consume anything, then this is a pointer-to-member.
+        # both of these get returned in the name regardless, so we're done.
+        selected_name = (point, stop), remaining[index:]
+        selected_pointers = (start, point), remaining[:index]
 
         # everything we skipped is the pointer definition where each
         # segment is contiguous and we only need it filtered to return.
-        pointers = [(left, right) for left, right in segments[:index] if string[left : right] not in whitespace]
-        return convention, pointers, name
+        convention = [(left, right) for left, right in token.segments(*selected_convention)]
+        pointers = [(left, right) for left, right in remaining[:index] if string[left : right] not in whitespace]
+        return convention, pointers, selected_name
 
 class nested(object):
     """
