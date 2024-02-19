@@ -2221,9 +2221,19 @@ class function(mangled):
             iterable = extract.parameters(self.__tree__, self.string, braces)
             parameters = [self.string[left : right] for (left, right), _ in iterable]
 
+            # We know the last 2 components are backticked and braced, so we
+            # can simply skip back from it in order to extract the owning object.
+            newsegments = segments[:-2]
+            peek = operator.getitem(self.string, slice(*newsegments[-1])) if newsegments else ''
+            point, _ = newsegments.pop() if peek == '::' else [newsegments.pop(), newsegments.pop()][-1] if peek == '()' else segments[-1]
+            object = declaration_with_qualifiers(self.__tree__, self.string, (start, point), newsegments)
+
             # Now we can just return a tuple prefixed with the operator.
             left, right = operator_name
-            return self.string[left : right], parameters
+            string = self.string[left : right]
+            transformed = self._declaration_backticks[string] if string in self._declaration_backticks else ''
+            operator_result = (string, transformed) if segments else (string, string)
+            return operator_result, object, parameters
 
         # If it's a known operator, then this is likely parameterized with angles.
         elif operator_name in self._declaration_operators:
@@ -2340,7 +2350,7 @@ class function(mangled):
 
             # FIXME: This is accessing a namespace that is completely deprecated.
             candidate = self.string[begin : end]
-            transformed = unmangled._declaration_rules[candidate] if candidate in unmangled._declaration_rules else ''
+            transformed = self._declaration_backticks[candidate] if candidate in self._declaration_backticks else ''
             operator_result = (operator_name, transformed) if transformed else (operator_name, operator_name)
 
             return operator_result, object, brace[1 : -1]
@@ -2436,7 +2446,7 @@ class name_component(selection):
         (start, stop), segments = self.__selection__
         candidate = (left, right) = segments[-1] if len(segments) else (stop, stop)
         string = self.__string__[left : right]
-        assert(operator.eq(*candidate) or string[:1] + string[-1:] in {'<>', "`'"}), string
+        assert(operator.eq(*candidate) or string[:1] + string[-1:] in {'<>', "`'", "{}"}), string
         if len(segments) > 1:
             cls = self.__class__
             (left, right), parameters = extract.trimmed(self.__string__, (start, left), segments[-1:])
