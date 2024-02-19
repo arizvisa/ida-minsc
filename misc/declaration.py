@@ -2435,10 +2435,6 @@ class function_pointer_with_qualifiers(selection):
         self.__cache_convention = convention, tree.get(start, [])
 
     @property
-    def __correct_selection_for_missing_convention(self):
-        (start, stop), segments = self.__selection__
-
-    @property
     def declaration(self):
         decl, _ = extract.qualifiers(self.__string__, *self.__selection__)
         (start, stop), _ = decl
@@ -2472,8 +2468,8 @@ class function_pointer_with_qualifiers(selection):
         (left, right), _ = self.__cache_convention
         if left < right:
             convention, _, _ = extract.function_pointer_convention(self.__string__, *self.__cache_convention)
-            left, right = convention
-        return self.__string__[left : right]
+            return [self.__string__[left : right] for left, right in convention]
+        return []
 
     @property
     def qualifiers(self):
