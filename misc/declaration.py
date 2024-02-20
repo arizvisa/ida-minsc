@@ -2208,9 +2208,14 @@ class function(mangled):
             object = declaration_with_qualifiers(self.__tree__, self.string, (start, left), newsegments)
             return object, selected_operator
 
+        # If there's no segments or operator name, then this is just a regular object.
+        if not segments and not operator_name:
+            object = declaration_with_qualifiers(self.__tree__, self.string, *prototype_name)
+            return object,
+
         # If we're a backticked operator with a brace, then our operator is a
         # vcall or similar. So, we need the last 2 segments of the name...
-        if operator_name[:1] + operator_name[-1:] == '`}':
+        elif operator_name[:1] + operator_name[-1:] == '`}':
             [operator_name, braces] = segments[-2:]
 
             # The braces segment can simply be treated as ','-delimited parameters.
@@ -2259,7 +2264,7 @@ class function(mangled):
 
         # FIXME: These operators_with_spaces are essentially a hack, since you can
         #        technically include any kind of complex type after the operator.
-        elif not segments or operator_name in self._declaration_operators_with_spaces or operator_name in self._declaration_operators_with_errors:
+        elif operator_name in self._declaration_operators_with_spaces or operator_name in self._declaration_operators_with_errors:
             object, selected = guess_declaration(segments, 0)
 
             transformed = next(lookup[operator_name] for lookup in [self._declaration_operators_with_spaces, self._declaration_operators_with_errors] if operator_name in lookup)
@@ -2335,15 +2340,22 @@ class function(mangled):
             return operator_result, object, brace[1 : -1]
 
         # If there's no operator, then we need to check our name for what the user wants.
-        [(start, stop)] = segments[-1:]
-        string = self.string[start : stop]
+        [(point, right)] = segments[-1:]
+        string = self.string[point : right]
 
         # If it's backticked, then the braces are within the backtick.
         if string[:1] + string[-1:] == "`'":
-            segments = self.__tree__.get(start, [])
-            left, right = segments[-1] if segments else (stop, stop)
+            ticked = self.__tree__.get(point, [])
+            left, right = ticked[-1] if ticked else (right, right)
             iterable = extract.parameters(self.__tree__, self.string, (left, right)) if left != right else []
-            return self.string[start : left] + "'", [self.string[left : right] for (left, right), _ in iterable]
+            object, selected = guess_declaration(segments, 1)
+            method_range, method_segments = selected
+            method_name = operator.getitem(self.string, slice(*method_range))
+            [method_short_range] = method_segments[:1] if method_segments else [(left, left)]
+            method_short = operator.getitem(self.string, slice(*method_short_range))
+            transformed = self._declaration_backticks[method_short] if method_short in self._declaration_backticks else ''
+            method_result = (method_name, transformed) if transformed else (method_name, method_name)
+            return method_result, object, self.string[point : left] + "'", [self.string[left : right] for (left, right), _ in iterable]
 
         # If we got here, then there just aren't any details for us to extract.
         return ()
