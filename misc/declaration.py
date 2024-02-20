@@ -2117,12 +2117,6 @@ class function(mangled):
             result = self.__cache_result_and_convention = result_trimmed, (left, right)
             return result
 
-        # If the convention segment represents a string that starts with "__",
-        # then just warn the user about it since it might be a candidate.
-        if self.string[left : right].startswith('__'):
-            cls, result = self.__class__, ()
-            logging.warning(u"{:s}.__result_and_convention: Ignoring candidate for calling convention \"{:s}\" due to it being unknown.".format('.'.join([__name__, cls.__name__]), utils.string.escape(self.string[left : right], '"')))
-
         # Otherwise, there is no convention and we store an empty segment for it.
         (left, right), _ = result_and_convention
         result = self.__cache_result_and_convention = result_and_convention, (right, right)
