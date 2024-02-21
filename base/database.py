@@ -4977,6 +4977,13 @@ class type(object):
     exception = has_exception = isexception = hasexception = exceptionQ = utils.alias(is_exception, 'type')
 
 t = type    # XXX: ns alias
+size = utils.alias(type.size, 'type')
+is_code = utils.alias(type.is_code, 'type')
+is_data = utils.alias(type.is_data, 'type')
+is_unknown = utils.alias(type.is_unknown, 'type')
+is_head = utils.alias(type.is_head, 'type')
+is_tail = utils.alias(type.is_tail, 'type')
+is_align = utils.alias(type.is_align, 'type')
 
 class types(object):
     """
@@ -5752,15 +5759,6 @@ class types(object):
         logging.info(u"{:s}.declare({!r}, {:s}{:s}) : Successfully parsed the given string into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', " ({:s})".format(name) if name else ''))
         return (name, ti) if flag & idaapi.PT_VAR else ti
     parse = decl = utils.alias(declare, 'types')
-
-## information about a given address
-size = utils.alias(type.size, 'type')
-is_code = utils.alias(type.is_code, 'type')
-is_data = utils.alias(type.is_data, 'type')
-is_unknown = utils.alias(type.is_unknown, 'type')
-is_head = utils.alias(type.is_head, 'type')
-is_tail = utils.alias(type.is_tail, 'type')
-is_align = utils.alias(type.is_align, 'type')
 
 class xref(object):
     """
