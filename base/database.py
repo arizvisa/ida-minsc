@@ -5479,15 +5479,17 @@ class types(object):
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def iterate(cls, name):
+    def iterate(cls, name, **type):
         '''Iterate through the types within the current type library that match the glob specified by `name`.'''
-        return cls.iterate(interface.tinfo.library(), like=name)
+        type['like'] = name
+        return cls.iterate(interface.tinfo.library(), **type)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def iterate(cls, name, library):
+    def iterate(cls, name, library, **type):
         '''Iterate through the types within the type `library` that match the glob specified by `name`.'''
-        return cls.iterate(library, like=name)
+        type['like'] = name
+        return cls.iterate(library, **type)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
@@ -5513,23 +5515,23 @@ class types(object):
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def search(cls, name):
+    def search(cls, name, **type):
         '''Search through the types within the current type library that match the glob `name` and return the first result.'''
-        til = idaapi.get_idati()
-        return cls.search(til, like=name)
+        type['like'] = name
+        return cls.search(interface.tinfo.library(), **type)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def search(cls, name, library):
+    def search(cls, name, library, **type):
         '''Search through the types within the type `library` that match the glob `name` and return the first result.'''
-        return cls.search(library, like=name)
+        type['like'] = name
+        return cls.search(library, **type)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def search(cls, **type):
         '''Search through the types in the current type library that match the keywords specified by `type`.'''
-        til = idaapi.get_idati()
-        return cls.search(til, **type)
+        return cls.search(interface.tinfo.library(), **type)
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
@@ -5553,23 +5555,23 @@ class types(object):
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def list(cls, name):
+    def list(cls, name, **type):
         '''List the types within the current type library that match the glob specified by `name`.'''
-        til = idaapi.get_idati()
-        return cls.list(til, like=name)
+        type['like'] = name
+        return cls.list(interface.tinfo.library(), **type)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def list(cls, name, library):
+    def list(cls, name, library, **type):
         '''List the types within the type `library` that match the glob specified by `name`.'''
-        return cls.list(library, like=name)
+        type['like'] = name
+        return cls.list(library, **type)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def list(cls, **type):
         '''List the types within the current type library that match the keywords specified by `type`.'''
-        til = idaapi.get_idati()
-        return cls.list(til, **type)
+        return cls.list(interface.tinfo.library(), **type)
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
@@ -5697,8 +5699,7 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def by_name(cls, name):
         '''Return the type information that has the specified `name`.'''
-        til = idaapi.get_idati()
-        return cls.by_name(name, til)
+        return cls.by_name(name, interface.tinfo.library())
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5713,8 +5714,7 @@ class types(object):
     @classmethod
     def by_index(cls, ordinal):
         '''Return the type information that is at the given `ordinal`.'''
-        til = idaapi.get_idati()
-        return cls.by_index(ordinal, til)
+        return cls.by_index(ordinal, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def by_index(cls, ordinal, library):
@@ -5722,8 +5722,8 @@ class types(object):
         if not (0 < ordinal < idaapi.get_ordinal_qty(library)):
             raise E.ItemNotFoundError(u"{:s}.by_index({:d}, {:s}) : No type information was found in the type library for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
 
-        ti, td = idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
-        if not ti.create_typedef(td):
+        ti = interface.tinfo.reference(ordinal, library)
+        if not ti:
             raise E.DisassemblerError(u"{:s}.get({:d}, {:s}) : Unable to create a type that references the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
         return ti
 
@@ -5731,8 +5731,7 @@ class types(object):
     @classmethod
     def name(cls, ordinal):
         '''Return the name of the type from the current type library at the specified `ordinal`.'''
-        til = idaapi.get_idati()
-        return cls.name(ordinal, til)
+        return cls.name(ordinal, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def name(cls, ordinal, library):
@@ -5748,8 +5747,7 @@ class types(object):
     @utils.string.decorate_arguments('string')
     def name(cls, ordinal, string, **mangled):
         '''Set the name of the type at the specified `ordinal` from the current library to `string`.'''
-        til = idaapi.get_idati()
-        return cls.name(ordinal, string, til, **mangled)
+        return cls.name(ordinal, string, interface.tinfo.library(), **mangled)
     @utils.multicase(ordinal=internal.types.integer, string=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('string')
@@ -5774,8 +5772,7 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def ordinal(cls, name):
         '''Return the ordinal number for the type with the specified `name`.'''
-        til = idaapi.get_idati()
-        return cls.ordinal(name, til)
+        return cls.ordinal(name, interface.tinfo.library())
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5848,15 +5845,13 @@ class types(object):
     @classmethod
     def set(cls, ordinal, info):
         '''Assign the type information `info` to the type at the specified `ordinal` of the current type library.'''
-        til = idaapi.get_idati()
-        return cls.set(ordinal, info, til)
+        return cls.set(ordinal, info, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     @utils.string.decorate_arguments('name')
     def set(cls, ordinal, name, info, **mangled):
         '''Assign the type information `info` with the specified `name` to the given `ordinal` of the current type library.'''
-        til = idaapi.get_idati()
-        return cls.set(ordinal, name, info, til, **mangled)
+        return cls.set(ordinal, name, info, interface.tinfo.library(), **mangled)
     @utils.multicase(ordinal=internal.types.integer, info=(internal.types.string, idaapi.tinfo_t), library=idaapi.til_t)
     @classmethod
     def set(cls, ordinal, info, library):
@@ -5925,8 +5920,7 @@ class types(object):
     @classmethod
     def remove(cls, ordinal):
         '''Remove the type information at the specified `ordinal` of the current type library.'''
-        til = idaapi.get_idati()
-        return cls.remove(ordinal, til)
+        return cls.remove(ordinal, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def remove(cls, ordinal, library):
@@ -5940,8 +5934,7 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def remove(cls, name, **mangled):
         '''Remove the type information with the specified `name` from the current type library.'''
-        til = idaapi.get_idati()
-        return cls.remove(name, til, **mangled)
+        return cls.remove(name, interface.tinfo.library(), **mangled)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5966,8 +5959,7 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def add(cls, name, **mangled):
         '''Add an empty type with the provided `name` to the current type library.'''
-        til = idaapi.get_idati()
-        return cls.add(name, til, **mangled)
+        return cls.add(name, interface.tinfo.library(), **mangled)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5980,8 +5972,7 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def add(cls, name, info, **mangled):
         '''Add the type information in `info` to the current type library using the provided `name`.'''
-        til = idaapi.get_idati()
-        return cls.add(name, info, til, **mangled)
+        return cls.add(name, info, interface.tinfo.library(), **mangled)
     @utils.multicase(name=internal.types.string, string=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -6033,8 +6024,7 @@ class types(object):
     @classmethod
     def count(cls):
         '''Return the number of types that are available within the current type library.'''
-        til = idaapi.get_idati()
-        return cls.count(til)
+        return cls.count(interface.tinfo.library())
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     def count(cls, library):
@@ -6048,8 +6038,7 @@ class types(object):
 
         If the integer `flags` is provided, then use the specified flags (``idaapi.PT_*``) when parsing the `string`.
         """
-        til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
-        return cls.declare(string, til, **flags)
+        return cls.declare(string, interface.tinfo.library(), **flags)
     @utils.multicase(string=internal.types.string, library=idaapi.til_t)
     @classmethod
     def declare(cls, string, library):
@@ -6090,7 +6079,7 @@ class types(object):
         pi = idaapi.ptr_type_data_t()
         if not info.get_ptr_details(pi):
             raise E.DisassemblerError(u"{:s}.dereference(\"{:s}\") : Unable to get the pointer type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
-        return pi.obj_type
+        return interface.tinfo.concretize(pi.obj_type)
 
     @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string))
     @classmethod
@@ -6111,7 +6100,7 @@ class types(object):
     @classmethod
     def pointer(cls, sptr, size, attributes, **fields):
         '''Create a pointer of `size` bytes that references the structure specified by `sptr` with the given `size` and extended `attributes`.'''
-        ti = type(sptr.id)
+        ti = interface.address.typeinfo(sptr.id)
         return cls.pointer(ti, size, attributes, **fields)
     @utils.multicase(string=internal.types.string, size=internal.types.integer, attributes=internal.types.integer)
     @classmethod
@@ -6141,22 +6130,13 @@ class types(object):
         ti = idaapi.tinfo_t()
         if not ti.create_ptr(pi):
             raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to create a pointer for the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', "{!s}".format(info)))
-        return ti
+        return interface.tinfo.concretize(ti)
 
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
     def array(cls, info):
         '''Return a tuple containing the element type and length of the array specified by `info`.'''
-        if not info.has_details():
-            raise E.MissingTypeOrAttrbute(u"{:s}.array(\"{:s}\") : The provided type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
-
-        if not info.is_array():
-            raise E.InvalidTypeOrValueError(u"{:s}.array(\"{:s}\") : The provided type information ({!r}) is not an array.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
-
-        ai = idaapi.array_type_data_t()
-        if not info.get_array_details(ai):
-            raise E.DisassemblerError(u"{:s}.array(\"{:s}\") : Unable to get the array type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
-        return ai.elem_type, ai.nelems
+        return interface.tinfo.array(info)
     @utils.multicase(element=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string), length=internal.types.integer)
     @classmethod
     def array(cls, element, length):
@@ -6194,7 +6174,7 @@ class types(object):
         ti = idaapi.tinfo_t()
         if not ti.create_array(ai):
             raise E.DisassemblerError(u"{:s}.array(\"{:s}\", {:d}, {:d}) : Unable to create an array using the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(element), '"'), length, base, "{!s}".format(element)))
-        return ti
+        return interface.tinfo.concretize(ti)
 
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
