@@ -5432,6 +5432,12 @@ class tinfo(object):
         # Now we ';'-terminate the type in order for the disassembler to understand it.
         terminated = string if string.rstrip().endswith(';') else "{:s};".format(string)
 
+        # If the terminated string is 'void', then manually create the void type
+        # since the disassembler refuses to parse 'void' into a type for us.
+        if terminated.strip('; ') in {'void'}:
+            BTF_VOID = idaapi.BTF_VOID if hasattr(idaapi, 'BTF_VOID') else getattr(idaapi, 'BT_VOID', 1) | getattr(idaapi, 'BTMT_SIZE0', 0)
+            return cls.get(til, bytearray([BTF_VOID]))
+
         # Ask the disassembler to parse this into a tinfo_t for us. We default to the
         # silent flag so that we're responsible for handling it if there's an error.
         if idaapi.__version__ < 6.9:
