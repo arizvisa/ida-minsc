@@ -1784,6 +1784,7 @@ class entries(object):
         `bounds` - Filter the entrypoints within the given boundaries
         `regex` - Filter the entrypoint names according to a regular-expression
         `iregex` - Filter the entrypoint names according to a case-insensitive regular-expression
+        `mangled` - Filter the entrypoint names for any that are mangled
         `index` - Filter the entrypoints by an index or a list of indices
         `ordinal` - Filter the entrypoint by an ordinal or a list of ordinals
         `greater` or `ge` - Filter the entrypoints for any after the specified address (inclusive)
@@ -1816,6 +1817,8 @@ class entries(object):
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('mangled', utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, utils.fdefault(''), idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else operator.startswith(('__', '?'))), idaapi.get_entry_ordinal, utils.fcondition(utils.fcompose(idaapi.get_entry_name, operator.truth))(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, interface.name.get)), utils.fdefault(''), utils.string.of)
+    __matcher__.alias('decorated', 'mangled')
     __matcher__.mapping('function', interface.function.has, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
