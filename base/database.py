@@ -2037,14 +2037,15 @@ class entries(object):
         for index in cls.__iterate__(**type):
             maxindex = max(index, maxindex)
 
-            res = idaapi.get_entry_ordinal(index)
-            maxaddr = max(idaapi.get_entry(res), maxaddr)
-            maxordinal = max(res, maxordinal)
+            res = cls.__entryordinal__(index)
+            ea = idaapi.get_entry(res)
+            maxaddr = max(ea, maxaddr)
+            maxordinal = maxordinal if res == ea else max(res, maxordinal)
 
             listable.append(index)
 
         # Collect the maximum sizes for everything from the first pass
-        cindex, cordinal = (utils.string.digits(maxindex, 10) for item in [maxindex, maxordinal])
+        cindex, cordinal = (utils.string.digits(item, 10) for item in [maxindex, maxordinal])
         caddr = utils.string.digits(maxaddr, 16)
 
         # List all the fields from everything that matched
@@ -2075,7 +2076,7 @@ class entries(object):
             # Otherwise, we always try to display the type regardless of what's available.
             else:
                 description = tags.get('__typeinfo__', realname)
-            six.print_(u"{:<{:d}s} {:s} {:<#{:d}x} : {:s} : {:s}".format("[{:d}]".format(index), 2 + math.trunc(cindex), "{:>{:d}s}".format('' if ea == ordinal else "(#{:d})".format(ordinal), 2 + 1 + math.trunc(cindex)), ea, 2 + math.trunc(caddr), ''.join(flags), description))
+            six.print_(u"{:<{:d}s} {:s} {:<#{:d}x} : {:s} : {:s}".format("[{:d}]".format(index), 2 + math.trunc(cindex), "{:>{:d}s}".format('' if ea == ordinal else "(#{:d})".format(ordinal), 2 + 1 + math.trunc(cordinal)), ea, 2 + math.trunc(caddr), ''.join(flags), description))
         return
 
     @utils.multicase(name=internal.types.string)
