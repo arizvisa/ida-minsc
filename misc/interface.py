@@ -5431,12 +5431,19 @@ class tinfo(object):
 
         # Now we ';'-terminate the type in order for the disassembler to understand it.
         terminated = string if string.rstrip().endswith(';') else "{:s};".format(string)
+        stripped = terminated.strip('; ')
 
         # If the terminated string is 'void', then manually create the void type
         # since the disassembler refuses to parse 'void' into a type for us.
-        if terminated.strip('; ') in {'void'}:
+        if stripped in {'void'}:
             BTF_VOID = idaapi.BTF_VOID if hasattr(idaapi, 'BTF_VOID') else getattr(idaapi, 'BT_VOID', 1) | getattr(idaapi, 'BTMT_SIZE0', 0)
             return cls.get(til, bytearray([BTF_VOID]))
+
+        # For some reason the disassembler does not like to parse pointers/arrays to
+        # unnamed unions that are prefixed with "union"...So, we have to strip it.
+        elif not flags & idaapi.PT_VAR and stripped.startswith(('union ', 'const union ')) and stripped.endswith(('*', '*const', '&', '&const', ']')):
+            for_split_twice = ' ' + terminated.lstrip() if stripped.startswith('union ') else terminated.lstrip()
+            _, _, terminated = for_split_twice.split(' ', 2)
 
         # Ask the disassembler to parse this into a tinfo_t for us. We default to the
         # silent flag so that we're responsible for handling it if there's an error.
