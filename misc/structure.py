@@ -2740,7 +2740,7 @@ class member_t(object):
 
             # Get any member attributes that we're able to. we don't have any typeinfo
             # to serialize, but we still need tinfo_t.deserialize to fail successfully.
-            comments = tuple(utils.string.of(idaapi.get_member_cmt(mptr.id, item)) for item in [True, False])
+            comments = tuple(member.get_comment(mptr, item) for item in [True, False])
             msize = idaapi.get_member_size(mptr)
             ty = mptr.flag, idaapi.BADADDR, msize
             typeinfo = ty, (b'', b'')
@@ -2758,7 +2758,8 @@ class member_t(object):
             state = mptr.props, mptr.soff, typeinfo, mname, comments
             return parent, self.__index__, state
 
-        # grab its typeinfo and serialize it
+        # We need to distinguish whether we can deserialize the type correctly, so
+        # we grab its typeinfo and check the api for replace_ordinal_typerefs...
         tid = self.typeid
         tid = None if tid is None else new(tid, self.offset) if has(tid) else tid
         flag, size = mptr.flag, idaapi.get_member_size(mptr)
@@ -2766,14 +2767,22 @@ class member_t(object):
 
         # if the user applied some type information to the member, then we make sure
         # to serialize it (print_tinfo) so we can parse it back into the member.
-        ti = self.typeinfo
+        ti = member.get_typeinfo(mptr)
         if '__typeinfo__' in self.tag():
             res = idaapi.PRTYPE_1LINE | idaapi.PRTYPE_SEMI | idaapi.PRTYPE_NOARRS | idaapi.PRTYPE_RESTORE
             tname = idaapi.print_tinfo('', 0, 0, res, ti, '', '')
             tinfo = idaapi.print_tinfo('', 0, 0, res | idaapi.PRTYPE_DEF, ti, tname, '')
 
-            # use a list so we can differentiate older version from newer
-            typeinfo = ty, [tname, tinfo]
+            # If we can concretize the type due to replace_ordinal_typerefs, then we
+            # can include it as part of our list. Older versions will try to re-parse
+            # the name, whereas newer versions can trust the deserialized type.
+            serialized = [ti.serialize()] if hasattr(idaapi, 'replace_ordinal_typerefs') else []
+            typeinfo = ty, [tname, tinfo] + serialized
+
+        # If all the required methods are available, then we can serialize the type
+        # without needing any sort of trickery. This requires replace_ordinal_typerefs.
+        elif hasattr(idaapi, 'replace_ordinal_typerefs') and all(hasattr(ti, methodname) for methodname in ['serialize', 'get_type_name', 'get_final_type_name']):
+            typeinfo = ty, [ti.get_final_type_name() or ti.get_type_name(), "{!s}".format(ti), ti.serialize()]
 
         # otherwise, we serialize the type into the older version. this shouldn't
         # get applied because there's a chance the type doesn't exist.
@@ -2781,8 +2790,8 @@ class member_t(object):
             typeinfo = ty, ti.serialize()
 
         # grab its comments
-        cmtt = idaapi.get_member_cmt(mptr.id, True)
-        cmtf = idaapi.get_member_cmt(mptr.id, False)
+        cmtt = member.get_comment(mptr, True)
+        cmtf = member.get_comment(mptr, False)
         comments = tuple(utils.string.of(cmt) for cmt in [cmtt, cmtf])
 
         # grab its parent name along with its name and a parsable name.
@@ -2886,7 +2895,7 @@ class member_t(object):
             if mptr and mptr.soff != soff:
                 newname = u"{:s}_{:x}".format(res, soff)
                 logging.warning(u"{:s}({:#x}, index={:d}): Duplicate name found for field \"{:s}\" of {:s} ({:s}), renaming it to \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(name, '"'), 'union' if sptr.props & idaapi.SF_UNION else 'structure', parentname, utils.string.escape(newname, '"')))
-                idaapi.set_member_name(sptr, soff, utils.string.to(newname))
+                member.set_name(mptr, newname)
 
             elif mptr:
                 logging.info(u"{:s}({:#x}, index={:d}): Ignoring field at index {:d} of {:s} ({:s}) with the same name (\"{:s}\") and position ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index, index, 'union' if sptr.props & idaapi.SF_UNION else 'structure', parentname, utils.string.escape(name, '"'), soff))
@@ -2900,7 +2909,7 @@ class member_t(object):
             if (utils.string.of(idaapi.get_member_name(mptr.id)), mptr.flag, idaapi.get_member_size(mptr)) != (res, flag, nbytes):
                 logging.warning(u"{:s}({:#x}, index={:d}): Already existing field found at {:s} ({:s}) with size ({:#x}) and flags ({:#x}), overwriting it with \"{:s}\" of size ({:#x}) and flags ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, index, "index {:d} of union".format(soff) if sptr.props & idaapi.SF_UNION else "offset {:+#x} of structure".format(soff), parentname, idaapi.get_member_size(mptr), mptr.flag, utils.string.escape(name, '"'), nbytes, flag))
                 idaapi.set_member_type(sptr, soff, flag, opinfo, nbytes)
-                idaapi.set_member_name(sptr, soff, res)
+                member.set_name(mptr, res)
 
         # unknown
         elif mem != idaapi.STRUC_ERROR_MEMBER_OK:
@@ -2919,16 +2928,27 @@ class member_t(object):
         self.__parent__, self.__index__ = parent, index
 
         # update both of the member's comments prior to fixing its type.
-        idaapi.set_member_cmt(mptr, utils.string.to(cmtt), True)
-        idaapi.set_member_cmt(mptr, utils.string.to(cmtf), False)
+        member.set_comment(mptr, cmtt, True)
+        member.set_comment(mptr, cmtf, False)
 
-        # if we're using the new tinfo version (a list), then try our hardest
-        # to parse it. if we succeed, then we likely can apply it later.
-        if isinstance(ti, types.list) and len(ti) == 2:
-            tname, tinfo = ti
-            typeinfo = interface.tinfo.parse(None, tname, idaapi.PT_SIL) if tname else None
-            typeinfo = typeinfo if typeinfo else interface.tinfo.parse(None, tinfo, idaapi.PT_SIL)
-            None if typeinfo is None else logging.info(u"{:s}({:#x}, index={:d}): Successfully parsed type information for field \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), typeinfo))
+        # if we're using the newest old tinfo version (a list), then try our
+        # hardest to parse it. if we succeed, then we likely can apply it later.
+        type_is_trusted = False
+        if isinstance(ti, types.list) and len(ti) in {2, 3}:
+            tname, tinfo, serialized = ti if len(ti) == 3 else itertools.chain(ti, [()])
+
+            # First, we try to deserialize the type we were given. If it doesn't
+            # exist or it fails, then we fall through to the next conditional.
+            typeinfo, candidate = None, idaapi.tinfo_t()
+            if serialized and len(serialized) in {1, 2, 3}:
+                type_is_trusted, typeinfo = (True, candidate) if candidate.deserialize(interface.tinfo.library(), *serialized) else (type_is_trusted, None)
+
+            # If we don't have any serialized data, then fall back to the old
+            # variation where we try to parse the name into a primitive type.
+            if not typeinfo:
+                typeinfo = interface.tinfo.parse(None, tname, idaapi.PT_SIL) if tname else None
+                typeinfo = typeinfo if typeinfo else interface.tinfo.parse(None, tinfo, idaapi.PT_SIL)
+                None if typeinfo is None else logging.info(u"{:s}({:#x}, index={:d}): Successfully parsed type information for field \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), typeinfo))
 
         # otherwise it's the old version (a tuple), and it shouldn't need to
         # exist... but, if we can actually deserialize it then later we can
@@ -2943,15 +2963,20 @@ class member_t(object):
 
         # before we do anything, we need to grab the original type information and check
         # it against what we deserialized in case we don't need to apply anything.
-        original = self.typeinfo if mem == idaapi.STRUC_ERROR_MEMBER_OK else None
+        original = member.get_typeinfo(mptr) if mem in {idaapi.STRUC_ERROR_MEMBER_OK, idaapi.STRUC_ERROR_MEMBER_NAME, idaapi.STRUC_ERROR_MEMBER_OFFSET} else None
         original_typeinfo = "{!s}".format(original if original else idaapi.tinfo_t())
-        typeinfo = typeinfo if typeinfo and original and original.compare_with(typeinfo, idaapi.TCMP_EQUAL) else None
+        typeinfo = typeinfo if any([not original, original and not original.present(), original.compare_with(typeinfo, idaapi.TCMP_EQUAL)]) else None
 
-        # if tinfo was defined and it doesn't use an ordinal, then we can apply it.
-        # FIXME: we are likely going to need to traverse this to determine if it's using an ordinal or not
-        if typeinfo and not any([typeinfo.get_ordinal(), typeinfo.is_array() and typeinfo.get_array_element().get_ordinal()]):
+        # If we can trust that the type information was deserialized correctly,
+        # with all of its ordinals being referenced by name, then we can just apply
+        # it. Otherwise, we are only able to apply it if it doesn't use any ordinals.
+        if typeinfo and (type_is_trusted or not any([typeinfo.get_ordinal(), typeinfo.is_array() and typeinfo.get_array_element().get_ordinal()])):
+
+            # FIXME: if the type is a structure (udt), and none of its members were serialized,
+            #        then things like field alignment and such are not applied. This results
+            #        in a struct->til conversion failed error when trying to calc alignments.
             try:
-                self.typeinfo = typeinfo
+                original = member.set_typeinfo(mptr, typeinfo)
 
             # if the type is not ideal, then we can pretty much ignore this because
             # the type is already there and IDA thinks that it's okay.
@@ -2972,11 +2997,10 @@ class member_t(object):
         # otherwise, we had type information that was an ordinal which might not
         # exist in our database...so we ask IDA to make a guess at what it is.
         elif typeinfo:
-            ti = idaapi.tinfo_t()
-            ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
+            ti, ok = member.get_typeinfo(mptr), False
             try:
-                if ok:
-                    self.typeinfo = ti
+                original = member.set_typeinfo(mptr, ti)
+                ok = True
 
             # if the type was not ideal, then this can be ignored because IDA
             # really knows best, and if it says we're wrong..then we're wrong.
