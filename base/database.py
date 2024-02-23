@@ -5848,18 +5848,23 @@ class types(object):
     @utils.multicase(ordinal=internal.types.integer, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     def set(cls, ordinal, info):
-        '''Assign the type information `info` to the type at the specified `ordinal` of the current type library.'''
+        '''Assign the type information in `info` to the type at the specified `ordinal` of the current type library.'''
         return cls.set(ordinal, info, interface.tinfo.library())
+    @utils.multicase(name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t))
+    @classmethod
+    def set(cls, name, info):
+        '''Assign the type information in `info` to the type identified by `name` of the current type library.'''
+        return cls.set(name, info, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     @utils.string.decorate_arguments('name')
     def set(cls, ordinal, name, info, **mangled):
-        '''Assign the type information `info` with the specified `name` to the given `ordinal` of the current type library.'''
+        '''Assign the type information in `info` with the specified `name` to the given `ordinal` of the current type library.'''
         return cls.set(ordinal, name, info, interface.tinfo.library(), **mangled)
     @utils.multicase(ordinal=internal.types.integer, info=(internal.types.string, idaapi.tinfo_t), library=idaapi.til_t)
     @classmethod
     def set(cls, ordinal, info, library):
-        '''Assign the type information `info` to the type at the `ordinal` of the specified type `library`.'''
+        '''Assign the type information in `info` to the type at the `ordinal` of the specified type `library`.'''
         try:
             # FIXME: do we get the mangled or unmangled name?
             name = cls.name(ordinal, library)
@@ -5868,6 +5873,14 @@ class types(object):
             # FIXME: if we couldn't find a name, can we create one based on the ordinal number (is_ordinal_name)?
             raise E.MissingNameError(u"{:s}.set({:d}, {!r}, {:s}) : Unable to assign the type information to the specified ordinal ({:d}) because it needs a name and a previous one was not found.".format('.'.join([__name__, cls.__name__]), ordinal, "{!s}".format(info), cls.__formatter__(library), ordinal))
         return cls.set(ordinal, name, info, library)
+    @utils.multicase(name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t), library=idaapi.til_t)
+    @classmethod
+    def set(cls, name, info, library):
+        '''Assign the type information in `info` to the type identified by `name` of the specified type `library`.'''
+        res = idaapi.get_type_ordinal(library, utils.string.to(name))
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.set({!r}, {!r}) : Could not find a type with the specified name (\"{:s}\") within the type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), utils.string.escape(name, '"')))
+        return cls.set(res, name, info, library)
     @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, string=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name', 'string')
@@ -5881,7 +5894,7 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def set(cls, ordinal, name, info, library, **mangled):
-        """Assign the type information `info` with the specified `name` to the given `ordinal` of the type `library`.
+        """Assign the type information in `info` with the specified `name` to the given `ordinal` of the type `library`.
 
         If the boolean `mangled` is specified, then the given name is mangled.
         """
