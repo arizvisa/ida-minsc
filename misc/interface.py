@@ -3261,7 +3261,8 @@ class address(object):
         # Now we need to figure out what flags to use when applying the type. If
         # the caller didn't provide any flags, we try to preserve them with the
         # intention that type changes are always guesses unless they're explicit.
-        definitive = node.aflags(ea, idaapi.AFL_USERTI)
+        guessed = node.aflags(ea, idaapi.AFL_TYPE_GUESSED if hasattr(idaapi, 'AFL_TYPE_GUESSED') else idaapi.AFL_USERTI)
+        definitive = True if guessed == idaapi.AFL_USERTI or guessed & getattr(idaapi, 'AFL_HR_DETERMINED', 0xC0000000) else False
         [tflags] = itertools.chain(flags if flags else [idaapi.TINFO_DEFINITE if definitive else idaapi.TINFO_GUESSED])
 
         # If the aflags already claim that this is a user-specified type, but we
