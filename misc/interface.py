@@ -5025,10 +5025,11 @@ class tinfo(object):
         else:
             newinfo = info
 
-        # Now we need to check the aflags for the address in order to determine
-        # which default flags we should use. We use AFL_USERTI to distinguish
-        # whether we apply the type with TINFO_DEFINITE or TINFO_GUESSED.
-        definitive = node.aflags(ea, idaapi.AFL_USERTI)
+        # Now we need to check the aflags for the address in order to determine the default
+        # flags to use when applying the type. If the decompiler guessed it, then to override,
+        # we need to set it definitively. Otherwise, we use AFL_USERTI distinguish the guess.
+        guessed = node.aflags(ea, idaapi.AFL_TYPE_GUESSED if hasattr(idaapi, 'AFL_TYPE_GUESSED') else idaapi.AFL_USERTI)
+        definitive = True if guessed == idaapi.AFL_USERTI or guessed & getattr(idaapi, 'AFL_HR_DETERMINED', 0xC0000000) else False
         [tflags] = itertools.chain(flags if flags else [idaapi.TINFO_DEFINITE if definitive else idaapi.TINFO_GUESSED])
 
         # Finally we have a proper idaapi.tinfo_t that we can apply. After we apply it,
