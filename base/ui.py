@@ -258,7 +258,10 @@ class current(object):
     @classmethod
     def address(cls):
         '''Return the current address.'''
-        return idaapi.get_screen_ea()
+        ea = idaapi.get_screen_ea()
+        if ea == idaapi.BADADDR:
+            raise internal.exceptions.AddressNotFoundError(u"{:s}.address() : Unable to determine the address from the current location.".format('.'.join([__name__, cls.__name__])))
+        return ea
     @classmethod
     def color(cls):
         '''Return the color of the current item.'''
