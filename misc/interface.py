@@ -5059,6 +5059,29 @@ class tinfo(object):
         return
 
     @classmethod
+    def format_library(cls, library, *name):
+        '''Return a string describing the specified type `library` along with an ordinal or `name` if one is given.'''
+        lclass, description = library.__class__, library.desc
+        if not name:
+            return "<{:s}; <{:s}>>".format('.'.join([lclass.__module__, lclass.__name__]), internal.utils.string.of(description))
+
+        # if we were given a name or an ordinal, then we'll include that too.
+        tclass, [ordinal_or_name] = idaapi.tinfo_t, name
+
+        if isinstance(ordinal_or_name, internal.types.string):
+            ordinal, name = idaapi.get_type_ordinal(library, internal.utils.string.to(ordinal_or_name)), ordinal_or_name
+            return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lclass.__module__, lclass.__name__]), "{:d}".format(ordinal) if ordinal else '???', name)
+
+        ordinal, name = ordinal_or_name, internal.utils.string.of(idaapi.get_numbered_type_name(library, ordinal_or_name))
+        if idaapi.get_type_ordinal(library, internal.utils.string.to(name or '')) == ordinal:
+            return "<{:s}; #{:d} \"{:s}\">".format('.'.join([lclass.__module__, lclass.__name__]), ordinal, name)
+
+        count = idaapi.get_ordinal_qty(library)
+        if name is None:
+            return "<{:s}; #{:s}>".format('.'.join([lclass.__module__, lclass.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???')
+        return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lclass.__module__, lclass.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???', name)
+
+    @classmethod
     def library(cls, type=None):
         '''Return the type library belonging to the specified type or the default type library for the database.'''
         til = None if type is None else type.get_til() if hasattr(type, 'get_til') else None
@@ -5727,6 +5750,119 @@ class tinfo(object):
                 continue
             logging.warning(u"{:s}.lower_function_type(\"{:s}\") : Encountered error {:s} while trying to attach the specified type information ({!r}) to the determined name \"{:s}\".".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{:s}({:d})".format(errors[code], code) if code in errors else "code ({:d})".format(code), "{!s}".format(string), internal.utils.string.escape(tname, '"')))
         return lowered
+
+    @classmethod
+    def has_ordinal(cls, ordinal, *library):
+        '''Return whether the given `ordinal` is associated with a type in the specified type `library`.'''
+        [library] = library if library else [None]
+        til = library if library else cls.library()
+        serialized = cls.get_numbered_type(til, ordinal)
+        return True if serialized else False
+
+    @classmethod
+    def has_name(cls, name, *library):
+        '''Return whether a type with the given `name` exists in the specified type `library`.'''
+        [library] = library if library else [None]
+        til = library if library else cls.library()
+        ordinal = idaapi.get_type_ordinal(til, internal.utils.string.to(name))
+        return True if ordinal else False
+
+    @classmethod
+    def has_identifier(cls, identifier, *library):
+        '''Return whether the given `identifier` is associated with a type in the specified type `library`.'''
+        identifier = identifier if isinstance(identifier, internal.types.integer) else identifier.id
+
+        # if the identifier is not a structure/union, then check if it's an enumeration.
+        sptr = idaapi.get_struc(identifier)
+        if not sptr and idaapi.get_enum_idx(identifier) == idaapi.BADADDR:
+            return False
+
+        # distinguish between a structure, union, and enumeration and use it to build
+        # a corresponding type_t. then, use the identifier name to get the ordinal.
+        type_t = idaapi.BTMT_ENUM if not sptr else idaapi.BTMT_UNION if internal.structure.union(sptr) else idaapi.BTMT_STRUCT
+        fullname = internal.netnode.name.get(idaapi.ea2node(identifier) if hasattr(idaapi, 'ea2node') else identifier)
+        ordinal = idaapi.get_ordinal_from_idb_type(fullname, bytes(bytearray([idaapi.BT_COMPLEX | type_t])))
+
+        # if we were given a type library, then verify the ordinal against its quantity.
+        if library:
+            return cls.has_ordinal(ordinal, *library)
+        return True if ordinal else False
+
+    @classmethod
+    def at_ordinal(cls, ordinal, *library):
+        '''Return the type information for the given `ordinal` from the specified type `library`.'''
+        [til] = library if library else [cls.library()]
+        serialized = cls.get_numbered_type(til, ordinal)
+        return cls.get(til, *serialized) if serialized else None
+
+    @classmethod
+    def at_name(cls, name, *library, **flags):
+        '''Return the type information for the type with the given `name` and `flags` from a type `library`.'''
+        [til] = library if library else [cls.library()]
+        serialized = cls.get_named_type(til, internal.utils.string.to(name), flags.get('flags', idaapi.NTF_TYPE))
+        if not serialized:
+            return None
+
+        # otherwise, we need to unpack the serialized information that was returned.
+        defaults = [0, b'', b'', b'', b'', getattr(idaapi, 'sc_unk', 0), 0]
+        ok, type, fields, cmt, fields_cmt, sclass, ordinal = [item for item in itertools.chain(serialized, defaults[len(serialized) - len(defaults):])][:len(defaults)]
+
+        # we don't need the error code or the ordinal, but we'll use everything else.
+        return cls.get(til, type, fields, cmt, fields_cmt, sclass) if ok else None
+
+    @classmethod
+    def by_name(cls, name, *library):
+        '''Return the ordinal for the type with the given `name` from a type `library`.'''
+        [til] = library if library else [cls.library()]
+        ordinal = idaapi.get_type_ordinal(til, internal.utils.string.to(name))
+        serialized = cls.get_numbered_type(til, ordinal)
+        return ordinal if any([not library, serialized]) else 0
+
+    @classmethod
+    def by_identifier(cls, identifier, *library):
+        '''Return the ordinal for the type associated with an `identifier` from the specified type `library`.'''
+        identifier = identifier if isinstance(identifier, internal.types.integer) else identifier.id
+
+        # first determine whether the identifier belongs to a structure/union/enumeration.
+        sptr = idaapi.get_struc(identifier)
+        if not sptr and idaapi.get_enum_idx(identifier) == idaapi.BADADDR:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.by({:#x}) : Unable to determine whether the given identifier ({:#x}) is a structure, union, or enumeration.".format('.'.join([__name__, cls.__name__]), identifier, identifier))
+
+        # we'll now create a type_t for whatever type it was so that we can pass
+        # it to get_ordinal_from_idb_type. we will also need the full name for it.
+        type_t = idaapi.BTMT_ENUM if not sptr else idaapi.BTMT_UNION if internal.structure.union(sptr) else idaapi.BTMT_STRUCT
+        fullname = internal.netnode.name.get(idaapi.ea2node(identifier) if hasattr(idaapi, 'ea2node') else identifier)
+
+        # now we can call get_ordinal_from_idb_type and check the ordinal. if we
+        # got one, then we can just use it to create a typeref and return it.
+        ordinal = idaapi.get_ordinal_from_idb_type(fullname, bytes(bytearray([idaapi.BT_COMPLEX | type_t])))
+        if ordinal:
+            return ordinal
+
+        # if we didn't get an ordinal, then we need to raise an exception here.
+        description = {idaapi.BTMT_STRUCT: 'structure', idaapi.BTMT_UNION: 'union', idaapi.BTMT_ENUM: 'enumeration'}
+        NotFoundException = internal.exceptions.StructureNotFoundError if sptr else internal.exceptions.EnumerationNotFoundError
+        raise NotFoundException(u"{:s}.by_identifier({:#x}) : Unable to locate the type information associated with the {:s} named \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, description.get(type_t, "identifier ({:#x})".format(identifier)), internal.utils.string.escape(fullname, '"')))
+
+    @classmethod
+    def for_ordinal(cls, ordinal, *library):
+        '''Return a reference to an `ordinal` from the specified type `library`.'''
+        [til] = library if library else [cls.library()]
+        return cls.reference(ordinal, til)
+
+    @classmethod
+    def for_name(cls, name, *library):
+        '''Return a reference to the type with the given `name` from a type `library`.'''
+        [til] = library if library else [cls.library()]
+        ordinal = idaapi.get_type_ordinal(til, internal.utils.string.to(name))
+        return cls.reference(ordinal, *library) if ordinal else None
+
+    @classmethod
+    def for_identifier(cls, identifier, *library):
+        '''Return a reference to the type associated with `identifier` from the specified type `library`.'''
+        [til] = library if library else [cls.library()]
+        ordinal = cls.by_identifier(identifier, til)
+        return cls.reference(ordinal, *library) if ordinal else None
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
