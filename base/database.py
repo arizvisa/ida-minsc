@@ -5397,28 +5397,6 @@ class types(object):
         '''Return the types within the database as a list composed of tuples packed as `(ordinal, name, tinfo_t)`.'''
         return [(ordinal, name, ti) for ordinal, name, ti in cls.iterate(*string, **type)]
 
-    @utils.multicase(library=idaapi.til_t)
-    @classmethod
-    def __formatter__(cls, library):
-        lcls, description = library.__class__, library.desc
-        return "<{:s}; <{:s}>>".format('.'.join([lcls.__module__, lcls.__name__]), utils.string.of(description))
-    @utils.multicase(library=idaapi.til_t, ordinal=internal.types.integer)
-    @classmethod
-    def __formatter__(cls, library, ordinal):
-        ocls, name = idaapi.tinfo_t, idaapi.get_numbered_type_name(library, ordinal)
-        if idaapi.get_type_ordinal(library, name) == ordinal:
-            return "<{:s}; #{:d} \"{:s}\">".format('.'.join([lcls.__module__, lcls.__name__]), ordinal, utils.string.of(name))
-        count = idaapi.get_ordinal_qty(library)
-        if name is None:
-            return "<{:s}; #{:s}>".format('.'.join([lcls.__module__, lcls.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???')
-        return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lcls.__module__, lcls.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???', name)
-    @utils.multicase(library=idaapi.til_t, name=internal.types.string)
-    @classmethod
-    @utils.string.decorate_arguments('name')
-    def __formatter__(cls, library, name):
-        ocls, ordinal = idaapi.tinfo_t, idaapi.get_type_ordinal(library, utils.string.to(name))
-        return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lcls.__module__, lcls.__name__]), "{:d}".format(ordinal) if ordinal else '???', name)
-
     __matcher__ = utils.matcher()
     __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1), operator.methodcaller('lower'))
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1))
@@ -5456,25 +5434,17 @@ class types(object):
     @classmethod
     def __iterate__(cls, library):
         '''Iterate through the types within the specified type `library`.'''
-        count, errors = idaapi.get_ordinal_qty(library), {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
-        for ordinal in builtins.range(1, count):
-            name, serialized = idaapi.get_numbered_type_name(library, ordinal), interface.tinfo.get_numbered_type(library, ordinal)
+        for ordinal in builtins.range(1, idaapi.get_ordinal_qty(library)):
+            name, ti = idaapi.get_numbered_type_name(library, ordinal), interface.tinfo.at_ordinal(ordinal, library)
 
-            # if we didn't get any information returned, then this ordinal was deleted.
-            if serialized is None:
-                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it having been deleted.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
-                continue
-
-            # try and create a new type from the serialized information. if we
-            # fail at this, then this is a critical error.
-            ti = cls.get(ordinal, library)
-            if ti is None:
-                logging.fatal(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to an error during deserialization.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
+            # if we didn't get any information returned, then this ordinal was probably deleted.
+            if not ti:
+                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at ordinal {:d} of the specified type library due to it having been deleted.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(library), ordinal))
                 continue
 
             # if the type is empty, then we can just issue a warning and skip it.
             elif ti.empty():
-                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at the current ordinal ({:d}) due to it being empty.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ordinal))
+                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at ordinal {:d} of the specified type library due to it being empty.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(library), ordinal))
                 continue
 
             yield ordinal, utils.string.of(name or ''), ti
@@ -5491,7 +5461,7 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def iterate(cls, name, library, **type):
-        '''Iterate through the types within the type `library` that match the glob specified by `name`.'''
+        '''Iterate through the types within a type `library` that match the glob specified by `name`.'''
         type['like'] = name
         return cls.iterate(library, **type)
     @utils.multicase()
@@ -5504,14 +5474,14 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def iterate(cls, library, **type):
-        '''Iterate through all of the types in the specified type `library` that match the keywords specified by `type`.'''
+        '''Iterate through the types in a type `library` that match the keywords specified by `type`.'''
         iterable = cls.__iterate__(library)
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
         for ordinal, name, tinfo in iterable:
-            res, ti, td = interface.tinfo.reference(ordinal, library), idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True) 
+            res, ti, td = interface.tinfo.reference(ordinal, library), idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
             if not res:
-                logging.warning(u"{:s}.iterate({:s}{:s}) : Unable to create a type that references the ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
+                logging.warning(u"{:s}.iterate({:s}{:s}) : Unable to create a type referencing ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
                 res = ti if ti.create_typedef(td) else ti
             yield ordinal, name, res
         return
@@ -5527,7 +5497,7 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def search(cls, name, library, **type):
-        '''Search through the types within the type `library` that match the glob `name` and return the first result.'''
+        '''Search through the types in a type `library` that match the glob `name` and return the first result.'''
         type['like'] = name
         return cls.search(library, **type)
     @utils.multicase()
@@ -5540,7 +5510,7 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def search(cls, library, **type):
-        '''Search through all of the types in the specified type `library` that match the keywords specified by `type`.'''
+        '''Search through the types in a type `library` that match the keywords specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
         listable = [item for item in cls.iterate(library, **type)]
@@ -5567,7 +5537,7 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def list(cls, name, library, **type):
-        '''List the types within the type `library` that match the glob specified by `name`.'''
+        '''List the types within a type `library` that match the glob specified by `name`.'''
         type['like'] = name
         return cls.list(library, **type)
     @utils.multicase()
@@ -5580,7 +5550,7 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def list(cls, library, **type):
-        '''List the types within the type `library` that match the keywords specified by `type`.'''
+        '''List the types within a type `library` that match the keywords specified by `type`.'''
         iterable = cls.__iterate__(library)
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
@@ -5597,7 +5567,7 @@ class types(object):
 
             #res, td = idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
             #if not res.create_typedef(td):
-            #    logging.warning(u"{:s}.list({:s}{:s}) : Unable to create a type that references the ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
+            #    logging.warning(u"{:s}.list({:s}{:s}) : Unable to create a type that references the ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
             listable.append((ordinal, name, ti))
 
         # We just need to calculate the number of digits for the largest and size.
@@ -5653,96 +5623,114 @@ class types(object):
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def by(cls, ordinal):
-        '''Return the type information that is at the given `ordinal`.'''
-        return cls.by_index(ordinal)
+        '''Return the type that is at the specified `ordinal` of the current type library.'''
+        res = interface.tinfo.for_ordinal(ordinal)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by({:d}) : No type was found at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        return res
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by(cls, name):
-        '''Return the type information that has the specified `name`.'''
-        return cls.by_name(name)
+        '''Return the type with the given `name` from the current type library.'''
+        res = interface.tinfo.for_name(name)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by({!r}) : No type was found with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+        return res
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def by(cls, ordinal, library):
-        '''Return the type information from the specified `library` that is at the given `ordinal`.'''
-        return cls.by_index(ordinal, library)
+        '''Return the type that is at the given `ordinal` of the specified type `library`.'''
+        res = interface.tinfo.for_ordinal(ordinal, library)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by({:d}, {:s}) : No type was found at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
+        return res
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by(cls, name, library):
-        '''Return the type information from the specified `library` that is using the given `name`.'''
-        return cls.by_name(name, library)
+        '''Return the type with the given `name` from the specified type `library`.'''
+        res = interface.tinfo.for_name(name, library)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by({!r}, {:s}) : No type was found with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
+        return res
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def has(cls, ordinal):
         '''Return whether the current type library has a type at the given `ordinal`.'''
-        return cls.has(ordinal, interface.tinfo.library())
+        return interface.tinfo.has_ordinal(ordinal)
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def has(cls, name):
         '''Return whether the current type library has a type with the specified `name`.'''
-        return cls.has(name, interface.tinfo.library())
+        return interface.tinfo.has_name(name)
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def has(cls, ordinal, library):
-        '''Return whether the provided type `library` has a type at the given `ordinal`.'''
-        serialized = interface.tinfo.get_numbered_type(library, ordinal)
-        return True if serialized else False
+        '''Return whether a type `library` has a type at the given `ordinal`.'''
+        return interface.tinfo.has_ordinal(ordinal, library)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def has(cls, name, library):
-        '''Return whether the provided type `library` has a type with the specified `name`.'''
-        ordinal = idaapi.get_type_ordinal(library, utils.string.to(name))
-        return True if ordinal else False
+        '''Return whether a type `library` has a type with the specified `name`.'''
+        return interface.tinfo.has_name(name, library)
 
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by_name(cls, name):
-        '''Return the type information that has the specified `name`.'''
-        return cls.by_name(name, interface.tinfo.library())
+        '''Return the type with the given `name` from the current type library.'''
+        res = interface.tinfo.for_name(name)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by_name({!r}) : No type was found with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+        return res
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by_name(cls, name, library):
-        '''Return the type information from the specified `library` that is using the given `name`.'''
-        ordinal = idaapi.get_type_ordinal(library, utils.string.to(name))
-        if ordinal:
-            return cls.by_index(ordinal, library)
-        raise E.ItemNotFoundError(u"{:s}.by_name({!r}, {:s}) : No type information was found in the type library with the specified name (\"{:s}\").".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), utils.string.escape(name, '"')))
+        '''Return the type with the given `name` from the specified type `library`.'''
+        res = interface.tinfo.for_name(name, library)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by_name({!r}, {:s}) : No type was found with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
+        return res
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def by_index(cls, ordinal):
-        '''Return the type information that is at the given `ordinal`.'''
-        return cls.by_index(ordinal, interface.tinfo.library())
+        '''Return the type that is at the specified `ordinal` of the current type library.'''
+        res = interface.tinfo.for_ordinal(ordinal)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by_index({:d}) : No type was found at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        return res
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def by_index(cls, ordinal, library):
-        '''Return the type information from the specified `library` that is at the given `ordinal`.'''
-        if not (0 < ordinal < idaapi.get_ordinal_qty(library)):
-            raise E.ItemNotFoundError(u"{:s}.by_index({:d}, {:s}) : No type information was found in the type library for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
-
-        ti = interface.tinfo.reference(ordinal, library)
-        if not ti:
-            raise E.DisassemblerError(u"{:s}.get({:d}, {:s}) : Unable to create a type that references the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
-        return ti
+        '''Return the type that is at the given `ordinal` of the specified type `library`.'''
+        res = interface.tinfo.for_ordinal(ordinal, library)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.by_index({:d}, {:s}) : No type was found at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
+        return res
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def name(cls, ordinal):
-        '''Return the name of the type from the current type library at the specified `ordinal`.'''
-        return cls.name(ordinal, interface.tinfo.library())
+        '''Return the name of the type at the given `ordinal` of the current type library.'''
+        res = idaapi.get_numbered_type_name(interface.tinfo.library(), ordinal)
+        if res is None:
+            raise E.ItemNotFoundError(u"{:s}.name({:d}) : Unable to return the name of type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+
+        # FIXME: which one do we return? the mangled or unmangled name?
+        return utils.string.of(res)
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def name(cls, ordinal, library):
-        '''Return the name of the type from the specified type `library` at the given `ordinal`.'''
+        '''Return the name of the type at the given `ordinal` of a specified type `library`.'''
         res = idaapi.get_numbered_type_name(library, ordinal)
         if res is None:
-            raise E.ItemNotFoundError(u"{:s}.name({:d}, {:s}) : Unable to return the name of specified ordinal ({:d}) from the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+            raise E.ItemNotFoundError(u"{:s}.name({:d}, {:s}) : Unable to return the name of type at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
 
         # FIXME: which one do we return? the mangled or unmangled name?
         return utils.string.of(res)
@@ -5750,308 +5738,328 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('string')
     def name(cls, ordinal, string, **mangled):
-        '''Set the name of the type at the specified `ordinal` from the current library to `string`.'''
+        '''Set the name of the type at the given `ordinal` of the current type library to `string`.'''
         return cls.name(ordinal, string, interface.tinfo.library(), **mangled)
     @utils.multicase(ordinal=internal.types.integer, string=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('string')
     def name(cls, ordinal, string, library, **mangled):
-        """Set the name of the type at the specified `ordinal` of the given type `library` to `string`.
+        """Set the name of the type at the given `ordinal` of a specified type `library` to `string`.
 
         If the boolean `mangled` is specified, then the given name is mangled.
         """
-        name, ti = cls.name(ordinal, library), cls.get(ordinal, library)
+        name, ti = cls.name(ordinal, library), interface.tinfo.at_ordinal(ordinal, library)
         if ti is None:
-            raise E.DisassemblerError(u"{:s}.name({:d}, {!r}, {:s}{:s}) : Unable to get the type information from the given ordinal ({:d}) of the type library.".format('.'.join([__name__, cls.__name__]), ordinal, string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
+            raise E.DisassemblerError(u"{:s}.name({:d}, {!r}, {:s}{:s}) : Unable to fetch the type from ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, string, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
 
         # now that we saved the type information, we can re-assign the type
         # and change the ordinal's name at the very same tie.
         res = cls.set(ordinal, utils.string.to(string), ti, library, **mangled)
         if ti.serialize() != res.serialize():
-            logging.warning(u"{:s}.name({:d}, {!r}, {:s}{:s}) : The type information for the given ordinal ({:d}) applied the type library has changed during the assignment of the new name ({!r}).".format('.'.join([__name__, cls.__name__]), ordinal, string, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, utils.string.of(string)))
+            logging.warning(u"{:s}.name({:d}, {!r}, {:s}{:s}) : The type at ordinal {:d} of the specified type library has been changed during the assignment of the new name ({!r}).".format('.'.join([__name__, cls.__name__]), ordinal, string, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, utils.string.of(string)))
         return name
 
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def ordinal(cls, name):
-        '''Return the ordinal number for the type with the specified `name`.'''
-        return cls.ordinal(name, interface.tinfo.library())
+        '''Return the ordinal number for the type with the given `name` from the current type library.'''
+        ordinal = interface.tinfo.by_name(name)
+        if not ordinal:
+            raise E.ItemNotFoundError(u"{:s}.ordinal({!r}) : Unable to find a type with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+        return ordinal
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def ordinal(cls, name, library):
-        '''Return the ordinal number for the type from the given `library` with the specified `name`.'''
-        res = idaapi.get_type_ordinal(library, utils.string.to(name))
-        if not res:
-            raise E.ItemNotFoundError(u"{:s}.ordinal({!r}, {:s}) : Could not find a type with the specified name (\"{:s}\") within the type library.".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), utils.string.escape(name, '"')))
-        return res
+        '''Return the ordinal number for the type with the given `name` from a specified type `library`.'''
+        ordinal = interface.tinfo.by_name(name, library)
+        if not ordinal:
+            raise E.ItemNotFoundError(u"{:s}.ordinal({!r}, {:s}) : Unable to find a type with the name \"{:s}\" in the specifed type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
+        return ordinal
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def get(cls, ordinal):
-        '''Get the type information at the given `ordinal` of the current type library and return it.'''
-        return cls.get(ordinal, interface.tinfo.library())
+        '''Get the type for the given `ordinal` of the current type library and return it.'''
+        res = interface.tinfo.at_ordinal(ordinal)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.get({:d}) : Unable to return the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        return res
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def get(cls, name):
-        '''Get the type information with the given `name` from the current type library and return it.'''
-        return cls.get(name, interface.tinfo.library())
+    def get(cls, name, **flags):
+        '''Get the type for the given `name` from the current type library and return it.'''
+        res = interface.tinfo.at_name(name, **flags)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.get({!r}{:s}) : Unable to find a type with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, ", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(name, '"')))
+        return res
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def get(cls, ordinal, library):
-        '''Get the type information at the given `ordinal` of the specified type `library` and return it.'''
-        if 0 < ordinal < idaapi.get_ordinal_qty(library):
-            serialized = interface.tinfo.get_numbered_type(library, ordinal)
-            return interface.tinfo.get(library, *serialized)
-        raise E.ItemNotFoundError(u"{:s}.get({:d}, {:s}) : No type information was found for the specified ordinal ({:d}) in the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+        '''Get the type for the given `ordinal` of a specified type `library` and return it.'''
+        res = interface.tinfo.at_ordinal(ordinal, library)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.get({:d}, {:s}) : Unable to return the type at ordinal {:d} of the specified the type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
+        return res
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def get(cls, name, library):
-        '''Get the type information with the given `name` from the specified type `library` and return it.'''
-        ordinal = idaapi.get_type_ordinal(library, utils.string.to(name))
-        if ordinal:
-            return cls.get(ordinal, library)
-        raise E.ItemNotFoundError(u"{:s}.get({!r}, {:s}) : No type information with the specified name (\"{:s}\") was found in the type library.".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), utils.string.escape(name, '"')))
+    def get(cls, name, library, **flags):
+        '''Get the type for the given `name` of a specified type `library` and return it.'''
+        res = interface.tinfo.at_name(name, library, **flags)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.get({!r}, {:s}{:s}) : Unable to find a type with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(name, '"')))
+        return res
+    # FIXME: we can do something when given a tinfo_t reference...
 
     # The following cases for the "types.get" functon are actually a lie and
-    # only exist as a way to get an "idaapi.tinfo_t" from any IDAPython API
-    # that returns the information in its serialized form.
+    # only exist as a way to get an "idaapi.tinfo_t" from any disassembler
+    # API that returns its type information in some kind of serialized form.
 
     @utils.multicase(serialized=internal.types.tuple)
     @classmethod
     def get(cls, serialized):
-        '''Convert the `serialized` type information from the current type library and return it.'''
+        '''Return the type for the `serialized` type information from the current type library.'''
         return cls.get(serialized, interface.tinfo.library())
     @utils.multicase(serialized=internal.types.tuple, library=idaapi.til_t)
     @classmethod
     def get(cls, serialized, library):
-        '''Convert the `serialized` type information from the specified type `library` and return it.'''
-        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('sc_')}
+        '''Return the type for the `serialized` type information from the specified type `library`.'''
         sclass = serialized[4] if len(serialized) == 5 else getattr(idaapi, 'sc_unk', 0)
 
         # we need to generate a description so that we can format error messages the user will understand.
         names = ['type', 'fields', 'cmt', 'fieldcmts']
-        items = itertools.chain(["{:s}={!r}".format(name, item) for name, item in zip(names, serialized) if item], ["{:s}={!s}".format('sclass', sclass)] if len(serialized) == 5 else [])
-        description = [item for item in items]
+        iterable = itertools.chain(["{:s}={!r}".format(name, item) for name, item in zip(names, serialized) if item], ["{:s}={!s}".format('sclass', sclass)] if len(serialized) == 5 else [])
+        description = [item for item in iterable]
 
         # try to deserialize the type so that we can return it to the caller.
         # if we were unable to do that, then we need to log a critical error
         # that's somewhat useful before returning None back to the user.
         result = interface.tinfo.get(library, *serialized)
         if not result:
-            logging.fatal(u"{:s}.get({:s}{:s}) : Unable to deserialize the information for a type using the serialized storage class {:s}.".format('.'.join([__name__, cls.__name__]), cls.__formatter__(library), ", {:s}".format(', '.join(description)) if description else '', "{:s}({:d})".format(errors[sclass], sclass) if sclass in errors else "({:d})".format(sclass)))
+            sclass_descriptions = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('s_')}
+            logging.fatal(u"{:s}.get({!s}, {:s}) : Unable to return a type using the {:s} storage class{:s}.".format('.'.join([__name__, cls.__name__]), "({:s})".format(', '.join(description)), interface.tinfo.format_library(library), "{:s}({:d})".format(sclass_descriptions[sclass], sclass) if sclass in sclass_descriptions else 'specified', '' if sclass in sclass_descriptions else "({:d})".format(sclass)))
         return result
 
     @utils.multicase(ordinal=internal.types.integer, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     def set(cls, ordinal, info):
-        '''Assign the type information in `info` to the type at the specified `ordinal` of the current type library.'''
+        '''Assign the type in `info` to the given `ordinal` of the current type library.'''
         return cls.set(ordinal, info, interface.tinfo.library())
     @utils.multicase(name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     def set(cls, name, info):
-        '''Assign the type information in `info` to the type identified by `name` of the current type library.'''
+        '''Assign the type in `info` to the given `name` of the current type library.'''
         return cls.set(name, info, interface.tinfo.library())
     @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     @utils.string.decorate_arguments('name')
     def set(cls, ordinal, name, info, **mangled):
-        '''Assign the type information in `info` with the specified `name` to the given `ordinal` of the current type library.'''
+        '''Assign the type in `info` with the given `name` to the specified `ordinal` of the current type library.'''
         return cls.set(ordinal, name, info, interface.tinfo.library(), **mangled)
     @utils.multicase(ordinal=internal.types.integer, info=(internal.types.string, idaapi.tinfo_t), library=idaapi.til_t)
     @classmethod
     def set(cls, ordinal, info, library):
-        '''Assign the type information in `info` to the type at the `ordinal` of the specified type `library`.'''
-        try:
-            # FIXME: do we get the mangled or unmangled name?
-            name = cls.name(ordinal, library)
+        '''Assign the type in `info` to the given `ordinal` of a specified type `library`.'''
+        res = cls.for_ordinal(ordinal, library)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.set({:d}, {!r}, {:s}) : No inforatmion was found in the type library for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, "{!s}".format(info), interface.tinfo.format_library(library), ordinal))
 
-        except Exception:
-            # FIXME: if we couldn't find a name, can we create one based on the ordinal number (is_ordinal_name)?
-            raise E.MissingNameError(u"{:s}.set({:d}, {!r}, {:s}) : Unable to assign the type information to the specified ordinal ({:d}) because it needs a name and a previous one was not found.".format('.'.join([__name__, cls.__name__]), ordinal, "{!s}".format(info), cls.__formatter__(library), ordinal))
-        return cls.set(ordinal, name, info, library)
+        elif not res.get_type_name():
+            raise E.MissingNameError(u"{:s}.set({:d}, {!r}, {:s}) : Unable to assign the type to ordinal {:d} of the specified type library because a name is needed and a previous one was not found.".format('.'.join([__name__, cls.__name__]), ordinal, "{!s}".format(info), interface.tinfo.format_library(library), ordinal))
+
+        return cls.set(ordinal, res.get_type_name() or res.get_final_type_name(), info, library)
     @utils.multicase(name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t), library=idaapi.til_t)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def set(cls, name, info, library):
-        '''Assign the type information in `info` to the type identified by `name` of the specified type `library`.'''
-        res = idaapi.get_type_ordinal(library, utils.string.to(name))
-        if not res:
-            raise E.ItemNotFoundError(u"{:s}.set({!r}, {!r}) : Could not find a type with the specified name (\"{:s}\") within the type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), utils.string.escape(name, '"')))
-        return cls.set(res, name, info, library)
+        '''Assign the type in `info` to the given `name` of a specified type `library`.'''
+        ordinal = interface.tinfo.by_name(name, library)
+        if not ordinal:
+            raise E.ItemNotFoundError(u"{:s}.set({!r}, {!r}, {:s}) : Could not find a type with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), interface.tinfo.format_library(library), utils.string.escape(name, '"')))
+        return cls.set(ordinal, name, info, library)
     @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, string=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name', 'string')
     def set(cls, ordinal, name, string, library, **mangled):
-        '''Assign the type information in `string` with the specified `name` to the specified `ordinal` of the given type `library`.'''
-        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
-        if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.set({:d}, {!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ordinal, name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(string)))
-        return cls.set(ordinal, name, ti, library, **mangled)
-    @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, info=idaapi.tinfo_t, library=idaapi.til_t)
-    @classmethod
-    @utils.string.decorate_arguments('name')
-    def set(cls, ordinal, name, info, library, **mangled):
-        """Assign the type information in `info` with the specified `name` to the given `ordinal` of the type `library`.
-
-        If the boolean `mangled` is specified, then the given name is mangled.
-        """
-        serialized = info.serialize()
-
-        # first try to get the type information at the given ordinal so that we can return it at the end.
-        try:
-            ti = cls.get(ordinal, library)
-
-        except Exception:
-            ti = None
-
-        # check that we were able to serialize the type information we were given.
-        if serialized is None:
-            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}{:s}) : Unable to serialize the given type information to assign to the ordinal ({:d}) of the type library.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
+        '''Assign the type in `string` with the given `name` to the specified `ordinal` of a type `library`.'''
+        info = interface.tinfo.parse(library, string, idaapi.PT_SIL)
+        if not info:
+            raise E.InvalidTypeOrValueError(u"{:s}.set({:d}, {!r}, {!r}, {:s}{:s}) : Unable to parse \"{:s}\" into a type to replace ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, name, string, interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(string, '"'), ordinal))
 
         # set the default flags that we're going to use for set_numbered_type.
-        flags = mangled.get('flags', idaapi.NTF_CHKSYNC)
+        res, flags = interface.tinfo.at_ordinal(ordinal, library), mangled.get('flags', idaapi.NTF_CHKSYNC)
         flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
 
-        # now we need to actually validate the name that we were given. IDA's names
-        # handle the first character differently (like an identifier), so we need
-        # to check that first before we figure out the rest of them.
+        # now we need to format the name into a C identifier for the disassembler.
         iterable = (item for item in name)
         item = builtins.next(iterable, '_')
         identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
         identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
 
-        # we need to now assign the serialized data we were given, and check if it error'd.
-        res = interface.tinfo.set_numbered_type(library, ordinal, identifier, serialized, flags=idaapi.NTF_REPLACE | flags)
-        if res > idaapi.TERR_OK:
-            return ti
+        # now we can use set_numbered_type to assign the type into the type library.
+        error = interface.tinfo.set_numbered_type(library, ordinal, identifier, info, flags)
+        if error > idaapi.TERR_OK:
+            return res
 
-        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
-        if res == idaapi.TERR_WRONGNAME:
-            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the type library with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
-        raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type information for the ordinal ({:d}) in the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), cls.__formatter__(library), ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
+        if error == idaapi.TERR_WRONGNAME:
+            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to replace the type at ordinal {:d} of the specified type library using the name \"{:s}\" due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, utils.string.escape(identifier, '"'), interface.tinfo.format_library(error) or "code ({:d})".format(error)))
+        raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to replace the type at ordinal {:d} of the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, interface.tinfo.format_library(error) or "code ({:d})".format(error)))
+    @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, info=idaapi.tinfo_t, library=idaapi.til_t)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def set(cls, ordinal, name, info, library, **mangled):
+        """Assign the type in `info` with the given `name` to the specified `ordinal` of a type `library`.
+
+        If the boolean `mangled` is specified, then the given name is mangled.
+        """
+        res, flags = interface.tinfo.at_ordinal(ordinal, library), mangled.get('flags', idaapi.NTF_CHKSYNC)
+        flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
+
+        # now we need to actually validate the name that we were given as the
+        # disassembler wants the name to be treated like a C identifier.
+        iterable = (item for item in name)
+        item = builtins.next(iterable, '_')
+        identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
+        identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
+
+        # we need to now assign the type we were given, and check if it error'd.
+        error = interface.tinfo.set_numbered_type(library, ordinal, identifier, info, idaapi.NTF_REPLACE | flags)
+        if error > idaapi.TERR_OK:
+            return res
+
+        if error == idaapi.TERR_WRONGNAME:
+            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to replace the type at ordinal {:d} of the specified type library using the name \"{:s}\" due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, utils.string.escape(identifier, '"'), interface.tinfo.format_library(error) or "code ({:d})".format(error)))
+        raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to replace the type at ordinal {:d} of the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, interface.tinfo.format_library(error) or "code ({:d})".format(error)))
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def remove(cls, ordinal):
-        '''Remove the type information at the specified `ordinal` of the current type library.'''
-        return cls.remove(ordinal, interface.tinfo.library())
+        '''Remove the type at the given `ordinal` of the current type library.'''
+        res = interface.tinfo.at_ordinal(ordinal)
+        if not idaapi.del_numbered_type(library, ordinal):
+            raise E.ItemNotFoundError(u"{:s}.remove({:d}) : Unable to remove the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+        return res
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def remove(cls, ordinal, library):
-        '''Remove the type information at the `ordinal` of the specified type `library`.'''
-        res = cls.get(ordinal, library)
+        '''Remove the type at the given `ordinal` of the specified type `library`.'''
+        res = interface.tinfo.at_ordinal(ordinal, library)
         if not idaapi.del_numbered_type(library, ordinal):
-            raise E.ItemNotFoundError(u"{:s}.remove({:d}, {:s}) : Unable to delete the type information at the specified ordinal ({:d}) of the type library.".format('.'.join([__name__, cls.__name__]), ordinal, cls.__formatter__(library), ordinal))
+            raise E.ItemNotFoundError(u"{:s}.remove({:d}, {:s}) : Unable to remove the type at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
         return res
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def remove(cls, name, **mangled):
-        '''Remove the type information with the specified `name` from the current type library.'''
-        return cls.remove(name, interface.tinfo.library(), **mangled)
+        '''Remove the type with the given `name` from the current type library.'''
+        res, flags = interface.tinfo.at_name(name), mangled.get('flags', 0)
+        flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
+
+        # then we can delete it from the type library.
+        if not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
+            raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to remove the type named \"{:s}\" from the current type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
+        return res
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def remove(cls, name, library, **mangled):
-        """Remove the type information with the specified `name` from the specified type `library`.
+        """Remove the type with the given `name` from the specified type `library`.
 
         If the boolean `mangled` is specified, then the given name is mangled.
         """
-        res = cls.get(ordinal, library)
-
-        # we need to figure out what flags to use from the keyword parameters.
-        flags = mangled.get('flags', 0)
+        res, flags = interface.tinfo.at_name(name, library), mangled.get('flags', 0)
         flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
 
         # now we can actually try using del_named_type with our given name and flags.
         if not idaapi.del_named_type(library, utils.string.to(name), idaapi.NTF_TYPE | flags):
-            raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to delete the type information with the specified name (\"{:s}\") from the type library.".format('.'.join([__name__, cls.__name__]), name, cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
+            raise E.ItemNotFoundError(u"{:s}.remove({!r}, {:s}{:s}) : Unable to remove the type named \"{:s}\" from the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(name, '"')))
         return res
 
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, **mangled):
-        '''Add an empty type with the provided `name` to the current type library.'''
+        '''Add an empty type with the given `name` to the current type library.'''
         return cls.add(name, interface.tinfo.library(), **mangled)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, library, **mangled):
-        '''Add an empty type with the provided `name` to the specified type `library`.'''
-        ti = cls.parse(' '.join(['struct', name]))
-        return cls.add(name, ti, library, **mangled)
+        '''Add an empty type with the given `name` to the specified type `library`.'''
+        BTF_VOID = idaapi.BTF_VOID if hasattr(idaapi, 'BTF_VOID') else getattr(idaapi, 'BT_VOID', 1) | getattr(idaapi, 'BTMT_SIZE0', 0)
+        BTF_STRUCT = [idaapi.BT_COMPLEX | getattr(idaapi, 'BTMT_STRUCT', 0x00), 1]
+        BTF_UNION = [idaapi.BT_COMPLEX | getattr(idaapi, 'BTMT_UNION', 0x10), 1]
+        BTF_ENUM = [idaapi.BT_COMPLEX | getattr(idaapi, 'BTMT_ENUM', 0x20), 1]
+        type_t = BTF_VOID
+        tinfo = interface.tinfo.get(library, *type_t) if isinstance(type_t, internal.types.ordered) else idaapi.tinfo_t(type_t)
+        return cls.add(name, tinfo, library, **mangled)
     @utils.multicase(name=internal.types.string, info=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, info, **mangled):
-        '''Add the type information in `info` to the current type library using the provided `name`.'''
+        '''Add the type in `info` with the given `name` to the current type library.'''
         return cls.add(name, info, interface.tinfo.library(), **mangled)
     @utils.multicase(name=internal.types.string, string=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, string, library, **mangled):
-        '''Add the type information in `string` to the specified type `library` using the provided `name`.'''
-        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
+        '''Add the type in `string` with the given `name` to the specified type `library`.'''
+        ti = interface.tinfo.parse(library, string, idaapi.PT_SIL)
         if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to parse the specified type declaration ({:s}).".format('.'.join([__name__, cls.__name__]), name, string, cls.__formatter__(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.repr(string)))
+            raise E.InvalidTypeOrValueError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to parse \"{:s}\" into a type to add to the type library.".format('.'.join([__name__, cls.__name__]), name, string, interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(string, '"')))
         return cls.add(name, ti, library, **mangled)
     @utils.multicase(name=internal.types.string, info=idaapi.tinfo_t, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, info, library, **mangled):
-        """Add the type information in `info` to the specified type `library` using the provided `name`.
+        """Add the type in `info` with the given `name` to the specified type `library`.
 
         If the boolean `mangled` is specified, then the given name is mangled.
         """
-        serialized = info.serialize()
-
-        # first we'll try to serialize the type before we make any perma-changes.
-        if serialized is None:
-            raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to serialize the type information that will be added to the type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else ''))
-
-        # set the default flags that we're going to use when using set_numbered_type.
         flags = mangled.get('flags', idaapi.NTF_CHKSYNC | idaapi.NTF_TYPE)
         flags |= idaapi.NTF_SYMM if mangled.get('mangled', False) else idaapi.NTF_SYMU
 
-        # last thing we need to do is correct the name we were given to a valid one
-        # since IDA wants these to follow the format (character set) for a general C
-        # identifier. so we'll simply do the first character, then finish the rest.
+        # we need to correct the name we were given to a valid one since the disassembler
+        # wants the character set for a general C identifier. so, we'll process the
+        # first character as alpha-underscore, and the rest can be alpha-underscore-numeric.
         iterable = (item for item in name)
         item = builtins.next(iterable, '_')
         identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
         identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
 
-        # we can now assign the serialized data that we got and check for an error.
-        # the comments are properly being passed as bytes before checking for error.
-        res = ordinal = interface.tinfo.set_numbered_type(library, 0, identifier, serialized, flags=flags)
-        if res > idaapi.TERR_OK:
+        # we can now assign the type that we got and check for an error.
+        error = ordinal = interface.tinfo.set_numbered_type(library, 0, identifier, info, flags)
+        if error > idaapi.TERR_OK:
             return ordinal
 
+        # if we got an error and the name already exists, then let the user know.
+        elif error == idaapi.TERR_SAVE_ERROR and interface.tinfo.has_name(name, library):
+            raise E.DuplicateItemError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add a type with the name \"{:s}\" to the type library due to another type ({:d}) using the same name.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(identifier, '"'), interface.tinfo.by_name(identifier)))
+
         # check the error code and raise an exception if it is at all necessary.
-        errors = {getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('TERR_')}
-        if res == idaapi.TERR_WRONGNAME:
-            raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) with the given name ({!r}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, identifier, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
-        raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the type information to the type library at the allocated ordinal ({:d}) due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), cls.__formatter__(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal, "{:s}({:d})".format(errors[res], res) if res in errors else "code ({:d})".format(res)))
+        error_name, error_description = interface.tinfo.format_type_error(error)
+        if error == idaapi.TERR_WRONGNAME:
+            raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add a type with the name \"{:s}\" to the type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(identifier, '"'), "{:s}({:d})".format(error_name, error) if name else "code ({:d})".format(error)))
+        raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add the given type to the type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', "{:s}({:d})".format(error_name, error) if error_name else  "code ({:d})".format(error)))
 
     @utils.multicase()
     @classmethod
     def count(cls):
-        '''Return the number of types that are available within the current type library.'''
+        '''Return the number of types within the current type library.'''
         return cls.count(interface.tinfo.library())
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     def count(cls, library):
-        '''Return the number of types that are available within the specified type `library`.'''
+        '''Return the number of types within the specified type `library`.'''
         return idaapi.get_ordinal_qty(library)
 
     @utils.multicase(string=internal.types.string)
     @classmethod
     def declare(cls, string, **flags):
-        """Parse the given `string` into an ``idaapi.tinfo_t`` using the current type library and return it.
+        """Parse the given `string` into an ``idaapi.tinfo_t`` with the current type library and return it.
 
         If the integer `flags` is provided, then use the specified flags (``idaapi.PT_*``) when parsing the `string`.
         """
@@ -6059,12 +6067,12 @@ class types(object):
     @utils.multicase(string=internal.types.string, library=idaapi.til_t)
     @classmethod
     def declare(cls, string, library):
-        '''Parse the given `string` into an ``idaapi.tinfo_t`` using the specified type `library` and return it.'''
+        '''Parse the given `string` into an ``idaapi.tinfo_t`` with the specified type `library` and return it.'''
         return cls.declare(string, library, idaapi.PT_TYP)
     @utils.multicase(string=internal.types.string, library=idaapi.til_t)
     @classmethod
     def declare(cls, string, library, flags):
-        '''Parse the given `string` into an ``idaapi.tinfo_t`` for the specified type `library` with `flags` and return it.'''
+        '''Parse the given `string` and `flags` into an ``idaapi.tinfo_t`` with the specified type `library` and return it.'''
         flag = flags | idaapi.PT_SIL
         result = interface.tinfo.parse(library, string, flag)
 
@@ -6075,11 +6083,11 @@ class types(object):
 
         # If we couldn't parse the type we were given, then simply bail.
         elif result is None:
-            raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}, {:#x}) : Unable to parse the provided string (\"{:s}\") into a valid type.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, utils.string.escape(string, '"')))
+            raise E.DisassemblerError(u"{:s}.declare({!r}, {:s}, {:#x}) : Unable to parse \"{:s}\" into a valid type that may be used.".format('.'.join([__name__, cls.__name__]), string, interface.tinfo.format_library(library), flags, utils.string.escape(string, '"')))
 
         # If we were given the idaapi.PT_VAR flag, then we return the parsed name too.
         name, ti = result if flag & idaapi.PT_VAR else ('', result)
-        logging.info(u"{:s}.declare({!r}, {:s}, {:#x}) : Successfully parsed the given string (\"{:s}\") into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, cls.__formatter__(library), flags, utils.string.escape(string, '"'), " ({:s})".format(name) if name else ''))
+        logging.info(u"{:s}.declare({!r}, {:s}, {:#x}) : Successfully parsed \"{:s}\" into a valid type{:s}.".format('.'.join([__name__, cls.__name__]), string, interface.tinfo.format_library(library), flags, utils.string.escape(string, '"'), " ({:s})".format(name) if name else ''))
         return result
     parse = utils.alias(declare, 'types')
 
@@ -6087,51 +6095,47 @@ class types(object):
     @classmethod
     def dereference(cls, info):
         '''Return the target type of the pointer that is specified by `info`.'''
-        if not info.has_details():
-            raise E.MissingTypeOrAttribute(u"{:s}.dereference(\"{:s}\") : The provided type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
-
         if not info.is_ptr():
-            raise E.InvalidTypeOrValueError(u"{:s}.dereference(\"{:s}\") : The provided type information ({!r}) is not a pointer.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+            raise E.InvalidTypeOrValueError(u"{:s}.dereference(\"{:s}\") : The provided type ({!r}) is not a pointer.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        elif not info.has_details():
+            raise E.MissingTypeOrAttribute(u"{:s}.dereference(\"{:s}\") : The provided type ({!r}) does not have any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
 
         pi = idaapi.ptr_type_data_t()
         if not info.get_ptr_details(pi):
-            raise E.DisassemblerError(u"{:s}.dereference(\"{:s}\") : Unable to get the pointer type data from the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+            raise E.DisassemblerError(u"{:s}.dereference(\"{:s}\") : Unable to get the pointer type data from the given type ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
         return interface.tinfo.concretize(pi.obj_type)
 
-    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string))
+    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t, internal.types.string))
     @classmethod
     def pointer(cls, type):
-        '''Create a pointer that references the specified `type`.'''
+        '''Return a pointer that references the specified `type`.'''
         return cls.pointer(type, 0, 0)
-    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string), size=internal.types.integer)
+    @utils.multicase(type=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t, internal.types.string), size=internal.types.integer)
     @classmethod
     def pointer(cls, type, size):
-        '''Create a pointer of `size` bytes that references the specified `type`.'''
+        '''Return a pointer of `size` bytes that references the specified `type`.'''
         return cls.pointer(type, size, 0)
-    @utils.multicase(type=internal.structure.structure_t, size=internal.types.integer, attributes=internal.types.integer)
+    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), size=internal.types.integer, attributes=internal.types.integer)
     @classmethod
-    def pointer(cls, type, size, attributes, **fields):
-        '''Create a pointer of `size` bytes that references the specified structure `type` with the given `size` and extended `attributes`.'''
-        return cls.pointer(type.ptr, size, attributes, **fields)
-    @utils.multicase(sptr=idaapi.struc_t, size=internal.types.integer, attributes=internal.types.integer)
-    @classmethod
-    def pointer(cls, sptr, size, attributes, **fields):
-        '''Create a pointer of `size` bytes that references the structure specified by `sptr` with the given `size` and extended `attributes`.'''
-        ti = interface.address.typeinfo(sptr.id)
+    def pointer(cls, structure, size, attributes, **fields):
+        '''Return a pointer of `size` bytes that references the specified `structure` and includes any extended `attributes`.'''
+        ptr = structure if isinstance(structure, (idaapi.struc_t, idaapi.member_t)) else structure.ptr
+        ti = interface.address.typeinfo(ptr.id) if isinstance(ptr, idaapi.struc_t) else internal.structure.member.get_typeinfo(ptr)
         return cls.pointer(ti, size, attributes, **fields)
     @utils.multicase(string=internal.types.string, size=internal.types.integer, attributes=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('string')
     def pointer(cls, string, size, attributes, **fields):
-        '''Create a pointer of `size` bytes that references the type specified by `string` with the given `size` and extended `attributes`.'''
-        ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
+        '''Return a pointer of `size` bytes that references the type specified by `string` and includes any extended `attributes`.'''
+        ti = interface.tinfo.parse(interface.tinfo.library(), string, idaapi.PT_SIL)
         if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.pointer({!r}, {:d}, {:#x}{:s}) : Unable to parse the given type declaration (\"{!s}\") for the pointer target.".format('.'.join([__name__, cls.__name__]), string, size, attributes, ", {:s}".format(utils.string.kwargs(fields)) if fields else '', utils.string.escape(string, '"')))
+            raise E.InvalidTypeOrValueError(u"{:s}.pointer({!r}, {:d}, {:#x}{:s}) : Unable to parse \"{!s}\" into a type that can be used for the pointer target.".format('.'.join([__name__, cls.__name__]), string, size, attributes, ", {:s}".format(utils.string.kwargs(fields)) if fields else '', utils.string.escape(string, '"')))
         return cls.pointer(ti, size, attributes, **fields)
     @utils.multicase(info=idaapi.tinfo_t, size=internal.types.integer, attributes=internal.types.integer)
     @classmethod
     def pointer(cls, info, size, attributes, **fields):
-        '''Create a pointer of `size` bytes that references the type specified by `info` with the given `size` and extended `attributes`.'''
+        '''Return a pointer of `size` bytes that references the type specified by `info` and includes any extended `attributes`.'''
         pi = idaapi.ptr_type_data_t()
         pi.obj_type = info
         pi.based_ptr_size = size
@@ -6140,13 +6144,13 @@ class types(object):
         # Verify that all of the fields that we were given are actually part of the ptr_type_data_t
         if any(not hasattr(pi, name) for name in fields):
             missing = {name for name in fields if not hasattr(pi, name)}
-            raise E.InvalidParameterError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to assign to the field{:s} ({:s}) of the pointer type data because {:s} not exist.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', '' if len(missing) == 1 else 's', ', '.join(sorted(missing)), 'it does' if len(missing) == 1 else 'they do'))
+            raise E.InvalidParameterError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to assign to the specified field{:s} ({:s}) of the pointer type data because {:s} not exist.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', '' if len(missing) == 1 else 's', ', '.join(sorted(missing)), 'it does' if len(missing) == 1 else 'they do'))
         [setattr(pi, name, value) for name, value in fields.items()]
 
         # Use the ptr_type_data_t to create a pointer and return it.
         ti = idaapi.tinfo_t()
         if not ti.create_ptr(pi):
-            raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to create a pointer for the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', "{!s}".format(info)))
+            raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to create a pointer with the given type ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', "{!s}".format(info)))
         return interface.tinfo.concretize(ti)
 
     @utils.multicase(info=idaapi.tinfo_t)
@@ -6157,83 +6161,87 @@ class types(object):
     @utils.multicase(element=(idaapi.tinfo_t, idaapi.struc_t, internal.structure.structure_t, internal.types.string), length=internal.types.integer)
     @classmethod
     def array(cls, element, length):
-        '''Create an array of the given `element` with the specified `length`.'''
+        '''Return an array composed of the given `element` and `length`.'''
         return cls.array(element, length, 0)
-    @utils.multicase(type=internal.structure.structure_t, length=internal.types.integer, base=internal.types.integer)
+    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t), length=internal.types.integer, base=internal.types.integer)
     @classmethod
-    def array(cls, type, length, base):
-        '''Create an array of the specified structure `type` with the given `length` and `base`.'''
-        return cls.array(type.ptr, length, base)
-    @utils.multicase(sptr=idaapi.struc_t, length=internal.types.integer, base=internal.types.integer)
-    @classmethod
-    def array(cls, sptr, length, base):
-        '''Create an array of the structure specified by `sptr` with the given `length` and `base`.'''
-        ti = type(sptr.id)
+    def array(cls, structure, length, base):
+        '''Return an array composed of the given `structure` and `length` with a specified `base`.'''
+        ti = interface.address.typeinfo(structure.id)
         return cls.array(ti, length, base)
     @utils.multicase(string=internal.types.string, length=internal.types.integer, base=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('string')
     def array(cls, string, length, base):
-        '''Create an array of the element specified by `string` with the given `length` and `base`.'''
+        '''Return an array composed of the element specified by `string` and `length` with a specified `base`.'''
         ti = interface.tinfo.parse(None, string, idaapi.PT_SIL)
         if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.array({!r}, {:d}, {:d}) : Unable to parse the given type declaration (\"{!s}\") for the array element.".format('.'.join([__name__, cls.__name__]), string, length, base, utils.string.escape(string, '"')))
+            raise E.InvalidTypeOrValueError(u"{:s}.array({!r}, {:d}, {:d}) : Unable to parse \"{!s}\" into a type that can be used as an array element.".format('.'.join([__name__, cls.__name__]), string, length, base, utils.string.escape(string, '"')))
         return cls.array(ti, length, base)
     @utils.multicase(element=idaapi.tinfo_t, length=internal.types.integer, base=internal.types.integer)
     @classmethod
     def array(cls, element, length, base):
-        '''Create an array of the given `element` with the specified `length` and `base`.'''
+        '''Return an array composed of the given `element` and `length` with a specified `base`.'''
         ai = idaapi.array_type_data_t()
         ai.elem_type = element
         ai.nelems = length
         ai.base = base
 
+        # FIXME: would be nice to allow creation of a multidimensional
+        #        array... but i personally don't have a real use for them.
         ti = idaapi.tinfo_t()
         if not ti.create_array(ai):
-            raise E.DisassemblerError(u"{:s}.array(\"{:s}\", {:d}, {:d}) : Unable to create an array using the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(element), '"'), length, base, "{!s}".format(element)))
+            raise E.DisassemblerError(u"{:s}.array(\"{:s}\", {:d}, {:d}) : Unable to create an array using the specified type ({!r}) as its element.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(element), '"'), length, base, "{!s}".format(element)))
         return interface.tinfo.concretize(ti)
 
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
     def typedef(cls, info):
-        '''Return the name and type of the typedef given by `info`.'''
-        if not info.has_details():
-            raise E.MissingTypeOrAttribute(u"{:s}.typedef(\"{:s}\") : The provided type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
-
+        '''Return the name and type of the reference specified by `info`.'''
         if not info.is_typeref():
-            raise E.InvalidTypeOrValueError(u"{:s}.typedef(\"{:s}\") : The provided type information ({!r}) is not a type definition.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+            raise E.InvalidTypeOrValueError(u"{:s}.typedef(\"{:s}\") : The provided type ({!r}) is not a reference to a type.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
+
+        elif not info.has_details():
+            raise E.MissingTypeOrAttribute(u"{:s}.typedef(\"{:s}\") : The provided type ({!r}) does not have any details.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), "{!s}".format(info)))
 
         library = interface.tinfo.library(info)
         name, ordinal = info.get_type_name(), interface.tinfo.ordinal(info, library)
-        return name, cls.get(ordinal, library) if ordinal else None
+        return name, cls.at_ordinal(ordinal, library) if ordinal else None
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
-    def typedef(cls, ordinal):
-        '''Create a reference to a type with the specified `ordinal` from the current type library and return it.'''
-        res = interface.tinfo.reference(ordinal, interface.tinfo.library())
+    def typedef(cls, ordinal, **missing):
+        """Return a reference to a type with the specified `ordinal` from the current type library.
+
+        If `missing` is specified as true, then the ordinal is not required to exist within the current type library.
+        """
+        ti, td, missing = idaapi.tinfo_t(), idaapi.typedef_type_data_t(None, ordinal, False), missing.get('missing', False)
+        if missing and not ti.create_typedef(td):
+            raise E.DisassemblerError(u"{:s}.typedef({:d}) : Unable to create a reference to a type with the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+
+        # Use the unresolved tinfo_t if missing was specified, or the original result if not.
+        res = ti if missing else interface.tinfo.for_ordinal(ordinal)
         if not res:
             raise E.MissingTypeOrAttribute(u"{:s}.typedef({:d}) : The specified ordinal ({:d}) does not exist in the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
         return res
     @utils.multicase(name=internal.types.string)
     @classmethod
     def typedef(cls, name, **missing):
-        """Create a reference to a type that is using the specified `name`.
+        """Return a reference to a type with the specified `name` from the current type library.
 
         If `missing` is specified as true, then the name is not required to exist within the current type library.
         """
-        res = interface.tinfo.reference(name) if missing.get('missing', False) else interface.tinfo.reference(name, interface.tinfo.library())
+        res = interface.tinfo.reference(name) if missing.get('missing', False) else interface.tinfo.for_name(name)
         if not res:
             raise E.MissingTypeOrAttribute(u"{:s}.typedef({!r}{:s}) : A type with the name \"{:s}\" does not exist in the current type library.".format('.'.join([__name__, cls.__name__]), name, u", {:s}".format(utils.string.kwargs(missing)) if missing else '', utils.string.escape(name, '"')))
         return res
     @utils.multicase(name=(internal.types.string, internal.types.integer), library=idaapi.til_t)
     @classmethod
     def typedef(cls, name, library):
-        '''Create a reference to a type with the given type `name` from the specified type `library`.'''
-        ordinal = cls.ordinal(name, library) if isinstance(name, internal.types.string) else name
-        res = interface.tinfo.reference(ordinal, library)
+        '''Return a reference to a type with the specified `name` from a type `library`.'''
+        res = interface.tinfo.for_name(name, library) if isinstance(name, internal.types.string) else interface.tinfo.for_ordinal(name, library)
         if not res:
-            raise E.MissingTypeOrAttribute(u"{:s}.typedef({!r}, {:s}) : A type with the {:s} does not exist in the specified type library.".format('.'.join([__name__, cls.__name__]), "{:d}".format(name) if isinstance(name, internal.types.integer) else name, cls.__formatter__(library), "given ordinal ({:d})".format(name) if isinstance(name, internal.types.integer) else "name \"{:s}\"".format(name, utils.string.escape(name, '"'))))
-        return ti
+            raise E.MissingTypeOrAttribute(u"{:s}.typedef({!r}, {:s}) : A type with the {:s} does not exist in the specified type library.".format('.'.join([__name__, cls.__name__]), "{:d}".format(name) if isinstance(name, internal.types.integer) else name, interface.tinfo.format_library(library), "given ordinal ({:d})".format(name) if isinstance(name, internal.types.integer) else "name \"{:s}\"".format(name, utils.string.escape(name, '"'))))
+        return res
     typeref = utils.alias(typedef, 'types')
 
 class xref(object):
