@@ -2770,6 +2770,11 @@ class address(object):
     def bounds(cls, ea):
         '''Return the bounds of the specified address `ea` in a tuple formatted as `(left, right)`.'''
         return interface.bounds_t(ea, ea + interface.address.size(ea))
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
+    @classmethod
+    def bounds(cls, start, stop):
+        '''Return the bounds from the address `start` until right before the address `stop`.'''
+        return interface.bounds_t(start, stop)
 
     @utils.multicase()
     @classmethod
