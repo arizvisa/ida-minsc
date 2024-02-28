@@ -2617,7 +2617,7 @@ class declaration_with_qualifiers(selection):
         (start, stop), segments = self.__selection__
         return ((start, left), segments[:-len(elements)] if elements else segments)
 
-    __qualifiers__ = {'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '(&)'}
+    __qualifiers__ = {'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '(&)', '(*)', '(* const)'}
     @property
     def qualifiers(self):
         _, quals = extract.qualifiers(self.__string__, *self.__correct_selection_for_array, qualifiers=self.__qualifiers__)
