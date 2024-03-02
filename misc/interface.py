@@ -3294,6 +3294,81 @@ class address(object):
         iterable = itertools.takewhile(Fwhile, cls.iterate(ea, step))
         return itertools.chain([ea], iterable)
 
+    @classmethod
+    def structure(cls, ea):
+        '''Return the union or structure identifier for the item at address `ea`.'''
+        is_struct = idaapi.is_struct if hasattr(idaapi, 'is_struct') else utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU))
+
+        # First check if there's a structure/union at the specified address.
+        ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
+        if not is_struct(flags):
+            return idaapi.BADNODE
+
+        # Grab the operand information (really operand 0), and return the type id.
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        if not ok:
+            return idaapi.BADNODE
+        return info.tid
+
+    @classmethod
+    def enumeration(cls, ea, *opnum):
+        '''Return the enumeration identifier and serial for the enumeration at address `ea`.'''
+        ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
+
+        # Verify that there's an enumeration at the suggested address.
+        has_enum = idaapi.is_enum(flags, *(opnum if opnum else [idaapi.OPND_ALL])) if hasattr(idaapi, 'is_enum') else bool(flags & operator.getitem([idaapi.FF_0ENUM, idaapi.FF_1ENUM], *opnum) if opnum else idaapi.enum_flag() if hasattr(idaapi, 'enum_flag') else idaapi.enumflag())
+        if not has_enum:
+            return
+
+        # Use the operand information to extract the identifier and serial for the enumeration member.
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        if not ok:
+            return
+        return info.ec.tid, info.ec.serial
+
+    @classmethod
+    def string(cls, ea):
+        '''Return the unpacked string type for the string at the address `ea`.'''
+        is_string = idaapi.is_strlit if hasattr(idaapi, 'is_strlit') else utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI))
+
+        # Check that the suggested address has a string applied to it.
+        ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
+        if not is_string(flags):
+            return
+
+        # Unpack the string type from the operand information for the address.
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        if ok:
+            return string.unpack(info.strtype)
+        return
+
+    @classmethod
+    def custom(cls, ea):
+        '''Return the custom data type id and a list of its formats for the item at address `ea`.'''
+        is_custom = idaapi.is_custom if hasattr(idaapi, 'is_custom') else utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_CUSTOM))
+
+        # Check if there's a custom data type applied to the address.
+        ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
+        if not is_custom(flags):
+            return
+
+        # Try to grab the operand information from the suggested address.
+        ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+        if not ok:
+            return
+
+        # Extract the custom data type and unpack all of its format identifiers.
+        cd = oi.cd
+        if hasattr(cd.fids, 'bytes'):
+            paired = zip(*[iter(bytearray(cd.fids.bytes))] * 2)
+            fids = [ 0x100 * hi + lo for lo, hi in paired ]
+
+        # Cast all the formats from the data type into an array and return it.
+        else:
+            address, parray_t = int(cd.fids), ctypes.POINTER(ctypes.c_int16 * idaapi.UA_MAXOP)
+            fids = [integer for integer in ctypes.cast(ctypes.c_void_p(address), parray_t).contents]
+        return cd.dtid, fids
+
 class range(object):
     """
     This namespace provides tools that assist with interacting with IDA 6.x's
