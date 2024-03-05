@@ -5056,6 +5056,12 @@ class tinfo(object):
         elif not rt and ti.is_func():
             info = ti
 
+        # If it's runtime-linked and a function instead of a pointer, then throw
+        # up a warning that we will be correcting it by promoting it to a pointer.
+        elif rt and ti.is_func() and not ti.is_ptr():
+            logging.warning(u"{:s}.update_function_details({:#x}, {!r}) : The type ({!r}) for the runtime-linked function at {:#x} is not a function pointer and will be corrected during modification.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
+            pi, info = idaapi.ptr_type_data_t(), ti
+
         # Anything else is a type error that we need to raise to the user.
         else:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_details({:#x}, {!r}) : The type that was received ({!r}) for the specified function ({:#x}) was not a function type.".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), "{!s}".format(ti), ea))
