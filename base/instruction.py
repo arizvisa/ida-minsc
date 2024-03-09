@@ -279,9 +279,8 @@ def ops_register(**modifiers):
 def ops_register(ea, **modifiers):
     '''Return references to the operands for the instruction at address `ea` that are using registers.'''
     ea = interface.address.inside(ea)
-    iterops = interface.regmatch.modifier(**modifiers)
-    fregisterQ = utils.fcompose(op, utils.fcondition(utils.finstance(interface.symbol_t))(utils.fcompose(utils.fattribute('symbols'), functools.partial(map, utils.finstance(interface.register_t)), any), utils.fconstant(False)))
-    return tuple(interface.opref_t(ea, opnum, op_access(ea, opnum)) for opnum in iterops(ea) if fregisterQ(ea, opnum))
+    matches = interface.regmatch(**modifiers)
+    return tuple(ref for ref in matches(ea))
 @utils.multicase(register=(types.string, interface.register_t))
 def ops_register(register, *registers, **modifiers):
     '''Return references to the operands for the current instruction that are using `register` or the additional `registers`.'''
@@ -295,9 +294,8 @@ def ops_register(ea, register, *registers, **modifiers):
     If the keyword `execute` is true, then only return the result if it's executing with the register.
     """
     ea = interface.address.inside(ea)
-    iterops = interface.regmatch.modifier(**modifiers)
-    uses = interface.regmatch.use( (register,) + registers )
-    return tuple(interface.opref_t(ea, opnum, op_access(ea, opnum)) for opnum in iterops(ea) if uses(ea, opnum))
+    matches = interface.regmatch(*itertools.chain([register], registers), **modifiers)
+    return tuple(ref for ref in matches(ea))
 ops_reg = utils.alias(ops_register)
 
 ## functions vs a specific operand of an insn
