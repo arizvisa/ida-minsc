@@ -6818,91 +6818,87 @@ class instruction(object):
 class regmatch(object):
     """
     This namespace is used to assist with doing register matching
-    against instructions. This simplifies the interface for register
-    matching so that one can specify whether any number of registers
-    are written to or read from.
+    against instructions. This allows one to request the operand
+    references for an address and only return the ones that match
+    any number of registers that are written to or read from. By
+    taking the difference of the result, you can also return
+    the operands that do not use any registers.
     """
+
     def __new__(cls, *registers, **modifiers):
-        '''Construct a closure that can be used for matching instruction using the specified `registers` and `modifiers`.'''
-        if not registers:
-            args = ', '.join(map(internal.utils.string.escape, registers))
-            mods = internal.utils.string.kwargs(modifiers)
-            raise internal.exceptions.InvalidParameterError(u"{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join([__name__, cls.__name__]), args, (', '+mods) if mods else ''))
-        use, iterops = cls.use(registers), cls.modifier(**modifiers)
-        def match(ea):
-            return any(map(functools.partial(use, ea), iterops(ea)))
-        return match
+        '''Return a closure that filters the operand references for an instruction using the specified `registers` and `modifiers`.'''
+        use, select = cls.use(*registers), cls.modifier(**modifiers)
+        def match_access(ea):
+            iterable = filter(use, select(ea)) if registers else select(ea)
+            return tuple(ref for ref in iterable)
+        return match_access
 
     @classmethod
-    def use(cls, registers):
-        '''Return a closure that checks if an address and opnum uses either of the specified `registers`.'''
+    def use(cls, *registers):
+        '''Return a closure that checks if an operand reference uses any of the specified `registers`.'''
         import __catalog__ as catalog
 
-        # convert any regs that are strings into their correct object type
-        regs = { architecture.by_name(r) if isinstance(r, internal.types.string) else r for r in registers }
+        # convert any registers that are strings into a register_t object.
+        choices = { architecture.by_name(reg) if isinstance(reg, internal.types.string) else reg for reg in registers }
 
-        # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
-        match = lambda r, regs=regs: any(map(r.related, regs))
+        # returns whether the register in operand is a subset of any of the given registers.
+        match = (lambda registers: lambda operand: any(map(operand.related, registers)))(choices)
 
-        # returns true if the operand at the specified address is related to one of the registers in `regs`.
-        def uses_register(ea, opnum):
+        # returns true if the operand at the specified address is composed of one of the specified `registers`.
+        def operand_uses_register(ea, opnum, *access):
             insn, operand = instruction.at(ea), instruction.operand(ea, opnum)
-            val = catalog.operand.decode(insn, operand)
-            if isinstance(val, symbol_t):
-                return any(map(match, val.symbols))
+            op = catalog.operand.decode(insn, operand)
+            if isinstance(op, symbol_t):
+                return any(map(match, op.symbols))
             return False
 
+        # return a wrapper that can take an address and opnum or an opref_t.
+        def uses_register(ref, *args):
+            return operand_uses_register(ref, *args) if args else operand_uses_register(*ref)
         return uses_register
 
     @classmethod
     def modifier(cls, **modifiers):
-        '''Return a closure that iterates through all the operands in an address that use either of the specified `modifiers`.'''
-        ops_count = internal.utils.fcompose(instruction.operands, tuple, len)
-
-        # by default, grab all operand indexes
-        iterops = internal.utils.fcompose(ops_count, builtins.range, sorted)
-
-        # now we can collect our required conditions to yield an operand index.
+        '''Return a closure that filters the operands references for an address using any of the specified `modifiers`.'''
         conditions = []
+
+        # now we can figure out the required conditions to confirm the operand access
+        includes = lambda access: lambda ref: access in ref.access
+        excludes = lambda access: lambda ref: access not in ref.access
 
         # if `read` is specified, then only grab operand indexes that are read from
         read_args = ['read', 'r']
         if any(item in modifiers for item in read_args):
             read = next(modifiers[item] for item in read_args if item in modifiers)
-            Fread = (lambda ref: 'r' in ref.access) if read else (lambda ref: 'r' not in ref.access)
-            conditions.append(Fread)
+            conditions.append(includes('r') if read else excludes('r'))
 
         # if `write` is specified that only grab operand indexes that are written to
         write_args = ['written', 'write', 'w']
         if any(item in modifiers for item in write_args):
             write = next(modifiers[item] for item in write_args if item in modifiers)
-            Fwrite = (lambda ref: 'w' in ref.access) if write else (lambda ref: 'w' not in ref.access)
-            conditions.append(Fwrite)
+            conditions.append(includes('w') if write else excludes('w'))
 
         # if `execute` is specified that only grab operand indexes that are executed
         execute_args = ['executed', 'execute', 'exec', 'x']
         if any(item in modifiers for item in execute_args):
             execute = next(modifiers[item] for item in execute_args if item in modifiers)
-            Fexec = (lambda ref: 'x' in ref.access) if execute else (lambda ref: 'x' not in ref.access)
-            conditions.append(Fexec)
+            conditions.append(includes('x') if execute else excludes('x'))
 
         # if `readwrite` is specified that only grab operand indexes that are modified
         readwrite_args = ['modify', 'modified', 'changed', 'readwrite', 'rw']
         if any(item in modifiers for item in readwrite_args):
             write = next(modifiers[item] for item in readwrite_args if item in modifiers)
-            Fwrite = (lambda ref: 'rw' in ref.access) if write else (lambda ref: 'rw' not in ref.access)
-            conditions.append(Fwrite)
+            conditions.append(includes('rw') if write else excludes('rw'))
 
         # if `readexecute` is specified that only grab operand indexes that are loaded before being used to execute
         execute_args = ['readexecute', 'readexec', 'rx']
         if any(item in modifiers for item in execute_args):
             execute = next(modifiers[item] for item in execute_args if item in modifiers)
-            Fexec = (lambda ref: 'rx' in ref.access) if execute else (lambda ref: 'rx' not in ref.access)
-            conditions.append(Fexec)
+            conditions.append(includes('rx') if execute else excludes('rx'))
 
         # now we just need to stack our conditions and enumerate the operands while only yielding their index.
         Fconditions = internal.utils.fcompose(internal.utils.fthrough(*conditions), any) if conditions else internal.utils.fconstant(True)
-        return internal.utils.fcompose(instruction.access, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(internal.utils.imap, operator.attrgetter('opnum')), sorted)
+        return internal.utils.fcompose(instruction.access, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(sorted, key=operator.attrgetter('opnum')))
 
 ## figure out the boundaries of sval_t
 if idaapi.BADADDR == 0xffffffff:
