@@ -3682,13 +3682,10 @@ class address(object):
             res = builtins.next(iterable, None)
             start = top() if res is None else idaapi.get_item_end(res)
 
-        # generate each helper using the regmatch class
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use(regs)
-
         # define a predicate for checking whether an address uses the desired registers.
-        Freg = lambda ea: fwithin(ea) and builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
-        F = utils.fcompose(utils.fmap(Freg, predicate), builtins.all)
+        matches = interface.regmatch(*regs, **modifiers)
+        has_regmatch = utils.fcompose(matches, internal.types.bool)
+        F = utils.fcompose(utils.fmap(has_regmatch, predicate), builtins.all)
 
         # now grab all addresses where any of our registers match using the count.
         iterable = (item for item in interface.address.iterate(ea, idaapi.prev_not_tail) if item >= start and type.code(ui.navigation.analyze(item)) and F(item))
@@ -3737,13 +3734,10 @@ class address(object):
             res = builtins.next(iterable, None)
             end = bottom() if res is None else idaapi.get_item_head(res)
 
-        # generate each helper using the regmatch class
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use(regs)
-
         # define a predicate for checking whether an address uses the desired registers.
-        Freg = lambda ea: fwithin(ea) and builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
-        F = utils.fcompose(utils.fmap(Freg, predicate), builtins.all)
+        matches = interface.regmatch(*regs, **modifiers)
+        has_regmatch = utils.fcompose(matches, internal.types.bool)
+        F = utils.fcompose(utils.fmap(has_regmatch, predicate), builtins.all)
 
         # now grab all addresses where any of our registers match using the count.
         iterable = (item for item in interface.address.iterate(ea, idaapi.next_not_tail) if item < end and type.code(ui.navigation.analyze(item)) and F(item))
