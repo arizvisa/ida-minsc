@@ -488,28 +488,24 @@ class chunks(object):
         # Now we can just iterate through each chunk whilst checking the bounds.
         return any(start <= ea < end for start, end in iterable)
 
-    @utils.multicase(reg=(types.string, interface.register_t))
+    @utils.multicase(register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the current function that uses `reg` or any one of the registers in `regs`.'''
-        return cls.register(ui.current.function(), reg, *regs, **modifiers)
-    @utils.multicase(func=(idaapi.func_t, types.integer), reg=(types.string, interface.register_t))
+    def register(cls, register, *registers, **modifiers):
+        '''Yield a reference for each operand within the current function that uses the specified `register` or any one of `registers`.'''
+        return cls.register(ui.current.function(), register, *registers, **modifiers)
+    @utils.multicase(func=(idaapi.func_t, types.integer), register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, func, reg, *regs, **modifiers):
-        """Yield each `(address, opnum, state)` within the function `func` that uses `reg` or any one of the registers in `regs`.
+    def register(cls, func, register, *registers, **modifiers):
+        """Yield a reference for each operand within the function `func` that uses the specified `register` or any one of `registers.
 
         If the keyword `write` is true, then only return the result if it's writing to the register.
         If the keyword `read` is true, then only return the result if it's reading from the register.
         If the keyword `execute` is true, then only return the result if it's executing with the register.
         """
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use( (reg,) + regs )
-
+        matches = interface.regmatch(*itertools.chain([register], registers), **modifiers)
         for ea in cls.iterate(func):
-            for opnum in iterops(ea):
-                if uses_register(ea, opnum):
-                    items = ea, opnum, instruction.op_access(ea, opnum)
-                    yield interface.opref_t(*items)
+            for ref in matches(ea):
+                yield ref
             continue
         return
 
@@ -637,27 +633,24 @@ class chunk(object):
             continue
         return
 
-    @utils.multicase(reg=(types.string, interface.register_t))
+    @utils.multicase(register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the function chunk containing the current address which uses `reg` or any one of the registers in `regs`.'''
-        return cls.register(ui.current.address(), reg, *regs, **modifiers)
-    @utils.multicase(ea=types.integer, reg=(types.string, interface.register_t))
+    def register(cls, register, *registers, **modifiers):
+        '''Yield a reference for each operand within the current function chunk which uses the specified `register` or any one of `registers`.'''
+        return cls.register(ui.current.address(), register, *registers, **modifiers)
+    @utils.multicase(ea=types.integer, register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, ea, reg, *regs, **modifiers):
-        """Yield each `(address, opnum, state)` within the function chunk containing the address `ea` which uses `reg` or any one of the registers in `regs`.
+    def register(cls, ea, register, *registers, **modifiers):
+        """Yield a reference for each operand within the function chunk containing the address `ea` which uses `register` or any one of `registers`.
 
         If the keyword `write` is true, then only return the result if it's writing to the register.
         If the keyword `read` is true, then only return the result if it's reading from the register.
         If the keyword `execute` is true, then only return the result if it's executing with the register.
         """
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use( (reg,) + regs )
-
+        matches = interface.regmatch(*itertools.chain([register], registers), **modifiers)
         for ea in cls.iterate(ea):
-            for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
-                items = ea, opnum, instruction.op_access(ea, opnum)
-                yield interface.opref_t(*items)
+            for ref in matches(ea):
+                yield ref
             continue
         return
 
@@ -2057,50 +2050,40 @@ class block(object):
         # passthrough to database.tag for removing the ones we don't handle.
         return internal.tags.address.remove(ea, key, none)
 
-    @utils.multicase(reg=(types.string, interface.register_t))
+    @utils.multicase(register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the current block that uses `reg` or any one of the registers in `regs`.'''
-        return cls.register(ui.current.address(), reg, *regs, **modifiers)
-    @utils.multicase(ea=types.integer, reg=(types.string, interface.register_t))
+    def register(cls, register, *registers, **modifiers):
+        '''Yield a reference for each operand within the current block that uses the specified `register` or any one of `registers`.'''
+        return cls.register(ui.current.address(), register, *registers, **modifiers)
+    @utils.multicase(ea=types.integer, register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, ea, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
+    def register(cls, ea, register, *registers, **modifiers):
+        '''Yield a reference for each operand within the block containing `ea` that uses the specified `register` or any one of `registers`.'''
         bb = cls.at(ea, **modifiers)
-        return cls.register(bb, reg, *regs, **modifiers)
-    @utils.multicase(bounds=interface.bounds_t, reg=(types.string, interface.register_t))
+        return cls.register(bb, register, *registers, **modifiers)
+    @utils.multicase(bounds=interface.bounds_t, register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, bounds, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the block identified by `bounds` that uses `reg` or any one of the registers in `regs`.'''
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use( (reg,) + regs )
-
+    def register(cls, bounds, register, *registers, **modifiers):
+        '''Yield a reference for each operand within the block identified by `bounds` that uses the specified `register` or any one of `registers`.'''
+        matches = interface.regmatch(*itertools.chain([register], registers), **modifiers)
         for ea in interface.address.items(*bounds):
-            for opnum in iterops(ea):
-                if uses_register(ea, opnum):
-                    items = ea, opnum, instruction.op_access(ea, opnum)
-                    yield interface.opref_t(*items)
-                continue
+            for ref in matches(ea):
+                yield ref
             continue
         return
-    @utils.multicase(bb=idaapi.BasicBlock, reg=(types.string, interface.register_t))
+    @utils.multicase(bb=idaapi.BasicBlock, register=(types.string, interface.register_t))
     @classmethod
-    def register(cls, bb, reg, *regs, **modifiers):
-        """Yield each `(address, opnum, state)` within the block `bb` that uses `reg` or any one of the registers in `regs`.
+    def register(cls, bb, register, *registers, **modifiers):
+        """Yield a reference for each operand within the block `bb` that uses the specified `register` or any one of `registers`.
 
         If the keyword `write` is true, then only return the result if it's writing to the register.
         If the keyword `read` is true, then only return the result if it's reading from the register.
         If the keyword `execute` is true, then only return the result if it's executing with the register.
         """
-        iterops = interface.regmatch.modifier(**modifiers)
-        uses_register = interface.regmatch.use( (reg,) + regs )
-
+        matches = interface.regmatch(*itertools.chain([register], registers), **modifiers)
         for ea in cls.iterate(bb):
-            for opnum in iterops(ea):
-                if uses_register(ea, opnum):
-                    items = ea, opnum, instruction.op_access(ea, opnum)
-                    yield interface.opref_t(*items)
-                continue
+            for ref in matches(ea):
+                yield ref
             continue
         return
 
