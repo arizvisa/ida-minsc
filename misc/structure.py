@@ -721,15 +721,13 @@ class member(object):
         # now we need to grab the type information since we're going to
         # be pythonifying our type information prior to returning it.
         opinfo = idaapi.opinfo_t()
-        if idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr):
-            tid = opinfo.tid
-        else:
-            tid = idaapi.BADADDR
+        ok = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+        tid = opinfo.tid if ok else idaapi.BADNODE
 
-        # now we can dissolve it the type, and use it to
-        # return a tuple containing everything we collected.
+        # now we can dissolve it the type, grab the type information,
+        # and use them to return a tuple containing everything we collected.
         dissolved = interface.typemap.dissolve(mptr.flag, tid, msize, offset=moffset)
-        return mptr.id, mname, dissolved, location, mcomments
+        return mptr.id, mname, dissolved, location, cls.get_typeinfo(mptr), mcomments
 
     @classmethod
     def has_references(cls, mptr):
@@ -4612,7 +4610,7 @@ class members_t(object):
         # to filter the old references. This way we can filter those references and
         # identify which member the reference was moved to during our reassignment.
         name = utils.string.of(idaapi.get_struc_name(sptr.id))
-        oldmembers = {id : (name, offset) for offset, (id, name, _, location, _) in olditems.items()}
+        oldmembers = {id : (name, offset) for offset, (id, name, _, location, _, _) in olditems.items()}
         newmembers = {id : (member.get_name(id), offset) for offset, id, packed in results}
         oldmembers[sptr.id] = name, oldsize
         newmembers[sptr.id] = name, idaapi.get_struc_size(sptr)
@@ -4650,7 +4648,7 @@ class members_t(object):
 
         # Finally we can return everything that we've just removed back to the caller.
         iterable = (olditems[offset] for offset, _ in selected if offset in olditems)
-        return [(mname, mtype, mlocation) for id, mname, mtype, mlocation, mcomments in iterable]
+        return [(mname, mtype, mlocation, mtypeinfo) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
     def __delitem__(self, index):
         '''Remove the member(s) at the specified `index` non-destructively.'''
@@ -4736,7 +4734,7 @@ class members_t(object):
             packed = members[offset]
 
             # Unpack some member attributes so that we can reference them in any logs.
-            identifier, mname, _, _, _ = packed
+            identifier, mname, _, _, _, _ = packed
             location_description = "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(offset)
 
             # If we were unable to remove a specific member, then log information about
@@ -4768,8 +4766,8 @@ class members_t(object):
         # Finally we can just return the packed information that we deleted from the structure.
         iterable = ((offset, mptr) for offset, mptr in selected)
         iterable = ((offset, members[offset] if offset in members else mptr) for offset, mptr in iterable if offset not in failures)
-        iterable = ((('', None, interface.location_t(base + offset, packed)) if isinstance(packed, types.integer) else packed[+1 : -1]) for offset, packed in iterable)
-        return [(mname, mtype, mlocation) for mname, mtype, mlocation in iterable]
+        iterable = ((('', None, interface.location_t(base + offset, packed), None) if isinstance(packed, types.integer) else packed[+1 : -1]) for offset, packed in iterable)
+        return [(mname, mtype, mlocation, mtypeinfo) for mname, mtype, mlocation, mtypeinfo in iterable]
 
     def __iter__(self):
         '''Yield all the members within the structure.'''
