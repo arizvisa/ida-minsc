@@ -1645,6 +1645,65 @@ class members(object):
         results = ((cls.by_identifier(sptr, member_or_size) if isinstance(member_or_size, idaapi.member_t) else member_or_size) for member_or_size in iterable)
         return [packed_or_size for packed_or_size in results]
 
+    @classmethod
+    def remove_bounds(cls, sptr, start, stop, *offset):
+        '''Remove the members from the offset `start` to `stop` from the structure or union identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        [base] = map(int, offset) if offset else [0]
+        start, stop = map(int, [start, stop])
+
+        # Start out by collecting the members that overlap with the segment
+        # we were given. This is so we can return the removed members when we
+        # leave. We also keep track of the indices for the boundary members.
+        result, lindex, rindex = [], sptr.memqty, 0
+        for mowner, mindex, mptr in cls.overlaps(sptr, start - base, stop - base):
+            packed = member.packed(base, mptr)
+            lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+            result.append(packed)
+
+        # Now we can use the boundary indices to figure out the exact boundaries to delete with
+        # the disassembler. We preserve the count so that we can complain about it if we failed.
+        mleft = sptr.members[lindex].soff if lindex < sptr.memqty else idaapi.get_struc_size(sptr)
+        mright = sptr.members[rindex].eoff if rindex < sptr.memqty else idaapi.get_struc_size(sptr)
+
+        # The reason why we are using exact member boundaries is to avoid having to manually clamp
+        # `start` and `stop`. With this, we can avoid invalid values being passed to the disassembler.
+        soff, eoff = 0 if mleft.flag & idaapi.MF_UNIMEM else mleft.soff, mright.eoff
+        count = idaapi.del_struc_members(sptr, soff, eoff)
+
+        # If we removed absolutely nothing (but we were supposed to),
+        # then bail here and let the user know that it didn't happen.
+        if result and not count:
+            bounds = interface.bounds_t(soff, eoff)
+            logging.fatal(u"{:s}({:#x}).members.remove({:#x}, {:#x}{:s}) : Unable to remove {:d} member{:s} overlapping the boundaries {:s} of the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', len(result), '' if len(result) == 1 else 's', bounds + base, 'union' if union(sptr) else 'structure', sptr.id))
+            return []
+
+        # If our count matches, then we're good and can simply return our results to
+        # the caller. We also translate the location with the offset we were given.
+        elif len(result) == count:
+            iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result)
+            return [packed for packed in iterable]
+
+        # Otherwise we only removed some of the members. So, we need
+        # to figure out exactly what happened and let the user know.
+        removed, expected = {mid for mid in []}, {mid : (mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result}
+        for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result:
+            moffset, msize = mlocation
+            mptr = idaapi.get_member(sptr, moffset - base)
+            if mptr and mptr.id == mid:
+                logging.debug(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member {:s} at offset {:+#x} with the specified id ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', mname, moffset, mid))
+                continue
+            removed.add(id)
+
+        # We should now have a list of identifiers that were removed. So we only need
+        # to proceed with our complaints and return whatever we successfuly deleted.
+        bounds = interface.bounds_t(*sorted([start, stop]))
+        logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove {:d} members of the expected {:d} members overlapping the boundaries {:s} of the requested {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', len(expected) - len(removed), len(expected), bounds, 'union' if union(sptr) else 'structure', sptr.id))
+
+        # Unpack and repack as punishment for such a fucking huge tuple...
+        iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result if mid in removed)
+        return [packed for packed in iterable]
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
