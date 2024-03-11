@@ -1134,17 +1134,21 @@ class multicase(object):
 
         # If both are selected, then we need to do some connections here.
         if varargs and wildargs:
-            t = constraints.pop(wildargs, ())
-            Fcritique, Ftransform = cls.parameter_critique(*t), cls.parameter_transform(*t)
-            critique_and_transform = Fcritique, Ftransform, Fflattened_constraints(t)
+            tvar, twild = constraints.pop(varargs, ()), constraints.pop(wildargs, ())
 
             # Since this callable is variable-length'd, we create a loop in our tree
             # and table so that we can consume any number of parameters.
+            Fcritique, Ftransform = cls.parameter_critique(*tvar), cls.parameter_transform(*tvar)
+            critique_and_transform = Fcritique, Ftransform, Fflattened_constraints(tvar)
+
             table[callable, len(args)] = discard_and_required, critique_and_transform, wildargs
             tree.setdefault(len(args), {})[callable] = varargs, len(args), len(args)
 
             # Since the callable is also wild, we need to create a loop outside the
             # count of parameters (-1). This way we can promote a loop to this path.
+            Fcritique, Ftransform = cls.parameter_critique(*twild), cls.parameter_transform(*twild)
+            critique_and_transform = Fcritique, Ftransform, Fflattened_constraints(twild)
+
             tree.setdefault(-1, {})[callable] = wildargs, -1, -1
             table[callable, -1] = discard_and_required, critique_and_transform, wildargs
 
@@ -1264,7 +1268,7 @@ class multicase(object):
 
         # Log any multicased functions that accidentally define type constraints for parameters
         # which don't actually exist. This is specifically done in order to aid debugging.
-        unavailable = {constraint_name for constraint_name in constraints.keys()} - {argument_name for argument_name in args}
+        unavailable = {constraint_name for constraint_name in constraints.keys()} - {argument_name for argument_name in itertools.chain(args, filter(None, [star, starstar]))}
         if unavailable:
             co = pycompat.function.code(function)
             co_fullname, co_filename, co_lineno = '.'.join([function.__module__, function.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
