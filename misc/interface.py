@@ -9110,6 +9110,33 @@ class name(object):
     that it can be applied to a particular address/identifier or
     checking if the name already exists within the database.
     """
+
+    __long_formats__ = {None : u"{:s}::{:s}".format}
+    __long_formats__.update({filetype : u"{:s}!{:s}".format for filetype in [
+        idaapi.f_EXE_old, idaapi.f_COM_old, idaapi.f_DRV,
+        idaapi.f_WIN, idaapi.f_LX, idaapi.f_LE, idaapi.f_COFF,
+        idaapi.f_PE, idaapi.f_EXE, idaapi.f_COM,
+    ]})
+    __long_formats__.setdefault(idaapi.f_MACHO, u"{:s}`{:s}".format) if hasattr(idaapi, 'f_MACHO') else ()
+
+    @classmethod
+    def format_long(cls, module, name, *ordinal):
+        '''Format the `module`, `name`, and `ordinal` components of symbol name for the current platform and return it.'''
+        default_formatter = cls.__long_formats__[None]
+        long_formatter = cls.__long_formats__.get(database.filetype(), default_formatter)
+
+        # If the module is empty, then this will typically only
+        # happen with gnu things. We can extract it from the end.
+        if module is None and u'@@' in name:
+            nestedname, nestedmodule = name.rsplit(u'@@', 1)
+            return long_formatter(nestedmodule, nestedname)
+
+        # Ordinal only makes sense on windows and it gets used if the
+        # name is empty. We just assume Windows if it's at all empty.
+        elif not name:
+            name = u"Ordinal{:d}".format(*ordinal) if ordinal else ''
+        return long_formatter(module, name) if all([module, name]) else ''
+
     @classmethod
     def exists(cls, name, *suffix):
         '''Return if the given `name` already exists at an address within the database.'''
