@@ -9422,3 +9422,184 @@ class name(object):
         else:
             result[idaapi.SN_LOCAL] = idaapi.SN_LOCAL
         return result
+
+class entries(object):
+    """
+    This tiny namespace is a wrapper around the entry point component
+    of the disassembler. Entry points are also known as the export
+    table in Windows parlance. The disassembler differentiates an
+    entry point from an export using its ordinal number and address.
+    Hence, this namespace does the same and allows one to read or
+    write to any of the entry points or exports within the database.
+
+    The native type that is used by this namespace is the index of
+    the entry point. One can use the index of an entry point to
+    determine its ordinal, name, or addresses. It is worth noting
+    that a single entry point can have multiple ordinals or names.
+    """
+
+    # This netnode uses alts and sups where the alts have a format where each
+    # ordinal is set to address+1 (NETMAP_VAL), and the BADADDR index is the
+    # number of entries. The sups map ordinal to a terminated string for the name.
+    __netnode_name__ = '$ entry points'
+
+    @classmethod
+    def count(cls):
+        '''Return the total number of entry points within the database.'''
+        return idaapi.get_entry_qty()
+
+    @classmethod
+    def new(cls, ea, name=None, *ordinal, **code):
+        """Create a new entry point at the address `ea` with the specified `name` and `ordinal`.
+
+        If `code` is false then avoid creating instructions at the specified address.
+        """
+        [realordinal] = ordinal if ordinal else [ea]
+
+        # We assume by default that adding an entry point is for marking it
+        # as code. There could be data imports, but why would anybody be
+        # using their disassembler to manually create their imports anyways...
+        mark_as_code = code.get('code', True)
+
+        # Now we can go ahead and tell the disassembler to add an entry.
+        index = idaapi.get_entry_qty()
+        if not idaapi.add_entry(realordinal, ea, internal.utils.string.to(name) if name else None, mark_as_code):
+            raise internal.exceptions.DisassemblerError(u"{:s}.new({:#x}, {!s}{:s}{:s}) : Unable to create an entry point at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, u"{!s}".format(name) if isinstance(name, internal.types.string) else name, u", {:d}".format(realordinal) if ordinal else u'', u", {:s}".format(internal.utils.string.kwargs(code)) if code else u'', ea))
+        return index
+
+    @classmethod
+    def iterate(cls):
+        '''Yield a tuple for each entry point and export within the database.'''
+        for index in builtins.range(idaapi.get_entry_qty()):
+            ordinal = idaapi.get_entry_ordinal(index)
+            address, res = (Fget_entry_thing(ordinal) for Fget_entry_thing in [idaapi.get_entry, idaapi.get_entry_name])
+            name = internal.utils.string.of(res) if res else None
+            yield index, address, name, ordinal
+        return
+
+    @classmethod
+    def exports(cls):
+        '''Yield a tuple for each export within the database.'''
+        for index, address, name, ordinal in cls.iterate():
+            if ordinal != address:
+                yield (index, address, name, ordinal)
+            continue
+        return
+
+    @classmethod
+    def entries(cls):
+        '''Yield a tuple for each entry point within the database.'''
+        for index, address, name, ordinal in cls.iterate():
+            if ordinal == address:
+                yield (index, address, name)
+            continue
+        return
+
+    @classmethod
+    def name(cls, index, *name):
+        '''Return or set the `name` of the entry point at the specified `index`.'''
+        ordinal = idaapi.get_entry_ordinal(index)
+        res = idaapi.get_entry_name(ordinal)
+        if not name:
+            return internal.utils.string.of(res) if res else ''
+
+        # Otherwise, go ahead and rename the entry using the disassembler.
+        [newname] = name
+        if not idaapi.rename_entry(ordinal, internal.utils.string.to(newname)):
+            raise internal.exceptions.DisassemblerError(u"{:s}.name({:d}, {!r}) : Unable to set the name for the entry point at the specified index ({:d}).".format('.'.join([__name__, cls.__name__]), index, newname, index))
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def fullname(cls, index):
+        '''Return the full symbol name of the entry point at the specified `index`.'''
+        module, res = database.filename(), cls.name(index)
+        if database.filetype() in {idaapi.f_ELF, idaapi.f_AOUT}:
+            return name.format_long("'{:s}'".format(module), res or None, idaapi.get_entry_ordinal(index))
+        return name.format_long(module, res or None, idaapi.get_entry_ordinal(index))
+
+    @classmethod
+    def ordinal(cls, index):
+        '''Return the ordinal of the entry point at the specified `index`.'''
+        return idaapi.get_entry_ordinal(index)
+
+    @classmethod
+    def address(cls, index):
+        '''Return the address of the entry point at the specified `index`.'''
+        ordinal = idaapi.get_entry_ordinal(index)
+        ea = idaapi.get_entry(ordinal)
+        return None if ea == idaapi.BADADDR else ea
+
+    @classmethod
+    def forward(cls, index, *name):
+        '''Return or set the forwarded `name` of the entry point at the specified `index`.'''
+        ordinal = idaapi.get_entry_ordinal(index)
+        res = idaapi.get_entry_forwarder(ordinal)
+        if not name:
+            return internal.utils.string.of(res or '') if ordinal > 0 else None
+
+        # If the API doesn't exist, then bail with a version complaint.
+        elif not hasattr(idaapi, 'set_entry_forwarder'):
+            raise internal.exceptions.UnsupportedVersion(u"{:s}.forwarder({:d}, {!r}) : Setting the forwarded name for an entry point is not supported by your version of the disassembler ({!s}).".format('.'.join([__name__, cls.__name__]), index, u"{!s}".format(*name), idaapi.__version__))
+
+        # Now we can just hand off the name to the disassembler.
+        [newname] = name
+        if not idaapi.set_entry_forwarder(ordinal, internal.utils.string.to(newname)):
+            raise internal.exceptions.DisassemblerError(u"{:s}.forwarder({:d}, {!r}) : Unable to set the forwarded name for entry point at the specified index ({:d}).".format('.'.join([__name__, cls.__name__]), index, newname, index))
+        return internal.utils.string.of(res)
+
+    @classmethod
+    def has(cls, index):
+        '''Return whether the entry point with the specified `index` is within the database.'''
+        return 0 <= idaapi.get_entry_qty() < index and idaapi.get_entry_ordinal(index) > 0
+
+    @classmethod
+    def has_ordinal(cls, ordinal):
+        '''Return whether the entry point with the specified `ordinal` is within the database.'''
+        return idaapi.get_entry(ordinal) != idaapi.BADADDR
+
+    @classmethod
+    def has_address(cls, ea):
+        '''Return whether the address specified by `ea` is an entry point.'''
+        is_entrypoint = idaapi.get_entry(ea) == ea
+        iterable = (True for index in builtins.range(idaapi.get_entry_qty()) if idaapi.get_entry(idaapi.get_entry_ordinal(index)) == ea)
+        return is_entrypoint or next(iterable, False)
+
+    @classmethod
+    def at_address(cls, ea):
+        '''Yield the index of each entry point at the address specified by `ea`.'''
+        # There just isn't a faster way than O(n) to accomplish this
+        # without having to keep track of the address ourselves...
+        for index in builtins.range(idaapi.get_entry_qty()):
+            ordinal = idaapi.get_entry_ordinal(index)
+            if ordinal > 0 and idaapi.get_entry(ordinal) == ea:
+                yield index
+            continue
+        return
+
+    @classmethod
+    def at_name(cls, name):
+        '''Yield the index of each entry point with the specified `name`.'''
+        # Entry point names are not guaranteed to be unique, and we have
+        # no other way to find the indices for a name other than O(n).
+        for index in builtins.range(idaapi.get_entry_qty()):
+            ordinal = idaapi.get_entry_ordinal(index)
+            res = internal.utils.string.of(idaapi.get_entry_name(ordinal) or '') if ordinal > 0 else u''
+            if ordinal > 0 and name == res:
+                yield index
+            continue
+        return
+
+    @classmethod
+    def by_ordinal(cls, ordinal):
+        '''Return the index of the entry point for the specified `ordinal`.'''
+        if idaapi.get_entry(ordinal) == idaapi.BADADDR:
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.by_ordinal({:d}) : No entry point was found with the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+
+        # It appears that we have no choice other than to iterate through all
+        # of the ordinals to find the index that matches the desired ordinal.
+        # We really should be keeping track of this index by ourselves...
+        for index in builtins.range(idaapi.get_entry_qty()):
+            if ordinal == idaapi.get_entry_ordinal(index):
+                return index
+            continue
+        raise internal.exceptions.ItemNotFoundError(u"{:s}.by_ordinal({:d}) : No entry point was found with the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
