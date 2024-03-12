@@ -1753,7 +1753,7 @@ def comment(ea, none, **repeatable):
     """
     return comment(ea, none or '', **repeatable)
 
-class entries(object):
+class exports(object):
     """
     This namespace can be used to enumerate all of the entry points and
     exports that are defined within the database By default the address
@@ -1800,40 +1800,40 @@ class entries(object):
 
     Some examples of using these keywords are as follows::
 
-        > database.entries.list(greater=h())
-        > iterable = database.entries.iterate(like='Nt*')
-        > result = database.entries.search(index=0)
+        > database.exports.list(greater=h())
+        > iterable = database.exports.iterate(like='Nt*')
+        > result = database.exports.search(index=0)
 
     """
 
     __matcher__ = utils.matcher()
-    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer, interface.integerish))(utils.fcompose(utils.fcondition(interface.function.has)(interface.function.owners, utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpack(utils.fidentity))), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(builtins.map, utils.fcondition(interface.function.has)(interface.function.owners, utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpack(utils.fidentity)))), utils.funpack(itertools.chain), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_entry_ordinal, idaapi.get_entry)
+    __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer, interface.integerish))(utils.fcompose(utils.fcondition(interface.function.has)(interface.function.owners, utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpack(utils.fidentity))), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(builtins.map, utils.fcondition(interface.function.has)(interface.function.owners, utils.fcompose(builtins.int, idaapi.get_item_head, utils.fpack(utils.fidentity)))), utils.funpack(itertools.chain), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(1))
     __matcher__.alias('ea', 'address')
-    __matcher__.boolean('ge', operator.le, idaapi.get_entry_ordinal, idaapi.get_entry), __matcher__.alias('greater', 'ge')
-    __matcher__.boolean('gt', operator.lt, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('le', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry), __matcher__.alias('less', 'le')
-    __matcher__.boolean('lt', operator.gt, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('mangled', utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, utils.fdefault(''), idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else operator.startswith(('__', '?'))), idaapi.get_entry_ordinal, utils.fcondition(utils.fcompose(idaapi.get_entry_name, operator.truth))(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, interface.name.get)), utils.fdefault(''), utils.string.of)
+    __matcher__.boolean('ge', operator.le, operator.itemgetter(1)), __matcher__.alias('greater', 'ge')
+    __matcher__.boolean('gt', operator.lt, operator.itemgetter(1))
+    __matcher__.boolean('le', operator.ge, operator.itemgetter(1)), __matcher__.alias('less', 'le')
+    __matcher__.boolean('lt', operator.gt, operator.itemgetter(1))
+    __matcher__.combinator('name', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), utils.fcompose(utils.fpartial(map, operator.methodcaller('lower')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))), operator.itemgetter(0), utils.fthrough(interface.entries.name, utils.fcompose(interface.entries.address, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(0), utils.fthrough(interface.entries.name, utils.fcompose(interface.entries.address, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(0), utils.fthrough(interface.entries.name, utils.fcompose(interface.entries.address, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), operator.itemgetter(0), utils.fthrough(interface.entries.name, utils.fcompose(interface.entries.address, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('mangled', utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, utils.fdefault(''), idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else operator.startswith(('__', '?'))), operator.itemgetter(0), utils.fcondition(utils.fcompose(interface.entries.name, operator.truth))(interface.entries.name, utils.fcompose(interface.entries.address, interface.name.get)), utils.fdefault(''), utils.string.of)
     __matcher__.alias('decorated', 'mangled')
-    __matcher__.mapping('function', interface.function.has, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.mapping('typed', operator.truth, idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
-    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
+    __matcher__.mapping('function', interface.function.has, operator.itemgetter(1))
+    __matcher__.mapping('typed', operator.truth, operator.itemgetter(1), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
+    __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.alias('tag', 'tagged')
-    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_entry_ordinal, idaapi.get_entry, lambda ea: internal.comment.contents.name(ea) if interface.function.has(ea) else internal.tags.address.get(ea).keys(), internal.types.set)
-    __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_entry_ordinal)
-    __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)))
-    __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.predicate('predicate', idaapi.get_entry_ordinal), __matcher__.alias('pred', 'predicate')
-    __matcher__.combinator('convention', utils.fcondition(utils.finstance(internal.types.integer, internal.types.string, internal.types.none, internal.types.ellipsis))(internal.declaration.convention.matches, utils.funpack(internal.declaration.convention.matches)), idaapi.get_entry_ordinal, idaapi.get_entry, utils.fcondition(interface.function.has)(utils.fcompose(utils.fmap(utils.fidentity, interface.function.typeinfo), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK)), utils.fconstant({convention for convention in []})))
+    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.comment.contents.name(ea) if interface.function.has(ea) else internal.tags.address.get(ea).keys(), internal.types.set)
+    __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0), interface.entries.ordinal)
+    __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
+    __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), operator.itemgetter(1))
+    __matcher__.predicate('predicate', operator.itemgetter(0), interface.entries.ordinal), __matcher__.alias('pred', 'predicate')
+    __matcher__.combinator('convention', utils.fcondition(utils.finstance(internal.types.integer, internal.types.string, internal.types.none, internal.types.ellipsis))(internal.declaration.convention.matches, utils.funpack(internal.declaration.convention.matches)), operator.itemgetter(1), utils.fcondition(interface.function.has)(utils.fcompose(utils.fthrough(utils.fidentity, interface.function.typeinfo), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK)), utils.fconstant({convention for convention in []})))
     __matcher__.alias('cc', 'convention')
 
     def __new__(cls, *string, **type):
         '''Return the address of each entry point defined within the database as a list.'''
-        return [ea for ea in cls.iterate(*string, **type)]
+        return [address for address, name, ordinal in cls.iterate(*string, **type)]
 
     @utils.multicase(string=internal.types.string)
     @classmethod
@@ -1844,10 +1844,10 @@ class entries(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
     def __iterate__(cls, **type):
-        listable = builtins.range(idaapi.get_entry_qty())
+        listable = [packed for packed in interface.entries.iterate()]
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
-            listable = [item for item in cls.__matcher__.match(key, value, listable)]
-        for item in listable: yield item
+            listable = [packed for packed in cls.__matcher__.match(key, value, listable)]
+        for packed in listable: yield packed
 
     @utils.multicase()
     @classmethod
@@ -1858,19 +1858,14 @@ class entries(object):
     @classmethod
     def at(cls, ea):
         '''Return the address of the entry point at the address specified by `ea`.'''
-        if not interface.function.has(ea):
-            address = interface.address.inside(ea)
-
-        # If we're within a function then adjust our address to its entrypoint.
-        else:
-            fn = idaapi.get_func(ea)
-            address, _ = interface.range.bounds(fn)
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
 
         # Now we should be able to get its index and use it to return the address.
-        res = cls.__index__(address)
+        iterable = interface.entries.at_address(address)
+        res = builtins.next(iterable, None)
         if res is None:
             raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : No entry point was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, address))
-        return cls.__address__(res)
+        return interface.entries.address(res)
 
     @utils.multicase()
     @classmethod
@@ -1878,28 +1873,19 @@ class entries(object):
     def has(cls, **type):
         '''Return whether the current address is referencing an entry point.'''
         if 'ordinal' in type:
-            ea = idaapi.get_entry(type['ordinal'])
-            return ea != idaapi.BADADDR
+            return interface.entries.has_ordinal(type['ordinal'])
         elif 'index' in type:
-            return cls.__entryordinal__(type['index']) > 0
+            return interface.entries.has(type['index'])
         elif type:
             raise E.InvalidParameterError(u"{:s}.has({:s}) : The given keyword parameter{:s} not supported.".format('.'.join([__name__, cls.__name__]), utils.string.kwargs(type), ' is' if len(type) == 1 else 's are'))
-        return cls.has(ui.current.address())
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
+        return interface.entries.has_address(address)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def has(cls, ea):
         '''Return whether the address in `ea` is referencing an entry point.'''
-        if not interface.function.has(ea):
-            address = interface.address.inside(ea)
-
-        # If the address is a function, then translate it to the function address.
-        else:
-            fn = idaapi.get_func(ea)
-            address, _ = interface.range.bounds(fn)
-
-        # Now we'll just try to gets its index, and if we got one then it's an export.
-        res = cls.__index__(address)
-        return res is not None
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
+        return interface.entries.has_address(address)
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
@@ -1932,61 +1918,42 @@ class entries(object):
     @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
     def iterate(cls, **type):
         '''Iterate through the entry points from the database that match the keywords specified by `type`.'''
-        for ea in cls.__iterate__(**type):
-            yield cls.__address__(ea)
+        for index, address, name, ordinal in cls.__iterate__(**type):
+            yield address, name, ordinal
         return
-
-    @classmethod
-    def __index__(cls, ea):
-        '''Return the index of the entry point at the specified `address`.'''
-        f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-
-        # Iterate through each entry point, and yield a tuple containing its address and index.
-        Ftransform = utils.fcompose(utils.fmap(f, utils.fidentity), tuple)
-        iterable = (Ftransform(item) for item in builtins.range(idaapi.get_entry_qty()))
-
-        # Iterate through each (address, index) looking for the matching address.
-        Fcrit = utils.fcompose(operator.itemgetter(0), functools.partial(operator.eq, ea))
-        filterable = (item for item in iterable if Fcrit(item))
-
-        # Return the index of the address that matched.
-        iterable = (index for _, index in filterable)
-        return builtins.next(iterable, None)
-
-    @classmethod
-    def __address__(cls, index):
-        '''Return the address of the entry point at the specified `index`.'''
-        res = cls.__entryordinal__(index)
-        res = idaapi.get_entry(res)
-        return None if res == idaapi.BADADDR else res
-
-    # Return the name of the entry point at the specified `index`.
-    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, utils.fmap(idaapi.get_entry_name, utils.fcompose(idaapi.get_entry, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of))
-    # Return the ordinal of the entry point at the specified `index`.
-    __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
     @utils.multicase()
     @classmethod
     def ordinal(cls):
-        '''Return the ordinal of the entry point at the current address.'''
+        '''Return the first ordinal for the entry point at the current address.'''
         return cls.ordinal(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def ordinal(cls, ea):
-        '''Return the ordinal of the entry point at the address `ea`.'''
-        if not interface.function.has(ea):
-            address = interface.address.inside(ea)
-
-        # If we're within a function then adjust our address to its entrypoint.
-        else:
-            fn = idaapi.get_func(ea)
-            address, _ = interface.range.bounds(fn)
+        '''Return the first ordinal for the entry point at the address `ea`.'''
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
 
         # Now we can use our determined address to get the index and then its ordinal.
-        res = cls.__index__(address)
-        if res is None:
+        iterable = interface.entries.at_address(address)
+        ordinal = builtins.next(iterable, None)
+        if ordinal is None:
             raise E.MissingTypeOrAttribute(u"{:s}.ordinal({:#x}) : No entry point was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, address))
-        return cls.__entryordinal__(res)
+        return ordinal
+    @utils.multicase()
+    @classmethod
+    def ordinals(cls):
+        '''Return the ordinals for the entry point at the current address.'''
+        ea = ui.current.address()
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
+        iterable = map(interface.entries.ordinal, interface.entries.at_address(address))
+        return [ordinal for ordinal in iterable]
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def ordinals(cls, ea):
+        '''Return the ordinals for the entry point at the address `ea`.'''
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
+        iterable = map(interface.entries.ordinal, interface.entries.at_address(address))
+        return [ordinal for ordinal in iterable]
 
     @utils.multicase()
     @classmethod
@@ -1997,19 +1964,30 @@ class entries(object):
     @classmethod
     def name(cls, ea):
         '''Return the name of the entry point at the address `ea`.'''
-        if not interface.function.has(ea):
-            address = interface.address.inside(ea)
-
-        # If we're within a function then adjust our address to its entrypoint.
-        else:
-            fn = idaapi.get_func(ea)
-            address, _ = interface.range.bounds(fn)
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
 
         # Now we can use the address to determine the index and then return its name.
-        res = cls.__index__(address)
+        iterable = interface.entries.at_address(address)
+        res = builtins.next(iterable, None)
         if res is None:
             raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}) : No entry point was found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, address))
-        return cls.__entryname__(res)
+        return interface.entries.name(res)
+
+    @utils.multicase()
+    @classmethod
+    def names(cls):
+        '''Return the names of the entry point at the current address.'''
+        ea = ui.current.address()
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
+        iterable = map(interface.entries.name, interface.entries.at_address(address))
+        return [name for name in iterable if name]
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def names(cls, ea):
+        '''Return the names of the entry point at the address `ea`.'''
+        address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
+        iterable = map(interface.entries.name, interface.entries.at_address(address))
+        return [name for name in iterable if name]
 
     @utils.multicase(name=internal.types.string)
     @classmethod
@@ -2037,15 +2015,12 @@ class entries(object):
 
         # First pass through our listable grabbing the maximum lengths of our fields
         listable = []
-        for index in cls.__iterate__(**type):
+        for packed in cls.__iterate__(**type):
+            index, address, name, ordinal = packed
             maxindex = max(index, maxindex)
-
-            res = cls.__entryordinal__(index)
-            ea = idaapi.get_entry(res)
-            maxaddr = max(ea, maxaddr)
-            maxordinal = maxordinal if res == ea else max(res, maxordinal)
-
-            listable.append(index)
+            maxaddr = max(address, maxaddr)
+            maxordinal = maxordinal if ordinal == address else max(ordinal, maxordinal)
+            listable.append(packed)
 
         # Collect the maximum sizes for everything from the first pass
         cindex, cordinal = (utils.string.digits(item, 10) for item in [maxindex, maxordinal])
@@ -2053,11 +2028,9 @@ class entries(object):
 
         # List all the fields from everything that matched
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
-        for index in listable:
-            ordinal = cls.__entryordinal__(index)
-            ea = idaapi.get_entry(ordinal)
+        for index, ea, name, ordinal in listable:
             tags = internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea)
-            realname = cls.__entryname__(index) or interface.name.get(ea)
+            realname = name or interface.name.get(ea)
 
             # Some flags that could be useful.
             fclass = 'A' if t.data(ea) or t.unknown(ea) else 'D' if interface.function.has(ea) and function.type.decompiled(ea) else 'F' if interface.function.has(ea) else 'C' if t.code(ea) else '-'
@@ -2095,65 +2068,62 @@ class entries(object):
         '''Search through the entry points within the database and return the first result matching the keywords specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        listable = [item for item in cls.__iterate__(**type)]
+        listable = [packed for packed in cls.__iterate__(**type)]
         if len(listable) > 1:
-            messages = ((u"[{:d}] ({:s}) {:#x} : {:s} {:s}".format(idx, '' if ordinal == ea else "#{:d}".format(ordinal), ea, '[FUNC]' if interface.function.has(ea) else '[ADDR]', name or unmangled(ea))) for idx, ordinal, name, ea in map(utils.fmap(utils.fidentity, cls.__entryordinal__, cls.__entryname__, cls.__address__), listable))
+            messages = ((u"[{:d}] ({:s}) {:#x} : {:s} {:s}".format(idx, '' if ordinal == ea else "#{:d}".format(ordinal), ea, '[FUNC]' if interface.function.has(ea) else '[ADDR]', name or unmangled(ea))) for idx, ea, name, ordinal in listable)
             [ logging.info(msg) for msg in messages ]
-            f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f(listable[0])))
+            _, ea, _, _ = listable[0]
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), ea))
 
-        iterable = (item for item in listable)
+        iterable = (address for index, address, name, ordinal in listable)
         res = builtins.next(iterable, None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), query_s))
-        return cls.__address__(res)
+        return res
 
     @utils.multicase()
     @classmethod
-    def new(cls):
-        '''Makes an entry point at the current address.'''
-        ea, entryname, ordinal = ui.current.address(), interface.name.get(ui.current.address()) or interface.function.name(ui.current.address()), idaapi.get_entry_qty()
-        if entryname is None:
-            raise E.MissingTypeOrAttribute(u"{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join([__name__, cls.__name__]), ea))
-        return cls.new(ea, entryname, ordinal)
+    def new(cls, **wait):
+        '''Create a new entry point in the database at the current address.'''
+        res, ok = interface.entries.new(ui.current.addres()), ui.state.wait() if wait.get('wait', True) else ()
+        return res
     @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def new(cls, ea):
-        '''Makes an entry point at the specified address `ea`.'''
-        entryname, ordinal = interface.name.get(ea) or interface.function.name(ea), idaapi.get_entry_qty()
-        if entryname is None:
-            raise E.MissingTypeOrAttribute(u"{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join([__name__, cls.__name__]), ea))
-        return cls.new(ea, entryname, ordinal)
+    def new(cls, ea, **wait):
+        '''Create a new entry point in the database at the address specified by `ea`.'''
+        res, ok = interface.entries.new(interface.address.inside(ea)), ui.state.wait() if wait.get('wait', True) else ()
+        return res
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def new(cls, name):
-        '''Adds the current address as an entry point using `name` and the next available index as the ordinal.'''
-        return cls.new(ui.current.address(), name, idaapi.get_entry_qty())
+    def new(cls, name, **wait):
+        '''Create a new entry point in the database at the current address with the specified `name`.'''
+        res, ok = interface.entries.new(ui.current.address(), name), ui.state.wait() if wait.get('wait', True) else ()
+        return res
     @utils.multicase(ea=internal.types.integer, name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def new(cls, ea, name):
-        '''Makes the specified address `ea` an entry point having the specified `name`.'''
-        ordinal = idaapi.get_entry_qty()
-        return cls.new(ea, name, ordinal)
+    def new(cls, ea, name, **wait):
+        '''Create a new entry point in the database at the address `ea` with the specified `name`.'''
+        res, ok = interface.entries.new(interface.address.inside(ea), name), ui.state.wait() if wait.get('wait', True) else ()
+        return res
     @utils.multicase(name=internal.types.string, ordinal=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def new(cls, name, ordinal):
-        '''Adds an entry point with the specified `name` to the database using `ordinal` as its index.'''
-        return cls.new(ui.current.address(), name, ordinal)
+    def new(cls, name, ordinal, **wait):
+        '''Create a new entry point in the database with the specified `name` and `ordinal`.'''
+        res, ok = interface.entries.new(ui.current.address(), name, ordinal), ui.state.wait() if wait.get('wait', True) else ()
+        return res
     @utils.multicase(ea=internal.types.integer, name=internal.types.string, ordinal=internal.types.integer)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def new(cls, ea, name, ordinal):
-        '''Adds an entry point at `ea` with the specified `name` and `ordinal`.'''
-        res = idaapi.add_entry(ordinal, interface.address.inside(ea), utils.string.to(name), 0)
-        ui.state.wait()
+    def new(cls, ea, name, ordinal, **wait):
+        '''Create a new entry point in the database at the address `ea` with the specified `name` and `ordinal`.'''
+        res, ok = interface.entries.new(interface.address.inside(ea), name, ordinal), ui.state.wait() if wait.get('wait', True) else ()
         return res
 
-    add = utils.alias(new, 'entries')
-exports = entries     # XXX: ns alias
+    add = utils.alias(new, 'exports')
+entries = exports   # XXX: ns alias
 
 def tags():
     '''Return all of the tag names used globally within the database.'''
