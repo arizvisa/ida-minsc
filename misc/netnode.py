@@ -195,7 +195,7 @@ class utils(object):
     def valfiter(cls, node, first, last, next, val, tag):
         '''Iterate through all of the values for a netnode in order, and yield the (item, value) for each item that was found for the given tag.'''
         start, end = first(node, tag), last(node, tag)
-        if start in {None, idaapi.BADADDR}: return
+        if start == end and start in {None, idaapi.BADNODE}: return
         yield start, val(node, start, tag)
         while start != end:
             start = next(node, start, tag)
@@ -206,7 +206,7 @@ class utils(object):
     def valriter(cls, node, first, last, prev, val, tag):
         '''Iterate through all of the values for a netnode in reverse order, and yield the (item, value) for each item that was found for the given tag.'''
         start, end = first(node, tag), last(node, tag)
-        if end in {None, idaapi.BADADDR}: return
+        if start == end and start in {None, idaapi.BADNODE}: return
         yield end, val(node, end, tag)
         while end != start:
             end = prev(node, end, tag)
@@ -267,6 +267,29 @@ class utils(object):
         return
 
     @classmethod
+    def faltvals(cls, node, tag=netnode.alttag):
+        '''Return a list of all "altval" for a given `node` in order.'''
+        result, Fnext, Fvalue = [], netnode.altnext, netnode.altval
+        start, end = netnode.altfirst(node, tag), netnode.altlast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((start, Fvalue(node, start, tag)))
+        while start != end:
+            start = Fnext(node, start, tag)
+            result.append((start, Fvalue(node, start, tag)))
+        return result
+    @classmethod
+    def raltvals(cls, node, tag=netnode.alttag):
+        '''Return a list of all "altval" for a given `node` in reverse order.'''
+        result, Fprev, Fvalue = [], netnode.altprev, netnode.altval
+        start, end = netnode.altfirst(node, tag), netnode.altlast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((end, Fvalue(node, end, tag)))
+        while start != end:
+            end = Fprev(node, end, tag)
+            result.append((end, Fvalue(node, end, tag)))
+        return result
+
+    @classmethod
     def fsup(cls, node, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in order, and yield each (item, value) that was found.'''
         for item in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
@@ -278,6 +301,29 @@ class utils(object):
         for item in cls.valriter(node, netnode.supfirst, netnode.suplast, netnode.supprev, value or netnode.supval, tag=tag):
             yield item
         return
+
+    @classmethod
+    def fsupvals(cls, node, value=None, tag=netnode.suptag):
+        '''Return a list of all "supval" for a given `node` in order.'''
+        result, Fnext, Fvalue = [], netnode.supnext, value or netnode.supval
+        start, end = netnode.supfirst(node, tag), netnode.suplast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((start, Fvalue(node, start, tag)))
+        while start != end:
+            start = Fnext(node, start, tag)
+            result.append((start, Fvalue(node, start, tag)))
+        return result
+    @classmethod
+    def rsupvals(cls, node, value=None, tag=netnode.suptag):
+        '''Return a list of all "supval" for a given `node` in reverse order.'''
+        result, Fprev, Fvalue = [], netnode.supprev, value or netnode.supval
+        start, end = netnode.supfirst(node, tag), netnode.suplast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((end, Fvalue(node, end, tag)))
+        while start != end:
+            end = Fprev(node, end, tag)
+            result.append((end, Fvalue(node, end, tag)))
+        return result
 
     @classmethod
     def fhash(cls, node, value=None, tag=netnode.hashtag):
@@ -293,6 +339,29 @@ class utils(object):
         return
 
     @classmethod
+    def fhashvals(cls, node, value=None, tag=netnode.hashtag):
+        '''Return a list of all "hashval" for a given `node` in order.'''
+        result, Fnext, Fvalue = [], netnode.hashnext, value or netnode.hashval
+        start, end = netnode.hashfirst(node, tag), netnode.hashlast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((start, Fvalue(node, start, tag)))
+        while start != end:
+            start = Fnext(node, start, tag)
+            result.append((start, netnode.hashval(node, start, tag)))
+        return result
+    @classmethod
+    def rhashvals(cls, node, value=None, tag=netnode.hashtag):
+        '''Return a list of all "hashval" for a given `node` in reverse order.'''
+        result, Fprev, Fvalue = [], netnode.hashprev, value or netnode.hashval
+        start, end = netnode.hashfirst(node, tag), netnode.hashlast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((end, Fvalue(node, end, tag)))
+        while start != end:
+            end = Fprev(node, end, tag)
+            result.append((end, Fvalue(node, end, tag)))
+        return result
+
+    @classmethod
     def fchar(cls, node, value=None, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in order, and yield each (item, value) that was found.'''
         for item in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, value or netnode.charval, tag=tag):
@@ -304,6 +373,29 @@ class utils(object):
         for item in cls.valriter(node, netnode.charfirst, netnode.charlast, netnode.charprev, value or netnode.charval, tag=tag):
             yield item
         return
+
+    @classmethod
+    def fcharvals(cls, node, value=None, tag=netnode.chartag):
+        '''Return a list of all "charval" for a given `node` in order.'''
+        result, Fnext, Fvalue = [], netnode.charnext, value or netnode.charval
+        start, end = netnode.charfirst(node, tag), netnode.charlast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((start, Fvalue(node, start, tag)))
+        while start != end:
+            start = Fnext(node, start, tag)
+            result.append((start, Fvalue(node, start, tag)))
+        return result
+    @classmethod
+    def rcharvals(cls, node, value=None, tag=netnode.chartag):
+        '''Return a list of all "charval" for a given `node` in reverse order.'''
+        result, Fprev, Fvalue = [], netnode.charprev, value or netnode.charval
+        start, end = netnode.charfirst(node, tag), netnode.charlast(node, tag)
+        if start == end and start in {None, idaapi.BADNODE}: return
+        result.append((end, Fvalue(node, end, tag)))
+        while start != end:
+            end = Fprev(node, end, tag)
+            result.append((end, Fvalue(node, end, tag)))
+        return result
 
 def new(name):
     '''Create a netnode with the given `name`, and return its identifier.'''
@@ -401,8 +493,8 @@ class value(object):
         node = utils.get(nodeidx)
         if isinstance(value, internal.types.memoryview):
             return netnode.set(nodeidx, value.tobytes())
-        elif isinstance(value, internal.types.bytes):
-            return netnode.set(node, value)
+        elif isinstance(value, (internal.types.bytes, internal.types.bytearray)):
+            return netnode.set(node, bytes(value))
         elif isinstance(value, internal.types.string):
             return netnode.set(node, value)
         elif isinstance(value, internal.types.integer):
@@ -571,6 +663,18 @@ class alt(object):
         return
 
     @classmethod
+    def fall(cls, nodeidx, tag=None):
+        '''Return a list of all elements for the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
+        node = utils.get(nodeidx)
+        return utils.faltvals(node, tag=netnode.alttag if tag is None else tag)
+
+    @classmethod
+    def rall(cls, nodeidx, tag=None):
+        '''Return a list of all elements for the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
+        node = utils.get(nodeidx)
+        return utils.raltvals(node, tag=netnode.alttag if tag is None else tag)
+
+    @classmethod
     def repr(cls, nodeidx, tag=None):
         '''Display the "altval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
@@ -597,20 +701,31 @@ class sup(object):
         return any(index == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
+    def __value_and_transform__(cls, type):
+        true = internal.utils.fconstant(True)
+        table = {
+            None:                       (netnode.supval, true,  None),
+            internal.types.memoryview:  (netnode.supval, bool,  internal.types.memoryview),
+            internal.types.bytes:       (netnode.supval, bool,  None),
+            internal.types.bytearray:   (netnode.supval, bool,  bytearray),
+            internal.types.string:      (netnode.supstr, bool,  None),
+        }
+        if type in table:
+            return table[type]
+        iterable = (result for subclass, result in table.items() if subclass and issubclass(type, subclass))
+        return next(iterable, None)
+
+    @classmethod
     def get(cls, nodeidx, index, type=None, tag=None):
         '''Return the value at the `index` of the "supval" array belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
-        node = utils.get(nodeidx)
-        if type in {None}:
-            return netnode.supval(node, index, netnode.suptag if tag is None else tag)
-        elif issubclass(type, internal.types.memoryview):
-            res = netnode.supval(node, index, netnode.suptag if tag is None else tag)
-            return res and internal.types.memoryview(res)
-        elif issubclass(type, internal.types.bytes):
-            return netnode.supstr(node, index, netnode.suptag if tag is None else tag)
-        elif issubclass(type, internal.types.string):
-            return netnode.supstr(node, index, netnode.suptag if tag is None else tag)
-        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:s}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, index, type, type))
+        value_transform = cls.__value_and_transform__(type)
+        if not value_transform:
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:s}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, index, type, type))
+
+        node, [value, ok, transform] = utils.get(nodeidx), value_transform
+        res = value(node, index, netnode.suptag if tag is None else tag)
+        return transform(res) if ok(res) and transform else res
 
     @classmethod
     def set(cls, nodeidx, index, value, tag=None):
@@ -635,21 +750,16 @@ class sup(object):
     @classmethod
     def fitems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
-        if type in {None}:
-            value, transform = netnode.supval, internal.utils.fidentity
-        elif issubclass(type, internal.types.memoryview):
-            value, transform = netnode.supval, internal.types.memoryview
-        elif issubclass(type, internal.types.bytes):
-            value, transform = netnode.supstr, internal.utils.fidentity
-        elif issubclass(type, internal.types.string):
-            value, transform = netnode.supstr, internal.utils.fidentity
-        else:
-            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
-        node = utils.get(nodeidx)
-        for nsup, supval in utils.fsup(node, value, tag=netnode.suptag if tag is None else tag):
-            yield nsup, transform(supval)
-        return
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            for nsup, supval in utils.fsup(node, value, tag=netnode.suptag if tag is None else tag):
+                yield nsup, transform(supval) if transform else supval
+            return
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:s}, type={!s}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
     def riter(cls, nodeidx, tag=None):
@@ -662,21 +772,42 @@ class sup(object):
     @classmethod
     def ritems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
-        if type in {None}:
-            value, transform = netnode.supval, internal.utils.fidentity
-        elif issubclass(type, internal.types.memoryview):
-            value, transform = netnode.supval, internal.types.memoryview
-        elif issubclass(type, internal.types.bytes):
-            value, transform = netnode.supstr, internal.utils.fidentity
-        elif issubclass(type, internal.types.string):
-            value, transform = netnode.supstr, internal.utils.fidentity
-        else:
-            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
-        node = utils.get(nodeidx)
-        for nsup, supval in utils.rsup(node, value, tag=netnode.suptag if tag is None else tag):
-            yield nsup, transform(supval)
-        return
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            for nsup, supval in utils.rsup(node, value, tag=netnode.suptag if tag is None else tag):
+                yield nsup, transform(supval) if transform else supval
+            return
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:s}, type={!s}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
+
+    @classmethod
+    def fall(cls, nodeidx, type=None, tag=None):
+        '''Return a list of all elements for the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.fsupvals(node, value, tag=netnode.suptag if tag is None else tag)
+            return [(nsup, transform(supval)) for nsup, supval in result] if transform else result
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fall({:s}, type={!s}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
+
+    @classmethod
+    def rall(cls, nodeidx, type=None, tag=None):
+        '''Return a list of all elements for the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.rsupvals(node, value, tag=netnode.suptag if tag is None else tag)
+            return [(nsup, transform(supval)) for nsup, supval in result] if transform else result
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.rall({:s}, type={!s}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
     def repr(cls, nodeidx, tag=None):
@@ -705,23 +836,32 @@ class hash(object):
         return any(key == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
+    def __value_and_transform__(cls, type):
+        true = internal.utils.fconstant(True)
+        table = {
+            None:                       (netnode.hashval,       true,   None),
+            internal.types.memoryview:  (netnode.hashval,       bool,   internal.types.memoryview),
+            internal.types.bytes:       (netnode.hashval,       bool,   internal.types.bytes),
+            internal.types.bytearray:   (netnode.hashval,       bool,   internal.types.bytearray),
+            internal.types.string:      (netnode.hashstr,       bool,   None),
+            internal.types.integer:     (netnode.hashval_long,  true,   None),
+        }
+        if type in table:
+            return table[type]
+        iterable = (result for subclass, result in table.items() if subclass and issubclass(type, subclass))
+        return next(iterable, None)
+
+    @classmethod
     def get(cls, nodeidx, key, type=None, tag=None):
         '''Return the value for the provided `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
-        node = utils.get(nodeidx)
-        if type in {None}:
-            return netnode.hashval(node, key, netnode.hashtag if tag is None else tag)
-        elif issubclass(type, internal.types.memoryview):
-            res = netnode.hashval(node, key, netnode.hashtag if tag is None else tag)
-            return res and internal.types.memoryview(res)
-        elif issubclass(type, internal.types.bytes):
-            res = netnode.hashval(node, key, netnode.hashtag if tag is None else tag)
-            return res and internal.types.bytes(res)
-        elif issubclass(type, internal.types.string):
-            return netnode.hashstr(node, key, netnode.hashtag if tag is None else tag)
-        elif issubclass(type, internal.types.integer):
-            return netnode.hashval_long(node, key, netnode.hashtag if tag is None else tag)
-        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:s}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, key, type, type))
+        value_transform = cls.__value_and_transform__(type)
+        if not value_transform:
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:s}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, key, type, type))
+
+        node, [value, ok, transform] = utils.get(nodeidx), value_transform
+        res = value(node, key, netnode.hashtag if tag is None else tag)
+        return transform(res) if ok(res) and transform else res
 
     @classmethod
     def set(cls, nodeidx, key, value, tag=None):
@@ -730,8 +870,8 @@ class hash(object):
         # in my testing the type really doesn't matter
         if isinstance(value, internal.types.memoryview):
             return netnode.hashset(node, key, value.tobytes(), netnode.hashtag if tag is None else tag)
-        elif isinstance(value, internal.types.bytes):
-            return netnode.hashset(node, key, value, netnode.hashtag if tag is None else tag)
+        elif isinstance(value, (internal.types.bytes, internal.types.bytearray)):
+            return netnode.hashset(node, key, bytes(value), netnode.hashtag if tag is None else tag)
         elif isinstance(value, internal.types.string):
             return netnode.hashset_buf(node, key, value, netnode.hashtag if tag is None else tag)
         elif isinstance(value, internal.types.integer):
@@ -756,23 +896,16 @@ class hash(object):
     @classmethod
     def fitems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
-        if type in {None}:
-            value, transform = netnode.hashval, internal.utils.fidentity
-        elif issubclass(type, internal.types.memoryview):
-            value, transform = netnode.hashval, internal.types.memoryview
-        elif issubclass(type, internal.types.bytes):
-            value, transform = netnode.hashval, bytes
-        elif issubclass(type, internal.types.string):
-            value, transform = netnode.hashstr, internal.utils.fidentity
-        elif issubclass(type, internal.types.integer):
-            value, transform = netnode.hashval_long, internal.utils.fidentity
-        else:
-            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
-        node = utils.get(nodeidx)
-        for idx, hashval in utils.fhash(node, value, tag=netnode.hashtag if tag is None else tag):
-            yield idx, transform(hashval)
-        return
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            for idx, hashval in utils.fhash(node, value, tag=netnode.hashtag if tag is None else tag):
+                yield idx, transform(hashval) if transform else hashval
+            return
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fitems({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
     def riter(cls, nodeidx, tag=None):
@@ -785,23 +918,42 @@ class hash(object):
     @classmethod
     def ritems(cls, nodeidx, type=None, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
-        if type in {None}:
-            value, transform = netnode.hashval, internal.utils.fidentity
-        elif issubclass(type, internal.types.memoryview):
-            value, transform = netnode.hashval, internal.types.memoryview
-        elif issubclass(type, internal.types.bytes):
-            value, transform = netnode.hashval, bytes
-        elif issubclass(type, internal.types.string):
-            value, transform = netnode.hashstr, internal.utils.fidentity
-        elif issubclass(type, internal.types.integer):
-            value, transform = netnode.hashval_long, internal.utils.fidentity
-        else:
-            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
-        node = utils.get(nodeidx)
-        for idx, hashval in utils.rhash(node, value, tag=netnode.hashtag if tag is None else tag):
-            yield idx, transform(hashval)
-        return
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            for idx, hashval in utils.rhash(node, value, tag=netnode.hashtag if tag is None else tag):
+                yield idx, transform(hashval) if transform else hashval
+            return
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.ritems({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
+
+    @classmethod
+    def fall(cls, nodeidx, type=None, tag=None):
+        '''Return a list of all elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.fhashvals(node, value, tag=netnode.hashtag if tag is None else tag)
+            return [(hidx, transform(hval)) for hidx, hval in result] if transform else result
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fall({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
+
+    @classmethod
+    def rall(cls, nodeidx, type=None, tag=None):
+        '''Return a list of all elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.rhashvals(node, value, tag=netnode.hashtag if tag is None else tag)
+            return [(hidx, transform(hval)) for hidx, hval in result] if transform else result
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fall({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
     def repr(cls, nodeidx, tag=None):
