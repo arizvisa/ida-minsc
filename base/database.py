@@ -1793,6 +1793,8 @@ class exports(object):
         `lt` - Filter the entrypoints for any before the specified address (exclusive)
         `function` - Filter the entrypoints for any that are referencing a function
         `convention` or `cc` - Filter the entrypoints for any that are using the specified calling convention(s)
+        `entrypoint` or `entry` - Filter the entrypoints for any that are not exports with an ordinal
+        `export` - Filter the entrypoints for any that are exports with an ordinal
         `typed` - Filter the entrypoints for any that have type information applied to them
         `tagged` - Filter the entrypoints for any that use the specified tag(s)
         `contents` - Filter the entrypoints for any that use the specified tag(s) in their contents
@@ -1824,6 +1826,9 @@ class exports(object):
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.alias('tag', 'tagged')
     __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.comment.contents.name(ea) if interface.function.has(ea) else internal.tags.address.get(ea).keys(), internal.types.set)
+    __matcher__.mapping('entrypoint', operator.truth, operator.itemgetter(0), utils.fthrough(interface.entries.ordinal, interface.entries.address), utils.funpack(operator.eq))
+    __matcher__.mapping('export', operator.not_, operator.itemgetter(0), utils.fthrough(interface.entries.ordinal, interface.entries.address), utils.funpack(operator.eq))
+    __matcher__.alias('entry', 'entrypoint')
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0), interface.entries.ordinal)
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(0))
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))), operator.itemgetter(1))
