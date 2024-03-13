@@ -5037,6 +5037,75 @@ class tinfo(object):
         return tinfo, ftd
 
     @classmethod
+    def update_prototype_details(cls, type):
+        '''Given a function prototype in `type`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the prototype with the ``idaapi.func_type_data_t`` that is sent back.'''
+        info, wrapped = type, []
+        while info.is_ptr():
+            wrapped.append(info)
+            info = info.get_pointed_object()
+
+        # Verify that it is actually a function prototype.
+        if not any([info.is_func(), info.is_funcptr()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.update_prototype_details({!r}) : The resolved type information \"{:s}\" is not a function prototype and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(info), '"')))
+
+        # ...and make sure it has details that we can use.
+        elif not info.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_prototype_details({!r}) : The resolved type information \"{:s}\" does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(info), '"')))
+
+        # Now we can grab our function details from the type information.
+        ftd = idaapi.func_type_data_t()
+        ok = info.get_func_details(ftd)
+        if not ok and not info.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS):
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({{!r}) : Unable to get the function details from the resolved prototype ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(info)))
+
+        elif not ok:
+            logging.info(u"{:s}.update_prototype_details({!r}) : Unable to calculate the argument locations for the resolved prototype ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(info)))
+
+        # Concretize the type that we're yielding in case the caller wants to save it.
+        til, old, new = cls.library(info), info, cls.copy(info)
+        res = idaapi.replace_ordinal_typerefs(til, info) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.update_prototype_details({!r}) : Ignoring error {:d} while trying to concretize the function prototype \"{:s}\".".format('.'.join([cls.__name__, cls.__name__]), "{!s}".format(type), res, internal.utils.string.escape("{!s}".format(info), '"')))
+        info = old if res < 0 else new
+
+        # Yield the function type along with the details to the caller and then
+        # receive one back (tit-for-tat) which we'll use to re-create the tinfo_t.
+        td = (yield (info, ftd))
+        if not info.create_func(td):
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({!r}) : Unable to modify the function details for the specified prototype ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(info)))
+
+        # Now we need to re-wrap the type using the layers that we preserved.
+        res = idaapi.tinfo_t()
+        for ti in wrapped[::-1]:
+            td = idaapi.ptr_type_data_t()
+            if not ti.get_ptr_details(td):
+                raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({!r}) : The preserved type \"{:s}\" does not contain the pointer details that were expected.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(ti), '"')))
+
+            # Attach our resulting type to whatever pointer we collected.
+            td.obj_type = info
+            if not res.create_ptr(td):
+                raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({!r}) : Unable to create a pointer for the currently nested type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), utils.string.escape("{!s".format(info), '"')))
+            info = res
+
+        # Before yielding our wrapped type, we need to concretize before yielding.
+        til, oldinfo, newinfo = cls.library(info), info, cls.copy(info)
+        res = idaapi.replace_ordinal_typerefs(til, newinfo) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.update_prototype_details({!r}) : Ignoring error {:d} while trying to concretize the function prototype \"{:s}\".".format('.'.join([cls.__name__, cls.__name__]), "{!s}".format(type), res, internal.utils.string.escape("{!s}".format(info), '"')))
+        newinfo = oldinfo if res < 0 else newinfo
+
+        # We're done, so keep generating the result until the caller closes us.
+        try:
+            while True:
+                td = yield (newinfo, td)
+
+        # I love you, but good bye. I looove you, but good bye. A
+        # bird with clipped wings can still sing but no longer fly.
+        except GeneratorExit:
+            pass
+        return
+
+    @classmethod
     def update_function_details(cls, func, ti=None, *flags):
         '''Given a function location in `func` and its type information as `ti`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the function with the `flags` and ``idaapi.func_type_data_t`` that is sent back.'''
         apply_tinfo = idaapi.apply_tinfo2 if idaapi.__version__ < 7.0 else idaapi.apply_tinfo
