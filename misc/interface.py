@@ -4973,8 +4973,13 @@ class tinfo(object):
     del(process_items)
 
     @classmethod
-    def function_details(cls, func, ti):
-        '''Given a function location in `func` and its type information as `ti`, return the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it.'''
+    def function_details(cls, func, *type):
+        '''Given a function location in `func` and its `type` information, return the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it.'''
+        [tinfo] = type if type else [function.typeinfo(func)]
+        tinfo = ti = function.typeinfo(func) if tinfo is None else tinfo
+        if tinfo is None:
+            _, ea = addressOfRuntimeOrStatic(func)
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.function_details({:#x}{:s}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ", {!r}".format("{!s}".format(*type)) if type else '', ea))
         rt, ea = addressOfRuntimeOrStatic(func)
 
         # If our type is a function pointer, then we need to dereference it
