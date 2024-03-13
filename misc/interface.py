@@ -5753,21 +5753,64 @@ class tinfo(object):
 
     @classmethod
     def function(cls, type):
-        '''Return a list containing the return type followed by each argument for the function that is specified by `type`.'''
-        if not any([type.is_func(), type.is_funcptr()]):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.function(\"{:s}\") : The specified type information ({!r}) is not a function and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(type)))
+        '''Return a list containing a tuple for the return type and each argument for the function specified by `type`.'''
+        tinfo = type
+        while tinfo.is_ptr():
+            tinfo = tinfo.get_pointed_object()
 
-        # If it's a function type, then get the result and number of args
-        # so that all the types which compose it can be returned as a list.
-        result, count = type.get_rettype(), type.get_nargs()
-        iterable = itertools.chain([result], (type.get_nth_arg(n) for n in builtins.range(count)))
+        # Ensure that we were able to get a function type from our parameter.
+        if not any([tinfo.is_func(), tinfo.is_funcptr()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.function({!r}) : The resolved type information \"{:s}\" is not a function and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(tinfo), '"')))
 
-        # Before returning them, though, we need to remove any ordinals so that each
-        # type is concretized. So we make a copy of each, strip them, and return it.
-        Fstrip_ordinals = idaapi.replace_ordinal_typerefs if hasattr(idaapi, 'replace_ordinal_typerefs') else lambda library, ti: 0
-        copied = [(item, cls.copy(item)) for item in iterable]
-        resolved = [(old if Fstrip_ordinals(cls.library(new), new) < 0 else new) for old, new in copied]
-        return [item for item in resolved]
+        # Make sure that the type has some details that we can extract.
+        elif not tinfo.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.function({!r}) : The resolved type information \"{:s}\" does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # Before doing anything, we need to concretize the ordinals out of the type..
+        til, old, new = cls.library(tinfo), tinfo, cls.copy(tinfo)
+        res = idaapi.replace_ordinal_typerefs(til, new) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.function({!r}) : Ignoring error {:d} while trying to concretize the function type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), res, internal.utils.string.escape("{!s}".format(tinfo), '"')))
+        tinfo = old if res < 0 else new
+
+        # Now we can grab our function details and begin to process them. We
+        # try to get them twice in case the layout is busted the first time.
+        ftd = idaapi.func_type_data_t()
+        ok = tinfo.get_func_details(ftd) or tinfo.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.function({!r}) : Unable to retrieve the details from the specified type information \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # Start by gathering the result first. Since the result doesn't have a
+        # name, we need to add an empty one for the purposes of consistency.
+        loc, name, ti = ftd.retloc, u'', cls.copy(ftd.rettype, til)
+        locinfo = cls.location_raw(loc)
+        rawitems = [(name, ti, locinfo)]
+
+        # Then we can gather the raw values from all of the parameters that exist.
+        for index in builtins.range(ftd.size()):
+            loc, name, ti = ftd[index].argloc, ftd[index].name, cls.copy(ftd[index].type, til)
+            locinfo = cls.location_raw(loc)
+            rawitems.append((internal.utils.string.of(name), ti, locinfo))
+
+        # Now we can safely iterate through the raw items, process them
+        # and then collect all of the components into a list to return.
+        result = []
+        for index, item in enumerate(rawitems):
+            name, ti, storage = item
+            ltype, linfo = storage
+            location = cls.location(ti.get_size(), architecture, ltype, linfo)
+
+            # Check to see if we got an error. We do this with a hack, by
+            # doing an identity check on what was returned.
+            if location is linfo:
+                ltype_table = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
+                ltype_s = ltype_table.get(ltype, '')
+                logging.warning(u"{:s}.function({!r}) : Unable to handle the unsupported type {:s}({:#x}) for argument at index {:d}{:s}{:s}.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), ltype_s, ltype, index, " with the name \"{:s}\"".format(internal.utils.string.escape(name, '"')) if name else '', " of the type {!s}".format(ti) if ti.is_well_defined() else ''))
+
+            # Now we have everything that we can pack and add to our list.
+            packed = name, ti, location
+            result.append(packed)
+        return result
 
     @classmethod
     def lower_function_type(cls, type):
@@ -5790,7 +5833,7 @@ class tinfo(object):
         # Iterate through all of the "incorrect" types that belong to this
         # function, and add any partial and undefined types types to it.
         library, results = cls.library(type), []
-        for item in cls.function(type):
+        for _, item, _ in cls.function(type):
             if item.is_correct():
                 continue
 
