@@ -5037,6 +5037,39 @@ class tinfo(object):
         return tinfo, ftd
 
     @classmethod
+    def prototype_details(cls, type):
+        '''Given a function prototype in `type`, return the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it.'''
+        info, wrapped = type, []
+        while info.is_ptr():
+            wrapped.append(info)
+            info = info.get_pointed_object()
+
+        # Verify that it is actually a function prototype.
+        if not any([info.is_func(), info.is_funcptr()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.prototype_details({!r}) : The resolved type information \"{:s}\" is not a function prototype and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(info), '"')))
+
+        # ...and make sure it has details that we can use.
+        elif not info.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.prototype_details({!r}) : The resolved type information \"{:s}\" does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(info), '"')))
+
+        # Now we can grab our function details from the type information.
+        ftd = idaapi.func_type_data_t()
+        ok = info.get_func_details(ftd)
+        if not ok and not info.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS):
+            raise internal.exceptions.DisassemblerError(u"{:s}.prototype_details({{!r}) : Unable to get the function details from the resolved prototype ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(info)))
+
+        elif not ok:
+            logging.info(u"{:s}.prototype_details({!r}) : Unable to calculate the argument locations for the resolved prototype ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(info)))
+
+        # Concretize the type that we're returning in case the caller wants to save it.
+        til, old, new = cls.library(info), info, cls.copy(info)
+        res = idaapi.replace_ordinal_typerefs(til, info) if hasattr(idaapi, 'replace_ordinal_typerefs') else 0
+        if res < 0:
+            logging.debug(u"{:s}.prototype_details({!r}) : Ignoring error {:d} while trying to concretize the function prototype \"{:s}\".".format('.'.join([cls.__name__, cls.__name__]), "{!s}".format(type), res, internal.utils.string.escape("{!s}".format(info), '"')))
+        info = old if res < 0 else new
+        return info, ftd
+
+    @classmethod
     def update_prototype_details(cls, type):
         '''Given a function prototype in `type`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the prototype with the ``idaapi.func_type_data_t`` that is sent back.'''
         info, wrapped = type, []
