@@ -3513,14 +3513,7 @@ class type(object):
     @classmethod
     def convention(cls, func):
         '''Return the calling convention for the function `func` as an integer that corresponds to one of the ``idaapi.CM_CC_*`` constants.'''
-        _, ea = interface.addressOfRuntimeOrStatic(func)
-
-        # Grab the type information for the specified function, guessing it if necessary.
-        ti = interface.function.typeinfo(func)
-
-        # Now we can just grab the function details for this type, use it to extract
-        # the convention and the spoiled count, and then return what we found.
-        _, ftd = interface.tinfo.function_details(ea, ti)
+        ti, ftd = interface.tinfo.function_details(func)
         result, spoiled_count = ftd.cc & idaapi.CM_CC_MASK, ftd.cc & ~idaapi.CM_CC_MASK
         return result
     @utils.multicase(func=(idaapi.func_t, types.integer), convention=(types.string, types.none, types.ellipsis))
@@ -3534,15 +3527,10 @@ class type(object):
     def convention(cls, func, convention):
         '''Set the calling convention used by the prototype for the function `func` to the specified `convention`.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
+        updater = interface.tinfo.update_function_details(ea)
 
-        # Grab the type information from the resolved address, guessing if at all necessary.
-        ti = interface.function.typeinfo(func)
-
-        # Now we just need to create the strpath.update_function_details
-        # coroutine. Our first result will contain the function details
-        # for us to tinker with.
-        updater = interface.tinfo.update_function_details(ea, ti)
-        _, ftd = builtins.next(updater)
+        # Grab the type and function details from our updater coroutine.
+        ti, ftd = builtins.next(updater)
 
         # Update the calling convention whilst preserving the spoiled count.
         # If it has extra bits that were set, then we need to warn the user
@@ -3581,22 +3569,8 @@ class type(object):
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
             '''Return the result type for the function `func` as an ``idaapi.tinfo_t``.'''
-            try:
-                _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-
-            # If we couldn't resolve the function, then consider our parameter
-            # as some type information that we're going to apply to the current one.
-            except E.FunctionNotFoundError:
-                return cls(ui.current.address(), func)
-
-            # The user gave us a function to try out, so we'll try and grab the
-            # type information from the address we resolved.
-            else:
-                ti = type(ea)
-
-            # Now we can grab our function details and then return the type.
-            _, ftd = interface.tinfo.function_details(ea, ti)
-            return ftd.rettype
+            tinfo, ftd = interface.tinfo.function_details(func)
+            return interface.tinfo.copy(ftd.rettype)
         @utils.multicase(func=(idaapi.func_t, types.integer), info=types.string)
         @utils.string.decorate_arguments('info')
         def __new__(cls, func, info):
@@ -3610,18 +3584,14 @@ class type(object):
         @utils.multicase(func=(idaapi.func_t, types.integer), info=idaapi.tinfo_t)
         def __new__(cls, func, info):
             '''Modify the result type for the function `func` to the type information provided as an ``idaapi.tinfo_t`` in `info`.'''
-            _, ea = interface.addressOfRuntimeOrStatic(func)
+            updater = interface.tinfo.update_function_details(func)
 
-            # Grab the function type information that we plan on updating.
-            ti = interface.function.typeinfo(func)
-
-            # Now we can create an updater, and grab the details out of it.
-            updater = interface.tinfo.update_function_details(ea, ti)
+            # Now we can grab the details out of the updater.
             _, ftd = builtins.next(updater)
 
             # From this, we'll trade the return type with the one the user gave us,
             # and then send it back to the updater to write it to the address.
-            result, ftd.rettype = ftd.rettype, info
+            result, ftd.rettype = interface.tinfo.copy(ftd.rettype), info
             updater.send(ftd), updater.close()
 
             # That was it and we only need to return the previous value.
@@ -3636,15 +3606,13 @@ class type(object):
         @classmethod
         def storage(cls, func):
             '''Return the storage location of the result belonging to the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
+            tinfo, ftd = interface.tinfo.function_details(func)
 
-            # Grab the function details, rip the result type and location out of them.
-            _, ftd = interface.tinfo.function_details(ea, ti)
+            # Rip the result type and raw location out of the the function details.
             tinfo, location = ftd.rettype, ftd.retloc
             locinfo = interface.tinfo.location_raw(location)
 
-            # Get the location out of it, and then figure out how to return it.
+            # Convert the raw location to a real one, and then figure out how to return it.
             result = interface.tinfo.location(tinfo.get_size(), instruction.architecture, *locinfo)
             if isinstance(result, types.tuple) and any(isinstance(item, interface.register_t) for item in result):
                 reg, offset = result
@@ -3682,37 +3650,31 @@ class type(object):
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer)
         def __new__(cls, func, index):
             '''Return the type information for the parameter at the specified `index` of the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
+            _, ea = interface.addressOfRuntimeOrStatic(func)
 
             # Use the address and tinfo to grab the details containing our arguments,
-            # and then check that the index is within its boundaries.
-            _, ftd = interface.tinfo.function_details(ea, ti)
+            # and then check that the index is actually within its boundaries.
+            tinfo, ftd = interface.tinfo.function_details(func)
             if not (0 <= index < ftd.size()):
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, index, ftd.size(), ea))
+                raise E.IndexOutOfBoundsError(u"{:s}({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
 
             # Now we can grab the argument using the index we were given and return its type.
             result = ftd[index]
-            return result.type
+            return interface.tinfo.copy(result.type)
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer, info=idaapi.tinfo_t)
         def __new__(cls, func, index, info):
             '''Modify the type information for the parameter at the specified `index` of the function `func` to `info`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
+            updater = interface.tinfo.update_function_details(func)
 
-            # We're going to update the type information as the specified address.
-            # So we'll use interface.tinfo.update_function_details to create an
-            # updater...
-            updater = interface.tinfo.update_function_details(ea, ti)
-
-            # ...and then we grab the details out of it to check the user's index.
-            _, ftd = builtins.next(updater)
+            # Grab the details out of the updater so that we can check the index.
+            ti, ftd = builtins.next(updater)
             if not (0 <= index < ftd.size()):
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}, {:d}, {!r}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, index, "{!s}".format(info), index, ftd.size(), ea))
+                raise E.IndexOutOfBoundsError(u"{:s}({:#x}, {:d}, {!r}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, "{!s}".format(info), index, ftd.size(), ea))
 
             # Now we can just trade their type with the argument at the given index.
             argument = ftd[index]
-            result, argument.type = argument.type, info
+            result, argument.type = interface.tinfo.copy(argument.type), info
 
             # Then we can send it back to our updater, and return the previous value.
             updater.send(ftd), updater.close()
@@ -3746,13 +3708,12 @@ class type(object):
         def name(cls, func, index):
             '''Return the name of the parameter at the specified `index` in the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
 
             # Use the address and type to get the function details, and then check that
             # the user's index is within their boundaries to access the argument name.
-            _, ftd = interface.tinfo.function_details(ea, ti)
+            tinfo, ftd = interface.tinfo.function_details(func)
             if not (0 <= index < ftd.size()):
-                raise E.InvalidTypeOrValueError(u"{:s}.name({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
+                raise E.IndexOutOfBoundsError(u"{:s}.name({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
 
             # Now we can grab the argument using the index we were given and return its name.
             result = ftd[index]
@@ -3767,16 +3728,15 @@ class type(object):
         @utils.string.decorate_arguments('string', 'suffix')
         def name(cls, func, index, string, *suffix):
             '''Modify the name of the parameter at the specified `index` of the function `func` to `string`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti, name = type(ea), interface.tuplename(*itertools.chain([string], suffix))
+            _, ea = interface.addressOfRuntimeOrStatic(func)
+            name = interface.tuplename(*itertools.chain([string], suffix))
+            updater = interface.tinfo.update_function_details(func)
 
-            # Now we can just use the address and type to create an updater for
-            # our function details. Grab the func_type_data_t from it and check
-            # that the user's argument index is within its bounds.
-            updater = interface.tinfo.update_function_details(ea, ti)
-            _, ftd = builtins.next(updater)
+            # Now we can just grab the type and func_type_data_t from the updater
+            # and check that the requested argument index is within its bounds.
+            tinfo, ftd = builtins.next(updater)
             if not (0 <= index < ftd.size()):
-                raise E.InvalidTypeOrValueError(u"{:s}.name({:#x}, {:d}, {!s}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), index, ftd.size(), ea))
+                raise E.IndexOutOfBoundsError(u"{:s}.name({:#x}, {:d}, {!s}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, utils.string.repr(name), index, ftd.size(), ea))
 
             # Only thing left to do is to trade the name the user gave us with
             # whatever was stored at the parameter index they specified.
@@ -3797,12 +3757,16 @@ class type(object):
         @classmethod
         def storage(cls, func, index):
             '''Return the storage location of the parameter at the specified `index` in the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            locations = [item for _, _, item in type.arguments.iterate(func)]
+            tinfo = interface.function.typeinfo(func)
+            if tinfo is None:
+                _, ea = interface.addressOfRuntimeOrStatic(func)
+                raise E.DisassemblerError(u"{:s}.storage({:#x}, {:d}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, ea))
 
             # As always, check our bounds and raise an exception...cleanly.
+            locations = [item for _, _, item in interface.tinfo.function(tinfo)[1:]]
             if not (0 <= index < len(locations)):
-                raise E.InvalidTypeOrValueError(u"{:s}.storage({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, len(locations), ea))
+                _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+                raise E.IndexOutOfBoundsError(u"{:s}.storage({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, len(locations), ea))
             location = locations[index]
 
             # Otherwise, this might be a tuple and we return the whole thing
@@ -3824,19 +3788,19 @@ class type(object):
         @classmethod
         def remove(cls, func, index):
             '''Remove the parameter at the specified `index` from the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            updater = interface.tinfo.update_function_details(ea, type(ea))
+            updater = interface.tinfo.update_function_details(func)
 
             # Grab the type and the details and verify the index is valid before
             # collecting into a list that we'll use for modifying things.
             ti, ftd = builtins.next(updater)
             if not (0 <= index < ftd.size()):
-                raise E.InvalidTypeOrValueError(u"{:s}.remove({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
+                _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+                raise E.IndexOutOfBoundsError(u"{:s}.remove({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
             items = [ftd[idx] for idx in builtins.range(ftd.size())]
 
-            # Now we can safely modify out list, and pop out the funcarg_t from it.
+            # Now we can safely modify our list, and pop out the funcarg_t from it.
             farg = items.pop(index)
-            name, result, location, comment = utils.string.of(farg.name), farg.type, farg.argloc, farg.cmt
+            name, result, location, comment = utils.string.of(farg.name), interface.tinfo.copy(farg.type), farg.argloc, farg.cmt
 
             # Instead of recreating the func_type_data_t, we'll reassign the
             # references back in, and then resize it afterwards.
@@ -3859,8 +3823,14 @@ class type(object):
         @classmethod
         def location(cls, ea, index):
             '''Return the address of the parameter at `index` that is passed to the function referenced at the address `ea`.'''
-            items = type.arguments.locations(ea)
-            return items[index]
+            if not (interface.xref.has_code(ea, descend=True) and interface.instruction.is_call(ea)):
+                raise E.InvalidTypeOrValueError(u"{:s}.location({:#x}, {:d}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
+
+            # Grab the argument addresses from the PIT and return the one at the specified index.
+            parameters = idaapi.get_arg_addrs(ea)
+            if 0 <= index < len(parameters):
+                return parameters[index]
+            raise E.IndexOutOfBoundsError(u"{:s}.location({:#x}, {:d}) : Unable to fetch the address of the specified parameter ({:d}) from the function call at address {:#x} due to only {:d} parameter{:s} being available.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ea, len(parameters), '' if len(parameters) == 1 else 's'))
 
     arg = parameter = argument  # XXX: ns alias
 
@@ -3880,19 +3850,13 @@ class type(object):
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         def __new__(cls, func):
             '''Return the type information for each of the parameters belonging to the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
-
-            # Use the address and type to snag the details requested by the
-            # caller, iterate through it, and then return each type as a list.
-            _, ftd = interface.tinfo.function_details(ea, ti)
-            iterable = (ftd[index] for index in builtins.range(ftd.size()))
-            return [item.type for item in iterable]
+            tinfo, ftd = interface.tinfo.function_details(func)
+            iterable = (ftd[index].type for index in builtins.range(ftd.size()))
+            return [item for item in map(interface.tinfo.copy, iterable)]
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), types=internal.types.ordered)
         def __new__(cls, func, types):
             '''Overwrite the type information for the parameters belonging to the function `func` with the provided list of `types`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            updater = interface.tinfo.update_function_details(ea, type(ea))
+            updater = interface.tinfo.update_function_details(func)
 
             # Grab the type and parameters so we can capture all of the ones that will be replaced.
             ti, ftd = builtins.next(updater)
@@ -3902,7 +3866,7 @@ class type(object):
             for idx in builtins.range(ftd.size()):
                 farg = ftd[idx]
                 aname, atype, aloc, acmt = farg.name, farg.type, farg.argloc, farg.cmt
-                results.append((aname, atype, aloc, acmt))
+                results.append((aname, interface.tinfo.copy(atype), aloc, acmt))
 
             # Now we should able to resize our details, and then update them with our input.
             ftd.resize(len(types))
@@ -3924,8 +3888,8 @@ class type(object):
         @classmethod
         def count(cls, func):
             '''Return the number of parameters in the prototype of the function identified by `func`.'''
-            ti = type(func)
-            return ti.get_nargs()
+            tinfo, ftd = interface.tinfo.function_details(func)
+            return ftd.size()
 
         @utils.multicase()
         @classmethod
@@ -3953,12 +3917,9 @@ class type(object):
         @classmethod
         def names(cls, func):
             '''Return the names for each of the parameters belonging to the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti, ftd = interface.tinfo.function_details(ea, type(ea))
-
-            # Iterate through the function details and return each name as a list.
+            ti, ftd = interface.tinfo.function_details(func)
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
-            return [utils.string.to(item.name) for item in iterable]
+            return [utils.string.of(item.name) for item in iterable]
         @utils.multicase(names=internal.types.ordered)
         @classmethod
         def names(cls, names):
@@ -3968,10 +3929,10 @@ class type(object):
         @classmethod
         def names(cls, func, names):
             '''Overwrite the names for the parameters belonging to the function `func` with the provided list of `names`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+            _, ea = interface.addressOfRuntimeOrStatic(func)
 
-            # Grab the type and parameters so we can capture all of the ones that will be replaced.
-            updater = interface.tinfo.update_function_details(ea, type(ea))
+            # Use a new updater to get the details from the specified function.
+            updater = interface.tinfo.update_function_details(func)
             ti, ftd = builtins.next(updater)
 
             # Force all of the names we were given into string that we can actually apply. Afterwards
@@ -4003,35 +3964,16 @@ class type(object):
         @classmethod
         def iterate(cls, func):
             '''Yield the `(name, type, storage)` of each of the parameters belonging to the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            ti = type(ea)
+            tinfo = interface.function.typeinfo(func)
+            if tinfo is None:
+                _, ea = interface.addressOfRuntimeOrStatic(func)
+                raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, ea))
 
-            # This should be easy, as we only need to grab the details from the type.
-            _, ftd = interface.tinfo.function_details(ea, ti)
-
-            # Then we can just iterate through them and grab their raw values.
-            items = []
-            for index in builtins.range(ftd.size()):
-                loc, name, ti = ftd[index].argloc, ftd[index].name, ftd[index].type
-                locinfo = interface.tinfo.location_raw(loc)
-                items.append((utils.string.of(name), ti, locinfo))
-
-            # Now we can iterate through each of these items safely, process them,
-            # and then yield each individual item to the caller.
-            for index, item in enumerate(items):
-                name, ti, storage = item
-                ltype, linfo = storage
-                result = interface.tinfo.location(ti.get_size(), instruction.architecture, ltype, linfo)
-
-                # Check to see if we got an error. We do this with a hack, by
-                # doing an identity check on what was returned.
-                if result is linfo:
-                    ltype_table = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
-                    ltype_s = ltype_table.get(ltype, '')
-                    logging.warning(u"{:s}.iterate({:#x}) : Unable to handle the unsupported type {:s}({:#x}) for argument at index {:d}{:s}{:s}.".format('.'.join([__name__, cls.__name__]), ea, ltype_s, ltype, index, " with the name \"{:s}\"".format(utils.string.escape(name, '"')) if name else '', " of the type {!s}".format(ti) if ti.is_well_defined() else ''))
-
-                # Now we can yield our result that we determined for each parameter.
-                yield name, ti, result
+            # All we need to do is extract the type from the function, grab each component,
+            # and then yield each of one them from the list while excluding the result.
+            components = interface.tinfo.function(tinfo)
+            for name, ti, storage in components[1:]:
+                yield name, ti, storage
             return
 
         @utils.multicase()
@@ -4043,8 +3985,14 @@ class type(object):
         @classmethod
         def registers(cls, func):
             '''Return the registers for each of the parameters belonging to the function `func`.'''
-            result = []
-            for _, _, loc in cls.iterate(func):
+            tinfo = interface.function.typeinfo(func)
+            if tinfo is None:
+                _, ea = interface.addressOfRuntimeOrStatic(func)
+                raise E.DisassemblerError(u"{:s}.registers({:#x}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, ea))
+
+            # Gather all of the registers from each prototype component and return it.
+            result, result_and_parameters = [], interface.tinfo.function(tinfo)
+            for _, _, loc in result_and_parameters[1:]:
                 if isinstance(loc, internal.types.tuple) and any(isinstance(item, interface.register_t) for item in loc):
                     reg, offset = loc
                     item = loc if all(isinstance(item, interface.register_t) for item in loc) else loc if offset else reg
@@ -4062,9 +4010,15 @@ class type(object):
         @classmethod
         def storage(cls, func):
             '''Return the storage locations for each of the parameters belonging to the function `func`.'''
-            iterable = (location for _, _, location in cls.iterate(func))
-            result = []
-            for _, _, item in cls.iterate(func):
+            tinfo = interface.function.typeinfo(func)
+            if tinfo is None:
+                _, ea = interface.addressOfRuntimeOrStatic(func)
+                raise E.MissingTypeOrAttribute(u"{:s}.storage({:#x}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, ea))
+
+            # All we need to do is extract the type from the function, grab each component,
+            # and then yield each of one them from the list while excluding the result.
+            result, result_and_parameters = [], interface.tinfo.function(tinfo)
+            for _, _, item in result_and_parameters[1:]:
                 if isinstance(item, internal.types.tuple) and isinstance(item[1], internal.types.integer):
                     register, offset = item
                     result.append(item if offset else register)
@@ -4088,8 +4042,7 @@ class type(object):
         @utils.string.decorate_arguments('name', 'suffix')
         def add(cls, func, info, name, *suffix):
             '''Add the provided type information in `info` with the given `name` as another parameter to the function `func`.'''
-            _, ea = internal.interface.addressOfRuntimeOrStatic(func)
-            updater = interface.tinfo.update_function_details(ea, type(ea))
+            updater = interface.tinfo.update_function_details(func)
 
             # Grab the type and the details, and then resize it to add space for another parameter.
             ti, ftd = builtins.next(updater)
@@ -4122,7 +4075,8 @@ class type(object):
         @classmethod
         def locations(cls, func, ea):
             '''Return the address of each of the parameters for the function `func` that are being passed to the function referenced at address `ea`.'''
-            refs = {ref for ref in cls.up(func)}
+            _, callee = interface.addressOfRuntimeOrStatic(func)
+            refs = {ref for ref in interface.xref.any(callee, False)}
             if ea not in refs:
                 logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, 'type', cls.__name__]), func, ea, address(func), ea))
             return cls.locations(ea)
