@@ -5037,10 +5037,16 @@ class tinfo(object):
         return tinfo, ftd
 
     @classmethod
-    def update_function_details(cls, func, ti, *flags):
+    def update_function_details(cls, func, ti=None, *flags):
         '''Given a function location in `func` and its type information as `ti`, yield the ``idaapi.tinfo_t`` and the ``idaapi.func_type_data_t`` that is associated with it and then update the function with the `flags` and ``idaapi.func_type_data_t`` that is sent back.'''
-        rt, ea = addressOfRuntimeOrStatic(func)
         apply_tinfo = idaapi.apply_tinfo2 if idaapi.__version__ < 7.0 else idaapi.apply_tinfo
+
+        # If we weren't given a type, then we need to figure it out ourselves.
+        rt, ea = addressOfRuntimeOrStatic(func)
+        tinfo = function.typeinfo(func) if ti is None else ti
+        if tinfo is None:
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_details({:#x}, {!s}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, "{!s}".format(ti), ea))
+        ti = tinfo
 
         # Similar to function_details, we first need to figure out if our type is a
         # function so that we can dereference it to get the information that we yield.
