@@ -3507,7 +3507,7 @@ class type(object):
     @utils.multicase(convention=(types.string, types.none, types.ellipsis))
     @classmethod
     def convention(cls, convention):
-        '''Set the calling convention used by the prototype for the current function to the string specified by `convention`.'''
+        '''Set the calling convention used by the prototype of the current function to the string specified by `convention`.'''
         return cls.convention(ui.current.address(), convention)
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
@@ -3516,16 +3516,41 @@ class type(object):
         ti, ftd = interface.tinfo.function_details(func)
         result, spoiled_count = ftd.cc & idaapi.CM_CC_MASK, ftd.cc & ~idaapi.CM_CC_MASK
         return result
+    @utils.multicase(type=idaapi.tinfo_t)
+    @classmethod
+    def convention(cls, type):
+        '''Return the calling convention from the prototype specified by `type` as an integer that corresponds to one of the ``idaapi.CM_CC_*`` constants.'''
+        tinfo = type
+        while tinfo.is_ptr():
+            tinfo = tinfo.get_pointed_object()
+
+        # Verify that it's actually a function prototype...
+        if not any([tinfo.is_func(), tinfo.is_funcptr()]):
+            raise E.InvalidTypeOrValueError(u"{:s}.convention({!r}) : The resolved type information \"{:s}\" is not a function and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # ...and make sure it has details that we can use.
+        elif not tinfo.has_details():
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : The resolved type information \"{:s}\" does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # Now we can just get the function details from the type...
+        ftd = idaapi.func_type_data_t()
+        ok = tinfo.get_func_details(ftd) or tinfo.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.convention({!r}) : Unable to retrieve the details from the specified type information \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # ...and then return the calling convention from it.
+        result, spoiled_count = ftd.cc & idaapi.CM_CC_MASK, ftd.cc & ~idaapi.CM_CC_MASK
+        return result
     @utils.multicase(func=(idaapi.func_t, types.integer), convention=(types.string, types.none, types.ellipsis))
     @classmethod
     def convention(cls, func, convention):
-        '''Set the calling convention used by the prototype for the function `func` to the string specified by `convention`.'''
+        '''Set the calling convention used by the prototype of the function `func` to the string specified by `convention`.'''
         cc = internal.declaration.convention.get(convention)
         return cls.convention(func, cc)
     @utils.multicase(func=(idaapi.func_t, types.integer), convention=types.integer)
     @classmethod
     def convention(cls, func, convention):
-        '''Set the calling convention used by the prototype for the function `func` to the specified `convention`.'''
+        '''Set the calling convention used by the prototype of the function `func` to the specified `convention`.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
         updater = interface.tinfo.update_function_details(ea)
 
@@ -3543,6 +3568,28 @@ class type(object):
         # return the value that was set prevously.
         updater.send(ftd), updater.close()
         return result & idaapi.CM_CC_MASK
+    @utils.multicase(type=idaapi.tinfo_t, convention=(types.integer, types.string, types.none, types.ellipsis))
+    @classmethod
+    def convention(cls, type, convention):
+        '''Set the calling convention of the prototype in `type` to the specified `convention`.'''
+        tinfo, cc = type, convention if isinstance(convention, types.integer) else internal.declaration.convention.get(convention)
+
+        # Create an updater for the specified type, and then
+        # grab whatever type details that it yields back to us.
+        updater = interface.tinfo.update_prototype_details(tinfo)
+        prototype, ftd = builtins.next(updater)
+
+        # Now we can just exchange the calling convention from the details.
+        res, ftd.cc = ftd.cc, (ftd.cc & ~idaapi.CM_CC_MASK) | (cc & idaapi.CM_CC_MASK)
+
+        # Then we send it back to the updater, and return whatever we received.
+        try:
+            newinfo, _ = updater.send(ftd)
+        except E.DisassemblerError:
+            raise E.DisassemblerError(u"{:s}.convention({!r}, {:#x}) : Unable to modify the calling convention ({:#x}) for the specified type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), cc, prototype))
+        finally:
+            updater.close()
+        return newinfo
     cc = utils.alias(convention, 'type')
 
     class result(object):
@@ -3559,31 +3606,31 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the result type for the current function as an ``idaapi.tinfo_t``.'''
+            '''Return the type of the result from the prototype of the current function.'''
             # we avoid ui.current.function() so that we can also act on function pointers.
             return cls(ui.current.address())
         @utils.multicase(info=(idaapi.tinfo_t, types.string))
         def __new__(cls, info):
-            '''Modify the result type for the current function to the type information provided as an ``idaapi.tinfo_t`` provided in `info`.'''
+            '''Apply the type specified in `info` to the result of the prototype from the current function.'''
+            if isinstance(info, idaapi.tinfo_t) and not info.is_ptr() and info.is_func():
+                return info.get_rettype()
             return cls(ui.current.address(), info)
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
-            '''Return the result type for the function `func` as an ``idaapi.tinfo_t``.'''
+            '''Return the type of the result from the prototype of the function `func`.'''
             tinfo, ftd = interface.tinfo.function_details(func)
             return interface.tinfo.copy(ftd.rettype)
-        @utils.multicase(func=(idaapi.func_t, types.integer), info=types.string)
-        @utils.string.decorate_arguments('info')
-        def __new__(cls, func, info):
-            '''Modify the result type for the function `func` to the type information provided as a string in `info`.'''
-
-            # FIXME: figure out the proper way to parse a type instead of as a declaration
-            tinfo = interface.tinfo.parse(None, info, idaapi.PT_SIL)
+        @utils.multicase(func=(idaapi.func_t, types.integer), string=types.string)
+        @utils.string.decorate_arguments('string')
+        def __new__(cls, func, string):
+            '''Apply the type specified as `string` to the result of the prototype for the function `func`.'''
+            tinfo = interface.tinfo.parse(None, string, idaapi.PT_SIL)
             if tinfo is None:
-                raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), func, info, info))
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, 'type', cls.__name__]), func, string, string))
             return cls(func, tinfo)
         @utils.multicase(func=(idaapi.func_t, types.integer), info=idaapi.tinfo_t)
         def __new__(cls, func, info):
-            '''Modify the result type for the function `func` to the type information provided as an ``idaapi.tinfo_t`` in `info`.'''
+            '''Apply the type specified in `info` to the result of the prototype for the function `func`.'''
             updater = interface.tinfo.update_function_details(func)
 
             # Now we can grab the details out of the updater.
@@ -3596,16 +3643,39 @@ class type(object):
 
             # That was it and we only need to return the previous value.
             return result
+        @utils.multicase(type=idaapi.tinfo_t, info=(idaapi.tinfo_t, types.string))
+        def __new__(cls, type, info):
+            '''Apply the type in `info` to the result for the prototype specified by `type`.'''
+            tinfo = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(None, info, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {!r}) : Unable to parse the provided result ({!r}) into a valid type.".format('.'.join([__name__, 'type', cls.__name__]), type, info, info))
+
+            # Now we can create an updater for the prototype, and
+            # then grab whatever details that it gives back to us.
+            updater = interface.tinfo.update_prototype_details(type)
+            prototype, ftd = builtins.next(updater)
+
+            # All we need to do is to assign whatever the user gave us to the return type.
+            result, ftd.rettype = interface.tinfo.copy(ftd.rettype), tinfo
+
+            # Then, we can send the details back to the updater to get our new type.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}({!r}, {!r}) : Unable to modify the result for the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), "{!s}".format(info), prototype))
+            finally:
+                updater.close()
+            return newinfo
 
         @utils.multicase()
         @classmethod
         def storage(cls):
-            '''Return the storage location of the result belonging to the current function.'''
+            '''Return the storage location of the result from the prototype of the current function.'''
             return cls.storage(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, types.integer))
         @classmethod
         def storage(cls, func):
-            '''Return the storage location of the result belonging to the function `func`.'''
+            '''Return the storage location of the result from the prototype of the function `func`.'''
             tinfo, ftd = interface.tinfo.function_details(func)
 
             # Rip the result type and raw location out of the the function details.
@@ -3618,6 +3688,16 @@ class type(object):
                 reg, offset = result
                 return result if offset else reg
             return result
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        @classmethod
+        def storage(cls, type):
+            '''Return the storage location of the result from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.storage({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+            result_and_parameters = interface.tinfo.function(tinfo)
+            [(name, type, storage)] = result_and_parameters[:1]
+            return storage
 
     class argument(object):
         """
@@ -3641,15 +3721,15 @@ class type(object):
 
         @utils.multicase(index=types.integer)
         def __new__(cls, index):
-            '''Return the type information for the parameter at the specified `index` of the current function.'''
+            '''Return the type of the parameter at the given `index` from the prototype of the current function.'''
             return cls(ui.current.address(), index)
         @utils.multicase(index=types.integer, info=(types.string, idaapi.tinfo_t))
         def __new__(cls, index, info):
-            '''Modify the type information for the parameter at the specified `index` of the current function to `info`.'''
+            '''Apply the type in `info` to the parameter at the given `index` from the prototype of the current function.'''
             return cls(ui.current.address(), index, info)
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer)
         def __new__(cls, func, index):
-            '''Return the type information for the parameter at the specified `index` of the function `func`.'''
+            '''Return the type of the parameter at the given `index` of the prototype from the function `func`.'''
             _, ea = interface.addressOfRuntimeOrStatic(func)
 
             # Use the address and tinfo to grab the details containing our arguments,
@@ -3661,9 +3741,17 @@ class type(object):
             # Now we can grab the argument using the index we were given and return its type.
             result = ftd[index]
             return interface.tinfo.copy(result.type)
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t), index=types.integer)
+        def __new__(cls, type, index):
+            '''Return the type of the parameter at the given `index` of the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, utils.string.escape("{!s}".format(type), '"')))
+            result = tinfo.get_nth_arg(index)
+            return interface.tinfo.copy(result)
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer, info=idaapi.tinfo_t)
         def __new__(cls, func, index, info):
-            '''Modify the type information for the parameter at the specified `index` of the function `func` to `info`.'''
+            '''Apply the type in `info` to the parameter at the given `index` of the prototype from the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
             updater = interface.tinfo.update_function_details(func)
 
@@ -3679,34 +3767,61 @@ class type(object):
             # Then we can send it back to our updater, and return the previous value.
             updater.send(ftd), updater.close()
             return result
-        @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer, info=types.string)
-        @utils.string.decorate_arguments('info')
-        def __new__(cls, func, index, info):
-            '''Modify the type information for the parameter at the specified `index` of the function `func` to the string in `info`.'''
-            tinfo = interface.tinfo.parse(None, info, idaapi.PT_SIL)
+        @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer, string=types.string)
+        @utils.string.decorate_arguments('string')
+        def __new__(cls, func, index, string):
+            '''Apply the type specified as `string` to the parameter at the given `index` of the prototype from the function `func`.'''
+            tinfo = interface.tinfo.parse(None, string, idaapi.PT_SIL)
             if tinfo is None:
-                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), func, index, info, info))
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, 'type', cls.__name__]), func, index, string, string))
             return cls(func, index, tinfo)
+        @utils.multicase(type=idaapi.tinfo_t, index=types.integer, info=(idaapi.tinfo_t, types.string))
+        def __new__(cls, type, index, info):
+            '''Apply the type in `info` to the parameter at the given `index` of the prototype specified by `type`.'''
+            tinfo = info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(None, info, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided argument type into a valid type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, "{!s}".format(info)))
+
+            # Start by creating an updater for the prototype, and grab what it gives back to us.
+            updater = interface.tinfo.update_prototype_details(type)
+            prototype, ftd = builtins.next(updater)
+
+            # Verify that the index we were given is actually valid.
+            if not (0 <= index < ftd.size()):
+                raise E.IndexOutOfBoundsError(u"{:s}({!r}, {:d}, {!r}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified prototype.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, "{!s}".format(info), index, ftd.size()))
+
+            # Now we can just trade their type with the argument.
+            argument = ftd[index]
+            result, argument.type = interface.tinfo.copy(argument.type), tinfo
+
+            # Then send the details back to the updater to get the new type to return.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}({!r}, {:d}, {!r}) : Unable to modify the result for the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, "{!s}".format(info), utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
 
         @utils.multicase(index=types.integer)
         @classmethod
         def name(cls, index):
-            '''Return the name of the parameter at the specified `index` in the current function.'''
+            '''Return the name of the parameter at the given `index` of the prototype from the current function.'''
             return cls.name(ui.current.address(), index)
         @utils.multicase(index=types.integer, none=types.none)
         @classmethod
         def name(cls, index, none):
-            '''Remove the name from the parameter at the specified `index` in the current function.'''
+            '''Remove the name from the parameter at the given `index` of the prototype from the current function.'''
             return cls.name(ui.current.address(), index, none)
         @utils.multicase(index=types.integer, string=types.string)
         @classmethod
         def name(cls, index, string, *suffix):
-            '''Modify the name of the parameter at the specified `index` of the current function to `string`.'''
+            '''Rename the parameter at the given `index` of the prototype from the current function to `string`.'''
             return cls.name(ui.current.address(), index, string, *suffix)
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer)
         @classmethod
         def name(cls, func, index):
-            '''Return the name of the parameter at the specified `index` in the function `func`.'''
+            '''Return the name of the parameter at the given `index` of the prototype from the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
 
             # Use the address and type to get the function details, and then check that
@@ -3718,16 +3833,25 @@ class type(object):
             # Now we can grab the argument using the index we were given and return its name.
             result = ftd[index]
             return utils.string.of(result.name) or None
-        @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer, none=types.none)
+        @utils.multicase(type=idaapi.tinfo_t, index=types.integer)
+        @classmethod
+        def name(cls, type, index):
+            '''Return the name of the parameter at the given `index` of the prototype specified by `type`.'''
+            tinfo, ftd = interface.tinfo.prototype_details(type)
+            if not (0 <= index < ftd.size()):
+                raise E.IndexOutOfBoundsError(u"{:s}.name({!r}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified prototype.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, index, ftd.size()))
+            result = ftd[index]
+            return utils.string.of(result.name) or None
+        @utils.multicase(func=(idaapi.func_t, types.integer, idaapi.tinfo_t), index=types.integer, none=types.none)
         @classmethod
         def name(cls, func, index, none):
-            '''Remove the name from the parameter at the specified `index` in the function `func`.'''
+            '''Remove the name from the parameter at the given `index` of the prototype from the function `func`.'''
             return cls.name(func, index, '')
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer, string=types.string)
         @classmethod
         @utils.string.decorate_arguments('string', 'suffix')
         def name(cls, func, index, string, *suffix):
-            '''Modify the name of the parameter at the specified `index` of the function `func` to `string`.'''
+            '''Rename the parameter at the given `index` of the prototype from the function `func` to `string`.'''
             _, ea = interface.addressOfRuntimeOrStatic(func)
             name = interface.tuplename(*itertools.chain([string], suffix))
             updater = interface.tinfo.update_function_details(func)
@@ -3747,16 +3871,44 @@ class type(object):
             # and then return the previous result that was assigned.
             updater.send(ftd), updater.close()
             return result or None
+        @utils.multicase(type=idaapi.tinfo_t, index=types.integer, string=types.string)
+        @classmethod
+        @utils.string.decorate_arguments('string', 'suffix')
+        def name(cls, type, index, string, *suffix):
+            '''Rename the parameter at the given `index` of the prototype specified by `type` to `string`.'''
+            name = interface.tuplename(*itertools.chain([string], suffix))
+
+            # Create an updater for the prototype, and
+            # grab whatever it wants to give back to us.
+            updater = interface.tinfo.update_prototype_details(type)
+            prototype, ftd = builtins.next(updater)
+
+            # Before doing anything, verify the requested index is within bounds.
+            if not (0 <= index < ftd.size()):
+                raise E.IndexOutOfBoundsError(u"{:s}.name({!r}, {:d}, {!s}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified prototype.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, utils.string.repr(name), index, ftd.size()))
+
+            # Now we can exchange the name with the one the user gave us.
+            argument = ftd[index]
+            result, argument.name = argument.name, utils.string.to(name)
+
+            # Then send the details back to the updater to get the new type to return.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}({!r}, {:d}, {!s}) : Unable to modify the name of the argument ({:d}) for the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, utils.string.repr(name), utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
 
         @utils.multicase(index=types.integer)
         @classmethod
         def storage(cls, index):
-            '''Return the storage location of the parameter at the specified `index` in the current function.'''
+            '''Return the storage location of the parameter at the given `index` of the prototype from the current function.'''
             return cls.storage(ui.current.address(), index)
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer)
         @classmethod
         def storage(cls, func, index):
-            '''Return the storage location of the parameter at the specified `index` in the function `func`.'''
+            '''Return the storage location of the parameter at the given `index` of the prototype from the function `func`.'''
             tinfo = interface.function.typeinfo(func)
             if tinfo is None:
                 _, ea = interface.addressOfRuntimeOrStatic(func)
@@ -3778,16 +3930,39 @@ class type(object):
                     return reg
                 return location
             return location
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t), index=types.integer)
+        @classmethod
+        def storage(cls, type, index):
+            '''Return the storage location of the parameter at the given `index` of the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.storage({!r}, {:d}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, utils.string.escape("{!s}".format(type), '"')))
+
+            # Check the index against the number of available parameters.
+            locations = [item for _, _, item in interface.tinfo.function(tinfo)[1:]]
+            if not (0 <= index < len(locations)):
+                raise E.IndexOutOfBoundsError(u"{:s}.storage({!r}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified prototype.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, index, len(locations)))
+            location = locations[index]
+
+            # Otherwise, this might be a tuple and we return the whole thing
+            # unless its a (register, offset). If it is, then check that it's
+            # a zero-offset because then we can return just the register.
+            if isinstance(location, types.tuple):
+                reg, off = location
+                if isinstance(off, types.integer) and off == 0:
+                    return reg
+                return location
+            return location
 
         @utils.multicase(index=types.integer)
         @classmethod
         def remove(cls, index):
-            '''Remove the parameter at the specified `index` from the current function.'''
+            '''Remove the parameter at the given `index` from the prototype of the current function.'''
             return cls.remove(ui.current.address(), index)
         @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer)
         @classmethod
         def remove(cls, func, index):
-            '''Remove the parameter at the specified `index` from the function `func`.'''
+            '''Remove the parameter at the specified `index` from the prototype of the function `func`.'''
             updater = interface.tinfo.update_function_details(func)
 
             # Grab the type and the details and verify the index is valid before
@@ -3812,6 +3987,39 @@ class type(object):
             # modified, and can send it back to update the prototype correctly.
             updater.send(ftd), updater.close()
             return result
+        @utils.multicase(type=idaapi.tinfo_t, index=types.integer)
+        @classmethod
+        def remove(cls, type, index):
+            '''Remove the parameter at the given `index` from the prototype specified by `type`.'''
+            updater = interface.tinfo.update_prototype_details(type)
+
+            # Grab the prototype and details so that we can verify the
+            # index is valid before processing the list of arguments.
+            prototype, ftd = builtins.next(updater)
+            if not (0 <= index < ftd.size()):
+                _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+                raise E.IndexOutOfBoundsError(u"{:s}.remove({!r}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified prototype.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, index, ftd.size()))
+
+            # Collect all the arguments into a list so that we can
+            # safely modify it before sending it back to the updater.
+            items = [ftd[idx] for idx in builtins.range(ftd.size())]
+            farg = items.pop(index)
+
+            # To avoid reinstantiating the function details, we'll just
+            # reassign the new items back in. Afterwards, we'll shrink
+            # the details to accommodate the removal of an element.
+            for idx, item in enumerate(items):
+                ftd[idx] = item
+            ftd.resize(len(items))
+
+            # We're done. We just need to send the details back to get our result.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}.remove({!r}, {:d}) : Unable to remove the argument at index {:d} of the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, index, utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
         pop = utils.alias(remove, 'type.argument')
 
         @utils.multicase(index=types.integer)
@@ -3845,17 +4053,29 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the type information for each of the parameters belonging to the current function.'''
+            '''Return the type for each of the parameters from the prototype for the current function.'''
             return cls(ui.current.address())
+        @utils.multicase(types=internal.types.ordered)
+        def __new__(cls, types):
+            '''Modify the types for the parameters of the current function with the provided list of `types`.'''
+            return cls(ui.current.address(), types)
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         def __new__(cls, func):
-            '''Return the type information for each of the parameters belonging to the function `func`.'''
+            '''Return the type for each of the parameters from the prototype of the function `func`.'''
             tinfo, ftd = interface.tinfo.function_details(func)
             iterable = (ftd[index].type for index in builtins.range(ftd.size()))
             return [item for item in map(interface.tinfo.copy, iterable)]
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        def __new__(cls, type):
+            '''Return the type for each of the parameters from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+            result_and_parameters = interface.tinfo.function(tinfo)
+            return [type for name, type, storage in result_and_parameters[1:]]
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), types=internal.types.ordered)
         def __new__(cls, func, types):
-            '''Overwrite the type information for the parameters belonging to the function `func` with the provided list of `types`.'''
+            '''Modify the types for the parameters of the function `func` with the provided list of `types`.'''
             updater = interface.tinfo.update_function_details(func)
 
             # Grab the type and parameters so we can capture all of the ones that will be replaced.
@@ -3878,57 +4098,123 @@ class type(object):
             # The very last thing we need to do is to return our results. Even though we collected
             # all their information for safety, we return just the types for simplicity.
             return [item for _, item, _, _ in results]
+        @utils.multicase(type=idaapi.tinfo_t, types=internal.types.ordered)
+        def __new__(cls, type, types):
+            '''Modify the types for the parameters of the prototype specified by `type` with the provided list of `types`.'''
+            updater = interface.tinfo.update_prototype_details(type)
+
+            # Start by getting the prototype and parameters prior to their modification.
+            prototype, ftd = builtins.next(updater)
+
+            # Iterate through all the parameters, and capture all of their attributes.
+            results = []
+            for idx in builtins.range(ftd.size()):
+                farg = ftd[idx]
+                aname, atype, aloc, acmt = farg.name, farg.type, farg.argloc, farg.cmt
+                results.append((aname, interface.tinfo.copy(atype), aloc, acmt))
+
+            # Now we should able to resize the details, and update them with our input.
+            ftd.resize(len(types))
+            for index, item in enumerate(types):
+                aname, ainfo = item if isinstance(item, internal.types.tuple) else ('', item)
+                atype = ainfo if isinstance(ainfo, idaapi.tinfo_t) else interface.tinfo.parse(None, ainfo, idaapi.PT_SIL)
+                if not atype:
+                    description = ["{!s}".format(item) for item in types]
+                    raise E.InvalidTypeOrValueError(u"{:s}({!r}, {!r}) : Unable to parse the string \"{:s}\" specified for index {:d} of the parameters into a valid type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), description, utils.string.escape("{!s}".format(item), '"'), index))
+                ftd[index].name, ftd[index].type = utils.string.to(aname), atype
+
+            # We should be good and only need to send things back to the updater.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                description = ["{!s}".format(item) for item in types]
+                raise E.DisassemblerError(u"{:s}({!r}, {!r}) : Unable to update the arguments for the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), description, utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
 
         @utils.multicase()
         @classmethod
         def count(cls):
-            '''Return the number of parameters in the prototype for the current function.'''
+            '''Return the number of parameters from the prototype of the current function.'''
             return cls.count(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         @classmethod
         def count(cls, func):
-            '''Return the number of parameters in the prototype of the function identified by `func`.'''
+            '''Return the number of parameters from the prototype of the function `func`.'''
             tinfo, ftd = interface.tinfo.function_details(func)
             return ftd.size()
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        @classmethod
+        def count(cls, type):
+            '''Return the number of parameters from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.count({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+            prototype, details = interface.tinfo.prototype_details(tinfo)
+            return prototype.get_nargs()
 
         @utils.multicase()
         @classmethod
         def types(cls):
-            '''Return the type information for each of the parameters belonging to the current function.'''
+            '''Return the types for each of the parameters from the prototype of the current function.'''
             return cls(ui.current.address())
+        @utils.multicase(types=internal.types.ordered)
+        @classmethod
+        def types(cls, types):
+            '''Modify the types for the parameters of the current function with the provided list of `types`.'''
+            return cls(ui.current.address(), types)
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         @classmethod
         def types(cls, func):
-            '''Return the type information for each of the parameters belonging to the function `func`.'''
+            '''Return the types for each of the parameters from the prototype of the function `func`.'''
             return cls(func)
-        @utils.multicase(func=(idaapi.func_t, internal.types.integer), types=internal.types.ordered)
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        @classmethod
+        def types(cls, type):
+            '''Return the types for each of the parameters from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.types({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+            result_and_parameters = interface.tinfo.function(tinfo)
+            return [type for name, type, storage in result_and_parameters[1:]]
+        @utils.multicase(func=(idaapi.func_t, internal.types.integer, idaapi.tinfo_t), types=internal.types.ordered)
         @classmethod
         def types(cls, func, types):
-            '''Overwrite the type information for the parameters belonging to the function `func` with the provided list of `types`.'''
+            '''Modify the types for the parameters of the function `func` with the provided list of `types`.'''
             return cls(func, types)
         type = utils.alias(types, 'type.arguments')
 
         @utils.multicase()
         @classmethod
         def names(cls):
-            '''Return the names for each of the parameters belonging to the current function.'''
+            '''Return the names for each of the parameters from the prototype of the current function.'''
             return cls.names(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         @classmethod
         def names(cls, func):
-            '''Return the names for each of the parameters belonging to the function `func`.'''
+            '''Return the names for each of the parameters from the prototype of the function `func`.'''
             ti, ftd = interface.tinfo.function_details(func)
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [utils.string.of(item.name) for item in iterable]
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        @classmethod
+        def names(cls, type):
+            '''Return the names for each of the parameters from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.names({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+            result_and_parameters = interface.tinfo.function(tinfo)
+            return [name for name, type, storage in result_and_parameters[1:]]
         @utils.multicase(names=internal.types.ordered)
         @classmethod
         def names(cls, names):
-            '''Overwrite the names for the parameters belonging to the current function with the provided list of `names`.'''
+            '''Modify the names of the parameters in the prototype for the current function with the provided list of `names`.'''
             return cls.names(ui.current.address(), names)
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), names=internal.types.ordered)
         @classmethod
         def names(cls, func, names):
-            '''Overwrite the names for the parameters belonging to the function `func` with the provided list of `names`.'''
+            '''Modify the names for the parameters in the prototype for the function `func` with the provided list of `names`.'''
             _, ea = interface.addressOfRuntimeOrStatic(func)
 
             # Use a new updater to get the details from the specified function.
@@ -3940,7 +4226,7 @@ class type(object):
             strings = [item for item in map("{!s}".format, names)]
             if strings[ftd.size():]:
                 discarded = ["\"{:s}\"".format(utils.string.escape(item, '"')) for item in strings[ftd.size():]]
-                logging.warning(u"{:s}.names({:#x}, {!r}) : Discarding {:d} additional name{:s} ({:s}) that {:s} given for the specified function which has only {:d} parameter{:s}.".format('.'.join([__name__, cls.__name__]), ea, names, len(discarded), '' if len(discarded) == 1 else 's', ', '.join(discarded), 'was' if len(discarded) == 1 else 'were', ftd.size(), '' if ftd.size() == 1 else 's'))
+                logging.warning(u"{:s}.names({:#x}, {!r}) : Discarding {:d} additional name{:s} ({:s}) that {:s} given for the specified function which has only {:d} parameter{:s}.".format('.'.join([__name__, 'type', cls.__name__]), ea, names, len(discarded), '' if len(discarded) == 1 else 's', ', '.join(discarded), 'was' if len(discarded) == 1 else 'were', ftd.size(), '' if ftd.size() == 1 else 's'))
 
             # Now we'll go through all of the available parameters, and update the names. If
             # we weren't given one, then we just assign an empty name to the funcarg_t.
@@ -3953,17 +4239,49 @@ class type(object):
             # That was it, just need to update everything and return our results.
             updater.send(ftd), updater.close()
             return results
+        @utils.multicase(type=idaapi.tinfo_t, names=internal.types.ordered)
+        @classmethod
+        def names(cls, type, names):
+            '''Modify the parameter names for the prototype specified by `type` with the provided list of `names`.'''
+            updater = interface.tinfo.update_prototype_details(type)
+
+            # Getting the prototype and parameters prior to renaming things.
+            prototype, ftd = builtins.next(updater)
+
+            # Force all of the names we were given into strings that we can actually apply.
+            # If we were given any extra, then we need to warn the user about them.
+            strings = [item for item in map("{!s}".format, names)]
+            if strings[ftd.size():]:
+                discarded = ["\"{:s}\"".format(utils.string.escape(item, '"')) for item in strings[ftd.size():]]
+                logging.warning(u"{:s}.names({!r}, {!r}) : Discarding {:d} additional name{:s} ({:s}) that {:s} given for the specified prototype which has only {:d} parameter{:s}.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), names, len(discarded), '' if len(discarded) == 1 else 's', ', '.join(discarded), 'was' if len(discarded) == 1 else 'were', ftd.size(), '' if ftd.size() == 1 else 's'))
+
+            # Now we can update the names for each of the available parameters. If the
+            # name is missing, then we can just use an empty name to clear the prameter.
+            results = []
+            for index in builtins.range(ftd.size()):
+                farg, item = ftd[index], strings[index] if index < len(strings) else ''
+                results.append(utils.string.of(farg.name))
+                ftd[index].name = utils.string.to(item)
+
+            # Finally we can send things back to the updater to get our final type.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}.names({!r}, {!r}) : Unable to update the argument names for the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), names, utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
         name = utils.alias(names, 'type.arguments')
 
         @utils.multicase()
         @classmethod
         def iterate(cls):
-            '''Yield the `(name, type, storage)` of each of the parameters belonging to the current function.'''
+            '''Yield the `(name, type, storage)` of each of the parameters from the prototype of the current function.'''
             return cls.iterate(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         @classmethod
         def iterate(cls, func):
-            '''Yield the `(name, type, storage)` of each of the parameters belonging to the function `func`.'''
+            '''Yield the `(name, type, storage)` of each of the parameters from the prototype of the function `func`.'''
             tinfo = interface.function.typeinfo(func)
             if tinfo is None:
                 _, ea = interface.addressOfRuntimeOrStatic(func)
@@ -3975,16 +4293,25 @@ class type(object):
             for name, ti, storage in components[1:]:
                 yield name, ti, storage
             return
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        @classmethod
+        def iterate(cls, type):
+            '''Yield the `(name, type, storage)` of each of the parameters from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.iterate({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+            result_and_parameters = interface.tinfo.function(tinfo)
+            return [(name, type, storage) for name, type, storage in result_and_parameters[1:]]
 
         @utils.multicase()
         @classmethod
         def registers(cls):
-            '''Return the registers for each of the parameters belonging to the current function.'''
+            '''Return the registers for each of the parameters from the prototype of the current function.'''
             return cls.registers(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         @classmethod
         def registers(cls, func):
-            '''Return the registers for each of the parameters belonging to the function `func`.'''
+            '''Return the registers for each of the parameters from the prototype of the function `func`.'''
             tinfo = interface.function.typeinfo(func)
             if tinfo is None:
                 _, ea = interface.addressOfRuntimeOrStatic(func)
@@ -3999,17 +4326,35 @@ class type(object):
                     result.append(item)
                 continue
             return result
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        @classmethod
+        def registers(cls, type):
+            '''Return the registers for each of the parameters from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.registers({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+
+            # Iterate through each prototype component, skipping over the result, and gather
+            # the ones that are registers. If the the register offset is 0, then exclude it.
+            result, result_and_parameters = [], interface.tinfo.function(tinfo)
+            for _, _, loc in result_and_parameters[1:]:
+                if isinstance(loc, internal.types.tuple) and any(isinstance(item, interface.register_t) for item in loc):
+                    reg, offset = loc
+                    item = loc if all(isinstance(item, interface.register_t) for item in loc) else loc if offset else reg
+                    result.append(item)
+                continue
+            return result
         regs = utils.alias(registers, 'type.arguments')
 
         @utils.multicase()
         @classmethod
         def storage(cls):
-            '''Return the storage location for each of the parameters belonging to the current function.'''
+            '''Return the storage location for each of the parameters from the prototype of the current function.'''
             return cls.storage(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, internal.types.integer))
         @classmethod
         def storage(cls, func):
-            '''Return the storage locations for each of the parameters belonging to the function `func`.'''
+            '''Return the storage locations for each of the parameters from the prototype of the function `func`.'''
             tinfo = interface.function.typeinfo(func)
             if tinfo is None:
                 _, ea = interface.addressOfRuntimeOrStatic(func)
@@ -4026,22 +4371,41 @@ class type(object):
                     result.append(item)
                 continue
             return result
+        @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+        @classmethod
+        def storage(cls, type):
+            '''Return the storage locations for each of the parameters from the prototype specified by `type`.'''
+            tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+            if tinfo is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.storage({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+
+            # Iterate through all the prototype components other than the result,
+            # and return each storage location excluding the offset if it is 0.
+            result, result_and_parameters = [], interface.tinfo.function(tinfo)
+            for _, _, location in result_and_parameters[1:]:
+                if isinstance(location, internal.types.tuple) and isinstance(location[1], internal.types.integer):
+                    register, offset = location
+                    result.append(location if offset else register)
+                else:
+                    result.append(location)
+                continue
+            return result
 
         @utils.multicase(info=(internal.types.string, idaapi.tinfo_t))
         @classmethod
         def add(cls, info):
-            '''Add the provided type information in `info` as another parameter to the current function.'''
+            '''Add the type in `info` as another parameter to the prototype of the current function.'''
             return cls.add(ui.current.address(), info, '')
-        @utils.multicase(func=(idaapi.func_t, internal.types.integer), info=(internal.types.string, idaapi.tinfo_t))
+        @utils.multicase(func=(idaapi.func_t, internal.types.integer, idaapi.tinfo_t), info=(internal.types.string, idaapi.tinfo_t))
         @classmethod
         def add(cls, func, info):
-            '''Add the provided type information in `info` as another parameter to the function `func`.'''
+            '''Add the type in `info` as another parameter to the prototype of the function `func`.'''
             return cls.add(func, info, '')
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), info=(internal.types.string, idaapi.tinfo_t), name=internal.types.string)
         @classmethod
         @utils.string.decorate_arguments('name', 'suffix')
         def add(cls, func, info, name, *suffix):
-            '''Add the provided type information in `info` with the given `name` as another parameter to the function `func`.'''
+            '''Add the type in `info` with the given `name` as another parameter to the prototype of the function `func`.'''
             updater = interface.tinfo.update_function_details(func)
 
             # Grab the type and the details, and then resize it to add space for another parameter.
@@ -4056,6 +4420,31 @@ class type(object):
             # We should be good to go and we just need to return the index.
             updater.send(ftd), updater.close()
             return index
+        @utils.multicase(type=idaapi.tinfo_t, info=(internal.types.string, idaapi.tinfo_t), name=internal.types.string)
+        @classmethod
+        @utils.string.decorate_arguments('name', 'suffix')
+        def add(cls, type, info, name, *suffix):
+            '''Add the type in `info` with the given `name` as another parameter to the prototype specified by `type`.'''
+            updater = interface.tinfo.update_prototype_details(type)
+
+            # Grab the prototype and parameters, and then resize them
+            # to add the required space to append another parameter.
+            prototype, ftd = builtins.next(updater)
+            index, _ = ftd.size(), ftd.resize(prototype.get_nargs() + 1)
+
+            # Now all we need to do is update the index we allocated space for.
+            res = name if isinstance(name, internal.types.tuple) else (name,)
+            aname, ainfo = interface.tuplename(*(res + suffix)), interface.tinfo.parse(None, info, idaapi.PT_SIL) if isinstance(info, internal.types.string) else info
+            ftd[index].name, ftd[index].type = utils.string.to(aname), ainfo
+
+            # To finish up, we just need to send our details back to get the final type.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}.add({!r}, {!r}, {!s}) : Unable to add an argument to the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), "{!s}".format(info), utils.string.repr(aname), utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
         append = utils.alias(add, 'type.arguments')
 
         @utils.multicase()
@@ -4074,7 +4463,7 @@ class type(object):
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), ea=internal.types.integer)
         @classmethod
         def locations(cls, func, ea):
-            '''Return the address of each of the parameters for the function `func` that are being passed to the function referenced at address `ea`.'''
+            '''Return the address of each of the parameters of the function `func` that are being passed to the function referenced at address `ea`.'''
             _, callee = interface.addressOfRuntimeOrStatic(func)
             refs = {ref for ref in interface.xref.any(callee, False)}
             if ea not in refs:
