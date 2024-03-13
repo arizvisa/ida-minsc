@@ -5865,6 +5865,52 @@ class tinfo(object):
         return result
 
     @classmethod
+    def function_spoiled(cls, info):
+        '''Return a list of registers spoiled by the function prototype specified in `info`.'''
+        tinfo = info
+        while tinfo.is_ptr():
+            tinfo = tinfo.get_pointed_object()
+
+        # Spoiled registers only apply to a function prototype, so bail if it isn't.
+        if not any([tinfo.is_func(), tinfo.is_funcptr()]):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.function_spoiled({!r}) : The resolved type information \"{:s}\" is not a function and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # If we're unable to get details from the type, then we need to abort.
+        elif not tinfo.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.function_spoiled({!r}) : The resolved type information \"{:s}\" does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # Extract the function details from the type so that we can check it out.
+        ftd = idaapi.func_type_data_t()
+        ok = tinfo.get_func_details(ftd) or tinfo.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.function_spoiled({!r}) : Unable to retrieve the details from the specified type information \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # Now we just need to access the reginfovec_t stored in ftd.spoiled. Each
+        # element of this array is a reginfo_t which we can easily convert to a reg.
+        result = []
+        for index in builtins.range(ftd.spoiled.size()):
+            reginfo = ftd.spoiled[index]
+            ridx, rsize = reginfo.reg, reginfo.size
+
+            # If the register doesn't exist, we just skip over it.
+            if not architecture.has(ridx):
+                logging.warning(u"{:s}.function_spoiled({!r}) : Unable to locate the spoiled register at the current index ({:d}) due to the register index being unknown ({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), index, ridx))
+                continue
+
+            # If we couldn't find a register of the exact size,
+            # then just use a regular register and issue a warning.
+            try:
+                reg = architecture.by(ridx, rsize)
+
+            except IndexError:
+                logging.warning(u"{:s}.function_spoiled({!r}) : The spoiled register at the current index ({:d}) has an unsupported size ({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), index, rsize))
+                reg = architecture.by(ridx)
+
+            # Now we can add it and try the next one.
+            result.append(reg)
+        return result
+
+    @classmethod
     def function(cls, type):
         '''Return a list containing a tuple for the return type and each argument for the function specified by `type`.'''
         tinfo = type
