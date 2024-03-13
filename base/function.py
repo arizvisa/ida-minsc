@@ -2526,8 +2526,7 @@ class frame(object):
             # first we'll need to check if there's a tinfo_t for the address to
             # give it priority over the frame. then we can grab its details.
             if type.has(ea):
-                tinfo = type(ea)
-                _, ftd = interface.tinfo.function_details(ea, tinfo)
+                tinfo, ftd = interface.tinfo.function_details(ea)
 
                 # iterate through the parameters and collect only arguments that
                 # are allocated on the stack so that we can use their information
@@ -2785,8 +2784,7 @@ class frame(object):
 
             # If we got here, then we have type information that we can grab out
             # of the given address. Once we have it, rip the details out o it.
-            tinfo = interface.function.typeinfo(ea)
-            _, ftd = interface.tinfo.function_details(ea, tinfo)
+            tinfo, ftd = interface.tinfo.function_details(ea)
 
             # Now we just need to iterate through our parameters collecting the
             # raw location information for all of them. We preserve the type
@@ -2858,18 +2856,18 @@ class frame(object):
             '''Returns the size of the arguments for the function `func`.'''
             fn = interface.function.by(func)
             max = structure.size(get_frameid(fn))
-            total = frame.lvars.size(fn) + frame.regs.size(fn)
+            total = frame.variables.size(fn) + frame.registers.size(fn)
             return max - total
     args = arg = arguments  # XXX: ns alias
 
-    class lvars(object):
+    class variables(object):
         """
         This namespace provides information about the local variables
         defined within a function's frame.
 
         Some ways to get this information can be::
 
-            > print( function.frame.lvars.size() )
+            > print( function.frame.variables.size() )
 
         """
         @utils.multicase()
@@ -2902,16 +2900,16 @@ class frame(object):
             '''Returns the size of the local variables for the function `func`.'''
             fn = interface.function.by(func)
             return fn.frsize
-    vars = lvars    # XXX: ns alias
+    lvars = vars = variables    # XXX: ns alias
 
-    class regs(object):
+    class registers(object):
         """
         This namespace provides information about the registers that
         are saved when a function constructs its frame.
 
         An example of using this namespace::
 
-            > print( function.frame.regs.size(ea) )
+            > print( function.frame.registers.size(ea) )
 
         """
 
@@ -2946,11 +2944,12 @@ class frame(object):
             '''Returns the number of bytes occupied by the saved registers for the function `func`.'''
             fn = interface.function.by(func)
             return fn.frregs + idaapi.get_frame_retsize(fn)
+    regs = registers    # XXX: ns alias
 
 get_frameid = utils.alias(frame.id, 'frame')
 get_args_size = utils.alias(frame.args.size, 'frame.args')
-get_vars_size = utils.alias(frame.lvars.size, 'frame.lvars')
-get_regs_size = utils.alias(frame.regs.size, 'frame.regs')
+get_vars_size = utils.alias(frame.variables.size, 'frame.variables')
+get_regs_size = utils.alias(frame.registers.size, 'frame.registers')
 get_spdelta = spdelta = utils.alias(frame.delta, 'frame')
 
 ## instruction iteration/searching
