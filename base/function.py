@@ -3505,6 +3505,11 @@ class type(object):
         '''Return the calling convention of the current function.'''
         # we avoid ui.current.function() so that we can also act on runtime-linked functions.
         return cls.convention(ui.current.address())
+    @utils.multicase(convention=(types.string, types.none, types.ellipsis))
+    @classmethod
+    def convention(cls, convention):
+        '''Set the calling convention used by the prototype for the current function to the string specified by `convention`.'''
+        return cls.convention(ui.current.address(), convention)
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def convention(cls, func):
