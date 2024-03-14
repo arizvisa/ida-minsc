@@ -347,6 +347,40 @@ class architecture_t(object):
     def by(self, index, size):
         '''Return a register from the given architecture by its `index` and `size`.'''
         return self.by_indexsize(index, size)
+    @utils.multicase(register=interface.register_t)
+    def by(self, register):
+        '''Return the specified `register` from the given architecture.'''
+        cls = self.__class__
+
+        # If it's a regular register, then we can trust its id and type.
+        if isinstance(register.realname, types.string):
+            return self.by_indextype(register.id, register.dtype)
+
+        # If it's a uarchitecture register, then we need to use its size
+        # to convert it in order to get to the actual register index.
+        elif isinstance(register.realname, types.integer) and hasattr(idaapi, 'mreg2reg'):
+            ridx = idaapi.mreg2reg(register.id, register.size)
+            return self.by_indextype(ridx, register.dtype)
+
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.by({!s}) : Unable to find the specified register ({!s}).".format('.'.join([cls.__module__, cls.__name__]), register, register))
+    @utils.multicase(register=interface.register_t, size=types.integer)
+    def by(self, register, size):
+        '''Return the specified `register` from the given architecture by its `size`.'''
+        dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
+        dtype = dtype_by_size(size)
+
+        # If it's a regular register, then we can trust its id and type.
+        if isinstance(register.realname, types.string):
+            return self.by_indextype(register.id, dtype)
+
+        # If it's a uarchitecture register, then we need to
+        # convert it to get to the actual register index.
+        elif isinstance(register.realname, types.integer) and hasattr(idaapi, 'mreg2reg'):
+            ridx = idaapi.mreg2reg(register.id, size)
+            return self.by_indextype(ridx, dtype)
+
+        cls = self.__class__
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.by({!s}, {:d}) : Unable to find the specified register ({!s}) in the given size ({:d}).".format('.'.join([cls.__module__, cls.__name__]), register, size, register, size))
 
     @utils.multicase(name=types.string)
     def has(self, name):
@@ -358,6 +392,20 @@ class architecture_t(object):
         '''Return true if a register at the given `index` exists within the architecture.'''
         names = idaapi.ph.regnames
         return 0 <= index < len(names)
+    @utils.multicase(register=interface.register_t)
+    def has(self, register):
+        '''Return true if the specified `register` exists within the architecture.'''
+
+        # If it's a regular register, then we can trust its id as the index.
+        # However, if it's a uarchitecture register, then we need to use the
+        # API to get the index. Afterwards we can just recurse for the result.
+        if isinstance(register.realname, types.string):
+            ridx = register.id
+        elif isinstance(register.realname, types.integer) and hasattr(idaapi, 'mreg2reg'):
+            ridx = idaapi.mreg2reg(register.id, register.size)
+        else:
+            ridx = -1
+        return self.has(ridx)
 
     def promote(self, register, bits=None):
         '''Promote the specified `register` to its next larger size as specified by `bits`.'''
