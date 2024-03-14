@@ -3592,6 +3592,32 @@ class type(object):
         return newinfo
     cc = utils.alias(convention, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def spoiled(cls):
+        '''Return a list of the spoiled registers from the prototype of the current function.'''
+        return cls.spoiled(ui.current.address())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def spoiled(cls, func):
+        '''Return a list of the spoiled registers from the prototype of the function `func`.'''
+        tinfo = interface.function.typeinfo(func)
+        if tinfo is None:
+            _, ea = interface.addressOfRuntimeOrStatic(func)
+            raise E.DisassemblerError(u"{:s}.spoiled({:#x}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+        unique = {register for register in interface.tinfo.function_spoiled(tinfo)}
+        return sorted(unique, key=operator.attrgetter('id'))
+    @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
+    @classmethod
+    def spoiled(cls, type):
+        '''Return a list of the spoiled registers from the prototype specified by `type`.'''
+        tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+        if tinfo is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.spoiled({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
+        unique = {register for register in interface.tinfo.function_spoiled(tinfo)}
+        return sorted(unique, key=operator.attrgetter('id'))
+    spoils = utils.alias(spoiled, 'type')
+
     class result(object):
         """
         This namespace allows one to interact with the result as defined
