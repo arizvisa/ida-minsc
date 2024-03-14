@@ -38,9 +38,9 @@ class Intel(internal.architecture.architecture_t):
         [ setitem('r'+_+'w', self.child(self.by_name('r'+_+'d'), 'r'+_+'w', 0, 16, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
         [ setitem('r'+_+'b', self.child(self.by_name('r'+_+'w'), 'r'+_+'b', 0, 8, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
         [ setitem(    _, self.child(self.by_name('e'+_), _, 0, 16)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
-        [ setitem(_+'h', self.child(self.by_name(_+'x'), _+'h', 8, 8)) for _ in ('a', 'c', 'd', 'b') ]
-        [ setitem(_+'l', self.child(self.by_name(_+'x'), _+'l', 0, 8)) for _ in ('a', 'c', 'd', 'b') ]
-        [ setitem(_+'l', self.child(self.by_name(_), _+'l', 0, 8)) for _ in ('sp', 'bp', 'si', 'di') ]
+        [ setitem(_+'h', self.child(self.by_name(_+'x'), _+'h', 8, 8, idaname=_+'h')) for _ in ('a', 'c', 'd', 'b') ]
+        [ setitem(_+'l', self.child(self.by_name(_+'x'), _+'l', 0, 8, idaname=_+'l')) for _ in ('a', 'c', 'd', 'b') ]
+        [ setitem(_+'l', self.child(self.by_name(_), _+'l', 0, 8, idaname=_+'l')) for _ in ('sp', 'bp', 'si', 'di') ]
         [ setitem(    _, self.new(_, 16)) for _ in ('es', 'cs', 'ss', 'ds', 'fs', 'gs') ]
 
         # FIXME: rex-prefixed 32-bit registers are implicitly extended to the 64-bit regs which implies that 64-bit are children of 32-bit
@@ -88,15 +88,15 @@ class Intel(internal.architecture.architecture_t):
         #       actually lays these out directly under the "eflags" register.
 
         # 16-bit flags
-        setitem('cf', self.child(self.by_name('eflags'), 'cf',  0, 1))
-        setitem('pf', self.child(self.by_name('eflags'), 'pf',  2, 1))
-        setitem('af', self.child(self.by_name('eflags'), 'af',  4, 1))
-        setitem('zf', self.child(self.by_name('eflags'), 'zf',  6, 1))
-        setitem('sf', self.child(self.by_name('eflags'), 'sf',  7, 1))
-        setitem('tf', self.child(self.by_name('eflags'), 'tf',  8, 1))
-        setitem('if', self.child(self.by_name('eflags'), 'if',  9, 1))
-        setitem('df', self.child(self.by_name('eflags'), 'df', 10, 1))
-        setitem('of', self.child(self.by_name('eflags'), 'of', 11, 1))
+        setitem('cf', self.child(self.by_name('eflags'), 'cf',  0, 1, idaname='cf'))
+        setitem('pf', self.child(self.by_name('eflags'), 'pf',  2, 1, idaname='pf'))
+        setitem('af', self.child(self.by_name('eflags'), 'af',  4, 1, idaname='af'))
+        setitem('zf', self.child(self.by_name('eflags'), 'zf',  6, 1, idaname='zf'))
+        setitem('sf', self.child(self.by_name('eflags'), 'sf',  7, 1, idaname='sf'))
+        setitem('tf', self.child(self.by_name('eflags'), 'tf',  8, 1, idaname='tf'))
+        setitem('if', self.child(self.by_name('eflags'), 'if',  9, 1, idaname='if'))
+        setitem('df', self.child(self.by_name('eflags'), 'df', 10, 1, idaname='df'))
+        setitem('of', self.child(self.by_name('eflags'), 'of', 11, 1, idaname='of'))
         setitem('iopl', self.child(self.by_name('eflags'), 'iopl', 12, 2))
         setitem('nt', self.child(self.by_name('eflags'), 'nt', 14, 1))
         setitem('md', self.child(self.by_name('eflags'), 'md', 15, 1))
