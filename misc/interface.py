@@ -5911,6 +5911,49 @@ class tinfo(object):
         return result
 
     @classmethod
+    def update_function_spoiled(cls, info, registers):
+        '''Update the list of spoiled registers in the function prototype `info` with the specified `registers`.'''
+        tinfo, ftd = cls.copy(info), idaapi.func_type_data_t()
+
+        # Spoiled registers only apply to a function prototype, so bail if it isn't.
+        if not tinfo.is_func():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.update_function_spoiled({!r}, {!r}) : The resolved type information \"{:s}\" is not a function and does not contain any arguments.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), registers, internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # If we're unable to get details from the type, then we need to abort.
+        elif not tinfo.has_details():
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.update_function_spoiled({!r}, {!r}) : The resolved type information \"{:s}\" does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), registers, internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # Extract the function details from the type so that we can modify it.
+        ok = tinfo.get_func_details(ftd) or tinfo.get_func_details(ftd, idaapi.GTD_NO_ARGLOCS)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_spoiled({!r}, {!r}) : Unable to retrieve the details from the specified type information \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), registers, internal.utils.string.escape("{!s}".format(tinfo), '"')))
+
+        # Before we do anything, we need to convert the list of registers we were
+        # given into a register index and a size. We support register_t (both),
+        # register names, and tuples of the register index and the size.
+        reginfo = []
+        for reg in registers:
+            identifier, _ = reg if isinstance(reg, tuple) else (reg, reg)
+            if not architecture.has(identifier):
+                logging.warning(u"{:s}.update_function_spoiled({!r}, {!r}) : Skipping unknown register ({!r}) being added to the list of spoiled registers.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), registers, reg))
+                continue
+            realreg = architecture.by(reg)
+            reginfo.append((realreg.id, realreg.size))
+
+        # Now we just need to resize the reginfovec_t and then
+        # we can update it with our list of register entries.
+        ftd.spoiled.resize(len(reginfo))
+        for index, (ridx, rsize) in zip(builtins.range(ftd.size()), reginfo):
+            ftd.spoiled[index].reg = ridx
+            ftd.spoiled[index].size = rsize
+
+        # Now we just need re-create the function using our updated function details.
+        newtype = cls.copy(info)
+        if not newtype.create_func(ftd):
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_spoiled({!r}, {!r}) : Unable to create a function type with the updated details ({:d} spoiled register{:s}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), registers, len(reginfo), '' if len(reginfo) == 1 else 's'))
+        return newtype
+
+    @classmethod
     def function(cls, type):
         '''Return a list containing a tuple for the return type and each argument for the function specified by `type`.'''
         tinfo = type
