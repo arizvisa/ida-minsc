@@ -3605,8 +3605,7 @@ class type(object):
         if tinfo is None:
             _, ea = interface.addressOfRuntimeOrStatic(func)
             raise E.DisassemblerError(u"{:s}.spoiled({:#x}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
-        unique = {register for register in interface.tinfo.function_spoiled(tinfo)}
-        return sorted(unique, key=operator.attrgetter('id'))
+        return [register for register in interface.tinfo.function_spoiled(tinfo)]
     @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     def spoiled(cls, type):
@@ -3614,8 +3613,7 @@ class type(object):
         tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
         if tinfo is None:
             raise E.InvalidTypeOrValueError(u"{:s}.spoiled({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
-        unique = {register for register in interface.tinfo.function_spoiled(tinfo)}
-        return sorted(unique, key=operator.attrgetter('id'))
+        return [register for register in interface.tinfo.function_spoiled(tinfo)]
     spoils = utils.alias(spoiled, 'type')
 
     class result(object):
