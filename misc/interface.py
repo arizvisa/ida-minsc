@@ -3369,6 +3369,39 @@ class address(object):
             fids = [integer for integer in ctypes.cast(ctypes.c_void_p(address), parray_t).contents]
         return cd.dtid, fids
 
+    # XXX: the following function should really have been deprecated some time ago...
+    #      unfortunately, it is still here because of the <M-up> and <M-down> hotkeys
+    #      in the disassembler. Once we start precalculating things for code flow,
+    #      then we can do something different when inside a function. however, if we
+    #      are outside a function without references, this is the best that we can do.
+
+    @classmethod
+    def scan_register(cls, start, stop, registers, predicate=None, *count, **modifiers):
+        '''Scan for the specified `registers` from the address `start` through `stop` while `predicate` returns true.'''
+        start, stop, utils, registers = int(start), int(stop), internal.utils, [register for register in registers]
+        Fwhile = functools.partial(operator.gt if start <= stop else operator.le, stop)
+
+        # gather our predicates that we will use for the actual matching.
+        Fmatches_register = utils.fcompose(regmatch(*registers, **modifiers), bool)
+        Fmatches = utils.fcompose(utils.fthrough(Fmatches_register, predicate), all) if callable(predicate) else Fmatches_register
+
+        # figure out which functions to use for moving in the desired
+        # direction, and grab the result number out of the parameter.
+        Fnext = idaapi.next_not_tail if start <= stop else idaapi.prev_not_tail
+        [count] = count if count else [1]
+
+        # build our generators that we will use for scanning the range of addresses.
+        iterable_with_flags = ((ea, cls.flags(ea, idaapi.MS_CLS)) for ea in cls.iterate(start, Fnext) if Fwhile(ea))
+        iterable = (ea for ea, flags in iterable_with_flags if flags == idaapi.FF_CODE and Fmatches(ea))
+
+        # now grab all matching addresses up to the specified count. if we didn't
+        # retrieve enough items, then we seeked past the sentinel value and bail.
+        result = [ea for index, ea in zip(builtins.range(count), iterable)]
+        if count and len(result) < count:
+            register_description = u', '.join("{!s}".format(register) for register in registers)
+            raise internal.exceptions.RegisterNotFoundError(u"{:s}.scan_register({:#x}, {:#x}, {:s}, {!s}, {:d}{:s}) : Unable to find address{:s} matching the requested register{:s} within the range {:#x}..{:#x}. Stopped at last matching address ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, "[{:s}]".format(register_description), utils.pycompat.fullname(predicate) if callable(predicate) else predicate, count, ", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '', " #{:d}".format(count) if count else '', '' if len(registers) == 1 else 's', start, stop, result[-1] if result else start))
+        return result[-1] if result else start
+
 class range(object):
     """
     This namespace provides tools that assist with interacting with IDA 6.x's
