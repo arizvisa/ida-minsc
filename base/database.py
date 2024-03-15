@@ -3621,109 +3621,119 @@ class address(object):
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.nextref(ea, Fcref, count=count)
 
-    @utils.multicase(reg=(internal.types.string, interface.register_t))
+    @utils.multicase()
     @classmethod
-    def prevreg(cls, reg, *regs, **modifiers):
-        '''Return the previous address containing an instruction that uses `reg` or any one of the specified `regs`.'''
-        return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
-    @utils.multicase(predicate=internal.types.callable, reg=(internal.types.string, interface.register_t))
+    def prevreg(cls, **modifiers):
+        '''Return the previous address containing an instruction that matches the specified `modifiers`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, [], modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(registers=(internal.types.string, interface.register_t))
     @classmethod
-    def prevreg(cls, predicate, reg, *regs, **modifiers):
-        '''Return the previous address containing an instruction that uses `reg` or any one of the specified `regs` and satisfies the provided `predicate`.'''
-        return cls.prevreg(ui.current.address(), predicate, reg, *regs, **modifiers)
-    @utils.multicase(ea=internal.types.integer, reg=(internal.types.string, interface.register_t))
+    def prevreg(cls, *registers, **modifiers):
+        '''Return the previous address containing an instruction that uses the specified `registers`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, registers, modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(predicate=internal.types.callable)
     @classmethod
-    def prevreg(cls, ea, reg, *regs, **modifiers):
-        '''Return the previous address from the address `ea` containing an instruction that uses `reg` or any one of the specified `regs`.'''
-        return cls.prevreg(ea, modifiers.pop('predicate', utils.fconstant(True)), reg, *regs, **modifiers)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, reg=(internal.types.string, interface.register_t))
+    def prevreg(cls, predicate, **modifiers):
+        '''Return the previous address containing an instruction that matches the specified `modifiers` and satisfies the given `predicate`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, [], predicate, *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(predicate=internal.types.callable, registers=(internal.types.string, interface.register_t))
     @classmethod
-    def prevreg(cls, ea, predicate, reg, *regs, **modifiers):
-        '''Return the previous address from the address `ea` containing an instruction that uses `reg` or any one of the specified `regs` and satisfies the provided `predicate`.'''
-        regs = (reg,) + regs
-        count = modifiers.get('count', 1)
-        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(str(reg), '"')) for reg in regs])
-        args = args + (u", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '')
-
-        # if we are within a function, then make sure we find a code type within
-        # the chunk's bounds. thus we'll stop at the very top of the chunk.
-        if interface.function.has(ea):
-            start = interface.range.start(interface.function.chunk(interface.function.by_address(ea), ea))
-            fwithin = utils.fcompose(utils.fmap(functools.partial(operator.le, start), type.code), builtins.all)
-
-        # otherwise ensure that we find a code type that is not in the function,
-        # which means that we'll stop at the very top of the database.
-        else:
-            fwithin = utils.fcompose(utils.fmap(utils.fcompose(interface.function.has, operator.not_), type.code), builtins.all)
-            iterable = (item for item in interface.address.iterate(ea, idaapi.prev_not_tail) if not fwithin(ui.navigation.analyze(item)))
-            res = builtins.next(iterable, None)
-            start = top() if res is None else idaapi.get_item_end(res)
-
-        # define a predicate for checking whether an address uses the desired registers.
-        matches = interface.regmatch(*regs, **modifiers)
-        has_regmatch = utils.fcompose(matches, internal.types.bool)
-        F = utils.fcompose(utils.fmap(has_regmatch, predicate), builtins.all)
-
-        # now grab all addresses where any of our registers match using the count.
-        iterable = (item for item in interface.address.iterate(ea, idaapi.prev_not_tail) if item >= start and type.code(ui.navigation.analyze(item)) and F(item))
-        items = [item for index, item in zip(builtins.range(count), iterable)]
-
-        # if we didn't retrieve enough items, then we seeked past the top of the chunk.
-        if count and len(items) < count:
-            raise E.RegisterNotFoundError(u"{:s}.prevreg({:s}) : Unable to find register{:s} within the chunk {:#x}..{:#x}. Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), args, '' if len(regs) == 1 else 's', start, ea - 1, items[-1] if items else ea))
-        return items[-1] if items else ea
-
-    @utils.multicase(reg=(internal.types.string, interface.register_t))
+    def prevreg(cls, predicate, *registers, **modifiers):
+        '''Return the previous address containing an instruction that uses any of the specified `registers` and satisfies the given `predicate`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, registers, predicate, *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def nextreg(cls, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that uses `reg` or any one of the specified `regs`.'''
-        return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
-    @utils.multicase(predicate=internal.types.callable, reg=(internal.types.string, interface.register_t))
+    def prevreg(cls, ea, **modifiers):
+        '''Return the previous address from the address `ea` containing an instruction that matches the specified `modifiers`.'''
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, [], modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer, registers=(internal.types.string, interface.register_t))
     @classmethod
-    def nextreg(cls, predicate, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction uses `reg` or any one of the specified `regs` and satisfies the provided `predicate`.'''
-        return cls.nextreg(ui.current.address(), predicate, reg, *regs, **modifiers)
-    @utils.multicase(ea=internal.types.integer, reg=(internal.types.string, interface.register_t))
+    def prevreg(cls, ea, *registers, **modifiers):
+        '''Return the previous address from the address `ea` containing an instruction that uses any of the specified `registers`.'''
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, registers, modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
     @classmethod
-    def nextreg(cls, ea, reg, *regs, **modifiers):
-        '''Return the next address from the address `ea` containing an instruction that uses `reg` or any one of the specified `regs`.'''
-        return cls.nextreg(ea, modifiers.pop('predicate', utils.fconstant(True)), reg, *regs, **modifiers)
-    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, reg=(internal.types.string, interface.register_t))
+    def prevreg(cls, ea, predicate, **modifiers):
+        '''Return the previous address from the address `ea` containing an instruction that matches the specified `modifiers` and satisfies the given `predicate`.'''
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, [], predicate, *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, registers=(internal.types.string, interface.register_t))
     @classmethod
-    def nextreg(cls, ea, predicate, reg, *regs, **modifiers):
-        '''Return the next address from the address `ea` containing an instruction that uses `reg` or any one of the specified `regs` and satisfies the provided `predicate`.'''
-        regs = (reg,) + regs
-        count = modifiers.get('count', 1)
-        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(str(reg), '"')) for reg in regs])
-        args = args + (u", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '')
+    def prevreg(cls, ea, predicate, *registers, **modifiers):
+        '''Return the previous address from the address `ea` containing an instruction that uses any of the specified `registers` and satisfies the given `predicate`.'''
+        count = [modifiers.pop('count')] if 'count' in modifiers else []
 
-        # if we are within a function, then make sure we find a code type within
-        # the chunk's bounds. thus we'll stop at the very end of the chunk.
-        if interface.function.has(ea):
-            end = interface.range.end(interface.function.chunk(interface.function.by_address(ea), ea))
-            fwithin = utils.fcompose(utils.fmap(functools.partial(operator.gt, end), type.code), builtins.all)
+        # grab the boundaries of the current function or the entire database.
+        # from this result, we can grab the top address to stop scanning at.
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, registers, predicate, *count, **modifiers)
 
-        # otherwise ensure that we find a code type that is not in the function,
-        # which means that we'll stop at the very bottom of the database.
-        else:
-            fwithin = utils.fcompose(utils.fmap(utils.fcompose(interface.function.has, operator.not_), type.code), builtins.all)
-            iterable = (item for item in interface.address.iterate(ea, idaapi.next_not_tail) if not fwithin(ui.navigation.analyze(item)))
-            res = builtins.next(iterable, None)
-            end = bottom() if res is None else idaapi.get_item_head(res)
+    @utils.multicase()
+    @classmethod
+    def nextreg(cls, **modifiers):
+        '''Return the next address containing an instruction that matches the specified `modifiers`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, [], modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def nextreg(cls, *registers, **modifiers):
+        '''Return the next address containing an instruction that uses the specified `registers`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, registers, modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(predicate=internal.types.callable)
+    @classmethod
+    def nextreg(cls, predicate, **modifiers):
+        '''Return the next address containing an instruction matches the specified `modifiers` and satisfies the given `predicate`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, [], predicate, *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(predicate=internal.types.callable, registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def nextreg(cls, predicate, *registers, **modifiers):
+        '''Return the next address containing an instruction uses the specified `registers` and satisfies the given `predicate`.'''
+        ea = ui.current.address()
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, registers, predicate, *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def nextreg(cls, ea, **modifiers):
+        '''Return the next address from the address `ea` containing an instruction that matches the specified `modifiers`.'''
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, [], modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer, registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def nextreg(cls, ea, *registers, **modifiers):
+        '''Return the next address from the address `ea` containing an instruction that uses the specified `registers`.'''
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, registers, modifiers.pop('predicate', None), *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
+    @classmethod
+    def nextreg(cls, ea, predicate, **modifiers):
+        '''Return the next address from the address `ea` containing an instruction that matches the specified `modifiers` and satisfies the given `predicate`.'''
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, bottom, [], predicate, *[modifiers.pop('count')] if 'count' in modifiers else [], **modifiers)
+    @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable, registers=(internal.types.string, interface.register_t))
+    @classmethod
+    def nextreg(cls, ea, predicate, *registers, **modifiers):
+        '''Return the next address from the address `ea` containing an instruction that uses the specified `registers` and satisfies the given `predicate`.'''
+        count = [modifiers.pop('count')] if 'count' in modifiers else []
 
-        # define a predicate for checking whether an address uses the desired registers.
-        matches = interface.regmatch(*regs, **modifiers)
-        has_regmatch = utils.fcompose(matches, internal.types.bool)
-        F = utils.fcompose(utils.fmap(has_regmatch, predicate), builtins.all)
-
-        # now grab all addresses where any of our registers match using the count.
-        iterable = (item for item in interface.address.iterate(ea, idaapi.next_not_tail) if item < end and type.code(ui.navigation.analyze(item)) and F(item))
-        items = [item for index, item in zip(builtins.range(count), iterable)]
-
-        # if we didn't retrieve enough items, then we seeked past the top of the chunk.
-        if count and len(items) < count:
-            raise E.RegisterNotFoundError(u"{:s}.nextreg({:s}) : Unable to find register{:s} within the chunk {:#x}..{:#x}. Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), args, '' if len(regs) == 1 else 's', ea, end - 1, items[-1] if items else ea))
-        return items[-1] if items else ea
+        # grab the boundaries of the current function or the entire database.
+        # from this result, we can grab the bottom address to stop scanning at.
+        top, bottom = interface.range.unpack(interface.function.chunk(interface.function.by_address(ea), ea)) if interface.function.has else interface.address.bounds()
+        return interface.address.scan_register(ea, top, registers, predicate, *count, **modifiers)
 
     # FIXME: these two functions, prevstack and nextstack, should be deprecated as they're really not
     #        useful for anything and their performance sucks. the only reason why they're not deprecated
