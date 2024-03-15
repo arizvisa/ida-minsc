@@ -7143,8 +7143,9 @@ class regmatch(object):
         has_read, has_write, has_modify, has_execute = (modifiers_used & args for args in [read_args, write_args, modify_args, execute_args])
         read, write, modify, execute = (next((modifiers[item] for item in args if item in modifiers), None) for args in [read_args, write_args, modify_args, execute_args])
 
-        # detecting loads and stores requires us to know whether we need to
-        # constrain the operand group. so, we split this up from the registers.
+        # if we're being asked to filter for a memory operand, then we need to
+        # ensure that there is always a condition. this also changes the default
+        # operand group that read/write/modify uses. so we update that at the end.
         F, conditions = None, []
         if has_memory:
             Fload = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_memory__), Fneeds_access('r', 'r')), all)
@@ -7156,52 +7157,29 @@ class regmatch(object):
             conditions.append(F) if has_store else conditions
 
             # we need to ensure that memory operands are included in our conditions.
-            registers_or_memory = cls.__operands_register__ | cls.__operands_memory__
-            if has_read and read:
-                F = utils.fcompose(utils.fthrough(Fuses_group(registers_or_memory), Fneeds_access('r', 'r')), all)
-            elif has_read:
-                F = utils.fnot(Fneeds_access('r', 'r'))
-            conditions.append(F) if has_read else conditions
-
-            if has_write and write:
-                F = utils.fcompose(utils.fthrough(Fuses_group(registers_or_memory), Fneeds_access('w', 'w')), all)
-            elif has_write:
-                F = utils.fnot(Fneeds_access('w', 'w'))
-            conditions.append(F) if has_write else conditions
-
-            if has_modify and modify:
-                F = utils.fcompose(utils.fthrough(Fuses_group(registers_or_memory), Fneeds_access('rw', 'rw')), all)
-            else:
-                F = utils.fnot(Fneeds_access('rw', 'rw'))
-            conditions.append(F) if has_modify else conditions
-
-            # the execute bit requires us to constrain to branch operands.
-            if has_execute and execute:
-                F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_branch__), Fneeds_access('x', 'x')), all)
-            elif has_execute:
-                F = utils.fnot(Fneeds_access('x', ''))
-            conditions.append(F) if has_execute else conditions
-
-            # now we can just return any operand where all of our conditions match.
-            Fconditions = utils.fcompose(utils.fthrough(*conditions), all)
-            return internal.utils.fcompose(instruction.access, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(sorted, key=operator.attrgetter('opnum')))
+            default_operand_group = cls.__operands_register__ | cls.__operands_memory__
 
         # if no loads/stores were specified, then we can use the "registers" operand
         # group for everything except for the executable modifier which uses branches.
+        else:
+            default_operand_group = cls.__operands_register__
+
+        # now we can do the regular bits: read, write, modify, execute, etc.
+        # FIXME: we should probably consolidate each operand group condition.
         if has_read and read:
-            F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_register__), Fneeds_access('r', 'r')), all)
+            F = utils.fcompose(utils.fthrough(Fuses_group(default_operand_group), Fneeds_access('r', 'r')), all)
         elif has_read:
             F = utils.fnot(Fneeds_access('r', 'r'))
         conditions.append(F) if has_read else conditions
 
         if has_write and write:
-            F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_register__), Fneeds_access('w', 'w')), all)
+            F = utils.fcompose(utils.fthrough(Fuses_group(default_operand_group), Fneeds_access('w', 'w')), all)
         elif has_write:
             F = utils.fnot(Fneeds_access('w', 'w'))
         conditions.append(F) if has_write else conditions
 
         if has_modify and modify:
-            F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_register__), Fneeds_access('rw', 'rw')), all)
+            F = utils.fcompose(utils.fthrough(Fuses_group(default_operand_group), Fneeds_access('rw', 'rw')), all)
         elif has_modify:
             F = utils.fnot(Fneeds_access('rw', 'rw'))
         conditions.append(F) if has_modify else conditions
