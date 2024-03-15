@@ -7102,47 +7102,119 @@ class regmatch(object):
             return operand_uses_register(ref, *args) if args else operand_uses_register(*ref)
         return uses_register
 
+    # Operand groups for the different modifiers that may be specified.
+    # FIXME: These are processor-specific and belong in the architecture module.
+    __operands_all__ = {op for op in builtins.range(idaapi.o_void + 1, 0x20)}
+    __operands_register__ = {
+        idaapi.o_reg, idaapi.o_phrase, idaapi.o_displ, idaapi.o_mem} | {
+        idaapi.o_idpspec0, idaapi.o_idpspec1, idaapi.o_idpspec2,
+        idaapi.o_idpspec3, idaapi.o_idpspec4, idaapi.o_idpspec5,
+        idaapi.o_idpspec5 + 1, idaapi.o_idpspec5 + 2
+    }
+    __operands_memory__ = {idaapi.o_mem, idaapi.o_displ, idaapi.o_phrase}
+    __operands_branch__ = {idaapi.o_near, idaapi.o_far, idaapi.o_mem}
+
     @classmethod
     def modifier(cls, **modifiers):
         '''Return a closure that filters the operands references for an address using any of the specified `modifiers`.'''
-        conditions = []
+        utils = internal.utils
 
-        # now we can figure out the required conditions to confirm the operand access
-        includes = lambda access: lambda ref: access in ref.access
-        excludes = lambda access: lambda ref: access not in ref.access
+        # define a few closures that we can use for filtering access and operand groups
+        Fneeds_access = lambda mask, flags: utils.fcompose(operator.itemgetter(-1), internal.types.set, functools.partial(operator.and_, {flag for flag in mask}), lambda available: [flag in available for flag in mask], all)
+        Fuses_group = lambda group: utils.fcompose(operator.itemgetter(slice(None, -1)), utils.funpack(instruction.operand), operator.attrgetter('type'), functools.partial(operator.contains, group))
 
-        # if `read` is specified, then only grab operand indexes that are read from
-        read_args = ['read', 'r']
-        if any(item in modifiers for item in read_args):
-            read = next(modifiers[item] for item in read_args if item in modifiers)
-            conditions.append(includes('r') if read else excludes('r'))
+        # define all of the available modifier parameters
+        load_args, store_args = {'load', 'loaded'}, {'store', 'stored'}
 
-        # if `write` is specified that only grab operand indexes that are written to
-        write_args = ['written', 'write', 'w']
-        if any(item in modifiers for item in write_args):
-            write = next(modifiers[item] for item in write_args if item in modifiers)
-            conditions.append(includes('w') if write else excludes('w'))
+        read_args = {'read', 'r'}
+        write_args = {'written', 'write', 'w'}
+        modify_args = {'modify', 'modified', 'changed', 'readwrite', 'rw'}
+        execute_args = {'executed', 'execute', 'exec', 'x'}
 
-        # if `execute` is specified that only grab operand indexes that are executed
-        execute_args = ['executed', 'execute', 'exec', 'x']
-        if any(item in modifiers for item in execute_args):
-            execute = next(modifiers[item] for item in execute_args if item in modifiers)
-            conditions.append(includes('x') if execute else excludes('x'))
+        # start by reading all of the modifiers from the parameters.
+        modifiers_used = {modifier for modifier in modifiers}
 
-        # if `readwrite` is specified that only grab operand indexes that are modified
-        readwrite_args = ['modify', 'modified', 'changed', 'readwrite', 'rw']
-        if any(item in modifiers for item in readwrite_args):
-            write = next(modifiers[item] for item in readwrite_args if item in modifiers)
-            conditions.append(includes('rw') if write else excludes('rw'))
+        has_load = modifiers_used & load_args
+        load = next((modifiers[item] for item in load_args if item in modifiers), None) if modifiers_used & load_args else None
+        has_store = modifiers_used & store_args
+        store = next((modifiers[item] for item in store_args if item in modifiers), None) if modifiers_used & store_args else None
+        has_memory = modifiers_used & (load_args | store_args)
 
-        # if `readexecute` is specified that only grab operand indexes that are loaded before being used to execute
-        execute_args = ['readexecute', 'readexec', 'rx']
-        if any(item in modifiers for item in execute_args):
-            execute = next(modifiers[item] for item in execute_args if item in modifiers)
-            conditions.append(includes('rx') if execute else excludes('rx'))
+        has_read, has_write, has_modify, has_execute = (modifiers_used & args for args in [read_args, write_args, modify_args, execute_args])
+        read, write, modify, execute = (next((modifiers[item] for item in args if item in modifiers), None) for args in [read_args, write_args, modify_args, execute_args])
 
-        # now we just need to stack our conditions and enumerate the operands while only yielding their index.
-        Fconditions = internal.utils.fcompose(internal.utils.fthrough(*conditions), any) if conditions else internal.utils.fconstant(True)
+        # detecting loads and stores requires us to know whether we need to
+        # constrain the operand group. so, we split this up from the registers.
+        F, conditions = None, []
+        if has_memory:
+            Fload = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_memory__), Fneeds_access('r', 'r')), all)
+            F = Fload if load else utils.fnot(Fload)
+            conditions.append(F) if has_load else conditions
+
+            Fstore = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_memory__), Fneeds_access('w', 'w')), all)
+            F = Fstore if store else utils.fnot(Fstore)
+            conditions.append(F) if has_store else conditions
+
+            # we need to ensure that memory operands are included in our conditions.
+            registers_or_memory = cls.__operands_register__ | cls.__operands_memory__
+            if has_read and read:
+                F = utils.fcompose(utils.fthrough(Fuses_group(registers_or_memory), Fneeds_access('r', 'r')), all)
+            elif has_read:
+                F = utils.fnot(Fneeds_access('r', 'r'))
+            conditions.append(F) if has_read else conditions
+
+            if has_write and write:
+                F = utils.fcompose(utils.fthrough(Fuses_group(registers_or_memory), Fneeds_access('w', 'w')), all)
+            elif has_write:
+                F = utils.fnot(Fneeds_access('w', 'w'))
+            conditions.append(F) if has_write else conditions
+
+            if has_modify and modify:
+                F = utils.fcompose(utils.fthrough(Fuses_group(registers_or_memory), Fneeds_access('rw', 'rw')), all)
+            else:
+                F = utils.fnot(Fneeds_access('rw', 'rw'))
+            conditions.append(F) if has_modify else conditions
+
+            # the execute bit requires us to constrain to branch operands.
+            if has_execute and execute:
+                F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_branch__), Fneeds_access('x', 'x')), all)
+            elif has_execute:
+                F = utils.fnot(Fneeds_access('x', ''))
+            conditions.append(F) if has_execute else conditions
+
+            # now we can just return any operand where all of our conditions match.
+            Fconditions = utils.fcompose(utils.fthrough(*conditions), all)
+            return internal.utils.fcompose(instruction.access, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(sorted, key=operator.attrgetter('opnum')))
+
+        # if no loads/stores were specified, then we can use the "registers" operand
+        # group for everything except for the executable modifier which uses branches.
+        if has_read and read:
+            F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_register__), Fneeds_access('r', 'r')), all)
+        elif has_read:
+            F = utils.fnot(Fneeds_access('r', 'r'))
+        conditions.append(F) if has_read else conditions
+
+        if has_write and write:
+            F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_register__), Fneeds_access('w', 'w')), all)
+        elif has_write:
+            F = utils.fnot(Fneeds_access('w', 'w'))
+        conditions.append(F) if has_write else conditions
+
+        if has_modify and modify:
+            F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_register__), Fneeds_access('rw', 'rw')), all)
+        elif has_modify:
+            F = utils.fnot(Fneeds_access('rw', 'rw'))
+        conditions.append(F) if has_modify else conditions
+
+        # the execute bit only matters for branch operands.
+        if has_execute and execute:
+            F = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_branch__), Fneeds_access('x', 'x')), all)
+        elif has_execute:
+            F = utils.fnot(Fneeds_access('x', ''))
+        conditions.append(F) if has_execute else conditions
+
+        # if we couldn't determine any conditions, then we constrain to the register group.
+        Fconditions = utils.fcompose(utils.fthrough(*conditions), all) if conditions else Fuses_group(cls.__operands_register__)
         return internal.utils.fcompose(instruction.access, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(sorted, key=operator.attrgetter('opnum')))
 
 ## figure out the boundaries of sval_t
