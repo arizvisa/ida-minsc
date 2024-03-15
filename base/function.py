@@ -3367,17 +3367,32 @@ class type(object):
     @utils.multicase()
     @classmethod
     def leave(cls):
-        '''Return if the current function returns.'''
-        return cls.leave(ui.current.function())
+        '''Return whether the function at the current address returns to its caller.'''
+        return cls.leave(ui.current.address())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def leave(cls, func):
-        '''Return if the function `func` returns.'''
+        '''Return whether the function `func` returns to its caller.'''
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        if rt:
+            return False if interface.node.aflags(ea, idaapi.AFL_NORET) else True
+
         fn = interface.function.by(func)
-        if fn.flags & idaapi.FUNC_NORET_PENDING == idaapi.FUNC_NORET_PENDING:
-            logging.warning(u"{:s}.leave({:s}) : Analysis for function return is still pending due to the `{:s}` flag being set.".format('.'.join([__name__, cls.__name__]), ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func), '.'.join(['idaapi', 'FUNC_NORET_PENDING'])))
-        return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
-    has_return = returns = utils.alias(leave, 'type')
+        if interface.function.flags(fn, idaapi.FUNC_NORET_PENDING) == idaapi.FUNC_NORET_PENDING:
+            logging.warning(u"{:s}.leave({:s}) : The analysis for the current function being returned is still pending due to the `{:s}({:#x})` flag being set.".format('.'.join([__name__, cls.__name__]), ea, 'FUNC_NORET_PENDING', idaapi.FUNC_NORET_PENDING))
+        return not interface.function.flags(fn, idaapi.FUNC_NORET)
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def leave(cls, func, boolean):
+        '''Update the flags for the function `func` to specify whether it returns to its caller depending on `boolean`.'''
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        if rt:
+            result = interface.node.aflags(ea, idaapi.AFL_NORET, 0 if boolean else -1)
+        else:
+            fn = interface.function.by(func)
+            result = interface.function.flags(fn, idaapi.FUNC_NORET, 0 if boolean else -1)
+        return False if result else True
+    has_return = returns = leaves = utils.alias(leave, 'type')
 
     @utils.multicase()
     @classmethod
