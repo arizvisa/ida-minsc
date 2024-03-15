@@ -7154,14 +7154,6 @@ else:
     sval_t = ctypes.c_int
     logging.fatal(u"{:s} : Unable to determine size of idaapi.BADADDR in order to determine boundaries of sval_t. Setting default size to {:d}-bits. The value of idaapi.BADADDR is {!r}.".format(__name__, ctypes.sizeof(sval_t), idaapi.BADADDR))
 
-#Ref_Types = {
-#    0 : 'Data_Unknown', 1 : 'Data_Offset',
-#    2 : 'Data_Write', 3 : 'Data_Read', 4 : 'Data_Text',
-#    5  : 'Data_Informational',
-#    16 : 'Code_Far_Call', 17 : 'Code_Near_Call',
-#    18 : 'Code_Far_Jump', 19 : 'Code_Near_Jump',
-#    20 : 'Code_User', 21 : 'Ordinary_Flow'
-#}
 class reftype_t(object):
     """
     An object representing a reference type that allows one to easily extract
