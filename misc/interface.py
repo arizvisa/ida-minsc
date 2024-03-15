@@ -7143,9 +7143,10 @@ class regmatch(object):
         has_read, has_write, has_modify, has_execute = (modifiers_used & args for args in [read_args, write_args, modify_args, execute_args])
         read, write, modify, execute = (next((modifiers[item] for item in args if item in modifiers), None) for args in [read_args, write_args, modify_args, execute_args])
 
-        # if we're being asked to filter for a memory operand, then we need to
-        # ensure that there is always a condition. this also changes the default
-        # operand group that read/write/modify uses. so we update that at the end.
+        # if we're being asked to filter for a memory operand, then we need
+        # to always test the memory operands and ensure there is at least one
+        # condition. this also affects the operand group that read/write/modify
+        # uses. so, for them to work, we make sure to update that at the end.
         F, conditions = None, []
         if has_memory:
             Fload = utils.fcompose(utils.fthrough(Fuses_group(cls.__operands_memory__), Fneeds_access('r', 'r')), all)
@@ -7156,7 +7157,7 @@ class regmatch(object):
             F = Fstore if store else utils.fnot(Fstore)
             conditions.append(F) if has_store else conditions
 
-            # we need to ensure that memory operands are included in our conditions.
+            # we need to ensure that memory operands are explicitly tested for.
             default_operand_group = cls.__operands_register__ | cls.__operands_memory__
 
         # if no loads/stores were specified, then we can use the "registers" operand
@@ -7164,25 +7165,15 @@ class regmatch(object):
         else:
             default_operand_group = cls.__operands_register__
 
-        # now we can do the regular bits: read, write, modify, execute, etc.
-        # FIXME: we should probably consolidate each operand group condition.
-        if has_read and read:
-            F = utils.fcompose(utils.fthrough(Fuses_group(default_operand_group), Fneeds_access('r', 'r')), all)
-        elif has_read:
-            F = utils.fnot(Fneeds_access('r', 'r'))
-        conditions.append(F) if has_read else conditions
-
-        if has_write and write:
-            F = utils.fcompose(utils.fthrough(Fuses_group(default_operand_group), Fneeds_access('w', 'w')), all)
-        elif has_write:
-            F = utils.fnot(Fneeds_access('w', 'w'))
-        conditions.append(F) if has_write else conditions
-
-        if has_modify and modify:
-            F = utils.fcompose(utils.fthrough(Fuses_group(default_operand_group), Fneeds_access('rw', 'rw')), all)
-        elif has_modify:
-            F = utils.fnot(Fneeds_access('rw', 'rw'))
-        conditions.append(F) if has_modify else conditions
+        # now we can do the regular bits using the determined operand group.
+        # FIXME: we should probably pull out the operand group conditon, since it
+        #        only needs to happen once if any of the "has_*" variables are set.
+        for has, needs, bits in zip([has_read, has_write, has_modify], [read, write, modify], ['r', 'w', 'rw']):
+            if has and needs:
+                F = utils.fcompose(utils.fthrough(Fuses_group(default_operand_group), Fneeds_access(bits, bits)), all)
+            elif has:
+                F = utils.fnot(Fneeds_access(bits, bits))
+            conditions.append(F) if has else conditions
 
         # the execute bit only matters for branch operands.
         if has_execute and execute:
