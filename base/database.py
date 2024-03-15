@@ -1792,6 +1792,7 @@ class exports(object):
         `less` or `le` - Filter the entrypoints for any before the specified address (inclusive)
         `lt` - Filter the entrypoints for any before the specified address (exclusive)
         `function` - Filter the entrypoints for any that are referencing a function
+        `lumina` - Filter the entrypoints that have been detected by Lumina
         `convention` or `cc` - Filter the entrypoints for any that are using the specified calling convention(s)
         `entrypoint` or `entry` - Filter the entrypoints for any that are not exports with an ordinal
         `export` - Filter the entrypoints for any that are exports with an ordinal
@@ -1823,6 +1824,7 @@ class exports(object):
     __matcher__.alias('decorated', 'mangled')
     __matcher__.mapping('function', interface.function.has, operator.itemgetter(1))
     __matcher__.mapping('typed', operator.truth, operator.itemgetter(1), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
+    __matcher__.mapping('lumina', operator.truth, operator.itemgetter(1), utils.fcondition(interface.function.has)(utils.fcompose(interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000))), utils.fconstant(False)))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.alias('tag', 'tagged')
     __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.comment.contents.name(ea) if interface.function.has(ea) else internal.tags.address.get(ea).keys(), internal.types.set)
