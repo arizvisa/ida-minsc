@@ -4526,6 +4526,25 @@ class type(object):
 
     args = parameters = arguments
 
+    @utils.multicase()
+    @classmethod
+    def lumina(cls):
+        '''Return whether the current function was identified by Lumina.'''
+        return cls.lumina(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def lumina(cls, func):
+        '''Return whether the function `func` was identified by Lumina.'''
+        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
+        fn = ok and interface.function.by(func)
+        return True if ok and interface.function.flags(fn, getattr(idaapi, 'FUNC_LUMINA', 0)) else False
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def lumina(cls, func, boolean):
+        '''Modify the attributes of the function `func` to set it as a function identified by Lumina depending on the value of `boolean`.'''
+        FUNC_LUMINA = getattr(idaapi, 'FUNC_LUMINA', 0)
+        return cls.flags(func, FUNC_LUMINA, -1 if boolean else 0) == FUNC_LUMINA
+
 t = type # XXX: ns alias
 prototype = utils.alias(type, 'type')
 convention = cc = utils.alias(type.convention, 'type')
