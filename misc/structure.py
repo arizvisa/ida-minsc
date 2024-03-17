@@ -1649,59 +1649,159 @@ class members(object):
     def remove_bounds(cls, sptr, start, stop, *offset):
         '''Remove the members from the offset `start` to `stop` from the structure or union identified by `sptr`.'''
         sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
-        [base] = map(int, offset) if offset else [0]
-        start, stop = map(int, [start, stop])
+        start, stop, size = map(int, [start, stop, idaapi.get_struc_size(sptr)])
 
-        # Start out by collecting the members that overlap with the segment
-        # we were given. This is so we can return the removed members when we
-        # leave. We also keep track of the indices for the boundary members.
-        result, lindex, rindex = [], sptr.memqty, 0
-        for mowner, mindex, mptr in cls.overlaps(sptr, start - base, stop - base):
-            packed = member.packed(base, mptr)
+        # If the structure is a frame, then there's certain members
+        # that we shouldn't delete because it will break the frame.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
+        specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
+
+        # Use the same base the disassembler would use if we weren't given one.
+        if offset:
+            [base] = map(int, offset)
+        elif fn and sptr.props & idaapi.SF_FRAME:
+            base = interface.function.frame_disassembler_offset(fn)
+        else:
+            base = 0
+
+        # Start out by collecting the members that reside within the segment we were
+        # given. This is so we can return the removed members when we leave. We also
+        # keep track of the indices so that we can figure out later what was removed.
+        selected, lindex, rindex, members, references = [], sptr.memqty, 0, {}, {}
+        for mowner, mindex, mptr in cls.at_bounds(sptr, start - base, stop - base):
             lindex, rindex = min(mindex, lindex), max(mindex, rindex)
-            result.append(packed)
 
-        # Now we can use the boundary indices to figure out the exact boundaries to delete with
-        # the disassembler. We preserve the count so that we can complain about it if we failed.
-        mleft = sptr.members[lindex].soff if lindex < sptr.memqty else idaapi.get_struc_size(sptr)
-        mright = sptr.members[rindex].eoff if rindex < sptr.memqty else idaapi.get_struc_size(sptr)
+            # Now we can gather the references for the member keyed by their
+            # address so that we know which addresses will need to be updated.
+            if mptr.id not in specials:
+                [references.setdefault(ea, []).append(mptr.id) for ea, _, _ in interface.xref.to(mptr.id, idaapi.XREF_ALL)]
 
-        # The reason why we are using exact member boundaries is to avoid having to manually clamp
-        # `start` and `stop`. With this, we can avoid invalid values being passed to the disassembler.
-        soff, eoff = 0 if mleft.flag & idaapi.MF_UNIMEM else mleft.soff, mright.eoff
-        count = idaapi.del_struc_members(sptr, soff, eoff)
+            # Afterwards, as long as it's not a special member, we can add it.
+            if mptr.id not in specials:
+                members[mptr.soff] = member.packed(base, mptr)
+                selected.append((mptr.soff, mptr))
+            continue
+
+        # If the structure is not a union, the deletion of elements will shift
+        # over every member after the boundaries we were given. So we need to
+        # collect references for those members too since they will be affected.
+        if not union(sptr):
+            for mowner, mindex, mptr in cls.iterate(sptr, slice(rindex, None)):
+                for ea, _, _ in interface.xref.to(mptr.id, idaapi.XREF_ALL):
+                    references.setdefault(ea, []).append(mptr.id)
+                continue
+
+            # Now we can use the indices to figure out the exact boundaries to
+            # delete with the disassembler. This also avoids invalid values being
+            # passed to the disassembler api. After deleting this range, we preserve
+            # the count so that we can complain about it later in case if we failed.
+            mleft = sptr.members[lindex] if lindex < sptr.memqty else None
+            soff = 0 if mleft and mleft.flag & idaapi.MF_UNIMEM else mleft.soff if mleft else size
+            eoff = sptr.members[rindex].eoff if rindex < sptr.memqty else size
+
+            # We now need the indices to remove, but in reverse. This way we can
+            # avoid having to do any calcuations for the members that have shifted.
+            indices = [mindex for mindex in builtins.range(*slice(lindex, rindex + 1).indices(sptr.memqty))][::-1]
+            iterable = (sptr.members[mindex] for mindex in indices)
+            listable = [(mptr.id, utils.string.of(idaapi.get_member_fullname(mptr.id)), mptr.soff, idaapi.get_member_size(mptr)) for mptr in iterable if mptr.id not in specials]
+
+        # If we're removing elements from a union, then the work we have to
+        # do is simplified since we only need the indices (in reverse) and
+        # all deletions or modifications to a union are already destructive.
+        else:
+            indices = sorted(selected, key=operator.itemgetter(0))
+            listable = [(mptr.id, utils.string.of(idaapi.get_member_fullname(mptr.id)), mindex, idaapi.get_member_size(mptr)) for mindex, mptr in indices[::-1] if mptr.id not in specials]
+
+        # Finally we can iterate through everything from the structure, remove
+        # an individual member, add some space if necessary, rinse, repeat.
+        failed, count, is_union = {moffset for moffset in []}, 0, union(sptr)
+        for mid, mname, moffset_or_mindex, msize in listable:
+            moffset = mindex = moffset_or_mindex
+            if moffset_or_mindex not in members:
+                continue
+
+            # Calculate the description of the location and delete the member.
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+            ok = idaapi.del_struc_member(sptr, mindex if is_union else moffset)
+
+            # If we couldn't delete the member or there's still a member at
+            # the offset, then we failed somehow and need to accommodate it.
+            mptr = None if is_union else idaapi.get_member(sptr, moffset)
+            if not ok:
+                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member \"{:s}\" ({:#x}) at {:s} of the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+                failed.add((mid, moffset))
+
+            elif mptr:
+                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} ({:#x}) was not removed ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, mptr.id))
+                failed.add((mid, moffset))
+
+            # If we succeeded, then we can go ahead and attempt to shrink the structure.
+            elif ok and (True if is_union else idaapi.expand_struc(sptr, moffset, -msize)):
+                count += 1
+
+            # If we couldn't shrink it, then we avoid updating the size and log a warning.
+            else:
+                logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove space ({:d}) at {:s} of {:s} ({:#x}) after removing member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, utils.string.escape(mname, '"'), mid))
+                failed.add((mid, moffset))
+            continue
 
         # If we removed absolutely nothing (but we were supposed to),
         # then bail here and let the user know that it didn't happen.
-        if result and not count:
+        if selected and not count:
             bounds = interface.bounds_t(soff, eoff)
-            logging.fatal(u"{:s}({:#x}).members.remove({:#x}, {:#x}{:s}) : Unable to remove {:d} member{:s} overlapping the boundaries {:s} of the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', len(result), '' if len(result) == 1 else 's', bounds + base, 'union' if union(sptr) else 'structure', sptr.id))
+            logging.fatal(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove {:d} member{:s} within the determined boundaries ({:s}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', len(selected), '' if len(selected) == 1 else 's', bounds + base, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
             return []
 
-        # If our count matches, then we're good and can simply return our results to
-        # the caller. We also translate the location with the offset we were given.
-        elif len(result) == count:
-            iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result)
+        # We deleted some members, but we might not have deleted all of them. The disassembler
+        # hasn't yet updated their references as autoanalysis could be paused. So, we step the
+        # autoqueue for every reference we captured with the best api that is available.
+        if hasattr(idaapi, 'auto_make_step'):
+            [idaapi.auto_make_step(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        elif hasattr(idaapi, 'auto_wait_range'):
+            [idaapi.auto_wait_range(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        # If our selected count matches, then we're now good and can return our
+        # results to the caller. The location for each result is also translated.
+        if len(selected) == count:
+            iterable = (members[moffset_or_mindex] for moffset_or_mindex, mptr_deleted in selected if moffset_or_mindex in members)
+            iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable)
             return [packed for packed in iterable]
+
+        # Collect the members that we had actually expected to have removed.
+        iterable = (moffset_or_mindex for moffset_or_mindex, mptr_deleted in selected)
+        iterable = (members[moffset_or_mindex] for moffset_or_mindex in iterable if moffset_or_mindex in members)
+        expected = {mid : (mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable}
 
         # Otherwise we only removed some of the members. So, we need
         # to figure out exactly what happened and let the user know.
-        removed, expected = {mid for mid in []}, {mid : (mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result}
-        for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result:
-            moffset, msize = mlocation
-            mptr = idaapi.get_member(sptr, moffset - base)
+        removed, is_union = {mid for mid in []}, union(sptr)
+        for moffset_or_mindex, mptr_deleted in selected:
+            if moffset_or_mindex not in members:
+                continue
+
+            # Grab everything we need to check the deleted member and its location.
+            mid, mname, _, _, _, _ = members[moffset_or_mindex]
+            moffset = mindex = moffset_or_mindex
+
+            # Now we can check the identifier of the member at the deleted location.
+            mptr = idaapi.get_member(sptr, mindex if is_union else moffset)
             if mptr and mptr.id == mid:
-                logging.debug(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member {:s} at offset {:+#x} with the specified id ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', mname, moffset, mid))
+                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+                logging.debug(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member {:s} at {:s} with id ({:#x}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', mname, location_description, mid, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
                 continue
             removed.add(id)
 
         # We should now have a list of identifiers that were removed. So we only need
         # to proceed with our complaints and return whatever we successfuly deleted.
         bounds = interface.bounds_t(*sorted([start, stop]))
-        logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove {:d} members of the expected {:d} members overlapping the boundaries {:s} of the requested {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', len(expected) - len(removed), len(expected), bounds, 'union' if union(sptr) else 'structure', sptr.id))
+        logging.warning(u"{:s}.remove_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove {:d} of {:s} within the determined boundaries ({:s}) of the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:+#x}".format(base) if offset else '', len(expected) - len(removed), "{:d} members".format(len(expected)) if len(expected) == 1 else "the expected {:d} members".format(len(expected)), bounds, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
 
         # Unpack and repack as punishment for such a fucking huge tuple...
-        iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in result if mid in removed)
+        iterable = (members[moffset_or_mindex] for moffset_or_mindex, mptr_deleted in selected if moffset_or_mindex in members)
+        iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable if mid in removed)
         return [packed for packed in iterable]
 
 ####### The rest of this file contains only definitions of classes that may be instantiated.
