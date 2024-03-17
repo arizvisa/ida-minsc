@@ -1646,6 +1646,159 @@ class members(object):
         return [packed_or_size for packed_or_size in results]
 
     @classmethod
+    def remove_slice(cls, sptr, slice, *offset):
+        '''Remove a `slice` of the members belonging to the structure or union identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        slice, size = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None), idaapi.get_struc_size(sptr)
+
+        # Determine if the structure is a frame so that we can avoid removing
+        # members that might interfere with how the disassembler uses it.
+        # that we shouldn't delete because it will break the frame.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = None if ea == idaapi.BADADDR else idaapi.get_func(ea)
+        iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
+        specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
+
+        # If we weren't given a base offset, then use what the disassembler would.
+        if offset:
+            [base] = map(int, offset)
+        elif fn and sptr.props & idaapi.SF_FRAME:
+            base = interface.function.frame_disassembler_offset(fn)
+        else:
+            base = 0
+
+        # This should be pretty easy, we just need to collect the members matching the
+        # slice that we were given. We also stash them so we can return them later.
+        selected, lindex, rindex, members, member_references = [], sptr.memqty, 0, {}, {}
+        for mowner, mindex, mptr in cls.iterate(sptr, slice):
+            lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+
+            # Capture the references for the member so that we can poke
+            # the disassembler to update them after we remove the member.
+            member_references.setdefault(mptr.id, []).extend(ea for ea, _, _ in interface.xref.to(mptr.id, idaapi.XREF_ALL))
+
+            # If the field is not an important frame member, then add it.
+            if mptr.id not in specials:
+                members[mptr.soff] = member.packed(base, mptr)
+                selected.append((mptr.soff, mptr))
+            continue
+
+        # Similar to `remove_bounds`, the members will be shifted which results in the references changing
+        # for members following a selected member. Since this is a slice, the results aren't guaranteed to
+        # be contiguous. So we recollect everything, but skip over the references that we already got.
+        for mowner, mindex, mptr in cls.iterate(sptr, builtins.slice(lindex, None)):
+            if mptr.id in member_references:
+                continue
+
+            for ea, _, _ in interface.xref.to(mptr.id, idaapi.XREF_ALL):
+                member_references.setdefault(mptr.id, []).append(ea)
+            continue
+
+        # Clear out any references to special members that were identified.
+        [member_references.pop(mid, ()) for mid in specials]
+
+        # Now we need to invert our dictionary of references so that
+        # they are keyed by address instead of by the member id.
+        references = {}
+        for mid, addresses in member_references.items():
+            [references.setdefault(ea, []).append(mid) for ea in addresses]
+        member_references.clear()
+
+        # Last thing to do is to use the slice to get the indices of the
+        # member to remove and reverse them so the numbers don't change.
+        indices = sorted(builtins.range(*slice.indices(sptr.memqty)))[::-1]
+        iterable = (sptr.members[index] for index in indices)
+        listable = [(mptr.id, utils.string.of(idaapi.get_member_fullname(mptr.id)), mptr.soff, idaapi.get_member_size(mptr)) for mptr in iterable if mptr.id not in specials]
+
+        # Now we can ask the disassembler to delete the member at each
+        # index specified as a slice. We don't track the delta since
+        # the members selected by a slice may not always be contiguous.
+        count, failed, is_union = 0, {moffset for moffset in []}, union(sptr)
+        for mid, mname, moffset_or_mindex, msize in listable:
+            moffset = mindex = moffset_or_mindex
+            if moffset_or_mindex not in members:
+                continue
+
+            # Go ahead, calculate the description, and then delete the member.
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+            ok = idaapi.del_struc_member(sptr, mindex if is_union else moffset)
+
+            # Check to see if there's still a member at the offset we deleted. If we couldn't
+            # delete it or the member still exists, then we go ahead and complain about it.
+            mptr = None if is_union else idaapi.get_member(sptr, moffset)
+            if not ok:
+                logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove member \"{:s}\" ({:#x}) at {:s} of the {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure'))
+                failed.add((mid, moffset))
+
+            elif mptr:
+                logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} was not removed ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', mptr.id))
+                failed.add((mid, moffset))
+
+            # if we succeeded, then we can go ahead and attempt to shrink the structure.
+            elif ok and (True if is_union else idaapi.expand_struc(sptr, moffset, -msize)):
+                count += 1
+
+            # if we couldn't shrink it, then we avoid updating the size and log a warning.
+            else:
+                logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove space ({:d}) {:s} of {:s} after removing member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(mname, '"'), mid))
+                failed.add((mid, moffset))
+            continue
+
+        # If we couldn't remove anything and our results show that
+        # we should have, then complain about it and then return.
+        if selected and not count:
+            logging.fatal(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove {:d} member{:s} from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', len(selected), '' if len(selected) == 1 else 's', 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+            return []
+
+        # After removing the members, the disassembler doesn't immediately update the
+        # cross-references that were changed. Since we collected them earlier, we use
+        # them with the best available api to ensure the cross-references get updated.
+        if hasattr(idaapi, 'auto_make_step'):
+            [idaapi.auto_make_step(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        elif hasattr(idaapi, 'auto_wait_range'):
+            [idaapi.auto_wait_range(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        # If the number of results matches the number of elements that were deleted,
+        # then we're done here and only need to return the members that were removed.
+        if len(selected) == count:
+            iterable = (members[moffset_or_mindex] for moffset_or_mindex, mptr_deleted in selected if moffset_or_mindex in members)
+            iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable)
+            return [packed for packed in iterable]
+
+        # Gather all the members that we expected to be able to remove.
+        iterable = (moffset_or_mindex for moffset_or_mindex, mptr_deleted in selected)
+        iterable = (members[moffset_or_mindex] for moffset_or_mindex in iterable if moffset_or_mindex in members)
+        expected = {mid : (mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable}
+
+        # If they didn't, then only some of the members were removed. This makes things
+        # a little more complicated and we need to distinguish which members still remain.
+        removed, is_union = {mid for mid in []}, union(sptr)
+        for moffset_or_mindex, mptr_deleted in selected:
+            if moffset_or_mindex not in members:
+                continue
+
+            # Grab any information that we need to verify the member doesn't exist.
+            mid, mname, _, _, _, _ = members[moffset_or_mindex]
+            moffset = mindex = moffset_or_mindex
+
+            # If it still exists (we verify the id), then complain about it.
+            mptr = idaapi.get_member(sptr, mindex if is_union else moffset)
+            if mptr and mptr.id == mid:
+                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+                logging.debug(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove member {:s} at {:s} with id ({:#x}) from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', mname, location_description, mid, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+                continue
+            removed.add(id)
+
+        # Finally we can complain about the identifers that were not removed,
+        # and then proceed to return whatever we were actually able to do.
+        logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove {:d} of {:s} from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', len(expected) - len(removed), "{:d} members".format(len(expected)) if len(expected) == 1 else "the expected {:d} members".format(len(expected)), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+
+        iterable = (members[moffset] for moffset, mptr_deleted in selected)
+        iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable if mid in removed)
+        return [packed for packed in iterable]
+
+    @classmethod
     def remove_bounds(cls, sptr, start, stop, *offset):
         '''Remove the members from the offset `start` to `stop` from the structure or union identified by `sptr`.'''
         sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
