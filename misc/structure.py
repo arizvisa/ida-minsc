@@ -1957,6 +1957,130 @@ class members(object):
         iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable if mid in removed)
         return [packed for packed in iterable]
 
+    @classmethod
+    def clear_slice(cls, sptr, slice, *offset):
+        '''Clear a `slice` of the members belonging to the structure or union identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        slice, size = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None), idaapi.get_struc_size(sptr)
+
+        # If our structure is a function frame, then we can't actually touch some of
+        # the members. So, we check the frame ahead of time and skip over them later.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = idaapi.get_func(ea)
+        iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
+        specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
+
+        # Figure out which offset the disassembler would use if we weren't given one.
+        if offset:
+            [base] = map(int, offset)
+        elif fn and sptr.props & idaapi.SF_FRAME:
+            base = interface.function.frame_disassembler_offset(fn)
+        else:
+            base = 0
+
+        # Just like `remove_slice`, we need to collect the members matching the slice
+        # from the parameter. We also stash their references so we can track them.
+        selected, lindex, rindex, members, references = [], sptr.memqty, 0, {}, {}
+        for mowner, mindex, mptr in cls.iterate(sptr, slice):
+            lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+
+            # Capture the references for the member so that we can poke the
+            # disassembler to update its references after it gets deleted.
+            if mptr.id not in specials:
+                [references.setdefault(ea, []).append(mptr.id) for ea, _, _ in interface.xref.to(mptr.id, idaapi.XREF_ALL)]
+
+            # If the field is not a special field, then it's okay to add.
+            if mptr.id not in specials:
+                members[mptr.soff] = member.packed(base, mptr)
+                selected.append((mptr.soff, mptr))
+            continue
+
+        # Use our slice parameter to figure out the indices we're being asked
+        # to clear. We'll actually be processing these in reverse so that when
+        # we remove each member element it won't change the list indexing.
+        indices = sorted(builtins.range(*slice.indices(sptr.memqty)))[::-1]
+        iterable = (sptr.members[index] for index in indices)
+        listable = [(mptr.id, utils.string.of(idaapi.get_member_fullname(mptr.id)), mptr.soff, idaapi.get_member_size(mptr)) for mptr in iterable if mptr.id not in specials]
+
+        # Finally we can just iterate through our list and delete each
+        # member that was picked out for us via the slice. We don't need
+        # to do anything too special since none of the offsets will change.
+        count, failed, is_union = 0, {moffset for moffset in []}, union(sptr)
+        for mid, mname, moffset_or_mindex, msize in listable:
+            mindex = moffset = moffset_or_mindex
+            if moffset_or_mindex not in members:
+                continue
+
+            # Now we can build the description and then delete the member that was chosen.
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+            ok = idaapi.del_struc_member(sptr, mindex if is_union else moffset)
+
+            # Verify that there isn't a member at the offset we just
+            # deleted. This way we have a better idea why we failed.
+            mptr = None if is_union else idaapi.get_member(sptr, moffset)
+            if not ok:
+                logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to erase member \"{:s}\" ({:#x}) at {:s} of the {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure'))
+                failed.add((mid, moffset))
+
+            elif mptr:
+                logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Member \"{:s}\" ({:#x}) at {:s} of {:s} was not erased ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', utils.string.escape(mname, '"'), mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', mptr.id))
+                failed.add((mid, moffset))
+
+            # Otherwise it worked, we're good, it's done.
+            else:
+                count += 1
+            continue
+
+        # If our counter is 0, then we didn't delete anything. If our results
+        # tell us that we should've, then log a fatal error and return.
+        # we should have, then complain about it and then return.
+        if selected and not count:
+            logging.fatal(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to erase {:d} member{:s} from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', len(selected), '' if len(selected) == 1 else 's', 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+            return []
+
+        # We deleted the members, but if auto-analysis is turned off, then the
+        # disassembler hasn't updated the references. If that's the case, we
+        # go back and poke the disassembler for each address that had a reference.
+        if hasattr(idaapi, 'auto_make_step'):
+            [idaapi.auto_make_step(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        elif hasattr(idaapi, 'auto_wait_range'):
+            [idaapi.auto_wait_range(ea, idaapi.next_not_tail(ea)) for ea in references]
+
+        # If our number of results match what we were able to clear,
+        # then we only have to return everything that we cleared.
+        if len(selected) == count:
+            iterable = (members[moffset_or_mindex] for moffset_or_mindex, mptr_deleted in selected if moffset_or_mindex in members)
+            iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable)
+            return [packed for packed in iterable]
+
+        # Gather everything that we should've been able to remove without issue.
+        iterable = (moffset_or_mindex for moffset_or_mindex, mptr_deleted in selected)
+        iterable = (members[moffset_or_mindex] for moffset_or_mindex in iterable)
+        expected = {mid : (mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable}
+
+        # If we got here, then we weren't able to clear out some of the members. We
+        # can't do much other than complain about it, so we drop some logging events.
+        deleted, is_union = {mid for mid in []}, union(sptr)
+        for moffset_or_mindex, mptr_deleted in selected:
+            mid, mname, _, _, _, _ = members[moffset_or_mindex]
+            moffset = mindex = moffset_or_mindex
+
+            mptr = idaapi.get_member(sptr, mindex if is_union else moffset)
+            if mptr and mptr.id == mid:
+                location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+                logging.debug(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to erase member {:s} ({:#x}) at {:s} from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', mname, mid, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+                continue
+            deleted.add(id)
+
+        # Finally we can complain about the identifiers that still exist
+        # and then proceed to return whatever we were actually able to do.
+        logging.warning(u"{:s}.clear_slice({:#x}, {!s}{:s}) : Unable to erase {:d} of {:s} from the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', len(expected) - len(deleted), "{:d} members".format(len(expected)) if len(expected) == 1 else "the expected {:d} members".format(len(expected)), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+
+        iterable = (members[moffset_or_mindex] for moffset_or_mindex, mptr_deleted in selected)
+        iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable if mid in removed)
+        return [packed for packed in iterable]
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
