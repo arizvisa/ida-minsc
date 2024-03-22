@@ -236,8 +236,8 @@ def ops_access():
 @utils.multicase(ea=types.integer)
 def ops_access(ea):
     '''Return the access type of each operand for the instruction at address `ea`.'''
-    ops = interface.instruction.access(interface.address.inside(ea))
-    return tuple(ref.access for ref in ops)
+    ea = interface.address.inside(ea)
+    return tuple(interface.instruction.access(ea))
 
 @utils.multicase()
 def ops_read():
@@ -336,8 +336,7 @@ def op_access(ea, opnum):
     ops = tuple(interface.instruction.access(interface.address.inside(ea)))
     if opnum >= len(ops):
         raise E.InvalidTypeOrValueError(u"{:s}.op_access({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(ops), ea))
-    _, _, access = ops[opnum]
-    return access
+    return ops[opnum]
 
 @utils.multicase(opnum=types.integer)
 def op_used(opnum):
