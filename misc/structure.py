@@ -11,7 +11,7 @@ definitions of these classes having to reside in a base module.
 """
 
 import builtins, six, operator, functools, itertools, logging, math
-import re, fnmatch, pickle, heapq
+import re, fnmatch, pickle, heapq, bisect
 
 import idaapi, internal
 from internal import utils, interface, types, exceptions as E
@@ -2204,6 +2204,106 @@ class members(object):
         iterable = ((moffset, members[moffset]) for moffset, _ in selected if moffset in members and moffset not in failures)
         iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for moffset, (mid, mname, mtype, mlocation, mtypeinfo, mcomments) in iterable)
         return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
+
+    @classmethod
+    def layout_getslice(cls, sptr, slice):
+        '''Return a contiguous `slice` of the layout belonging to the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        is_variable, is_frame = (sptr.props & prop for prop in [idaapi.SF_VAR, idaapi.SF_FRAME])
+
+        # Figure out the indices for the slice being selected. We will
+        # be grabbing the boundaries of the member past these indices
+        # so that we can include any empty space within the selection.
+        slice = slice if isinstance(slice, builtins.slice) else builtins.slice(slice, 1 + slice or None)
+        istart, istop, istep = slice.indices(sptr.memqty)
+        listable = [(mowner, mindex, mptr) for mowner, mindex, mptr in cls.iterate(sptr, slice)]
+        indices, selected = zip(*((mindex, mptr) for mowner, mindex, mptr in listable)) if listable else ([], [])
+
+        # If the structure is a union, then our slice doesn't need to be
+        # contiguous. So we can simply include the index and return it.
+        if union(sptr):
+            sizes = [idaapi.get_member_size(mptr) for mptr in selected]
+            return min(sizes), max(sizes), [(mptr.soff, mptr) for mptr in selected]
+
+        # Otherwise, we need to figure out the start and end offsets.
+        if istart < istop:
+            ileft, iright = istart, istop
+            soff = 0 if ileft < 0 or slice.start is None else sptr.members[ileft].soff if ileft < sptr.memqty else idaapi.get_struc_size(sptr)
+            eoff = idaapi.get_struc_size(sptr) if sptr.memqty <= iright or slice.stop is None else 0 if iright < 0 else sptr.members[iright].soff
+        elif istart > istop:
+            ileft, iright = istop, istart
+            soff = 0 if ileft < 0 or slice.stop is None else sptr.members[ileft].eoff if ileft < sptr.memqty else idaapi.get_struc_size(sptr)
+            eoff = idaapi.get_struc_size(sptr) if sptr.memqty <= iright or slice.start is None else 0 if iright < 0 else sptr.members[iright].soff
+        elif indices:
+            soff, eoff = sptr.members[istart].soff, sptr.members[istop].eoff
+        else:
+            index = min(istart, istop)
+            soff = 0 if index < 0 or slice.start is None else sptr.members[index].soff if index < sptr.memqty else idaapi.get_struc_size(sptr)
+            eoff = idaapi.get_struc_size(sptr) if sptr.memqty <= index or slice.stop is None else 0 if index < 0 else sptr.members[index].eoff
+
+        # Store the unique points (sorted) with the segments from the selection.
+        iterable = itertools.chain(*([mptr.soff, mptr.eoff] for mptr in selected))
+        points = [point for point, duplicates in itertools.groupby(sorted(iterable))]
+
+        # Add the boundary points to our list that we figured out from the selection.
+        points.insert(0, soff) if any([not points, points and operator.lt(soff, *points[:+1])]) else points
+        points.append(eoff) if any([not points, points and operator.gt(eoff, *points[-1:])]) else points
+
+        # Iterate through the members and add each one to its corresponding segment.
+        segments, iterable = {}, ((mptr, mptr.soff, mptr.eoff) for mptr in selected)
+        for mptr, mstart, mstop in sorted(iterable, key=operator.itemgetter(1)):
+            start, stop = mstart, mstop if mstart < mstop else mstop + member.element(mptr) if is_variable and mstart == mstop else mstop
+            segments[mstart] = segments[mstop] = mptr
+
+        # If our selection is from left to right (ordered), then we treat it as
+        # normal and be sure to include the empty space in front of the last member.
+        if selected and istart <= istop:
+            imaximum = 1 + max(indices) if indices else 0
+            maximum = sptr.members[imaximum].soff if imaximum < sptr.memqty else points[-1]
+            start = bisect.bisect_left(points, points[0] if slice.start is None else selected[0].soff)
+            stop = bisect.bisect_left(points, points[-1] if slice.stop is None else maximum) + 1
+
+        # If the selection is from right to left (reversed), then we need to
+        # invert our tests against the slice and adjust for the minimum point.
+        elif selected:
+            iminimum = min(istart, istop)
+            minimum = sptr.members[iminimum].eoff if iminimum > 0 else points[0]
+            start = bisect.bisect_left(points, points[0] if slice.stop is None else minimum)
+            stop = bisect.bisect_left(points, points[-1] if slice.start is None else selected[0].eoff)
+
+        # If we couldn't select anything, then use the boundaries of the
+        # members that were within the requested slice to identify the points.
+        elif sptr.memqty:
+            sleft, sright = (slice.start, slice.stop) if istart <= istop else (slice.stop, slice.start)
+            iterable = ((sptr.members[index].soff if index < sptr.memqty else eoff) for index in [istart, istop])
+            minimum = min(points) if sleft is None else min(*iterable)
+            iterable = ((sptr.members[index].eoff if index < sptr.memqty else eoff) for index in [istart, istop])
+            maximum = max(points) if sright is None else max(*iterable)
+            start = bisect.bisect_left(points, minimum)
+            stop = bisect.bisect_left(points, maximum) + 1 if istart <= istop else bisect.bisect_left(points, maximum)
+
+        # Otherwise since there's no selection or even members, we have nothing to return.
+        else:
+            return soff, eoff, []
+
+        # Now we need to figure out which direction to slice the elements in.
+        step, point = -1 if istep < 0 else +1, 0 if start < 0 else points[start] if start < len(points) else eoff
+
+        # Last thing to do is to iterate through each point to yield each member and
+        # any holes. Each member should only be yielded once, so we track that too.
+        offset, result, available = point, [], {mptr.id : mptr for mptr in selected}
+        for point in points[start : stop]:
+            if offset < point:
+                result.append((offset, point - offset))
+            mptr = segments.get(point, None)
+            if mptr and mptr.id in available:
+                result.append((point, available.pop(mptr.id)))
+            offset = mptr.eoff if mptr else point
+
+        # Verify that the slice we were given is able to select something.
+        if not any([istart <= istop and istep > 0, istart > istop and istep < 0]) and not available:
+            return points[start], point, []
+        return points[start], point, result[::-1 if istep < 0 else +1]
 
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
