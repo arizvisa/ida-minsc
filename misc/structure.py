@@ -2081,6 +2081,130 @@ class members(object):
         iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable if mid in removed)
         return [packed for packed in iterable]
 
+    @classmethod
+    def clear_bounds(cls, sptr, start, stop, *offset):
+        '''Undefine the members from the offset `start` to `stop` in the structure or union identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        start, stop = map(int, [start, stop])
+
+        # If our structure is a function frame, then we can't actually touch some of
+        # the members. So, we check the frame ahead of time and skip over them later.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = idaapi.get_func(ea)
+        iterable = itertools.chain([idaapi.frame_off_savregs(fn)] if fn.frregs else [], [idaapi.frame_off_retaddr(fn)] if idaapi.get_frame_retsize(fn) else []) if fn else []
+        specials = {idaapi.get_member(sptr, moffset).id for moffset in filter(functools.partial(idaapi.get_member, sptr), iterable)}
+
+        # If the structure is a frame, then figure out the default base offset.
+        if offset:
+            [base] = map(int, offset)
+        elif fn and sptr.props & idaapi.SF_FRAME:
+            base = interface.function.frame_disassembler_offset(fn)
+        else:
+            base = 0
+
+        # Now, just like remove_bounds, we collect all the members that overlap with the
+        # segment we were given. This way we can return the cleared members when we leave.
+        selected, lindex, rindex, members, references = [], sptr.memqty, 0, {}, {}
+        for mowner, mindex, mptr in cls.at_bounds(sptr, start - base, stop - base):
+            lindex, rindex = min(mindex, lindex), max(mindex, rindex)
+
+            # Only collect its references if it's a special frame member.
+            if mptr.id not in specials:
+                references[mptr.soff] = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mptr.id, idaapi.XREF_ALL)]
+
+            # If it's not a special field (from a frame), add it to our selection.
+            if mptr.id not in specials:
+                members[mptr.soff] = member.packed(base, mptr)
+                selected.append((mptr.soff, mptr))
+            continue
+
+        # If the structure is a union then we can simply remove the member at each
+        # index, because there's no way to remove a union member non-descrutively.
+        if union(sptr):
+            order = sorted(index for index, mptr in selected)
+
+            # Now we need to delete each union member. We do this in reverse order
+            # so that when the indices get reordered, our copy will still reference
+            # the correct index for the ones that we haven't processed yet.
+            results = [(index, idaapi.del_struc_member(sptr, index)) for index in order[::-1]]
+            failures = {index for index, success in results if not success}
+
+        # Otherwise we need to cleanly remove each member that was selected. We just iterate
+        # through everything, remove a member, add some space if necessary, rinse, repeat.
+        else:
+            size, failures = idaapi.get_struc_size(sptr), {moffset for moffset in []}
+            for moffset, mptr in selected:
+                identifier, msize = mptr.id, idaapi.get_member_size(mptr)
+
+                # If we're a special member, then we can just skip processing it.
+                if identifier in specials:
+                    continue
+
+                # Delete the member. If we did but a member still exists..then the deletion
+                # actually failed. This only happens on older versions of the disassembler.
+                ok = idaapi.del_struc_member(sptr, moffset)
+                if ok and not idaapi.get_member(sptr, moffset):
+                    pass
+
+                # We couldn't remove the member at all, which means that we
+                # couldn't honor the request the user has made of us.
+                else:
+                    failures.add(moffset)
+                continue
+
+            # We need both the order and failures initialized to proceed.
+            order = sorted(moffset for moffset, mptr_deleted in selected)
+
+        # Before we emit any error messages, we need to collect any references to the
+        # union/structure that owns the member. This is so we can exclude any xrefs that
+        # have been promoted, and only warn about the xrefs that have been truly lost.
+        iterable = (packed_frm_iscode_type for moffset, packed_frm_iscode_type in references.items() if moffset not in failures)
+        processed = {xfrm for xfrm, _, _ in itertools.chain(*iterable) if idaapi.auto_make_step(xfrm, xfrm + 1)}
+        promoted = {xfrm for xfrm, xiscode, xtype in interface.xref.to(sptr.id, idaapi.XREF_ALL)}
+
+        # Now we should have a list of member indices/offsets that were processed, a set of
+        # indices/offsets that failed, references, and packed information for the members.
+        is_union = union(sptr)
+        for moffset_or_mindex, mptr in selected:
+            moffset = mindex = moffset_or_mindex
+            if moffset_or_mindex not in members:
+                continue
+
+            # Unpack some member attributes so that we can reference them in any logs.
+            identifier, mname, _, _, _, _ = members[mindex if is_union else moffset]
+            location_description = "index {:d}".format(mindex) if is_union else "offset {:+#x}".format(moffset + base)
+
+            # If we were unable to remove a specific member, then log information about
+            # the member so that the user knows that something unexpected happened.
+            if moffset in failures:
+                logging.warning(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Unable to remove member \"{:s}\" ({:#x}) that was at {:s} of {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
+                mreferences = []
+
+            # Otherwise, we removed the member and we need to check if any references
+            # were lost. We preloaded these, so we just need to format them properly.
+            else:
+                mreferences = references[moffset]
+
+            # Now we collect our member references into a list of descriptions so that
+            # we can let the user know which refs have been lost in the member removal.
+            cdrefs = [((None, xfrm) if interface.node.identifier(xfrm) else (xfrm, None)) for xfrm, xiscode, xtype in mreferences if xfrm not in promoted]
+            crefs, drefs = ([ea for ea in xrefs if ea is not None] for xrefs in zip(*cdrefs)) if cdrefs else [(), ()]
+
+            # First we do the list of addresses...
+            if crefs:
+                logging.warning(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Removal of member \"{:s}\" ({:#x}) at {:s} has resulted in the removal of {:d} reference{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, len(crefs), '' if len(crefs) == 1 else 's', ', '.join(map("{:#x}".format, crefs))))
+
+            # ...then we can do the identifiers which includes structures/unions, members, or whatever.
+            if drefs:
+                logging.warning(u"{:s}.clear_bounds({:#x}, {:#x} {:#x}{:s}) : Removal of member \"{:s}\" ({:#x}) at {:s} has resulted in the removal of {:d} referenced identifier{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, len(drefs), '' if len(drefs) == 1 else 's', ', '.join(map("{:#x}".format, drefs))))
+                [logging.info(u"{:s}.clear_bounds({:#x}, {:#x}, {:#x}{:s}) : Removed member \"{:s}\" ({:#x}) at {:s} used to reference \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, start, stop, ", {:#x}".format(base) if offset else '', utils.string.escape(mname, '"'), identifier, location_description, internal.netnode.name.get(idaapi.ea2node(id)), id)) for id in drefs]
+            continue
+
+        # Finally we can just return the packed information that we deleted from the structure.
+        iterable = ((moffset, members[moffset]) for moffset, _ in selected if moffset in members and moffset not in failures)
+        iterable = ((mname, mtype, mlocation, mtypeinfo, mcomments) for moffset, (mid, mname, mtype, mlocation, mtypeinfo, mcomments) in iterable)
+        return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
