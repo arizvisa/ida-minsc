@@ -2323,7 +2323,7 @@ class members(object):
         offset_description = ", {:#x}".format(base) if offset else ''
 
         # First we need to validate our parameters to ensure we were given
-        # a slice if we're being asked to assign an iterable of items.
+        # a slice if we are being asked to assign with some kind of iterable.
         multiple = isinstance(layout, types.ordered) and not isinstance(layout, interface.namedtypedtuple)
         if multiple and not isinstance(slice, builtins.slice):
             iterable = interface.contiguous.describe(layout if multiple else [layout])
@@ -2331,8 +2331,9 @@ class members(object):
 
         # Now we can order our layout as a list and then use the slice
         # to select all of the contiguous we're being asked to assign to.
-        items = layout if multiple else [layout]
-        layout_description = "[{:s}]".format(', '.join(interface.contiguous.describe(layout)))
+        iterable = layout if multiple else [layout]
+        newlayout = [item for item in iterable]
+        layout_description = "[{:s}]".format(', '.join(interface.contiguous.describe(newlayout)))
         left, right, selected = cls.layout_getslice(sptr, slice)
 
         # If our structure is a function frame, then certain members cannot be replaced.
@@ -2344,7 +2345,7 @@ class members(object):
         # Since our assignment will be destructive, we need to calculate the
         # original size and the new size before figuring out how to assign things.
         iterable = (mptr for offset, mptr in selected)
-        oldsize, newsize = (interface.contiguous.size(members) for members in [iterable, items])
+        oldsize, newsize = (interface.contiguous.size(members) for members in [iterable, newlayout])
 
         # Next since we want to confirm any references that get destroyed, we
         # collect all references to any of the members that were selected.
@@ -2353,13 +2354,14 @@ class members(object):
         references[idaapi.get_struc_size(sptr.id)] = sptr.id, [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(sptr.id, idaapi.XREF_ALL)]
 
         # Before we do any serious damage to the union/structure, save the
-        # selected member data that we plan on overwriting with our new items.
+        # selected member data that we plan on overwriting with our new layout.
         iterable = ((offset, mptr) for offset, mptr in selected if isinstance(mptr, idaapi.member_t))
         olditems = {offset : member.packed(base, mptr) for offset, mptr in iterable}
 
-        # Now we can layout each member that we're going to assign contiguously. This
-        # way we can collect their offset and the minimum attributes into a list.
-        newitems, area_t, iterable = [], idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, interface.contiguous.layout(left, items, +1)
+        # Now we can lay out each member that we're going to assign contiguously
+        # and collect each offset along with their minimum attributes into a list.
+        newitems, area_t = [], idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
+        iterable = interface.contiguous.layout(left, newlayout, +1)
         layout = ((sptr.memqty + idx, item) for idx, (_, item) in enumerate(iterable)) if union(sptr) else iterable
         for offset, item in layout:
             if isinstance(item, (types.integer, interface.bounds_t, area_t, interface.namedtypedtuple, interface.symbol_t)):
@@ -2392,8 +2394,8 @@ class members(object):
                 raise E.InvalidTypeOrValueError(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to determine member attributes for an unsupported type {!s} ({!r}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, item.__class__, item))
 
             # Now we can add the member and offset, but we first need to validate it
-            # in that we can't add the same structure to itself, and convert it into
-            # an flag, opinfo, bytes, and other stuff so and that we can add it as a member.
+            # in that we can't add the same structure to itself. We need to capture
+            # its flag, opinfo, bytes, and other stuff so that we can add it as a member.
             if isinstance(mptr, idaapi.struc_t):
                 opinfo, nbytes = idaapi.opinfo_t(), idaapi.get_struc_size(mptr)
                 if mptr.id == sptr.id:
@@ -2406,7 +2408,7 @@ class members(object):
 
                 # Copy any repeatable comment from the structure as a non-repeatable comment.
                 cmt = idaapi.get_struc_cmt(mptr.id, True)
-                comments = [utils.string.of(cmt)]   # index 0 (False)
+                comments = [utils.string.of(cmt)]   # index 0 (false) is non-repeatable.
 
             # Make an exact copy of the member information, comments, type information, and all.
             elif isinstance(mptr, idaapi.member_t):
@@ -2414,11 +2416,11 @@ class members(object):
                 flag, res = mptr.flag, idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
                 opinfo = opinfo if res else None
 
-                # Extract the comments in order...index 0 (False) is non-repeatable, index 1 (True) is repeatable.
+                # Extract the comments in order...index 0 (false) is non-repeatable, index 1 (true) is repeatable.
                 comments = [utils.string.of(idaapi.get_member_cmt(mptr.id, repeatable)) for repeatable in [False, True]]
 
-            # If we received a type or a string, then we'll need to figure out
-            # the flags so that we can properly assign things to the structure.
+            # If we received a type or a string, then we'll need to determine
+            # the flags so that we can properly assign it into the structure.
             elif isinstance(mptr, (idaapi.tinfo_t, types.string)):
                 has_name = interface.tinfo.parse(None, "{!s}".format(mptr), idaapi.PT_SIL|idaapi.PT_VAR)
                 tinfo = mptr if isinstance(mptr, idaapi.tinfo_t) else interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR)[-1] if has_name else interface.tinfo.parse(None, mptr, idaapi.PT_SIL)
@@ -2434,7 +2436,7 @@ class members(object):
                 opinfo, tinfo, comments = idaapi.opinfo_t(), idaapi.tinfo_t(), []
                 opinfo.tid = typeid
 
-            # This should just be a size and nothing else.
+            # If it's an integer, then this is just a size and nothing else.
             else:
                 opinfo, flag, nbytes, tinfo, comments = None, 0, mptr, None, []
 
@@ -2447,16 +2449,12 @@ class members(object):
                 logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Skipping the addition of member at {:s} of {:s} due to not having a valid size ({:d}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, "index {:d}".format(offset) if union(sptr) else "offset {:#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', nbytes))
             continue
 
-        # So, in order to ensure we don't have any errors we need to confirm that any new members
-        # we create do not have a duplicate name. This can happen when expanding or shrinking a
-        # structure without adjusting the names, or if the user explicitly specifies a default name.
-        iterable = (sptr.members[index] for index in builtins.range(sptr.memqty))
-        filtered = ((mptr, member.get_name(mptr)) for mptr in iterable if mptr.soff not in olditems)
-        used = {utils.string.of(mname) : mptr for mptr, mname in filtered if mname}
-
-        # We need to go through all of the newitems and figure out if any of the names
-        # will end up being duplicated. To accomplish this, we'll figure out the names
-        # in multiple passes. The first pass will gather all of the user-proposed names.
+        # In order to ensure that there aren't any errors when assigning members, we need to
+        # confirm that any new members will not have a duplicate name. This can happen when
+        # expanding or shrinking a structure without adjusting the names or if the user
+        # explicitly specified a name already being used. So, we need to go through all of the
+        # newitems and figure out if any will end up being duplicated. We accomplish this in
+        # multiple passes. We start with the first pass to gather the potential default names.
         newnames = {}
         for offset, mptr, _ in newitems:
             if isinstance(mptr, idaapi.member_t):
@@ -2471,10 +2469,10 @@ class members(object):
                 mname = ''
             newnames[offset] = mname
 
-        # The second pass requires us to go through each of the newnames. We check all
-        # of them to ensure that none of them match any of the names that have been
-        # used elsewhere within the structure. If so, then we give them a field name.
-        original, candidates, unavailable = {}, {}, {name for name in used} | {''}
+        # The second pass requires us to go through each of the new items and
+        # extract each name into a dictionary of candidate names. These will
+        # overwrite any of the default names that were determined in the first pass.
+        original, candidates = {}, {}
         for offset, mptr, _ in newitems:
             if isinstance(mptr, (idaapi.tinfo_t, types.string)):
                 has_name = interface.tinfo.parse(None, mptr, idaapi.PT_SIL|idaapi.PT_VAR) if isinstance(mptr, types.string) else False
@@ -2493,31 +2491,55 @@ class members(object):
                 candidates.setdefault(mname, []).append(offset)
 
             # Check if the item is non-anonymous type by checking against an
-            # integer. If it's not an integer, then sure it gets a default name.
+            # integer. If it's not an integer, then we ensure it gets a name.
             elif not isinstance(mptr, types.integer):
                 mname = member.default_name(sptr, None, offset)
                 original[offset] = newnames[offset] = mname
                 candidates.setdefault(mname, []).append(offset)
             continue
 
-        # Now we should have all the candidate names, so we start by figuring out
-        # which of our names are duplicates that we can't use. Any name with more
-        # than one offset or that exists within our used names needs to be fixed.
-        duplicates = {mname : offsets for mname, offsets in candidates.items() if len(offsets) > 1 or mname in used}
-        unavailable = unavailable | {mname for mname in candidates}
+        # To avoid iterating through all the names within our structure (which
+        # may be large), we now re-format all of our candidate names into "full"
+        # structure member names. This way we can ask the disassembler if the
+        # name is already being used and we only need to process as much data
+        # as the number of members that we're being asked to assign to the slice.
+        sname = internal.netnode.name.get(idaapi.ea2node(sptr.id))
+
+        # Now that we have all the candidate names, we start by figuring out which of our
+        # names are duplicates that we can't use. Any candidate name that is associated
+        # with more than one member offset is a duplicate name in the fields being added.
+        iterable = ((mname, offsets, idaapi.get_member_by_name(sptr, utils.string.to(mname))) for mname, offsets in candidates.items())
+        duplicates = {mname : offsets for mname, offsets, mptr in iterable if len(offsets) > 1 or mptr}
+
+        # Last thing we need is a way to calculate the real offset for a member.
         frargs = idaapi.frame_off_args(fn) if fn else 0
         #calculate_offset = functools.partial(idaapi.soff_to_fpoff, fn)     # XXX: this can calculate fpoff incorrectly if the fpd is busted
         calculate_offset = lambda moff: offset - frargs if frargs <= offset else offset - fn.frsize
+        delta = newsize - oldsize
+
+        # Now we can go through the list of duplicates, calculate a unique
+        # name for the member, and then add it to the newnames dictionary.
         for mname, offsets in duplicates.items():
             for offset in offsets:
                 oldname = newnames[offset]
                 assert(oldname == mname)
 
+                # If the member name already exists and it's being used by the current member,
+                # then we don't need to fix the name. We only need to adjust the members after
+                # our slice since we treat all structures as if they're growing downwards.
+                mptr = idaapi.get_member_by_name(sptr, utils.string.to(oldname))
+                oldoffset = mptr.soff + delta if mptr.soff >= right else mptr.soff
+                if mptr and oldoffset == offset:
+                    continue
+
+                # Now we attempt to calculate the new name if a duplicate one was found. We
+                # continue to suffix the member offset until the name is finally "unique".
                 name, adjusted = mname, calculate_offset(offset) if fn else offset
-                while name in unavailable:
+                while name in candidates or idaapi.get_member_by_name(sptr, utils.string.to(name)):
                     name = '_'.join([name, "{:X}".format(abs(adjusted))])
                 newname = name
 
+                # Update our newnames dictionar with the new name that we generated.
                 newnames[offset] = newname
             continue
 
@@ -2615,28 +2637,30 @@ class members(object):
             else:
                 position = sptr.memqty if union(sptr) else offset
                 logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Adding member at {:s} as {:d} byte{:s} of space with the specified flags ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), nbytes, '' if nbytes == 1 else 's', flag))
-                err = idaapi.add_struc_member(sptr, newnames[offset], idaapi.BADADDR if union(sptr) else position, flag, opinfo, nbytes)
-
-            # Check to see if we encountered an error of some sort while trying to add the member.
-            if err == idaapi.STRUC_ERROR_MEMBER_NAME:
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} (\"{:s}\").".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', 'a duplicate field name', newnames[offset]))
-            elif err == idaapi.STRUC_ERROR_MEMBER_OFFSET:
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', 'invalid offset', offset))
-            elif err == idaapi.STRUC_ERROR_MEMBER_SIZE:
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} ({:d}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', 'invalid field size', nbytes))
-            elif err == idaapi.STRUC_ERROR_MEMBER_TINFO:
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', 'invalid type id', opinfo.tid))
-            elif err == idaapi.STRUC_ERROR_MEMBER_STRUCT:
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:#x}) adding member at {:s} of {:s} due to {:s} for {:#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', 'bad structure identifier', sptr.id))
-            elif err != idaapi.STRUC_ERROR_MEMBER_OK:
-                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:#x}) while adding member at {:s} of {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure'))
+                err = idaapi.add_struc_member(sptr, utils.string.to(newnames[offset]), idaapi.BADADDR if union(sptr) else position, flag, opinfo, nbytes)
 
             # Immediately rip the identifier out of the member if we were able to add it to the
             # structure/union succesfully. Apparently, the mptr (member_t) can completely go out
             # of scope for no good reason (whatsoever) while we're processing the new items list.
-            mptr = idaapi.get_member(sptr, position)
-            if err == idaapi.STRUC_ERROR_MEMBER_OK and mptr:
-                results.append((position, mptr.id, packed))
+            if err == idaapi.STRUC_ERROR_MEMBER_OK:
+                mptr = idaapi.get_member(sptr, position)
+                if err == idaapi.STRUC_ERROR_MEMBER_OK and mptr:
+                    results.append((position, mptr.id, packed))
+                continue
+
+            # Check to see if we encountered an error of some sort while trying to add the member.
+            error_description = {}
+            error_description[idaapi.STRUC_ERROR_MEMBER_NAME] = 'a duplicate field name', "\"{:s}\"".format(utils.string.escape(newnames[offset], '"'))
+            error_description[idaapi.STRUC_ERROR_MEMBER_OFFSET] = 'an invalid offset', "{:+#x}".format(offset)
+            error_description[idaapi.STRUC_ERROR_MEMBER_SIZE] = 'an invalid field size', "{:d}".format(nbytes)
+            error_description[idaapi.STRUC_ERROR_MEMBER_TINFO] = 'an invalid type id', "{:#x}".format(opinfo.tid if opinfo else idaapi.BADADDR)
+            error_description[idaapi.STRUC_ERROR_MEMBER_STRUCT] = 'a bad structure identifier', "{:#x}".format(sptr.id)
+
+            if err in error_description:
+                reason, culprit = error_description[err]
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:d}) adding member at {:s} of {:s} ({:#x}) due to {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, reason, culprit))
+            else:
+                logging.warning(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Error ({:d}) while adding member at {:s} of {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, err, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id))
             continue
 
         # And now the very last thing we need to do is to update the member
@@ -2666,8 +2690,8 @@ class members(object):
                 member.set_typeinfo(mptr, tinfo)
 
             # Apply any comments that we might've needed to copy.
-            for repeatable, string in enumerate(map(utils.string.to, comments)):
-                if string and not idaapi.set_member_cmt(mptr, string, repeatable):
+            for repeatable, string in enumerate(comments):
+                if string and not idaapi.set_member_cmt(mptr, utils.string.to(string), repeatable):
                     logging.debug(u"{:s}.layout_setslice({:#x}, {!s}, {:s}{:s}) : Unable to update member ({:s}) at {:s} of {:s} ({:#x}) with {:s} comment \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, slice_description, layout_description, offset_description, mptr.id, "index {:d}".format(offset) if union(sptr) else "offset {:+#x}".format(base + offset), 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', sptr.id, 'repeatable' if repeatable else 'non-repeatable', utils.string.escape(string, '"')))
                 continue
             continue
