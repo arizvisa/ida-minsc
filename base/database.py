@@ -6085,13 +6085,13 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, **mangled):
-        '''Add an empty type with the given `name` to the current type library.'''
+        '''Add an empty type with the given `name` to the current type library and return it.'''
         return cls.add(name, interface.tinfo.library(), **mangled)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, library, **mangled):
-        '''Add an empty type with the given `name` to the specified type `library`.'''
+        '''Add an empty type with the given `name` to the specified type `library` and return it.'''
         BTF_VOID = idaapi.BTF_VOID if hasattr(idaapi, 'BTF_VOID') else getattr(idaapi, 'BT_VOID', 1) | getattr(idaapi, 'BTMT_SIZE0', 0)
         BTF_STRUCT = [idaapi.BT_COMPLEX | getattr(idaapi, 'BTMT_STRUCT', 0x00), 1]
         BTF_UNION = [idaapi.BT_COMPLEX | getattr(idaapi, 'BTMT_UNION', 0x10), 1]
@@ -6103,13 +6103,13 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, info, **mangled):
-        '''Add the type in `info` with the given `name` to the current type library.'''
+        '''Add the type in `info` with the given `name` to the current type library and return it.'''
         return cls.add(name, info, interface.tinfo.library(), **mangled)
     @utils.multicase(name=internal.types.string, string=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, string, library, **mangled):
-        '''Add the type in `string` with the given `name` to the specified type `library`.'''
+        '''Add the type in `string` with the given `name` to the specified type `library` and return it.'''
         ti = interface.tinfo.parse(library, string, idaapi.PT_SIL)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to parse \"{:s}\" into a type to add to the type library.".format('.'.join([__name__, cls.__name__]), name, string, interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(string, '"')))
@@ -6118,7 +6118,7 @@ class types(object):
     @classmethod
     @utils.string.decorate_arguments('name')
     def add(cls, name, info, library, **mangled):
-        """Add the type in `info` with the given `name` to the specified type `library`.
+        """Add the type in `info` with the given `name` to the specified type `library` and return it.
 
         If the boolean `mangled` is specified, then the given name is mangled.
         """
@@ -6136,7 +6136,10 @@ class types(object):
         # we can now assign the type that we got and check for an error.
         error = ordinal = interface.tinfo.set_numbered_type(library, 0, identifier, info, flags)
         if error > idaapi.TERR_OK:
-            return ordinal
+            res = interface.tinfo.for_ordinal(ordinal, library)
+            if not res:
+                raise E.ItemNotFoundError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to return the recently created type at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', ordinal))
+            return res
 
         # if we got an error and the name already exists, then let the user know.
         elif error == idaapi.TERR_SAVE_ERROR and interface.tinfo.has_name(name, library):
