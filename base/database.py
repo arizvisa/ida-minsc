@@ -5660,6 +5660,46 @@ class types(object):
         if not res:
             raise E.ItemNotFoundError(u"{:s}.by({!s}, {:s}) : No type was found with the given identifier ({:#x}) in the specified type library.".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), identifier))
         return res
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def by(cls, info):
+        '''Return the base type for the array, pointer, or reference specified by `info`.'''
+        ti = info
+        if ti.is_ptr():
+            return interface.tinfo.resolve(ti)
+
+        elif ti.is_array():
+            ti, count = interface.tinfo.array(ti)
+            return ti
+
+        # Extract both the ordinal and the name from the type. Then we'll try to
+        # return its information using the ordinal first, falling back to the name.
+        elif ti.is_typeref():
+            ordinal, name = interface.tinfo.ordinal(ti), utils.string.of(ti.get_type_name())
+            return interface.tinfo.at_ordinal(ordinal) if ordinal else interface.tinfo.at_name(name)
+
+        # If we couldn't figure out the correct type, then raise an exception.
+        raise E.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to reduce the type \"{:s}\" using the current type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), utils.string.escape("{!s}".format(ti), '"')))
+    @utils.multicase(info=idaapi.tinfo_t, library=idaapi.til_t)
+    @classmethod
+    def by(cls, info, library):
+        '''Return the base type for the array, pointer, or reference specified by `info` using the given type `library`.'''
+        ti = info
+        if ti.is_ptr():
+            return interface.tinfo.resolve(ti)
+
+        elif ti.is_array():
+            ti, count = interface.tinfo.array(ti)
+            return ti
+
+        # Get the ordinal and name from the type. If the ordinal is valid, then
+        # use it with the library. Otherwise, fall back to checking with the name.
+        elif ti.is_typeref():
+            ordinal, name = interface.tinfo.ordinal(ti), utils.string.of(ti.get_type_name())
+            return interface.tinfo.at_ordinal(ordinal, library) if ordinal else interface.tinfo.at_name(name, library)
+
+        # If we weren't given a valid type, then we have no choice but to abort.
+        raise E.InvalidTypeOrValueError(u"{:s}.by({!r}, {:s}) : Unable to reduce the type \"{:s}\" using the specified type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), interface.tinfo.format_library(library), utils.string.escape("{!s}".format(ti), '"')))
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
@@ -5697,6 +5737,59 @@ class types(object):
         ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
         identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
         return interface.tinfo.has_identifier(identifier, library)
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def has(cls, info):
+        '''Return whether the base type for the array, pointer, or reference specified by `info` is in the current type library.'''
+        ti = info
+
+        # If we weren't given a type reference, use a loop to continuously
+        # reduce the type until we either get one, or can't reduce it anymore.
+        while not ti.is_typeref():
+            if ti.is_ptr():
+                ti = interface.tinfo.resolve(ti)
+            elif ti.is_array():
+                ti, count = interface.tinfo.array(ti)
+            else:
+                break
+            continue
+
+        # If we couldn't reduce it into a typeref, then abort with an exception.
+        if not ti.is_typeref():
+            raise E.InvalidTypeOrValueError(u"{:s}.has({!r}) : Unable to reduce the type \"{:s}\" to a type reference that can be used with the current type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), utils.string.escape("{!s}".format(ti), '"')))
+
+        # Extract the ordinal along with the name from the given type. We can then
+        # check the current type library for the ordinal first, followed by its name.
+        ordinal, name = interface.tinfo.ordinal(ti), utils.string.of(ti.get_type_name())
+        if ordinal:
+            return interface.tinfo.has_ordinal(ordinal)
+        return interface.tinfo.has_name(name)
+    @utils.multicase(info=idaapi.tinfo_t, library=idaapi.til_t)
+    @classmethod
+    def has(cls, info, library):
+        '''Return whether the base type for the array, pointer, or reference specified by `info` is in the specified type `library`.'''
+        ti = info
+
+        # Loop through the type we were given, reducing it as far as we are able.
+        while not ti.is_typeref():
+            if ti.is_ptr():
+                ti = interface.tinfo.resolve(ti)
+            elif ti.is_array():
+                ti, count = interface.tinfo.array(ti)
+            else:
+                break
+            continue
+
+        # If we couldn't reduce it into a type reference, then bail with an exception.
+        if not ti.is_typeref():
+            raise E.InvalidTypeOrValueError(u"{:s}.has({!r}, {:s}) : Unable to reduce the type \"{:s}\" to a type reference that can be used with the specified type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), interface.tinfo.format_library(library), utils.string.escape("{!s}".format(ti), '"')))
+
+        # Get the ordinal and name from the type. If the ordinal is valid, then
+        # use it with the library. Otherwise, fall back to checking with the name.
+        ordinal, name = interface.tinfo.ordinal(ti), utils.string.of(ti.get_type_name())
+        if ordinal:
+            return interface.tinfo.has_ordinal(ordinal, library)
+        return interface.tinfo.has_name(name, library)
 
     @utils.multicase(name=internal.types.string)
     @classmethod
