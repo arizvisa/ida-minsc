@@ -4564,8 +4564,9 @@ class members_t(object):
 
     def __iterate__(self):
         '''Yield each of the members within the structure.'''
-        for idx in range(len(self)):
-            yield member_t(self.owner, idx)
+        owner = self.owner
+        for sptr, mindex, mptr in members.iterate(owner.ptr):
+            yield member_t(owner, mindex)
         return
 
     @utils.multicase(tag=types.string)
@@ -4638,18 +4639,18 @@ class members_t(object):
     ### Private methods
     def __str__(self):
         '''Render all of the fields within the current structure.'''
-        res = []
-        offset, mn, ms, mti = self.baseoffset, 0, 0, 0
-        for i in range(len(self)):
-            m = self[i]
-            name, t, ti, moffset, msize, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
-            res.append((-1, '', [None, moffset - offset], None, offset, moffset - offset, '', {})) if offset < moffset else None
-            res.append((i, name, t, ti, moffset, msize, comment or '', tag))
+        res, owner = [], self.owner
+        base, mn, ms, mti, eoff = self.baseoffset, 0, 0, 0, self.baseoffset
+        for sptr, mindex, mptr in members.iterate(owner.ptr):
+            moffset, t = base if union(sptr) else base + mptr.soff, member.get_type(mptr, 0 if union(sptr) else base + mptr.soff)
+            res.append((-1, '', [None, moffset - eoff], None, eoff, moffset - eoff, '', {})) if eoff < moffset else None
+            name, ti, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
+            res.append((mindex, name, t, ti, moffset, msize, comment or '', tag))
             mn = max(mn, len(name))
-            ms = max(ms, len("{:+#x}".format(moffset - offset)))
+            ms = max(ms, len("{:+#x}".format(moffset - base)))
             ms = max(ms, len("{:+#x}".format(msize)))
             mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
-            offset = moffset + msize
+            eoff = base + mptr.eoff
 
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
@@ -4660,18 +4661,18 @@ class members_t(object):
 
     def __unicode__(self):
         '''Render all of the fields within the current structure.'''
-        res = []
-        offset, mn, ms, mti = self.baseoffset, 0, 0, 0
-        for i in range(len(self)):
-            m = self[i]
-            name, t, ti, moffset, msize, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
-            res.append((-1, '', [None, moffset - offset], None, offset, moffset - offset, '', {})) if offset < moffset else None
-            res.append((i, name, t, ti, moffset, msize, comment or '', tag))
+        res, owner = [], self.owner
+        base, mn, ms, mti, eoff = self.baseoffset, 0, 0, 0, self.baseoffset
+        for sptr, mindex, mptr in members.iterate(owner.ptr):
+            moffset, t = base if union(sptr) else base + mptr.soff, member.get_type(mptr, 0 if union(sptr) else base + mptr.soff)
+            name, ti, msize, comment, tag = (F(mptr) for F in [member.get_name, member.get_typeinfo, idaapi.get_member_size, member.get_comment, internal.tags.member.get])
+            res.append((-1, '', [None, moffset - eoff], None, eoff, moffset - eoff, '', {})) if eoff < moffset else None
+            res.append((mindex, name, t, ti, moffset, msize, comment or '', tag))
             mn = max(mn, len(name))
-            ms = max(ms, len("{:+#x}".format(moffset - offset)))
+            ms = max(ms, len("{:+#x}".format(moffset - base)))
             ms = max(ms, len("{:+#x}".format(msize)))
             mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
-            offset = moffset + msize
+            eoff = base + mptr.eoff
 
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
@@ -5247,8 +5248,9 @@ class members_t(object):
 
     def __iter__(self):
         '''Yield all the members within the structure.'''
-        for idx in range(len(self)):
-            yield member_t(self.owner, idx)
+        owner = self.owner
+        for sptr, mindex, mptr in members.iterate(owner.ptr):
+            yield member_t(owner, mindex)
         return
 
     def __contains__(self, member):
