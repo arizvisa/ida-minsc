@@ -3333,20 +3333,23 @@ class member_t(object):
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.member_t``.'''
-        parent = self.parent
-        return parent.ptr.get_member(self.__index__)
+        parent = self.__parent__
+        mowner, mindex, mptr = members.by_index(parent.ptr, self.__index__)
+        return mptr
     @property
     def id(self):
         '''Return the identifier of the member.'''
-        return self.ptr.id
+        mptr = self.ptr
+        return mptr.id
     @property
     def properties(self):
         '''Return the properties for the current member.'''
-        return self.ptr.props
+        mptr = self.ptr
+        return mptr.props
     @property
     def size(self):
         '''Return the size of the member.'''
-        return idaapi.get_member_size(self.ptr)
+        return member.size(self.ptr)
     @property
     def realoffset(self):
         '''Return the real offset of the member.'''
@@ -3421,12 +3424,12 @@ class member_t(object):
     ## Readable/Writeable Properties
     @property
     def name(self):
-        '''Return the name of the member.'''
+        '''Return the name of the member as a string.'''
         return member.get_name(self.ptr)
     @name.setter
     @utils.string.decorate_arguments('string')
     def name(self, string):
-        '''Set the name of the member to `string`.'''
+        '''Set the name of the member to the specified `string`.'''
         string = interface.tuplename(*string) if isinstance(string, types.ordered) else string
 
         # Type safety is fucking valuable, and in python it's an after-thought.
@@ -3438,91 +3441,44 @@ class member_t(object):
 
     @property
     def comment(self, repeatable=True):
-        '''Return the repeatable comment of the member.'''
-        res = idaapi.get_member_cmt(self.id, repeatable) or idaapi.get_member_cmt(self.id, not repeatable)
-        return utils.string.of(res)
+        '''Return the repeatable comment of the member as a string.'''
+        return member.get_comment(self.ptr, repeatable)
     @comment.setter
-    @utils.string.decorate_arguments('value')
-    def comment(self, value, repeatable=True):
-        '''Set the repeatable comment of the member to `value`.'''
-        res = utils.string.to(value or '')
-        if not idaapi.set_member_cmt(self.ptr, res, repeatable):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
-
-        # verify that the comment was actually assigned properly
-        assigned = idaapi.get_member_cmt(self.id, repeatable)
-        if utils.string.of(assigned) != utils.string.of(res):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
-        return assigned
+    @utils.string.decorate_arguments('string')
+    def comment(self, string, repeatable=True):
+        '''Set the repeatable comment of the member to the specified `string`.'''
+        return member.set_comment(self.ptr, string, repeatable)
 
     @property
     def type(self):
         '''Return the type of the member in its pythonic form.'''
-        res = interface.typemap.dissolve(self.flag, self.typeid, self.size, offset=self.offset)
-        if isinstance(res, structure_t):
-            res = new(res.id, offset=self.offset)
-        elif isinstance(res, types.tuple):
-            iterable = (item for item in res)
-            t = next(iterable)
-            if isinstance(t, structure_t):
-                t = new(t.id, offset=self.offset)
-            elif isinstance(t, types.list) and isinstance(t[0], structure_t):
-                t[0] = new(t[0].id, offset=self.offset)
-            res = tuple(itertools.chain([t], iterable))
-        return res
+        return member.get_type(self.ptr, self.offset)
     @type.setter
     def type(self, type):
-        '''Set the type of the member to the provided `type`.'''
-        cls, set_member_tinfo = self.__class__, idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
+        """Set the type of the member to the given `type` non-destructively.
 
-        # if we were given a tinfo_t or a string to use, then we pretty much use
-        # it with the typeinfo api, but allow it the ability to destroy other members.
-        if isinstance(type, (types.string, idaapi.tinfo_t)):
-            info = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
-            if info is None:
-                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).type({!s}) : Unable to parse the specified type declaration ({!s}) for structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(type)), utils.string.escape("{!s}".format(type), '"'), utils.string.repr(self.name)))
-            return member.set_typeinfo(self.ptr, info, idaapi.SET_MEMTI_MAY_DESTROY)
+        If the given `type` is pythonic, then assign it in a non-destructive manner.
+        If the given `type` is an ``idaapi.tinfo_t``, then apply it to the member destructively.
+        """
+        if not isinstance(type, (types.string, idaapi.tinfo_t)):
+            return member.set_type(self.ptr, type)
 
-        # decompose the pythonic type into the actual information to apply.
-        flag, typeid, nbytes = interface.typemap.resolve(type)
-
-        opinfo = idaapi.opinfo_t()
-        opinfo.tid = typeid
-        if not idaapi.set_member_type(self.parent.ptr, self.offset - self.parent.members.baseoffset, flag, opinfo, nbytes):
-            raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, type, utils.string.repr(self.name)))
-
-        # verify that our type has been applied before we update its refinfo,
-        # because if it hasn't then we need to warn the user about it so that
-        # they know what's up and why didn't do what we were asked.
-        expected, expected_tid = (flag, nbytes), typeid
-        resulting, resulting_tid = (self.flag, self.size), self.typeid
-
-        if expected == resulting:
-            interface.address.update_refinfo(self.id, flag)
-        else:
-            logging.warning(u"{:s}({:#x}).type({!s}) : Applying the given flags and size ({:#x}, {:d}) resulted in different flags and size being assigned ({:#x}, {:d}).".format('.'.join([__name__, cls.__name__]), self.id, type, *itertools.chain(expected, resulting)))
-
-        # smoke-test that we actually updated the type identifier and log it if it
-        # didn't actually work. this is based on my ancient logic which assumed
-        # that opinfo.tid should be BADADDR which isn't actually the truth when
-        # you're working with a refinfo. hence we try to be quiet about it.
-        if expected_tid != (resulting_tid or idaapi.BADADDR):
-            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, type, expected_tid, resulting_tid or idaapi.BADADDR))
-
-        # return the stuff that actually applied.
-        flag, size = resulting
-        return flag, resulting_tid, size
+        # if we were given a tinfo_t or a string to use, then we just use the typeinfo
+        # api, but ensure that we use the flags that allow it to destroy other members.
+        info = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+        if info is None:
+            cls = self.__class__
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).type({!s}) : Unable to parse the specified type declaration ({!s}) for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr("{!s}".format(type)), utils.string.repr(self.type), utils.string.escape("{!s}".format(self.name), '"')))
+        return member.set_typeinfo(self.ptr, info, idaapi.SET_MEMTI_MAY_DESTROY)
 
     @property
     def typeinfo(self):
-        '''Return the type information of the current member.'''
+        '''Return the type information that has been applied to the member.'''
         return member.get_typeinfo(self.ptr)
 
     @typeinfo.setter
     def typeinfo(self, info):
-        '''Set the type information of the current member to `info`.'''
+        '''Set the type information of the member to `info` non-destructively.'''
         mptr = self.ptr
 
         # Type safety is fucking valuable, and we are contractually obligated
