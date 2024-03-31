@@ -4105,21 +4105,6 @@ class members_t(object):
         return result
     byoffset = utils.alias(by_offset, 'members_t')
 
-    def index(self, member):
-        '''Return the index of the specified `member` within the structure.'''
-        cls, owner = self.__class__, self.owner
-        if not hasattr(member, 'id'):
-            raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!s}) was specified for the member to search for.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, member, member.__class__))
-        identifier = member.id
-
-        # Iterate through all of the members and find the index that matches.
-        try:
-            sptr, mindex, mptr = members.by_identifier(owner.ptr, identifier)
-        except E.MemberNotFoundError:
-            Fget_full_name = utils.fcompose(getattr(idaapi, 'ea2node', utils.fidentity), internal.netnode.name.get, utils.string.of)
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) is not in the list of members.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, "{:#x}".format(identifier) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), Fget_full_name(identifier)))
-        return mindex
-
     def by_realoffset(self, offset):
         '''Return the member at the specified `offset` of the structure.'''
         owner = self.owner
@@ -4328,7 +4313,32 @@ class members_t(object):
         index = self.index(mem)
         return self[index]
 
-    # adding/removing members
+    ## Adding and removing members from a structure.
+    def index(self, member):
+        '''Return the index of the specified `member` within the structure.'''
+        cls, owner = self.__class__, self.owner
+        if not hasattr(member, 'id'):
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!s}) was specified as the member being requested.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, member, member.__class__))
+        identifier = member.id
+
+        # Iterate through all of the members and find the index that matches.
+        try:
+            sptr, mindex, mptr = members.by_identifier(owner.ptr, identifier)
+        except E.MemberNotFoundError:
+            Fget_full_name = utils.fcompose(getattr(idaapi, 'ea2node', utils.fidentity), internal.netnode.name.get, utils.string.of)
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) does not belong to the current {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, "{:#x}".format(identifier) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), Fget_full_name(identifier), 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', owner.ptr.id))
+        return mindex
+
+    @utils.multicase(index=types.integer)
+    def pop(self, index):
+        '''Remove the member at the specified `index` of the structure.'''
+        cls, owner, base = self.__class__, self.owner, self.baseoffset
+        results = members.remove_slice(owner.ptr, index, base)
+        if not results:
+            raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the member at index {:d} of the {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, index, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', owner.ptr.id))
+        [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
+        return mname, mtype, mlocation, mtypeinfo
+
     @utils.multicase()
     def add(self, **offset):
         '''Append a member with the default type to the end of the structure.'''
@@ -4461,16 +4471,6 @@ class members_t(object):
         # a member_t that we'll return back to the caller.
         idx = self.index(mptr)
         return member_t(owner, idx)
-
-    @utils.multicase(index=types.integer)
-    def pop(self, index):
-        '''Remove the member at the specified `index`.'''
-        cls, owner, base = self.__class__, self.owner, self.baseoffset
-        results = members.remove_slice(owner.ptr, index, base)
-        if not results:
-            raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the member at index {:d}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, index))
-        [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
-        return mname, mtype, mlocation, mtypeinfo
 
     @utils.multicase(offset=types.integer)
     def remove(self, offset):
