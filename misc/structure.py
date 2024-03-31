@@ -2831,74 +2831,8 @@ class structure_t(object):
         return res <= offset < res + cb
 
     def refs(self):
-        '''Return all the structure members and operand references which reference this specific structure.'''
-        cls, Fnetnode = self.__class__, getattr(idaapi, 'ea2node', utils.fidentity)
-        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
-
-        # First collect all of our identifiers referenced by this structure,
-        # whilst making sure to include all the members too.
-        iterable = itertools.chain([self.id], map(operator.attrgetter('id'), self.members))
-        items = [identifier for identifier in iterable]
-
-        # Now we need to iterate through all of our members and grab all references
-        # to absolutely everything. This is pretty much bypassing the "cross-reference depth"
-        # option since if the user is using the api, they probably want everything anywayz.
-        ichainable = (interface.xref.to(identifier, idaapi.XREF_ALL) for identifier in items)
-        refs = [packed_frm_iscode_type for packed_frm_iscode_type in itertools.chain(*ichainable)]
-
-        # That should've given us absolutely every reference related to this
-        # structure, so the last thing to do is to filter our list for references
-        # to addresses within the database.
-        results, matches = {}, {identifier for identifier in items}
-        for xrfrom, xriscode, xrtype in refs:
-            flags = address.flags(xrfrom)
-
-            # If the reference is an identifier, then it's not what we're looking
-            # for as this method only cares about database addresses.
-            if interface.node.identifier(xrfrom):
-                continue
-
-            # If the reference is not pointing to code, then we skip this because
-            # there's no way it can actually be pointing to an operand.
-            if not address.code(xrfrom):
-                logging.debug(u"{:s}({:#x}).refs() : Skipping {:s} reference at {:#x} with the type ({:d}) due to its address not being marked as code.".format('.'.join([__name__, cls.__name__]), self.id, 'code' if xriscode else 'data', xrfrom, xrtype))
-                continue
-
-            # Iterate through all of its operands and only care about
-            # the ones that have operand information for it.
-            access = [ref.access for ref in interface.instruction.access(xrfrom)]
-            for opnum, operand in enumerate(address.operands(xrfrom)):
-                value = idaapi.as_signed(operand.value if operand.type in {idaapi.o_imm} else operand.addr)
-
-                # Collect the operand information into a proper path in case
-                # the opinfo_t is damaged...which happens sometimes.
-                delta, tids = interface.node.get_stroff_path(xrfrom, opnum)
-
-                # If we grabbed a path, then we can use it to grab the
-                # structure and all of its member identifiers.
-                if tids:
-                    path = interface.strpath.of_tids(delta + value, tids)
-                    members, nomember = {member.id for _, member, _ in path if member}, any(member is None for _, member, _ in path)
-
-                    # Verify that one of our ids is contained within it unless the path is
-                    # referencing the structure directly. If none of the members in the path
-                    # are related to our structure, then we can just ignore this reference.
-                    if not any([members & matches, nomember]):
-                        continue
-
-                    # Unify the reference we found with the access from the operand.
-                    #results.setdefault(xrfrom, []).append(interface.opref_t(xrfrom, opnum, interface.access_t(xrtype, xriscode) | access[opnum]))
-                    results.setdefault(xrfrom, []).append(interface.opref_t(xrfrom, opnum, interface.access_t(xrtype, xriscode)))
-
-                # Otherwise this is likely a refinfo or stack variable, and we only need
-                # to follow the reference in order to grab it.
-                elif idaapi.is_stkvar(flags, opnum) or idaapi.is_stroff(flags, opnum) or idaapi.is_off(flags, opnum):
-                    results.setdefault(xrfrom, []).append(interface.opref_t(xrfrom, opnum, interface.access_t(xrtype, xriscode)))
-                continue
-            continue
-
-        merged = {ea : functools.reduce(operator.or_, items) for ea, items in results.items()}
-        return [merged[ea] for ea in sorted(results)]
+        '''Return the operand references from the database that reference this structure or its members.'''
+        return members.references(self.ptr)
 
     def up(self):
         '''Return all structure or frame members within the database that reference this particular structure.'''
