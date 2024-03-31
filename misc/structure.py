@@ -160,63 +160,20 @@ class xref(object):
 
     @classmethod
     def structure(cls, sptr):
-        '''Yield each structure or frame member referencing the structure identified by `sptr` as a tuple composed of the offset and reference type.'''
-        results, this = [], idaapi.get_struc(sptr if isinstance(sptr, types.integer) else sptr.id)
+        '''Yield each structure member or reference that uses the structure identified by `sptr`.'''
+        sptr = idaapi.get_struc(sptr if isinstance(sptr, types.integer) else sptr.id)
+        for offset, reference_or_member in interface.xref.structure(sptr):
+            if isinstance(reference_or_member, interface.refbase_t):
+                reference = reference_or_member
+                yield reference
 
-        # Iterate through each reference for the structure to determine what it was
-        # actually applied to. If the reference is an identifier, then we need to know
-        # the mptr, full name, and sptr to identify what is actually being referenced.
-        for xrfrom, xriscode, xrtype in interface.xref.to(this.id, idaapi.XREF_ALL):
-            if interface.node.identifier(xrfrom):
-                mpack = idaapi.get_member_by_id(xrfrom)
-                if mpack is None:
-                    raise E.MemberNotFoundError(u"{:s}.structure({:#x}) : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), this.id, xrfrom))
-
-                mptr, name, sptr = mpack
-                if not interface.node.identifier(sptr.id):
-                    sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
-
-                # Validate that the type of the mptr is what we're expecting.
-                if not isinstance(mptr, idaapi.member_t):
-                    name = utils.string.of(idaapi.get_member_fullname(xrfrom))
-                    raise E.InvalidTypeOrValueError(u"{:s}.structure({:#x}) : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), this.id, mptr.__class__, utils.string.escape(name, '"')))
-
-                # Try and fetch the frame's address (which should fail if not a frame),
-                # and then use it to get the func_t that owns the member.
-                ea = idaapi.get_func_by_frame(sptr.id)
-                func = idaapi.get_func(ea)
-
-                # If we were unable to get the function frame, then we're referencing a
-                # member from a different structure and we already have everything.
-                if ea == idaapi.BADADDR:
-                    sptr, soffset = sptr, 0
-
-                # If we couldn't grab the func, then we just bail.
-                elif not func:
-                    raise E.FunctionNotFoundError(u"{:s}.structure({:#x}) : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), this.id, mptr.id, ea))
-
-                # If we couldn't grab the frame, then we bail on that too.
-                elif not idaapi.get_frame(func):
-                    raise E.MissingTypeOrAttribute(u"{:s}.structure({:#x})) : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), this.id, ea, mptr.id))
-
-                # Otherwise we're referencing a frame member, and we need to figure out
-                # the structure and the base that we'll be creating its structure at.
-                else:
-                    sptr, soffset = idaapi.get_frame(func), interface.function.frame_offset(func)
-
-                # Now we need to figure out the index of the member and then we can yield it.
-                packed = mowner, mindex, mcandidate = sptr, members.index(sptr, mptr), mptr
-                yield soffset, packed
-
-            # If it's not code, then we're just a reference to an address and so we
-            # need to yield the address it's for along with its reference type.
-            elif not address.code(xrfrom):
-                yield xrfrom, interface.ref_t(xrfrom, interface.reftype_t.of(xrtype))
-
-            # If it's code, then we skip this because structure_t.up only returns
-            # data references to the structure and operands are for structure_t.refs.
+            # Otherwise it is a tuple for a structure member, and we need to
+            # use it to construct a structure_t and fetch the member by index.
             else:
-                logging.debug(u"{:s}.structure({:#x}) : Skipping {:s}({:d}) reference at {:#x} with the type ({:d}) due to the reference address not marked as data.".format('.'.join([__name__, cls.__name__]), this.id, 'code' if xriscode else 'data', xriscode, xrfrom, xrtype))
+                mowner, mcandidate = reference_or_member
+                mindex = members.index(mowner, mcandidate)
+                member = structure_t(mowner, offset).members[mindex]
+                yield member
             continue
         return
 
@@ -813,12 +770,12 @@ class member(object):
             # now that we have our work, we can add it to our list. however, we also
             # need to check if our parent is a union so that we can descend through
             # its members for ones at the same offset of our referring member.
-            for _, item in itertools.chain(*map(xref.structure, queue)):
+            for _, item in itertools.chain(*map(interface.xref.structure, queue)):
                 if isinstance(item, interface.ref_t):
                     continue
 
                 # unpack the item and then check if it's a frame, since we can skip those too.
-                mowner, mindex, mmember = item
+                mowner, mmember = item
                 if frame(mowner):
                     continue
                 mrealoffset = 0 if union(mowner) else mmember.soff
@@ -2837,18 +2794,7 @@ class structure_t(object):
     def up(self):
         '''Return the structure members or references in the database that use this structure.'''
         result, sptr = [], self.ptr
-        for offset, reference_or_member in xref.structure(sptr):
-            if isinstance(reference_or_member, interface.refbase_t):
-                reference = reference_or_member
-                result.append(reference)
-
-            # Otherwise it is a tuple for a structure member, and we need to
-            # use it to construct a structure_t and fetch the member by index.
-            else:
-                sptr, index, mptr = reference_or_member
-                member = structure_t(sptr, offset).members[index]
-                result.append(member)
-            continue
+        result.extend(xref.structure(sptr))
         return result
 
     ### Properties
