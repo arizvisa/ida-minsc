@@ -4264,55 +4264,6 @@ class members_t(object):
         return self[index]
     by_id = byid = byidentifier = utils.alias(by_identifier, 'members_t')
 
-    def near_offset(self, offset):
-        '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
-        owner = self.owner
-
-        # This was just a wrapper anyways...
-        return self.near_realoffset(offset - self.baseoffset)
-    near = nearoffset = utils.alias(near_offset, 'members_t')
-
-    def near_realoffset(self, offset):
-        '''Return the member nearest to the specified `offset`.'''
-        owner = self.owner
-
-        # Start by getting our bounds.
-        minimum, maximum = owner.realbounds
-        if not (minimum <= offset < maximum):
-            cls = self.__class__
-            logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset ({:#x}) is not within the bounds ({:#x}<->{:#x}) of the structure and will result in returning the nearest member.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, offset, minimum, maximum))
-
-        # If there aren't any elements in the structure, then there's no members
-        # to search through in here. So just raise an exception and bail.
-        if not len(self):
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Unable to find member near offset.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset))
-
-        # Grab all of the members at the specified offset so we can determine
-        # if there's an exact member that can be found.
-        members = [mptr for mptr in self.__members_at__(offset)]
-
-        # If we found more than one member, then try and filter the exact one
-        # using the members_t.by_realoffset method.
-        if len(members):
-            return self.by_realoffset(offset)
-
-        # We couldn't find any members, so now we'll try and search for the
-        # member that is nearest to the offset that was requested.
-        def recurse(offset, available):
-            if len(available) == 1:
-                return available[0]
-            index = len(available) // 2
-            return recurse(offset, available[:index]) if offset <= available[index].realoffset else recurse(offset, available[index:])
-
-        # This should already be sorted for us, so descend into it looking
-        # for the nearest member.
-        mem = recurse(offset, [item for item in self])
-
-        # Now we can return the exact member that was found.
-        index = self.index(mem)
-        return self[index]
-
     ## Adding and removing members from a structure.
     def index(self, member):
         '''Return the index of the specified `member` within the structure.'''
