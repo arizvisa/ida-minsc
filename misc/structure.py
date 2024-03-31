@@ -69,16 +69,8 @@ class address(object):
 
         # Try super hard to get the type information, first doing it the official way
         # and then guessing it. If none of that worked, then return None for no type.
-        ti, error = idaapi.tinfo_t(), 0
-        ok = get_tinfo(ti, ea) or guess_tinfo(ti, ea) != idaapi.GUESS_FUNC_FAILED
-        if not ok:
-            return None
-
-        # Concretize the type because this is likely going to be returned or serialized.
-        elif hasattr(idaapi, 'replace_ordinal_typerefs'):
-            error = idaapi.replace_ordinal_typerefs(ti.get_til(), ti)
-        return None if error < 0 else ti
-
+        ti = idaapi.tinfo_t()
+        return interface.tinfo.concretize(ti) if get_tinfo(ti, ea) or guess_tinfo(ti, ea) != idaapi.GUESS_FUNC_FAILED else None
     @utils.multicase(ea=types.integer, none=types.none)
     @classmethod
     def type(cls, ea, none):
