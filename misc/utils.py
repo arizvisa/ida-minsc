@@ -16,7 +16,20 @@ import sys, codecs, heapq, collections, array, math
 import internal
 import idaapi, ida, ctypes
 
-__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fidentity','fdefault','fcompose','fdiscard','fcondition','fthrough','flazy','fpartial','fapply','fapplyto','frpartial','freverse','fthrow','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','nth','first','second','third','last','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
+__all__ = [
+    'fpack', 'funpack', 'fcar', 'fcdr',
+    'finstance', 'fhasitem', 'fgetitem', 'fitem', 'fsetitem', 'fdelitem', 'fhasattr', 'fgetattr', 'fattribute', 'fsetattr', 'fsetattribute',
+    'fconstant', 'fidentity', 'fdefault', 'fcompose', 'fdiscard', 'fcondition', 'fthrough',
+    'flazy', 'fpartial', 'fapply', 'fapplyto', 'frpartial', 'freverse',
+    'fthrow', 'fcatch',
+    'fcomplement', 'fnot',
+    'ilist', 'liter', 'ituple', 'titer',
+    'icount', 'itake', 'iget', 'nth', 'first', 'second', 'third', 'last',
+    'iterslice', 'itermap', 'iterfilter', 'iterzip', 'iterchain',
+    'listslice', 'listmap', 'listfilter', 'listzip',
+    'islice', 'imap', 'ifilter', 'ichain', 'izip',
+    'lslice', 'lmap', 'lfilter', 'lzip',
+]
 
 ### functional programming combinators (FIXME: probably better to document these with examples)
 
@@ -29,17 +42,17 @@ fcar = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap[:1]), **{ key : value for
 # return a closure that executes `F` with all of it arguments but the first.
 fcdr = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap[1:]), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that will check that `object` is an instance of `type`.
-finstance = lambda *type: frpartial(builtins.isinstance, type)
-# return a closure that will check if its argument has an item `key`.
-fhasitem = lambda key: frpartial(operator.contains, key)
+finstance = lambda *type: lambda object: builtins.isinstance(object, type)
+# return a closure that will check if `object` has an item `key`.
+fhasitem = lambda key: lambda object: operator.contains(object, key)
 # return a closure that will get a particular element from an object.
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
 # return a closure that will set a particular element on an object.
 fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, item, value) or object
 # return a closure that will remove a particular element from an object and return the modified object
 fdelitem = lambda *items: fcompose(fthrough(fidentity, *[fcondition(fhasitem(item))(frpartial(operator.delitem, item), None) for item in items]), builtins.iter, builtins.next)
-# return a closure that will check if its argument has an `attribute`.
-fhasattr = lambda attribute: frpartial(builtins.hasattr, attribute)
+# return a closure that will check if `object` has an `attribute`.
+fhasattr = lambda attribute: lambda object: builtins.hasattr(object, attribute)
 # return a closure that will get a particular attribute from an object.
 fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(object, attribute, *default)
 # return a closure that will set a particular attribute on an object.
@@ -128,11 +141,13 @@ nth = lambda count: fcompose(builtins.iter, frpartial(itertools.islice, 1 + coun
 # return the first, second, or third item of a thing.
 first, second, third, last = nth(0), nth(1), nth(2), operator.itemgetter(-1)
 # copy from itertools
-islice, imap, ifilter, ichain, izip = itertools.islice, fcompose(builtins.map, builtins.iter), fcompose(builtins.filter, builtins.iter), itertools.chain, fcompose(builtins.zip, builtins.iter)
+iterslice, itermap, iterfilter, iterchain, iterzip = itertools.islice, getattr(itertools, 'imap', fcompose(builtins.map, builtins.iter)), getattr(itertools, 'ifilter', fcompose(builtins.filter, builtins.iter)), itertools.chain, getattr(itertools, 'izip', fcompose(builtins.zip, builtins.iter))
+[islice, imap, ifilter, ichain, izip] = (iterslice, itermap, iterfilter, iterchain, iterzip)
 # restoration of the Py2-compatible list types
-lslice, lmap, lfilter, lzip = fcompose(itertools.islice, builtins.list), fcompose(builtins.map, builtins.list), fcompose(builtins.filter, builtins.list), fcompose(builtins.zip, builtins.list)
+listslice, listmap, listfilter, listzip = fcompose(itertools.islice, builtins.list), fcompose(builtins.map, builtins.list), fcompose(builtins.filter, builtins.list), fcompose(builtins.zip, builtins.list)
+[lslice, lmap, lfilter, lzip] = (listmap, listmap, listfilter, listzip)
 # count number of elements of a container
-count = fcompose(builtins.iter, builtins.list, builtins.len)
+icount = count = fcompose(builtins.iter, builtins.list, builtins.len)
 
 # cheap pattern-like matching
 class Pattern(object):
