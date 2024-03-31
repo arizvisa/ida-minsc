@@ -3970,150 +3970,94 @@ class members_t(object):
     @utils.string.decorate_arguments('name', 'suffix')
     def has(self, name, *suffix):
         '''Return whether a member with the specified `name` exists.'''
-        if not suffix and isinstance(name, interface.location_t): return self.has(location=name)
         string = name if isinstance(name, types.ordered) else (name,)
-        owner, res = self.owner, utils.string.to(interface.tuplename(*itertools.chain(string, suffix)))
-        return idaapi.get_member_by_name(owner.ptr, res) is not None
+        return members.has_name(self.owner.ptr, tuple(itertools.chain(string, suffix)))
     @utils.multicase(location=interface.location_t)
     def has(self, location):
-        '''Return whether a member exists at the specified `location`.'''
+        '''Return whether a member exists inside the specified `location`.'''
         get_data_elsize = idaapi.get_full_data_elsize if hasattr(idaapi, 'get_full_data_elsize') else idaapi.get_data_elsize
 
-        # First unpack the location to convert both its components to integers.
+        # First unpack the location to convert both its components to integers, and
+        # then translate them to the structure as if it was based at offset 0.
         offset, size = location
         if isinstance(offset, interface.symbol_t):
             [offset] = (int(item) for item in offset.symbols)
-
-        # Then we need to figure out the realoffset of the entire structure.
         sptr, realoffset, realsize = self.owner.ptr, offset - self.baseoffset, size
-        size, unionQ = idaapi.get_struc_size(sptr), union(sptr)
 
-        # If we're using a variable-length structure, then we'll need
-        # to check the last member if none of the others matched.
-        variable = sptr.props & idaapi.SF_VAR and 0 <= realoffset and size <= realoffset
+        # Now we can use it to get the list of candidates, then we can filter
+        # out the ones that don't align with the realoffset we were given.
+        candidates = (mptr for sptr, _, mptr in members.at_offset(sptr, realoffset))
+        iterable = ((mptr, member.at(mptr, realoffset)) for mptr in candidates if member.contains(mptr, realoffset))
+        filtered = [mptr for mptr, (index, moffset) in iterable if not moffset]
 
-        # Otherwise, we start by checking that the offset is within bounds.
-        if not any([0 <= realoffset < size, variable]):
-            return False
-
-        # Now we just iterate through all our members to find a match.
-        ok = False
-        for midx in range(sptr.memqty):
-            opinfo, mptr = idaapi.opinfo_t(), sptr.get_member(midx)
-            mleft, mright, msize = 0 if unionQ else mptr.soff, mptr.eoff, idaapi.get_member_size(mptr)
-
-            # Get any information about the member and use it to get the size of the type.
+        # Finally, we check each member in our list of candidates against the size.
+        for mptr in filtered:
+            opinfo = idaapi.opinfo_t()
             retrieved = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
-            mrealsize = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None)
+            melement, msize = get_data_elsize(mptr.id, mptr.flag, opinfo if retrieved else None), idaapi.get_member_size(mptr)
 
-            # If we're a variable-length structure and the member has no size, then we
-            # need to check if the location is a multiple of the member location.
-            if all([variable, mleft == mright, mleft <= realoffset, mrealsize, realsize % mrealsize == 0]):
-                index, remainder = divmod(realoffset - mleft, mrealsize)
-                ok = ok if remainder else True
+            # Here, we verify that the parameter size is a multiple of the member's
+            # size, and that the size does not go outside the member's boundaries.
+            # This confirms that the location selects at least one of its elements.
+            index, remainder = divmod(realsize, melement)
+            is_multiple = False if remainder else True
 
-            # Otherwise, we can simply check if the whole element matches.
-            elif all([msize, realoffset == mleft, realsize == msize]):
-                ok = ok or all([msize, realoffset == mleft, realsize == msize])
+            left, right = realoffset, realoffset + melement * index
+            is_variable = sptr.props & idaapi.SF_VAR and mptr.soff == mptr.eoff
 
-            # Or we check to see if the member is an array and we match any number of elements.
-            elif all([mrealsize, mrealsize != msize, realsize < msize, realsize % mrealsize == 0]):
-                index, remainder = divmod(realoffset - mleft, mrealsize)
-                ok = ok if remainder else True
-            continue
-        return ok
-    @utils.multicase(offset=types.integer)
-    def has(self, offset):
-        '''Return whether a member exists at the specified `offset`.'''
-        owner = self.owner
-        base, size, unionQ = self.baseoffset, idaapi.get_struc_size(owner.ptr), union(owner.ptr)
-
-        # Calculate the realoffset so that we can verify the offset is within some valid boundaries.
-        realoffset = offset - base
-
-        # If we're a variable-length structure, then our bounds are technically from 0 to infinity.
-        if owner.ptr.props & idaapi.SF_VAR and 0 <= realoffset and size <= realoffset:
-            pass
-
-        # Otherwise, we can check that the offset is within our valid boundaries.
-        elif not (0 <= realoffset < size):
-            return False
-
-        # Iterate through all of our members and figure out which one contains us.
-        for member in self.__iterate__():
-            mptr = member.ptr
-            mleft, mright = 0 if unionQ else mptr.soff, mptr.eoff
-
-            # If our member has no size and we're using a variable-length structure,
-            # then the realoffset is "within" the member if it comes after it.
-            if owner.ptr.props & idaapi.SF_VAR and mleft == mright and mleft <= realoffset:
-                return True
-
-            # Otherwise, we just check its boundaries like normal.
-            elif mleft <= realoffset < mright:
+            # If the size is a multiple of the element size, and the end of the
+            # location is within the boundaries of the member, then we got a match.
+            if is_multiple and realsize > 0 and any([is_variable, right <= mptr.soff + msize]):
                 return True
             continue
         return False
+    @utils.multicase(offset=types.integer)
+    def has(self, offset):
+        '''Return whether a member exists at the specified `offset`.'''
+        owner, realoffset = self.owner, offset - self.baseoffset
+        return members.has_offset(owner.ptr, realoffset)
     @utils.multicase(start=types.integer, end=types.integer)
     def has(self, start, end):
         '''Return whether any members exist from the offset `start` to the offset `end`.'''
         owner = self.owner
-        base, size, unionQ = self.baseoffset, idaapi.get_struc_size(owner.ptr), union(owner.ptr)
-
-        # We mostly copy the member_t.has(int) implementation.
-        left, right = map(functools.partial(operator.add, -base), sorted([start, end]))
-
-        # If we're a variable-length structure, then our bounds are technically from 0 to infinity.
-        if owner.ptr.props & idaapi.SF_VAR and 0 <= realoffset and size <= realoffset:
-            pass
-
-        # Iterate through all of our members and figure out which one contains us.
-        for member in self.__iterate__():
-            mptr = member.ptr
-            mleft, mright = 0 if unionQ else mptr.soff, mptr.eoff
-
-            # If our member has no size and we're using a variable-length structure,
-            # then the realoffset is "within" the member if it comes after it.
-            if owner.ptr.props & idaapi.SF_VAR and mleft == mright and mleft <= left:
-                return True
-
-            # Otherwise, check if the segment overlaps with the member.
-            elif left < mright and right > mleft:
-                return True
-            continue
-        return False
+        start, stop = (offset - self.baseoffset for offset in sorted([start, end]))
+        return members.has_bounds(owner.ptr, start, stop)
     @utils.multicase(bounds=interface.bounds_t)
     def has(self, bounds):
         '''Return whether any members exist within the specified `bounds`.'''
-        start, stop = sorted(bounds)
-        return self.has(start, stop)
+        start, stop = (offset - self.baseoffset for offset in sorted(bounds))
+        return members.has_bounds(start, stop)
     @utils.multicase(structure=(idaapi.struc_t, structure_t))
     def has(self, structure):
         '''Return whether any members uses the specified `structure` as a field or references it as a pointer.'''
-        sptr = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
-        owner, tid, tinfo = self.owner.ptr, None if sptr.id == idaapi.BADADDR else sptr.id, address.type(sptr.id)
-        stype = None if tinfo is None else interface.tinfo.structure(tinfo)
-        for midx in range(owner.memqty):
-            mptr = owner.get_member(midx)
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
-            # First retrieve the type and check if the type-id matches.
+        # First, we get all the information for the structure parameter. We extract its id,
+        # and then try to extract its type. We assume that its type is _always_ a structure.
+        candidate = structure if isinstance(structure, idaapi.struc_t) else structure.ptr
+        tid, tinfo = None if candidate.id == idaapi.BADADDR else candidate.id, address.type(candidate.id)
+        stype = None if tinfo is None else interface.tinfo.structure(tinfo)
+
+        # Iterate through all of the members and check first if the type
+        # identifier matches the structure that we were given as a parameter.
+        for sptr, midx, mptr in members.iterate(self.owner.ptr):
             opinfo = idaapi.opinfo_t()
             res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
-            if res and res.tid == tid:
+            if mptr.flag & idaapi.DT_TYPE == FF_STRUCT and res and res.tid == tid:
                 return True
 
-            # Otherwise we need to check if we're able to compare the type
-            # and then we can extract the type information and compare.
+            # Otherwise we need to check if we're able to compare the type information that
+            # was applied to the member, so we try to extract it and skip if we couldn't.
             mtype = address.type(mptr.id)
             if any([mtype is None, stype is None]):
                 continue
 
-            # Try to resolve the member's type. We use the exception
-            # to assign "None" to candidate if we couldn't resolve it.
+            # Try to resolve the member's type to the structure it's based on. We use the
+            # exception to assign "None" as the candidate if we couldn't resolve it.
             try: candidate = interface.tinfo.structure(mtype)
             except (E.DisassemblerError, TypeError): candidate = None
 
-            # If the types actually matched, then we can return success.
+            # If there was a candidate and it actually matches, then we can return success.
             if candidate and interface.tinfo.equals(stype, candidate):
                 return True
             continue
@@ -4121,9 +4065,8 @@ class members_t(object):
     @utils.multicase(info=idaapi.tinfo_t)
     def has(self, info):
         '''Return whether the types of any of the members are the same as the type information in `info`.'''
-        owner = self.owner.ptr
-        for midx in range(owner.memqty):
-            mptr = owner.get_member(midx)
+        owner = self.owner
+        for sptr, midx, mptr in members.iterate(owner.ptr):
             mtype = address.type(mptr.id)
             if mtype is not None and interface.tinfo.equals(mtype, info):
                 return True
