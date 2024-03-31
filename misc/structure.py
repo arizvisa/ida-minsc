@@ -4465,23 +4465,12 @@ class members_t(object):
     @utils.multicase(index=types.integer)
     def pop(self, index):
         '''Remove the member at the specified `index`.'''
-        owner, item = self.owner, self[index]
-        if not union(owner.ptr):
-            return self.remove(item.offset)
-
-        # grab the owner, the member, and all of the member's attributes.
-        sptr, mptr = owner.ptr, item.ptr
-        moffset, mindex, msize = self.baseoffset, mptr.soff, idaapi.get_member_size(mptr)
-        mname, location = utils.string.of(idaapi.get_member_name(mptr.id) or ''), interface.location_t(moffset, msize)
-
-        # grab the type information so we can pythonify and return it.
-        info = idaapi.retrieve_member_info(mptr, idaapi.opinfo_t()) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(idaapi.opinfo_t(), mptr)
-        type = interface.typemap.dissolve(mptr.flag, info.tid if info else idaapi.BADADDR, msize, offset=moffset)
-
-        # delete the member and return what we just removed.
-        if not idaapi.del_struc_member(sptr, mindex):
-            raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the union member at the specified index ({:d}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, mindex))
-        return mname, type, location
+        cls, owner, base = self.__class__, self.owner, self.baseoffset
+        results = members.remove_slice(owner.ptr, index, base)
+        if not results:
+            raise E.DisassemblerError(u"{:s}({:#x}).members.pop({:d}) : Unable to remove the member at index {:d}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, index, index))
+        [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
+        return mname, mtype, mlocation, mtypeinfo
 
     @utils.multicase(offset=types.integer)
     def remove(self, offset):
