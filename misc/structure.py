@@ -4106,18 +4106,19 @@ class members_t(object):
     byoffset = utils.alias(by_offset, 'members_t')
 
     def index(self, member):
-        '''Return the index of the specified `member`.'''
-        owner = self.owner
+        '''Return the index of the specified `member` within the structure.'''
+        cls, owner = self.__class__, self.owner
         if not hasattr(member, 'id'):
-            cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!s}) was specified for the member to search for.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, member, member.__class__))
+        identifier = member.id
 
-        for i in range(owner.ptr.memqty):
-            if member.id == self[i].id:
-                return i
-            continue
-        cls, Fnetnode = self.__class__, getattr(idaapi, 'ea2node', utils.fidentity)
-        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) is not in the members list.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), internal.netnode.name.get(Fnetnode(member.id))))
+        # Iterate through all of the members and find the index that matches.
+        try:
+            sptr, mindex, mptr = members.by_identifier(owner.ptr, identifier)
+        except E.MemberNotFoundError:
+            Fget_full_name = utils.fcompose(getattr(idaapi, 'ea2node', utils.fidentity), internal.netnode.name.get, utils.string.of)
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) is not in the list of members.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, "{:#x}".format(identifier) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), Fget_full_name(identifier)))
+        return mindex
 
     def by_realoffset(self, offset):
         '''Return the member at the specified `offset` of the structure.'''
