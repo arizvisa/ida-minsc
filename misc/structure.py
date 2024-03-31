@@ -4305,133 +4305,47 @@ class members_t(object):
 
     @utils.multicase(offset=types.integer)
     def remove(self, offset):
-        '''Remove the member at `offset` from the structure.'''
-        cls, owner, items = self.__class__, self.owner, [mptr for mptr in self.__members_at__(offset - self.baseoffset)] if offset >= self.baseoffset else []
+        '''Remove the member at the specified `offset` of the structure.'''
+        cls, owner, items = self.__class__, self.owner, [packed for packed in members.at_offset(offset - self.baseoffset)]
 
-        # If there are no items at the requested offset, then we bail.
+        # If there are no items or more than one at the requested offset than
+        # we bail because of there being either no member or it's a union.
         if not items:
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find a member at the specified offset ({:#x}) of the structure ({:s}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, offset, self.owner.bounds))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find a member at the specified offset ({:#x}) of the {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, offset, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', owner.bounds))
 
-        # If more than one item was found, then we also need to bail.
         elif len(items) > 1:
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.remove({:+#x}) : Refusing to remove more than {:d} member{:s} ({:d}) at offset {:#x}.".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, 1, '' if len(items) == 1 else 's', len(items), offset))
 
-        # Now we know exactly what we can remove.
-        mptr, = items
-        results = self.remove(self.baseoffset + mptr.soff, mptr.eoff - mptr.soff)
+        # Grab the single item out of our list of results, and remove it.
+        [(mowner, mindex, mptr)] = items
+        results = members.remove_slice(owner.ptr, mindex, self.baseoffset)
         if not results:
-            raise E.DisassemblerError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to remove the member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, self.baseoffset + mptr.soff))
-        result, = results
-        return result
-    @utils.multicase(offset=types.integer, size=types.integer)
-    def remove(self, offset, size):
-        '''Remove all the members from the structure from the specified `offset` up to `size` bytes.'''
-        cls, sptr, soffset = self.__class__, self.owner.ptr, offset - self.baseoffset
-        if not sptr.memqty:
-            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : The structure has no members that are able to be removed.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size))
-            return []
+            raise E.DisassemblerError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to remove the member at index {:d} of the {:s} for the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, offset, mindex, 'union' if union(owner.ptr) else 'frame' if frame(owner.ptr) else 'structure', self.baseoffset + mptr.soff))
 
-        # If we're a union, then we need to raise an exception because
-        # there's a likely chance that the user might empty out the
-        # union entirely.
-        if union(sptr):
-            raise E.InvalidParameterError(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Refusing to remove members from the specified union by the specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, offset))
-
-        # We need to calculate range that we're actually going to be removing, so
-        # that we can clamp it to the boundaries of the structure. If the range
-        # doesn't overlap, then we simply abort here with a warning.
-        (left, right), (sleft, sright) = sorted([soffset, soffset + size]), (0, idaapi.get_struc_size(sptr))
-        if not all([left <= sright - 1, right - 1  >= sleft]):
-            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : The specified range ({:#x}..{:#x}) is outside the range of the structure ({:#x}..{:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, *map(functools.partial(operator.add, self.baseoffset), [left, right - 1, sleft, sright - 1])))
-            return []
-
-        # Now that we know the range overlaps, we just need to clamp our values
-        # to the overlapping part and recalculate the size.
-        else:
-            soffset, ssize = max(left, sleft), min(right, sright) - max(left, sleft)
-
-        # First we'll need to figure out the index of the member that we will
-        # start removing things at so we can collect the members to remove.
-        previndex, nextindex = idaapi.get_prev_member_idx(sptr, soffset), idaapi.get_next_member_idx(sptr, soffset)
-        index = previndex if nextindex < 0 else nextindex - 1
-        if not (0 <= index < sptr.memqty):
-            logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to determine the index of the member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, soffset + self.baseoffset))
-            return []
-
-        # Next we need to collect each member that will be removed so
-        # that we can return them back to the caller after removal.
-        items = []
-        while index < sptr.memqty and sptr.members[index].soff < soffset + ssize:
-            mptr = sptr.members[index]
-            items.append(mptr)
-            index += 1
-
-        # Now we know what will need to be removed, so we'll need to
-        # collect their attributes so that the user can recreate them
-        # if necessary.
-        result = []
-        for mptr in items:
-            name = utils.string.of(idaapi.get_member_name(mptr.id) or '')
-            moffset, msize = mptr.soff + self.baseoffset, idaapi.get_member_size(mptr)
-
-            # now we need to grab the type information in order to pythonify
-            # our type before we remove it.
-            opinfo = idaapi.opinfo_t()
-            if idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr):
-                tid = opinfo.tid
-            else:
-                tid = idaapi.BADADDR
-
-            # now we can dissolve it, and than append things to our results.
-            type, location = interface.typemap.dissolve(mptr.flag, tid, msize, offset=moffset), interface.location_t(moffset, msize)
-            result.append((mptr.id, name, type, location))
-
-        # Figure out whether we're just going to remove one element, or
-        # multiple elements so that we can call the correct api and figure
-        # out how to compare the number of successfully removed members.
-        if len(items) > 1:
-            count = idaapi.del_struc_members(sptr, soffset, soffset + ssize)
-        elif len(items):
-            count = 1 if idaapi.del_struc_member(sptr, soffset) else 0
-        else:
-            count = 0
-
-        # If we didn't remove anything and we were supposed to, then let
-        # the user know that it didn't happen.
-        if result and not count:
-            start, stop = result[0], result[-1]
-            bounds = interface.bounds_t(start[3].bounds.left, stop[3].bounds.right)
-            logging.fatal(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove the requested elements ({:s}) from the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, bounds))
-            return []
-
-        # If our count matches what was expected, then we're good and can
-        # just return our results to the user.
-        if len(result) == count:
-            items = [(name, type, location) for _, name, type, location in result]
-            return items[::-1] if size < 0 else items
-
-        # Otherwise, we only removed some of the elements and we need to
-        # figure out what happened so we can let the user know.
-        removed, expected = {id for id in []}, {id : (name, type, location) for id, name, type, location in result}
-        for id, name, _, location in result:
-            moffset, _ = location
-            if idaapi.get_member(sptr, moffset - self.baseoffset):
-                logging.debug(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove member {:s} at offset {:+#x} with the specified id ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, name, moffset, id))
-                continue
-            removed.add(id)
-
-        # We have the list of identities that were removed. So let's proceed
-        # with our warnings and return whatever we successfully removed.
-        start, stop = result[0], result[-1]
-        bounds = interface.bounds_t(start[3].bounds.left, stop[3].bounds.right)
-        logging.warning(u"{:s}({:#x}).members.remove({:+#x}, {:+#x}) : Unable to remove {:d} members out of an expected {:d} members within the specified range ({:s}) of the structure.".format('.'.join([__name__, cls.__name__]), sptr.id, offset, size, len(expected) - len(removed), len(expected), bounds))
-        items = [(name, type, location) for id, name, type, location in result if id in removed]
-        return items[::-1] if size < 0 else items
+        # Return whatever it was that we just removed.
+        [(mname, mtype, mlocation, mtypeinfo, mcomments)] = results
+        return mname, mtype, mlocation, mtypeinfo
     @utils.multicase(bounds=interface.bounds_t)
     def remove(self, bounds):
-        '''Remove all the members from the structure within the specified `bounds`.'''
-        start, stop = sorted(bounds)
-        return self.remove(start, stop - start)
+        '''Remove the members from the structure within the specified `bounds`.'''
+        owner, base = self.owner, self.baseoffset
+        start, stop = bounds
+        removed = members.remove_bounds(owner.ptr, start, stop, base)
+        return [(mname, mtype, mlocation, mtypeinfo) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in removed]
+    @utils.multicase(start=types.integer, stop=types.integer)
+    def remove(self, start, stop):
+        '''Remove the members of the structure from the offset `start` to `stop`.'''
+        owner, base = self.owner, self.baseoffset
+        # FIXME: this should remove overlapping members
+        removed = members.remove_bounds(owner.ptr, start, stop, base)
+        return [(mname, mtype, mlocation, mtypeinfo) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in removed]
+    @utils.multicase(location=interface.location_t)
+    def remove(self, location):
+        '''Remove the members at the specified `location` of the structure.'''
+        owner, base = self.owner, self.baseoffset
+        start, stop = location.bounds
+        removed = members.remove_bounds(owner.ptr, start, stop, base)
+        return [(mname, mtype, mlocation, mtypeinfo) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in removed]
 
     ### Properties
     @property
