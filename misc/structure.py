@@ -2179,16 +2179,24 @@ class members(object):
             ileft, iright = istart, istop
             soff = 0 if ileft < 0 or slice.start is None else sptr.members[ileft].soff if ileft < sptr.memqty else idaapi.get_struc_size(sptr)
             eoff = idaapi.get_struc_size(sptr) if sptr.memqty <= iright or slice.stop is None else 0 if iright < 0 else sptr.members[iright].soff
+
         elif istart > istop:
             ileft, iright = istop, istart
             soff = 0 if ileft < 0 or slice.stop is None else sptr.members[ileft].eoff if ileft < sptr.memqty else idaapi.get_struc_size(sptr)
             eoff = idaapi.get_struc_size(sptr) if sptr.memqty <= iright or slice.start is None else 0 if iright < 0 else sptr.members[iright].soff
+
+        # If the start and end indices are the same, and something was
+        # selected, then use the boundaries for the selected member.
         elif indices:
             soff, eoff = sptr.members[istart].soff, sptr.members[istop].eoff
+
+        # Otherwise nothing was selected, which makes this sort of
+        # like selecting a single point within the list of members.
         else:
             index = min(istart, istop)
-            soff = 0 if index < 0 or slice.start is None else sptr.members[index].soff if index < sptr.memqty else idaapi.get_struc_size(sptr)
-            eoff = idaapi.get_struc_size(sptr) if sptr.memqty <= index or slice.stop is None else 0 if index < 0 else sptr.members[index].eoff
+            point = 0 if index < 0 else sptr.members[index].soff if index < sptr.memqty else idaapi.get_struc_size(sptr)
+            soff = 0 if slice.start is None else point
+            eoff = idaapi.get_struc_size(sptr) if slice.stop is None else point
 
         # Store the unique points (sorted) with the segments from the selection.
         iterable = itertools.chain(*([mptr.soff, mptr.eoff] for mptr in selected))
