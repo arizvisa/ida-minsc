@@ -2705,6 +2705,148 @@ class members(object):
         iterable = (olditems[offset] for offset, _ in selected if offset in olditems)
         return [(mname, mtype, mlocation, mtypeinfo, mcomments) for mid, mname, mtype, mlocation, mtypeinfo, mcomments in iterable]
 
+    @classmethod
+    def format_error_add_member(cls, code):
+        '''Return the specified error `code` as a tuple composed of the error name and its description.'''
+        descriptions, names = {}, {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('STRUC_ERROR_MEMBER_')}
+        descriptions[idaapi.STRUC_ERROR_MEMBER_OK] = 'success'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_NAME] = 'duplicate field name'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_OFFSET] = 'specified offset already contains a member'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_SIZE] = 'invalid number of bytes'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_TINFO] = 'invalid type identifier'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_STRUCT] = 'invalid structure identifier'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_UNIVAR] = 'unions cannot contain a variable sized member'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_VARLAST] = 'unable to add a variable sized member at this offset'
+        descriptions[idaapi.STRUC_ERROR_MEMBER_NESTED] = 'unable to recursively nest a structure'
+        return names.get(code, ''), descriptions.get(code, '')
+
+    @classmethod
+    def add(cls, sptr, name, type, location, *offset):
+        '''Add a member to the structure identified by `sptr` with the given `name`, `type`, and `location`.'''
+        sptr = idaapi.get_struc(sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else sptr)
+        set_member_tinfo = idaapi.set_member_tinfo2 if idaapi.__version__ < 7.0 else idaapi.set_member_tinfo
+
+        # First, we need to figure out the base offset in order to make sense of
+        # the location. So, we grab the function and unpack the base if available.
+        ea = idaapi.get_func_by_frame(sptr.id)
+        fn = idaapi.get_func(ea)
+        [base] = map(int, offset) if offset else [interface.function.frame_disassembler_offset(fn) if fn and sptr.props & idaapi.SF_FRAME else 0]
+        offset_description = ", {:#x}".format(base) if offset else ''
+
+        # Now we need to make sense of the location we were given. This
+        # is because the structure can also be a frame or a union, and
+        # so we'll need to translate it to the real structure offset.
+        is_union, is_frame, is_variable = union(sptr), sptr.props & idaapi.SF_FRAME, sptr.props & idaapi.SF_VAR
+
+        index_or_offset = useroffset = int(location)
+        userindex = realoffset = index_or_offset if is_union else index_or_offset - base
+        realindex = userindex if userindex <= sptr.memqty else sptr.memqty
+        location_description = "{:d}".format(userindex) if is_union else "{:#x}".format(useroffset)
+
+        # Next we need to figure out the name. Similar to all names, the name is
+        # "packed" so that adding a numeric suffix avoids a string concatenation.
+        packedname = interface.tuplename(*name) if isinstance(name, types.ordered) else name or ''
+        defaultname = member.default_name(sptr, None, realindex if is_union else realoffset)
+        suffix = realindex if is_union else interface.function.frame_member_offset(fn, realoffset) if is_frame else useroffset
+        name_description = "{!s}".format(tuple(name)) if isinstance(name, types.ordered) else "{!r}".format(name)
+
+        # However, we need to check if the name is valid to determine if we need
+        # to add a suffix, or use a default name for the field if we didn't get one.
+        oldname = candidatename = packedname or defaultname
+        while idaapi.get_member_by_name(sptr, utils.string.to(candidatename)):
+            candidatename = "{:s}_{:X}".format(candidatename, abs(suffix))
+        newname = candidatename
+
+        # Figure out whether we're adding a pythonic type or we were given a tinfo_t. If
+        # we were given a tinfo_t, then use its size to allocate a place in the structure.
+        res = interface.tinfo.parse(None, type, idaapi.PT_SIL) if isinstance(type, types.string) else type
+        type, tinfo, tdescr = ([None, res.get_size()], res, "{!s}".format(res)) if isinstance(res, idaapi.tinfo_t) else (res, None, "{!s}".format(res))
+        flag, typeid, nbytes = interface.typemap.resolve(type if tinfo is None or 0 < tinfo.get_size() < idaapi.BADSIZE else None)
+        opinfo = idaapi.opinfo_t()
+        opinfo.tid = typeid
+        type_description = "{!r}".format("{!s}".format(res)) if isinstance(res, idaapi.tinfo_t) else "{!s}".format(type)
+
+        # Now we have all the things that can prevent us from adding a member. We have
+        # a fix for the name, but we need to verify that there's enough space available.
+        if is_union and 0 <= realindex < sptr.memqty:
+            mptr = sptr.members[realindex]
+            fullname = member.fullname(mptr)
+            raise E.InvalidParameterError(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to add a member to the requested {:s} due to the index ({:d}) already being used by \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, 'union' if is_union else 'frame' if is_frame else 'structure', realindex, fullname, mptr.id))
+
+        # If it's not a union, then we need to check if it will overlap another. If the
+        # member is zero-length'd, then check the whole structure size because it can
+        # only be a variable-length member which fills up the entirety of the structure.
+        elif not is_union and any(cls.overlaps(sptr, realoffset, realoffset + (nbytes if nbytes else idaapi.get_struc_size(sptr)))):
+            left, right = realoffset, realoffset + (nbytes if nbytes else idaapi.get_struc_size(sptr))
+            iterable = cls.overlaps(sptr, left, right)
+            problems = [mptr.id for mowner, mindex, mptr in iterable]
+            raise E.InvalidTypeOrValueError(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to add a member to the requested {:s} due to its boundaries ({:s}) overlapping with {:d} member{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, 'union' if is_union else 'frame' if is_frame else 'structure', interface.bounds_t(base + left, base + right), len(problems), '' if len(problems) == 1 else 's', ', '.join(map("{:#x}".format, problems))))
+
+        # If we're adding a variable-length member to the end of a variable-length
+        # structure, then we can't add anything past the last member without overlap.
+        elif is_variable and not nbytes and realoffset >= idaapi.get_struc_size(sptr):
+            left, right = realoffset, realoffset + idaapi.get_struc_size(sptr) + 1
+            iterable = cls.overlaps(sptr, left, right)
+            problems = [mptr.id for mowner, mindex, mptr in iterable]
+            raise E.InvalidTypeOrValueError(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to add a member to the requested {:s} due to its boundaries ({:s}) overlapping with {:d} member{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, 'union' if is_union else 'frame' if is_frame else 'structure', interface.bounds_t(base + left, base + right), len(problems), '' if len(problems) == 1 else 's', ', '.join(map("{:#x}".format, problems))))
+
+        # Our very last check ensures that we don't pass a negative value as a location
+        # to the disassembler. Although the disassembler recognizes BADADDR, we don't
+        # because we wouldn't be able to find the member after it's been added.
+        elif (realindex < 0 if is_union else realoffset < 0):
+            description = "the index ({:d}) being invalid".format(realindex) if is_union else "the offset ({:#x}) being outside the boundaries ({:s}) of the {:s}".format(useroffset, interface.bounds_t(base, base + idaapi.get_struc_size(sptr)), 'union' if is_union else 'frame' if is_frame else 'structure')
+            raise E.InvalidParameterError(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to add the member to the requested {:s} ({:#x}) due to {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, 'union' if is_union else 'frame' if is_frame else 'structure', sptr.id, description))
+
+        # If we had to adjust the name of the new member, then we just need
+        # to issue a warning so that the user knows the name was changed.
+        elif oldname != newname:
+            mptr = idaapi.get_member_by_name(sptr, utils.string.to(oldname))
+            logging.warning(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Using alternative name \"{:s}\" for new member at offset {:+#x} due to a member ({:#x}) at offset {:+#x} using the requested name \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, utils.string.escape(newname, '"'), base + realoffset, mptr.id, mptr.soff + base, utils.string.escape(oldname, '"')))
+
+        # Now that we've checked everything and complained about what we had to
+        # fix, we can finally use the disassembler api to create the member.
+        res = idaapi.add_struc_member(sptr, utils.string.to(newname), idaapi.BADADDR if is_union else realoffset, flag, opinfo, nbytes)
+        if res != idaapi.STRUC_ERROR_MEMBER_OK:
+            DisassemblerExceptionType = E.DuplicateItemError if res == idaapi.STRUC_ERROR_MEMBER_NAME else E.DisassemblerError
+            error_name, error_description = cls.format_error_add_member(res)
+            raise DisassemblerExceptionType(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to add a member to the requested {:s} due to error {:s}{:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, 'union' if is_union else 'frame' if is_frame else 'structure', error_name or "code {:d}".format(res), " ({:s})".format(error_description) if error_description else ''))
+
+        # That should have done it, so we now need to return the newly created
+        # member back to the caller. We accomplish this by trying to fetch the
+        # member at the offset or index that it was supposed to be created at.
+        mptr = idaapi.get_member(sptr, realindex if is_union else realoffset)
+        if mptr is None:
+            where = "index {:d}".format(realindex) if is_union else "offset {:#x}{:s}".format(realoffset, "{:+#x}".format(nbytes) if nbytes else '')
+            raise E.MemberNotFoundError(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to find the recently created member \"{:s}\" at {:s} of the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, utils.string.escape(newname, '"'), where, 'union' if is_union else 'frame' if is_frame else 'structure', sptr.id))
+
+        # If we were given a tinfo_t for the type, then we need to apply it to
+        # the newly-created member. Our size should already be correct, so we
+        # can just apply the typeinfo in a non-destructive (compatible) manner.
+        res = idaapi.SMT_OK if tinfo is None else set_member_tinfo(sptr, mptr, mptr.soff, tinfo, idaapi.SET_MEMTI_COMPATIBLE)
+
+        # If we couldn't apply the tinfo_t, then we need to complain. We can't
+        # really remove the field we just created, because that would betray the
+        # caller's request. So instead we log a critical error, since at least
+        # the size of the member should be set to exactly what the user wanted.
+        if res == idaapi.SMT_FAILED:
+            where = "index {:d}".format(realindex) if is_union else "offset {:#x}{:s}".format(realoffset, "{:+#x}".format(nbytes) if nbytes else '')
+            logging.fatal(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to apply the specified type to the new member \"{:s}\" at {:s} of the specified {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, utils.string.escape(newname, '"'), where, 'union' if is_union else 'frame' if is_frame else 'structure', sptr.id))
+
+        elif res not in {idaapi.SMT_OK, idaapi.SMT_KEEP}:
+            error_name, error_description = cls.format_error_typeinfo(res)
+            logging.fatal(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Unable to apply the specified type to the new member \"{:s}\" at {:s} of the specified {:s} ({:#x}) due to error {:s}{:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, utils.string.escape("{!s}".format(tinfo), '"'), utils.string.escape(newname, '"'), where, 'union' if is_union else 'frame' if is_frame else 'structure', sptr.id, error_name or "code {:d}".format(res), " ({:s})".format(error_description) if error_description else ''))
+
+        # Our work is done, we can log our small success and update the
+        # refinfo_t of the member in case it is actually necessary.
+        refcount = interface.address.update_refinfo(mptr.id, flag)
+        fullname, where = member.fullname(mptr), "index {:d}".format(realindex) if is_union else "offset {:#x}{:s}".format(base + realoffset, "{:+#x}".format(nbytes) if nbytes else '')
+        logging.debug(u"{:s}.add({:#x}, {:s}, {!s}, {:s}{:s}) : Succesfully added member \"{:s}\" at {:s} of the specified {:s} ({:#x}){:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, name_description, type_description, location_description, offset_description, utils.string.escape(fullname, '"'), where, 'union' if is_union else 'frame' if is_frame else 'structure', sptr.id, " ({:d} references)".format(refcount) if refcount > 0 else ''))
+
+        # If we successfully grabbed the member, then we need to figure out its
+        # actual index in the structure. Then we can return it all to the caller.
+        mindex = cls.index(sptr, mptr)
+        return sptr, mindex, mptr
+
 ####### The rest of this file contains only definitions of classes that may be instantiated.
 
 class structure_t(object):
