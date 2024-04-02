@@ -7361,6 +7361,202 @@ class regmatch(object):
         Fconditions = utils.fcompose(utils.fthrough(*conditions), all) if conditions else Fuses_group(cls.__operands_register__)
         return internal.utils.fcompose(instruction.access, functools.partial(internal.utils.ifilter, Fconditions), functools.partial(sorted, key=operator.attrgetter('opnum')))
 
+class typematch(object):
+    """
+    This namespace generates a dictionary from a list of types
+    that can be used to filter or match against another type.
+    It also provides utility functions for enumerating all of
+    the component types belonging to a type. The intention of
+    this is to allow one to match all of the dependent types
+    against one of the chosen types.
+    """
+
+    masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+    full_type = {idaapi.BT_VOID, idaapi.BT_BOOL, idaapi.BT_FLOAT, idaapi.BT_COMPLEX}
+    integer_types = {idaapi.BT_INT8, idaapi.BT_INT16, idaapi.BT_INT32, idaapi.BT_INT64, idaapi.BT_INT128, idaapi.BT_INT}
+    integer_sizes = {1: idaapi.BT_INT8, 2: idaapi.BT_INT16, 4: idaapi.BT_INT32, 8: idaapi.BT_INT64, 32: idaapi.BT_INT128}
+    flags_optional = {idaapi.BT_FUNC, idaapi.BT_BITFIELD}
+    flags_none = {idaapi.BT_PTR, idaapi.BT_ARRAY, idaapi.BT_UNK}
+
+    def __new__(cls, types, *library):
+        '''Reduce the list of `types` into a dictionary that can be used with other functions in this namespace.'''
+        [til] = library if library else [tinfo.library()]
+        iterable = ((tinfo.parse(til, item) if isinstance(item, internal.types.string) else item) for item in types)
+        res, errors, candidates = {}, [], [type for type in iterable if type]
+        for ti in candidates:
+            decl, size = ti.get_decltype(), ti.get_size()
+            base, flags, modifiers = (decl & mask for mask in cls.masks)
+
+            # if it's a typeref, then we figure out whether it has an ordinal,
+            # a name, or both so that we can use it as a key for an exact match.
+            if (base, flags) == (idaapi.BT_COMPLEX, idaapi.BTMT_TYPEDEF):
+                keys = [ti.get_ordinal(), ti.get_type_name()]
+                [res.setdefault(key, [ti]) for key in keys if key]
+
+            # if we need the full type to check this, then use all masks as the key.
+            if base in cls.full_type:
+                key = (base, flags, modifiers) if modifiers else (base, flags)
+                res.setdefault(key, []).append(ti)
+
+            # if the flags are optional, then add the full type and the fallback.
+            elif base in cls.flags_optional:
+                key = (base, flags, modifiers) if modifiers else (base, flags)
+                res.setdefault(key, []).append(ti)
+                res.setdefault((base,), []).append(ti)
+
+            # if it's a processor integer type, then we treat it as an regular
+            # int, but with the additional matching depending on its size.
+            elif base == idaapi.BT_INT and size in cls.integer_sizes and flags:
+                newbase = cls.integer_sizes[size]
+                keypart = (flags, modifiers) if modifiers else (flags,)
+
+                key = (base,) + keypart
+                res.setdefault(key, []).append(ti)
+                res.setdefault((base,), []).append(ti)
+
+                key = (newbase,) + keypart
+                res.setdefault(key, []).append(ti)
+                res.setdefault((newbase,), []).append(ti)
+
+            # if there aren't any flags, then we use -1 as the key so that
+            # we can check the modifiers of the type's declaration.
+            elif base == idaapi.BT_INT and size in cls.integer_sizes and not flags:
+                newbase = cls.integer_sizes[size]
+                res.setdefault((base, -1, modifiers), []).append(ti) if modifiers else res.setdefault((base,), []).append(ti)
+                res.setdefault((newbase, -1, modifiers), []).append(ti) if modifiers else res.setdefault((newbase,), []).append(ti)
+
+            # if it's an integer type, then we need to check if the sign was
+            # given. we also need to know its size if it's a processor int.
+            elif base in cls.integer_types and modifiers:
+                keypart = (flags, modifiers) if flags else (-1, modifiers)
+                res.setdefault((base,) + keypart, []).append(ti)
+                res.setdefault((base,), []).append(ti)
+
+            elif base in cls.integer_types:
+                res.setdefault((base, flags), []).append(ti) if flags else ()
+                res.setdefault((base,), []).append(ti)
+
+            # if we don't need the flags, then just include the base.
+            elif base in cls.flags_none:
+                res.setdefault((base, -1, modifiers), []).append(ti) if modifiers else res.setdefault((base,), []).append(ti)
+
+            # we have no idea what this is.. capture it so we can log a warning.
+            else:
+                errors.append((base, flags, modifiers, ti))
+            continue
+
+        # if we didn't encounter any errors, then we're done here.
+        if not errors:
+            return res
+
+        description = ', '.join("{!r}".format("{!s}".format(ti)) for ti in candidates)
+        for base, flags, modifiers, ti in errors:
+            logging.warning(u"{:s}.typematch({:s}) : Unable to index the unsupported \"{:s}\" type due to its base declaration ({:#x}), flags ({:#x}), or modifiers ({:#x}).".format('.'.join([__name__, cls.__name__]), '[' + description + ']', utils.string.escape("{!s}".format(ti), '"'), base, flags, modifiers))
+        return res
+
+    @classmethod
+    def unpack(cls, type):
+        '''Unpack the unique attributes from the specified `type` as its identity.'''
+        decl, size, name = type.get_decltype(), type.get_size(), type.get_type_name() or ''
+
+        # We only need the fields if it's a base type. We also assume
+        # that the type that we get is _always_ going to be a named type.
+        if decl < idaapi.BT_PTR:
+            base, flags, modifiers = (decl & mask for mask in cls.masks)
+            return base, flags, modifiers, -1 if size == idaapi.BADSIZE else size, name
+
+        # If the type nests others, then take a performance hit and hash
+        # the serialized data with names and everything. This is because
+        # I couldn't find another way to generate a unique key for them.
+        serialized = type.serialize()
+        return hash(serialized[0]), len(serialized[0]), name
+
+    @classmethod
+    def collect(cls, type):
+        '''Yield each individual type that is used to compose the specified `type`.'''
+        library = tinfo.library(type)
+        Fnamed_type = functools.partial(idaapi.replace_ordinal_typerefs, library) if hasattr(idaapi, 'replace_ordinal_typerefs') else None
+
+        # Shove the type into our queue, and begin processing its components.
+        refs, queue = {ref for ref in []}, [type]
+        while queue:
+            ti = queue.pop(0)
+
+            # We attempt to force every type into a named type so that we
+            # can use the serialized data as the key when it's complex.
+            Fnamed_type and idaapi.replace_ordinal_typerefs(library, ti)
+            key = cls.unpack(ti)
+
+            # If the key used to represent our type has
+            # already been queued, then we can skip it.
+            if key in refs:
+                continue
+            refs.add(key)
+
+            # Type references allow for recursion, so we need to check these.
+            if ti.is_typeref():
+                name, ordinal = ti.get_type_name(), tinfo.ordinal(ti, library)
+                keys = [ordinal, name] if ordinal else [name]
+                if any(key in refs for key in keys):
+                    [ refs.setdefault(key, ti) for key in keys ]
+                    continue
+                subtype = tinfo.at_ordinal(ordinal, library) if ordinal else tinfo.at_name(name, library)
+                queue.append(subtype) if subtype else queue
+
+            # If it's a pointer, then we dereference until we get to a concrete type.
+            elif ti.is_ptr():
+                subtype, components = ti, []
+                while subtype.is_ptr():
+                    subtype = idaapi.remove_pointer(subtype)
+                    components.append(subtype)
+                queue.extend(components)
+
+            # An array only requires us to know its element type.
+            elif ti.is_array():
+                subtype, count = tinfo.array(ti)
+                queue.append(subtype)
+
+            # If we're processing a function, we need its result and parameters.
+            elif ti.is_func():
+                iterable = (subtype for _, subtype, _ in tinfo.function(ti))
+                queue.extend(iterable)
+
+            # If it's a struct/union, then we need all of its members.
+            elif ti.is_udt():
+                iterable = (mtype for mname, moffset, msize, mtype, malign in tinfo.members(ti))
+                queue.extend(iterable)
+
+            # If it's an enumeration, then we only need to queue up its base type.
+            elif ti.is_enum():
+                subtype = tinfo.enumeration(ti)
+                queue.append(subtype)
+
+            # All of the type's components have been processed, so
+            # we only need to yield a copy of it back to the caller.
+            yield tinfo.copy(ti, library)
+        return
+
+    @classmethod
+    def candidates(cls, collection, type):
+        '''Return the candidates that match the given `type` from the specified `collection`.'''
+        decl = type.get_decltype()
+
+        # Unpack the base type, flags, and any modifiers
+        # from the declaration of the type we were given.
+        base, flags, modifiers = (decl & mask for mask in cls.masks)
+
+        # If there are modifiers in the type declaration, then we first attempt to use them to
+        # find any candidates from the collection that explicitly contain the same modifiers.
+        if modifiers:
+            key_full = (base, flags, modifiers)
+            key_noflags = (base, -1, modifiers)
+            return collection.get(key_full, collection.get(key_noflags, collection.get((base,), [])))
+
+        # Otherwise we try to find candidates from the collection that match the base declaration
+        # type along with its flags. If that didn't work, then we fall back to just the base type.
+        key_flags = (base, flags)
+        return collection.get(key_flags, collection.get((base,), []))
+
 ## figure out the boundaries of sval_t
 if idaapi.BADADDR == 0xffffffff:
     sval_t = ctypes.c_long
