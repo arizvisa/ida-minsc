@@ -6223,6 +6223,148 @@ class tinfo(object):
         ordinal = cls.by_identifier(identifier, til)
         return cls.reference(ordinal, *library) if ordinal else None
 
+    @classmethod
+    def bitfield(cls, type):
+        '''Return the number of bits, size, and sign for the specified bitfield `type`.'''
+        bf, size = idaapi.bitfield_type_data_t(), type.get_size()
+        if not bf:
+            sign = type.get_sign()
+            return 8 * size, size, {idaapi.no_sign: 0, idaapi.type_signed: -1, idaapi.type_unsigned: +1}[sign]
+        size, width = bf.nbytes, bf.width
+        return width, size, +1 if bt.is_unsigned() else -1
+
+    @classmethod
+    def enumeration(cls, type):
+        '''Return the base integer type of the enumeration specified by `type`.'''
+        et, signedness = idaapi.enum_type_data_t(), {idaapi.no_sign: idaapi.BTMT_UNKSIGN, idaapi.type_signed: idaapi.BTMT_SIGNED, idaapi.type_unsigned: idaapi.BTMT_USIGNED}
+        if not type.is_enum():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.enumeration({!r}) : The specified type information ({!r}) is not an enumeration.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+        elif not type.get_enum_details(et):
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.enumeration({!r}) : Unable to get the enumeration type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # Unpack the attributes from the enumeration and use it to generate an integer type.
+        sz, bitmask, out = (et.bte & mask for mask in [idaapi.BTE_SIZE_MASK, idaapi.BTE_BITMASK, idaapi.BTE_OUT_MASK])
+        return idaapi.tinfo_t(type.get_enum_base_type() | signedness.get(type.get_sign(), idaapi.no_sign))
+
+    @classmethod
+    def enumeration_masks(cls, type):
+        '''Yield each bitmask from the enumeration bitfield specified by `type`.'''
+        et, signedness = idaapi.enum_type_data_t(), {idaapi.no_sign: idaapi.BTMT_UNKSIGN, idaapi.type_signed: idaapi.BTMT_SIGNED, idaapi.type_unsigned: idaapi.BTMT_USIGNED}
+        if not type.is_enum():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.enumeration_masks({!r}) : The specified type information ({!r}) is not an enumeration.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+        elif not type.get_enum_details(et):
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.enumeration_masks({!r}) : Unable to get the enumeration type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # First thing to do is to figure out what the base type is. We're assuming
+        # that this will always be an integer so that we can add the sign to it.
+        sz, bitmask, out = (et.bte & mask for mask in [idaapi.BTE_SIZE_MASK, idaapi.BTE_BITMASK, idaapi.BTE_OUT_MASK])
+        bt, sign, library = type.get_enum_base_type(), type.get_sign(), cls.library(type)
+
+        Fcast_integer = idaapi.as_signed if sign == idaapi.type_signed else lambda integer, bits: (pow(2, bits) - 1) & integer
+        width, ti = et.calc_nbytes(), idaapi.tinfo_t(bt | signedness.get(sign, idaapi.no_sign))
+
+        # Grab the indices of all of the masks that are in the bitfield, and
+        # the members. Then all we need to do is yield the ones that we found.
+        group_intervals = [et.group_sizes[index] for index in builtins.range(et.group_sizes.size())]
+        group_indices = functools.reduce(lambda list, item: list + [list[-1] + item], group_intervals, [0])
+        indices = {index : length for index, length in zip(group_indices, group_intervals)}
+        iterable = (et[index] for index in builtins.range(et.size()))
+        members = [tuple(itertools.chain([em.value], map(internal.utils.string.of, [em.name, em.cmt]))) for em in iterable]
+
+        # Iterate through the list.. only yielding the enumeration members that
+        # are masks. If this isn't a bitfield, then nothing should be yielded.
+        for index, member in enumerate(members):
+            emask, ename, ecmt = member
+            if index in indices:
+                yield cls.copy(ti, library), Fcast_integer(emask, 8 * width), ename, ecmt
+            continue
+        return
+
+    @classmethod
+    def enumeration_bitfields(cls, type):
+        '''Return a dictionary of the masks and the enumeration members that use them from the bitfield specified by `type`.'''
+        et, signedness = idaapi.enum_type_data_t(), {idaapi.no_sign: idaapi.BTMT_UNKSIGN, idaapi.type_signed: idaapi.BTMT_SIGNED, idaapi.type_unsigned: idaapi.BTMT_USIGNED}
+        if not type.is_enum():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.enumeration_bitfields({!r}) : The specified type information ({!r}) is not an enumeration.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+        elif not type.get_enum_details(et):
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.enumeration_bitfields({!r}) : Unable to get the enumeration type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # If the enumeration is not a bitfield, then there's nothing to return.
+        sz, bitmask, out = (et.bte & mask for mask in [idaapi.BTE_SIZE_MASK, idaapi.BTE_BITMASK, idaapi.BTE_OUT_MASK])
+        if not bitmask:
+            return {}
+
+        # Now we need to figure out what the base type is. We're assuming that
+        # this will always be an integer so that we can add the sign to it.
+        bt, sign, library = type.get_enum_base_type(), type.get_sign(), cls.library(type)
+        width, ti = et.calc_nbytes(), idaapi.tinfo_t(bt | signedness.get(sign, idaapi.no_sign))
+        Fcast_integer = idaapi.as_signed if sign == idaapi.type_signed else lambda integer, bits: (pow(2, bits) - 1) & integer
+
+        # Now we can collect the bitfield members into a list to reference.
+        iterable = (et[index] for index in builtins.range(et.size()))
+        members = [tuple(itertools.chain([em.value], map(internal.utils.string.of, [em.name, em.cmt]))) for em in iterable]
+
+        # Grab the indices of all of the masks that are in the bitfield. This
+        # way we can build a dictionary for looking up the bitmask for an index.
+        group_intervals = [et.group_sizes[index] for index in builtins.range(et.group_sizes.size())]
+        group_indices = functools.reduce(lambda list, item: list + [list[-1] + item], group_intervals, [0])
+        indices = {index : length for index, length in zip(group_indices, group_intervals)}
+        iterable = ((index, members[index]) for index, length in zip(group_indices, group_intervals))
+        masks = {index : emask for index, (emask, ename, ecmt) in iterable}
+
+        # Iterate through the members, using mask as a key to our results,
+        # and appending each member to the list for the current bit mask.
+        result, emask = {}, 0
+        for index, member in enumerate(members):
+            evalue, ename, ecmt = member
+            emask = Fcast_integer(masks[index], 8 * width) if index in masks else emask
+            if indices.get(index, 1) > 1:
+                continue
+            emasked_value = emask & Fcast_integer(evalue, 8 * width)
+            packed = cls.copy(ti, library), emasked_value, ename, ecmt
+            result.setdefault(emask, []).append(packed)
+        return result
+
+    @classmethod
+    def enumeration_members(cls, type):
+        '''Yield each member of the enumeration that is specified by `type`.'''
+        et, signedness = idaapi.enum_type_data_t(), {idaapi.no_sign: idaapi.BTMT_UNKSIGN, idaapi.type_signed: idaapi.BTMT_SIGNED, idaapi.type_unsigned: idaapi.BTMT_USIGNED}
+        if not type.is_enum():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.enumeration_members({!r}) : The specified type information ({!r}) is not an enumeration.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+        elif not type.get_enum_details(et):
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.enumeration_members({!r}) : Unable to get the enumeration type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+        # Figure out the base type for the enumeration and use it
+        # to create an integer type that is fully aware of its sign.
+        bt, sign, library = type.get_enum_base_type(), type.get_sign(), cls.library(type)
+        width, ti = et.calc_nbytes(), idaapi.tinfo_t(bt | signedness.get(sign, idaapi.no_sign))
+
+        Fcast_integer = idaapi.as_signed if sign == idaapi.type_signed else lambda integer, bits: (pow(2, bits) - 1) & integer
+        bsz, bitmask, out = (et.bte & mask for mask in [idaapi.BTE_SIZE_MASK, idaapi.BTE_BITMASK, idaapi.BTE_OUT_MASK])
+
+        # Grab all of the members into a list that we can check for masks.
+        iterable = (et[index] for index in builtins.range(et.size()))
+        members = [tuple(itertools.chain([em.value], map(internal.utils.string.of, [em.name, em.cmt]))) for em in iterable]
+
+        # Now we just need to build a table of the indices in case this is
+        # a bitfield. If so, then we'll be excluding these from our results.
+        group_intervals = [et.group_sizes[index] for index in builtins.range(et.group_sizes.size())]
+        group_indices = functools.reduce(lambda list, item: list + [list[-1] + item], group_intervals, [0])
+        indices = {index : length for index, length in zip(group_indices, group_intervals)}
+        iterable = ((index, members[index]) for index, length in zip(group_indices, group_intervals))
+        masks = {index : emask for index, (emask, ename, ecmt) in iterable}
+
+        # Yield each member from the enumeration that isn't a bitmask.
+        emask = Fcast_integer(pow(2, 8 * width) - 1, 8 * width)
+        for index, member in enumerate(members):
+            evalue, ename, ecmt = member
+            emask = Fcast_integer(masks[index], 8 * width) if index in masks else emask
+            if indices.get(index, 1) > 1:
+                continue
+            emasked_value = emask & Fcast_integer(evalue, 8 * width)
+            yield cls.copy(ti, library), emasked_value, ename, ecmt
+        return
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
