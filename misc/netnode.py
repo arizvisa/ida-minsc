@@ -254,6 +254,46 @@ class utils(object):
         return
 
     @classmethod
+    def valforward(cls, node, index, prev, next, last, tag):
+        '''Return the next encountered value for a netnode from the specified `index`.'''
+        stop = last(node, tag) if callable(last) else last
+        backward, forward = (F(node, index, tag) for F in [prev, next])
+        Freverse, nindex = (next, backward) if forward in {None, idaapi.BADNODE} else (prev, forward)
+        if Freverse(node, nindex, tag) == index:
+            return index
+        return None if forward in {None, idaapi.BADNODE} and index >= stop else forward
+
+    @classmethod
+    def valbackward(cls, node, index, prev, next, first, tag):
+        '''Return the previous encountered value for a netnode from the specified `index`.'''
+        stop = first(node, tag) if callable(first) else first
+        backward, forward = (F(node, index, tag) for F in [prev, next])
+        Freverse, nindex = (prev, forward) if backward in {None, idaapi.BADNODE} else (next, backward)
+        if Freverse(node, nindex, tag) == index:
+            return index
+        return None if backward in (None, idaapi.BADNODE) and index <= stop else backward
+
+    @classmethod
+    def hforward(cls, node, key, prev, next, last, tag):
+        '''Return the next encountered hash value for a netnode from the specified `key`.'''
+        stop = last(node, tag) if callable(last) else last
+        backward, forward = (F(node, key, tag) for F in [prev, next])
+        Freverse, nkey = (next, backward) if forward in {None, idaapi.BADNODE} else (prev, forward)
+        if Freverse(node, nkey, tag) == key:
+            return key
+        return None if forward in {None, idaapi.BADNODE} else forward
+
+    @classmethod
+    def hbackward(cls, node, key, prev, next, first, tag):
+        '''Return the previous encountered hash value for a netnode from the specified `key`.'''
+        stop = first(node, tag) if callable(first) else first
+        backward, forward = (F(node, key, tag) for F in [prev, next])
+        Freverse, nkey = (prev, forward) if backward in {None, idaapi.BADNODE} else (next, backward)
+        if Freverse(node, nkey, tag) == key:
+            return key
+        return None if backward in {None, idaapi.BADNODE} else backward
+
+    @classmethod
     def falt(cls, node, tag=netnode.alttag):
         '''Iterate through each "altval" for a given `node` in order, and yield each (item, value) that was found.'''
         for item in cls.valfiter(node, netnode.altfirst, netnode.altlast, netnode.altnext, netnode.altval, tag=tag):
@@ -268,13 +308,19 @@ class utils(object):
     @classmethod
     def faltfrom(cls, node, index, tag=netnode.alttag):
         '''Iterate through each "altval" for a given `node` in order from `index`, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, index, netnode.altlast, netnode.altnext, netnode.altval, tag=tag):
+        realindex = cls.valforward(node, index, netnode.altprev, netnode.altnext, netnode.altlast, tag)
+        if realindex is None:
+            return
+        for item in cls.valfiter(node, realindex, netnode.altlast, netnode.altnext, netnode.altval, tag=tag):
             yield item
         return
     @classmethod
     def raltfrom(cls, node, index, tag=netnode.alttag):
         '''Iterate through each "altval" for a given `node` in reverse order from `index`, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.altfirst, index, netnode.altprev, netnode.altval, tag=tag):
+        realindex = cls.valbackward(node, index, netnode.altprev, netnode.altnext, netnode.altfirst, tag)
+        if realindex is None:
+            return
+        for item in cls.valriter(node, netnode.altfirst, realindex, netnode.altprev, netnode.altval, tag=tag):
             yield item
         return
 
@@ -316,13 +362,19 @@ class utils(object):
     @classmethod
     def fsupfrom(cls, node, index, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in order from `index`, and yield each (item, value) that was found.'''
-        for item in utils.valfiter(node, index, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
+        realindex = cls.valforward(node, index, netnode.supprev, netnode.supnext, netnode.suplast, tag)
+        if realindex is None:
+            return
+        for item in utils.valfiter(node, realindex, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
             yield item
         return
     @classmethod
     def rsupfrom(cls, node, index, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in reverse order from `index`, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.supfirst, index, netnode.supprev, value or netnode.supval, tag=tag):
+        realindex = cls.valbackward(node, index, netnode.supprev, netnode.supnext, netnode.supfirst, tag)
+        if realindex is None:
+            return
+        for item in cls.valriter(node, netnode.supfirst, realindex, netnode.supprev, value or netnode.supval, tag=tag):
             yield item
         return
 
@@ -364,13 +416,19 @@ class utils(object):
     @classmethod
     def fhashfrom(cls, node, key, value=None, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in order from `key`, and yield each (item, value) that was found.'''
-        for item in cls.hfiter(node, key, netnode.hashlast, netnode.hashnext, value or netnode.hashval, tag=tag):
+        realkey = cls.hforward(node, key, netnode.hashprev, netnode.hashnext, netnode.hashlast, tag)
+        if realkey is None:
+            return
+        for item in cls.hfiter(node, realkey, netnode.hashlast, netnode.hashnext, value or netnode.hashval, tag=tag):
             yield item
         return
     @classmethod
     def rhashfrom(cls, node, key, value=None, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in reverse order from `key`, and yield each (item, value) that was found.'''
-        for item in cls.hriter(node, netnode.hashfirst, key, netnode.hashprev, value or netnode.hashval, tag=tag):
+        realkey = cls.hbackward(node, key, netnode.hashprev, netnode.hashnext, netnode.hashfirst, tag)
+        if realkey is None:
+            return
+        for item in cls.hriter(node, netnode.hashfirst, realkey, netnode.hashprev, value or netnode.hashval, tag=tag):
             yield item
         return
 
@@ -412,13 +470,19 @@ class utils(object):
     @classmethod
     def fcharfrom(cls, node, index, value=None, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in order from `index`, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, index, netnode.charlast, netnode.charnext, value or netnode.charval, tag=tag):
+        realindex = cls.valforward(node, index, netnode.charprev, netnode.charnext, netnode.charlast, tag)
+        if realindex is None:
+            return
+        for item in cls.valfiter(node, realindex, netnode.charlast, netnode.charnext, value or netnode.charval, tag=tag):
             yield item
         return
     @classmethod
     def rcharfrom(cls, node, index, value=None, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in reverse order from `index`, and yield each (item, value) that was found.'''
-        for item in cls.valriter(node, netnode.charfirst, index, netnode.charprev, value or netnode.charval, tag=tag):
+        realindex = cls.valbackward(node, index, netnode.charprev, netnode.charnext, netnode.charfirst, tag)
+        if realindex is None:
+            return
+        for item in cls.valriter(node, netnode.charfirst, realindex, netnode.charprev, value or netnode.charval, tag=tag):
             yield item
         return
 
