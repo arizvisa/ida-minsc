@@ -787,99 +787,6 @@ class type(object):
     is_listed = utils.alias(listed, 'type')
 is_union, is_frame, is_listed = utils.alias(type.union, 'type'), utils.alias(type.frame, 'type'), utils.alias(type.listed, 'type')
 
-@utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.string, types.integer))
-def members(structure, **base):
-    '''Yield each member of the given `structure` as a tuple containing its attributes.'''
-    st = by(structure)
-    return members(st.ptr, **base)
-@utils.multicase(sptr=idaapi.struc_t)
-def members(sptr, **base):
-    """Yield each member of the structure in `sptr` as a tuple of containing its `(offset, size, tags)`.
-
-    If the integer `base` is defined, then the offset of each member will be translated by the given value.
-    """
-    st, struc = (F(sptr.id) for F in [idaapi.get_struc, by])
-
-    # If we couldn't get the structure, then blow up in the user's face.
-    if st is None:
-        raise E.StructureNotFoundError(u"{:s}.members({:#x}) : Unable to find the requested structure ({:#x}).".format(__name__, sptr.id, sptr.id))
-
-    # Grab some attributes like the structure's size, and whether or not
-    # it's a union so that we can figure out each member's offset.
-    size, unionQ = idaapi.get_struc_size(st), type.union(st)
-
-    # Iterate through all of the member in the structure.
-    offset, translated = 0, next((base[key] for key in ['offset', 'base', 'baseoffset'] if key in base), 0)
-    for i in range(st.memqty):
-        m, mem = st.get_member(i), struc.members[i]
-
-        # Grab the member and its properties.
-        msize, munionQ = idaapi.get_member_size(m), m.props & idaapi.MF_UNIMEM
-
-        # Figure out the boundaries of the member. If our structure is a union, then
-        # the starting offset never changes since IDA dual-uses it as the member index.
-        left, right = offset if unionQ else m.soff, m.eoff
-
-        # If our current offset does not match the member's starting offset, then this
-        # is an empty field, or undefined. We yield this to the caller so that they
-        # know that there's some padding they need to know about.
-        if offset < left:
-            yield translated + offset, left - offset, {}
-            offset = left
-
-        # Grab the attributes about the member that we plan on yielding and make sure
-        # that we force any critical implicit tags for identification (like the name).
-        items = mem.tag()
-        items.setdefault('__name__', idaapi.get_member_name(m.id))
-
-        # That was everything that our caller should likely care about, so we can
-        # just yield our item and proceed onto the next member.
-        yield translated + offset, msize, items
-
-        # If we're a union, then the offset just never changes and thus we don't need
-        # to adjust the offset like we have to do for a regular member.
-        offset += 0 if unionQ else msize
-    return
-
-@utils.multicase(structure=(idaapi.struc_t, idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer)
-def fragment(structure, offset, **base):
-    '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
-    st = by(structure)
-    return fragment(st.ptr, offset, st.size, **base)
-@utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer, size=types.integer)
-def fragment(structure, offset, size, **base):
-    '''Yield each member of the given `structure` from the specified `offset` up to `size` as a tuple containing its attributes.'''
-    st = by(structure)
-    return fragment(st.ptr, offset, size, **base)
-@utils.multicase(sptr=idaapi.struc_t, offset=types.integer, size=types.integer)
-def fragment(sptr, offset, size, **base):
-    """Yield each member of the structure in `sptr` from the given `offset` up to `size` as a tuple containing its `(offset, size, tags)`.
-
-    If the integer `base` is defined, then the offset of each member will be translated by the given value.
-    """
-    iterable, unionQ = members(sptr.id, **base), type.union(sptr.id)
-
-    # seek
-    for item in iterable:
-        m_offset, m_size, state = item
-
-        left, right = m_offset, m_offset + m_size
-        if (offset >= left) and (offset < right):
-            delta = max(m_offset, offset) - m_offset
-            yield m_offset + delta, m_size - delta, state
-            size -= 0 if unionQ else m_size
-            break
-        continue
-
-    # return
-    for item in iterable:
-        if size > 0:
-            m_offset, m_size, state = item
-            yield m_offset, m_size, state
-            size -= 0 if unionQ else m_size
-        continue
-    return
-
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def remove(structure):
     '''Remove the specified `structure` from the database.'''
@@ -997,3 +904,142 @@ def references(member):
     mptr = member if isinstance(member, idaapi.member_t) else member.ptr
     return internal.structure.member.references(mptr)
 refs = utils.alias(references)
+
+class members(object):
+    """
+    This namespace is essentially a shortcut for accessing the members of
+    a structure or a union. It's functionality is the same as accessing
+    the "members" property of a structure that has been fetched.
+    """
+    @utils.multicase(ea=types.integer)
+    def __new__(cls, ea):
+        '''Return the members of the structure belonging to the address specified by `ea`.'''
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        ea = interface.address.head(ea)
+        if interface.function.has(ea):
+            ok, result = True, interface.function.frame(ea)
+        elif interface.node.identifier(ea):
+            ok, result = True, internal.structure.new(ea, 0)
+        elif interface.address.flags(ea, idaapi.DT_TYPE) == FF_STRUCT:
+            tid = interface.address.structure(ea)
+            ok, result = not(tid == idaapi.BADADDR), None if tid == idaapi.BADADDR else internal.structure.new(tid, ea)
+        else:
+            ok = False
+        if not ok:
+            raise E.StructureNotFoundError(u"{:s}.members({:#x}) : Unable to locate a structure at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+        return result.members
+    @utils.multicase(name=types.string)
+    @utils.string.decorate_arguments('name', 'suffix')
+    def __new__(cls, name, *suffix):
+        '''Return the members of the structure with the specified `name`.'''
+        string = name if isinstance(name, types.tuple) else (name,)
+        res = utils.string.to(interface.tuplename(*(string + suffix)))
+        id = idaapi.get_struc_id(res)
+        if id == idaapi.BADADDR:
+            raise E.StructureNotFoundError(u"{:s}.members({!r}) : Unable to locate a structure with the specified name.".format(__name__, utils.string.escape(res, '"')))
+        return internal.structure.new(id, 0).members
+    @utils.multicase(sptr=(idaapi.struc_t, structure_t))
+    def __new__(cls, sptr):
+        '''Return the members of the structure specified by `sptr`.'''
+        offset = sptr.baseoffset if isinstance(sptr, structure_t) else 0
+        return internal.structure.new(sptr.id, offset).members
+
+    # XXX The following functions should actually be deprecated as there are
+    #     now much better ways to get the contiguous layout of a structure.
+    @utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.string, types.integer))
+    @classmethod
+    def layout(cls, structure, **base):
+        '''Yield each member of the given `structure` as a tuple containing its attributes.'''
+        st = by(structure)
+        return cls.layout(st.ptr, **base)
+    @utils.multicase(sptr=idaapi.struc_t)
+    @classmethod
+    def layout(cls, sptr, **base):
+        """Yield each member of the structure in `sptr` as a tuple of containing its `(offset, size, tags)`.
+
+        If the integer `base` is defined, then the offset of each member will be translated by the given value.
+        """
+        st, struc = (F(sptr.id) for F in [idaapi.get_struc, by])
+
+        # If we couldn't get the structure, then blow up in the user's face.
+        if st is None:
+            raise E.StructureNotFoundError(u"{:s}.layout({:#x}) : Unable to find the requested structure ({:#x}).".format('.'.join([cls.__name__, __name__]), sptr.id, sptr.id))
+
+        # Grab some attributes like the structure's size, and whether or not
+        # it's a union so that we can figure out each member's offset.
+        size, unionQ = idaapi.get_struc_size(st), type.union(st)
+
+        # Iterate through all of the member in the structure.
+        offset, translated = 0, next((base[key] for key in ['offset', 'base', 'baseoffset'] if key in base), 0)
+        for i in range(st.memqty):
+            m, mem = st.get_member(i), struc.members[i]
+
+            # Grab the member and its properties.
+            msize, munionQ = idaapi.get_member_size(m), m.props & idaapi.MF_UNIMEM
+
+            # Figure out the boundaries of the member. If our structure is a union, then
+            # the starting offset never changes since IDA dual-uses it as the member index.
+            left, right = offset if unionQ else m.soff, m.eoff
+
+            # If our current offset does not match the member's starting offset, then this
+            # is an empty field, or undefined. We yield this to the caller so that they
+            # know that there's some padding they need to know about.
+            if offset < left:
+                yield translated + offset, left - offset, {}
+                offset = left
+
+            # Grab the attributes about the member that we plan on yielding and make sure
+            # that we force any critical implicit tags for identification (like the name).
+            items = mem.tag()
+            items.setdefault('__name__', idaapi.get_member_name(m.id))
+
+            # That was everything that our caller should likely care about, so we can
+            # just yield our item and proceed onto the next member.
+            yield translated + offset, msize, items
+
+            # If we're a union, then the offset just never changes and thus we don't need
+            # to adjust the offset like we have to do for a regular member.
+            offset += 0 if unionQ else msize
+        return
+
+    @utils.multicase(structure=(idaapi.struc_t, idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer)
+    @classmethod
+    def fragment(cls, structure, offset, **base):
+        '''Yield each member of the given `structure` from the specified `offset` as a tuple containing its attributes.'''
+        st = by(structure)
+        return cls.fragment(st.ptr, offset, st.size, **base)
+    @utils.multicase(structure=(idaapi.tinfo_t, structure_t, types.integer, types.string), offset=types.integer, size=types.integer)
+    @classmethod
+    def fragment(cls, structure, offset, size, **base):
+        '''Yield each member of the given `structure` from the specified `offset` up to `size` as a tuple containing its attributes.'''
+        st = by(structure)
+        return cls.fragment(st.ptr, offset, size, **base)
+    @utils.multicase(sptr=idaapi.struc_t, offset=types.integer, size=types.integer)
+    @classmethod
+    def fragment(cls, sptr, offset, size, **base):
+        """Yield each member of the structure in `sptr` from the given `offset` up to `size` as a tuple containing its `(offset, size, tags)`.
+
+        If the integer `base` is defined, then the offset of each member will be translated by the given value.
+        """
+        iterable, unionQ = cls.layout(sptr.id, **base), type.union(sptr.id)
+
+        # seek
+        for item in iterable:
+            m_offset, m_size, state = item
+
+            left, right = m_offset, m_offset + m_size
+            if (offset >= left) and (offset < right):
+                delta = max(m_offset, offset) - m_offset
+                yield m_offset + delta, m_size - delta, state
+                size -= 0 if unionQ else m_size
+                break
+            continue
+
+        # return
+        for item in iterable:
+            if size > 0:
+                m_offset, m_size, state = item
+                yield m_offset, m_size, state
+                size -= 0 if unionQ else m_size
+            continue
+        return
