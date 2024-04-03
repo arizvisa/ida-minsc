@@ -8685,6 +8685,48 @@ class function(object):
             continue
         return
 
+    __skippable_name__ = '$ ignore micro'
+    @classmethod
+    def skippable(cls, boundaries):
+        '''Yield the address and ignore code of each instruction that has been toggled as skippable from the list of `boundaries`.'''
+        if not internal.netnode.has(cls.__skippable_name__):
+            return (sup_val for sup_val in [])
+        nidx = internal.netnode.get(cls.__skippable_name__)
+        if isinstance(boundaries, (idaapi.func_t, internal.types.integer)):
+            ranges = map(range.unpack, cls.chunks(boundaries))
+        else:
+            ranges = [bounds for bounds in boundaries]
+        iterable = ((internal.netnode.sup.forward(nidx, idaapi.ea2node(start), type=bytes, tag=0), stop) for start, stop in ranges)
+        iterators = [itertools.takewhile((lambda stop: lambda sup_val: sup_val[0] < stop)(stop), iterator) for iterator, stop in iterable]
+        Fsup_val = lambda sup_val: (idaapi.node2ea(sup_val[0]), sup_val[1])
+        return itertools.chain(*(internal.utils.imap(Fsup_val, iterator) for iterator in iterators))
+
+    @classmethod
+    def prologue(cls, func):
+        '''Return a list of the addresses from the function `func` that belong to its prologue.'''
+        range_t = idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
+        if isinstance(func, (idaapi.func_t, internal.types.integer)):
+            list = map(range.unpack, cls.chunks(func))
+        elif isinstance(func, (range_t, idaapi.BasicBlock)):
+            list = [range.unpack(func)]
+        else:
+            list = func if isinstance(func, internal.types.list) else [func]
+        iterable = cls.skippable(list)
+        return [ea for ea, val in iterable if val == b'\x01']
+
+    @classmethod
+    def epilogue(cls, func):
+        '''Return a list of the addresses from the function `func` that belong to its epilogue.'''
+        range_t = idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t
+        if isinstance(func, (idaapi.func_t, internal.types.integer)):
+            list = map(range.unpack, cls.chunks(func))
+        elif isinstance(func, (range_t, idaapi.BasicBlock)):
+            list = [range.unpack(func)]
+        else:
+            list = func if isinstance(func, internal.types.list) else [func]
+        iterable = cls.skippable(list)
+        return [ea for ea, val in iterable if val == b'\x02']
+
     @classmethod
     def frame_offset(cls, func, *offset):
         '''Return the base offset used by the frame belonging to the function `func`.'''
