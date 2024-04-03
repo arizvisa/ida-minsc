@@ -265,6 +265,18 @@ class utils(object):
         for item in cls.valriter(node, netnode.altfirst, netnode.altlast, netnode.altprev, netnode.altval, tag=tag):
             yield item
         return
+    @classmethod
+    def faltfrom(cls, node, index, tag=netnode.alttag):
+        '''Iterate through each "altval" for a given `node` in order from `index`, and yield each (item, value) that was found.'''
+        for item in cls.valfiter(node, index, netnode.altlast, netnode.altnext, netnode.altval, tag=tag):
+            yield item
+        return
+    @classmethod
+    def raltfrom(cls, node, index, tag=netnode.alttag):
+        '''Iterate through each "altval" for a given `node` in reverse order from `index`, and yield each (item, value) that was found.'''
+        for item in cls.valriter(node, netnode.altfirst, index, netnode.altprev, netnode.altval, tag=tag):
+            yield item
+        return
 
     @classmethod
     def faltvals(cls, node, tag=netnode.alttag):
@@ -299,6 +311,18 @@ class utils(object):
     def rsup(cls, node, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
         for item in cls.valriter(node, netnode.supfirst, netnode.suplast, netnode.supprev, value or netnode.supval, tag=tag):
+            yield item
+        return
+    @classmethod
+    def fsupfrom(cls, node, index, value=None, tag=netnode.suptag):
+        '''Iterate through each "supval" for a given `node` in order from `index`, and yield each (item, value) that was found.'''
+        for item in utils.valfiter(node, index, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
+            yield item
+        return
+    @classmethod
+    def rsupfrom(cls, node, index, value=None, tag=netnode.suptag):
+        '''Iterate through each "supval" for a given `node` in reverse order from `index`, and yield each (item, value) that was found.'''
+        for item in cls.valriter(node, netnode.supfirst, index, netnode.supprev, value or netnode.supval, tag=tag):
             yield item
         return
 
@@ -337,6 +361,18 @@ class utils(object):
         for item in cls.hriter(node, netnode.hashfirst, netnode.hashlast, netnode.hashprev, value or netnode.hashval, tag=tag):
             yield item
         return
+    @classmethod
+    def fhashfrom(cls, node, key, value=None, tag=netnode.hashtag):
+        '''Iterate through each "hashval" for a given `node` in order from `key`, and yield each (item, value) that was found.'''
+        for item in cls.hfiter(node, key, netnode.hashlast, netnode.hashnext, value or netnode.hashval, tag=tag):
+            yield item
+        return
+    @classmethod
+    def rhashfrom(cls, node, key, value=None, tag=netnode.hashtag):
+        '''Iterate through each "hashval" for a given `node` in reverse order from `key`, and yield each (item, value) that was found.'''
+        for item in cls.hriter(node, netnode.hashfirst, key, netnode.hashprev, value or netnode.hashval, tag=tag):
+            yield item
+        return
 
     @classmethod
     def fhashvals(cls, node, value=None, tag=netnode.hashtag):
@@ -371,6 +407,18 @@ class utils(object):
     def rchar(cls, node, value=None, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in reverse order, and yield each (item, value) that was found.'''
         for item in cls.valriter(node, netnode.charfirst, netnode.charlast, netnode.charprev, value or netnode.charval, tag=tag):
+            yield item
+        return
+    @classmethod
+    def fcharfrom(cls, node, index, value=None, tag=netnode.chartag):
+        '''Iterate through each "charval" for a given `node` in order from `index`, and yield each (item, value) that was found.'''
+        for item in cls.valfiter(node, index, netnode.charlast, netnode.charnext, value or netnode.charval, tag=tag):
+            yield item
+        return
+    @classmethod
+    def rcharfrom(cls, node, index, value=None, tag=netnode.chartag):
+        '''Iterate through each "charval" for a given `node` in reverse order from `index`, and yield each (item, value) that was found.'''
+        for item in cls.valriter(node, netnode.charfirst, index, netnode.charprev, value or netnode.charval, tag=tag):
             yield item
         return
 
