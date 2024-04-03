@@ -194,7 +194,7 @@ class utils(object):
     @classmethod
     def valfiter(cls, node, first, last, next, val, tag):
         '''Iterate through all of the values for a netnode in order, and yield the (item, value) for each item that was found for the given tag.'''
-        start, end = first(node, tag), last(node, tag)
+        start, end = ((F(node, tag) if callable(F) else F) for F in [first, last])
         if start == end and start in {None, idaapi.BADNODE}: return
         yield start, val(node, start, tag)
         while start != end:
@@ -205,7 +205,7 @@ class utils(object):
     @classmethod
     def valriter(cls, node, first, last, prev, val, tag):
         '''Iterate through all of the values for a netnode in reverse order, and yield the (item, value) for each item that was found for the given tag.'''
-        start, end = first(node, tag), last(node, tag)
+        start, end = ((F(node, tag) if callable(F) else F) for F in [first, last])
         if start == end and start in {None, idaapi.BADNODE}: return
         yield end, val(node, end, tag)
         while end != start:
@@ -216,7 +216,7 @@ class utils(object):
     @classmethod
     def hfiter(cls, node, first, last, next, val, tag):
         '''Iterate through all of the hash values for a netnode in order, and yield the (item, value) for each item that was found for the given tag.'''
-        start, end = first(node, tag), last(node, tag)
+        start, end = ((F(node, tag) if callable(F) else F) for F in [first, last])
 
         # If the start key is None, and it's the same as the end key, then we
         # need to verify that there's no value stored for the empty key. If
@@ -236,7 +236,7 @@ class utils(object):
     @classmethod
     def hriter(cls, node, first, last, prev, val, tag):
         '''Iterate through all of the hash values for a netnode in reverse order, and yield the (item, value) for each item that was found for the given tag.'''
-        start, end = first(node, tag), last(node, tag)
+        start, end = ((F(node, tag) if callable(F) else F) for F in [first, last])
 
         # If the end key is None, and it's the same as the start key, then we
         # need to verify that there's no value stored for the empty key. If
@@ -292,7 +292,7 @@ class utils(object):
     @classmethod
     def fsup(cls, node, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in order, and yield each (item, value) that was found.'''
-        for item in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
+        for item in utils.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
             yield item
         return
     @classmethod
@@ -396,6 +396,42 @@ class utils(object):
             end = Fprev(node, end, tag)
             result.append((end, Fvalue(node, end, tag)))
         return result
+
+    @classmethod
+    def nextalt(cls, node, index, tag=netnode.alttag):
+        '''Return the next "altval" for a given `node`.'''
+        return netnode.altnext(node, index, tag)
+    @classmethod
+    def prevalt(cls, node, index, tag=netnode.alttag):
+        '''Return the previous "altval" for a given `node`.'''
+        return netnode.altprev(node, index, tag)
+
+    @classmethod
+    def nextsup(cls, node, index, tag=netnode.suptag):
+        '''Return the next "supval" for a given `node`.'''
+        return netnode.supnext(node, index, tag)
+    @classmethod
+    def prevsup(cls, node, index, tag=netnode.suptag):
+        '''Return the previous "supval" for a given `node`.'''
+        return netnode.supprev(node, index, tag)
+
+    @classmethod
+    def nexthash(cls, node, index, tag=netnode.hashtag):
+        '''Return the next "hashval" for a given `node`.'''
+        return netnode.hashnext(node, index, tag)
+    @classmethod
+    def prevhash(cls, node, index, tag=netnode.hashtag):
+        '''Return the previous "hashval" for a given `node`.'''
+        return netnode.hashprev(node, index, tag)
+
+    @classmethod
+    def nextchar(cls, node, index, tag=netnode.chartag):
+        '''Return the next "charval" for a given `node`.'''
+        return netnode.charnext(node, index, tag)
+    @classmethod
+    def prevchar(cls, node, index, tag=netnode.chartag):
+        '''Return the previous "charval" for a given `node`.'''
+        return netnode.charprev(node, index, tag)
 
 def new(name):
     '''Create a netnode with the given `name`, and return its identifier.'''
