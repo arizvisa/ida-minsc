@@ -8791,6 +8791,16 @@ class function(object):
         return
 
     @classmethod
+    def block(cls, func, ea, *flags):
+        '''Return the ``BasicBlock`` at the address `ea` for the function `func` with the specified `flags`.'''
+        fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+        for bb in cls.blocks(fn, *flags):
+            if range.within(ea, bb):
+                return bb
+            continue
+        raise internal.exceptions.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}{:s}) : Unable to locate `{:s}` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), range.start(fn), ea, ", {:#x}".format(*flags) if flags else '', utils.pycompat.fullname(idaapi.BasicBlock), ea, range.start(fn)))
+
+    @classmethod
     def frame_offset(cls, func, *offset):
         '''Return the base offset used by the frame belonging to the function `func`.'''
         fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
