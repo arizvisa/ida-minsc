@@ -541,6 +541,30 @@ class chunks(object):
         return
     stackpoints = utils.alias(points, 'chunks')
 
+    @utils.multicase()
+    @classmethod
+    def prologue(cls):
+        '''Yield the address of each instruction composing the prologue for the current function.'''
+        return cls.prologue(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def prologue(cls, func):
+        '''Yield the address of each instruction composing the prologue for the function `func`.'''
+        iterable = interface.function.prologue(func)
+        return (ea for ea in iterable)
+
+    @utils.multicase()
+    @classmethod
+    def epilogue(cls):
+        '''Yield the address of each instruction composing the epilogue for the current function.'''
+        return cls.epilogue(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def epilogue(cls, func):
+        '''Yield the address of each instruction composing the epilogue for the function `func`.'''
+        iterable = interface.function.epilogue(func)
+        return (ea for ea in iterable)
+
 iterate = utils.alias(chunks.iterate, 'chunks')
 contains = utils.alias(chunks.contains, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
@@ -915,6 +939,49 @@ class chunk(object):
         '''Remove the chunk specified by `bounds` from the function `func`.'''
         ea, _ = bounds
         return cls.remove(func, ea)
+
+    @utils.multicase()
+    @classmethod
+    def prologue(cls):
+        '''Yield the address of each instruction composing the prologue in the current function chunk.'''
+        return cls.prologue(ui.current.function())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def prologue(cls, ea):
+        '''Yield the address of each instruction composing the prologue from the function chunk at address `ea`.'''
+        fn = interface.function.by(ea)
+        chunk = interface.function.chunk(fn, ea)
+        iterable = interface.function.prologue(chunk)
+        return (ea for ea in iterable)
+    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
+    @classmethod
+    def prologue(cls, func, ea):
+        '''Yield the address of each instruction composing the prologue from the function chunk at address `ea` belonging to `func`.'''
+        chunk = interface.function.chunk(func, ea)
+        iterable = interface.function.prologue(chunk)
+        return (ea for ea in iterable)
+
+    @utils.multicase()
+    @classmethod
+    def epilogue(cls):
+        '''Yield the address for each instruction composing the epilogue in the current function chunk.'''
+        return cls.epilogue(ui.current.function())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def epilogue(cls, ea):
+        '''Yield the address for each instruction composing the epilogue from the function chunk at address `ea`.'''
+        fn = interface.function.by(ea)
+        chunk = interface.function.chunk(fn, ea)
+        iterable = interface.function.epilogue(chunk)
+        return (ea for ea in iterable)
+    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
+    @classmethod
+    def epilogue(cls, func, ea):
+        '''Yield the address for each instruction composing the epilogue from the function chunk at address `ea` belonging to `func`.'''
+        chunk = interface.function.chunk(func, ea)
+        iterable = interface.function.epilogue(chunk)
+        return (ea for ea in iterable)
+
 add_chunk, remove_chunk = utils.alias(chunk.add, 'chunk'), utils.alias(chunk.remove, 'chunk')
 
 class blocks(object):
