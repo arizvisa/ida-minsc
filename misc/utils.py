@@ -29,6 +29,7 @@ __all__ = [
     'listslice', 'listmap', 'listfilter', 'listzip',
     'islice', 'imap', 'ifilter', 'ichain', 'izip',
     'lslice', 'lmap', 'lfilter', 'lzip',
+    'flatmap'
 ]
 
 ### functional programming combinators (FIXME: probably better to document these with examples)
@@ -148,6 +149,8 @@ listslice, listmap, listfilter, listzip = fcompose(itertools.islice, builtins.li
 [lslice, lmap, lfilter, lzip] = (listmap, listmap, listfilter, listzip)
 # count number of elements of a container
 icount = count = fcompose(builtins.iter, builtins.list, builtins.len)
+# map a function to any number of iterables and flatten its results
+flatmap = lambda F, *iterables: itertools.chain(*imap(F, *iterables))
 
 # cheap pattern-like matching
 class Pattern(object):
