@@ -1044,6 +1044,38 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
+    def prologue(cls):
+        '''Return a list of the basic blocks for the current function that contain any instructions that compose the prologue.'''
+        return cls.prologue(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def prologue(cls, func):
+        '''Return a list of the basic blocks for the function `func` that contain any instructions composing the prologue.'''
+        result = []
+        for bb in interface.function.blocks(func):
+            if interface.function.prologue(bb):
+                result.append(interface.range.bounds(bb))
+            continue
+        return result
+
+    @utils.multicase()
+    @classmethod
+    def epilogue(cls):
+        '''Return a list of the basic blocks for the current function contain any instructions that compose the epilogue.'''
+        return cls.epilogue(ui.current.function())
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def epilogue(cls, func):
+        '''Return a list of the basic blocks for the function `func` that contain any instructions composing the epilogue.'''
+        result = []
+        for bb in interface.function.blocks(func):
+            if interface.function.epilogue(bb):
+                result.append(interface.range.bounds(bb))
+            continue
+        return result
+
+    @utils.multicase()
+    @classmethod
     def walk(cls, **flags):
         '''Traverse each of the successor blocks starting from the beginning of the current function.'''
         fn = ui.current.function()
@@ -1964,6 +1996,42 @@ class block(object):
         '''Yield all the addresses in the basic block `bb`.'''
         left, right = interface.range.unpack(bb)
         return interface.address.items(left, right)
+
+    @utils.multicase()
+    @classmethod
+    def prologue(cls):
+        '''Return a list of the addresses from the current basic block that compose the prologue.'''
+        return cls.prologue(ui.current.address())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def prologue(cls, ea):
+        '''Return a list of the addresses from the basic block at address `ea` that compose the prologue.'''
+        fn = interface.function.by(ea)
+        bb = interface.function.block(fn, ea)
+        return interface.function.prologue(bb)
+    @utils.multicase(bounds=(interface.bounds_t, idaapi.BasicBlock, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t))
+    @classmethod
+    def prologue(cls, bounds):
+        '''Return a list of the addresses from the basic block identified by `bounds` that compose the prologue.'''
+        return interface.function.prologue(bounds)
+
+    @utils.multicase()
+    @classmethod
+    def epilogue(cls):
+        '''Return a list of the addresses from the current basic block that compose the epilogue.'''
+        return cls.epilogue(ui.current.address())
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def epilogue(cls, ea):
+        '''Return a list of the addresses from the basic block at address `ea` that compose the epilogue.'''
+        fn = interface.function.by(ea)
+        bb = interface.function.block(fn, ea)
+        return interface.function.epilogue(bb)
+    @utils.multicase(bounds=(interface.bounds_t, idaapi.BasicBlock, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t))
+    @classmethod
+    def epilogue(cls, bounds):
+        '''Return a list of the addresses from the basic block identified by `bounds` that compose the epilogue.'''
+        return interface.function.epilogue(bounds)
 
     # current block
     @utils.multicase()
