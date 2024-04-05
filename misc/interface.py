@@ -8728,6 +8728,69 @@ class function(object):
         return [ea for ea, val in iterable if val == b'\x02']
 
     @classmethod
+    def flowchart(cls, func, *flags):
+        '''Return a ``FlowChart`` object built with the specified `flags` for the function `func`.'''
+        fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+        defaults = itertools.chain([idaapi.FC_PREDS, idaapi.FC_NOEXT], [idaapi.FC_CALL_ENDS] if hasattr(idaapi, 'FC_CALL_ENDS') else [])
+        [flags_] = flags if flags else [functools.reduce(operator.or_, defaults)]
+        return idaapi.FlowChart(f=fn, flags=flags_)
+
+    @classmethod
+    def blocks(cls, func, *flags):
+        '''Yield each ``BasicBlock`` belonging to the function `func` with the specified `flags`.'''
+        fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
+
+        # figure out the default flags to use if none were specified.
+        defaults = itertools.chain([idaapi.FC_PREDS, idaapi.FC_NOEXT], [idaapi.FC_CALL_ENDS] if hasattr(idaapi, 'FC_CALL_ENDS') else [])
+        FC_CALL_ENDS, has_calls = getattr(idaapi, 'FC_CALL_ENDS', 0x20), hasattr(idaapi, 'FC_CALL_ENDS')
+        [flags] = flags if flags else [functools.reduce(operator.or_, defaults)]
+
+        # build a tree that we can use to check if a point belongs to a chunk.
+        chunks = sorted(range.unpack(chunk) for chunk in cls.chunks(fn))
+        ranges, points = {}, [point for point in itertools.chain(*chunks)]
+        [ranges.setdefault(left, (lambda left, right: lambda ea: left <= ea < right)(left, right)) for left, right in chunks]
+        [ranges.setdefault(right, (lambda left, right: lambda ea: left <= ea < right)(left, right)) for left, right in chunks]
+        inside = lambda ea: (lambda index: index and ranges[points[index - 1]](ea))(bisect.bisect_right(points, ea))
+
+        # iterate through all the basic-blocks in the flow chart and yield
+        # each of them back to the caller. we need to ensure that the bounds
+        # are actually contained by the function, so we collect this too.
+        for bb in cls.flowchart(func, flags):
+            start, stop = range.unpack(bb)
+
+            # if we're unable to split up calls, then we need to traverse
+            # this block so that we can figure out where we need to split.
+            if not has_calls and flags & FC_CALL_ENDS:
+                locations = [ea for ea in address.items(start, stop) if instruction.is_call(ea)]
+
+                # now that we've collected all of the locations of any
+                # call instructions, we use them to yield each block.
+                for ea in locations:
+                    left, right = start, idaapi.next_not_tail(ea)
+                    yield idaapi.BasicBlock(bb.id, range.pack(left, right), bb._fc)
+                    start = right
+
+                # if the addresses are different, then we have one more block to yield.
+                if start < stop:
+                    yield idaapi.BasicBlock(bb.id, range.pack(start, stop), bb._fc)
+
+                # if they're the same and we didn't have to chop it up, then this is external.
+                elif not(flags & idaapi.FC_NOEXT) and start == stop and not locations:
+                    yield idaapi.BasicBlock(bb.id, range.pack(start, stop), bb._fc)
+                continue
+
+            # if we've been asked to return external blocks which might be outside
+            # the selected function, then we can just yield the current block.
+            elif not(flags & idaapi.FC_NOEXT):
+                yield bb
+
+            # otherwise, we verify that the block is inside a chunk before yielding it.
+            elif start != stop and inside(start):
+                yield bb
+            continue
+        return
+
+    @classmethod
     def frame_offset(cls, func, *offset):
         '''Return the base offset used by the frame belonging to the function `func`.'''
         fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
