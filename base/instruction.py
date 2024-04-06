@@ -1118,12 +1118,14 @@ def op_structure(ea, opnum, sptr, path):
     # and the value matches the structure size, then this is simply the structure size.
     if len(userpath) == 1 and all(mptr is None for _, mptr, _ in userpath) and userdelta + value == st.size:
         realdelta, realpath = 0, userpath
+        display_members = False
 
     # Now we can calculate the path to the value that the user is trying to suggest
     # a path for. We don't really need the delta, but we can use it to determine
     # the path that the user stopped at with the path that we'll actually apply.
     else:
         realdelta, realpath = interface.strpath.guide(value, st.ptr, userpath)
+        display_members = not(userdelta + value) and any(mptr for _, mptr, _ in userpath)
 
     logging.info(u"{:s}.op_structure({:#x}, {:d}, {:#x}, [{:s}]) : The determined (real) path was {:s} with a delta of {:+#x} for the given value ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), interface.strpath.fullname(realpath), realdelta, value))
 
@@ -1151,6 +1153,7 @@ def op_structure(ea, opnum, sptr, path):
     # we just applied to the user using the other op_structure case.
     if not idaapi.op_stroff(insn.ea if idaapi.__version__ < 7.0 else insn, opnum, tid.cast(), length, 0):
         raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply the resolved structure path ({:s}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), ', '.join(map("{:#x}".format, items)), opnum, insn.ea))
+    interface.node.aflags(ea, idaapi.AFL_ZSTROFF, idaapi.AFL_ZSTROFF if display_members else 0)
     return op_structure(insn.ea, opnum)
 op_struc = op_struct = utils.alias(op_structure)
 
@@ -1552,19 +1555,21 @@ def op_structurepath(ea, opnum, sptr, path):
     # user's path would appear relative to the operand. But since we now support integer-likes, we
     # perform the calculation as the user can just adjust the calculation for that capability.
     delta = realdelta - idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr)
+    display_members = False if base + delta else True
 
-    # XXX: The purpose of excluding the operand was when the user knows that a register is
-    #      pointing at a specific field and wants all future references to be relative to it.
-    #      By excluding the operand, they could avoid having to calculate it. However, as these
+    # XXX: The purpose of excluding the operand from the realdelta was when the user knows that
+    #      a register is pointing at a specific field and wants all future references to be
+    #      relative to it. This avoids them having to calculate it themselves. However, as these
     #      op_structure functions allow integer-like path members, the user can simply include
     #      the operand in their path for the operand to appear relative to a structure field.
-
+    #      That's the purpose of the prior delta being assigned and this line being commented.
     #delta = realdelta
 
     # Only thing that's left to do is apply the tids that we collected along with
     # the delta that we calculated from the user's path to the desired operand.
     if not idaapi.op_stroff(insn.ea if idaapi.__version__ < 7.0 else insn, opnum, tid.cast(), length, base + delta):
         raise E.DisassemblerError(u"{:s}.op_structurepath({:#x}, {:d}, {:#x}, [{:s}]) : Unable to apply the resolved structure path ({:s}) and delta ({:+#x}) to the operand ({:d}) at the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, ', '.join(path_description), ', '.join(map("{:#x}".format, items)), base + delta, opnum, insn.ea))
+    interface.node.aflags(ea, idaapi.AFL_ZSTROFF, idaapi.AFL_ZSTROFF if display_members else 0)
 
     # And then we can call into our other case to return what we just applied.
     return op_structurepath(insn.ea, opnum)
