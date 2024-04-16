@@ -8804,7 +8804,7 @@ class function(object):
     def frame_offset(cls, func, *offset):
         '''Return the base offset used by the frame belonging to the function `func`.'''
         fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
-        res = 0 if fn is None or fn.frame == idaapi.BADNODE else -idaapi.frame_off_args(fn)
+        res = 0 if fn is None or fn.frame == idaapi.BADNODE else -idaapi.frame_off_args(fn) + idaapi.get_frame_retsize(fn)
         return operator.add(res, *map(int, offset)) if offset else res
 
     @classmethod
@@ -8841,9 +8841,7 @@ class function(object):
         sptr = idaapi.get_frame(fn)
         if fn.frame == idaapi.BADNODE or not sptr:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.frame({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), range.start(fn)))
-
-        offset = idaapi.frame_off_args(fn)
-        return internal.structure.new(sptr.id, -offset)
+        return internal.structure.new(sptr.id, cls.frame_offset(fn))
 
     @classmethod
     def name(cls, func):
