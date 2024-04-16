@@ -50,7 +50,7 @@ class MIPS(internal.architecture.architecture_t):
 
         # FIXME: we should probably include all of the selector versions for the
         #        coprocessor registers too...
-        i2s = "{:d}".format
+        i2s = "coproc0_{:d}".format
 
         # coprocessor registers (0 - 31)
         setitem('Index', self.new('Index', BITS, id=0))         # 0
