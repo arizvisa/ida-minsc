@@ -5501,7 +5501,7 @@ class types(object):
 
         listable = [item for item in cls.iterate(library, **type)]
         if len(listable) > 1:
-            messages = ((u"[{:d}] {:+#x} {!s}".format(ordinal, ti.get_size() if ti.present() else 0, item)) for ordinal, item, ti in listable)
+            messages = ((u"[{:d}] {:+#x} {!s}".format(ordinal, interface.tinfo.size(ti), item)) for ordinal, item, ti in listable)
             [ logging.info(msg) for msg in messages ]
             ordinal, name, _ = listable[0]
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first type (#{:d}) \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), ordinal, utils.string.escape("{!s}".format(name), '"')))
@@ -5542,23 +5542,25 @@ class types(object):
             iterable = cls.__matcher__.match(key, value, iterable)
 
         # Set some reasonable defaults for the list of types
-        maxordinal = maxname = maxsize = 0
+        maxordinal = maxname = 0
+
+        size_length = 0
+        format_size = lambda size, atoms={None: '?', Ellipsis: '...'}: atoms[size] if size in atoms else "{:+#x}".format(size)
 
         # Perform the first pass through our listable grabbing all the lengths.
         listable = []
         for ordinal, name, ti in iterable:
             maxordinal = max(ordinal, maxordinal)
             maxname = max(len(name or ''), maxname)
-            maxsize = max(ti.get_size(), maxsize)
+            size_length = max(len(format_size(interface.tinfo.size(ti, True))), size_length)
 
             #res, td = idaapi.tinfo_t(), idaapi.typedef_type_data_t(library, ordinal, True)
             #if not res.create_typedef(td):
             #    logging.warning(u"{:s}.list({:s}{:s}) : Unable to create a type that references the ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(type)) if type else '', ordinal))
             listable.append((ordinal, name, ti))
 
-        # We just need to calculate the number of digits for the largest and size.
+        # We just need to calculate the number of digits for some of the integers.
         cordinal = 2 + utils.string.digits(maxordinal, 10)
-        csize = 2 + utils.string.digits(maxsize, 16)
 
         # Lookup table for figuring out some useful flags
         items = [
@@ -5599,11 +5601,12 @@ class types(object):
 
             # Render the type and clamp it to some arbitrary size.
             # FIXME: is there some way to calculate the width of the console rather than hardcoding 0xa0 here?
-            width, description = 0xa0 - sum([cordinal, 1 + csize, maxname]), "{!s}".format(ti)
+            width, description = 0xa0 - sum([cordinal, size_length, maxname]), "{!s}".format(ti)
             clamped_description = description if len(description) < width else "{:s}...".format(description[:width][:-3])
 
             # That was it, now we can just display it.
-            six.print_(u"{:<{:d}s} {:>+#{:d}x} : {:s} : {:<{:d}s} : {:s}".format("[{:d}]".format(ordinal), cordinal, ti.get_size() if ti.present() else 0, 1 + csize, ''.join(flags), name, maxname, clamped_description))
+            size = interface.tinfo.size(ti, True)
+            six.print_(u"{:<{:d}s} {:>{:d}s} : {:s} : {:<{:d}s} : {:s}".format("[{:d}]".format(ordinal), cordinal, format_size(size), size_length, ''.join(flags), name, maxname, clamped_description))
         return
 
     @utils.multicase(ordinal=internal.types.integer)
