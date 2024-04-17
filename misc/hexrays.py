@@ -639,6 +639,13 @@ class variables(object):
         lvar = reference if isinstance(reference, ida_hexrays_types.lvar_t) else reference.getv()
         return cls.new_locator(lvar.defea, lvar.location)
 
+    @classmethod
+    def identity(cls, locator):
+        '''Return a unique identity that can be used in comparisons for the ``ida_hexrays.lvar_locator_t`` specified by `locator`.'''
+        ea, vdloc = locator.defea, locator.location
+        atype, alocinfo = vdloc.atype(), interface.tinfo.location_raw(vdloc)
+        return ea, atype, alocinfo
+
 class function(object):
     """
     This namespace contains tools for a function that is produced by the
