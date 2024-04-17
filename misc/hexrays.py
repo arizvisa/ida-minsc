@@ -659,32 +659,50 @@ class function(object):
     """
 
     @classmethod
+    def by_address(cls, ea, *flags):
+        '''Decompile the function at the address `ea` with the given `flags` and return an ``idaapi.cfuncptr_t``.'''
+        if not interface.function.has(int(ea)):
+            raise interface.function.missing(int(ea), caller=['hexrays', 'function', 'by_address'])
+
+        [flags] = flags if flags else [{getattr(ida_hexrays, attribute, 0) for attribute in ['DECOMP_NO_WAIT', 'DECOMP_NO_XREFS']}]
+        failure, defaults = ida_hexrays.hexrays_failure_t(), functools.reduce(operator.or_, flags)
+
+        fn, argcount = int(ea), utils.pycompat.code.argcount(utils.pycompat.function.code(ida_hexrays.decompile))
+        res = ida_hexrays.decompile(fn, failure) if argcount < 3 else ida_hexrays.decompile(fn, failure, defaults)
+        if res is None:
+            raise exceptions.DisassemblerError(u"{:s}.by_address({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
+        return res
+
+    @classmethod
+    def by_function(cls, func, *flags):
+        '''Decompile the function specified in `func` with the given `flags` and return an ``idaapi.cfuncptr_t``.'''
+        if not hasattr(ida_hexrays, 'decompile_func'):
+            ea = cls.address(func)
+            return cls.by_address(ea, *flags)
+
+        [flags] = flags if flags else [{getattr(ida_hexrays, attribute, 0) for attribute in ['DECOMP_NO_WAIT', 'DECOMP_NO_XREFS']}]
+        failure, defaults = ida_hexrays.hexrays_failure_t(), functools.reduce(operator.or_, flags)
+
+        res = ida_hexrays.decompile_func(func, failure, defaults)
+        if res is None:
+            ea = cls.address(func)
+            raise exceptions.DisassemblerError(u"{:s}.by_function({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
+        return res
+
+    @classmethod
+    def by(cls, function, *flags):
+        '''Decompile the specified `function` using the given `flags` and return an ``idaapi.cfuncptr_t``.'''
+        fn = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else function
+        return cls.by_function(fn) if isinstance(fn, idaapi.func_t) else cls.by_address(fn)
+
+    @classmethod
     def address(cls, function):
         '''Return the address of the entry point for the given `function`.'''
-        res = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t)) else function
+        res = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else function
         fn = res if isinstance(res, idaapi.func_t) else idaapi.get_func(int(res))
         if not fn:
             raise interface.function.missing(res, caller=['hexrays', 'function', 'address'])
         return interface.range.start(fn)
-
-    @classmethod
-    def decompile(cls, function, flags):
-        '''Return the decompiler output for the specified `function`.'''
-        ea = cls.address(function)
-        Fdecompile, target = (ida_hexrays.decompile_func, function) if isinstance(function, idaapi.func_t) else (ida_hexrays.decompile, ea)
-
-        # Verify that the address is actually a function.
-        if not interface.function.has(ea):
-            raise interface.function.missing(ea, caller=['hexrays', 'function', 'decompile'])
-
-        # Now we can just decompile the function we were given.
-        failure = ida_hexrays.hexrays_failure_t()
-        res = Fdecompile(target, failure) if utils.pycompat.code.argcount(utils.pycompat.function.code(Fdecompile)) < 3 else Fdecompile(target, failure, flags)
-
-        # Check whether we failed and raise an exception if so.
-        if res is None:
-            raise exceptions.DisassemblerError(u"{:#x}: Unable to decompile function due to error {:#x} ({:s}).".format(failure.errea, failure.code, utils.string.to(failure.desc())))
-        return res
 
     @classmethod
     def has(cls, function):
