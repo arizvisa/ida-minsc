@@ -577,6 +577,16 @@ class variables(object):
     to the contents of the ``internal.interface`` module.
     """
 
+    def __new__(cls, func):
+        '''Return the ``ida_hexrays.lvars_t`` for the function specified by `func`.'''
+        if isinstance(func, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t)):
+            return func.lvars
+        elif isinstance(func, ida_hexrays_types.mba_t):
+            return func.vars
+        elif isinstance(func, ida_hexrays_types.lvars_t):
+            return func
+        return function.by(func).lvars
+
     @classmethod
     def copy_vdloc(cls, atype, alocinfo):
         '''Return a new instance of ``ida_hexrays.vdloc_t`` using the given `atype` and `alocinfo`.'''
