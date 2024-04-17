@@ -4652,6 +4652,93 @@ class type(object):
 
         @utils.multicase()
         @classmethod
+        def pop(cls):
+            '''Pop the last parameter from the prototype of the current function and return its type.'''
+            return cls.pop(ui.current.address(), -1)
+        @utils.multicase(func=(idaapi.func_t, internal.types.integer))
+        @classmethod
+        def pop(cls, func):
+            '''Pop the last parameter from the prototype of the function `func` and return its type.'''
+            return cls.pop(func, -1)
+        @utils.multicase(func=(idaapi.func_t, internal.types.integer), index=internal.types.integer)
+        @classmethod
+        def pop(cls, func, index):
+            '''Pop the parameter at the specified `index` from the prototype of the function `func` and return its type.'''
+            updater = interface.tinfo.update_function_details(func)
+
+            # Grab the type and all the parameter information into a list,
+            # and then pop the element at the index that was specified.
+            ti, ftd = builtins.next(updater)
+            iterable = (ftd[iarg] for iarg in builtins.range(ftd.size()))
+            args = [(utils.string.of(arg.name), interface.tinfo.copy(arg.type), arg.argloc, arg.flags, utils.string.of(arg.cmt)) for arg in iterable]
+
+            if -len(args) <= index < len(args):
+                result = args.pop(index)
+            else:
+                _, ea = interface.addressOfRuntimeOrStatic(func)
+                description = "only {:d} parameter".format(len(args)) if len(args) == 1 else "{:s} parameters".format("{:d}".format(len(args)) if args else 'no')
+                range_description = "({:-d}..{:-d})".format(-len(args), len(args) - 1) if len(args) > 1 else "({:d})".format(0) if args else ''
+                raise E.IndexOutOfBoundsError(u"{:s}.pop({:#x}, {:d}) : Unable to remove the specified parameter ({:d}) from the function at {:#x} which has {:s}{:s}.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ea, description, " {:s}".format(range_description) if range_description else ''))
+
+            # Now we can resize the func_type_data_t, and then update
+            # its elements with whatever parameter information is left.
+            ftd.resize(len(args))
+            for index, packed in enumerate(args):
+                aname, atype, aloc, aflags, acmt = packed
+
+                ftd[index].name = utils.string.to(aname)
+                ftd[index].type = atype
+                ftd[index].argloc = aloc
+                ftd[index].flags = aflags
+                ftd[index].cmt = utils.string.to(acmt)
+
+            # That should've done it.. Send the updated func_type_data_t
+            # back, close it, unpack our result, and then return the type.
+            updater.send(ftd), updater.close()
+            aname, atype, aloc, aflags, acmt = result
+            return atype
+        @utils.multicase(type=idaapi.tinfo_t, index=internal.types.integer)
+        @classmethod
+        def pop(cls, type, index):
+            '''Pop the parameter at the specified `index` from the prototype specified by `type`.'''
+            updater = interface.tinfo.update_prototype_details(type)
+
+            # Grab the type and all the parameter information into a list,
+            # and then pop the element at the index that was specified.
+            ti, ftd = builtins.next(updater)
+            iterable = (ftd[iarg] for iarg in builtins.range(ftd.size()))
+            args = [(utils.string.of(arg.name), interface.tinfo.copy(arg.type), arg.argloc, arg.flags, utils.string.of(arg.cmt)) for arg in iterable]
+
+            if -len(args) <= index < len(args):
+                result = args.pop(index)
+            else:
+                description = "only {:d} parameter".format(len(args)) if len(args) == 1 else "{:s} parameters".format("{:d}".format(len(args)) if args else 'no')
+                range_description = "({:-d}..{:-d})".format(-len(args), len(args) - 1) if len(args) > 1 else "({:d})".format(0) if args else ''
+                raise E.IndexOutOfBoundsError(u"{:s}.pop({!r}, {:d}) : Unable to remove the parameter at the given index ({:d}) from the specified prototype which has {:s}{:s}.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, index, description, " {:s}".format(range_description) if range_description else ''))
+
+            # Now we can resize the func_type_data_t, and then update
+            # its elements with whatever parameter information is left.
+            ftd.resize(len(args))
+            for idx, packed in enumerate(args):
+                aname, atype, aloc, aflags, acmt = packed
+
+                ftd[idx].name = utils.string.to(aname)
+                ftd[idx].type = atype
+                ftd[idx].argloc = aloc
+                ftd[idx].flags = aflags
+                ftd[idx].cmt = utils.string.to(acmt)
+
+            # That was it, so we just need to send our details back to get the final type.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}.pop({!r}, {:d}) : Unable to remove the parameter at the given index ({:d}) from the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, index, utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
+
+        @utils.multicase()
+        @classmethod
         def locations(cls):
             '''Return the address of each of the parameters being passed to the function referenced at the current address.'''
             return cls.locations(ui.current.address())
