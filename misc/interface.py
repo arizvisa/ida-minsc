@@ -8816,9 +8816,10 @@ class function(object):
 
     @classmethod
     def frame_member_offset(cls, func, offset):
-        '''Return the offset of the member at the specified `offset` in the frame belonging to the function `func`.'''
+        '''Return the offset used by the member name at the specified `offset` of the frame belonging to the function `func`.'''
         fn = func if isinstance(func, idaapi.func_t) or func is None else cls.by(func)
-        return cls.frame_disassembler_offset(fn, offset) if offset < idaapi.frame_off_args(fn) else cls.frame_offset(fn, offset)
+        vars, retaddr, args = idaapi.frame_off_savregs(fn), idaapi.frame_off_retaddr(fn), idaapi.frame_off_args(fn)
+        return cls.frame_disassembler_offset(fn, offset) if offset < retaddr else offset - args if args <= offset else 0
 
     @classmethod
     def frame_registers(cls, func):
