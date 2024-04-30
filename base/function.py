@@ -3747,10 +3747,10 @@ class type(object):
     def spoiled(cls):
         '''Return a list of the spoiled registers from the prototype of the current function.'''
         return cls.spoiled(ui.current.address())
-    @utils.multicase(registers=types.unordered)
+    @utils.multicase(registers=(types.unordered, types.none))
     @classmethod
     def spoiled(cls, registers):
-        '''Update the spoiled registers from the prototype of the current function with the specified `registers`.'''
+        '''Update the prototype of the current function by applying or removing the specified spoiled `registers`.'''
         return cls.spoiled(ui.current.address(), registers)
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
@@ -3764,7 +3764,7 @@ class type(object):
     @utils.multicase(func=(idaapi.func_t, types.integer), registers=types.unordered)
     @classmethod
     def spoiled(cls, func, registers):
-        '''Update the spoiled registers from the prototype of the function `func` with the specified `registers`.'''
+        '''Update the prototype for the function `func` with the specified spoiled `registers`.'''
         tinfo = interface.function.typeinfo(func)
         if tinfo is None:
             _, ea = interface.addressOfRuntimeOrStatic(func)
@@ -3776,6 +3776,22 @@ class type(object):
             _, ea = interface.addressOfRuntimeOrStatic(func)
             raise E.InvalidTypeOrValueError(u"{:s}.spoiled({:#x}, {!r}) : Unable to update the prototype for the specified function ({:#x}) with the new type \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, registers, ea, utils.string.escape(new, '"')))
         return [register for register in interface.tinfo.function_spoiled(old)]
+    @utils.multicase(func=(idaapi.func_t, types.integer), none=types.none)
+    @classmethod
+    def spoiled(cls, func, none):
+        '''Remove the spoiled registers from the prototype of the function `func`.'''
+        tinfo = interface.function.typeinfo(func)
+        if tinfo is None:
+            _, ea = interface.addressOfRuntimeOrStatic(func)
+            raise E.DisassemblerError(u"{:s}.spoiled({:#x}, {!s}) : Unable to get the prototype for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, none, ea))
+
+        # Remove the spoiled registers from the new type, and apply them to
+        # the requested function. Afterwards, return whatever was removed.
+        old, new = tinfo, interface.tinfo.update_function_spoiled(tinfo, none)
+        if not interface.function.apply_typeinfo(func, new):
+            _, ea = interface.addressOfRuntimeOrStatic(func)
+            raise E.InvalidTypeOrValueError(u"{:s}.spoiled({:#x}, {!s}) : Unable to update the prototype for the specified function ({:#x}) with the new type \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, none, ea, utils.string.escape(new, '"')))
+        return [register for register in interface.tinfo.function_spoiled(old)]
     @utils.multicase(type=(internal.types.string, idaapi.tinfo_t))
     @classmethod
     def spoiled(cls, type):
@@ -3784,10 +3800,18 @@ class type(object):
         if tinfo is None:
             raise E.InvalidTypeOrValueError(u"{:s}.spoiled({!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(type), '"')))
         return [register for register in interface.tinfo.function_spoiled(tinfo)]
+    @utils.multicase(type=(internal.types.string, idaapi.tinfo_t), none=types.none)
+    @classmethod
+    def spoiled(cls, type, none):
+        '''Remove the spoiled registers from the prototype specified by `type`.'''
+        tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
+        if tinfo is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.spoiled({!r}, {!s}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), none, utils.string.escape("{!s}".format(type), '"')))
+        return interface.tinfo.update_function_spoiled(tinfo, none)
     @utils.multicase(type=(internal.types.string, idaapi.tinfo_t), registers=types.unordered)
     @classmethod
     def spoiled(cls, type, registers):
-        '''Update the spoiled registers from the prototype specified by `type` with the given `registers`.'''
+        '''Update the prototype specified by `type` with the given spoiled `registers`.'''
         tinfo = type if isinstance(type, idaapi.tinfo_t) else interface.tinfo.parse(None, type, idaapi.PT_SIL)
         if tinfo is None:
             raise E.InvalidTypeOrValueError(u"{:s}.spoiled({!r}, {!r}) : Unable to parse the specified string \"{:s}\" into a type.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), registers, utils.string.escape("{!s}".format(type), '"')))
