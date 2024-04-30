@@ -6318,41 +6318,42 @@ class types(object):
     def pointer(cls, type, size):
         '''Return a pointer of `size` bytes that references the specified `type`.'''
         return cls.pointer(type, size, 0)
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), size=internal.types.integer, attributes=internal.types.integer)
+    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
     @classmethod
     def pointer(cls, structure, size, attributes, **fields):
         '''Return a pointer of `size` bytes that references the specified `structure` and includes any extended `attributes`.'''
         ptr = structure if isinstance(structure, (idaapi.struc_t, idaapi.member_t)) else structure.ptr
         ti = interface.address.typeinfo(ptr.id) if isinstance(ptr, idaapi.struc_t) else internal.structure.member.get_typeinfo(ptr)
         return cls.pointer(ti, size, attributes, **fields)
-    @utils.multicase(string=internal.types.string, size=internal.types.integer, attributes=internal.types.integer)
+    @utils.multicase(string=internal.types.string, size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
     @classmethod
     @utils.string.decorate_arguments('string')
     def pointer(cls, string, size, attributes, **fields):
         '''Return a pointer of `size` bytes that references the type specified by `string` and includes any extended `attributes`.'''
         ti = interface.tinfo.parse(interface.tinfo.library(), string, idaapi.PT_SIL)
         if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.pointer({!r}, {:d}, {:#x}{:s}) : Unable to parse \"{!s}\" into a type that can be used for the pointer target.".format('.'.join([__name__, cls.__name__]), string, size, attributes, ", {:s}".format(utils.string.kwargs(fields)) if fields else '', utils.string.escape(string, '"')))
+            raise E.InvalidTypeOrValueError(u"{:s}.pointer({!r}, {:d}, {:s}{:s}) : Unable to parse \"{!s}\" into a type that can be used for the pointer target.".format('.'.join([__name__, cls.__name__]), string, size, "{:#x}".format(attributes) if isinstance(attributes, internal.types.integer) else "{!r}".format(attributes), ", {:s}".format(utils.string.kwargs(fields)) if fields else '', utils.string.escape(string, '"')))
         return cls.pointer(ti, size, attributes, **fields)
-    @utils.multicase(info=idaapi.tinfo_t, size=internal.types.integer, attributes=internal.types.integer)
+    @utils.multicase(info=idaapi.tinfo_t, size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
     @classmethod
     def pointer(cls, info, size, attributes, **fields):
         '''Return a pointer of `size` bytes that references the type specified by `info` and includes any extended `attributes`.'''
         pi = idaapi.ptr_type_data_t()
         pi.obj_type = info
         pi.based_ptr_size = size
-        pi.taptr_bits = idaapi.TAH_HASATTRS | attributes if attributes else 0
+        pi.taptr_bits = taptr_bits = attributes if isinstance(attributes, internal.types.integer) else interface.tinfo.pointer_attributes(attributes)
 
         # Verify that all of the fields that we were given are actually part of the ptr_type_data_t
         if any(not hasattr(pi, name) for name in fields):
             missing = {name for name in fields if not hasattr(pi, name)}
-            raise E.InvalidParameterError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to assign to the specified field{:s} ({:s}) of the pointer type data because {:s} not exist.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', '' if len(missing) == 1 else 's', ', '.join(sorted(missing)), 'it does' if len(missing) == 1 else 'they do'))
+            raise E.InvalidParameterError(u"{:s}.pointer(\"{:s}\", {:d}, {:#x}{:s}) : Unable to assign to the specified field{:s} ({:s}) of the pointer type data because {:s} not exist.".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, taptr_bits, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', '' if len(missing) == 1 else 's', ', '.join(sorted(missing)), 'it does' if len(missing) == 1 else 'they do'))
         [setattr(pi, name, value) for name, value in fields.items()]
 
         # Use the ptr_type_data_t to create a pointer and return it.
         ti = idaapi.tinfo_t()
         if not ti.create_ptr(pi):
-            raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:d}{:s}) : Unable to create a pointer with the given type ({!r}).".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, attributes, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', "{!s}".format(info)))
+            attributes_description = " using the given attributes ({:#x})".format(taptr_bits) if taptr_bits else ''
+            raise E.DisassemblerError(u"{:s}.pointer(\"{:s}\", {:d}, {:#x}{:s}) : Unable to create a pointer{:s} for the specifed type \"{:s}\".".format('.'.join([__name__, cls.__name__]), utils.string.escape("{!s}".format(info), '"'), size, taptr_bits, u", {:s}".format(utils.string.kwargs(fields)) if fields else '', attributes_description, utils.string.escape("{!s}".format(info), '"')))
         return interface.tinfo.concretize(ti)
 
     @utils.multicase(info=idaapi.tinfo_t)
