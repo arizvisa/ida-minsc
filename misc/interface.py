@@ -6369,6 +6369,41 @@ class tinfo(object):
             yield cls.copy(ti, library), emasked_value, ename, ecmt
         return
 
+    # Table containing all of the available pointer attributes.
+    _pointer_attributes = {0 : 0}
+    _pointer_attributes['__ptr32'] = _pointer_attributes['ptr32'] = _pointer_attributes[idaapi.TAPTR_PTR32] = idaapi.TAPTR_PTR32
+    _pointer_attributes['__ptr64'] = _pointer_attributes['ptr64'] = _pointer_attributes[idaapi.TAPTR_PTR64] = idaapi.TAPTR_PTR64
+    _pointer_attributes['__restrict'] = _pointer_attributes['restrict'] = _pointer_attributes[idaapi.TAPTR_RESTRICT] = idaapi.TAPTR_RESTRICT
+
+    # If shifted pointers are available, then include support for those too.
+    if hasattr(idaapi, 'TAPTR_SHIFTED'):
+        _pointer_attributes['__shifted'] = _pointer_attributes['shifted'] = _pointer_attributes[idaapi.TAPTR_SHIFTED] = idaapi.TAPTR_SHIFTED
+        _pointer_attributes['__shift'] = _pointer_attributes['shift'] = _pointer_attributes[idaapi.TAPTR_SHIFTED]
+
+    # FIXME: It'd be nice if we verified the attributes we are being given
+    #        against the ptr_type_data_t fields that need to be populated.
+
+    @classmethod
+    def pointer_attributes(cls, attributes):
+        '''Converts the given `attributes` that can be specified as an integer, string, or iterable into its matching ``idaapi.TAPTR_`` attributes.'''
+        if isinstance(attributes, (internal.types.string, internal.types.integer)):
+            attribute = attributes if isinstance(attributes, internal.types.integer) else attributes.lower()
+            if attribute in cls._pointer_attributes:
+                return idaapi.TAH_HASATTRS | cls._pointer_attributes[attribute] if cls._pointer_attributes[attribute] else 0
+            format_parameter, format_description = ("{:#x}".format, "{:d}".format) if isinstance(attributes, internal.types.integer) else ("{!r}".format, lambda attribute: "\"{:s}\"".format(internal.utils.string.escape(attributes, '"')))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.pointer_attributes({:s}) : Unable to determine the correct pointer attribute for the given value ({:s}).".format('.'.join([__name__, cls.__name__]), format_parameter(attributes), format_description(attributes)))
+
+        # Otherwise we were given an iterable and we need to convert and reduce each item.
+        normalized = [(item.lower() if isinstance(item, internal.types.string) else item) for item in attributes]
+        unique = {cls._pointer_attributes.get(attribute, attribute) for attribute in normalized}
+        if any(integer not in cls._pointer_attributes for integer in unique):
+            iterable = (item for item in res if item not in cls._pointer_attributes)
+            invalid = [("{:#x}".format(item) if isinstance(item, internal.types.integer) else "{!r}".format(item)) for item in iterable]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.pointer_attributes({!r}) : Unable to determine the pointer attributes for {:d} of the {:d} suggested values ({!r}).".format('.'.join([__name__, cls.__name__]), attributes, len(invalid), len(unique), invalid))
+
+        # Reduce all of the items we were given into something for ptr_type_data_t.taptr_bits.
+        return functools.reduce(operator.or_, unique, idaapi.TAH_HASATTRS if any(unique) else 0)
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
