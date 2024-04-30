@@ -5965,7 +5965,7 @@ class tinfo(object):
         # given into a register index and a size. We support register_t (both),
         # register names, and tuples of the register index and the size.
         reginfo = []
-        for reg in registers:
+        for reg in (registers or []):
             identifier, _ = reg if isinstance(reg, tuple) else (reg, reg)
             if not architecture.has(identifier):
                 logging.warning(u"{:s}.update_function_spoiled({!r}, {!r}) : Skipping unknown register ({!r}) being added to the list of spoiled registers.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), registers, reg))
@@ -5975,10 +5975,14 @@ class tinfo(object):
 
         # Now we just need to resize the reginfovec_t and then
         # we can update it with our list of register entries.
-        ftd.spoiled.resize(len(reginfo))
-        for index, (ridx, rsize) in zip(builtins.range(ftd.size()), reginfo):
+        original, _, capacity = ftd.spoiled.capacity(), ftd.spoiled.resize(len(reginfo)), ftd.spoiled.size()
+        if capacity != len(reginfo):
+            raise internal.exceptions.DisassemblerError(u"{:s}.update_function_spoiled({!r}, {!r}) : Unable to modify the capacity ({:d}) of the `{:s}` ({:d}) from the function type in order to reserve space for {:d} register{:s}.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), registers, original, internal.utils.pycompat.fullname(ftd.spoiled.__class__), capacity, len(reginfo), '' if len(reginfo) == 1 else 's'))
+
+        for index, (ridx, rsize) in enumerate(reginfo):
             ftd.spoiled[index].reg = ridx
             ftd.spoiled[index].size = rsize
+        ftd.flags = (ftd.flags & ~idaapi.FTI_SPOILED) | (0 if registers is None else idaapi.FTI_SPOILED)
 
         # Now we just need re-create the function using our updated function details.
         newtype = cls.copy(info)
