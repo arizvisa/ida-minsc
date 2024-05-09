@@ -2722,7 +2722,7 @@ class frame(object):
             # once we have our locations, we can grab a fragment from the frame
             # and yield all of the members that are considered as arguments.
             current, base = 0, idaapi.frame_off_args(fn)
-            for offset, size, content in structure.fragment(fr.id, base, structure.size(fr.id) - base):
+            for offset, size, content in structure.members.fragment(fr.id, base, structure.size(fr.id) - base):
                 stkoff = offset - base
 
                 # check our locations to see if we have any type information for
@@ -2891,7 +2891,7 @@ class frame(object):
 
                     # Now we can grab the fragment of the structure containing the parameters. If
                     # there's no content, then skip it and move onto the next member.
-                    for offset, size, content in structure.fragment(fr.id, fr.size - asize, asize):
+                    for offset, size, content in structure.members.fragment(fr.id, fr.size - asize, asize):
                         if not content:
                             continue
 
@@ -3020,7 +3020,7 @@ class frame(object):
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             results = []
-            for off, size, content in structure.fragment(fr.id, 0, fn.frsize):
+            for off, size, content in structure.members.fragment(fr.id, 0, fn.frsize):
                 results.append((off - idaapi.frame_off_savregs(fn), content.get('__name__', None), size))
             return results
 
@@ -3063,7 +3063,7 @@ class frame(object):
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             results, regsize, delta = [], sum([fn.frregs, idaapi.get_frame_retsize(fn)]), idaapi.frame_off_args(fn)
-            iterable = structure.fragment(fr.id, idaapi.frame_off_savregs(fn), regsize) if regsize else []
+            iterable = structure.members.fragment(fr.id, idaapi.frame_off_savregs(fn), regsize) if regsize else []
             for off, size, content in iterable:
                 results.append((off - delta, content.get('__name__', None), size))
             return results
