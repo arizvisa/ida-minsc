@@ -2651,12 +2651,13 @@ class frame(object):
 
         @utils.multicase()
         def __new__(cls):
-            '''Yield the `(offset, name, size)` of each argument belonging to the current function.'''
+            '''Yield the `(location, name, tags)` of each argument relative to the stack pointer at the entry point of the current function.'''
             return cls(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
-            '''Yield the `(offset, name, size)` of each argument belonging to the function `func`.'''
+            '''Yield the `(location, name, tags)` of each argument relative to the stack pointer at the entry point of the function `func`.'''
             _, ea = interface.addressOfRuntimeOrStatic(func)
+            fn = idaapi.get_func(ea)
 
             # first we'll need to check if there's a tinfo_t for the address to
             # give it priority over the frame. then we can grab its details.
@@ -2674,20 +2675,22 @@ class frame(object):
                     if loc.atype() != idaapi.ALOC_STACK:
                         continue
 
-                    # extract the stack offset, and then add the argument
+                    # extract the raw location, and then add the argument
                     # information that we collected to our list.
-                    stkoff = loc.stkoff()
-                    items.append((index, stkoff, utils.string.of(arg.name), arg.type))
+                    items.append((index, interface.tinfo.location_raw(loc), utils.string.of(arg.name), interface.tinfo.copy(arg.type)))
 
                 # our results shouldn't have duplicates, but they might. actually,
                 # our results could technically be overlapping too. still, this is
-                # just to priority the tinfo_t and we only care about the stkoff.
+                # just to priority the tinfo_t and we only care about the offset.
                 locations = {}
-                for index, offset, name, tinfo in items:
-                    if operator.contains(locations, offset):
-                        old_index, old_name, _ = locations[offset]
-                        logging.warning(u"{:s}({:#x}) : Overwriting the parameter {:s}(index {:d}) for function ({:#x}) due to parameter {:s}(index {:d}) being allocated at the same frame offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(old_name, '"')) if old_name else '', old_index, ea, "\"{:s}\" ".format(utils.string.escape(name, '"')) if name else '', index, offset))
-                    locations[offset] = (index, name, tinfo)
+                for index, rawlocation, name, tinfo in items:
+                    location = interface.tinfo.location(tinfo.get_size(), instruction.architecture, *rawlocation)
+                    moffset, msize = mlocation = location + idaapi.get_frame_retsize(fn)
+                    if operator.contains(locations, moffset):
+                        old_index, old_name, _ = locations[moffset]
+                        logging.warning(u"{:s}({:#x}) : Overwriting the parameter {:s}(index {:d}) for function ({:#x}) due to parameter {:s}(index {:d}) being allocated at the same frame offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(old_name, '"')) if old_name else '', old_index, ea, "\"{:s}\" ".format(utils.string.escape(name, '"')) if name else '', index, moffset))
+
+                    locations[moffset] = (index, name, tinfo, mlocation)
 
                 # that was it, we have our locations and we can proceed.
                 locations = locations
@@ -2707,12 +2710,13 @@ class frame(object):
                 # between our $pc and any actual args allocated on the stack.
                 delta = min(locations) if locations else 0
                 if delta:
-                    results.append((0, None, delta))
+                    results.append((interface.location_t(0, delta), None, {}))
 
                 # now we can iterate through all our locations and yield each one.
                 for offset in sorted(locations):
-                    _, name, ti = locations[offset]
-                    results.append((offset, name or None, ti.get_size()))
+                    _, name, ti, location = locations[offset]
+                    tags = {}   # FIXME: tinfo_t has comments, we should grab the tags jic
+                    results.append((loc, name or None, tags))
                 return results
 
             # to proceed, we need to know the function to get its frame sizes.
@@ -2721,55 +2725,58 @@ class frame(object):
 
             # once we have our locations, we can grab a fragment from the frame
             # and yield all of the members that are considered as arguments.
-            current, base = 0, idaapi.frame_off_args(fn)
-            for offset, size, content in structure.members.fragment(fr.id, base, structure.size(fr.id) - base):
-                stkoff = offset - base
+            current = 0
+            for sptr, mindex, mptr in internal.structure.members.at_bounds(fr.id, idaapi.frame_off_args(fn), idaapi.get_struc_size(fr)):
+                offset = interface.function.frame_offset(fn, mptr.soff)
+                size, mtags = (F(mptr) for F in [idaapi.get_member_size, internal.tags.member.get])
 
-                # check our locations to see if we have any type information for
-                # the given stkoff so that way we can prioritize it.
-                if operator.contains(locations, stkoff):
-                    index, tname, tinfo = locations.pop(stkoff)
+                # check our locations to see if we have any type information
+                # for the given offset so that way we can prioritize it.
+                if offset in locations:
+                    index, tname, tinfo, location = locations.pop(offset)
 
                     # grab the tinfo name and tinfo size. if the name wasn't found,
                     # then fall back to using the member name from the frame.
-                    name, tsize = tname or content.get('__name__', None), tinfo.get_size()
+                    name = tname or internal.structure.member.get_name(mptr)
+                    toffset, tsize = location
 
                     # if our member size matches our tinfo size, then we can yield it.
                     if tsize == size:
-                        results.append((stkoff, name, tsize))
+                        results.append((location, name, mtags))
 
                     # if the tinfo size is smaller then the member's, then we're
                     # going to need to pad it up to the expected member size.
                     elif tsize < size:
-                        results.append((stkoff, name, tsize))
-                        results.append((stkoff + tsize, None, size - tsize))
+                        results.append((location, name, mtags))
+                        results.append((interface.location_t(toffset + tsize, size - tsize), None, {}))
 
                     # otherwise, the member size is smaller than the tinfo size.
                     # if this is the case, then we need to use the member size
                     # but log a warning that we're ignoring the size of the tinfo.
                     else:
-                        logging.warning(u"{:s}({:#x}) : Ignoring the type size for parameter {:s}(index {:d}) for function ({:#x}) due to the frame member at offset ({:+#x}) being smaller ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(tname, '"')) if tname else '', index, ea, stkoff, size))
-                        results.append((stkoff, name, size))
+                        logging.warning(u"{:s}({:#x}) : Ignoring the type size for parameter {:s}(index {:d}) for function ({:#x}) due to the frame member at offset ({:+#x}) being smaller ({:+#x}).".format('.'.join([__name__, cls.__name__]), ea, "\"{:s}\" ".format(utils.string.escape(tname, '"')) if tname else '', index, ea, offset, size))
+                        results.append((interface.location_t(offset, size), name, mtags))
+                        results.append((interface.location_t(offset + size, tsize - size), None, {}))
 
                 # otherwise we'll just yield the information from the member.
                 else:
-                    results.append((stkoff, content.get('__name__', None), size))
+                    results.append((interface.location_t(offset, size), internal.structure.member.get_name(mptr), mtags))
 
                 # update our current offset and proceed to the next member.
-                current = stkoff + size
+                current = offset + size
 
             # iterate through all of the locations that we have left.
-            for stkoff in sorted(locations):
-                _, name, ti = locations[stkoff]
+            for offset in sorted(locations):
+                _, name, ti, location = locations[offset]
 
-                # if our current position is not pointing at the expected stkoff,
+                # if our current position is not pointing at the expected offset,
                 # then we need to yield some padding that will put us there.
-                if current < stkoff:
-                    results.append((current, None, stkoff - current))
+                if current < offset:
+                    results.append((interface.location_t(current, offset - current), None, {}))
 
                 # now we can yield the next member and adjust our current position.
-                results.append((stkoff, name or None, ti.get_size()))
-                current = stkoff + ti.get_size()
+                results.append((location, name or None, {}))
+                current = offset + ti.get_size()
             return results
 
         @utils.multicase()
@@ -3007,11 +3014,11 @@ class frame(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Yield the `(offset, name, size)` of each local variable relative to the stack pointer for the current function.'''
+            '''Yield the `(location, name, tags)` of each local variable relative to the stack pointer at the entry point for the current function.'''
             return cls(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
-            '''Yield the `(offset, name, size)` of each local variable relative to the stack pointer for the function `func`.'''
+            '''Yield the `(location, name, tags)` of each local variable relative to the stack pointer at the entry point for the function `func`.'''
             fn = interface.function.by(func)
 
             # figure out the frame
@@ -3020,8 +3027,11 @@ class frame(object):
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             results = []
-            for off, size, content in structure.members.fragment(fr.id, 0, fn.frsize):
-                results.append((off - idaapi.frame_off_savregs(fn), content.get('__name__', None), size))
+            for sptr, mindex, mptr in internal.structure.members.at_bounds(fr.id, 0, fn.frsize):
+                offset = interface.function.frame_offset(fn, mptr.soff)
+                mname, mtags = (F(mptr) for F in [internal.structure.member.get_name, internal.tags.member.get])
+                location = interface.location_t(offset, idaapi.get_member_size(mptr))
+                results.append((location, mname, mtags))
             return results
 
         @utils.multicase()
@@ -3050,11 +3060,11 @@ class frame(object):
 
         @utils.multicase()
         def __new__(cls):
-            '''Yield the `(offset, name, size)` of each saved register relative to the stack pointer of the current function.'''
+            '''Yield the `(location, name, tags)` of each saved register relative to the stack pointer at the entry point of the current function.'''
             return cls(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
-            '''Yield the `(offset, name, size)` of each saved register relative to the stack pointer of the function `func`.'''
+            '''Yield the `(location, name, tags)` of each saved register relative to the stack pointer at the entry point of the function `func`.'''
             fn = interface.function.by(func)
 
             # figure out the frame
@@ -3062,10 +3072,12 @@ class frame(object):
             if fr is None:  # unable to figure out arguments
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
-            results, regsize, delta = [], sum([fn.frregs, idaapi.get_frame_retsize(fn)]), idaapi.frame_off_args(fn)
-            iterable = structure.members.fragment(fr.id, idaapi.frame_off_savregs(fn), regsize) if regsize else []
-            for off, size, content in iterable:
-                results.append((off - delta, content.get('__name__', None), size))
+            results, offset = [], idaapi.frame_off_savregs(fn)
+            for sptr, mindex, mptr in internal.structure.members.at_bounds(fr.id, offset, offset + interface.function.frame_registers(fn)):
+                offset = interface.function.frame_offset(fn, mptr.soff)
+                mname, mtags = (F(mptr) for F in [internal.structure.member.get_name, internal.tags.member.get])
+                location = interface.location_t(offset, idaapi.get_member_size(mptr))
+                results.append((location, mname, mtags))
             return results
 
         @utils.multicase()
