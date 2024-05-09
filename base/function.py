@@ -3002,15 +3002,20 @@ class frame(object):
         @utils.multicase()
         @classmethod
         def registers(cls):
-            '''Return the register information associated with the arguments of the current function.'''
+            '''Return the `(register, type, name)` associated with the arguments of the current function as a list.'''
             return cls.registers(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, types.integer))
         @classmethod
         def registers(cls, func):
-            '''Return the register information associated with the arguments of the function `func`.'''
+            '''Return the `(register, type, name)` associated with the arguments of the function `func` as a list.'''
             result = []
-            for reg, ti, name in cls.iterate(func):
-                result.append(reg) if any([isinstance(reg, interface.register_t), isinstance(reg, types.tuple) and all(isinstance(item, interface.register_t) for item in reg)]) else None
+            for apacked in cls.iterate(func):
+                areg, atype, name = apacked
+                if isinstance(areg, interface.register_t):
+                    result.append(apacked)
+                elif isinstance(arg, types.tuple) and all(isinstance(item, interface.register_t) for item in areg):
+                    result.append(apacked)
+                continue
             return result
         regs = utils.alias(registers, 'frame.args')
 
@@ -3033,7 +3038,7 @@ class frame(object):
     class variables(object):
         """
         This namespace provides information about the local variables
-        defined within a function's frame.
+        within the frame of a function as constructed by its prologue.
 
         Some ways to get this information can be::
 
@@ -3066,7 +3071,8 @@ class frame(object):
         @classmethod
         def size(cls):
             '''Returns the size of the local variables for the current function.'''
-            return cls.size(ui.current.function())
+            fn = interface.function.by(ui.current.function())
+            return fn.frsize
         @utils.multicase(func=(idaapi.func_t, types.integer))
         @classmethod
         def size(cls, func):
@@ -3077,8 +3083,8 @@ class frame(object):
 
     class registers(object):
         """
-        This namespace provides information about the registers that
-        are saved when a function constructs its frame.
+        This namespace provides information about the registers that are
+        preserved in the prologue when a function constructs its frame.
 
         An example of using this namespace::
 
@@ -3088,11 +3094,11 @@ class frame(object):
 
         @utils.multicase()
         def __new__(cls):
-            '''Yield the `(location, name, tags)` of each saved register relative to the stack pointer at the entry point of the current function.'''
+            '''Yield the `(location, name, tags)` of each preserved register relative to the stack pointer at the entry point of the current function.'''
             return cls(ui.current.address())
         @utils.multicase(func=(idaapi.func_t, types.integer))
         def __new__(cls, func):
-            '''Yield the `(location, name, tags)` of each saved register relative to the stack pointer at the entry point of the function `func`.'''
+            '''Yield the `(location, name, tags)` of each preserved register relative to the stack pointer at the entry point of the function `func`.'''
             fn = interface.function.by(func)
 
             # figure out the frame
@@ -3111,14 +3117,13 @@ class frame(object):
         @utils.multicase()
         @classmethod
         def size(cls):
-            '''Returns the number of bytes occupied by the saved registers in the current function.'''
-            return cls.size(ui.current.function())
+            '''Returns the number of bytes occupied by the preserved registers in the current function.'''
+            return interface.function.frame_registers(ui.current.function())
         @utils.multicase(func=(idaapi.func_t, types.integer))
         @classmethod
         def size(cls, func):
-            '''Returns the number of bytes occupied by the saved registers for the function `func`.'''
-            fn = interface.function.by(func)
-            return fn.frregs + idaapi.get_frame_retsize(fn)
+            '''Returns the number of bytes occupied by the preserved registers for the function `func`.'''
+            return interface.function.frame_registers(func)
     regs = registers    # XXX: ns alias
 
 get_frameid = utils.alias(frame.id, 'frame')
