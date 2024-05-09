@@ -2829,171 +2829,173 @@ class frame(object):
             }
             byte.create_simple_type(idaapi.BTF_BYTE)
 
-            # If we have no type information, then we can only process arguments if we're within
-            # a function. If we're not not part of a functon, then we log a warning and bail.
-            if not has_tinfo:
-                if not fn:
-                    logging.warning(u"{:s}.iterate({:#x}) : Unable to iterate through the arguments for the given function ({:#x}) due to missing type information and frame.".format('.'.join([__name__, cls.__name__]), ea, ea))
+            # If we have type information that we can grab from the given address,
+            # then we can use it to rip out the details and locate each member.
+            if has_tinfo:
+                tinfo, ftd = interface.tinfo.function_details(ea)
 
-                # If our function's regargqty is larger than zero, then we're supposed to extract the
-                # regargs directly out of the func_t.
-                elif fn.regargqty:
-                    items = []
+                # Now we just need to iterate through our parameters collecting the
+                # raw location information for all of them. We preserve the type
+                # information in case we're unable to find the argument in a member.
+                items = []
+                for index in builtins.range(ftd.size()):
+                    arg, aloc = ftd[index], ftd[index].argloc
+                    items.append((index, utils.string.of(arg.name), interface.tinfo.copy(arg.type), interface.tinfo.location_raw(aloc)))
 
-                    # If regargqty is set, but regargs is None...then we need to call read_regargs on our
-                    # fn to get IDA to actually read it...The funny thing is, on earlier versions of IDA
-                    # it seems that read_regargs won't always allocate an iterator...so this means that
-                    # we manually make it a list and then this way we can iterate through the fucker.
-                    idaapi.read_regargs(fn) if fn.regargs is None else None
-                    if isinstance(fn.regargs, idaapi.regarg_t):
-                        regargs = [fn.regargs]
-                    else:
-                        regargs = [fn.regargs[index] for index in builtins.range(fn.regargqty)]
+                # Last thing that we need to do is to extract each location and
+                # figure out whether we return it as a location or an actual member.
+                fr = None if rt else frame(ea) if idaapi.get_frame(ea) else None
+                for index, aname, atype, ainfo in items:
+                    aloc = interface.tinfo.location(atype.get_size(), instruction.architecture, *ainfo)
 
-                    # Iterate through all of our arguments in order to grab the register,
-                    # the type information, and argument name out of the register argument.
-                    for index, regarg in enumerate(regargs):
-                        rreg, rtype, rname = regarg.reg, regarg.type, utils.string.of(regarg.name)
-                        reg = instruction.architecture.by_index(rreg) if instruction.architecture.has(rreg) else None
-                        rsize = reg.size if reg else 0
+                    # If it's a location, then we need to translate it to find out
+                    # where the member is actually located at. This becomes our result
+                    # if we have a frame. Otherwise, we just return the location as-is.
+                    if isinstance(aloc, interface.location_t):
+                        aoffset, asize = aloc
+                        moffset = aoffset + idaapi.frame_off_args(fn)
+                        offset, nameoffset = (F(fn, moffset) for F in [interface.function.frame_offset, interface.function.frame_member_offset])
+                        location = interface.location_t(offset, asize)
 
-                        # Deserialize the type information that we received from the register argument.
-                        ti = interface.tinfo.get(None, rtype)
-                        if not ti and operator.contains(tilookup, bits):
-                            ti = interface.tinfo.get(None, bytes(bytearray([tilookup[bits]])))
-
-                        # If we failed creating a type of the correct size, then we fall back to an
-                        # array that uses the register size so that we at least get the size correct.
-                        atd, array_t = idaapi.array_type_data_t(), idaapi.tinfo_t()
-                        atd.base, atd.nelems, atd.elem_type = 0, rsize, byte
-                        if not ti and reg and array_t.create_array(atd):
-                            ti = interface.tinfo.concretize(array_t)
-                            logging.warning(u"{:s}.iterate({:#x}) : Using the placeholder type \"{:s}\" due to being unable to decode the type information ({!r}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape("{!s}".format(ti), '"'), rtype, index))
-
-                        # If we _still_ don't have a type, then we issue a warning and substitute a void*
-                        # for the type. This should always result in the correct default register size.
-                        voidstar = interface.tinfo.get(None, bytes(bytearray([idaapi.BT_PTR, idaapi.BT_VOID])))
-                        if not ti and voidstar:
-                            ti = voidstar
-                            logging.warning(u"{:s}.iterate({:#x}) : Falling back to the placeholder type \"{:s}\" due to being unable to cast the type information ({!r}) to an array ({:d}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape("{!s}".format(ti), '"'), rtype, rsize, index))
-
-                        # If we couldn't create a void* type, then this is a critical failure that needs
-                        # to get logged. We still add it, though, so that the register can be yielded.
-                        elif not ti:
-                            logging.critical(u"{:s}.iterate({:#x}) : Unable to find a type of the correct size ({:d}) for register argument at index {:d} ({!s}) using the given type information ({!r}).".format('.'.join([__name__, cls.__name__]), ea, rsize, index, reg, rtype))
-
-                        # Now we can add everything that was determined to our list for processing.
-                        items.append((reg, ti, rname))
-
-                    # Now that we have the register, its tinfo_t, and the type. We do one final
-                    # pass to correct the register size according to the type that was determined.
-                    for reg, ti, rname in items:
+                        # Use the translated offset to find the correct member. If we
+                        # couldn't find one, then use the location as the member. We
+                        # also assign the member name, giving it priority over the type.
                         try:
-                            reg = instruction.architecture.by_indexsize(reg.id, ti.get_size())
-
-                        # If there was no type, then yield a non-present type.
-                        except KeyError:
-                            yield reg, ti or idaapi.tinfo_t(), rname or None
+                            mem = fr.members.by(offset) if fr else location
+                        except (E.MemberNotFoundError, E.OutOfBoundsError):
+                            mem, mname = location, aname
                         else:
-                            yield reg, ti or idaapi.tinfo_t(), rname or None
-                        continue
+                            mname = mem.name or aname if fr else aname
 
-                    # We've processed the registers, so we can fall-through for the rest of the parameters.
+                        # Now we can yield the member/location, the type and its name.
+                        yield mem, atype, mname or interface.tuplename('arg', nameoffset)
 
-                # If we don't have a frame, then there's nothing we can do. So we abort.
-                sptr = idaapi.get_frame(fn) if fn else None
-                if not sptr:
-                    return
+                    # If it's a tuple, then we check if it contains any registers
+                    # so that way we can process them if necessary. If its a register
+                    # offset where its second item is an integer and it's zero, then
+                    # we can simply exclude the offset from our results.
+                    elif isinstance(aloc, types.tuple) and any(isinstance(item, interface.register_t) for item in loc):
+                        reg, offset = aloc
+                        yield aloc if offset else reg, atype, aname
 
-                # If we do have a frame, then we do our best to figure out the parameters from it.
-                fr = interface.function.frame(fn)
-
-                # Now we can grab the fragment of the structure containing the parameters.
-                for mowner, mindex, mptr in internal.structure.members.at_bounds(fr.id, idaapi.frame_off_args(fn), idaapi.get_struc_size(sptr)):
-                    aoffset = interface.function.frame_offset(fn, mptr.soff)
-                    asize = idaapi.get_member_size(mptr)
-                    aname = internal.structure.member.get_name(mptr) or internal.structure.member.default_name(fr, mptr)
-                    location = interface.location_t(aoffset, asize)
-
-                    # Pre-create an array_type_data_t so that we can create a type if it is missing.
-                    atd = idaapi.array_type_data_t()
-                    atd.base, atd.nelems, atd.elem_type = 0, asize, byte
-
-                    atype = idaapi.tinfo_t()
-                    if not atype.create_array(atd):
-                        raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to create an array of the required number of bytes ({:d}).".format('.'.join([__name__, cls.__name__]), ea, asize))
-
-                    # Now we can just use the index to fetch the member to return. We also extract the
-                    # type information, so that we can create it if the member is missing its type.
-                    mem = fr.members[mindex]
-                    mtype = internal.structure.member.get_typeinfo(mptr)
-
-                    # If we have some type information, then we can just yield everything as-is.
-                    if mtype:
-                        yield mem, mtype, aname
-
-                    # If there isn't a type, then we try to find one that matches the member size.
-                    elif operator.contains(tilookup, 8 * asize) and interface.tinfo.get(None, bytes(bytearray([tilookup[8 * asize]]))):
-                        yield mem, interface.tinfo.get(None, bytes(bytearray([tilookup[8 * asize]]))), aname
-
-                    # Otherwise, we use the array that we created earlier for the member type.
+                    # Otherwise, it's one of the custom locations that we don't
+                    # support. So we can just return it as we received it.
                     else:
-                        yield mem, interface.tinfo.concretize(atype), aname
+                        yield aloc, atype, aname
                     continue
                 return
 
-            # If we got here, then we have type information that we can grab out
-            # of the given address. Once we have it, rip the details out o it.
-            tinfo, ftd = interface.tinfo.function_details(ea)
+            # If we have no type information, then we can only process arguments if we're within
+            # a function. If we're not not part of a functon, then we log a warning and bail.
+            elif not fn:
+                logging.warning(u"{:s}.iterate({:#x}) : Unable to iterate through the arguments for the given function ({:#x}) due to missing type information and frame.".format('.'.join([__name__, cls.__name__]), ea, ea))
+                return
 
-            # Now we just need to iterate through our parameters collecting the
-            # raw location information for all of them. We preserve the type
-            # information in case we're unable to find the argument in a member.
-            items = []
-            for index in builtins.range(ftd.size()):
-                arg, aloc = ftd[index], ftd[index].argloc
-                items.append((index, utils.string.of(arg.name), interface.tinfo.copy(arg.type), interface.tinfo.location_raw(aloc)))
+            # Otherwise, we have no type information and we'll need to extract things
+            # directly from the func_t. We start out by checking if regarqty is larger
+            # than zero so that we can yield any registers that the disassembler found.
+            if fn.regargqty:
+                registers = []
 
-            # Last thing that we need to do is to extract each location and
-            # figure out whether we return it as a register or an actual member.
-            fr = None if rt else frame(ea) if idaapi.get_frame(ea) else None
-            for index, aname, atype, ainfo in items:
-                aloc = interface.tinfo.location(atype.get_size(), instruction.architecture, *ainfo)
-
-                # If it's a location, then we need to translate it to find out
-                # where the member is actually located at. This becomes our result
-                # if we have a frame. Otherwise, we just return the location as-is.
-                if isinstance(aloc, interface.location_t):
-                    aoffset, asize = aloc
-                    moffset = aoffset + idaapi.frame_off_args(fn)
-                    offset, nameoffset = (F(fn, moffset) for F in [interface.function.frame_offset, interface.function.frame_member_offset])
-                    location = interface.location_t(offset, asize)
-
-                    # Use the translated offset to find the correct member. If we
-                    # couldn't find one, then use the location as the member. We
-                    # also assign the member name, giving it priority over the type.
-                    try:
-                        mem = fr.members.by(offset) if fr else location
-                    except (E.MemberNotFoundError, E.OutOfBoundsError):
-                        mem, mname = location, aname
-                    else:
-                        mname = mem.name or aname if fr else aname
-
-                    # Now we can yield the member/location, the type and its name.
-                    yield mem, atype, mname or interface.tuplename('arg', nameoffset)
-
-                # If it's a tuple, then we check if it contains any registers
-                # so that way we can process them if necessary. If its a register
-                # offset where its second item is an integer and it's zero, then
-                # we can simply exclude the offset from our results.
-                elif isinstance(aloc, types.tuple) and any(isinstance(item, interface.register_t) for item in loc):
-                    reg, offset = aloc
-                    yield aloc if offset else reg, atype, aname
-
-                # Otherwise, it's one of the custom locations that we don't
-                # support. So we can just return it as we received it.
+                # If regargqty is set, but regargs is None...then we need to call read_regargs on our
+                # fn to get IDA to actually read it...The funny thing is, on earlier versions of IDA
+                # it seems that read_regargs won't always allocate an iterator...so this means that
+                # we manually make it a list and then this way we can iterate through the fucker.
+                idaapi.read_regargs(fn) if fn.regargs is None else None
+                if isinstance(fn.regargs, idaapi.regarg_t):
+                    regargs = [fn.regargs]
                 else:
-                    yield aloc, atype, aname
+                    regargs = [fn.regargs[index] for index in builtins.range(fn.regargqty)]
+
+                # Iterate through all of our arguments in order to grab the register,
+                # the type information, and argument name out of the register argument.
+                for index, regarg in enumerate(regargs):
+                    rreg, rtype, rname = regarg.reg, regarg.type, utils.string.of(regarg.name)
+                    reg = instruction.architecture.by_index(rreg) if instruction.architecture.has(rreg) else None
+                    rsize = reg.size if reg else 0
+
+                    # Deserialize the type information that we received from the register argument.
+                    ti = interface.tinfo.get(None, rtype)
+                    if not ti and operator.contains(tilookup, bits):
+                        ti = interface.tinfo.get(None, bytes(bytearray([tilookup[bits]])))
+
+                    # If we failed creating a type of the correct size, then we fall back to an
+                    # array that uses the register size so that we at least get the size correct.
+                    atd, array_t = idaapi.array_type_data_t(), idaapi.tinfo_t()
+                    atd.base, atd.nelems, atd.elem_type = 0, rsize, byte
+                    if not ti and reg and array_t.create_array(atd):
+                        ti = interface.tinfo.concretize(array_t)
+                        logging.warning(u"{:s}.iterate({:#x}) : Using the placeholder type \"{:s}\" due to being unable to decode the type information ({!r}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape("{!s}".format(ti), '"'), rtype, index))
+
+                    # If we _still_ don't have a type, then we issue a warning and substitute a void*
+                    # for the type. This should always result in the correct default register size.
+                    voidstar = interface.tinfo.get(None, bytes(bytearray([idaapi.BT_PTR, idaapi.BT_VOID])))
+                    if not ti and voidstar:
+                        ti = voidstar
+                        logging.warning(u"{:s}.iterate({:#x}) : Falling back to the placeholder type \"{:s}\" due to being unable to cast the type information ({!r}) to an array ({:d}) for the argument at index {:d}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape("{!s}".format(ti), '"'), rtype, rsize, index))
+
+                    # If we couldn't create a void* type, then this is a critical failure that needs
+                    # to get logged. We still add it, though, so that the register can be yielded.
+                    elif not ti:
+                        logging.critical(u"{:s}.iterate({:#x}) : Unable to find a type of the correct size ({:d}) for register argument at index {:d} ({!s}) using the given type information ({!r}).".format('.'.join([__name__, cls.__name__]), ea, rsize, index, reg, rtype))
+
+                    # Now we can add everything that was determined to our list for processing.
+                    registers.append((reg, ti, rname))
+
+                # Now that we have the register, its tinfo_t, and the type. We do one final
+                # pass to correct the register size according to the type that was determined.
+                for reg, rtype, rname in registers:
+                    try:
+                        reg = instruction.architecture.by_indexsize(reg.id, rtype.get_size())
+
+                    # If there was no type, then yield a non-present type.
+                    except KeyError:
+                        yield reg, rtype or idaapi.tinfo_t(), rname or None
+                    else:
+                        yield reg, rtype or idaapi.tinfo_t(), rname or None
+                    continue
+
+                # We've processed the registers, so we can fall-through for the other paramters.
+
+            # If we don't have a frame, then there's nothing more we can do.
+            sptr = idaapi.get_frame(fn) if fn else None
+            if not sptr:
+                return
+
+            # If we do have a frame, then we do our best to figure out the parameters from it.
+            fr = interface.function.frame(fn)
+
+            # Now we can grab the fragment of the structure containing the parameters.
+            for mowner, mindex, mptr in internal.structure.members.at_bounds(fr.id, idaapi.frame_off_args(fn), idaapi.get_struc_size(sptr)):
+                aoffset = interface.function.frame_offset(fn, mptr.soff)
+                asize = idaapi.get_member_size(mptr)
+                aname = internal.structure.member.get_name(mptr) or internal.structure.member.default_name(fr, mptr)
+                location = interface.location_t(aoffset, asize)
+
+                # Pre-create an array_type_data_t so that we can create a type if it is missing.
+                atd = idaapi.array_type_data_t()
+                atd.base, atd.nelems, atd.elem_type = 0, asize, byte
+
+                atype = idaapi.tinfo_t()
+                if not atype.create_array(atd):
+                    raise E.DisassemblerError(u"{:s}.iterate({:#x}) : Unable to create an array of the required number of bytes ({:d}).".format('.'.join([__name__, cls.__name__]), ea, asize))
+
+                # Now we can just use the index to fetch the member to return. We also extract the
+                # type information, so that we can create it if the member is missing its type.
+                mem = fr.members[mindex]
+                mtype = internal.structure.member.get_typeinfo(mptr)
+
+                # If we have some type information, then we can just yield everything as-is.
+                if mtype:
+                    yield mem, mtype, aname
+
+                # If there isn't a type, then we try to find one that matches the member size.
+                elif operator.contains(tilookup, 8 * asize) and interface.tinfo.get(None, bytes(bytearray([tilookup[8 * asize]]))):
+                    yield mem, interface.tinfo.get(None, bytes(bytearray([tilookup[8 * asize]]))), aname
+
+                # Otherwise, we use the array that we created earlier for the member type.
+                else:
+                    yield mem, interface.tinfo.concretize(atype), aname
                 continue
             return
 
