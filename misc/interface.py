@@ -5691,6 +5691,11 @@ class tinfo(object):
             BTF_VOID = idaapi.BTF_VOID if hasattr(idaapi, 'BTF_VOID') else getattr(idaapi, 'BT_VOID', 1) | getattr(idaapi, 'BTMT_SIZE0', 0)
             return cls.get(til, bytearray([BTF_VOID]))
 
+        # XXX: If the stripped name is _BOOL8, then the type is really _BOOL2 on 64-bit.
+        elif stripped in {64: {'_BOOL8'}}.get(database.bits(), {}):
+            BOOL_16o64 = getattr(idaapi, 'BT_BOOL', 8) | getattr(idaapi, 'BTMT_SIZE48', 0x20)
+            return cls.get(til, bytearray([BOOL_16o64]))
+
         # For some reason the disassembler does not like to parse pointers/arrays to
         # unnamed unions that are prefixed with "union"...So, we have to strip it.
         elif not flags & idaapi.PT_VAR and stripped.startswith(('union ', 'const union ')) and stripped.endswith(('*', '*const', '&', '&const', ']')):
