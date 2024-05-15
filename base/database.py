@@ -4889,6 +4889,59 @@ class type(object):
         return any(interface.address.refinfo(ea) for ea in interface.address.items(*bounds))
     has_relocation = is_relocation = utils.alias(relocation, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def fixup(cls):
+        '''Return the type of the fixup that has been applied to the item at the current address.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
+            return cls.fixup(address, address + interface.address.size(address))
+        return cls.fixup(selection)
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def fixup(cls, ea):
+        '''Return the type of the fixup that has been applied to the address `ea`.'''
+        fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
+        if not get_fixup(fd, ea):
+            return 0
+        return fd.get_type()
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
+    @classmethod
+    def fixup(cls, start, stop):
+        '''Return the type of the first fixup from the address `start` till `stop`.'''
+        left, right = sorted([start, stop])
+        fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
+        res = idaapi.get_prev_fixup_ea(right) if stop < start else idaapi.get_next_fixup_ea(left)
+        contained = left < res <= right if stop < start else left <= res < right
+        if not idaapi.contains_fixups(1 + left if stop < start else left, right - left):
+            return 0
+        elif res != idaapi.BADADDR and contained and get_fixup(fd, res):
+            return fd.get_type()
+        return 0
+    @utils.multicase(location=interface.location_t)
+    @classmethod
+    def fixup(cls, location):
+        '''Return the type of the fixup at the specified `location`.'''
+        ea, size = location
+        fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
+        if hasattr(idaapi, 'calc_fixup_size') and get_fixup(fd, ea) and idaapi.calc_fixup_size(fd.get_type()) == size:
+            return fd.get_type()
+        elif get_fixup(fd, ea) and size == idaapi.calc_max_item_end(ea, idaapi.ITEM_END_FIXUP) - ea:
+            return fd.get_type()
+        return 0
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def fixup(cls, bounds):
+        '''Return the type of the first fixup that is within the specified `bounds`.'''
+        left, right = sorted(bounds)
+        fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
+        res = idaapi.get_prev_fixup_ea(right) if size < 0 else idaapi.get_next_fixup_ea(left)
+        if not idaapi.contains_fixups(left, right - left):
+            return 0
+        elif res != idaapi.BADADDR and left <= res < right and get_fixup(fd, res):
+            return fd.get_type()
+        return 0
+
     class array(object):
         """
         This namespace is for returning type information about an array
