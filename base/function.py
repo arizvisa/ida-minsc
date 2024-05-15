@@ -4312,6 +4312,78 @@ class type(object):
                 return parameters[index]
             raise E.IndexOutOfBoundsError(u"{:s}.location({:#x}, {:d}) : Unable to fetch the address of the specified parameter ({:d}) from the function call at address {:#x} due to only {:d} parameter{:s} being available.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ea, len(parameters), '' if len(parameters) == 1 else 's'))
 
+        @utils.multicase(index=types.integer)
+        @classmethod
+        def unused(cls, index):
+            '''Return whether the parameter at the specified `index` of the prototype from the current function is marked as unused.'''
+            return cls.unused(ui.current.address(), index)
+        @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer)
+        @classmethod
+        def unused(cls, func, index):
+            '''Return whether the parameter at the specified `index` of the prototype from the function ``func`` is marked as unused.'''
+            _, ea = interface.addressOfRuntimeOrStatic(func)
+
+            # Grab the prototype and details from the specified function.
+            tinfo, ftd = interface.tinfo.function_details(ea)
+            if not (0 <= index < ftd.size()):
+                raise E.IndexOutOfBoundsError(u"{:s}.unused({:#x}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ftd.size(), ea))
+
+            # Now we can grab the argument using the index we were given and return its name.
+            result, FAI_UNUSED = ftd[index], getattr(idaapi, 'FAI_UNUSED', 0x10)
+            return True if result.flags & FAI_UNUSED else False
+        @utils.multicase(type=idaapi.tinfo_t, index=types.integer)
+        @classmethod
+        def unused(cls, type, index):
+            '''Return whether the parameter at the given `index` of the prototype specified by ``type`` is marked as unused.'''
+            prototype, ftd = interface.tinfo.prototype_details(type)
+            if not (0 <= index < ftd.size()):
+                raise E.IndexOutOfBoundsError(u"{:s}.unused({!r}, {:d}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified prototype.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, index, ftd.size()))
+            result, FAI_UNUSED = ftd[index], getattr(idaapi, 'FAI_UNUSED', 0x10)
+            return True if result.flags & FAI_UNUSED else False
+        @utils.multicase(func=(idaapi.func_t, types.integer), index=types.integer)
+        @classmethod
+        def unused(cls, func, index, boolean):
+            '''Set the unused attribute of the parameter at the specified `index` from the prototype of the function `func` to `boolean`.'''
+            updater = interface.tinfo.update_function_details(func)
+
+            # Grab the function type and its details that we can modify it.
+            tinfo, ftd = builtins.next(updater)
+            if not (0 <= index < ftd.size()):
+                _, ea = internal.interface.addressOfRuntimeOrStatic(func)
+                raise E.IndexOutOfBoundsError(u"{:s}.unused({:#x}, {:d}, {!s}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified function ({:#x}).".format('.'.join([__name__, 'type', cls.__name__]), ea, index, True if unused else False, index, ftd.size(), ea))
+
+            # Grab the parameter and exchange its flags with our boolean.
+            argument, FAI_UNUSED = ftd[index], getattr(idaapi, 'FAI_UNUSED', 0x10)
+            preserve, value = (idaapi.as_uint32(integer) for integer in [~FAI_UNUSED, -1 if boolean else 0])
+            result, argument.flags = argument.flags & FAI_UNUSED, idaapi.as_uint32((argument.flags & preserve) | (value & FAI_UNUSED))
+
+            # Send the new flags back to our updater and return what we snagged.
+            updater.send(ftd), updater.close()
+            return True if result else False
+        @utils.multicase(type=idaapi.tinfo_t, index=types.integer)
+        @classmethod
+        def unused(cls, type, index, boolean):
+            updater = interface.tinfo.update_prototype_details(type)
+
+            # Get the prototype and its details from the updater.
+            prototype, ftd = builtins.next(updater)
+            if not (0 <= index < ftd.size()):
+                raise E.IndexOutOfBoundsError(u"{:s}.unused({!r}, {:d}, {!s}) : The provided index ({:d}) is not within the range of the number of arguments ({:d}) for the specified prototype.".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, True if unused else False, index, ftd.size()))
+
+            # Now we can grab the parameter in order to exchange its flags with our boolean.
+            argument, FAI_UNUSED = ftd[index], getattr(idaapi, 'FAI_UNUSED', 0x10)
+            preserve, value = (idaapi.as_uint32(integer) for integer in [~FAI_UNUSED, -1 if boolean else 0])
+            result, argument.flags = argument.flags & FAI_UNUSED, idaapi.as_uint32((argument.flags & preserve) | (value & FAI_UNUSED))
+
+            # That was it. We just need to send the details back to get our result.
+            try:
+                newinfo, _ = updater.send(ftd)
+            except E.DisassemblerError:
+                raise E.DisassemblerError(u"{:s}.unused({!r}, {:d}, {!s}) : Unable to remove the argument at index {:d} of the specified prototype \"{:s}\".".format('.'.join([__name__, 'type', cls.__name__]), "{!s}".format(type), index, True if unused else False, index, utils.string.escape("{!s}".format(prototype), '"')))
+            finally:
+                updater.close()
+            return newinfo
+
     arg = parameter = argument  # XXX: ns alias
 
     class arguments(object):
