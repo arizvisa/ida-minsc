@@ -4866,49 +4866,54 @@ class type(object):
 
     @utils.multicase()
     @classmethod
-    def relocation(cls):
-        '''Return if the current address was relocated by a relocation during load.'''
+    def has_relocation(cls):
+        '''Return if a relocation has been applied to the item at the current address.'''
         address, selection = ui.current.address(), ui.current.selection()
         if operator.eq(*(interface.address.head(ea) for ea in selection)):
-            return cls.relocation(address)
+            get_fixup = utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
+            return True if get_fixup(None, address) else False
+        left, right = sorted(selection)
+        return True if idaapi.contains_fixups(left, right - left) else False
+    @utils.multicase(ea=internal.types.integer)
+    @classmethod
+    def has_relocation(cls, ea):
+        '''Return if the address at `ea` has a relocation applied to it.'''
+        get_fixup = utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
+        return True if get_fixup(None, ea) else False
+    @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
+    @classmethod
+    def has_relocation(cls, start, stop):
+        '''Return if an address from `start` till `stop` has a relocation applied to it.'''
+        left, right = sorted([start, stop])
+        return True if idaapi.contains_fixups(left, right - left) else False
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def has_relocation(cls, bounds):
+        '''Return if an address within the specified `bounds` has a relocation applied to it.'''
+        left, right = bounds
+        return True if idaapi.contains_fixups(left, right - left) else False
+    is_relocation = utils.alias(has_relocation, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def relocation(cls):
+        '''Return the type of the relocation that has been applied to the item at the current address.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
+            return cls.relocation(address, interface.address.size(address))
         return cls.relocation(selection)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def relocation(cls, ea):
-        '''Return if the address at `ea` was relocated by a relocation during load.'''
-        return True if interface.address.refinfo(ea) else False
-    @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
-    @classmethod
-    def relocation(cls, ea, size):
-        '''Return if an address at `ea` up to `size` bytes was relocated by a relocation during load.'''
-        return any(interface.address.refinfo(ea) for ea in interface.address.items(*bounds))
-    @utils.multicase(bounds=interface.bounds_t)
-    @classmethod
-    def relocation(cls, bounds):
-        '''Return if an address within the specified `bounds` was relocated by a relocation during load.'''
-        return any(interface.address.refinfo(ea) for ea in interface.address.items(*bounds))
-    has_relocation = is_relocation = utils.alias(relocation, 'type')
-
-    @utils.multicase()
-    @classmethod
-    def fixup(cls):
-        '''Return the type of the fixup that has been applied to the item at the current address.'''
-        address, selection = ui.current.address(), ui.current.selection()
-        if operator.eq(*(interface.address.head(ea) for ea in selection)):
-            return cls.fixup(address, address + interface.address.size(address))
-        return cls.fixup(selection)
-    @utils.multicase(ea=internal.types.integer)
-    @classmethod
-    def fixup(cls, ea):
-        '''Return the type of the fixup that has been applied to the address `ea`.'''
+        '''Return the type of the relocation that has been applied to the address `ea`.'''
         fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
         if not get_fixup(fd, ea):
             return 0
         return fd.get_type()
     @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
     @classmethod
-    def fixup(cls, start, stop):
-        '''Return the type of the first fixup from the address `start` till `stop`.'''
+    def relocation(cls, start, stop):
+        '''Return the type of the first relocation from the address `start` till `stop`.'''
         left, right = sorted([start, stop])
         fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
         res = idaapi.get_prev_fixup_ea(right) if stop < start else idaapi.get_next_fixup_ea(left)
@@ -4920,8 +4925,8 @@ class type(object):
         return 0
     @utils.multicase(location=interface.location_t)
     @classmethod
-    def fixup(cls, location):
-        '''Return the type of the fixup at the specified `location`.'''
+    def relocation(cls, location):
+        '''Return the type of the relocation at the specified `location`.'''
         ea, size = location
         fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
         if hasattr(idaapi, 'calc_fixup_size') and get_fixup(fd, ea) and idaapi.calc_fixup_size(fd.get_type()) == size:
@@ -4931,8 +4936,8 @@ class type(object):
         return 0
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def fixup(cls, bounds):
-        '''Return the type of the first fixup that is within the specified `bounds`.'''
+    def relocation(cls, bounds):
+        '''Return the type of the first relocation that is within the specified `bounds`.'''
         left, right = sorted(bounds)
         fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
         res = idaapi.get_prev_fixup_ea(right) if size < 0 else idaapi.get_next_fixup_ea(left)
