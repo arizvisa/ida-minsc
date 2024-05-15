@@ -4272,87 +4272,87 @@ class address(object):
 
     @utils.multicase()
     @classmethod
-    def prevfixup(cls, **count):
-        '''Return the address of the fixup prior to the current address.'''
-        return cls.prevfixup(ui.current.address(), count.pop('count', 1))
+    def prevrelocation(cls, **count):
+        '''Return the address of the relocation prior to the current address.'''
+        return cls.prevrelocation(ui.current.address(), count.pop('count', 1))
     @utils.multicase(predicate=internal.types.callable)
     @classmethod
-    def prevfixup(cls, predicate, **count):
-        '''Return the address of the fixup prior to the current address that satisfies the given `predicate`.'''
-        return cls.prevfixup(ui.current.address(), predicate, **count)
+    def prevrelocation(cls, predicate, **count):
+        '''Return the address of the relocation prior to the current address that satisfies the given `predicate`.'''
+        return cls.prevrelocation(ui.current.address(), predicate, **count)
     @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
     @classmethod
-    def prevfixup(cls, ea, predicate, **count):
-        '''Return the address of the fixup prior to the address `ea` that satisfies the given `predicate`.'''
+    def prevrelocation(cls, ea, predicate, **count):
+        '''Return the address of the relocation prior to the address `ea` that satisfies the given `predicate`.'''
         counter = max(1, count.get('count', 1))
         while counter > 0:
             next = idaapi.get_prev_fixup_ea(ea)
             if next == idaapi.BADADDR:
-                raise E.AddressOutOfBoundsError(u"{:s}.prevfixup({:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
+                raise E.AddressOutOfBoundsError(u"{:s}.prevrelocation({:#x}, {!s}{:s}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', top(), ea))
             elif predicate(next):
                 counter -= 1
             ea = next
         return ea
     @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def prevfixup(cls, ea):
-        '''Return the address of the fixup prior to the address `ea`.'''
+    def prevrelocation(cls, ea):
+        '''Return the address of the relocation prior to the address `ea`.'''
         res = idaapi.get_prev_fixup_ea(ea)
         if res == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.prevfixup({:#x}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, top(), ea))
+            raise E.AddressOutOfBoundsError(u"{:s}.prevrelocation({:#x}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, top(), ea))
         return res
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
-    def prevfixup(cls, ea, count):
-        '''Return the address of the fixup prior to the specified `count` fixups from the address `ea`.'''
+    def prevrelocation(cls, ea, count):
+        '''Return the address of the relocation prior to the specified `count` relocations from the address `ea`.'''
         for index in builtins.range(max(1, count)):
             next = idaapi.get_prev_fixup_ea(ea)
             if next == idaapi.BADADDR:
-                raise E.AddressOutOfBoundsError(u"{:s}.prevfixup({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
+                raise E.AddressOutOfBoundsError(u"{:s}.prevrelocation({:#x}, {:d}): Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, top(), ea))
             ea = next
         return ea
-
     @utils.multicase()
     @classmethod
-    def nextfixup(cls, **count):
-        '''Return the address of the fixup after the current address.'''
-        return cls.nextfixup(ui.current.address(), count.pop('count', 1))
+    def nextrelocation(cls, **count):
+        '''Return the address of the relocation after the current address.'''
+        return cls.nextrelocation(ui.current.address(), count.pop('count', 1))
     @utils.multicase(predicate=internal.types.callable)
     @classmethod
-    def nextfixup(cls, predicate, **count):
-        '''Return the address of the fixup after the current address that satisfies the given `predicate`.'''
-        return cls.nextfixup(ui.current.address(), predicate, **count)
+    def nextrelocation(cls, predicate, **count):
+        '''Return the address of the relocation after the current address that satisfies the given `predicate`.'''
+        return cls.nextrelocation(ui.current.address(), predicate, **count)
     @utils.multicase(ea=internal.types.integer, predicate=internal.types.callable)
     @classmethod
-    def nextfixup(cls, ea, predicate, **count):
-        '''Return the address of the fixup after the address `ea` that satisfies the given `predicate`.'''
+    def nextrelocation(cls, ea, predicate, **count):
+        '''Return the address of the relocation after the address `ea` that satisfies the given `predicate`.'''
         counter = max(1, count.get('count', 1))
         while counter > 0:
             next = idaapi.get_next_fixup_ea(ea)
             if next == idaapi.BADADDR:
-                raise E.AddressOutOfBoundsError(u"{:s}.nextfixup({:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
+                raise E.AddressOutOfBoundsError(u"{:s}.nextrelocation({:#x}, {!s}{:s}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, predicate, ", {:s}".format(utils.string.kwargs(count)) if count else '', bottom(), ea))
             elif predicate(next):
                 counter -= 1
             ea = next
         return ea
     @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def nextfixup(cls, ea):
-        '''Return the address of the fixup after the address `ea`.'''
+    def nextrelocation(cls, ea):
+        '''Return the address of the relocation after the address `ea`.'''
         res = idaapi.get_next_fixup_ea(ea)
         if res == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError(u"{:s}.nextfixup({:#x}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bottom(), idaapi.get_item_end(ea)))
+            raise E.AddressOutOfBoundsError(u"{:s}.nextrelocation({:#x}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bottom(), idaapi.get_item_end(ea)))
         return res
     @utils.multicase(ea=internal.types.integer, count=internal.types.integer)
     @classmethod
-    def nextfixup(cls, ea, count):
-        '''Return the address of the fixup after the specified `count` fixups from the address `ea`.'''
+    def nextrelocation(cls, ea, count):
+        '''Return the address of the relocation after the specified `count` relocations from the address `ea`.'''
         for index in builtins.range(max(1, count)):
             next = idaapi.get_next_fixup_ea(ea)
             if next == idaapi.BADADDR:
-                raise E.AddressOutOfBoundsError(u"{:s}.nextfixup({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
+                raise E.AddressOutOfBoundsError(u"{:s}.nextrelocation({:#x}, {:d}): Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, count, bottom(), idaapi.get_item_end(ea)))
             ea = next
         return ea
+    prevfixup, nextfixup = utils.alias(prevrelocation, 'address'), utils.alias(nextrelocation, 'address')
 
     # address translations
     @classmethod
