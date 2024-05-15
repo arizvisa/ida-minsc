@@ -8641,45 +8641,46 @@ class get(object):
 
     @utils.multicase()
     @classmethod
-    def fixup(cls):
-        '''Return the ``location_t`` for the fixup applied to the item at the current address.'''
+    def relocation(cls):
+        '''Return the ``location_t`` for the relocation applied to the item at the current address.'''
         address, selection = ui.current.address(), ui.current.selection()
         if operator.eq(*(interface.address.head(ea) for ea in selection)):
-            return cls.fixup(address, address + interface.address.size(address))
-        return cls.fixup(selection)
+            return cls.relocation(address, address + interface.address.size(address))
+        return cls.relocation(selection)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
-    def fixup(cls, ea):
-        '''Return the ``location_t`` of the fixup that has been applied to the address `ea`.'''
+    def relocation(cls, ea):
+        '''Return the ``location_t`` of the relocation that has been applied to the address `ea`.'''
+        fd = idaapi.fixup_data_t()
         fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
         if not get_fixup(fd, ea):
-            raise E.MissingTypeOrAttribute(u"{:s}.fixup({:#x}) : No relocations were found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+            raise E.MissingTypeOrAttribute(u"{:s}.relocation({:#x}) : No relocations were found at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
         rsize = idaapi.calc_fixup_size(fd.get_type()) if hasattr(idaapi, 'calc_fixup_size') else idaapi.calc_max_item_end(ea, idaapi.ITEM_END_FIXUP) - ea
         return interface.location_t(ea, rsize)
     @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
     @classmethod
-    def fixup(cls, start, stop):
-        '''Return the ``location_t`` of the first fixup from the address `start` till `stop`.'''
+    def relocation(cls, start, stop):
+        '''Return the ``location_t`` of the first relocation from the address `start` till `stop`.'''
         left, right = sorted([start, stop])
         fd, get_fixup = idaapi.fixup_data_t(), utils.freverse(idaapi.get_fixup) if idaapi.__version__ < 7.0 else idaapi.get_fixup
         res = idaapi.get_prev_fixup_ea(right) if stop < start else idaapi.get_next_fixup_ea(left)
         contained = left < res <= right if stop < start else left <= res < right
         if not idaapi.contains_fixups(1 + left if stop < start else left, right - left):
-            raise E.MissingTypeOrAttribute(u"{:s}.fixup({:#x}, {:#x}) : No relocations were found {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), start, stop, 'at the specified address' if left == right else 'within the specified boundaries', "{:#x}".format(left) if left == right else "{:#x}..{:#x}".format(left, right)))
+            raise E.MissingTypeOrAttribute(u"{:s}.relocation({:#x}, {:#x}) : No relocations were found {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), start, stop, 'at the specified address' if left == right else 'within the specified boundaries', "{:#x}".format(left) if left == right else "{:#x}..{:#x}".format(left, right)))
         elif res != idaapi.BADADDR and contained and get_fixup(fd, res):
             rtype = fd.get_type()
             rsize = idaapi.calc_fixup_size(rtype) if hasattr(idaapi, 'calc_fixup_size') else idaapi.calc_max_item_end(ea, idaapi.ITEM_END_FIXUP) - ea
         else:
-            raise E.MissingTypeOrAttribute(u"{:s}.fixup({:#x}, {:#x}) : No relocations were found {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), start, stop, 'at the specified address' if left == right else 'within the specified boundaries', "{:#x}".format(left) if left == right else "{:#x}..{:#x}".format(left, right)))
+            raise E.MissingTypeOrAttribute(u"{:s}.relocation({:#x}, {:#x}) : No relocations were found {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), start, stop, 'at the specified address' if left == right else 'within the specified boundaries', "{:#x}".format(left) if left == right else "{:#x}..{:#x}".format(left, right)))
         if rsize < 0:
-            raise E.InvalidTypeOrValueError(u"{:s}.fixup({:#x}, {:#x}) : Unable to determine the size for the relocation at address {:#x} with the determined type ({:d}).".format('.'.join([__name__, cls.__name__]), start, stop, res, rtype))
+            raise E.InvalidTypeOrValueError(u"{:s}.relocation({:#x}, {:#x}) : Unable to determine the size for the relocation at address {:#x} with the determined type ({:d}).".format('.'.join([__name__, cls.__name__]), start, stop, res, rtype))
         return interface.location_t(res, rsize)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
-    def fixup(cls, bounds):
-        '''Return the ``location_t`` of the first fixup that is within the specified `bounds`.'''
+    def relocation(cls, bounds):
+        '''Return the ``location_t`` of the first relocation that is within the specified `bounds`.'''
         left, right = sorted(bounds)
-        return cls.fixup(left, right)
+        return cls.relocation(left, right)
 
     @utils.multicase()
     @classmethod
