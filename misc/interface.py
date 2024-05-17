@@ -6192,24 +6192,33 @@ class tinfo(object):
         identifier = identifier if isinstance(identifier, internal.types.integer) else identifier.id
 
         # first determine whether the identifier belongs to a structure/union/enumeration.
-        sptr = idaapi.get_struc(identifier)
+        sptr = idaapi.get_struc(identifier) or idaapi.get_member_by_id(identifier)
         if not sptr and idaapi.get_enum_idx(identifier) == idaapi.BADADDR:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.by({:#x}) : Unable to determine whether the given identifier ({:#x}) is a structure, union, or enumeration.".format('.'.join([__name__, cls.__name__]), identifier, identifier))
 
+        # if we didn't get a struc_t, then this is a member that we need to unpack.
+        # after we unpack the member and get its typeinfo, then we can get the ordinal.
+        elif sptr and not isinstance(sptr, idaapi.struc_t):
+            mptr, mname, mowner = sptr
+            mtype = internal.structure.member.get_typeinfo(mptr)
+            type_t, ordinal, fullname = mtype.get_decltype(), cls.ordinal(mtype, *library), internal.utils.string.of(mname)
+
         # we'll now create a type_t for whatever type it was so that we can pass
         # it to get_ordinal_from_idb_type. we will also need the full name for it.
-        type_t = idaapi.BTMT_ENUM if not sptr else idaapi.BTMT_UNION if internal.structure.union(sptr) else idaapi.BTMT_STRUCT
-        fullname = internal.netnode.name.get(idaapi.ea2node(identifier) if hasattr(idaapi, 'ea2node') else identifier)
+        else:
+            type_t = idaapi.BTMT_ENUM if not sptr else idaapi.BTMT_UNION if internal.structure.union(sptr) else idaapi.BTMT_STRUCT
+            fullname = internal.utils.string.of(idaapi.get_struc_name(identifier) if sptr else idaapi.get_enum_name(identifier))
 
-        # now we can call get_ordinal_from_idb_type and check the ordinal. if we
-        # got one, then we can just use it to create a typeref and return it.
-        ordinal = idaapi.get_ordinal_from_idb_type(fullname, bytes(bytearray([idaapi.BT_COMPLEX | type_t])))
+            # now we can call get_ordinal_from_idb_type and get the ordinal.
+            ordinal = idaapi.get_ordinal_from_idb_type(internal.utils.string.to(fullname), bytes(bytearray([idaapi.BT_COMPLEX | type_t])))
+
+        # if we got an ordinal, then we can just return it back to the caller.
         if ordinal:
             return ordinal
 
         # if we didn't get an ordinal, then we need to raise an exception here.
         description = {idaapi.BTMT_STRUCT: 'structure', idaapi.BTMT_UNION: 'union', idaapi.BTMT_ENUM: 'enumeration'}
-        NotFoundException = internal.exceptions.StructureNotFoundError if sptr else internal.exceptions.EnumerationNotFoundError
+        NotFoundException = internal.exceptions.StructureNotFoundError if isinstance(sptr, idaapi.struc_t) else internal.exceptions.MemberNotFoundError if sptr else internal.exceptions.EnumerationNotFoundError
         raise NotFoundException(u"{:s}.by_identifier({:#x}) : Unable to locate the type information associated with the {:s} named \"{:s}\".".format('.'.join([__name__, cls.__name__]), identifier, description.get(type_t, "identifier ({:#x})".format(identifier)), internal.utils.string.escape(fullname, '"')))
 
     @classmethod
