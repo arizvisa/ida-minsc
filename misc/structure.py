@@ -3077,6 +3077,31 @@ class structure_t(object):
         return assigned
 
     @property
+    def alignment(self):
+        '''Return the alignment of the structure.'''
+        sptr, shift = self.ptr, pow(2, 7)
+        res, _ = divmod(sptr.props & idaapi.SF_ALIGN, shift)
+        return pow(2, res)
+
+    @alignment.setter
+    def alignment(self, size):
+        '''Modify the alignment of the structure to the specifyed `size`.'''
+        sptr, shift = self.ptr, pow(2, 7)
+        alignment, name = int(size), utils.string.of(idaapi.get_struc_name(sptr.id))
+        res, _ = divmod(sptr.props & idaapi.SF_ALIGN, shift)
+        e = math.floor(math.log(alignment, 2)) if alignment else 0
+        if pow(2, math.trunc(e)) != alignment:
+            cls = self.__class__
+            raise E.InvalidParameterError(u"{:s}({:#x}).alignment({!s}) : Unable to change the alignment ({:+d}) for structure \"{:s}\" to an amount ({:d}) that is not a power of 2.".format('.'.join([__name__, cls.__name__]), sptr.id, size, pow(2, res), utils.string.escape(name, '"'), alignment))
+        elif not (0 <= math.trunc(e) < 32):
+            cls = self.__class__
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).alignment({!s}) : The requested alignment ({:+d}) for structure \"{:s}\" cannot be {:s} than {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, size, pow(2, math.trunc(e)), utils.string.escape(name, '"'), 'smaller' if math.trunc(e) < 32 else 'larger', "{:d}".format(pow(2, 0 if math.trunc(e) < 32 else 31))))
+        elif not idaapi.set_struc_align(sptr, math.trunc(e)):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).alignment({!s}) : Unable to set the alignment for structure \"{:s}\" to the specified power of 2 ({:d}).".format('.'.join([__name__, cls.__name__]), sptr.id, size, utils.string.escape(name, '"'), math.trunc(e)))
+        return pow(2, res)
+
+    @property
     def size(self):
         '''Return the size of the structure.'''
         return idaapi.get_struc_size(self.ptr)
