@@ -5755,10 +5755,13 @@ class types(object):
     @classmethod
     def by(cls, ordinal):
         '''Return the type that is at the specified `ordinal` of the current type library.'''
-        res = interface.tinfo.for_ordinal(ordinal)
-        if not res:
-            raise E.ItemNotFoundError(u"{:s}.by({:d}) : No type was found at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
-        return res
+        res = interface.tinfo.by_identifier(ordinal) if interface.node.identifier(ordinal) else ordinal
+        info = interface.tinfo.for_ordinal(res)
+        if not info:
+            parameter = "{:#x}".format(ordinal) if interface.node.identifier(ordinal) else "{:d}".format(ordinal)
+            description = "for the specified identifier ({!s}) in".format(parameter) if interface.node.identifier(ordinal) else "at ordinal ({!s}) of".format(parameter)
+            raise E.ItemNotFoundError(u"{:s}.by({:d}) : No type was found {:s} the current type library.".format('.'.join([__name__, cls.__name__]), parameter, description))
+        return info
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5772,39 +5775,42 @@ class types(object):
     @classmethod
     def by(cls, ordinal, library):
         '''Return the type that is at the given `ordinal` of the specified type `library`.'''
-        res = interface.tinfo.for_ordinal(ordinal, library)
-        if not res:
-            raise E.ItemNotFoundError(u"{:s}.by({:d}, {:s}) : No type was found at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
-        return res
+        res = interface.tinfo.by_identifier(ordinal, library) if interface.node.identifier(ordinal) else ordinal
+        info = interface.tinfo.for_ordinal(res, library)
+        if not info:
+            parameter = "{:#x}".format(ordinal) if interface.node.identifier(ordinal) else "{:d}".format(ordinal)
+            description = "for the specified identifier ({!s}) in".format(parameter) if interface.node.identifier(ordinal) else "at ordinal ({!s}) of".format(parameter)
+            raise E.ItemNotFoundError(u"{:s}.by({!s}, {:s}) : No type was found {:s} the specified type library.".format('.'.join([__name__, cls.__name__]), parameter, interface.tinfo.format_library(library), description))
+        return info
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by(cls, name, library):
         '''Return the type with the given `name` from the specified type `library`.'''
-        res = interface.tinfo.for_name(name, library)
-        if not res:
+        info = interface.tinfo.for_name(name, library)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.by({!r}, {:s}) : No type was found with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
-        return res
+        return info
     @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
     @classmethod
     def by(cls, structure):
         '''Return the type for the given `structure` from the current type library.'''
         ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
         identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
-        res = interface.tinfo.for_identifier(identifier)
-        if not res:
+        info = interface.tinfo.for_identifier(identifier)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.by({!s}, {:s}) : No type was found with the given identifier ({:#x}) in the current type library.".format('.'.join([__name__, cls.__name__]), structure, identifier))
-        return res
+        return info
     @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
     @classmethod
     def by(cls, structure, library):
         '''Return the type for the given `structure` from the specified type `library`.'''
         ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
         identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
-        res = interface.tinfo.for_identifier(identifier, library)
-        if not res:
+        info = interface.tinfo.for_identifier(identifier, library)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.by({!s}, {:s}) : No type was found with the given identifier ({:#x}) in the specified type library.".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), identifier))
-        return res
+        return info
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
     def by(cls, info):
@@ -5850,7 +5856,8 @@ class types(object):
     @classmethod
     def has(cls, ordinal):
         '''Return whether the current type library has a type at the given `ordinal`.'''
-        return interface.tinfo.has_ordinal(ordinal)
+        res = interface.tinfo.by_identifier(ordinal) if interface.node.identifier(ordinal) else ordinal
+        return interface.tinfo.has_ordinal(res)
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5861,7 +5868,8 @@ class types(object):
     @classmethod
     def has(cls, ordinal, library):
         '''Return whether a type `library` has a type at the given `ordinal`.'''
-        return interface.tinfo.has_ordinal(ordinal, library)
+        res = interface.tinfo.by_identifier(ordinal, library) if interface.node.identifier(ordinal) else ordinal
+        return interface.tinfo.has_ordinal(res, library)
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5941,36 +5949,36 @@ class types(object):
     @utils.string.decorate_arguments('name')
     def by_name(cls, name):
         '''Return the type with the given `name` from the current type library.'''
-        res = interface.tinfo.for_name(name)
-        if not res:
+        info = interface.tinfo.for_name(name)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.by_name({!r}) : No type was found with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
-        return res
+        return info
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def by_name(cls, name, library):
         '''Return the type with the given `name` from the specified type `library`.'''
-        res = interface.tinfo.for_name(name, library)
-        if not res:
+        info = interface.tinfo.for_name(name, library)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.by_name({!r}, {:s}) : No type was found with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
-        return res
+        return info
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
     def by_index(cls, ordinal):
         '''Return the type that is at the specified `ordinal` of the current type library.'''
-        res = interface.tinfo.for_ordinal(ordinal)
-        if not res:
+        info = interface.tinfo.for_ordinal(ordinal)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.by_index({:d}) : No type was found at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
-        return res
+        return info
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def by_index(cls, ordinal, library):
         '''Return the type that is at the given `ordinal` of the specified type `library`.'''
-        res = interface.tinfo.for_ordinal(ordinal, library)
-        if not res:
+        info = interface.tinfo.for_ordinal(ordinal, library)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.by_index({:d}, {:s}) : No type was found at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
-        return res
+        return info
 
     @utils.multicase(ordinal=internal.types.integer)
     @classmethod
@@ -6035,7 +6043,7 @@ class types(object):
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.ordinal({!r}, {:s}) : Unable to find a type with the name \"{:s}\" in the specifed type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), utils.string.escape(name, '"')))
         return ordinal
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
+    @utils.multicase(structure=(internal.types.integer, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
     @classmethod
     def ordinal(cls, structure):
         '''Return the ordinal number for the given `structure` from the current type library.'''
@@ -6045,7 +6053,7 @@ class types(object):
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.ordinal({!s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal, identifier))
         return ordinal
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
+    @utils.multicase(structure=(internal.types.integer, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
     @classmethod
     def ordinal(cls, structure, library):
         '''Return the ordinal number for the given `structure` from the specified type `library`.'''
@@ -6076,36 +6084,42 @@ class types(object):
     @classmethod
     def get(cls, ordinal):
         '''Get the type for the given `ordinal` of the current type library and return it.'''
-        res = interface.tinfo.at_ordinal(ordinal)
-        if not res:
-            raise E.ItemNotFoundError(u"{:s}.get({:d}) : Unable to return the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
-        return res
+        res = interface.tinfo.by_identifier(ordinal) if interface.node.identifier(ordinal) else ordinal
+        info = interface.tinfo.at_ordinal(res)
+        if not info:
+            parameter = "{:#x}".format(ordinal) if interface.node.identifier(ordinal) else "{:d}".format(ordinal)
+            description = "for the specified identifier ({!s}) in".format(parameter) if interface.node.identifier(ordinal) else "at ordinal ({!s}) of".format(parameter)
+            raise E.ItemNotFoundError(u"{:s}.get({!s}) : Unable to return the type {:s} the current type library.".format('.'.join([__name__, cls.__name__]), parameter, description))
+        return info
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
     def get(cls, name, **flags):
         '''Get the type for the given `name` from the current type library and return it.'''
-        res = interface.tinfo.at_name(name, **flags)
-        if not res:
+        info = interface.tinfo.at_name(name, **flags)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!r}{:s}) : Unable to find a type with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, ", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(name, '"')))
-        return res
+        return info
     @utils.multicase(ordinal=internal.types.integer, library=idaapi.til_t)
     @classmethod
     def get(cls, ordinal, library):
         '''Get the type for the given `ordinal` of a specified type `library` and return it.'''
-        res = interface.tinfo.at_ordinal(ordinal, library)
-        if not res:
-            raise E.ItemNotFoundError(u"{:s}.get({:d}, {:s}) : Unable to return the type at ordinal {:d} of the specified the type library.".format('.'.join([__name__, cls.__name__]), ordinal, interface.tinfo.format_library(library), ordinal))
-        return res
+        res = interface.tinfo.by_identifier(ordinal, library) if interface.node.identifier(ordinal) else ordinal
+        info = interface.tinfo.at_ordinal(ordinal, library)
+        if not info:
+            parameter = "{:#x}".format(ordinal) if interface.node.identifier(ordinal) else "{:d}".format(ordinal)
+            description = "for the specified identifier ({!s}) in".format(parameter) if interface.node.identifier(ordinal) else "at ordinal ({!s}) of".format(parameter)
+            raise E.ItemNotFoundError(u"{:s}.get({!s}, {:s}) : Unable to return the type {:s} the specified the type library.".format('.'.join([__name__, cls.__name__]), parameter, interface.tinfo.format_library(library), description))
+        return info
     @utils.multicase(name=internal.types.string, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
     def get(cls, name, library, **flags):
         '''Get the type for the given `name` of a specified type `library` and return it.'''
-        res = interface.tinfo.at_name(name, library, **flags)
-        if not res:
+        info = interface.tinfo.at_name(name, library, **flags)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!r}, {:s}{:s}) : Unable to find a type with the name \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), name, interface.tinfo.format_library(library), ", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(name, '"')))
-        return res
+        return info
     @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
     @classmethod
     def get(cls, structure):
@@ -6115,10 +6129,10 @@ class types(object):
         ordinal = interface.tinfo.by_identifier(identifier)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.get({!s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal, identifier))
-        res = interface.tinfo.at_ordinal(ordinal)
-        if not res:
+        info = interface.tinfo.at_ordinal(ordinal)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!s}) : Unable to return the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal))
-        return res
+        return info
     @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
     @classmethod
     def get(cls, structure, library):
@@ -6128,10 +6142,10 @@ class types(object):
         ordinal = interface.tinfo.by_identifier(identifier, library)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.get({!s}, {:s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the specified type library.".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), ordinal, identifier))
-        res = interface.tinfo.at_ordinal(ordinal)
-        if not res:
+        info = interface.tinfo.at_ordinal(ordinal)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!s}, {:s}) : Unable to return the type at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), structure, interface.tinfo.format_library(library), ordinal))
-        return res
+        return info
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
     def get(cls, info):
@@ -6139,10 +6153,10 @@ class types(object):
         ordinal = interface.tinfo.ordinal(info)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.get({!r}) : Unable to find the ordinal for the type \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), utils.string.escape("{!s}".format(info), '"')))
-        res = interface.tinfo.at_ordinal(ordinal)
-        if not res:
+        info = interface.tinfo.at_ordinal(ordinal)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!r}) : Unable to return the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), ordinal))
-        return res
+        return info
     @utils.multicase(info=idaapi.tinfo_t, library=idaapi.til_t)
     @classmethod
     def get(cls, info, library):
@@ -6150,10 +6164,10 @@ class types(object):
         ordinal = interface.tinfo.ordinal(info, library)
         if not ordinal:
             raise E.ItemNotFoundError(u"{:s}.get({!r}, {:s}) : Unable to find the ordinal for the type \"{:s}\" in the specified type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), interface.tinfo.format_library(library), utils.string.escape("{!s}".format(info), '"')))
-        res = interface.tinfo.at_ordinal(ordinal)
-        if not res:
+        info = interface.tinfo.at_ordinal(ordinal)
+        if not info:
             raise E.ItemNotFoundError(u"{:s}.get({!s}, {:s}) : Unable to return the type at ordinal {:d} of the specified type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(info), interface.tinfo.format_library(library), ordinal))
-        return res
+        return info
 
     # The following cases for the "types.get" functon are actually a lie and
     # only exist as a way to get an "idaapi.tinfo_t" from any disassembler
@@ -6499,7 +6513,7 @@ class types(object):
     def pointer(cls, type, size):
         '''Return a pointer of `size` bytes that references the specified `type`.'''
         return cls.pointer(type, size, 0)
-    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
+    @utils.multicase(structure=(internal.types.integer, idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), size=internal.types.integer, attributes=(internal.types.integer, internal.types.string, internal.types.unordered))
     @classmethod
     def pointer(cls, structure, size, attributes, **fields):
         '''Return a pointer of `size` bytes that references the specified `structure` and includes any extended `attributes`.'''
