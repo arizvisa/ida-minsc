@@ -6437,6 +6437,45 @@ class types(object):
 
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
+    def size(cls, info):
+        '''Return the size of the type specified by `info`.'''
+        return info.get_size()
+    @utils.multicase(ordinal=internal.types.integer)
+    @classmethod
+    def size(cls, ordinal):
+        '''Return the size of the type specified by `ordinal`.'''
+        res = interface.tinfo.by_identifier(ordinal) if interface.node.identifier(ordinal) else ordinal
+        info = interface.tinfo.for_ordinal(res)
+        if not info:
+            parameter = "{:#x}".format(ordinal) if interface.node.identifier(ordinal) else "{:d}".format(ordinal)
+            description = "for the specified identifier ({!s}) in".format(parameter) if interface.node.identifier(ordinal) else "at ordinal ({!s}) of".format(parameter)
+            raise E.ItemNotFoundError(u"{:s}.size({!s}) : Unable to return the type {:s} the current type library.".format('.'.join([__name__, cls.__name__]), parameter, description))
+        return info.get_size()
+    @utils.multicase(name=internal.types.string)
+    @classmethod
+    def size(cls, name):
+        '''Return the size of the type with the given `name`.'''
+        res = interface.tinfo.for_name(name)
+        res = res if res else interface.tinfo.parse(None, string, idaapi.PT_SIL)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.size({!r}) : No type was found with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
+        return res.get_size()
+    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t))
+    @classmethod
+    def size(cls, structure):
+        '''Return the size of the type for the given `structure` or member.'''
+        ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
+        identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
+        ordinal = interface.tinfo.by_identifier(identifier)
+        if not ordinal:
+            raise E.ItemNotFoundError(u"{:s}.size({!s}) : Unable to find the ordinal ({:d}) for identifier {:#x} in the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal, identifier))
+        res = interface.tinfo.for_ordinal(ordinal)
+        if not res:
+            raise E.ItemNotFoundError(u"{:s}.size({!s}) : Unable to return the type at ordinal {:d} of the current type library.".format('.'.join([__name__, cls.__name__]), structure, ordinal))
+        return res.get_size()
+
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
     def dereference(cls, info):
         '''Return the target type of the pointer that is specified by `info`.'''
         if not info.is_ptr():
