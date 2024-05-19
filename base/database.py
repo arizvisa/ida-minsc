@@ -2725,11 +2725,11 @@ class address(object):
     def __new__(cls, start, stop, step):
         '''Return a list of each address from `start` until the address `stop` using the callable `step` to find the next address.'''
         return [ea for ea in cls.iterate(start, stop, step)]
-    @utils.multicase(bounds=interface.bounds_t)
+    @utils.multicase(bounds=(interface.bounds_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, idaapi.BasicBlock))
     def __new__(cls, bounds):
         '''Return a list of each address within the given `bounds`.'''
         return [ea for ea in cls.iterate(bounds)]
-    @utils.multicase(bounds=interface.bounds_t, step=internal.types.callable)
+    @utils.multicase(bounds=(interface.bounds_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, idaapi.BasicBlock), step=internal.types.callable)
     def __new__(cls, bounds, step):
         '''Return a list of each address within the given `bounds` using the callable `step` to find the next address.'''
         return [ea for ea in cls.iterate(bounds, step)]
@@ -2745,13 +2745,18 @@ class address(object):
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def bounds(cls, ea):
-        '''Return the bounds of the specified address `ea` in a tuple formatted as `(left, right)`.'''
+        '''Return the bounds of the specified address `ea` as a tuple formatted as `(left, right)`.'''
         return interface.bounds_t(ea, ea + interface.address.size(ea))
     @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
     @classmethod
     def bounds(cls, start, stop):
         '''Return the bounds from the address `start` until right before the address `stop`.'''
         return interface.bounds_t(start, stop)
+    @utils.multicase(range=(interface.bounds_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, idaapi.BasicBlock))
+    @classmethod
+    def bounds(cls, range):
+        '''Return the bounds of the specified `range` as a tuple formatted as `(left, right)`.'''
+        return interface.bounds_t(*range) if isinstance(range, internal.types.tuple) else interface.range.bounds(range)
 
     @utils.multicase()
     @classmethod
@@ -2803,18 +2808,18 @@ class address(object):
         '''Iterate through all of the addresses defined within the specified `location`.'''
         bounds = location.bounds
         return cls.iterate(bounds, step)
-    @utils.multicase(bounds=interface.bounds_t)
+    @utils.multicase(bounds=(interface.bounds_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, idaapi.BasicBlock))
     @classmethod
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
-        start, stop = bounds
+        start, stop = bounds if isinstance(bounds, internal.types.tuple) else interface.range.unpack(bounds)
         return cls.iterate(start, stop)
-    @utils.multicase(bounds=interface.bounds_t, step=internal.types.callable)
+    @utils.multicase(bounds=(interface.bounds_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, idaapi.BasicBlock), step=internal.types.callable)
     @classmethod
     def iterate(cls, bounds, step):
         '''Iterate through all of the addresses defined within `bounds` using the callable `step` to find the next address.'''
-        left, right = bounds
-        return cls.iterate(left, right, step)
+        start, stop = bounds if isinstance(bounds, internal.types.tuple) else interface.range.unpack(bounds)
+        return cls.iterate(start, stop, step)
 
     @utils.multicase()
     @classmethod
@@ -2827,12 +2832,12 @@ class address(object):
     def blocks(cls, stop):
         '''Yields the boundaries of each block from the current address until the address `stop`.'''
         return cls.blocks(ui.current.address(), stop)
-    @utils.multicase(bounds=interface.bounds_t)
+    @utils.multicase(bounds=(interface.bounds_t, idaapi.area_t if idaapi.__version__ < 7.0 else idaapi.range_t, idaapi.BasicBlock))
     @classmethod
     def blocks(cls, bounds):
         '''Yields the boundaries of each block within the specified `bounds`.'''
-        left, right = bounds
-        return cls.blocks(left, right)
+        start, stop = bounds if isinstance(bounds, internal.types.tuple) else interface.range.unpack(bounds)
+        return cls.blocks(start, stop)
     @utils.multicase(start=internal.types.integer, stop=internal.types.integer)
     @classmethod
     def blocks(cls, start, stop):
