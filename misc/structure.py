@@ -3682,10 +3682,18 @@ class member_t(object):
         flag, size = mptr.flag, idaapi.get_member_size(mptr)
         ty = mptr.flag, tid, size
 
-        # if the user applied some type information to the member, then we make sure
-        # to serialize it (print_tinfo) so we can parse it back into the member.
+        # Now we need to get the type information so we can serialize it. If the
+        # type has a bad size, then this type is not present and corrupted in some
+        # way. In this case, we treat it as a missing type and log a warning.
         ti = member.get_typeinfo(mptr)
-        if '__typeinfo__' in self.tag():
+        if ti.get_size() == idaapi.BADSIZE:
+            description = "index {:d}+{:#x}".format(mptr.soff, size) if union(sptr) else "offset {:#x}".format(mptr.soff) if mptr.soff == mptr.eoff else "offset {:#x}..{:#x}".format(mptr.soff, mptr.eoff)
+            logging.warning(u"{:s}({:#x}, index={:d}) : Ignoring serialization of an invalid type that is applied to {:s} member \"{:s}\" at {:s}.".format('.'.join([__name__, self.__class__.__name__]), mptr.id, self.__index__, 'union' if union(sptr) else 'structure', utils.string.escape(fullname, '"'), description))
+            typeinfo = ty, ()
+
+        # If the user applied some type information to the member, then we make sure
+        # to serialize it (print_tinfo) so we can parse it back into the member.
+        elif '__typeinfo__' in self.tag():
             res = idaapi.PRTYPE_1LINE | idaapi.PRTYPE_SEMI | idaapi.PRTYPE_NOARRS | idaapi.PRTYPE_RESTORE
             tname = idaapi.print_tinfo('', 0, 0, res, ti, '', '')
             tinfo = idaapi.print_tinfo('', 0, 0, res | idaapi.PRTYPE_DEF, ti, tname, '')
@@ -3870,13 +3878,17 @@ class member_t(object):
         # otherwise it's the old version (a tuple), and it shouldn't need to
         # exist... but, if we can actually deserialize it then later we can
         # likely apply it...unless it has an ordinal.
-        else:
+        elif ti:
             typeinfo = idaapi.tinfo_t()
             if typeinfo.deserialize(None, *ti):
                 logging.debug(u"{:s}({:#x}, index={:d}): Successfully deserialized type information for field \"{:s}\" as \"{!s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, utils.string.escape(fullname, '"'), typeinfo))
             else:
                 logging.info(u"{:s}({:#x}, index={:d}): Skipping application of corrupted type information ({!r}) for field \"{:s}\".".format('.'.join([__name__, cls.__name__]), sptr.id, index, ti, utils.string.escape(fullname, '"')))
                 typeinfo = None
+
+        # if the typeinfo is not defined, then there was an error during serialization.
+        else:
+            typeinfo = None
 
         # before we do anything, we need to grab the original type information and check
         # it against what we deserialized in case we don't need to apply anything.
