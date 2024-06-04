@@ -2208,6 +2208,19 @@ class type(object):
 
     """
     @utils.multicase()
+    def __new__(cls):
+        '''Return the instruction code (processor-specific) for the instruction at the current address.'''
+        ea = interface.address.inside(ui.current.address())
+        insn = interface.instruction.at(ea)
+        return insn.itype
+    @utils.multicase(ea=types.integer)
+    def __new__(cls, ea):
+        '''Return the instruction code (processor-specific) for the instruction at address `ea`.'''
+        ea = interface.address.inside(ea)
+        insn = interface.instruction.at(ea)
+        return insn.itype
+
+    @utils.multicase()
     @classmethod
     def feature(cls):
         '''Return the feature bitmask of the current instruction.'''
