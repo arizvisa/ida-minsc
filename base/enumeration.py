@@ -45,7 +45,7 @@ from internal import utils, interface, types, exceptions as E
 def has(enum):
     '''Return truth if an enumeration with the identifier `enum` exists within the database.'''
     ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL = -1, -3, -5, -8
-    return interface.node.is_identifier(enum) and idaapi.get_enum_idx(enum) != idaapi.BADADDR
+    return interface.node.identifier(enum) and idaapi.get_enum_idx(enum) != idaapi.BADADDR
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def has(name, *suffix):
@@ -116,7 +116,7 @@ byindex = utils.alias(by_index)
 @utils.multicase(eid=types.integer)
 def by_identifier(eid):
     '''Return the identifier for the enumeration using the specified `eid`.'''
-    if interface.node.is_identifier(eid) and idaapi.get_enum_idx(eid) != idaapi.BADADDR:
+    if interface.node.identifier(eid) and idaapi.get_enum_idx(eid) != idaapi.BADADDR:
         return eid
     raise E.EnumerationNotFoundError(u"{:s}.by_identifier({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
 byidentifier = utils.alias(by_identifier)
@@ -124,7 +124,7 @@ byidentifier = utils.alias(by_identifier)
 @utils.multicase(index=types.integer)
 def by(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
-    return by_identifier(index) if interface.node.is_identifier(index) else by_index(index)
+    return by_identifier(index) if interface.node.identifier(index) else by_index(index)
 @utils.multicase(name=types.string)
 @utils.string.decorate_arguments('name', 'suffix')
 def by(name, *suffix):
@@ -354,7 +354,7 @@ def up(name, *suffix):
 @utils.multicase(eid=types.integer)
 def up(eid):
     '''Return a list of references to the enumeration identified by `eid`.'''
-    if not interface.node.is_identifier(eid) or idaapi.get_enum_idx(eid) == idaapi.BADADDR:
+    if not interface.node.identifier(eid) or idaapi.get_enum_idx(eid) == idaapi.BADADDR:
         raise E.EnumerationNotFoundError(u"{:s}.up({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
 
     # Start out by collecting all of the members for the enumeration, and then
@@ -392,7 +392,7 @@ def refs(name, *suffix):
 @utils.multicase(enum=types.integer)
 def refs(enum):
     '''Return a list of references to any instruction operands that use the enumeration with the identifier `enum`.'''
-    if not interface.node.is_identifier(enum) or idaapi.get_enum_idx(enum) == idaapi.BADADDR:
+    if not interface.node.identifier(enum) or idaapi.get_enum_idx(enum) == idaapi.BADADDR:
         raise E.EnumerationNotFoundError(u"{:s}.refs({:#x}) : Unable to find an enumeration with the specified identifier ({:#x}).".format(__name__, enum, enum))
 
     # Start out by collecting all of the members for the enumeration, and then
@@ -853,7 +853,7 @@ class members(object):
     @classmethod
     def by(cls, enum, n):
         '''Return the member belonging to `enum` identified by its index or id in `n`.'''
-        return cls.by_identifier(enum, n) if interface.node.is_identifier(n) else cls.by_index(enum, n)
+        return cls.by_identifier(enum, n) if interface.node.identifier(n) else cls.by_index(enum, n)
     @utils.multicase(enum=(types.integer, types.string, types.tuple), name=types.string)
     @classmethod
     @utils.string.decorate_arguments('name', 'suffix')
@@ -960,7 +960,7 @@ class member(object):
     @classmethod
     def by(cls, mid):
         '''Return the enumeration member as specified by the provided `mid`.'''
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.by({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         eid = cls.parent(mid)
         return members.by_identifier(eid, mid)
@@ -986,7 +986,7 @@ class member(object):
     @classmethod
     def name(cls, mid):
         '''Return the name of the enumeration member `mid`.'''
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.name({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         res = idaapi.get_enum_member_name(mid)
         return utils.string.of(res)
@@ -1025,7 +1025,7 @@ class member(object):
 
         If the bool `repeatable` is specified, then return the repeatable comment.
         """
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.comment({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         res = idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True))
         return utils.string.of(res)
@@ -1044,7 +1044,7 @@ class member(object):
 
         If the bool `repeatable` is specified, then set the repeatable comment.
         """
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.comment({:#x}, {!s}{:s}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', mid))
         string = utils.string.to(comment)
         res, ok = idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True)), idaapi.set_enum_member_cmt(mid, string, repeatable.get('repeatable', True))
@@ -1070,7 +1070,7 @@ class member(object):
     @classmethod
     def value(cls, mid):
         '''Return the value of the enumeration member `mid`.'''
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.value({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         return idaapi.get_enum_member_value(mid)
     @utils.multicase(enum=(types.integer, types.string, types.tuple))
@@ -1084,7 +1084,7 @@ class member(object):
     @classmethod
     def value(cls, mid, value):
         '''Assign the integer specified by `value` to the enumeration member `mid`.'''
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid))
         eid = cls.parent(mid)
 
@@ -1117,7 +1117,7 @@ class member(object):
     @classmethod
     def serial(cls, mid):
         '''Return the serial of the enumeration member `mid`.'''
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.serial({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         CONST_SERIAL = -7
         return idaapi.get_enum_member_serial(mid)
@@ -1133,7 +1133,7 @@ class member(object):
     @classmethod
     def mask(cls, mid):
         '''Return the bitmask for the enumeration member `mid`.'''
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         CONST_BMASK = -6
         return idaapi.get_enum_member_bmask(mid)
@@ -1149,7 +1149,7 @@ class member(object):
     @classmethod
     def refs(cls, mid):
         '''Return a list of references for any instruction operands that use the enumeration member `mid`.'''
-        if not interface.node.is_identifier(mid):
+        if not interface.node.identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to find a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
         eid = cls.parent(mid)
 
