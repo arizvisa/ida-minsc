@@ -967,6 +967,14 @@ class member(object):
 
     @utils.multicase(mid=types.integer)
     @classmethod
+    def has(cls, mid):
+        '''Return whether the database contains the enumeration member specified by the provided `mid`.'''
+        if interface.node.identifier(mid) and idaapi.get_enum_member_enum(mid) != idaapi.BADNODE:
+            return True
+        return False
+
+    @utils.multicase(mid=types.integer)
+    @classmethod
     def remove(cls, mid):
         '''Remove the enumeration member with the given `mid`.'''
         eid, value, serial, mask = cls.parent(mid), cls.value(mid), cls.serial(mid), cls.mask(mid)
