@@ -13,19 +13,109 @@ If you wish to change the directory that the plugin is loaded from, specify the
 location of the plugin's git repository in the variable that is marked below.
 """
 import sys, os, logging
-import builtins, six, imp, fnmatch, ctypes, itertools, types
+import builtins, six, fnmatch, ctypes, itertools, types
 import idaapi
 
 # :: Point this variable at the directory containing the repository of the plugin ::
 root = idaapi.get_user_idadir()
 
 # The following classes contain the pretty much all of the loader logic used by the
-# plugin. This is being defined here so that this file can also be used as a module.
+# plugin. These are being defined here so that this file can also be used as a module.
+
+class python_import_machinery(object):
+    """
+    This class is a wrapper around the import machinery used by the Python
+    interpreter. It does this by implementing a few of the functions from
+    the original Py2 "imp" module using the "importlib" functionality that
+    was introduced with Python 3.4. On earlier versions of Python, the
+    implementation just wraps the relevant functions of the "imp" module.
+    """
+
+    # Py2-specific functions for dynamically generating and loading
+    # modules. All are based on the original "imp" module functionality.
+    @classmethod
+    def new_module_py2(cls, fullname):
+        return cls.imp.new_module(fullname)
+
+    @classmethod
+    def find_module_py2(cls, name, path=None):
+        return cls.imp.find_module(name, path)
+
+    @classmethod
+    def load_module_py2(cls, name, file, path, description):
+        return cls.imp.load_module(name, file, path, description)
+
+    @classmethod
+    def load_source_py2(cls, name, path):
+        return cls.imp.load_source(name, path)
+
+    # Py3-specific functions for dynamically generating and loading
+    # modules. These use the new module loader specification format
+    # found within the "importlib" module. It (poorly) attempts to
+    # load modules exactly how Py2 used to originally load modules.
+    @classmethod
+    def new_module_py3(cls, fullname):
+        spec = cls.importlib.machinery.ModuleSpec(fullname, None)
+        module = cls.importlib.util.module_from_spec(spec)
+        return module
+
+    @classmethod
+    def find_module_py3(cls, name, path=None):
+        ext, fucking_paths = 'py', sys.path if path is None else path
+        for path in fucking_paths:
+            fullpath = os.path.join(path, '.'.join([name, ext]))
+            spec = cls.importlib.util.spec_from_file_location(name, fullpath)
+            if spec:
+                filemode, PY_SOURCE, PY_COMPILED, C_EXTENSION = 'rt', 1, 2, 3
+                description = ext, filemode, PY_SOURCE
+                return open(fullpath, filemode), fullpath, description
+            continue
+        raise ModuleNotFoundError
+
+    @classmethod
+    def load_module_py3(cls, name, path):
+        spec = cls.importlib.util.spec_from_file_location(name, path)
+        module = cls.importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    @classmethod
+    def load_source_py3(cls, name, path):
+        loader = cls.importlib.machinery.SourceFileLoader(name, path)
+        spec = cls.importlib.util.spec_from_loader(loader.name, loader)
+        module = cls.importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+        return module
+
+    @classmethod
+    def module_spec(cls, *args, **kwargs):
+        return cls.importlib.machinery.ModuleSpec(*args, **kwargs)
+
+    @classmethod
+    def module_spec_from_file(cls, name, path):
+        return cls.importlib.util.spec_from_file_location(name, path)
+
+    @classmethod
+    def module_from_spec(cls, spec):
+        return cls.importlib.util.module_from_spec(spec)
+
+    # Now for the obligatory version checks that assigns each available
+    # class method to the correct implementation. This is for Py2.
+    if sys.version_info.major < 3 or (sys.version_info.major == 3 and sys.version_info.minor < 4):
+        import imp
+        new_module, find_module, load_module, load_source = new_module_py2, find_module_py2, load_module_py2, load_source_py2
+
+    # These next ones map the same functions to their Py3 versions.
+    else:
+        import importlib, importlib.machinery, importlib.util
+        new_module, find_module, load_module, load_source = new_module_py3, find_module_py3, load_module_py3, load_source_py3
+
 class internal_api(object):
     """
     Loader base-class for any api that's based on files contained within a directory.
     """
-    os, imp, fnmatch = os, imp, fnmatch
+    os, imp, fnmatch = os, python_import_machinery, fnmatch
     def __init__(self, directory, **attributes):
         '''Initialize the api using the contents within the specified `directory`.'''
         self.path = self.os.path.realpath(directory)
@@ -78,6 +168,13 @@ class internal_api(object):
     def load_module(self, fullname):
         raise NotImplementedError
 
+    def find_spec(self, fullname, path, target=None):
+        raise NotImplementedError
+    def create_module(self, spec):
+        return None
+    def exec_module(self, module):
+        raise NotImplementedError
+
     def __iter__(self):
         '''Yield the full path of each module that is provided by this class.'''
         return
@@ -104,6 +201,11 @@ class internal_path(internal_api):
         if fullname not in self.cache:
             raise ImportError("path-loader ({:s}) was not able to find a module named `{:s}`".format(self.path, fullname))
         return self.new_api(fullname, self.cache[fullname])
+
+    def find_spec(self, fullname, path, target=None):
+        if fullname in self.cache:
+            return self.imp.module_spec_from_file(fullname, self.cache[fullname])
+        return None
 
     def __iter__(self):
         '''Yield each of the available modules.'''
@@ -195,6 +297,78 @@ class internal_submodule(internal_api):
         # Return the module that we just created.
         return module
 
+    def find_spec(self, fullname, path, target=None):
+        if fullname == self.__name__:
+            api = {name : path for name, path in self.iterate_api(**self.attrs)}
+            loader = self.spec_loader(self, api)
+            spec = self.imp.module_spec(fullname, loader, is_package=True)
+            spec.submodule_search_locations[:] = []
+            return spec
+        return None
+
+    class spec_loader(object):
+        def __init__(self, finder, api):
+            self._finder, self._api = finder, api
+        def create_module(self, spec):
+            return None
+        def exec_module(self, module):
+            cache = self._api
+
+            # Build a temporary cache for the module names and paths to load the api,
+            # and use them to build their documentation.
+            maximum = max(map(len, cache)) if cache else 0
+            documentation = '\n'.join("{:<{:d}s} : {:s}".format(name, maximum, path) for name, path in sorted(cache.items()))
+            documentation = '\n\n'.join([self._finder.attrs['__doc__'], documentation]) if '__doc__' in self._finder.attrs else documentation
+            module.__doc__ = documentation
+
+            # Load each submodule that composes the api, and attach it to the returned submodule.
+            stack, count, result = [item for item in cache.items()], len(cache), {}
+            while stack and count > 0:
+                name, path = stack.pop(0)
+
+                # Take the submodule name we popped off of the cache, and try and load it.
+                # If we were able to load it successfully, then we just need to attach the
+                # loaded code as a submodule of the object we're going to return.
+                try:
+                    modulename = '.'.join([self._finder.__name__, name])
+                    res = self._finder.imp.load_module_py3(modulename, path)
+
+                # If an exception was raised, then remember it so that we can let the user
+                # know after we've completely loaded the module.
+                except Exception as E:
+                    import logging
+                    logging.debug("{:s} : Error trying to import module `{:s}` from {!s}. Queuing it until later.".format(self._finder.__name__, name, path), exc_info=True)
+
+                    # If we caught an exception while trying to import the module, then stash
+                    # our exception info state into a dictionary and decrease a counter. This
+                    # is strictly to deal with module recursion issues in Python3.
+                    result[name], count = sys.exc_info(), count - 1
+                    stack.append((name, path))
+
+                # Add the submodule that we loaded into the module that we're going to return.
+                else:
+                    setattr(module, name, res)
+                continue
+
+            # If we weren't able to load one of the submodules that should've been in our cache,
+            # then go through all of our backtraces and log the exception that was raised.
+            if stack:
+                import logging, traceback
+                for name, path in stack:
+                    logging.fatal("{:s} : Error trying to import module `{:s}` from {!s}.".format(self._finder.__name__, name, path), exc_info=result[name])
+                return module
+
+            # If we caught an exception despite our stack being empty, then this is because of a
+            # recursion issue. In case someone wants to track these situations down, we go through
+            # our caught exceptions and create some logging events with the backtrace. These errors
+            # are considered non-fatal because importing another sub-module helped resolve it.
+            import logging
+            for name, exc_info in result.items():
+                logging.info("{!s} : Encountered a non-fatal exception while trying to import recursive module `{:s}` from {!s}".format(self._finder.__name__, name, cache[name]), exc_info=result[name])
+
+            # Return the module that we just created.
+            return module
+
     def __iter__(self):
         '''Yield each of the available modules.'''
         for name, _ in self.iterate_api(**self.attrs):
@@ -205,7 +379,7 @@ class internal_object(object):
     """
     Loader class which will simply expose an object instance as the module.
     """
-    sys = sys
+    sys, imp = sys, python_import_machinery
 
     def __init__(self, module, constructor, *args, **attributes):
         '''Initialize the loader so that it returns the object generated by `constructor` when the module `name` is requested.'''
@@ -243,6 +417,20 @@ class internal_object(object):
             raise ImportError("object-loader ({:s}) was not able to find a module named `{:s}`".format(self.__name__, fullname))
         module = self.sys.modules[fullname] = self.get_instance()
         return module
+
+    class spec_loader(object):
+        def __init__(self, finder):
+            self._finder, self._instanced = finder, 0
+        def create_module(self, spec):
+            return self._finder.get_instance()
+        def exec_module(self, module):
+            self._instanced += 1
+            return module
+
+    def find_spec(self, fullname, path, target=None):
+        if fullname == self.__name__:
+            return self.imp.module_spec(fullname, self.spec_loader(self))
+        return None
 
 class object_proxy(object):
     """
@@ -556,7 +744,7 @@ class internal_proxy(object):
     that is used by the proxy object that gets returned during import can then be
     changed by using the `internal_proxy.update_module` method with any object.
     """
-    sys = sys
+    sys, imp = sys, python_import_machinery
     def __init__(self, module, name):
         self.__name__ = module
         proxy, updater = object_proxy(module, name)
@@ -577,6 +765,19 @@ class internal_proxy(object):
             raise ImportError("object-loader ({:s}) was not able to find a module named `{:s}`".format(self.__name__, fullname))
         module = self.sys.modules[fullname] = self.__proxy__
         return module
+
+    class spec_loader(object):
+        def __init__(self, finder):
+            self._finder = finder
+        def create_module(self, spec):
+            return self._finder.__proxy__
+        def exec_module(self, module):
+            return module
+
+    def find_spec(self, fullname, path, target=None):
+        if fullname == self.__name__:
+            return self.imp.module_spec(fullname, self.spec_loader(self))
+        return None
 
 class plugin_module(object):
     """
@@ -605,7 +806,7 @@ class plugin_module(object):
 # The following logic is responsible for replacing a namespace with
 # the contents namespace that represents the entirety of the plugin.
 def load(namespace, preserve=()):
-    module = imp.load_source('__root__', os.path.join(root, '__root__.py'))
+    module = python_import_machinery.load_source('__root__', os.path.join(root, '__root__.py'))
 
     # save certain things within the namespace
     preserved = {symbol : value for symbol, value in namespace.items() if symbol in preserve}
@@ -1027,7 +1228,7 @@ class MINSC(idaapi.plugin_t):
 
     def get_loader(self):
         '''Return the loader containing all the components needed for loading and initializing the plugin'''
-        import imp
+        imp = python_import_machinery
 
         # We explicitly create our own version of the loader from the current
         # file. The functionality we need is actually within our current module,
