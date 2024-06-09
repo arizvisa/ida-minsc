@@ -13,7 +13,7 @@ to the user's idapythonrc.py in their home directory.
 print_banner()
 
 # some general python modules that we use for meta_path
-import sys, os, imp
+import sys, os
 import idaapi
 
 # grab ida's user directory and remove from it from the path since we use
@@ -23,8 +23,18 @@ root = idaapi.get_user_idadir()
 sys.path[:] = [item for item in sys.path if os.path.realpath(item) not in {os.path.realpath(root)}]
 
 # grab the loader, and then use it to seed python's meta_path.
-loader = imp.load_source('__loader__', os.path.join(root, 'plugins', 'minsc.py'))
+if sys.version_info.major < 3 and sys.version_info.minor < 10:
+    load_source = __import__('imp').load_source
+else:
+    def load_source(machinery, util, name, path):
+        source_loader = machinery.SourceFileLoader(name, path)
+        module = util.module_from_spec(util.spec_from_loader(source_loader.name, source_loader))
+        source_loader.exec_module(module)
+        return module
+    load_source = __import__('functools').partial(load_source, __import__('importlib').machinery, __import__('importlib').util)
+loader = load_source('__loader__', os.path.join(root, 'plugins', 'minsc.py'))
 sys.meta_path.extend(loader.finders())
+del(load_source)
 
 # then we need to patch the version into "idaapi" so that we can
 # access it when figuring out which logic we need to use.
