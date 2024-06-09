@@ -71,13 +71,25 @@ def greeting():
         [six.print_("    {:s}".format(submodule)) for submodule in submodules]
         six.print_("")
 
+    # List all of the known modules that we support.
+    # FIXME: Why isn't binsync or ipyida in this list?
     useful_modules = [
         ('ida_hexrays', 'https://hex-rays.com/decompiler/', 'for a freaking decompiler'),
         ('networkx', 'https://pypi.org/project/networkx/', 'for a real graph api'),
         ('dill', 'https://pypi.org/project/dill/', 'to save (and load) your game'),
     ]
 
-    results, find_loader = [], __import__('imp').find_module if sys.version_info.major < 3 else __import__('importlib').find_loader
+    # Figure out which loader implementation to use depending on the python version.
+    if sys.version_info.major < 3:
+        find_loader = __import__('imp').find_module
+    elif sys.version_info.minor < 10:
+        find_loader = __import__('importlib').find_loader
+    else:
+        find_loader = (lambda imp: lambda name: (lambda spec: spec and imp.util.module_from_spec(spec))(imp.util.find_spec(name)))(__import__('importlib.util'))
+
+    # Iterate through all the known and supported modules so
+    # that we can check which ones are actually available.
+    results = []
     for name, url, description in useful_modules:
         try:
             if find_loader(name) is None:
