@@ -2475,7 +2475,7 @@ class wrap(object):
     # definitely seems like it's nearing its ripeness.
 
     @classmethod
-    def assemble_311x(cls, function, wrapper, bound=False):
+    def assemble_312x(cls, function, wrapper, bound=False):
         """Assemble a ``types.CodeType`` that will execute `wrapper` with `F` as its first parameter.
 
         If `bound` is ``True``, then assume that the first parameter for `F` represents the instance it's bound to.
@@ -2542,8 +2542,12 @@ class wrap(object):
             asm(cls.co_assemble('LIST_EXTEND', 1))
         co_stacksize = max(2 + len(Fvarargs), co_stacksize)                     # wrapper + pack(F, args) + load_fast(varargs)
 
-        # ...and convert it into a tuple
-        asm(cls.co_assemble('LIST_TO_TUPLE'))
+        # ...and convert it into a tuple. if we're using 3.12, though,
+        # then the list_to_tuple opcode has been changed to an intrinsic.
+        if sys.version_info.minor < 12:
+            asm(cls.co_assemble('LIST_TO_TUPLE'))
+        else:
+            asm(cls.co_assemble('CALL_INTRINSIC_1', 'INTRINSIC_LIST_TO_TUPLE'))
 
         ## now we need to pack all kw arguments...
         asm(cls.co_assemble('BUILD_MAP', 0))
@@ -2585,7 +2589,7 @@ class wrap(object):
     def __new__(cls, callable, wrapper):
         '''Return a function similar to `callable` that calls `wrapper` with `callable` as the first argument.'''
         cons, f = pycompat.function.constructor(callable), pycompat.function.extract(callable)
-        Fassemble = cls.assemble_2x if sys.version_info.major < 3 else cls.assemble_38x if sys.version_info.minor < 9 else cls.assemble_39x if sys.version_info.minor < 11 else cls.assemble_311x
+        Fassemble = cls.assemble_2x if sys.version_info.major < 3 else cls.assemble_38x if sys.version_info.minor < 9 else cls.assemble_39x if sys.version_info.minor < 11 else cls.assemble_312x
 
         # create a wrapper for the function that'll execute `callable` with the function as its first argument, and the rest with any args
         res = Fassemble(callable, wrapper, bound=isinstance(callable, (internal.types.classmethod, internal.types.method)))
