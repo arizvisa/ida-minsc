@@ -2109,6 +2109,14 @@ class wrap(object):
         def co_assemble(cls, operation, operand=None):
             '''Assembles the specified `operation` and `operand` into a code string.'''
             opcode, ext = cls.opcode.opmap[operation], cls.opcode.EXTENDED_ARG
+
+            # If our current version of Python supports intrinsics, then the
+            # operand might need to be converted from a string to an integer.
+            if operation in ({'CALL_INTRINSIC_1', 'CALL_INTRINSIC_2'} & cls.opcode.opmap.keys()) and any(hasattr(cls.opcode, attribute) for attribute in {'_intrinsic_1_descs', '_intrinsic_2_descs'}):
+                intrinsic_map = {attribute : descs.index(attribute) for descs, attribute in itertools.chain(*((lambda desc: zip([desc] * len(desc), desc))(getattr(cls.opcode, attribute)) for attribute in {'_intrinsic_1_descs', '_intrinsic_2_descs'} if hasattr(cls.opcode, attribute)))}
+                operand = intrinsic_map.get(operand, operand)
+
+            # If the operand fits within a single byte, then pack it and return.
             if (operand or 0) < 0x00000100:
                 return bytes(bytearray([opcode, operand or 0]))
 
