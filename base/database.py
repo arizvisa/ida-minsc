@@ -1559,6 +1559,17 @@ def name(ea, string, *suffix, **flags):
         maximum = max(idaapi.SN_LOCAL, flags['flags'])
         return interface.name.set(ea, string, flags['flags'], 2 * pow(2, int(math.log(maximum, 2))) - 1)
 
+    # if no flags were specified, then we can just set the name.
+    elif not flags:
+        return interface.name.set(ea, string)
+
+    # if there are any keywords we don't know about, then complain.
+    elif {keyword for keyword in flags} - {'listed', 'weak', 'public'}:
+        unknown = [keyword for keyword in {keyword for keyword in flags} - {'listed', 'weak', 'public'}]
+        Fquoted = lambda string: "\"{:s}\"".format(utils.string.escape(string, '"'))
+        description = ' and '.join(map(Fquoted, unknown)) if len(unknown) <= 2 else ', '.join(itertools.chain(map(Fquoted, unknown[:-1]), ["and {:s}".format(*map(Fquoted, unknown[-1:]))]))
+        raise E.InvalidParameterError(u"{:s}.name({:#x}, {!r}{:s}) : Unable to determine the correct flags from the specified keyword{:s} ({:s}).".format(__name__, ea, string, ", {:s}".format(utils.string.kwargs(flags)) if flags else '', '' if len(unknown) == 1 else 's', description))
+
     # otherwise, we need to check for "listed", "weak", and "public".
     flag, preserve = 0 if flags.get('listed', False) else idaapi.SN_NOLIST, idaapi.SN_NOLIST if 'listed' in flags else 0
     if 'weak' in flags:
