@@ -2625,6 +2625,7 @@ class frame(object):
 
         > print( function.frame() )
         > print( hex(function.frame.id(ea)) )
+        > fr = function.frame.new(ea, 0x100, 8 * 4, regs=8)
         > sp = function.frame.delta(ea)
 
     """
@@ -2647,17 +2648,24 @@ class frame(object):
         '''Add an empty frame to the current function.'''
         fn = ui.current.function()
         return cls.new(fn, 0, idaapi.get_frame_retsize(fn), 0)
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def new(cls, func):
+        '''Add an empty frame to the function `func`.'''
+        fn = interface.function.by(func)
+        return cls.new(fn, 0, idaapi.get_frame_retsize(fn), 0)
     @utils.multicase(lvars=types.integer, args=types.integer)
     @classmethod
-    def new(cls, lvars, args):
+    def new(cls, lvars, args, **regs):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
         fn = ui.current.function()
-        return cls.new(fn, lvars, idaapi.get_frame_retsize(fn), args)
-    @utils.multicase(lvars=types.integer, regs=types.integer, args=types.integer)
+        return cls.new(fn, lvars, regs.get('regs', idaapi.get_frame_retsize(fn)), args)
+    @utils.multicase(func=(idaapi.func_t, types.integer), lvars=types.integer, args=types.integer)
     @classmethod
-    def new(cls, lvars, regs, args):
-        '''Add a frame to the current function using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.'''
-        return cls.new(ui.current.function(), lvars, regs, args)
+    def new(cls, func, lvars, args):
+        '''Add a frame to the function `func` using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
+        fn = interface.function.by(func)
+        return cls.new(fn, lvars, idaapi.get_frame_retsize(fn), args)
     @utils.multicase(func=(idaapi.func_t, types.integer), lvars=types.integer, regs=types.integer, args=types.integer)
     @classmethod
     def new(cls, func, lvars, regs, args):
