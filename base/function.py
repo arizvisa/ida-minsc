@@ -554,12 +554,18 @@ class chunks(object):
         '''Return the `(address, delta)` for the stack point at address `ea` of the function that contains it.'''
         fn = interface.function.by(ea)
         return ea, idaapi.get_spd(fn, ea)
-    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
+    @utils.multicase(func=idaapi.func_t, ea=types.integer)
     @classmethod
     def point(cls, func, ea):
         '''Return the `(address, delta)` for the stack point at address `ea` of the function `func`.'''
         fn = interface.function.by(func)
         return ea, idaapi.get_spd(fn, ea)
+    @utils.multicase(ea=types.integer, delta=types.integer)
+    @classmethod
+    def point(cls, ea, delta, **auto):
+        '''Set the stack point at address `ea` to the specified `delta`.'''
+        fn = interface.function.by(ea)
+        return cls.point(fn, ea, delta, **auto)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer, delta=types.integer)
     @classmethod
     def point(cls, func, ea, delta, **auto):
