@@ -639,6 +639,8 @@ class chunks(object):
 iterate = utils.alias(chunks.iterate, 'chunks')
 contains = utils.alias(chunks.contains, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
+point = stackpoint = utils.alias(chunks.point, 'chunks')
+points = stackpoints = utils.alias(chunks.points, 'chunks')
 
 class chunk(object):
     """
