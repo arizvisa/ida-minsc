@@ -646,6 +646,8 @@ class chunk(object):
         > ea = function.chunk.top()
         > function.chunk.add(function.by(), 0x401000, 0x402000)
         > function.chunk.remove(ea)
+        > for ea, delta in function.chunk.points(ea): ...
+        > function.chunk.point(function.by(), ea, -0x1000)
 
     """
     @utils.multicase()
@@ -831,6 +833,7 @@ class chunk(object):
             yield ea, spd
         return
     stackpoints = utils.alias(points, 'chunk')
+    stackpoint = point = utils.alias(chunks.point, 'chunks')
 
     @utils.multicase()
     @classmethod
