@@ -2626,7 +2626,6 @@ class frame(object):
         > print( function.frame() )
         > print( hex(function.frame.id(ea)) )
         > fr = function.frame.new(ea, 0x100, 8 * 4, regs=8)
-        > sp = function.frame.delta(ea)
 
     """
     @utils.multicase()
@@ -2691,24 +2690,6 @@ class frame(object):
         '''Returns the structure id for the function `func`.'''
         fn = interface.function.by(func)
         return fn.frame
-
-    @utils.multicase()
-    @classmethod
-    def delta(cls):
-        '''Returns the stack delta for the current address within its function.'''
-        return cls.delta(ui.current.address())
-    @utils.multicase(ea=types.integer)
-    @classmethod
-    def delta(cls, ea):
-        '''Returns the stack delta for the address `ea` within its given function.'''
-        fn, ea = interface.function.by(ea), interface.address.inside(ea)
-        return idaapi.get_spd(fn, ea)
-    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
-    @classmethod
-    def delta(cls, func, ea):
-        '''Returns the stack delta for the address `ea` within the function `func`.'''
-        fn, ea = interface.function.by(func), interface.address.inside(ea)
-        return idaapi.get_spd(fn, ea)
 
     class arguments(object):
         """
@@ -3206,7 +3187,6 @@ get_frameid = utils.alias(frame.id, 'frame')
 get_args_size = utils.alias(frame.args.size, 'frame.args')
 get_vars_size = utils.alias(frame.variables.size, 'frame.variables')
 get_regs_size = utils.alias(frame.registers.size, 'frame.registers')
-get_spdelta = spdelta = utils.alias(frame.delta, 'frame')
 
 ## instruction iteration/searching
 ## tagging
