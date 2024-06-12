@@ -408,6 +408,7 @@ class chunks(object):
 
         > for l, r in function.chunks(): ...
         > for ea in function.chunks.iterate(ea): ...
+        > for ea, delta in function.chunks.points(ea): ...
 
     """
     @utils.multicase()
@@ -540,6 +541,70 @@ class chunks(object):
             continue
         return
     stackpoints = utils.alias(points, 'chunks')
+
+    @utils.multicase()
+    @classmethod
+    def point(cls):
+        '''Return the `(address, delta)` for the stack point at the current address in the current function chunk.'''
+        fn, ea = ui.current.function(), ui.current.address()
+        return ea, idaapi.get_spd(fn, ea)
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def point(cls, ea):
+        '''Return the `(address, delta)` for the stack point at address `ea` of the function that contains it.'''
+        fn = interface.function.by(ea)
+        return ea, idaapi.get_spd(fn, ea)
+    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
+    @classmethod
+    def point(cls, func, ea):
+        '''Return the `(address, delta)` for the stack point at address `ea` of the function `func`.'''
+        fn = interface.function.by(func)
+        return ea, idaapi.get_spd(fn, ea)
+    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer, delta=types.integer)
+    @classmethod
+    def point(cls, func, ea, delta, **auto):
+        """Set the stack point at address `ea` for the function `func` to the specified `delta`.
+
+        If `auto` is set to true, then set an "auto" stack point for the function.
+        Otherwise, set a user-defined stack point for the given address.
+        """
+        fn = interface.function.by(func)
+        Fadd_user_stkpnt, Fadd_auto_stkpnt = idaapi.add_user_stkpnt, idaapi.add_auto_stkpnt2 if hasattr(idaapi, 'add_auto_stkpnt2') else idaapi.add_auto_stkpnt
+
+        # Check the parameters for a valid "auto" keyword.
+        is_auto = next((auto[k] for k in ['auto'] if k in auto), False)
+        Fadd_stkpnt = functools.partial(Fadd_auto_stkpnt, fn) if is_auto else Fadd_user_stkpnt
+
+        # If there is already a stack point at the given address, then remove it.
+        current, adjustment = (F(fn, ea) for F in [idaapi.get_spd, idaapi.get_sp_delta])
+        if adjustment and not idaapi.del_stkpnt(fn, ea):
+            fn, description = interface.range.start(fn), "{:s}({:#x}, {:#x})".format(utils.pycompat.fullname(idaapi.del_stkpnt), interface.range.start(fn), ea)
+            raise E.DisassemblerError(u"{:s}.point({:#x}, {:#x}, {:+d}{:s}) : Unable to remove existing stack point {:+#x} ({:+#x}) from the specified address ({:#x}) with `{:s}`.".format('.'.join([__name__, cls.__name__]), fn, ea, delta, ", {:s}".format(utils.string.kwargs(auto)) if auto else '', current, adjustment, ea, description))
+
+        # Now that we've cleared the stack point, we can grab what the
+        # original delta should be. We then calculate how much to adjust
+        # so that we can apply our parameter as the exact stack delta.
+        spd = delta - idaapi.get_spd(fn, ea)
+
+        # Now we can add the stack point to the specified address, bailing if we couldn't.
+        if not Fadd_stkpnt(ea, spd):
+            fn, description = interface.range.start(fn), "{:s}({:#x}, {:#x}, {:+#x})".format(utils.pycompat.fullname(Fadd_auto_stkpnt if is_auto else Fadd_user_stkpnt), interface.range.start(fn), ea, spd)
+            raise E.DisassemblerError(u"{:s}.point({:#x}, {:#x}, {:+d}{:s}) : Unable to set the stack point of the specified address ({:#x}) to {:+#x} ({:+#x}) with `{:s}`.".format('.'.join([__name__, cls.__name__]), fn, ea, delta, ", {:s}".format(utils.string.kwargs(auto)) if auto else '', ea, delta, spd, description))
+        return ea, current
+    @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer, none=types.none)
+    @classmethod
+    def point(cls, func, ea, none):
+        '''Remove the stack point at address `ea` from the function `func`.'''
+        fn = interface.function.by(func)
+        res = _, current = ea, idaapi.get_spd(fn, ea)
+
+        # Attempt to delete the stack point for the specified address.
+        adjustment = idaapi.get_sp_delta(fn, ea)
+        if not idaapi.del_stkpnt(fn, ea):
+            fn, description = interface.range.start(fn), "{:s}({:#x}, {:#x})".format(utils.pycompat.fullname(idaapi.del_stkpnt), interface.range.start(fn), ea)
+            raise E.DisassemblerError(u"{:s}.point({:#x}, {:#x}, {!s}) : Unable to remove the stack point ({:+#x}) from the specified address ({:#x}) with `{:s}`.".format('.'.join([__name__, cls.__name__]), fn, ea, none, current, ea, description))
+        return res
+    stackpoint = utils.alias(point, 'chunks')
 
     @utils.multicase()
     @classmethod
