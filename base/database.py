@@ -6270,14 +6270,20 @@ class types(object):
         identifier = item if idaapi.is_valid_typename(utils.string.to(item)) else '_'
         identifier+= str().join(item if idaapi.is_valid_typename(identifier + utils.string.to(item)) else '_' for item in iterable)
 
+        # before updating the ordinal, check for a duplicate name so that we
+        # can avoid the disassembler deleting the old type using the name.
+        check = interface.tinfo.by_name(identifier)
+        if check and ordinal != check:
+            raise E.DuplicateNameError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to use the name \"{:s}\" for the type at ordinal {:d} of the specified type library due to it being used by another type ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), utils.string.escape(identifier, '"'), ordinal, check))
+
         # now we can use set_numbered_type to assign the type into the type library.
         error = interface.tinfo.set_numbered_type(library, ordinal, identifier, info, flags)
         if error > idaapi.TERR_OK:
             return res
 
-        if error == idaapi.TERR_WRONGNAME:
-            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to replace the type at ordinal {:d} of the specified type library using the name \"{:s}\" due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, utils.string.escape(identifier, '"'), interface.tinfo.format_library(error) or "code ({:d})".format(error)))
-        raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to replace the type at ordinal {:d} of the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, interface.tinfo.format_library(error) or "code ({:d})".format(error)))
+        elif error == idaapi.TERR_WRONGNAME:
+            raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the name for the type at ordinal {:d} of the specified type library to \"{:s}\" due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, utils.string.escape(identifier, '"'), interface.tinfo.format_library(error) or "code ({:d})".format(error)))
+        raise E.DisassemblerError(u"{:s}.set({:d}, {!r}, {!r}, {:s}) : Unable to set the type at ordinal {:d} of the specified type library due to error {:s}.".format('.'.join([__name__, cls.__name__]), ordinal, name, "{!s}".format(info), interface.tinfo.format_library(library), ordinal, interface.tinfo.format_library(error) or "code ({:d})".format(error)))
     @utils.multicase(ordinal=internal.types.integer, name=internal.types.string, info=idaapi.tinfo_t, library=idaapi.til_t)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -6411,7 +6417,7 @@ class types(object):
 
         # if we got an error and the name already exists, then let the user know.
         elif error == idaapi.TERR_SAVE_ERROR and interface.tinfo.has_name(name, library):
-            raise E.DuplicateItemError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add a type with the name \"{:s}\" to the type library due to another type ({:d}) using the same name.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(identifier, '"'), interface.tinfo.by_name(identifier)))
+            raise E.DuplicateTypeError(u"{:s}.add({!r}, {!r}, {:s}{:s}) : Unable to add a type with the name \"{:s}\" to the type library due to another type ({:d}) using the same name.".format('.'.join([__name__, cls.__name__]), name, "{!s}".format(info), interface.tinfo.format_library(library), u", {:s}".format(utils.string.kwargs(mangled)) if mangled else '', utils.string.escape(identifier, '"'), interface.tinfo.by_name(identifier)))
 
         # check the error code and raise an exception if it is at all necessary.
         error_name, error_description = interface.tinfo.format_type_error(error)
