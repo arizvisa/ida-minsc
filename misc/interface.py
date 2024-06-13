@@ -7525,8 +7525,8 @@ class typematch(object):
         return hash(serialized[0]), len(serialized[0]), name
 
     @classmethod
-    def collect(cls, type):
-        '''Yield each individual type that is used to compose the specified `type`.'''
+    def collect_recursive(cls, type):
+        '''Recursively yield each individual type that composes the specified `type`.'''
         library = tinfo.library(type)
         Fnamed_type = functools.partial(idaapi.replace_ordinal_typerefs, library) if hasattr(idaapi, 'replace_ordinal_typerefs') else None
 
@@ -7614,7 +7614,7 @@ class typematch(object):
     def use(cls, collection, type):
         '''Return whether the specified `type` is composed of any of the types in the given `collection`.'''
         result = False
-        for subtype in cls.collect(type):
+        for subtype in cls.collect_recursive(type):
             key = subtype.get_ordinal() or subtype.get_type_name()
             if key not in collection:
                 candidates = cls.candidates(collection, subtype)
@@ -7642,7 +7642,7 @@ class typematch(object):
     @classmethod
     def iterate(cls, collection, type):
         '''Yield each type composing the specified `type` along with any matching types from the given `collection`.'''
-        for subtype in cls.collect(type):
+        for subtype in cls.collect_recursive(type):
             key = subtype.get_ordinal() or subtype.get_type_name()
             candidates = collection[key] if key in collection else cls.candidates(collection, subtype)
             if candidates:
