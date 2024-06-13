@@ -260,3 +260,13 @@ class DuplicateItemError(UnicodeException, E.NameError):
     """
     The requested command has failed due to a duplicate item.
     """
+
+class DuplicateNameError(DuplicateItemError):
+    """
+    The requested command has failed due to a duplicate name existing in the database.
+    """
+
+class DuplicateTypeError(DuplicateItemError, E.TypeError):
+    """
+    The requested command has failed due to a duplicate type existing in the database.
+    """
