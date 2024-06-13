@@ -2482,7 +2482,17 @@ class parameters(selection):
 
     @property
     def count(self):
+        cache = self.cache
+
+        # if there's a single element in the cache, with a 0-length range,
+        # and no segments, then there are no parameters in our list.
+        iterable = ((operator.eq(*range) and not(segments)) for range, segments in cache)
+        if len(cache) in {0, 1} and all(iterable):
+            return 0
         return len(self.cache)
+
+    def __len__(self):
+        return self.count
 
     @property
     def cache(self):
@@ -2494,8 +2504,8 @@ class parameters(selection):
     __getitem__ = item
 
     def __repr__(self):
-        cls, string, iterable = self.__class__, self.__string__, (range for range, _ in self.__cache)
-        return "{!s} {:s} : {!r}".format(cls, "{:d}..{:d}".format(*self.range), [string[left : right] for (left, right) in iterable])
+        cls, string, iterable = self.__class__, self.__string__, (range for range, _ in self.cache)
+        return "{!s} {:s} : ({:d}) {!r}".format(cls, "{:d}..{:d}".format(*self.range), self.count, [string[left : right] for (left, right) in iterable])
 
 class angle_parameters(parameters): __pairs__ = {'<>'}
 class group_parameters(parameters): __pairs__ = {'()'}
