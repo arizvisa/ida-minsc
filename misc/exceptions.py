@@ -260,8 +260,3 @@ class DuplicateItemError(UnicodeException, E.NameError):
     """
     The requested command has failed due to a duplicate item.
     """
-
-#structure:742 and previous to it should output the module name, classname, and method
-#comment:334 should catch whatever tree.find raises
-#comment:100 (this needs some kind of error when the symbol or token component is not found)
-#interface:283, interface:302, interface:620, interface:640 (this should be a NameError)
