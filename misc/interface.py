@@ -7590,6 +7590,56 @@ class typematch(object):
         return
 
     @classmethod
+    def collect_scalars(cls, type):
+        '''Yield each scalar type that the specified `type` is composed of.'''
+        library = tinfo.library(type)
+        Fnamed_type = functools.partial(idaapi.replace_ordinal_typerefs, library) if hasattr(idaapi, 'replace_ordinal_typerefs') else None
+
+        # Shove the type into our queue, and begin processing its components.
+        refs, queue = {ref for ref in []}, [type]
+        while queue:
+            ti = queue.pop(0)
+
+            # We attempt to force every type into a named type so that we
+            # can use the serialized data as the key when it's complex.
+            Fnamed_type and idaapi.replace_ordinal_typerefs(library, ti)
+            key = cls.unpack(ti)
+
+            # If the key used to represent our type has
+            # already been queued, then we can skip it.
+            if key in refs:
+                continue
+            refs.add(key)
+
+            # Type references allow for recursion, so we need to check these.
+            if ti.is_typeref():
+                name, ordinal = ti.get_type_name(), tinfo.ordinal(ti, library)
+                keys = [ordinal, name] if ordinal else [name]
+                if any(key in refs for key in keys):
+                    [ refs.setdefault(key, ti) for key in keys ]
+                    continue
+                subtype = tinfo.at_ordinal(ordinal, library) if ordinal else tinfo.at_name(name, library)
+                queue.append(subtype) if subtype else queue
+
+            # If it's a pointer, then we dereference until we get to a concrete type.
+            elif ti.is_ptr():
+                subtype, components = ti, []
+                while subtype.is_ptr():
+                    subtype = idaapi.remove_pointer(subtype)
+                    components.append(subtype)
+                queue.extend(components)
+
+            # If it's an enumeration, then we only need to queue up its base type.
+            elif ti.is_enum():
+                subtype = tinfo.enumeration(ti)
+                queue.append(subtype)
+
+            # All of the type's components have been processed, so
+            # we only need to yield a copy of it back to the caller.
+            yield tinfo.copy(ti, library)
+        return
+
+    @classmethod
     def candidates(cls, collection, type):
         '''Return the candidates that match the given `type` from the specified `collection`.'''
         decl = type.get_decltype()
@@ -7614,7 +7664,7 @@ class typematch(object):
     def use(cls, collection, type):
         '''Return whether the specified `type` is composed of any of the types in the given `collection`.'''
         result = False
-        for subtype in cls.collect_recursive(type):
+        for subtype in cls.collect_scalars(type):
             key = subtype.get_ordinal() or subtype.get_type_name()
             if key not in collection:
                 candidates = cls.candidates(collection, subtype)
@@ -7642,7 +7692,7 @@ class typematch(object):
     @classmethod
     def iterate(cls, collection, type):
         '''Yield each type composing the specified `type` along with any matching types from the given `collection`.'''
-        for subtype in cls.collect_recursive(type):
+        for subtype in cls.collect_scalars(type):
             key = subtype.get_ordinal() or subtype.get_type_name()
             candidates = collection[key] if key in collection else cls.candidates(collection, subtype)
             if candidates:
