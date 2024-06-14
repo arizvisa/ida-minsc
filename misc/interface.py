@@ -7641,7 +7641,7 @@ class typematch(object):
 
     @classmethod
     def candidates(cls, collection, type):
-        '''Return the candidates that match the given `type` from the specified `collection`.'''
+        '''Return all candidates from the specified `collection` that may match the given `type`.'''
         decl = type.get_decltype()
 
         # Unpack the base type, flags, and any modifiers
@@ -7661,38 +7661,27 @@ class typematch(object):
         return collection.get(key_flags, collection.get((base,), []))
 
     @classmethod
-    def use(cls, collection, type):
-        '''Return whether the specified `type` is composed of any of the types in the given `collection`.'''
+    def use(cls, collection, subtypes):
+        '''Return whether the specified `type` is composed of any of the types from the given `collection`.'''
         result = False
-        for subtype in cls.collect_scalars(type):
+        for subtype in subtypes:
             key = subtype.get_ordinal() or subtype.get_type_name()
             if key not in collection:
                 candidates = cls.candidates(collection, subtype)
             else:
                 candidates = collection[key]
 
-            # XXX: The following is used for debugging the functionality of this namespace.
-            #      It emits the candidate types that match and then does a final comparison
-            #      for castability. It should be removed once everything has been confirmed.
-            if logging.root.level <= logging.INFO:
-                if candidates:
-                    logging.warning("{:s}.use(..., {!r}) : Found {:d} candidate{:s} for the target's sub-type \"{!s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), len(candidates), '' if len(candidates) == 1 else 's', internal.utils.string.escape("{!s}".format(subtype), '"')))
-
-                for index, ti in enumerate(candidates):
-                    logging.warning("{:s}.use(..., {!r}) : Candidate {:d} for sub-type \"{!s}\" matches \"{!s}\" and is {:s}.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), 1 + index, internal.utils.string.escape("{!s}".format(subtype), '"'), internal.utils.string.escape("{!s}".format(ti), '"'), 'castable' if tinfo.compare(ti, subtype) else 'NOT castable'))
-                    result = result or tinfo.compare(ti, subtype)
-                continue
-
-            # Check each of the candidates for any that are castable to the current subtype.
-            elif any(tinfo.compare(ti, subtype) for ti in candidates):
+            # Check any of the candidates that were found from the collection
+            # for any types that are also castable to the current subtype.
+            if any(tinfo.compare(ti, subtype) for ti in candidates):
                 return True
             continue
         return result
 
     @classmethod
-    def iterate(cls, collection, type):
-        '''Yield each type composing the specified `type` along with any matching types from the given `collection`.'''
-        for subtype in cls.collect_scalars(type):
+    def select(cls, collection, subtypes):
+        '''Yield each type from the specified `subtypes` that match a type from the given `collection`.'''
+        for subtype in subtypes:
             key = subtype.get_ordinal() or subtype.get_type_name()
             candidates = collection[key] if key in collection else cls.candidates(collection, subtype)
             if candidates:
