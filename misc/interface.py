@@ -7680,6 +7680,12 @@ class typematch(object):
         return cls.collect_types_from_library(library, [type])
 
     @classmethod
+    def collect_types_from_prototype(cls, prototype):
+        '''Recursively yield each individual type that composes the specified function `prototype`.'''
+        library, iterable = tinfo.library(type), itertools.chain((subtype for _, subtype, _ in tinfo.function(prototype)), [prototype])
+        return cls.collect_scalars_from_types(library, [type for type in iterable])
+
+    @classmethod
     def candidates(cls, collection, type):
         '''Return all candidates from the specified `collection` that may match the given `type`.'''
         decl = type.get_decltype()
