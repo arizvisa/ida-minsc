@@ -7416,12 +7416,42 @@ class regmatch(object):
 
 class typematch(object):
     """
-    This namespace generates a dictionary from a list of types
-    that can be used to filter or match against another type.
-    It also provides utility functions for enumerating all of
-    the component types belonging to a type. The intention of
-    this is to allow one to match all of the dependent types
-    against one of the chosen types.
+    This namespace is intended to enable one to match or filter
+    a list of types and its subtypes. This is done by creating a
+    dictionary from each selected type that is composed of their
+    base declaration type, flags, and their modifiers.
+
+    These three type declaration attributes are used in combination
+    to produce three levels of keys that are queried in order of
+    decreasing levels of detail. The first key type includes any
+    modifiers, along with the standard base declaration type and
+    flags to allow explicitly specifying a modifier to search for.
+    The other two key types include the base type and its flags,
+    or if nothing was found, the general base declaration type.
+
+    The function for this namespace is responsible for taking
+    a list of desired types and converting it into a collection
+    that can then be used for matching. Once the collection has
+    been created, it is then usable with other functions from
+    the namespace to match and filter an arbitrary list of types.
+
+    There are other tools in this namespace that recursively
+    yield all of the subtypes that may compose a specific
+    type. These are intended to be used to generate a stream
+    of subtypes that can be used when matching a collection
+    in order to allow selecting matching members of a structure,
+    parameters and result from a prototype, or scalars that
+    are of the same base type despite any attribute modifiers
+    that they may have.
+
+    Some ways to utilize this namespace are::
+
+        > collection = typematch(['signed long', 'char[]', 'struct mystruc**'])
+        > iterable = typematch.collect_scalars(typeinfo)
+        > print( typematch.use(collection, iterable) )
+        > for type in typematch.select(collection, iterable): ...
+        > for candidate in typematch.candidates(collection, sometype): ...
+
     """
 
     masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
