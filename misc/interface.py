@@ -7447,7 +7447,7 @@ class typematch(object):
     Some ways to utilize this namespace are::
 
         > collection = typematch(['signed long', 'char[]', 'struct mystruc**'])
-        > iterable = typematch.collect_scalars(typeinfo)
+        > iterable = typematch.collect_scalars_from_type(typeinfo)
         > print( typematch.use(collection, iterable) )
         > for type in typematch.select(collection, iterable): ...
         > for candidate in typematch.candidates(collection, sometype): ...
@@ -7555,13 +7555,12 @@ class typematch(object):
         return hash(serialized[0]), len(serialized[0]), name
 
     @classmethod
-    def collect_recursive(cls, type):
-        '''Recursively yield each individual type that composes the specified `type`.'''
-        library = tinfo.library(type)
+    def collect_types_from_library(cls, library, types):
+        '''Yield each type composing all of the specified `types` from a type `library`.'''
         Fnamed_type = functools.partial(idaapi.replace_ordinal_typerefs, library) if hasattr(idaapi, 'replace_ordinal_typerefs') else None
 
         # Shove the type into our queue, and begin processing its components.
-        refs, queue = {ref for ref in []}, [type]
+        queue, refs = [type for type in types], {ref for ref in []}
         while queue:
             ti = queue.pop(0)
 
@@ -7620,13 +7619,12 @@ class typematch(object):
         return
 
     @classmethod
-    def collect_scalars(cls, type):
-        '''Yield each scalar type that the specified `type` is composed of.'''
-        library = tinfo.library(type)
+    def collect_scalars_from_types(cls, library, types):
+        '''Yield each scalar type composing the specified `types` from a type `library`.'''
         Fnamed_type = functools.partial(idaapi.replace_ordinal_typerefs, library) if hasattr(idaapi, 'replace_ordinal_typerefs') else None
 
         # Shove the type into our queue, and begin processing its components.
-        refs, queue = {ref for ref in []}, [type]
+        queue, refs = [type for type in types], {ref for ref in []}
         while queue:
             ti = queue.pop(0)
 
@@ -7668,6 +7666,18 @@ class typematch(object):
             # we only need to yield a copy of it back to the caller.
             yield tinfo.copy(ti, library)
         return
+
+    @classmethod
+    def collect_scalars_from_type(cls, type):
+        '''Yield each scalar type that the specified `type` is composed of.'''
+        library = tinfo.library(type)
+        return cls.collect_scalars_from_types(library, [type])
+
+    @classmethod
+    def collect_types_from_type(cls, type):
+        '''Recursively yield each individual type that composes the specified `type`.'''
+        library = tinfo.library(type)
+        return cls.collect_types_from_library(library, [type])
 
     @classmethod
     def candidates(cls, collection, type):
