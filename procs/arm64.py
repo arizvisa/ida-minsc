@@ -6,6 +6,7 @@ for the 64-bit extensions (AArch64) of the ARM-architecture family.
 """
 
 import idaapi, database, processors, __catalog__ as catalog
+import processors.arm
 
 class AArch64(processors.arm.AArch):
     """
