@@ -21,7 +21,7 @@ window that they wish to expose to the user.
 import builtins, os, operator, math, functools, itertools, six, threading
 import logging, inspect, time
 
-import idaapi, internal
+import idaapi, internal, internal.utils
 import database as _database
 
 ## TODO:
