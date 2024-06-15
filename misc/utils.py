@@ -13,7 +13,7 @@ import os, logging, weakref
 import functools, operator, itertools
 import sys, codecs, heapq, collections, array, math
 
-import internal
+import internal, internal.types
 import idaapi, ida, ctypes
 
 __all__ = [
