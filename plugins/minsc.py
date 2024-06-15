@@ -876,7 +876,7 @@ def finders():
     yield internal_submodule('internal', os.path.join(root, 'misc'), __doc__=documentation)
 
     # public (hooking) api
-    yield internal_object('hook', lambda: __import__('internal').hooks.module(), __name__='hook')
+    yield internal_object('hook', lambda: __import__('internal.hooks').hooks.module(), __name__='hook')
 
     # private (processors) api
     yield internal_submodule('processors', os.path.join(root, 'procs'), __doc__='This virtual module contains definitions for a number of different processors.')
@@ -887,7 +887,7 @@ def finders():
 
     # private (catalog) api that updates its proxy
     documentation = 'This virtual module maintains the architecturess that are registered by the plugin.'
-    catalog = internal_object('__catalog__', lambda update=catalog_proxy.update_module: __import__('internal').architecture.module(update), __name__='catalog', __doc__=documentation)
+    catalog = internal_object('__catalog__', lambda update=catalog_proxy.update_module: __import__('internal.architecture').architecture.module(update), __name__='catalog', __doc__=documentation)
     yield catalog
 
     # public api
