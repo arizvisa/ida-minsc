@@ -77,7 +77,7 @@ import builtins, functools, operator, itertools, logging, six
 import re, fnmatch
 
 import database, instruction, ui
-import idaapi, internal
+import idaapi, internal, internal.structure
 from internal import utils, interface, types, exceptions as E
 structure_t, member_t = internal.structure.structure_t, internal.structure.member_t
 
