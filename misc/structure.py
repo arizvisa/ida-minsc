@@ -13,7 +13,7 @@ definitions of these classes having to reside in a base module.
 import builtins, six, operator, functools, itertools, logging, math
 import re, fnmatch, pickle, heapq, bisect
 
-import idaapi, internal
+import idaapi, internal, internal.tags
 from internal import utils, interface, types, exceptions as E
 
 def new(identifier, offset):
