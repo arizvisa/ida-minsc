@@ -298,15 +298,41 @@ class internal_submodule(internal_api):
         return module
 
     def find_spec(self, fullname, path, target=None):
+        module, submodule = fullname.split('.', 1) if '.' in fullname else (fullname, '')
+
         if fullname == self.__name__:
             api = {name : path for name, path in self.iterate_api(**self.attrs)}
-            loader = self.spec_loader(self, api)
+            loader = self.fake_module_loader(self, api)
             spec = self.imp.module_spec(fullname, loader, is_package=True)
-            spec.submodule_search_locations[:] = []
+            spec.submodule_search_locations[:] = [self.path]
             return spec
+
+        elif module == self.__name__:
+            api = {name : path for name, path in self.iterate_api(**self.attrs)}
+            if submodule in api:
+                loader = self.submodule_loader(self, api)
+                return self.imp.module_spec(fullname, loader, is_package=True)
+            return None
         return None
 
-    class spec_loader(object):
+    class fake_module_loader(object):
+        def __init__(self, finder, api):
+            self._finder, self._api = finder, api
+        def create_module(self, spec):
+            return None
+        def exec_module(self, module):
+            cache = self._api
+
+            # Build a temporary cache for the module names and paths to load the api,
+            # and use them to build their documentation.
+            maximum = max(map(len, cache)) if cache else 0
+            documentation = '\n'.join("{:<{:d}s} : {:s}".format(name, maximum, path) for name, path in sorted(cache.items()))
+            documentation = '\n\n'.join([self._finder.attrs['__doc__'], documentation]) if '__doc__' in self._finder.attrs else documentation
+            module.__doc__ = documentation
+
+            return module
+
+    class submodule_loader(object):
         def __init__(self, finder, api):
             self._finder, self._api = finder, api
         def create_module(self, spec):
