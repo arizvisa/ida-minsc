@@ -6,6 +6,7 @@ for the 64-bit instructions belonging to the MIPS-architecture (MIPS64).
 """
 
 import idaapi, database, processors, __catalog__ as catalog
+import processors.mips
 
 class MIPS64(processors.mips.MIPS):
     """

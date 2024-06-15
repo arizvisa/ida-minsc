@@ -8,6 +8,7 @@ distributed with the IDA Pro disassembler.
 """
 
 import idaapi, database, processors, __catalog__ as catalog
+import processors.pc
 
 # This is pretty much a dummy module since we use the exact same
 # register state as the 32-bit Intel architecture.
