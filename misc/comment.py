@@ -61,7 +61,7 @@ import functools, operator, itertools
 import collections, heapq, string
 import sys, logging
 
-import internal, idaapi
+import idaapi, internal, internal.netnode
 import codecs
 
 ### cheap data structure for doing pattern matching with
