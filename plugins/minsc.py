@@ -867,7 +867,7 @@ library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
 def finders():
     '''Yield each finder that will be used by the plugin to locate its modules.'''
 
-    documentation = 'This is a ctypes-library to the shared object that is exposed to the IDA SDK.'
+    documentation = 'This is a ctypes-library to the shared object that is used by the IDA SDK.'
 
     # IDA's native lower-level api
     if sys.platform in {'darwin'}:
@@ -886,21 +886,21 @@ def finders():
         logging.warning("{:s} : Unable to load IDA's native api via ctypes. Ignoring...".format(__name__))
 
     # private (internal) api
-    documentation = 'This virtual module contains a number of internal submodules.'
+    documentation = 'This virtual package contains various tools that are used internally by the plugin.'
     yield internal_submodule('internal', os.path.join(root, 'misc'), __doc__=documentation)
 
     # public (hooking) api
     yield internal_object('hook', lambda: __import__('internal.hooks').hooks.module(), __name__='hook')
 
     # private (processors) api
-    yield internal_submodule('processors', os.path.join(root, 'procs'), __doc__='This virtual module contains definitions for a number of different processors.')
+    yield internal_submodule('processors', os.path.join(root, 'procs'), __doc__='This virtual package contains processor-specific definitions for the disassembler.')
 
     # public (architecture) api that proxies its attributes
     catalog_proxy = internal_proxy('architecture', 'architecture')
     yield catalog_proxy
 
     # private (catalog) api that updates its proxy
-    documentation = 'This virtual module maintains the architecturess that are registered by the plugin.'
+    documentation = 'This virtual module maintains the currently registered architectures supported by the plugin.'
     catalog = internal_object('__catalog__', lambda update=catalog_proxy.update_module: __import__('internal.architecture').architecture.module(update), __name__='catalog', __doc__=documentation)
     yield catalog
 
@@ -908,7 +908,7 @@ def finders():
     yield internal_path(os.path.join(root, 'base'))
 
     # tools and application api
-    documentation = 'This virtual module contains a number of different files as submodules.'
+    documentation = 'This virtual package contains various utilities within its different submodules.'
     for directory in ['tools', 'application']:
         yield internal_submodule(directory, os.path.join(root, directory), __doc__=documentation)
     return
