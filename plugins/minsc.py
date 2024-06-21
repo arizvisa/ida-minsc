@@ -332,6 +332,18 @@ class internal_submodule(internal_api):
 
             return module
 
+    class fake_module_autoloader(fake_module_loader):
+        def exec_module(self, module):
+            cache, module = self._api, super(internal_submodule.fake_module_autoloader, self).exec_module(module)
+
+            # populate the module with all of its submodules by default.
+            hack = "from . import {:s}".format(', '.join(cache))
+
+            # FIXME: we really should be assigning the api submodules
+            #        directly into this module instead of exec'ing it.
+            exec(hack, module.__dict__, module.__dict__)
+            return module
+
     class submodule_loader(object):
         def __init__(self, finder, api):
             self._finder, self._api = finder, api
