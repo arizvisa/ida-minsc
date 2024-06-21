@@ -224,6 +224,7 @@ class internal_submodule(internal_api):
         super(internal_submodule, self).__init__(path)
         attrs.setdefault('include', '*.py')
         self.__name__, self.attrs = __name__, attrs
+        self.__preload_submodules = attrs.pop('submodules', False)
 
     def find_module(self, fullname, path=None):
         '''If the module with the name `fullname` matches our submodule name, then act as its loader.'''
@@ -302,7 +303,8 @@ class internal_submodule(internal_api):
 
         if fullname == self.__name__:
             api = {name : path for name, path in self.iterate_api(**self.attrs)}
-            loader = self.fake_module_loader(self, api)
+            fake_module_loader_t = self.fake_module_autoloader if self.__preload_submodules else self.fake_module_loader
+            loader = fake_module_loader_t(self, api)
             spec = self.imp.module_spec(fullname, loader, is_package=True)
             spec.submodule_search_locations[:] = [self.path]
             return spec
