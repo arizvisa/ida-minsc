@@ -910,7 +910,7 @@ def finders():
     # tools and application api
     documentation = 'This virtual package contains various utilities within its different submodules.'
     for directory in ['tools', 'application']:
-        yield internal_submodule(directory, os.path.join(root, directory), __doc__=documentation)
+        yield internal_submodule(directory, os.path.join(root, directory), __doc__=documentation, submodules=True)
     return
 
 # The following logic is simply for detecting the version of IDA and
