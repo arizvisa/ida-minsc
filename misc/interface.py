@@ -2905,6 +2905,15 @@ class address(object):
         return [ea for ea in builtins.range(ea, ea + idaapi.get_item_size(ea)) if getflagsex(ea, 0) & idaapi.FF_REF]
 
     @classmethod
+    def has(cls, ea):
+        '''Return whether the address `ea` is contained within the database and accessible.'''
+        Fis_mapped = getattr(idaapi, 'isEnabled' if idaapi.__version__ < 7.0 else 'is_mapped', None)
+        if Fis_mapped:
+            return Fis_mapped(int(ea))
+        start, stop = cls.bounds()
+        return start <= int(ea) < stop
+
+    @classmethod
     def bounds(cls):
         '''Return the smallest and largest address within the database as a tuple.'''
         if idaapi.__version__ < 7.2:
