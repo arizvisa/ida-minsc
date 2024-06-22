@@ -2912,12 +2912,21 @@ class address(object):
             min, max = info.minEA, info.maxEA
         else:
             min, max = idaapi.inf_get_min_ea(), idaapi.inf_get_max_ea()
-        return min, max
+        return bounds_t(min, max)
 
-    @classmethod
-    def __within__(cls, ea):
-        l, r = cls.bounds()
-        return l <= ea < r
+    # XXX: The following protected functions are marked as such due to them
+    #      them having the ability to work on a single or pair of addresses.
+    #      These are specifically used to adjust inputs so that you can select
+    #      a pair that cuddle an item in the database, are inclusive to the
+    #      address pair, or exclude one of the addresses specified in the
+    #      pair.
+    #
+    #      There are also variations for both the head and tail of an address
+    #      that can be specified to complain about an inexact pair before
+    #      adjustment. The intention is so that you can specify pairs that
+    #      are out-of-bounds or unaligned for some api, but still get both of
+    #      them corrected to a head, tail, inclusive cuddle, or the exclusive
+    #      cuddle for a range, a segment, or even the entire database.
 
     @classmethod
     def __head1__(cls, ea, **warn):
@@ -3018,6 +3027,11 @@ class address(object):
         return cls.__inside1__(*args)
 
     @classmethod
+    def __within__(cls, ea):
+        '''Return whether the address `ea` is within the bounds of the database.'''
+        start, stop = cls.bounds()
+        return start <= ea < stop
+    @classmethod
     def __within1__(cls, ea):
         '''Check that `ea` is within the database.'''
         entryframe = cls.pframe()
@@ -3065,6 +3079,8 @@ class address(object):
         left, right = cls.bounds()
         minimum = idaapi.next_not_tail(left)
         return minimum if ea <= minimum else ea
+
+    # Now we can return back to our regularly scheduled program...
 
     @classmethod
     def refinfo(cls, ea, *opnum):
