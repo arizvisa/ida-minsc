@@ -3723,7 +3723,7 @@ class type(object):
     def hidden(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a hidden function depending on the value of `boolean`.'''
         return cls.flags(func, idaapi.FUNC_HIDDEN, -1 if boolean else 0) == idaapi.FUNC_HIDDEN
-    is_hidden = utils.alias(hidden, 'type')
+    is_hidden = hide = utils.alias(hidden, 'type')
 
     @utils.multicase()
     @classmethod
@@ -4997,6 +4997,7 @@ convention = cc = utils.alias(type.convention, 'type')
 result = type.result # XXX: ns alias
 arguments = args = type.arguments   # XXX: ns alias
 argument = arg = type.argument  # XXX: ns alias
+hide = utils.alias(type, 'hidden')
 
 class xref(object):
     """
