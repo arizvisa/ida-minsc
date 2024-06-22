@@ -3053,6 +3053,20 @@ class address(object):
         return cls.__within1__(*args)
 
     @classmethod
+    def clamp_forward(cls, ea):
+        '''Return the maximum available address in the database if the address in `ea` comes after it.'''
+        left, right = cls.bounds()
+        maximum = idaapi.prev_not_tail(right)
+        return maximum if ea >= maximum else ea
+
+    @classmethod
+    def clamp_backward(cls, ea):
+        '''Return the minimum available address in the database if the address in `ea` comes before it.'''
+        left, right = cls.bounds()
+        minimum = idaapi.next_not_tail(left)
+        return minimum if ea <= minimum else ea
+
+    @classmethod
     def refinfo(cls, ea, *opnum):
         '''This returns the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the address given in `ea`.'''
         ri, OPND_ALL = idaapi.refinfo_t(), getattr(idaapi, 'OPND_ALL', 0xf)
