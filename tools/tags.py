@@ -356,6 +356,10 @@ class apply(object):
             mapstate = { name : value for name, value in new.items() if state.get(name, dummy) != value }
             state.update(mapstate)
 
+            # if there's type information applied, then honor it first.
+            if '__typeinfo__' in state:
+                member.type = state.pop('__typeinfo__')
+
             # apply each tag directly to the field that it belongs to.
             [ member.tag(name, value) for name, value in state.items() ]
 
