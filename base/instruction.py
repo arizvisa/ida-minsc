@@ -1741,6 +1741,57 @@ def op_string(ea, opnum, strtype):
     res = opinfo(ea, opnum, info, flags=F)
     return True if res.strtype == strtype else False
 
+@utils.multicase(opnum=types.integer)
+def op_typeinfo(opnum):
+    '''Return the type information for the operand `opnum` belonging to the current instruction.'''
+    return op_typeinfo(ui.current.address(), opnum)
+@utils.multicase(reference=interface.opref_t)
+def op_typeinfo(reference):
+    '''Return the type information for the operand pointed to by `reference`.'''
+    ti, (ea, opnum) = idaapi.tinfo_t(), reference
+    ok = idaapi.get_op_tinfo2(ea, opnum, ti) if idaapi.__version__ < 7.0 else idaapi.get_op_tinfo(ti, ea, opnum)
+    return interface.tinfo.concretize(ti) if ok else None
+@utils.multicase(ea=types.integer, opnum=types.integer)
+def op_typeinfo(ea, opnum):
+    '''Return the type information for the operand `opnum` belonging to the instruction at `ea`.'''
+    ti = idaapi.tinfo_t()
+    ok = idaapi.get_op_tinfo2(ea, opnum, ti) if idaapi.__version__ < 7.0 else idaapi.get_op_tinfo(ti, ea, opnum)
+    return interface.tinfo.concretize(ti) if ok else None
+@utils.multicase(reference=interface.opref_t, info=(idaapi.tinfo_t, types.string, types.none))
+def op_typeinfo(reference, info):
+    '''Apply the type information specified in `info` to the operand pointed to by `reference`.'''
+    ea, opnum = reference
+    return op_typeinfo(ea, opnum, info)
+@utils.multicase(opnum=types.integer, info=(idaapi.tinfo_t, types.string, types.none))
+def op_typeinfo(opnum, info):
+    '''Apply the type information specified in `info` to the operand `opnum` belonging to the current instruction.'''
+    return op_typeinfo(ui.current.address(), opnum, info)
+@utils.multicase(ea=types.integer, opnum=types.integer, info=(idaapi.tinfo_t, types.string))
+def op_typeinfo(ea, opnum, info):
+    '''Apply the type information specified in `info` to the operand `opnum` for the instruction at `ea`.'''
+    ti, newtype = idaapi.tinfo_t(), info if isinstance(info, idaapi.tinfo_t) else interface.tinfo.parse(None, info, idaapi.PT_SIL)
+    if not newtype:
+        raise E.InvalidTypeOrValueError(u"{:s}.op_typeinfo({:#x}, {:d}, {!r}) : Unable to parse the provided type information \"{:s}\" into a valid type.".format(__name__, ea, opnum, "{!s}".format(info), utils.string.escape(info, '"')))
+
+    # Grab the original type from the operand if it is available.
+    ok = idaapi.get_op_tinfo2(ea, opnum, ti) if idaapi.__version__ < 7.0 else idaapi.get_op_tinfo(ti, ea, opnum)
+    res = interface.tinfo.concretize(ti) if ok else None
+
+    # Now try to apply the new type before returning the one we retrieved.
+    ok = idaapi.set_op_tinfo2(ea, opnum, ti) if idaapi.__version__ < 7.0 else idaapi.set_op_tinfo(ea, opnum, newtype)
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.op_typeinfo({:#x}, {:d}, {!r}) : Unable to apply the given type \"{:s}\" to the specified operand number ({:d}) of the instruction at {:#x}.".format(__name__, ea, opnum, "{!s}".format(info), utils.string.escape("{!s}".format(newtype), '"'), opnum, ea))
+    return res
+@utils.multicase(ea=types.integer, opnum=types.integer, none=types.none)
+def op_typeinfo(ea, opnum, none):
+    '''Remove the type information from the operand `opnum` belonging to the instruction at `ea`.'''
+    ti = idaapi.tinfo_t()
+    ok = idaapi.get_op_tinfo2(ea, opnum, ti) if idaapi.__version__ < 7.0 else idaapi.get_op_tinfo(ti, ea, opnum)
+    void = idaapi.del_tinfo2(ea, opnum) if idaapi.__version__ < 7.0 else idaapi.del_op_tinfo(ea, opnum)
+    if not ok:
+        logging.info(u"{:s}.op_typeinfo({:#x}, {:d}, {!s}) : Ignoring request to remove non-existing type from the specified operand number ({:d}) of the instruction at {:#x}.".format(__name__, ea, opnum, none, opnum, ea))
+    return interface.tinfo.concretize(ti) if ok else None
+
 # XXX: these functions are pretty much deprecated in favor of interface.address.refinfo.
 @utils.multicase()
 def ops_refinfo():
