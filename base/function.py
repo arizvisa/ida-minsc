@@ -3482,7 +3482,7 @@ class type(object):
     @classmethod
     def flags(cls):
         '''Return the flags for the current function.'''
-        return cls.flags(ui.current.function())
+        return interface.function.flags(ui.current.function())
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def flags(cls, func):
@@ -3493,13 +3493,13 @@ class type(object):
     @classmethod
     def flags(cls, func, mask):
         '''Return the flags for the function `func` selected with the specified `mask`.'''
-        fn = interface.function.by(func)
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'flags']))
         return interface.function.flags(fn, mask)
     @utils.multicase(func=(idaapi.func_t, types.integer), mask=types.integer, integer=(types.bool, types.integer))
     @classmethod
     def flags(cls, func, mask, integer):
         '''Set the flags for the function `func` selected by the specified `mask` to the provided `integer`.'''
-        fn = interface.function.by(func)
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'flags']))
         res = interface.function.flags(fn, mask, integer)
         if res is None:
             description = ("{:#x}" if isinstance(func, types.integer) else "{!r}").format(func)
@@ -3578,7 +3578,7 @@ class type(object):
     @classmethod
     def frame(cls, func):
         '''Return if the function `func` has a frame allocated to it.'''
-        fn = interface.function.by(func)
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'frame']))
         return fn.frame != idaapi.BADADDR
     has_frame = utils.alias(frame, 'type')
 
@@ -3591,8 +3591,8 @@ class type(object):
     @classmethod
     def frameptr(cls, func):
         '''Return if the function `func` uses a frame pointer (register).'''
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        return True if ok and cls.flags(func, idaapi.FUNC_FRAME) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, idaapi.FUNC_FRAME) else False
     has_frameptr = utils.alias(frameptr, 'type')
 
     @utils.multicase()
@@ -3647,13 +3647,14 @@ class type(object):
     @classmethod
     def library(cls, func):
         '''Return a boolean describing whether the function `func` is considered a library function.'''
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        return True if ok and cls.flags(func, idaapi.FUNC_LIB) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, idaapi.FUNC_LIB) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def library(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a library function depending on the value of `boolean`.'''
-        return cls.flags(func, idaapi.FUNC_LIB, -1 if boolean else 0) == idaapi.FUNC_LIB
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'library']))
+        return interface.function.flags(fn, idaapi.FUNC_LIB, -1 if boolean else 0) == idaapi.FUNC_LIB
     is_library = utils.alias(library, 'type')
 
     @utils.multicase()
@@ -3665,13 +3666,14 @@ class type(object):
     @classmethod
     def thunk(cls, func):
         '''Return a boolean describing whether the function `func` was determined to be a code thunk.'''
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        return True if ok and cls.flags(func, idaapi.FUNC_THUNK) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, idaapi.FUNC_THUNK) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def thunk(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a code thunk depending on the value of `boolean`.'''
-        return cls.flags(func, idaapi.FUNC_THUNK, -1 if boolean else 0) == idaapi.FUNC_THUNK
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'thunk']))
+        return interface.function.flags(fn, idaapi.FUNC_THUNK, -1 if boolean else 0) == idaapi.FUNC_THUNK
     is_thunk = utils.alias(thunk, 'type')
 
     @utils.multicase()
@@ -3683,8 +3685,8 @@ class type(object):
     @classmethod
     def far(cls, func):
         '''Return a boolean describing whether the function `func` is considered a "far" function by IDA or the user.'''
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        return True if ok and cls.flags(func, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
     is_far = utils.alias(far, 'type')
 
     @utils.multicase()
@@ -3697,14 +3699,15 @@ class type(object):
     def static(cls, func):
         '''Return a boolean describing whether the function `func` is defined as a static function.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        return True if ok and cls.flags(func, FUNC_STATICDEF) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, FUNC_STATICDEF) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def static(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a static function depending on the value of `boolean`.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
-        return cls.flags(func, FUNC_STATICDEF, -1 if boolean else 0) == FUNC_STATICDEF
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'static']))
+        return interface.function.flags(fn, FUNC_STATICDEF, -1 if boolean else 0) == FUNC_STATICDEF
     is_static = utils.alias(static, 'type')
 
     @utils.multicase()
@@ -3716,13 +3719,14 @@ class type(object):
     @classmethod
     def hidden(cls, func):
         '''Return a boolean describing whether the function `func` is hidden.'''
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        return True if ok and cls.flags(func, idaapi.FUNC_HIDDEN) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, idaapi.FUNC_HIDDEN) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def hidden(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a hidden function depending on the value of `boolean`.'''
-        return cls.flags(func, idaapi.FUNC_HIDDEN, -1 if boolean else 0) == idaapi.FUNC_HIDDEN
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'hidden']))
+        return interface.function.flags(fn, idaapi.FUNC_HIDDEN, -1 if boolean else 0) == idaapi.FUNC_HIDDEN
     is_hidden = hide = utils.alias(hidden, 'type')
 
     @utils.multicase()
@@ -3735,14 +3739,15 @@ class type(object):
     def outline(cls, func):
         '''Return a boolean describing whether the function `func` is outlined.'''
         FUNC_OUTLINE = getattr(idaapi, 'FUNC_OUTLINE', 0x20000)
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        return True if ok and cls.flags(func, FUNC_OUTLINE) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, FUNC_OUTLINE) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def outline(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as an outlined function depending on the value of `boolean`.'''
         FUNC_OUTLINE = getattr(idaapi, 'FUNC_OUTLINE', 0x20000)
-        return cls.flags(func, FUNC_OUTLINE, -1 if boolean else 0) == idaapi.FUNC_OUTLINE
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'outline']))
+        return interface.function.flags(fn, FUNC_OUTLINE, -1 if boolean else 0) == idaapi.FUNC_OUTLINE
     is_outline = utils.alias(outline, 'type')
 
     @utils.multicase()
@@ -4981,15 +4986,15 @@ class type(object):
     @classmethod
     def lumina(cls, func):
         '''Return whether the function `func` was identified by Lumina.'''
-        ok = isinstance(func, idaapi.func_t) or idaapi.get_func(func)
-        fn = ok and interface.function.by(func)
-        return True if ok and interface.function.flags(fn, getattr(idaapi, 'FUNC_LUMINA', 0)) else False
+        fn = func if isinstance(func, idaapi.func_t) else idaapi.get_func(func)
+        return True if fn and interface.function.flags(fn, getattr(idaapi, 'FUNC_LUMINA', 0)) else False
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
     def lumina(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a function identified by Lumina depending on the value of `boolean`.'''
         FUNC_LUMINA = getattr(idaapi, 'FUNC_LUMINA', 0)
-        return cls.flags(func, FUNC_LUMINA, -1 if boolean else 0) == FUNC_LUMINA
+        fn = interface.function.by(func, caller='.'.join([__name__, cls.__name__, 'lumina']))
+        return interface.function.flags(fn, FUNC_LUMINA, -1 if boolean else 0) == FUNC_LUMINA
 
 t = type # XXX: ns alias
 prototype = utils.alias(type, 'type')
