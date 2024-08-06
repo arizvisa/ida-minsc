@@ -499,7 +499,7 @@ class functions(object):
     __matcher__.combinator('address', utils.fcondition(utils.finstance(internal.types.integer, interface.integerish))(utils.fcompose(utils.fcondition(interface.function.has)(interface.function.owners, utils.fpack(utils.fidentity)), utils.fpartial(builtins.map, builtins.int), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fpartial(builtins.map, interface.function.owners), utils.funpack(itertools.chain), internal.types.set, utils.fpartial(utils.fpartial, operator.contains))))
     __matcher__.alias('ea', 'address')
     __matcher__.combinator('index', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), idaapi.get_func_num)
-    __matcher__.combinator('mangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else utils.fpartial(utils.fcompose, utils.fmap(utils.fidentity, internal.declaration.demangle), utils.funpack(operator.ne)))), idaapi.get_true_name if idaapi.__version__ < 6.8 else idaapi.get_ea_name, utils.string.of)
+    __matcher__.combinator('mangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, operator.itemgetter(-1))), utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.funpack(interface.name.mangled), utils.fpartial(operator.ne, idaapi.FF_UNK)))), utils.fthrough(utils.fidentity, utils.fcompose(idaapi.get_true_name if idaapi.__version__ < 6.8 else idaapi.get_ea_name, utils.string.of)))
     __matcher__.alias('decorated', 'mangled')
     __matcher__.combinator('arguments', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), function.type, operator.methodcaller('get_nargs'))
     __matcher__.alias('args', 'arguments')
@@ -983,7 +983,7 @@ class names(object):
         `iregex` - Filter the symbol names according to a case-insensitive regular-expression
         `index` - Filter the symbol according to an index or a list of indices
         `function` - Filter the symbol names for any that are referring to a function
-        `imports` - Filter the symbol names for any that are imports
+        `import` - Filter the symbol names for any that are imports
         `typed` - Filter the symbol names for any that have type information applied to them
         `tagged` - Filter the symbol names for any that use the specified tag(s)
         `predicate` - Filter the symbols by passing their address to a callable
@@ -1006,7 +1006,8 @@ class names(object):
     __matcher__.combinator('unmangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
     __matcher__.alias('demangled', 'unmangled')
     __matcher__.mapping('function', interface.function.has, idaapi.get_nlist_ea)
-    __matcher__.mapping('imports', utils.fpartial(operator.eq, idaapi.SEG_XTRN), idaapi.get_nlist_ea, idaapi.segtype)
+    __matcher__.mapping('import', utils.fpartial(operator.eq, idaapi.SEG_XTRN), idaapi.get_nlist_ea, idaapi.segtype)
+    __matcher__.alias('imports', 'import')
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_nlist_ea, lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.alias('tag', 'tagged')
     __matcher__.mapping('typed', operator.truth, idaapi.get_nlist_ea, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
@@ -1073,8 +1074,6 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
     def list(cls, **type):
         '''List the names from the database that match the keywords specified by `type`.'''
-        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
         # Set some reasonable defaults
@@ -1106,8 +1105,7 @@ class names(object):
             flags = itertools.chain(finitialized, ftype, ftagged)
 
             # Figure out which name we need to use, the mangled one or the real one.
-            mangled_name_type_t = Fmangled_type(utils.string.to(name))
-            realname = name if mangled_name_type_t == MANGLED_UNKNOWN else (idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP) or name)
+            realname = name if interface.name.mangled(ea, name) == idaapi.FF_UNK else (idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP) or name)
 
             # Now we can just try to demangle the name and display both mangled and unmangled forms.
             description = utils.string.of(idaapi.demangle_name(utils.string.to(name), MNG_LONG_FORM) or realname)
@@ -1125,15 +1123,12 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
     def search(cls, **type):
         '''Search through the names within the database and return the first result matching the keywords specified by `type`.'''
-        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-        Fmangled_type = (lambda ea, string: idaapi.get_mangled_name_type(string)) if hasattr(idaapi, 'get_mangled_name_type') else lambda ea, string: utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if interface.address.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE else MANGLED_DATA, MANGLED_UNKNOWN))(string)
         MNG_LONG_FORM = getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
-
         query_s = utils.string.kwargs(type)
         listable = [item for item in cls.__iterate__(**type)]
         if len(listable) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)
-            messages = ((u"[{:d}] {:#x} {:s}".format(idx, ea, name if Fmangled_type(utils.string.to(name)) == MANGLED_UNKNOWN else "({:s}) {:s}".format(name, utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name))) for idx, ea, name in map(utils.fmap(utils.fidentity, f1, f2), listable)))
+            messages = ((u"[{:d}] {:#x} {:s}".format(idx, ea, name if interface.name.mangled(ea, name) == idaapi.FF_UNK else "({:s}) {:s}".format(name, utils.string.of(idaapi.demangle_name(name, MNG_LONG_FORM) or name))) for idx, ea, name in map(utils.fthrough(utils.fidentity, f1, f2), listable)))
             [ logging.info(msg) for msg in messages ]
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
 
@@ -1590,13 +1585,11 @@ def mangled():
 @utils.multicase(ea=internal.types.integer)
 def mangled(ea):
     '''Return the mangled name at the address specified by `ea`.'''
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
-
     result = interface.name.get(ea)
-    mangled_name_type_t = Fmangled_type(utils.string.to(result))
-    if mangled_name_type_t == MANGLED_UNKNOWN:
-        logging.warning(u"{:s}.mangled({:#x}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, ea, mangled_name_type_t, 'regular'))
+    mangled_name_t = interface.name.mangled(ea, result)
+    if mangled_name_t == idaapi.FF_UNK:
+        mangled_name_type_table = {value: getattr(idaapi, name, index) for index, (name, value) in enumerate(zip(['MANGLED_CODE', 'MANGLED_DATA', 'MANGLED_UNKNOWN'], [idaapi.FF_CODE, idaapi.FF_DATA, idaapi.FF_UNK]))}
+        logging.warning(u"{:s}.mangled({:#x}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, ea, mangled_name_type_table.get(mangled_name_t, mangled_name_t), 'regular'))
     return result
 @utils.multicase(string=internal.types.string)
 @utils.string.decorate_arguments('string','suffix')
@@ -1611,30 +1604,25 @@ def mangled(none):
 @utils.string.decorate_arguments('string', 'suffix')
 def mangled(ea, string, *suffix):
     '''Rename the address specified by `ea` to the mangled version of `string` and return its previous mangled value.'''
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
-
-    mangled_name_type_t = Fmangled_type(utils.string.to(string))
-    if mangled_name_type_t == MANGLED_UNKNOWN:
+    mangled_name_t = interface.name.mangled(ea, string)
+    if mangled_name_t == idaapi.FF_UNK:
         raise NotImplementedError(u"{:s}.mangled({:#x}, {:s}) : Unable to mangle the specified name (\"{:s}\") before applying it to the address ({:#x}).".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), ea))
     if suffix:
         raise NotImplementedError(u"{:s}.mangled({:#x}, {:s}) : Unable to attach the suffix (\"{:s}\") to the unmangled name (\"{:s}\") before applying it to the address ({:#x}).".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), interface.tuplename(*suffix), internal.declaration.demangle(string), ea))
     # FIXME: mangle the string that we were given according to the schema for
     #        the default compiler type with the suffix appended to its name.
-    logging.warning(u"{:s}.mangled({:#x}, {:s}) : The specified name (\"{:s}\") is already mangled ({:d}) and will be assigned to the given address ({:#x}) as \"{:s}\".".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), mangled_name_type_t, ea, internal.declaration.demangle(string)))
+    logging.warning(u"{:s}.mangled({:#x}, {:s}) : The specified name (\"{:s}\") is already mangled ({:d}) and will be assigned to the given address ({:#x}) as \"{:s}\".".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), mangled_name_t, ea, internal.declaration.demangle(string)))
     return interface.name.set(ea, interface.tuplename(*itertools.chain([string], suffix)))
 @utils.multicase(ea=internal.types.integer, none=internal.types.none)
 def mangled(ea, none):
     '''Remove the name at the address specified by `ea` and return its previous mangled value.'''
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
     GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
-
     flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
-    string, _ = interface.name.get(ea, flags), interface.name.set(ea, none)
-    mangled_name_type_t = Fmangled_type(utils.string.to(string))
-    if mangled_name_type_t == MANGLED_UNKNOWN:
-        logging.warning(u"{:s}.mangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_t, 'regular'))
+    string, unmangled, result = interface.name.get(ea, 0), interface.name.get(ea, flags), interface.name.set(ea, none, 0, idaapi.SN_LOCAL)
+    mangled_name_t = interface.name.mangled(ea, string)
+    if mangled_name_t == idaapi.FF_UNK:
+        mangled_name_type_table = {value: getattr(idaapi, name, index) for index, (name, value) in enumerate(zip(['MANGLED_CODE', 'MANGLED_DATA', 'MANGLED_UNKNOWN'], [idaapi.FF_CODE, idaapi.FF_DATA, idaapi.FF_UNK]))}
+        logging.warning(u"{:s}.mangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_table.get(mangled_name_t, mangled_name_t), 'regular'))
     return string
 mangle = utils.alias(mangled)
 
@@ -1646,7 +1634,6 @@ def unmangled():
 def unmangled(ea):
     '''Return the name at the address specified by `ea` in its unmangled form.'''
     GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
-
     flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
     result = interface.name.get(ea, flags)
     return result if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
@@ -1663,13 +1650,11 @@ def unmangled(none):
 @utils.string.decorate_arguments('string', 'suffix')
 def unmangled(ea, string, *suffix):
     '''Rename the address specified by `ea` using the mangled version of `string` and return its previous unmangled value.'''
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
     GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
-
-    mangled_name_type_t = Fmangled_type(utils.string.to(string))
-    if mangled_name_type_t != MANGLED_UNKNOWN:
-        logging.warning(u"{:s}.unmangled({:#x}, {:s}) : The specified name (\"{:s}\") is already mangled ({:d}) and will be assigned to the given address ({:#x}) as \"{:s}\".".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), mangled_name_type_t, ea, internal.declaration.demangle(string)))
+    mangled_name_t = interface.name.mangled(ea, string)
+    if mangled_name_t != idaapi.FF_UNK:
+        mangled_name_type_table = {value: getattr(idaapi, name, index) for index, (name, value) in enumerate(zip(['MANGLED_CODE', 'MANGLED_DATA', 'MANGLED_UNKNOWN'], [idaapi.FF_CODE, idaapi.FF_DATA, idaapi.FF_UNK]))}
+        logging.warning(u"{:s}.unmangled({:#x}, {:s}) : The specified name (\"{:s}\") is already mangled ({:d}) and will be assigned to the given address ({:#x}) as \"{:s}\".".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), utils.string.escape(string, '"'), mangled_name_type_table.get(mangled_name_t, mangled_name_t), ea, internal.declaration.demangle(string)))
     if suffix:
         raise NotImplementedError(u"{:s}.unmangled({:#x}, {:s}) : Unable to attach the suffix (\"{:s}\") to the unmangled name (\"{:s}\") before applying it to the address ({:#x}).".format(__name__, ea, ', '.join(map("{!r}".format, itertools.chain([string], suffix))), interface.tuplename(*suffix), internal.declaration.demangle(string), ea))
     # FIXME: correct the string, doing whatever it takes to keep it the same
@@ -1680,16 +1665,14 @@ def unmangled(ea, string, *suffix):
 @utils.multicase(ea=internal.types.integer, none=internal.types.none)
 def unmangled(ea, none):
     '''Remove the name at the address specified by `ea` and return its previous unmangled value.'''
-    MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-    Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE if type.code(ea) else MANGLED_DATA, MANGLED_UNKNOWN))
     GN_DEMANGLED = getattr(idaapi, 'GN_DEMANGLED', 0)
-
     flags = functools.reduce(operator.or_, [GN_DEMANGLED, idaapi.GN_SHORT])
-    string, result = interface.name.get(ea, flags), interface.name.set(ea, none, 0, idaapi.SN_LOCAL)
-    mangled_name_type_t = Fmangled_type(utils.string.to(string))
-    if mangled_name_type_t == MANGLED_UNKNOWN:
-        logging.warning(u"{:s}.unmangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_t, 'regular'))
-    return result if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
+    string, unmangled, result = interface.name.get(ea, 0), interface.name.get(ea, flags), interface.name.set(ea, none, 0, idaapi.SN_LOCAL)
+    mangled_name_t = interface.name.mangled(ea, string)
+    if mangled_name_t == idaapi.FF_UNK:
+        mangled_name_type_table = {value: getattr(idaapi, name, index) for index, (name, value) in enumerate(zip(['MANGLED_CODE', 'MANGLED_DATA', 'MANGLED_UNKNOWN'], [idaapi.FF_CODE, idaapi.FF_DATA, idaapi.FF_UNK]))}
+        logging.warning(u"{:s}.unmangled({:#x}, {!s}) : The name at the given address ({:#x}) was not mangled ({:d}) and will be the same as returning the {:s} name.".format(__name__, ea, none, ea, mangled_name_type_table.get(mangled_name_t, mangled_name_t), 'regular'))
+    return unmangled if hasattr(idaapi, 'GN_DEMANGLED') else internal.declaration.demangle(result)
 unmangle = demangle = demangled = utils.alias(unmangled)
 
 @utils.multicase()
@@ -1831,7 +1814,7 @@ class exports(object):
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(0), utils.fthrough(interface.entries.name, utils.fcompose(interface.entries.address, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(0), utils.fthrough(interface.entries.name, utils.fcompose(interface.entries.address, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), operator.itemgetter(0), utils.fthrough(interface.entries.name, utils.fcompose(interface.entries.address, utils.fcondition(interface.function.has)(function.name, unmangled))), utils.fpartial(filter, None), utils.itake(1), operator.itemgetter(0), utils.fdefault(''), utils.string.of)
-    __matcher__.combinator('mangled', utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.string.to, utils.fdefault(''), idaapi.get_mangled_name_type, utils.fpartial(operator.ne, getattr(idaapi, 'MANGLED_UNKNOWN', 2))) if hasattr(idaapi, 'get_mangled_name_type') else operator.startswith(('__', '?'))), operator.itemgetter(0), utils.fcondition(utils.fcompose(interface.entries.name, operator.truth))(interface.entries.name, utils.fcompose(interface.entries.address, interface.name.get)), utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('mangled', utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.funpack(interface.name.mangled), utils.fpartial(operator.ne, idaapi.FF_UNK))), utils.fthrough(operator.itemgetter(1), utils.fcompose(operator.itemgetter(0), utils.fcondition(utils.fcompose(interface.entries.name, operator.truth))(utils.fcompose(interface.entries.name, utils.string.of, utils.fdefault('')), utils.fcompose(interface.entries.address, interface.name.get, utils.string.of, utils.fdefault(''))))))
     __matcher__.alias('decorated', 'mangled')
     __matcher__.mapping('function', interface.function.has, operator.itemgetter(1))
     __matcher__.mapping('typed', operator.truth, operator.itemgetter(1), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
@@ -2023,8 +2006,6 @@ class exports(object):
     @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
     def list(cls, **type):
         '''List the entry points from the database that match the keywords specified by `type`.'''
-        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_CODE, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
         MNG_NOSCTYP, MNG_NOCALLC = getattr(idaapi, 'MNG_NOSCTYP', 0x400), getattr(idaapi, 'MNG_NOCALLC', 0x100)
 
@@ -2062,8 +2043,8 @@ class exports(object):
             # while being aware of name mangling. If there's no type information, then
             # use the unmangled name for displaying the export.
             if interface.function.has(ea):
-                ti, mangled_name_type_t = idaapi.tinfo_t(), Fmangled_type(utils.string.to(realname))
-                dname = realname if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_NODEFINIT|MNG_NOPTRTYP) or realname)
+                ti, mangled_name_t = idaapi.tinfo_t(), interface.name.mangled(ea, realname)
+                dname = realname if mangled_name_t == idaapi.FF_UNK else utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_NODEFINIT|MNG_NOPTRTYP) or realname)
                 demangled = utils.string.of(idaapi.demangle_name(utils.string.to(realname), MNG_LONG_FORM|MNG_NOSCTYP|MNG_NOCALLC)) or realname
                 description = idaapi.print_tinfo('', 0, 0, idaapi.PRTYPE_DEF, ti, utils.string.to(dname), '') if get_tinfo(ti, ea) else demangled
 
@@ -2568,8 +2549,6 @@ class imports(object):
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex', 'iregex')
     def list(cls, **type):
         '''List the imports from the database that match the keywords specified by `type`.'''
-        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(MANGLED_DATA, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
         # Set some reasonable defaults
@@ -2607,8 +2586,7 @@ class imports(object):
             # Clean up the name and then figure out what the actual name would be. We first
             # strip out the import prefix, then figure out the type before we render just the name.
             name = name[len(prefix):] if name.startswith(prefix) else name
-            mangled_name_type_t = Fmangled_type(utils.string.to(name))
-            realname = name if mangled_name_type_t == MANGLED_UNKNOWN else utils.string.of(idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP) or name)
+            realname = name if interface.name.mangled(ea, name) == idaapi.FF_UNK else utils.string.of(idaapi.demangle_name(utils.string.to(name), MNG_NODEFINIT|MNG_NOPTRTYP) or name)
 
             # Some flags that are probably useful.
             ftyped = 'T' if get_tinfo(idaapi.tinfo_t(), ea) else 't' if t.has(ea) else '-'
