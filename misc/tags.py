@@ -26,8 +26,6 @@ class address(object):
     @classmethod
     def get(cls, ea):
         '''Return a dictionary containing the tags for the item at address `ea`.'''
-        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7)
 
         ea = interface.address.inside(int(ea))
@@ -72,7 +70,7 @@ class address(object):
         # First thing we need to figure out is whether the name exists and if
         # it's actually special in that we need to demangle it for the real name.
         aname = interface.name.get(ea)
-        if aname and Fmangled_type(utils.string.to(aname)) != MANGLED_UNKNOWN:
+        if aname and interface.name.mangled(ea, aname) != idaapi.FF_UNK:
             realname = utils.string.of(idaapi.demangle_name(utils.string.to(aname), MNG_NODEFINIT|MNG_NOPTRTYP) or aname)
         else:
             realname = aname or ''
@@ -406,8 +404,6 @@ class function(object):
     @classmethod
     def get(cls, func):
         '''Return a dictionary containing the tags for the function `func`.'''
-        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
 
         try:
@@ -442,7 +438,7 @@ class function(object):
 
         # Collect all of the naming information for the function.
         fname, mangled = interface.function.name(ea), utils.string.of(idaapi.get_func_name(ea))
-        if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
+        if fname and interface.name.mangled(ea, mangled) != idaapi.FF_UNK:
             realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
         else:
             realname = fname or ''
