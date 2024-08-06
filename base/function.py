@@ -3422,8 +3422,6 @@ class type(object):
     @utils.string.decorate_arguments('info')
     def __new__(cls, func, info, **guessed):
         '''Parse the type information string in `info` into an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
-        MANGLED_CODE, MANGLED_DATA, MANGLED_UNKNOWN = getattr(idaapi, 'MANGLED_CODE', 0), getattr(idaapi, 'MANGLED_DATA', 1), getattr(idaapi, 'MANGLED_UNKNOWN', 2)
-        Fmangled_type = idaapi.get_mangled_name_type if hasattr(idaapi, 'get_mangled_name_type') else utils.fcompose(utils.frpartial(idaapi.demangle_name, 0), utils.fcondition(operator.truth)(0, MANGLED_UNKNOWN))
         MNG_NODEFINIT, MNG_NOPTRTYP, MNG_LONG_FORM = getattr(idaapi, 'MNG_NODEFINIT', 8), getattr(idaapi, 'MNG_NOPTRTYP', 7), getattr(idaapi, 'MNG_LONG_FORM', 0x6400007)
         parseflags = functools.reduce(operator.or_, [idaapi.PT_SIL, idaapi.PT_VAR, idaapi.PT_LOWER, idaapi.PT_NDC])
 
@@ -3432,7 +3430,7 @@ class type(object):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
 
         fname, mangled = interface.function.name(ea), interface.name.get(ea) if rt else utils.string.of(idaapi.get_func_name(ea))
-        if fname and Fmangled_type(utils.string.to(mangled)) != MANGLED_UNKNOWN:
+        if fname and interface.name.mangled(ea, mangled) != idaapi.FF_UNK:
             realname = utils.string.of(idaapi.demangle_name(utils.string.to(mangled), MNG_NODEFINIT|MNG_NOPTRTYP) or fname)
         else:
             realname = fname
