@@ -977,6 +977,7 @@ class names(object):
         `address` or `ea` - Filter the symbols by an address or a list of addresses
         `name` - Filter the symbols by unmangled name or a list of unmangled names
         `unmangled` - Filter the unmangled symbol names according to a regular-expression
+        `mangled` - Filter the mangled symbol names according to a glob
         `like` - Filter the symbol names according to a glob
         `bounds` - Filter the symbol names within the given boundaries
         `regex` - Filter the symbol names according to a regular-expression
@@ -984,6 +985,9 @@ class names(object):
         `index` - Filter the symbol according to an index or a list of indices
         `function` - Filter the symbol names for any that are referring to a function
         `import` - Filter the symbol names for any that are imports
+        `code` - Filter the symbol names for any that are defined as code
+        `data` - Filter the symbol names for any that are defined as data
+        `unknown` - Filter the symbol names for any that are defined as unknown
         `typed` - Filter the symbol names for any that have type information applied to them
         `tagged` - Filter the symbol names for any that use the specified tag(s)
         `predicate` - Filter the symbols by passing their address to a callable
@@ -1003,9 +1007,14 @@ class names(object):
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
     __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), idaapi.get_nlist_name, utils.string.of)
-    __matcher__.combinator('unmangled', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_nlist_name, internal.declaration.demangle)
+    __matcher__.combinator('unmangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, operator.itemgetter(-1), internal.declaration.demangle)), utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.funpack(interface.name.mangled), utils.fpartial(operator.eq, idaapi.FF_UNK)))), utils.fthrough(idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)))
     __matcher__.alias('demangled', 'unmangled')
+    __matcher__.combinator('mangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, operator.itemgetter(-1))), utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.funpack(interface.name.mangled), utils.fpartial(operator.ne, idaapi.FF_UNK)))), utils.fthrough(idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)))
+    __matcher__.alias('decorated', 'mangled')
     __matcher__.mapping('function', interface.function.has, idaapi.get_nlist_ea)
+    __matcher__.mapping('code', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.MS_CLS), utils.fpartial(operator.eq, idaapi.FF_CODE)), idaapi.get_nlist_ea)
+    __matcher__.mapping('data', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.MS_CLS), utils.fpartial(operator.eq, idaapi.FF_DATA)), idaapi.get_nlist_ea)
+    __matcher__.mapping('unknown', utils.fcompose(interface.address.flags, utils.fpartial(operator.and_, idaapi.MS_CLS), utils.fpartial(operator.eq, idaapi.FF_UNK)), idaapi.get_nlist_ea)
     __matcher__.mapping('import', utils.fpartial(operator.eq, idaapi.SEG_XTRN), idaapi.get_nlist_ea, idaapi.segtype)
     __matcher__.alias('imports', 'import')
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), idaapi.get_nlist_ea, lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
