@@ -8291,6 +8291,37 @@ class set(object):
         # return the array that we just created.
         return get.array(ea, length=reallength)
 
+    @utils.multicase()
+    @classmethod
+    def revert(cls):
+        '''Revert the decision made by the disassembler at the current address or selection.'''
+        address, selection = ui.current.address(), ui.current.selection()
+        if operator.eq(*(interface.address.head(ea) for ea in selection)):
+            return cls(address)
+        return cls.revert(selection)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def revert(cls, bounds):
+        '''Revert the decisions made by the disassembler within the specified `bounds`.'''
+        start, stop = bounds
+        idaapi.revert_ida_decisions(start, stop)
+        return bounds
+    @utils.multicase(location=interface.location_t)
+    @classmethod
+    def revert(cls, location):
+        '''Revert the decisions made by the disassembler within the given `location`.'''
+        ea, size = location
+        start, stop = bounds = interface.bounds_t(ea, ea + size)
+        idaapi.revert_ida_decisions(start, stop)
+        return bounds
+    @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
+    @classmethod
+    def revert(cls, ea, size):
+        '''Revert the decisions made by the disassembler from the address `ea` up to `size` bytes.'''
+        start, stop = bounds = interface.bounds_t(ea, ea + size)
+        idaapi.revert_ida_decisions(start, stop)
+        return bounds
+
 class get(object):
     """
     This namespace used to fetch and decode the data from the database
