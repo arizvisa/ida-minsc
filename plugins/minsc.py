@@ -13,7 +13,7 @@ If you wish to change the directory that the plugin is loaded from, specify the
 location of the plugin's git repository in the variable that is marked below.
 """
 import sys, os, logging
-import builtins, six, fnmatch, ctypes, itertools, types
+import builtins, six, fnmatch, ctypes, itertools, operator, functools, types
 import idaapi
 
 # :: Point this variable at the directory containing the repository of the plugin ::
@@ -946,6 +946,10 @@ class DisplayHook(object):
     Re-implementation of IDAPython's displayhook that doesn't tamper with
     classes that inherit from base classes
     """
+
+    # Add a class property that preserves the types used to represent an integer.
+    _integer_types = tuple({(sys.maxsize + integer).__class__ for integer in range(2)})
+
     def __init__(self, output, displayhook):
         self.orig_displayhook = displayhook or sys.displayhook
 
@@ -965,7 +969,56 @@ class DisplayHook(object):
         # Save our output callable so we can write raw and unprocessed information to it.
         self.output = output
 
-    def format_seq(self, num_printer, storage, item, open, close):
+        # Use a hash-lookup to locate formatters for nested types.
+        self._nested_formatters = formatters = {
+            dict: self.__format_dictionary,
+            list: functools.partial(self.__format_sequence, *'[]'),
+            tuple: functools.partial(self.__format_sequence, *'()'),
+            set: functools.partial(self.__format_sequence, 'set([', '])'),
+        }
+        formatters.setdefault({}.keys().__class__, functools.partial(self.__format_sequence, 'dict_keys([', '])'))
+        formatters.setdefault({}.values().__class__, functools.partial(self.__format_sequence, 'dict_values([', '])'))
+        formatters.setdefault({}.items().__class__, functools.partial(self.__format_sequence, 'dict_items([', '])'))
+
+        # We use another hash-lookup to identify formatters for native types.
+        self._native_formatters = formatters = {
+            None.__class__: "{!s}".format,
+            bool: "{!s}".format,
+            float: "{!s}".format,
+            ''.__class__: self.__format_basestring, u''.__class__: self.__format_basestring,
+            idaapi.tinfo_t: self.__format_tinfo,
+            ctypes._SimpleCData: self.__format_ctypes,
+            ctypes._Pointer: self.__format_ctypes,
+            ctypes._CFuncPtr: self.__format_ctypes,
+            ctypes.Array: self.__format_ctypes,
+            ctypes.Structure: self.__format_ctypes,
+        }
+        if hasattr(builtins, 'basestring'):
+            formatters[builtins.basestring] = self.__format_basestring
+        formatters.setdefault(bytes, "{!s}".format)
+        formatters.setdefault(bytearray, "{!s}".format)
+
+        # Store a table for formatting classes that inherit from some type.
+        # This is traversed linearly, and doesn't get used as a dictionary.
+        self._class_formatters = formatters = {
+            (ctypes._SimpleCData, ctypes._Pointer, ctypes._CFuncPtr, ctypes.Array, ctypes.Structure): self.__format_ctypes,
+        }
+
+    @staticmethod
+    def __format_tinfo(item):
+        return "{!s}".format(item.dstr())
+
+    def __format_dictionary(self, num_printer, storage, item):
+        storage.append('{')
+        for idx, pair in enumerate(item.items()):
+            if idx > 0:
+                storage.append(', ')
+            self.format_item(num_printer, storage, pair[0])
+            storage.append(": ")
+            self.format_item(num_printer, storage, pair[1])
+        storage.append('}')
+
+    def __format_sequence(self, open, close, num_printer, storage, item):
         storage.append(open)
         for idx, el in enumerate(item):
             if idx > 0:
@@ -973,7 +1026,8 @@ class DisplayHook(object):
             self.format_item(num_printer, storage, el)
         storage.append(close)
 
-    def format_basestring(self, string):
+    @classmethod
+    def __format_basestring(cls, string):
         # FIXME: rather than automatically evaluating the string as we're
         #        currently doing, it'd be much cleaner if we just format the
         #        result from a function with some sort of wrapper object. This
@@ -993,7 +1047,8 @@ class DisplayHook(object):
             result = u"'{!s}'".format(encoded)
         return result
 
-    def format_ctypes(self, num_printer, storage, item):
+    @classmethod
+    def __format_ctypes(cls, num_printer, storage, item):
         cls, size = item.__class__, ctypes.sizeof(item)
         if isinstance(item, ctypes._SimpleCData):
             contents = "{:#0{:d}x}".format(item.value, 2 + 2 * size) if isinstance(item.value, six.integer_types) else "{!s}".format(item.value)
@@ -1005,33 +1060,20 @@ class DisplayHook(object):
         return
 
     def format_item(self, num_printer, storage, item):
-        if item is None or isinstance(item, bool):
-            storage.append("{!s}".format(item))
-        elif isinstance(item, six.string_types):
-            storage.append(self.format_basestring(item))
-        elif isinstance(item, six.integer_types):
-            storage.append(num_printer(item))
-        elif isinstance(item, idaapi.tinfo_t):
-            storage.append("{!s}".format(item.dstr()))
-        elif isinstance(item, (ctypes._SimpleCData, ctypes._Pointer, ctypes._CFuncPtr, ctypes.Array, ctypes.Structure)):
-            self.format_ctypes(num_printer, storage, item)
-        elif item.__class__ is list:
-            self.format_seq(num_printer, storage, item, '[', ']')
-        elif item.__class__ is tuple:
-            self.format_seq(num_printer, storage, item, '(', ')')
-        elif item.__class__ is set:
-            self.format_seq(num_printer, storage, item, 'set([', '])')
-        elif item.__class__ is dict:
-            storage.append('{')
-            for idx, pair in enumerate(item.items()):
-                if idx > 0:
-                    storage.append(', ')
-                self.format_item(num_printer, storage, pair[0])
-                storage.append(": ")
-                self.format_item(num_printer, storage, pair[1])
-            storage.append('}')
-        else:
-            storage.append("{!r}".format(item))
+        item_t = item.__class__
+        native_formatter = self._native_formatters.get(item_t)
+        if native_formatter:
+            return storage.append(native_formatter(item))
+        elif isinstance(item, self._integer_types):
+            return storage.append(num_printer(item))
+        nested_formatter = self._nested_formatters.get(item_t)
+        if nested_formatter:
+            return nested_formatter(num_printer, storage, item)
+        iterable = (formatter for formatter_t, formatter in self._class_formatters.items() if isinstance(item, formatter_t))
+        class_formatter = next(iterable, None)
+        if class_formatter:
+            return class_formatter(num_printer, storage, item)
+        return storage.append("{!r}".format(item))
 
     def displayhook(self, item):
         self.injectable_builtins['_'] = item
