@@ -2755,6 +2755,45 @@ class address(object):
     def bounds(cls, range):
         '''Return the bounds of the specified `range` as a tuple formatted as `(left, right)`.'''
         return interface.bounds_t(*range) if isinstance(range, internal.types.tuple) else interface.range.bounds(range)
+    @utils.multicase(location=interface.location_t)
+    @classmethod
+    def bounds(cls, location):
+        '''Return the bounds of the specified `location` as a tuple formatted as `(left, right)`.'''
+        ea, size = location
+        return interface.bounds_t(ea, ea + size)
+    @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t))
+    @classmethod
+    def bounds(cls, structure):
+        '''Return the bounds of the specified `structure` as a tuple formatted as `(left, right)`.'''
+        sptr = structure.ptr if isinstance(structure, internal.structure.structure_t) else structure
+        size = idaapi.get_struc_size(sptr)
+        if structure is not sptr:
+            offset = structure.offset
+        elif internal.structure.frame(sptr):
+            ea = idaapi.get_func_by_frame(sptr.id)
+            offset = interface.function.frame_offset(ea)
+        else:
+            offset = 0
+        return interface.bounds_t(offset, offset + size)
+    @utils.multicase(member=(idaapi.member_t, internal.structure.member_t))
+    @classmethod
+    def bounds(cls, member):
+        '''Return the bounds of the specified `member` as a tuple formatted as `(left, right)`.'''
+        mptr = member.ptr if isinstance(member, internal.structure.member_t) else member
+        _, fullname, sptr = idaapi.get_member_by_id(mptr.id)
+        size = internal.structure.member.size(mptr)
+        base = member.parent.offset if member is not mptr else interface.function.frame_offset(idaapi.get_func_by_frame(sptr.id)) if internal.structure.frame(sptr) else 0
+        if member is not mptr:
+            offset = member.offset
+        else:
+            offset = base + mptr.soff
+        return interface.bounds_t(offset, offset + size)
+    @utils.multicase(info=idaapi.tinfo_t)
+    @classmethod
+    def bounds(cls, info):
+        '''Return the bounds of the ``idaapi.tinfo_t`` specified in `info` as a tuple that is formatted as `(left, right)`.'''
+        offset, size = 0, info.get_size()
+        return interface.bounds_t(offset, offset + size)
 
     @utils.multicase()
     @classmethod
