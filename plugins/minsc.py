@@ -1033,9 +1033,6 @@ class DisplayHook(object):
         else:
             storage.append("{!r}".format(item))
 
-    def _print_hex(self, x):
-        return "{:#x}".format(x)
-
     def displayhook(self, item):
         self.injectable_builtins['_'] = item
         if item is None or not hasattr(item, '__class__') or item.__class__ is bool:
@@ -1047,20 +1044,27 @@ class DisplayHook(object):
                 import idaapi as ida_idp
             else:
                 import ida_idp
-            num_printer = self._print_hex
+
+            # figure out which number format was chosen. if we
+            # didn't find one, then use hexadecimal by default.
+            num_printer = "{:#x}".format
             dn = ida_idp.ph_get_flag() & ida_idp.PR_DEFNUM
             if dn == ida_idp.PRN_OCT:
-                num_printer = oct
+                num_printer = "{:o}".format
             elif dn == ida_idp.PRN_DEC:
-                num_printer = str
+                num_printer = "{!s}".format
             elif dn == ida_idp.PRN_BIN:
-                num_printer = bin
+                num_printer = "{:#b}".format
+
+            # now we can format the item and render it to output.
             self.format_item(num_printer, storage, item)
             self.output("%s\n" % "".join(storage))
+
         except Exception:
             import traceback
             traceback.print_exc()
             self.orig_displayhook(item)
+        return
 
 # Locate the user's dotfile and execute it within the specified namespace.
 def dotfile(namespace, filename=u'.idapythonrc.py'):
