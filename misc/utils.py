@@ -950,6 +950,14 @@ class multicase(object):
         return
 
     @classmethod
+    def unbiased(cls, packed_parameters, candidates, tree, table):
+        '''Yield the callable and transformed `packed_parameters` from `candidates` using `tree` and `table`.'''
+        for F, index in candidates:
+            args, kargs, bias = cls.critique_and_transform(F, packed_parameters, tree, table)
+            yield F, (args, kargs)
+        return
+
+    @classmethod
     def preordered(cls, packed_parameters, candidates, tree, table):
         '''Yield the callable and transformed `packed_parameters` from `candidates` using `tree` and `table` in the correct order.'''
         results = {}
@@ -1350,7 +1358,7 @@ class multicase(object):
         def F(*arguments, **keywords):
             packed_parameters = arguments, keywords
             candidates = cls.match(packed_parameters, tree, table)
-            iterable = cls.preordered(packed_parameters, candidates, tree, table)
+            iterable = cls.preordered(packed_parameters, candidates, tree, table) if len(candidates) > 1 else cls.unbiased(packed_parameters, candidates, tree, table)
 
             # Extract our first match if we were able to find one. If not, then pass what
             # we tried to match to the missing-hook to complain about it.
