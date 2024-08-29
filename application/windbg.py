@@ -102,6 +102,7 @@ def breakpoints(f=None, **kwargs):
 
     If the string `module` is specified, then use it instead of the current filename when emitting the location.
     If the string `tagname` is provided, then use it to query instead of "break".
+    If the boolean `label` is false, then do not emit the address label as the location.
     """
     tagname = kwargs.get('tagname', 'break')
 
@@ -137,7 +138,7 @@ def breakpoints(f=None, **kwargs):
 
         # create the command that emits the current label
         label_t = string.Template(r'.printf "$label -- $note\n"' if operator.contains(t, '') else r'.printf "$label\n"')
-        commands.append(label_t.safe_substitute(label=label(ea), note=t.get('', '')))
+        commands.append(label_t.safe_substitute(label=label(ea), note=t.get('', ''))) if kwargs.get('label', True) else commands
 
         # append the commands to execute when encountering the given breakpoint
         res = t.get(tagname, ['g'])
@@ -147,8 +148,8 @@ def breakpoints(f=None, **kwargs):
             commands.append(res)
 
         # escape all of the commands since we're going to join them together
-        commands = (escape(cmd) for cmd in commands)
+        commands = [escape(cmd) for cmd in commands]
 
         parameters = next((kwargs[kw] for kw in ['parameters', 'params', 'param'] if kw in kwargs), '')
-        six.print_('bp {:s}{:s} "{:s}"'.format("{:s} ".format(parameters) if parameters else '', reference(ea, **kwargs), escape(';'.join(commands), depth=1)))
+        six.print_('bp {:s}{:s}{:s}'.format("{:s} ".format(parameters) if parameters else '', reference(ea, **kwargs), " \"{:s}\"".format(escape(';'.join(commands), depth=1)) if any(commands) else ''))
     return
