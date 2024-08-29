@@ -19,8 +19,8 @@ integer = six.integer_types
 float = float
 ellipsis = Ellipsis.__class__
 
-# Py2 imports are wonky when the names clash, so we use dunder import
-# to work around Py2's busted import implementation.
+# Py2 imports are wonky when the names clash, so we dunder
+# import to work around Py2's busted import implementation.
 code = __import__('types').CodeType
 function = __import__('types').FunctionType
 method = __import__('types').MethodType
@@ -45,3 +45,8 @@ slice = slice
 bytearray = bytearray
 memoryview = memoryview
 callable = callable
+
+dictionary_keys = {}.keys().__class__
+dictionary_values = {}.values().__class__
+dictionary_items = {}.items().__class__
+dictionary_iterator = dictionary_keys, dictionary_values, dictionary_items
