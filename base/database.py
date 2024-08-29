@@ -7629,7 +7629,7 @@ class set(object):
         # Finally that gives us the actual string size but without the terminator
         # characters.. so, we need to add the terminal character size and then we
         # can dispatch to the right function to create the desired string.
-        bounds = interface.bounds_t(ea, right + width)
+        bounds = interface.bounds_t(ea, right if Fis_terminator(ea) else right + width)
         return cls.string(bounds, width, 0, encoding)
 
     # Each of the implementations that follow are the only ones that are actually
