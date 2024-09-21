@@ -142,6 +142,7 @@ class netnode(object):
     suptag = idaapi.stag
     hashtag = idaapi.htag
     chartag = b'd' if idaapi.__version__ < 7.0 else 0x64    # found while reversing ida's shared library
+    blobtag = b'B' if idaapi.__version__ < 7.0 else 0x42    # taking a guess at what we can use for this
 
 class utils(object):
     """
@@ -703,55 +704,55 @@ class blob(object):
     This namespace is used to interact with the blob assigned to a given netnode.
     """
     @classmethod
-    def has(cls, nodeidx, tag, index=0):
+    def has(cls, nodeidx, index=0, tag=None):
         '''Return whether the node identified by `nodeidx` at the specified `index` has a blob associated with it.'''
         node = utils.get(nodeidx)
-        res = netnode.blobsize(node, index, tag)
+        res = netnode.blobsize(node, index, netnode.blobtag if tag is None else tag)
         return res > 0
 
     @classmethod
-    def get(cls, nodeidx, tag, index=0):
+    def get(cls, nodeidx, index=0, tag=None):
         '''Return the blob stored in `tag` at the specified `index` for the netnode identified by `nodeidx`.'''
         node = utils.get(nodeidx)
-        sz = netnode.blobsize(node, index, tag)
-        res = netnode.getblob(node, index, tag)
+        sz = netnode.blobsize(node, index, netnode.blobtag if tag is None else tag)
+        res = netnode.getblob(node, index, netnode.blobtag if tag is None else tag)
         return None if res is None else res[:sz]
 
     @classmethod
-    def set(cls, nodeidx, tag, value, index=0):
+    def set(cls, nodeidx, index=0, value=b'', tag=None):
         '''Assign the data provided by `value` to the blob stored in `tag` at the specified `index` for the netnode identified by `nodeidx`.'''
         node, value = utils.get(nodeidx), value.tobytes(value) if isinstance(value, memoryview) else internal.types.bytes(value)
-        return netnode.setblob(node, value, index, tag)
+        return netnode.setblob(node, value, index, netnode.blobtag if tag is None else tag)
 
     @classmethod
-    def remove(cls, nodeidx, tag, index=0):
+    def remove(cls, nodeidx, index=0, tag=None):
         '''Remove the data from the blob stored in `tag` at the specified `index` for the netnode identified by `nodeidx`.'''
         node = utils.get(nodeidx)
 
         # first grab the size so that we can verify that there is something to
         # remove. if there's no size, then we can just return a failure.
-        size = netnode.blobsize(node, index, tag)
+        size = netnode.blobsize(node, index, netnode.blobtag if tag is None else tag)
         if not(size > 0):
             return False
 
         # now we can actually remove the blob and then verify that we actually
         # removed something by checking the removed size with our preserved one.
-        removed = netnode.delblob(node, index, tag)
+        removed = netnode.delblob(node, index, netnode.blobtag if tag is None else tag)
         return True if removed > 0 else False
 
     @classmethod
-    def size(cls, nodeidx, tag, index=0):
+    def size(cls, nodeidx, index=0, tag=None):
         '''Return the size of the blob stored in `tag` at the specified `index` for the netnode identified by `nodeidx`.'''
         node = utils.get(nodeidx)
-        return netnode.blobsize(node, index, tag)
+        return netnode.blobsize(node, index, netnode.blobtag if tag is None else tag)
 
     @classmethod
-    def repr(cls, nodeidx, tag, index=0):
+    def repr(cls, nodeidx, index=0, tag=None):
         '''Display the blob stored in `tag` at the specified `index` for the netnode identified by `nodeidx`.'''
-        if cls.size(nodeidx, tag, index) == 0:
+        if cls.size(nodeidx, index, netnode.blobtag if tag is None else tag) == 0:
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}, {!r}, {:#x}) : The specified node ({:s}) does not have a blob at index {:#x} for the given tag ({!r}).".format('.'.join([__name__, cls.__name__]), description, tag, index, description, index, tag))
-        res = cls.get(nodeidx, tag, index)
+        res = cls.get(nodeidx, index, netnode.blobtag if tag is None else tag)
         return "{!r}".format(res)
 
 ### node iteration
