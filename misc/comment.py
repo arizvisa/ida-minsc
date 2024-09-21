@@ -1000,7 +1000,7 @@ class contents(tagging):
         logging.warning(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Overwriting the target netnode \"{!s}\" ({:#x}) using the contents from the source netnode \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), old, new, internal.utils.string.escape(newname, '"'), newnode, internal.utils.string.escape(oldname, '"'), oldnode))
         logging.debug(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Overwriting the new netnode data in {:#x} ({!s}) using the contents from the old netnode at {:#x} ({!s}).".format('.'.join([__name__, cls.__name__]), old, new, newnode, ''.join(map("{:02x}".format, bytearray(newencoded))), oldnode, ''.join(map("{:02x}".format, bytearray(oldencoded)))))
 
-        if not internal.netnode.blob.set(newnode, cls.btag, oldencoded):
+        if not internal.netnode.blob.set(newnode, tag=cls.btag, value=oldencoded):
             logging.critical(u"{:s}._move_netnode_tagcache({:#x}, {:#x}) : Failure trying to copy {:d} byte{:s} of old tagcache \"{!s}\" ({:#x}) for function {:#x} over {:d} byte{:s} of new tagcache \"{!s}\" ({:#x}) for function {:#x}.".format('.'.join([__name__, cls.__name__]), old, new, len(oldencoded), '' if len(oldencoded) == 1 else 's', internal.utils.string.escape(oldname, '"'), oldnode, old, len(newencoded), '' if len(newencoded) == 1 else 's', internal.utils.string.escape(newname, '"'), newnode, new))
 
         # Finally, we can remove the netnode containing the old tagcache since
@@ -1074,14 +1074,14 @@ class contents(tagging):
         # logic is the gateway to fixing issue #198.
         if cls._has_new_tagcache(key):
             name = cls._format_netnode_name(key, ea)
-            return internal.netnode.blob.get(name, cls.btag)
+            return internal.netnode.blob.get(name, tag=cls.btag)
 
         elif not(cls._has_old_tagcache(key)):
             return None
 
         # otherwise, we get the blob for the specified function and return it to
         # the caller so that they can decompress and unmarshall it.
-        return internal.netnode.blob.get(key, cls.btag)
+        return internal.netnode.blob.get(key, tag=cls.btag)
 
     @classmethod
     def _new_tagcache_blob(cls, target, ea):
@@ -1125,12 +1125,12 @@ class contents(tagging):
         if cls._has_new_tagcache(key):
             name = cls._format_netnode_name(key, ea)
             node = internal.netnode.get(name)
-            return internal.netnode.blob.set(node, cls.btag, encoded)
+            return internal.netnode.blob.set(node, tag=cls.btag, value=encoded)
 
         # otherwise, we just write it to the old location of the tag cache. the
         # tagcache should actually be migrated by someone else. so, that makes
         # this logic a fallback in case that other person didn't migrate it yet.
-        return internal.netnode.blob.set(key, cls.btag, encoded)
+        return internal.netnode.blob.set(key, tag=cls.btag, value=encoded)
 
     @classmethod
     def _del_tagcache_blob(cls, target, ea):
@@ -1150,12 +1150,12 @@ class contents(tagging):
         if cls._has_new_tagcache(key):
             name = cls._format_netnode_name(key, ea)
             node = internal.netnode.get(name)
-            return internal.netnode.blob.remove(node, cls.btag)
+            return internal.netnode.blob.remove(node, tag=cls.btag)
 
         # otherwise, we just remove it from the old location. this should only
         # occur if it hasn't been migrated yet as this location conflicts with
         # some of the disassemblers like AArch and AArch64.
-        return internal.netnode.blob.remove(key, cls.btag)
+        return internal.netnode.blob.remove(key, tag=cls.btag)
 
     @classmethod
     def _migrate_tagcache(cls, ea):
@@ -1176,21 +1176,21 @@ class contents(tagging):
         # now we go ahead and grab the blob from the old location in the
         # function's netnode, and then we write it to the new location. if the
         # blob is empty, then we create the new netnode but we leave it alone.
-        encoded = internal.netnode.blob.get(key, cls.btag)
+        encoded = internal.netnode.blob.get(key, tag=cls.btag)
         if encoded is None:
             return True
 
         name = cls._format_netnode_name(key, ea)
         node = internal.netnode.new(name)
 
-        ok = internal.netnode.blob.set(node, cls.btag, encoded)
+        ok = internal.netnode.blob.set(node, tag=cls.btag, value=encoded)
         if not ok:
             logging.info(u"{:s}._migrate_tagcache({:#x}) : Error while writing the following data to the blob cache in \"{:s}\" ({:#x}): {!r}.".format('.'.join([__name__, cls.__name__]), ea, internal.utils.string.repr(value), internal.utils.string.escape(name, '"'), node, encoded))
             raise internal.exceptions.DisassemblerError(u"{:s}._migrate_tagcache({:#x}) : Unable to migrate the contents for address {:#x} from the blob cache ({!s}) in the function associated with the key {:#x} to the new netnode \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea, cls.btag, key, internal.utils.string.escape(name, '"'), node))
 
         # finally, we go ahead and remove the blob that was previously stashed
         # to the netnode for the specified function.
-        ok = internal.netnode.blob.remove(key, cls.btag)
+        ok = internal.netnode.blob.remove(key, tag=cls.btag)
         if not ok:
             logging.warning(u"{:s}._migrate_tagcache({:#x}) : Error while trying to remove the blob data from the tag cache stashed in the function netnode at address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, key))
         return ok
@@ -1280,7 +1280,7 @@ class contents(tagging):
             name = cls._format_netnode_name(key, ea)
             node = internal.netnode.get(name)
             migrating = cls._has_old_tagcache(key)
-            data = " with data ({!s})".format(internal.utils.string.repr(internal.netnode.blob.get(key, cls.btag)))
+            data = " with data ({!s})".format(internal.utils.string.repr(internal.netnode.blob.get(key, tag=cls.btag)))
             logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Failure while {:s} netnode \"{:s}\" ({:#x}) {!s} for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrating to' if migrating else 'creating', internal.utils.string.escape(name, '"'), node, data if migrating else '', key))
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Error while trying to {:s} the tag cache for function {:#x} to an isolated netnode \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), 'migrate' if migrating else 'create', key, internal.utils.string.escape(name, '"'), node))
 
