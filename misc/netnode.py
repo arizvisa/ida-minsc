@@ -746,7 +746,7 @@ class alt(object):
     @classmethod
     def has(cls, nodeidx, index, tag=None):
         '''Return whether the netnode identified by `nodeidx` has an "altval" for the specified `index`.'''
-        return any(index == idx for idx in cls.fiter(nodeidx, tag=tag))
+        return any(index == idx for idx in cls.fiter(nodeidx, tag=netnode.alttag if tag is None else tag))
 
     @classmethod
     def get(cls, nodeidx, index, tag=None):
@@ -830,7 +830,7 @@ class alt(object):
     def repr(cls, nodeidx, tag=None):
         '''Display the "altval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
-        for index, value in cls.fitems(nodeidx, tag=tag):
+        for index, value in cls.fitems(nodeidx, tag=netnode.alttag if tag is None else tag):
             res.append("{0:x} : {1:#x} ({1:d})".format(index, value))
         if not res:
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
@@ -993,7 +993,7 @@ class sup(object):
     def repr(cls, nodeidx, tag=None):
         '''Display the "supval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
-        for index, item in enumerate(cls.fiter(nodeidx, tag=tag)):
+        for index, item in enumerate(cls.fiter(nodeidx, tag=netnode.suptag if tag is None else tag)):
             value = cls.get(nodeidx, item, tag=tag)
             res.append("[{:d}] {:x} : {!r}".format(index, item, value))
         if not res:
@@ -1168,7 +1168,7 @@ class hash(object):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         res = []
         try:
-            l1 = max(len(key or '') for key in cls.fiter(nodeidx, tag=tag))
+            l1 = max(len(key or '') for key in cls.fiter(nodeidx, tag=netnode.hashtag if tag is None else tag))
             l2 = max(len("{!r}".format(cls.get(nodeidx, key, tag=tag))) for key in cls.fiter(nodeidx, tag=tag))
         except ValueError:
             l1, l2 = 0, 2
