@@ -941,7 +941,7 @@ class contents(tagging):
         elif isinstance(key, internal.types.list):
             key, _ = key[0], logging.critical(u"{:s}._read({!r}, {:#x}) : Choosing to read cache from function {:#x} for address {:#x} as it is owned by {:d} function{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), target, ea, key[0], ea, len(key), '' if len(key) == 1 else 's', ', '.join(map("{:#x}".format, key))))
 
-        encdata = internal.netnode.blob.get(key, cls.btag)
+        encdata = internal.netnode.blob.get(key, tag=cls.btag, index=0)
         if encdata is None:
             return None
 
@@ -987,7 +987,7 @@ class contents(tagging):
                     logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove the address {:#x} from the cache header associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, key))
 
             finally:
-                count = internal.netnode.blob.remove(key, cls.btag)
+                count = internal.netnode.blob.remove(key, tag=cls.btag, index=0)
                 logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed {:d} blob{:s} ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), count, '' if count == 1 else 's', cls.btag, key))
 
             return True
@@ -1012,7 +1012,7 @@ class contents(tagging):
             raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         # write blob
-        ok = internal.netnode.blob.set(key, cls.btag, encdata)
+        ok = internal.netnode.blob.set(key, tag=cls.btag, value=encdata, index=0)
         if not ok:
             logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Error while writing the following data to the blob cache: {!r}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), encdata))
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to write the contents for address {:#x} to the blob cache ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
