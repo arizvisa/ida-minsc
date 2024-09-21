@@ -239,7 +239,7 @@ def erase_contents():
     yield total
 
     for idx, ea in enumerate(map(ui.navigation.set, functions)):
-        internal.netnode.blob.remove(ea, tag)
+        internal.netnode.blob.remove(ea, tag=tag, index=0)
         yield idx, ea
     return
 
