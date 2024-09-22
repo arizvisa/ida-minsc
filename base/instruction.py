@@ -230,14 +230,15 @@ def ops_decoder(ea):
     return tuple(map(f, range(ops_count(ea))))
 
 @utils.multicase()
-def ops_access():
+def ops_access(**modifiers):
     '''Return the access type of each operand for the current instruction.'''
-    return ops_access(ui.current.address())
+    return ops_access(ui.current.address(), **modifiers)
 @utils.multicase(ea=types.integer)
-def ops_access(ea):
+def ops_access(ea, **modifiers):
     '''Return the access type of each operand for the instruction at address `ea`.'''
     ea = interface.address.inside(ea)
-    return tuple(interface.instruction.access(ea))
+    iterable = interface.regmatch(**modifiers)(ea) if modifiers else interface.instruction.access(ea)
+    return tuple(iterable)
 
 @utils.multicase()
 def ops_read():
