@@ -8188,7 +8188,8 @@ class set(object):
         if operator.eq(*(interface.address.head(ea) for ea in selection)):
             return cls.array(ui.current.address(), type)
         start, stop = selection
-        return cls.array(interface.bounds_t(start, address.next(stop)), type)
+        maximum = interface.address.clamp_forward(stop)
+        return cls.array(interface.bounds_t(start, address.next(stop) if stop == maximum else maximum), type)
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def array(cls, ea, type):
