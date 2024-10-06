@@ -572,12 +572,14 @@ class OffsetBaseIndexScale(interface.integerish, interface.symbol_t):
 
 @catalog.processor(idaapi.PLFM_386)
 def __newprc__(plfm):
-    '''Intel architecture 32-bit'''
+    '''Intel architecture 32-bit (flat)'''
+    if plfm == idaapi.PLFM_386 and interface.database.bits() == 32: # id == 15
+        return Intel()
+    return
 
-    # XXX: If this module hasn't been loaded properly, then this is because IDA hasn't actually started yet.
-    if not hasattr(database, 'config'):
-        return
-
-    if plfm == idaapi.PLFM_386 and database.config.bits() < 64: # id == 15
+@catalog.processor(idaapi.PLFM_386)
+def __newprc__(plfm):
+    '''Intel architecture 16-bit/32-bit'''
+    if plfm == idaapi.PLFM_386 and interface.database.bits() == 16: # id == 15
         return Intel()
     return
