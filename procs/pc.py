@@ -407,14 +407,13 @@ class operand:
         elif not (auxpref & (aux_use32 | aux_use64)):
 
             # FIXME: Test this thing out whenever a user complains about it.
-            R_bx, R_bp, R_si, R_di, R_sp = (architecture.by_index(name).id for name in ['bx', 'bp', 'si', 'di', 'sp'])
+            R_bx, R_bp, R_si, R_di, R_sp = (architecture.by_name(name).id for name in ['bx', 'bp', 'si', 'di', 'sp'])
             phrase_table = {
-                0: (R_bx, R_si), 1: (R_bx, R_di), 2: (R_bx, None),
-                2: (R_bp, R_si), 3: (R_bp, R_di), 6: (R_bp, None),
-                4: (R_si, None), 5: (R_di, None),-1: (R_sp, None),
+                0: (R_bx, R_si), 2: (R_bp, R_si), 1: (R_bx, R_di),
+                3: (R_bp, R_di), 4: (R_si, None), 5: (R_di, None),
+                7: (R_bx, None), 6: (R_bp, None),-1: (R_sp, None),
             }
             base, index = phrase_table[op.phrase]
-            logging.warning(u"{:s}.phrase({:#x}, {!r}) : {:d}-bit phrases are implemented but untested. If the registers in the phrase (`{:s}`) does not match the operand, please open a new issue.".format('.'.join([__name__, 'operand_types']), insn.ea, op, 16, "[{:s}]".format(architecture.by_index(base).name) if index is None else "[{:s}+{:s}]".format(architecture.by_index(base).name, architecture.by_index(index).name)))
 
         # If there isn't an SIB, then the base register is in op_t.phrase.
         else:
