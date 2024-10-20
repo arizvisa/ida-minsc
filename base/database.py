@@ -8160,13 +8160,21 @@ class set(object):
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def array(cls, ea):
-        '''Set the data at the address `ea` to an array by scanning for continguous types and values.'''
+        '''Set the data at the address `ea` to an array by scanning for contiguous types and values.'''
         original_type, original_length = type.array(ea)
 
         # If the array already has a length, then there really isn't anything to do without
         # explicitly changing the already defined array.. So in essence, we're done here.
         if original_length > 1:
             return get.array(ea, type=original_type, length=original_length)
+        return cls.array(ea, original_type)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def array(cls, bounds):
+        start, stop = bounds
+        original_type, original_length = type.array(start)
+        if original_length > 1:
+            logging.info(u"{:s}.array({:s}) : Resizing the array at the specified address ({:#x}) from {:d} element{:s} to the requested bounds ({:s}).".format('.'.join([__name__, cls.__name__]), bounds, start, original_length, '' if original_length == 1 else 's', bounds))
         return cls.array(ea, original_type)
     @utils.multicase()
     @classmethod
