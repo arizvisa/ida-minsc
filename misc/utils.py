@@ -2153,17 +2153,20 @@ class wrap(object):
         '''Convert `args` into a ``cell`` tuple.'''
         return tuple((pycompat.function.closure((lambda item: lambda : item)(arg))[0]) for arg in args)
 
-    # The classmethods that follow are responsible for assembling the equivalent of
-    # the closure that gets returned from the following python.
+    # The following classmethods are responsible for assembling the equivalent
+    # of the closure being returned from the following python. The difference is
+    # that the number of arguments, types, and their names are being directly
+    # copied from the original callable.
 
     # def wrap(callable, wrapper):
-    #     def result(callable[arg1], callable[arg2], callable[arg3...], *callable[args], **callable[keywords]):
-    #         return wrapper(callable, callable[arg1], callable[arg2], callable[arg3...], *callable[args], **callable[keywords])
+    #     def result(arg1, arg2, arg3, arg4, *args, **kwargs):
+    #         return wrapper(callable, arg1, arg2, arg3, arg4, *args, **kwargs)
     #     return result
 
-    # The reason why we're assembling this directly is so that the returned object
-    # has the _exact_ same arguments (including both wild and keyword arguments)
-    # which allows the documentation to still work properly when it's decorated.
+    # The reason why we're assembling this directly is so that the returned
+    # object has the has the _exact_ same arguments (including both wild and
+    # keyword arguments) which allows python's auto-documentation to still work
+    # exactly the same even thbough it has been decorated.
 
     @classmethod
     def assemble_2x(cls, function, wrapper, bound=False):
@@ -2525,11 +2528,19 @@ class wrap(object):
         # from our closure and warms up Py11's predictor (lol).
         asm(cls.co_assemble('COPY_FREE_VARS', len(co_freevars)))
         asm(cls.co_assemble('RESUME', 0))
-        asm(cls.co_assemble('PUSH_NULL', 0))
 
         # then we push the callable that we need to call to wrap our function.
-        asm(cls.co_assemble('LOAD_DEREF', len(co_varnames) + co_freevars.index('wrapper')))
-        co_stacksize += 1
+        if sys.version_info.minor < 13:
+            asm(cls.co_assemble('PUSH_NULL', 0))
+            asm(cls.co_assemble('LOAD_DEREF', len(co_varnames) + co_freevars.index('wrapper')))
+            co_stacksize += 1
+
+        # python 3.13 seems to swap the order of these. i'm not sure why, but it
+        # seems to prevent it from crashing. so, we do as we're fucking told.
+        else:
+            asm(cls.co_assemble('LOAD_DEREF', len(co_varnames) + co_freevars.index('wrapper')))
+            asm(cls.co_assemble('PUSH_NULL', 0))
+            co_stacksize += 1
 
         ## now we need to pack all of our parameters into a tuple starting with our
         ## `F` parameter which contains the function that's being wrapped.
@@ -2598,6 +2609,16 @@ class wrap(object):
         '''Return a function similar to `callable` that calls `wrapper` with `callable` as the first argument.'''
         cons, f = pycompat.function.constructor(callable), pycompat.function.extract(callable)
         Fassemble = cls.assemble_2x if sys.version_info.major < 3 else cls.assemble_38x if sys.version_info.minor < 9 else cls.assemble_39x if sys.version_info.minor < 11 else cls.assemble_312x
+
+        # figure out the bytecode to use depending on the python version.
+        if sys.version_info.major < 3:
+            Fassemble = cls.assemble_2x
+        elif sys.version_info.minor < 9:
+            Fassemble = cls.assemble_38x
+        elif sys.version_info.minor < 11:
+            Fassemble = cls.assemble_39x
+        else:
+            Fassemble = cls.assemble_312x
 
         # create a wrapper for the function that'll execute `callable` with the function as its first argument, and the rest with any args
         res = Fassemble(callable, wrapper, bound=isinstance(callable, (internal.types.classmethod, internal.types.method)))
