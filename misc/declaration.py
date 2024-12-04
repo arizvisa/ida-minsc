@@ -370,10 +370,11 @@ class extract(object):
         return decl, result
 
     @classmethod
-    def qualifiers(cls, string, range, segments, qualifiers={'const', 'volatile', 'throw()', 'throw(void)', 'noexcept'}):
+    def qualifiers(cls, string, range, segments, qualifiers={'const', 'volatile', 'throw()', 'throw(void)', 'noexcept', '[clone]'}):
         '''Return a tuple containing the selections for the declaration and qualifiers using the given `range` and `segments` with `string`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
         symbols, cuddled = {'', ' ', '*', '&'}, {item for item in itertools.chain((qualifier[qualifier.rindex('('):] for qualifier in qualifiers if qualifier[-1] in ')'))}
+        cuddled_qualifiers = cuddled | qualifiers
 
         # special case: if the whole string is a qualifier, then return it.
         if string[start : stop] in qualifiers:
@@ -403,7 +404,7 @@ class extract(object):
 
             # if it's a candidate qualifier, then peek at the next segment and try
             # to confirm it. if we didn't confirm, then we can abort processing.
-            elif string[left : right] in cuddled:
+            elif string[left : right] in cuddled_qualifiers:
                 pivot, left = leftover[-1] if leftover else (start, start)
                 if string[left : right] not in qualifiers:
                     point = right
