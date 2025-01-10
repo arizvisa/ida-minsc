@@ -7327,6 +7327,26 @@ class instruction(object):
         iterable = (map(functools.partial(operator.add, insn.ea), bounds[index]) for index, _ in enumerate(operands))
         return [bounds_t(*bounds) for bounds in iterable]
 
+    @classmethod
+    def arguments(cls, ea):
+        '''Return the initialization address for each of the parameters being passed to the function reference at `ea`.'''
+        [is_call, is_branch] = (F(ea) for F in [cls.is_call, cls.is_branch])
+        if not (is_call or is_branch):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : The instruction at the specified address ({:#x}) is not a call or branch instruction.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        elif is_branch and not xref.has_code(ea, descend=True):
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.arguments({:#x}) : Unable to return parameters for the branch at the provided address ({:#x}) due to it not having any code references.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        # Grab the argument addresses from the PIT and verify that we got them
+        # if the instruction is a branch instruction. If the instruction is a
+        # call instruction, then we always return some number of parameters.
+        items = idaapi.get_arg_addrs(ea)
+        if items is None and not is_call:
+            raise internal.exceptions.DisassemblerError(u"{:s}.arguments({:#x}) : Unable to retrieve the initialization addresses for the parameters passed to the instruction at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        # If we received a BADADDR for any of the addresses, then replace it.
+        mapped = map(lambda ea: None if ea == idaapi.BADADDR else ea, items or [])
+        return [ea for ea in mapped]
+
 class regmatch(object):
     """
     This namespace is used to assist with doing register matching
