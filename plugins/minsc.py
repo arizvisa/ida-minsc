@@ -679,7 +679,7 @@ class object_proxy(object):
 
         # remove any and all attributes that we added to the proxy's class.
         finally:
-            [delattr(proxy, key) for key in state if key not in cls.attributes.description]
+            [delattr(proxy, key) for key in state if hasattr(proxy, key) and key not in cls.attributes.description]
         state.clear()
 
     @classmethod
