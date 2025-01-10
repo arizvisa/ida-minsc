@@ -2853,21 +2853,16 @@ class frame(object):
         @classmethod
         def location(cls, ea):
             '''Return the list of address locations for each of the parameters that are passed to the function call at `ea`.'''
-            if not any(Finstruction(ea) for Finstruction in [interface.instruction.is_call, interface.instruction.is_branch]):
-                raise E.MissingTypeOrAttribute(u"{:s}.location({:#x}) : The instruction at the specified address ({:#x}) is not a function call.".format('.'.join([__name__, cls.__name__]), ea, ea))
-
-            items = idaapi.get_arg_addrs(ea)
-            if items is None:
-                raise E.DisassemblerError(u"{:s}.location({:#x}) : Unable to retrieve the initialization addresses for the arguments to the function call at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
-            return [ea for ea in items]
+            iterable = interface.instruction.arguments(ea)
+            return [ea for ea in iterable]
         @utils.multicase(ea=types.integer, index=types.integer)
         @classmethod
         def location(cls, ea, index):
             '''Return the initialization address for the parameter at `index` for the function call at `ea`.'''
-            items = cls.location(ea)
-            if not (0 <= index < len(items)):
-                raise E.InvalidTypeOrValueError(u"{:s}.location({:#x}, {:d}) : The requested argument index ({:d}) for the function call at address {:#x} is not within the bounds of the function's arguments ({:d} <= {:d} < {:d}).".format('.'.join([__name__, cls.__name__]), ea, index, index, ea, 0, index, len(items)))
-            return items[index]
+            items = interface.instruction.arguments(ea)
+            if 0 <= index < len(items):
+                return items[index]
+            raise E.InvalidTypeOrValueError(u"{:s}.location({:#x}, {:d}) : The requested argument index ({:d}) for the function reference at address {:#x} is outside the number of available arguments ({:d} <= {:d} < {:d}).".format('.'.join([__name__, cls.__name__]), ea, index, index, ea, 0, index, len(items)))
         locations = utils.alias(location, 'frame.args')
 
         @utils.multicase()
@@ -4370,11 +4365,7 @@ class type(object):
         @classmethod
         def location(cls, ea, index):
             '''Return the address of the parameter at `index` that is passed to the function referenced at the address `ea`.'''
-            if not (interface.xref.has_code(ea, descend=True) and interface.instruction.is_call(ea)):
-                raise E.InvalidTypeOrValueError(u"{:s}.location({:#x}, {:d}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
-
-            # Grab the argument addresses from the PIT and return the one at the specified index.
-            parameters = idaapi.get_arg_addrs(ea)
+            items = interface.instruction.arguments(ea)
             if 0 <= index < len(parameters):
                 return parameters[index]
             raise E.IndexOutOfBoundsError(u"{:s}.location({:#x}, {:d}) : Unable to fetch the address of the specified parameter ({:d}) from the function call at address {:#x} due to only {:d} parameter{:s} being available.".format('.'.join([__name__, 'type', cls.__name__]), ea, index, index, ea, len(parameters), '' if len(parameters) == 1 else 's'))
@@ -4958,10 +4949,8 @@ class type(object):
         @classmethod
         def locations(cls, ea):
             '''Return the address of each of the parameters being passed to the function referenced at address `ea`.'''
-            if not (interface.xref.has_code(ea, descend=True) and interface.instruction.is_call(ea)):
-                raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, 'type', cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
-            items = idaapi.get_arg_addrs(ea)
-            return [] if items is None else [ea for ea in items]
+            iterable = interface.instruction.arguments(ea)
+            return [ea for ea in iterable]
         @utils.multicase(func=(idaapi.func_t, internal.types.integer), ea=internal.types.integer)
         @classmethod
         def locations(cls, func, ea):
@@ -4969,7 +4958,7 @@ class type(object):
             _, callee = interface.addressOfRuntimeOrStatic(func)
             refs = {ref for ref in interface.xref.any(callee, False)}
             if ea not in refs:
-                logging.warning(u"{:s}.arguments({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, 'type', cls.__name__]), func, ea, address(func), ea))
+                logging.warning(u"{:s}.locations({!r}, {:#x}) : Ignoring the provided function ({:#x}) as the specified reference ({:#x}) is not referring to it.".format('.'.join([__name__, 'type', cls.__name__]), func, ea, address(func), ea))
             return cls.locations(ea)
         location = utils.alias(locations, 'type.arguments')
 
@@ -5223,10 +5212,8 @@ class xref(object):
     @classmethod
     def arguments(cls, ea):
         '''Return a list of addresses for the parameters being passed to the function reference at address `ea`.'''
-        if not (interface.xref.has_code(ea, True) and interface.instruction.is_call(ea)):
-            raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the given address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if interface.instruction.is_call(ea) else 'is not a call instruction with'))
-        items = idaapi.get_arg_addrs(ea) or []
-        return [(None if ea == idaapi.BADADDR else ea) for ea in items]
+        iterable = interface.instruction.arguments(ea)
+        return [ea for ea in iterable]
     args = utils.alias(arguments, 'xref')
 
 x = xref    # XXX: ns alias
