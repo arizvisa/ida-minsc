@@ -7405,6 +7405,17 @@ class set(object):
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
         return size if ok and type.unknown(ea, size) else interface.address.size(ea) if type.unknown(ea) else 0
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def unknown(cls, bounds):
+        '''Set the data within the specified `bounds` to undefined.'''
+        start, stop = sorted(bounds)
+        size = stop - start
+        if idaapi.__version__ < 7.0:
+            ok = idaapi.do_unknown_range(start, size, idaapi.DOUNK_SIMPLE)
+        else:
+            ok = idaapi.del_items(start, idaapi.DELIT_SIMPLE, size)
+        return size if ok and type.unknown(start, size) else interface.address.size(start) if type.unknown(start) else 0
     @utils.multicase(ea=internal.types.integer, size=internal.types.integer)
     @classmethod
     def unknown(cls, ea, size):
@@ -7419,12 +7430,12 @@ class set(object):
     @utils.multicase()
     @classmethod
     def code(cls):
-        '''Set the data at the current address to code.'''
+        '''Set the type at the current address to code.'''
         return cls.code(ui.current.address())
     @utils.multicase(ea=internal.types.integer)
     @classmethod
     def code(cls, ea):
-        '''Set the data at address `ea` to code.'''
+        '''Set the type at address `ea` to code.'''
         if idaapi.__version__ < 7.0:
             return idaapi.create_insn(ea)
 
@@ -7434,6 +7445,14 @@ class set(object):
         except TypeError:
             pass
         return idaapi.create_insn(res, ea)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def code(cls, bounds):
+        '''Set the range within the specified `bounds` to code.'''
+        raise NotImplementedError
+        if idaapi.__version__ < 7.0:
+            return idaapi.create_insn(ea)
+        res = idaapi.insn_t()
 
     @utils.multicase(size=internal.types.integer)
     @classmethod
