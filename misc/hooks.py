@@ -1499,6 +1499,7 @@ class extra_cmt(changingchanged):
 ### individual tags
 def item_color_changed(ea, color):
     '''This hook is for when a color is applied to an address.'''
+    DEFCOLOR = 0xffffffff
 
     # First make sure it's not an identifier, as if it is then we
     # need to terminate early because the tag cache doesn't care
@@ -1510,13 +1511,16 @@ def item_color_changed(ea, color):
     # that we can look it up to see if we need to remove it or add it.
     ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
-    # FIXME: we need to figure out if the color is being changed,
-    #        updated, or removed. since there's no way to determine
-    #        this accurately, we just assume that any color is going
-    #        to increase the reference count.
+    # FIXME: we need to figure out if the color is being changed, updated or
+    #        removed. unfortunately, the event we receive only happens after the
+    #        color has been applied. this means that there's just no way to
+    #        identify whether an already existing color is being changed to
+    #        another color resulting in the reference count always being
+    #        incremented. ideally, we could work around this if the tagging
+    #        backend was actually updated to track more than just tag counts.
 
     # If the color was restored, then we need to decrease its ref.
-    if color in {idaapi.COLOR_DEFAULT}:
+    if color in {DEFCOLOR}:
         ctx.dec(ea, '__color__')
 
     # The color is being applied, so we can just increase its reference.
@@ -1721,7 +1725,7 @@ def add_func(pfn):
 
 def remove_contents(fn, iterable):
     '''This is just a utility that manually removes the contents from a function using an iterator of addresses.'''
-    func, results = interface.range.start(fn), {}
+    func, results, DEFCOLOR = interface.range.start(fn), {}, 0xffffffff
 
     # Iterate through each address we were given and decode the contents tags directly
     # using IDAPython, since none of these addresses are accessible via our api.
@@ -1740,7 +1744,7 @@ def remove_contents(fn, iterable):
 
         # Now we need to do a couple of the implicit tags which means we need to
         # check the name, type information, and color.
-        if idaapi.get_item_color(ea) == idaapi.COLOR_DEFAULT:
+        if idaapi.get_item_color(ea) == DEFCOLOR:
             internal.comment.contents.dec(ea, '__color__', target=func)
         if internal.comment.extra.get_prefix(ea) is not None:
             internal.comment.contents.dec(ea, '__extra_prefix__', target=func)
@@ -1800,7 +1804,8 @@ def del_func(pfn):
         [ internal.comment.globals.dec(fn, k) for k in nonrepeatable ]
 
         # We also need to handle any implicit tags as well to be properly done.
-        if pfn.color == idaapi.COLOR_DEFAULT:
+        DEFCOLOR = 0xffffffff
+        if pfn.color == DEFCOLOR:
             internal.comment.globals.dec(fn, '__color__')
 
         get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
