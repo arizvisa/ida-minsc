@@ -1689,7 +1689,7 @@ class members(object):
 
             # if we couldn't shrink it, then we avoid updating the size and log a warning.
             else:
-                logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove space ({:d}) {:s} of {:s} after removing member \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', location_description, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(mname, '"'), mid))
+                logging.warning(u"{:s}.remove_slice({:#x}, {!s}{:s}) : Unable to remove space ({:d}) from {:s} after removing member \"{:s}\" ({:#x}) at {:s}.".format('.'.join([__name__, cls.__name__]), sptr.id, slice, ", {:+#x}".format(base) if offset else '', msize, 'union' if union(sptr) else 'frame' if frame(sptr) else 'structure', utils.string.escape(mname, '"'), mid, location_description))
                 failed.add((mid, moffset))
             continue
 
