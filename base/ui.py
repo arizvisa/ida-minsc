@@ -209,7 +209,7 @@ class ask(object):
     def identifier(cls, message, **default):
         '''Request the user provide an identifier in the form of a string using the specified `message` as the prompt.'''
         key = next((k for k in ['default', 'text', 'string'] if k in default), None)
-        dflt = default[key] if key in default else current.symbol()
+        dflt = default[key] if key in default else current.symbol() or u''
         result = idaapi.ask_str(internal.utils.string.to(dflt), idaapi.HIST_IDENT, internal.utils.string.to(message))
         return internal.utils.string.of(result)
 
