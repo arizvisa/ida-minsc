@@ -8755,8 +8755,8 @@ class function(object):
             result = cls.by_address(int(func))
         elif isinstance(func, internal.types.string):
             result = cls.by_name(func)
-        elif isinstance(func, idaapi.struc_t):
-            result = cls.by_frame(func)
+        elif isinstance(func, (idaapi.struc_t, internal.structure.structure_t)):
+            result = cls.by_frame(func if isinstance(func, idaapi.struc_t) else func.ptr)
         else:
             result = None
 
