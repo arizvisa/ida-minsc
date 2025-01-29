@@ -114,7 +114,9 @@ def offset():
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def offset(func):
     '''Return the offset of the function `func` from the base address of the database.'''
-    return offset(func, 0)
+    res = interface.function.by(func)
+    ea = interface.range.start(res)
+    return interface.address.offset(ea)
 @utils.multicase(func=(idaapi.func_t, types.integer), offset=types.integer)
 def offset(func, offset):
     '''Return the offset of the function `func` from the base address of the database and add the provided `offset` to it.'''
@@ -128,6 +130,14 @@ def offset(name, *suffix):
     res = (name,) + suffix
     func = interface.function.by(interface.tuplename(*res))
     ea = interface.range.start(func)
+    return interface.address.offset(ea)
+@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+def offset(frame):
+    '''Return the offset from the base address of the database for the function that owns the specified `frame`.'''
+    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    if res is None:
+        raise interface.function.missing(frame)
+    ea = interface.range.start(res)
     return interface.address.offset(ea)
 
 ## properties
@@ -186,6 +196,13 @@ def name():
 def name(func):
     '''Return the name of the function `func`.'''
     return interface.function.name(func)
+@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+def name(frame):
+    '''Return the name of the function that is owned by the specified `frame`.'''
+    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    if res is None:
+        raise interface.function.missing(frame)
+    return interface.function.name(res)
 @utils.multicase(none=types.none)
 def name(none, **flags):
     '''Remove the custom-name from the current function.'''
@@ -298,7 +315,8 @@ def address():
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def address(func):
     '''Return the address for the entrypoint belonging to the function `func`.'''
-    return address(func, 0)
+    res = interface.function.by(func)
+    return interface.range.start(res)
 @utils.multicase(func=(idaapi.func_t, types.integer), offset=types.integer)
 def address(func, offset):
     '''Return the address for the entrypoint belonging to the function `func` and add the provided `offset` to it.'''
@@ -310,6 +328,13 @@ def address(name, *suffix):
     '''Return the address for the entrypoint belonging to the function with the given `name`.'''
     res = (name,) + suffix
     res = interface.function.by(interface.tuplename(*res))
+    return interface.range.start(res)
+@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+def address(frame):
+    '''Return the address for the entrypoint of the function that owns the specified `frame`.'''
+    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    if res is None:
+        raise interface.function.missing(frame)
     return interface.range.start(res)
 top = addr = utils.alias(address)
 
@@ -330,6 +355,13 @@ def bottom(func):
         interface.fc_block_type_t.fcb_error
     )
     return tuple(database.address.prev(interface.range.end(item)) for item in fc if item.type in exit_types)
+@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+def bottom(frame):
+    '''Return the exit-points of the function that owns the specified `frame`.'''
+    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    if res is None:
+        raise interface.function.missing(frame)
+    return bottom(res)
 
 @utils.multicase()
 def marks():
