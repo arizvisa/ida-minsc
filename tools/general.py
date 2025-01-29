@@ -68,6 +68,8 @@ class remote(object):
 
     def get(self, ea):
         '''Translate a remote address to the local database address.'''
+        if isinstance(ea, internal.types.string):
+            ea = int(ea, 16)
         offset = ea - self.rbase
         return offset + self.lbase
 
