@@ -2104,48 +2104,48 @@ class block(object):
     @utils.multicase()
     @classmethod
     def before(cls):
-        '''Return the addresses of all the instructions that branch to the current basic block.'''
+        '''Return the address for each instruction that will be executed before the current basic block.'''
         return cls.before(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
     def before(cls, ea):
-        '''Return the addresses of all the instructions that branch to the basic block at address `ea`.'''
+        '''Return the address for each instruction that will be executed before the basic block at address `ea`.'''
         res = blocks.at(ea)
         return cls.before(res)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def before(cls, bounds):
-        '''Return the addresses of all the instructions that branch to the basic block identified by `bounds`.'''
+        '''Return the address for each instruction that will be executed before the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.before(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def before(cls, bb):
-        '''Return the addresses of all the instructions that branch to the basic block `bb`.'''
+        '''Return the address for each instruction that will be executed before the basic block `bb`.'''
         return [ idaapi.prev_not_tail(interface.range.end(bb)) for bb in bb.preds() ]
     predecessors = preds = utils.alias(before, 'block')
 
     @utils.multicase()
     @classmethod
     def after(cls):
-        '''Return the addresses of all the instructions that the current basic block leaves to.'''
+        '''Return the address for each instruction that will follow the execution of the current basic block.'''
         return cls.after(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
     def after(cls, ea):
-        '''Return the addresses of all the instructions that the basic block at address `ea` leaves to.'''
+        '''Return the address for each instruction that will follow the execution of the basic block at address `ea`.'''
         bb = cls.at(ea)
         return cls.after(bb)
     @utils.multicase(bounds=interface.bounds_t)
     @classmethod
     def after(cls, bounds):
-        '''Return the addresses of all the instructions that branch to the basic block identified by `bounds`.'''
+        '''Return the address for each instruction that will follow the execution of the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.after(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def after(cls, bb):
-        '''Return the addresses of all the instructions that branch to the basic block `bb`.'''
+        '''Return the address for each instruction that will follow the execution of basic block `bb`.'''
         return [interface.range.start(bb) for bb in bb.succs()]
     successors = succs = utils.alias(after, 'block')
 
