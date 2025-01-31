@@ -37,8 +37,16 @@ class map_t(object):
         raise AttributeError(name)
 
     def __setattr__(self, name, register):
-        res = self.__state__
+        cls, res = self.__class__, self.__state__
+        if not isinstance(register, interface.register_t):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.__setattr__({!r}, {!r}) : Refusing to assign an invalid type ({!s}) to the current architecture as the \"{:s}\" register.".format('.'.join([cls.__module__, cls.__name__]), name, register, register.__class__, internal.utils.string.escape(name, '"')))
+        elif name in res and hash(res[name]) != hash(register):
+            raise internal.exceptions.DuplicateItemError(u"{:s}.__setattr__({!r}, {!r}) : Refusing to assign an alternative register ({!r}) to the current architecture as \"{:s}\" due to it having already been defined.".format('.'.join([cls.__module__, cls.__name__]), name, register, register, internal.utils.string.escape(name, '"')))
         return res.__setitem__(name, register)
+
+    def __delattr__(self, name):
+        cls, res = self.__class__, self.__state__
+        raise internal.exceptions.UnsupportedCapability(u"{:s}.__delattr__({!r}) : Refusing to remove the \"{:s}\" register from the current architecture.".format('.'.join([cls.__module__, cls.__name__]), name, internal.utils.string.escape(name, '"')))
 
     def __contains__(self, name):
         return name in self.__state__
