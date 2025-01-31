@@ -2151,6 +2151,57 @@ class block(object):
 
     @utils.multicase()
     @classmethod
+    def previous(cls):
+        '''Return the basic block that is previous (contiguously) of the current basic block.'''
+        left, right = cls()
+        return cls(left - 1)
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def previous(cls, ea):
+        '''Return the basic block that is previous (contiguously) of the basic block at address `ea`.'''
+        left, right = cls(ea)
+        return cls(left - 1)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def previous(cls, bounds):
+        '''Return the basic block that is previous (contiguously) of the basic block identified by `bounds`.'''
+        left, right = cls(bounds)
+        return cls(left - 1)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def previous(cls, bb):
+        '''Return the basic block that is previous (contiguously) of the basic block `bb`.'''
+        left, right = cls(bb)
+        return cls(left - 1)
+    prev = utils.alias(previous, 'block')
+
+    @utils.multicase()
+    @classmethod
+    def next(cls):
+        '''Return the basic block that is after (contiguously) the current basic block.'''
+        left, right = cls()
+        return cls(right)
+    @utils.multicase(ea=types.integer)
+    @classmethod
+    def next(cls, ea):
+        '''Return the basic block that is after (contiguously) the basic block at address `ea`.'''
+        left, right = cls(ea)
+        return cls(right)
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def next(cls, bounds):
+        '''Return the basic block that is after (contiguously) the basic block identified by `bounds`.'''
+        left, right = cls(bounds)
+        return cls.at(right)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def next(cls, bb):
+        '''Return the basic block that is after (contiguously) the basic block `bb`.'''
+        left, right = cls(bb)
+        return cls.at(right)
+
+    @utils.multicase()
+    @classmethod
     def iterate(cls):
         '''Yield all the addresses in the current basic block.'''
         return cls.iterate(ui.current.address())
