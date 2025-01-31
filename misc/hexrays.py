@@ -703,7 +703,7 @@ class function(object):
     def by(cls, function, *flags):
         '''Decompile the specified `function` using the given `flags` and return an ``idaapi.cfuncptr_t``.'''
         fn = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else function
-        return cls.by_function(fn) if isinstance(fn, idaapi.func_t) else cls.by_address(fn)
+        return cls.by_function(fn, *flags) if isinstance(fn, idaapi.func_t) else cls.by_address(fn, *flags)
 
     @classmethod
     def address(cls, function):
