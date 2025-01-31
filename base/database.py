@@ -1042,9 +1042,16 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
     def __iterate__(cls, **type):
         iterable = (idx for idx in builtins.range(idaapi.get_nlist_size()))
+        # XXX: it seems that there's a weird situation where a name can exist at
+        #      address 0 which causes the get_nlist_name api to return None as
+        #      its result. To avoid any possible situation where that might
+        #      happen, we filter our iterable for indices where the address can
+        #      actually be contained in the database.
+        start, stop = interface.address.bounds()
+        filtered = (idx for idx in iterable if start <= idaapi.get_nlist_ea(idx) < stop)
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
-            iterable = cls.__matcher__.match(key, value, iterable)
-        for item in iterable: yield item
+            filtered = cls.__matcher__.match(key, value, filtered)
+        for item in filtered: yield item
 
     @utils.multicase(name=internal.types.string)
     @classmethod
