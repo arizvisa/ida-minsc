@@ -699,6 +699,10 @@ class function(object):
         if res is None:
             ea = cls.address(func)
             raise exceptions.DisassemblerError(u"{:s}.by_function({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
+
+        # XXX: to ensure that the ctree is immediately available for the
+        #      decompiled function, we use the get_pseudocode() method.
+        discarded = res.get_pseudocode()
         return res
 
     @classmethod
