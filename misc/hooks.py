@@ -2242,6 +2242,24 @@ def make_ida_not_suck_cocks(nw_code):
         hook.ui.add('plugin_loaded', hook.hx.__plugin_loaded__, -10000)
         hook.ui.add('plugin_unloading', hook.hx.__plugin_unloading__, +10000)
 
+    # add any hooks that are required to automatically prepare the
+    # microarchitecture module that is tied to the decompiler.
+    if hasattr(hook, 'hx'):
+        micro = catalog.microarchitecture
+
+        # only enable the module if the decompiler is loaded and enabled.
+        hook.ui.add('plugin_loaded', micro.__plugin_loaded__, -10000)
+        hook.ui.add('plugin_unloading', micro.__plugin_unloading__, +10000)
+
+        # update the microarchitecture module whenever the processor changes.
+        if idaapi.__version__ >= 7.0:
+            scheduler.default(hook.idp, 'ev_newprc', micro.ev_newprc, 0)
+        elif idaapi.__version__ >= 6.9:
+            scheduler.default(hook.idp, 'newprc', micro.newprc, 0)
+        else:
+            scheduler.default(hook.notification, idaapi.NW_OPENIDB, micro.nw_newprc, -10)
+        del(micro)
+
     ## just some debugging notification hooks
     #[ hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
     #[ hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
