@@ -1007,11 +1007,31 @@ class module(object):
     the currently chosen architecture and expose tools that may be used
     internally by the plugin.
     """
-    __slots__ = {'__processor__', '__operand__', '__update__'}
-    def __init__(self, update):
+    __slots__ = {'__processor__', '__operand__', '__update__', '__lazyattributes__', '__attributes__'}
+    def __init__(self, update, **constructors):
         self.__processor__ = processors()
         self.__operand__ = operands()
         self.__update__ = update
+
+        # the following is a hack that allows us to attach arbitrary objects to
+        # this class as an attribute by providing the constructor for it.
+        self.__lazyattributes__ = constructors
+        self.__attributes__ = {}
+
+    def __getattr__(self, attribute):
+        if attribute in self.__attributes__:
+            return self.__attributes__[attribute]
+
+        # If the attribute wasn't cached, but we have a constructor for it, then
+        # call it (if it's callable) and assign the new instance to our cache.
+        elif attribute in self.__lazyattributes__:
+            cons = self.__lazyattributes__[attribute]
+            res = cons() if callable(cons) else cons
+            self.__attributes__[attribute] = res
+            return res
+
+        cls = self.__class__
+        raise AttributeError("{!r} object has no attribute {!r}".format(cls.__name__, attribute))
 
     @property
     def processor(self):
