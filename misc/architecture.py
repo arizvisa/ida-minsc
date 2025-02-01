@@ -907,6 +907,130 @@ else:
 
     logging.debug(u"{:s} : Successfully defined Hex-Rays (decompiler) microcode architecture.".format(__name__))
 
+class microarchitecture_attribute(object):
+    """
+    This class is basically a place for containing whatever `uarchitecture_t`
+    is currently instantiated. This way a hook can be used to synchronize it
+    with whatever architecture is being used by the decompiler. If the
+    decompiler is not available, then this class doesn't do anything.
+
+    This class is similar to the `module` class found at the end of this file.
+    """
+
+    __slots__ = {'__object__', '__update__', '__hexrays_module__', '__hexrays_ready__'}
+    def __init__(self, update):
+        self.__update__ = update
+
+        # First we'll do a smoke-test to ensure the Hexrays api is accessible
+        # and then preserve it as an attribute. This way we'll always have it
+        # available when the processor changes.
+        try:
+            import ida_hexrays
+        except Exception:
+            cls = self.__class__
+            raise internal.exceptions.UnsupportedCapability(u"{:s} : Unable to instantiate class due to missing module ({:s}).".format('.'.join([__name__, cls.__name__]), 'ida_hexrays'))
+        else:
+            self.__hexrays_module__ = module = ida_hexrays
+        finally:
+            self.__hexrays_ready__ = False
+
+        # Now we'll instantiate a dummy type and use it to update our proxy.
+        reason = 'no processor' if hasattr(self, '__hexrays_module__') else 'no decompiler'
+        complaint = 'no processor being selected' if hasattr(self, '__hexrays_module__') else 'the decompiler being unavailable'
+        description = '''
+        Microarchitecture module ({:s})
+
+        This module contains utilities for interacting with the microregisters
+        that are used by the decompiler. These registers are based on the
+        registers that are available in the processor selected by the database.
+
+        Due to {:s}, this module is currently empty.
+        '''.format(reason, complaint)
+        instance_t = type('uarchitecture_t', (object,), {'__doc__': description})
+
+        self.__object__ = instance = instance_t()
+        self.__update__(instance)
+
+    @property
+    def object(self):
+        '''Return the current instance that is contained within this class.'''
+        return self.__object__
+
+    ## The following hooks are for ensuring that this class will only work when
+    ## the decompiler plugin has been loaded and initialized. This is done by
+    ## toggling the "__hexrays_ready__" attribute.
+
+    __plugin_required = {'Hex-Rays Decompiler'}
+    def __plugin_loaded__(self, plugin_info):
+        if plugin_info.name not in self.__plugin_required:
+            return
+
+        # If there was no module assigned during instantiation, then we really
+        # can't do anything here.
+        elif not hasattr(self, '__hexrays_module__'):
+            return
+
+        # Now that the plugin has been loaded and the hexrays module assigned,
+        # we'll use the module to attempt initialization.
+        module = self.__hexrays_module__
+        if not module.init_hexrays_plugin():
+            cls = self.__class__
+            raise internal.exceptions.DisassemblerError(u"{:s} : Failure while trying initialize the Hex-Rays plugin ({:s}).".format('.'.join([__name__, cls.__name__]), 'init_hexrays_plugin'))
+
+        # If that was successful, then we can turn on this class and leave.
+        self.__hexrays_ready__ = True
+
+    def __plugin_unloading__(self, plugin_info):
+        plugin_name = {'Hex-Rays Decompiler'}
+        if plugin_info.name not in self.__plugin_required:
+            return
+
+        # If there was no module assigned for the api, then abort.
+        elif not hasattr(self, '__hexrays_module__'):
+            return
+
+        # Now we need to turn off the class, by marking our flag as not ready,
+        # and then clear the instance from the proxy module.
+        self.__hexrays_ready__ = False
+        self.__update__(None)
+
+    ## The next set of hooks is used to actually instantiate the uarchitecture
+    ## whenever the processor gets changed. We're assuming that the decompiler
+    ## will also switch. Afterwards, we preserve a reference to the new instance
+    ## so that we can send it to our microarchitecture proxy module.
+
+    # XXX: It's important that we execute our processor hook _after_ the regular
+    #      architecture was chosen since we base the microarchitecture one on
+    #      whatever the contents are of the architecture module.
+
+    def nw_newprc(self, nw_code, is_old_database):
+        pnum = idaapi.ph_get_id()
+        return self.newprc(pnum)
+
+    def ev_newprc(self, pnum, keep_cfg):
+        return self.newprc(pnum)
+
+    def newprc(self, id):
+        """
+        Instantiate a `uarchitecture_t` using whatever architecture is loaded
+        into the `architecture` proxy, and preserve its instance in our class.
+        """
+        if not hasattr(self, '__hexrays_module__'):
+            return
+
+        # If the Hexrays plugin is not ready, then we don't have to do anything.
+        elif not self.__hexrays_ready__:
+            return
+
+        # Now we can just import the currently selected architecture from the
+        # proxy module, and then use it to instantiate our object.
+        import architecture
+        instance = uarchitecture_t(architecture)
+
+        # Preserve our reference to it, and then send it to the proxy module.
+        self.__object__ = instance
+        self.__update__(instance)
+
 class operands(object):
     """
     This object is a registration table for the operand type decoders
