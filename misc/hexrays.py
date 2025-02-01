@@ -596,6 +596,17 @@ class variables(object):
             yield variable.new_locator(lvar.defea, lvar.location)
         return
 
+    @classmethod
+    def get(cls, *args):
+        '''Return an ``ida_hexrays.lvar_t`` for the variable identified by the given `args`.'''
+        locator = cls.by(*args)
+        ea, lvars = function.address(locator.defea), cls(locator.defea)
+        lvar = lvars.find(locator)
+        if lvar is None:
+            description = variable.repr_locator(locator)
+            raise exceptions.ItemNotFoundError(u"{:s}.get({:#x}, {:s}) : Unable to find the variable for the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
+        return lvar
+
 class variable(object):
     """
     This namespace contains utilities that are related to an individual variable
