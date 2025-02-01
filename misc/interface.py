@@ -9232,6 +9232,57 @@ class function(object):
             [[idaapi.auto_unmark(*range + (queue,)) for queue in marks] for range in ranges]
         return ok
 
+    @classmethod
+    def points(cls, func, ea):
+        '''Yield the `(address, delta)` for each stack point from the chunk containing the address `ea` in the function `func`.'''
+        fn, ch = cls.by(func), idaapi.get_fchunk(ea)
+
+        # If we were unable to get the function chunk for the provided address,
+        # then (obviously) there aren't any stack deltas for what was requested.
+        if ch is None:
+            return
+
+        # If this is a function tail, then we need to use the function we got
+        # to filter out just the desired addresses and get their stackpoints.
+        if ch.flags & idaapi.FUNC_TAIL and hasattr(getattr(fn, 'points', None), '__getitem__'):
+            Fcontains, owner = range.bounds(ch).contains, fn
+
+            # Now all we need to do is to grab all of the stack points for
+            # the function, and filter them by our chunk's boundaries.
+            points = (owner.points[index] for index in builtins.range(owner.pntqty))
+            iterable = ((point.ea, point.spd) for point in points if Fcontains(point.ea))
+
+        # A non-tail just requires us to iterate through the points stored in the
+        # chunk, so we can yield the address and delta for each individual point.
+        elif hasattr(ch, 'points') and hasattr(ch.points, '__getitem__'):
+            points = (ch.points[index] for index in builtins.range(ch.pntqty))
+            iterable = ((point.ea, point.spd) for point in points)
+
+        # If we were completely unable to access the correct attributes, then we
+        # need to do all of the work ourselves. We walk the entire function, filter
+        # for deltas in our chunk, sort them, and then yield each of them one-by-one.
+        else:
+            spd, points = 0, {}
+            for start, stop in map(range.unpack, cls.chunks(fn)):
+                for ea in address.items(start, stop):
+                    if address.flags(ea, idaapi.MS_CLS) != idaapi.FF_CODE:
+                        continue
+
+                    res = idaapi.get_spd(fn, ea)
+                    if res != spd:
+                        points[ea] = spd = res
+                    continue
+                continue
+
+            filtered = filter(range.bounds(ch).contains, points)
+            iterable = ((ea, points[ea]) for ea in sorted(filtered))
+
+        # We have our iterator of points, so all we need to do is to unpack each
+        # one and yield it to our caller.
+        for ea, spd in iterable:
+            yield ea, spd
+        return
+
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
