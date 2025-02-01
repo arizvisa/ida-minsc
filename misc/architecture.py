@@ -1013,6 +1013,21 @@ class module(object):
         self.__operand__ = operands()
         self.__update__ = update
 
+        # create a temporary instance containing basic documentation that can be
+        # sent to the proxy and help'd when no architecture has been selected.
+        description = '''
+        Architecture module (no processor)
+
+        This module contains utilities for interacting with the registers
+        available for the current processor selected by the database. This can
+        allow for querying the dimensions or relationships of said registers.
+
+        Due to no processor having been selected, this module is empty.
+        '''
+        instance_t = type('architecture_t', (object,), {'__doc__': description})
+        instance = instance_t()
+        update(instance)
+
         # the following is a hack that allows us to attach arbitrary objects to
         # this class as an attribute by providing the constructor for it.
         self.__lazyattributes__ = constructors
