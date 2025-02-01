@@ -899,9 +899,26 @@ def finders():
     catalog_proxy = internal_proxy('architecture', 'architecture')
     yield catalog_proxy
 
-    # private (catalog) api that updates its proxy
+    # public microcode architecture api for the decompiler as a proxy that gets
+    # updated when hexrays gets initialized.
+    micro_proxy = internal_proxy('microarchitecture', 'microarchitecture')
+    yield micro_proxy
+
+    # create some callables that we will use to update both the catalog_proxy
+    # and micro_proxy modules. we need to attach the micro_proxy container to
+    # the catalog, so we do it as a lazy-constructed attribute.
+    def Fmicro_proxy_container(update=micro_proxy.update_module):
+        internal = __import__('internal.architecture')
+        return internal.architecture.microarchitecture_attribute(update)
+
+    def Fupdate_catalog_proxy(update=catalog_proxy.update_module, micro=Fmicro_proxy_container):
+        internal = __import__('internal.architecture')
+        return internal.architecture.module(update, microarchitecture=micro)
+
+    # private (catalog) api that updates its proxy. we also stash a reference to
+    # the microcode architecture container so that hooks can update that too.
     documentation = 'This virtual module maintains the currently registered architectures supported by the plugin.'
-    catalog = internal_object('__catalog__', lambda update=catalog_proxy.update_module: __import__('internal.architecture').architecture.module(update), __name__='catalog', __doc__=documentation)
+    catalog = internal_object('__catalog__', Fupdate_catalog_proxy, __name__='catalog', __doc__=documentation)
     yield catalog
 
     # public api
