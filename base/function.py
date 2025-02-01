@@ -462,7 +462,7 @@ class chunks(object):
     @classmethod
     def iterate(cls, func):
         '''Iterate through all the instructions for each chunk in the function `func`.'''
-        for start, end in cls(func):
+        for start, end in map(interface.range.bounds, interface.function.chunks(func)):
             for ea in interface.address.items(start, end):
                 if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
                     yield ea
@@ -697,7 +697,7 @@ class chunk(object):
     @utils.multicase(ea=types.integer)
     def __new__(cls, ea):
         '''Return a tuple containing the bounds of the function chunk at the address `ea`.'''
-        area = cls.at(ea, ea)
+        area = interface.function.chunk(ea, ea)
         return interface.range.bounds(area)
 
     @utils.multicase()
@@ -772,7 +772,7 @@ class chunk(object):
     @classmethod
     def iterate(cls, ea):
         '''Iterate through all the instructions for the function chunk containing the address ``ea``.'''
-        start, end = cls(ea)
+        start, end = interface.range.bounds(interface.function.chunk(ea, ea))
         for ea in interface.address.items(start, end):
             if interface.address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
                 yield ea
@@ -856,20 +856,18 @@ class chunk(object):
     @classmethod
     def top(cls):
         '''Return the top address of the chunk at the current address.'''
-        left, _ = cls()
-        return left
+        ea = ui.current.address()
+        return interface.range.start(interface.function.chunk(ea, ea))
     @utils.multicase(ea=types.integer)
     @classmethod
     def top(cls, ea):
         '''Return the top address of the chunk at address `ea`.'''
-        left, _ = cls(ea)
-        return left
+        return interface.range.start(interface.function.chunk(ea, ea))
     @utils.multicase(ea=types.integer, address=types.integer)
     @classmethod
     def top(cls, ea, address):
         '''Change the top address of the chunk at address `ea` to the specified `address`.'''
-        bounds = cls(ea)
-        left, _ = bounds
+        left = interface.range.start(interface.function.chunk(ea, ea))
 
         # Set the function start and return the previous top if we modified it successfully.
         result = idaapi.set_func_start(left, address)
@@ -884,20 +882,18 @@ class chunk(object):
     @classmethod
     def bottom(cls):
         '''Return the bottom address of the chunk at the current address.'''
-        _, right = cls()
-        return right
+        ea = ui.current.address()
+        return interface.range.end(interface.function.chunk(ea, ea))
     @utils.multicase(ea=types.integer)
     @classmethod
     def bottom(cls, ea):
         '''Return the bottom address of the chunk at address `ea`.'''
-        _, right = cls(ea)
-        return right
+        return interface.range.end(interface.function.chunk(ea, ea))
     @utils.multicase(ea=types.integer, address=types.integer)
     @classmethod
     def bottom(cls, ea, address):
         '''Change the bottom address of the chunk at address `ea` to the specified `address`.'''
-        bounds = cls(ea)
-        left, right = bounds
+        left, right = interface.range.bounds(interface.function.chunk(ea, ea))
         if not idaapi.set_func_end(left, address):
             raise E.DisassemblerError(u"{:s}.bottom({:#x}, {:#x}) : Unable to modify the bottom of the specified chunk with `{:s}({:#x}, {:#x})`.".format('.'.join([__name__, cls.__name__]), ea, address, utils.pycompat.fullname(idaapi.set_func_end), left, address))
         return right
@@ -906,18 +902,17 @@ class chunk(object):
     @classmethod
     def address(cls):
         '''Return the top address of the function chunk containing the current address.'''
-        return cls.address(ui.current.address(), 0)
+        return cls.address(ui.current.address())
     @utils.multicase(ea=types.integer)
     @classmethod
     def address(cls, ea):
         '''Return the top address of the function chunk containing the address `ea`.'''
-        return cls.address(ea, 0)
+        return interface.range.start(interface.function.chunk(ea, ea))
     @utils.multicase(ea=types.integer, offset=types.integer)
     @classmethod
     def address(cls, ea, offset):
         '''Return the address of the function chunk containing the address `ea` and add the provided `offset` to it.'''
-        left, _ = cls(ea)
-        return left + offset
+        return interface.range.start(interface.function.chunk(ea, ea)) + offset
 
     @utils.multicase()
     @classmethod
@@ -933,7 +928,7 @@ class chunk(object):
     @classmethod
     def offset(cls, ea, offset):
         '''Return the offset from the base of the database for the function chunk containing the address `ea` and add the provided `offset` to it.'''
-        left, _ = cls(ea)
+        left = interface.range.start(interface.function.chunk(ea, ea))
         return interface.address.offset(left) + offset
 
     @utils.multicase(start=types.integer)
@@ -956,7 +951,7 @@ class chunk(object):
             fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
             raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}) : Unable add the chunk at the specified address ({:#x}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, start, interface.range.start(fn), fullname))
         ui.state.wait()
-        return cls(start)
+        return interface.range.bounds(interface.function.chunk(start, start))
     @utils.multicase(func=(idaapi.func_t, types.integer), start=types.integer, end=types.integer)
     @classmethod
     def add(cls, func, start, end):
@@ -967,7 +962,7 @@ class chunk(object):
             fullname = '.'.join([getattr(idaapi.append_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.append_func_tail, attribute)])
             raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}, {:#x}) : Unable add the specified chunk ({:s}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, start, end, bounds, interface.range.start(fn), fullname))
         ui.state.wait()
-        return cls(ea)
+        return interface.range.bounds(interface.function.chunk(ea, ea))
     @utils.multicase(func=(idaapi.func_t, types.integer), bounds=interface.bounds_t)
     @classmethod
     def add(cls, func, bounds):
@@ -996,7 +991,7 @@ class chunk(object):
     def remove(cls, func, ea):
         '''Remove the chunk at `ea` from the function `func`.'''
         fn, ea = interface.function.by(func), interface.address.within(ea)
-        bounds = cls(ea)
+        bounds = interface.range.bounds(interface.function.chunk(fn, ea))
         if not idaapi.remove_func_tail(fn, ea):
             fullname = '.'.join([getattr(idaapi.remove_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.remove_func_tail, attribute)])
             raise E.DisassemblerError(u"{:s}.remove({!r}, {:#x}) : Unable to delete the chunk ({:s}) for the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, bounds, interface.range.start(fn), fullname))
@@ -2728,7 +2723,7 @@ class frame(object):
         ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
             raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `{:s}({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), lvars, regs - _r, args, utils.pycompat.fullname(idaapi.add_frame), interface.range.start(fn), lvars, regs - _r, args))
-        return cls(fn)
+        return interface.function.frame(fn)
 
     @utils.multicase()
     @classmethod
