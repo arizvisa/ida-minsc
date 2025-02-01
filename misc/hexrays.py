@@ -596,6 +596,18 @@ class variables(object):
             yield variable.new_locator(lvar.defea, lvar.location)
         return
 
+class variable(object):
+    """
+    This namespace contains utilities that are related to an individual variable
+    from a function produced by the decompiler. To avoid dealing with the
+    ``ida_hexrays.lvar_t`` type, all of the functions within this namespace use
+    the ``ida_hexrays.lvar_locator_t`` due to it being more stable and not
+    requiring us to tamper with a reference count.
+
+    This is an internal namespace and is intended to be similar
+    to the contents of the ``internal.interface`` module.
+    """
+
     @classmethod
     def copy_vdloc(cls, atype, alocinfo):
         '''Return a new instance of ``ida_hexrays.vdloc_t`` using the given `atype` and `alocinfo`.'''
@@ -631,12 +643,12 @@ class variables(object):
         return result
 
     @classmethod
-    def new_locator(cls, ea, location):
-        '''Return the ``ida_hexrays.lvar_locator_t`` for a variable defined at the address `ea` using the given `location` as its type.'''
-        atype, alocinfo = location.atype(), interface.tinfo.location_raw(location)
+    def new_locator(cls, ea, locator):
+        '''Return the ``ida_hexrays.lvar_locator_t`` for a variable defined at the address `ea` using the given `locator` as its type.'''
+        atype, alocinfo = locator.atype(), interface.tinfo.location_raw(locator)
         if atype == idaapi.ALOC_REG2:
             ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
-            raise exceptions.InvalidTypeOrValueError(u"{:s}.new_locator({:#x}, {!r}) : Unable to create a locator for the variable at address {:#x} using an unsupported type {:s}.".format('.'.join([__name__, cls.__name__]), ea, location, ea, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype)))
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.new_locator({:#x}, {!r}) : Unable to create a locator for the variable at address {:#x} using an unsupported type {:s}.".format('.'.join([__name__, cls.__name__]), ea, locator, ea, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype)))
 
         # use the location info that we extracted with interface.tinfo, and
         # use its result  to create a new instance of the decompiler's vdloc_t.
@@ -657,6 +669,43 @@ class variables(object):
         # completely new (and hopefully safe) instance of lvar_locator_t.
         lvar = reference if isinstance(reference, ida_hexrays_types.lvar_t) else reference.getv()
         return cls.new_locator(lvar.defea, lvar.location)
+
+    @classmethod
+    def repr_locator(cls, locator):
+        '''Return a description for the given ``ida_hexrays.lvar_locator_t`` in `locator` defined at the address `ea`.'''
+        ea, location = locator.defea, locator.location
+        atype, alocinfo = interface.tinfo.location_raw(location)
+        if atype == idaapi.ALOC_REG2:
+            ltypes = {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('ALOC_')}
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.repr_locator({!r}) : Unable to describe the given locator due to its type {:s} being unsupported.".format('.'.join([__name__, cls.__name__]), location, "{:s}({:d})".format(ltypes[atype], atype) if atype in ltypes else "{:d}".format(atype)))
+
+        def describe(atype, alocinfo):
+            if atype == idaapi.ALOC_STACK:
+                return "STACK({:+#x})".format(alocinfo)
+            elif atype == idaapi.ALOC_STATIC:
+                return "STATIC({:#x})".format(alocinfo)
+            elif atype == idaapi.ALOC_REG1 and not hasattr(alocinfo, '__iter__'):
+                return "REG1({:#0{:d}x})".format(alocinfo, 2 + 8)
+            elif atype == idaapi.ALOC_REG2 and not hasattr(alocinfo, '__iter__'):
+                return "REG2({:#0{:d}x})".format(alocinfo, 2 + 8)
+            elif atype == idaapi.ALOC_RREL:
+                ridx, roff = alocinfo
+                return "RREL({:d}, {:d})".format(ridx, roff)
+            elif atype == idaapi.ALOC_DIST:
+                F = lambda atype, item, offset, size: describe(atype, (item, offset, size))
+                iterable = ( F(atype, *item) for atype, item in alocinfo )
+                return "DIST({!s})".format({offset : item for offset, item in iterable})
+
+            elif atype == idaapi.ALOC_REG1:
+                locinfo, offset, size = alocinfo
+                return "REG1({:#x}{:+#x}, {:#0{:d}x})".format(offset, size, locinfo, 2 + 8)
+            elif atype == idaapi.ALOC_STACK:
+                locinfo, offset, size = alocinfo
+                return "STACK({:#x}{:+#x}, {:+#x})".format(offset, size, locinfo)
+            elif atype == idaapi.ALOC_NONE:
+                return 'NONE'
+            return "UNKNOWN({!s})".format(alocinfo)
+        return "{:s}({:#x}, {:s})".format(internal.utils.pycompat.fullname(ida_hexrays.lvar_locator_t), ea, describe(atype, alocinfo))
 
     @classmethod
     def identity(cls, locator):
