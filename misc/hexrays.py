@@ -708,6 +708,14 @@ class function(object):
         return cls.by_function(fn, *flags) if isinstance(fn, idaapi.func_t) else cls.by_address(fn, *flags)
 
     @classmethod
+    def cached(cls, function, *flags):
+        '''Return the cached decompilation for the specified `function` as an ``idaapi.cfuncptr_t``.'''
+        ea = cls.address(function)
+        if ida_hexrays.has_cached_cfunc(ea):
+            return cls.by(ea, *flags)
+        raise exceptions.MissingTypeOrAttribute(u"{:s}.cached({:#x}{:s}) : The specified function ({:#x}) does not have any decompilation information currently cached.".format('.'.join([__name__, cls.__name__]), ea, ", {:#x}".format(*flags) if flags else '', ea))
+
+    @classmethod
     def address(cls, function):
         '''Return the address of the entry point for the given `function`.'''
         res = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else function
