@@ -567,8 +567,8 @@ class chunks(object):
     def points(cls, func):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the function `func`.'''
         fn = interface.function.by(func)
-        for ch, _ in cls(fn):
-            for ea, delta in chunk.points(fn, ch):
+        for ch in map(interface.range.start, interface.function.chunks(fn)):
+            for ea, delta in interface.function.points(fn, ch):
                 yield ea, delta
             continue
         return
@@ -819,59 +819,19 @@ class chunk(object):
     @classmethod
     def points(cls):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the current function chunk.'''
-        return cls.points(ui.current.function(), ui.current.address())
+        fn, ea = ui.current.function(), ui.current.address()
+        return interface.function.points(fn, ea)
     @utils.multicase(ea=types.integer)
     @classmethod
     def points(cls, ea):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea`.'''
         fn = interface.function.by(ea)
-        return cls.points(fn, ea)
+        return interface.function.points(fn, ea)
     @utils.multicase(func=(idaapi.func_t, types.integer), ea=types.integer)
     @classmethod
     def points(cls, func, ea):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea` belonging to the function `func`.'''
-        fn, ch = interface.function.by(func), idaapi.get_fchunk(ea)
-
-        # If we were unable to get the function chunk for the provided address,
-        # then IDA didn't calculate any stack deltas for what was requested.
-        if ch is None:
-            return
-
-        # If this is a function tail, then we need to use the function we got
-        # to filter out just the desired addresses and get their stackpoints.
-        if ch.flags & idaapi.FUNC_TAIL and hasattr(getattr(fn, 'points', None), '__getitem__'):
-            Fcontains, owner = interface.range.bounds(ch).contains, fn
-
-            # Now all we need to do is to grab all of the stack points for
-            # the function, and filter them by our chunk's boundaries.
-            points = (owner.points[index] for index in builtins.range(owner.pntqty))
-            iterable = ((point.ea, point.spd) for point in points if Fcontains(point.ea))
-
-        # A non-tail just requires us to iterate through the points stored in the
-        # chunk, so we can yield the address and delta for each individual point.
-        elif hasattr(ch, 'points') and hasattr(ch.points, '__getitem__'):
-            points = (ch.points[index] for index in builtins.range(ch.pntqty))
-            iterable = ((point.ea, point.spd) for point in points)
-
-        # If we were completely unable to access the correct attributes, then we
-        # need to do all of the work ourselves. We walk the entire function, filter
-        # for deltas in our chunk, sort them, and then yield each of them one-by-one.
-        else:
-            spd, points = 0, {}
-            for ea in chunks.iterate(fn):
-                res = idaapi.get_spd(fn, ea)
-                if res == spd:
-                    continue
-                points[ea], spd = res, spd
-
-            filtered = filter(interface.range.bounds(ch).contains, points)
-            iterable = ((ea, points[ea]) for ea in sorted(filtered))
-
-        # We have our iterator of points, so all we need to do is to unpack each
-        # one and yield it to our caller.
-        for ea, spd in iterable:
-            yield ea, spd
-        return
+        return interface.function.points(func, ea)
     stackpoints = utils.alias(points, 'chunk')
     stackpoint = point = utils.alias(chunks.point, 'chunks')
 
