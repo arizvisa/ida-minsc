@@ -585,7 +585,16 @@ class variables(object):
             return func.vars
         elif isinstance(func, ida_hexrays_types.lvars_t):
             return func
-        return function.by(func).lvars
+        return function.cached(func).lvars
+
+    @classmethod
+    def iterate(cls, func):
+        '''Yield the ``ida_hexrays.lvar_locator_t`` for each variable in the function `func`.'''
+        lvars = cls(func)
+        for index in range(lvars.size()):
+            lvar = lvars[index]
+            yield variable.new_locator(lvar.defea, lvar.location)
+        return
 
     @classmethod
     def copy_vdloc(cls, atype, alocinfo):
