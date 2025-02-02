@@ -8,7 +8,7 @@ document this to allow curious individuals to determine how it all works.
 """
 
 import functools, operator, itertools, logging
-import idaapi, database, internal
+import idaapi, internal, microarchitecture
 from internal import utils, interface, types, exceptions
 
 ### some decorators to help guard the available of certain functions.
@@ -727,6 +727,54 @@ class variable(object):
         if isinstance(alocinfo, internal.types.list):
             return ea, atype, tuple(alocinfo)
         return ea, atype, alocinfo
+
+    @classmethod
+    def get_storage(cls, locator, size):
+        '''Return the storage location of the variable described by the given `locator` and `size`.'''
+        fn = interface.function.by(locator.defea)
+
+        # If this function has already been decompiled, then we can grab the
+        # cached bytecode and copy out the decompiler stacksize for the frame.
+        if function.has(fn):
+            mba = function.cached(fn).mba
+            tmpstk_size = mba.tmpstk_size
+            stacksize = mba.stacksize
+
+        # Otherwise, we crawl the stack points ourselves, and use them to
+        # calculate the points used by the decompiler for the frame.
+        else:
+            chunks = map(interface.range.start, interface.function.chunks(fn))
+            iterable = map(functools.partial(interface.function.points, fn), chunks)
+            points = [(ea, delta) for ea, delta in itertools.chain(*iterable)]
+
+            # We need to know the stack delta changes for the prologue in order
+            # to know how much stack the decompiler allocated for the frame.
+            allocate = {ea for ea in interface.function.prologue(fn)}
+            deallocate = {ea for ea in interface.function.epilogue(fn)}
+            deltas = {spd for ea, spd in points if ea in allocate}
+
+            # Next we need to know the maximum stack value (minimum, really).
+            # This is needed so that we can calculate the temporary stack size
+            # which changes when parameters are pushed onto the stack.
+            minimum = min({spd for _, spd in points}) if points else 0
+            allocation_delta = min(deltas) if deltas else 0
+
+            # Finally we can calculate the temporary stack size by taking the
+            # difference of the maximum stack value and the prologue delta, and
+            # then adding it to the frame size to get the full stack size.
+            tmpstk_size = allocation_delta - minimum
+            stacksize = sum([tmpstk_size, fn.frsize, fn.frregs])
+
+        # Our stack vantage point is from the perspective of the function entry
+        # point. Essentially, offset 0 should be pointing directly at our return
+        # address which requires us to translate it by the decompiler stacksize.
+        delta = -stacksize
+
+        # Now we can return the location information translated by our delta if
+        # itś actually a variable in the stack frame.
+        alocinfo = interface.tinfo.location_raw(locator.location)
+        location = interface.tinfo.location(size, microarchitecture, *alocinfo)
+        return location + delta if isinstance(location, interface.integerish) else location
 
 class function(object):
     """
