@@ -547,6 +547,21 @@ class ida_hexrays_types(object):
     voff_t              = Fget_type_from_module(ida_hexrays, 'voff_t')
     del(Fget_type_from_module)
 
+    # just some type groups to reduce amount of typing needed for multicase decorations.
+    hexrays_function_types = (
+        types.integer, idaapi.func_t,
+        mba_t,
+        cfuncptr_t, cfunc_t
+    )
+
+    hexrays_variable_types = (
+        lvar_locator_t, lvar_t,
+        var_ref_t, lvar_ref_t, stkvar_ref_t,
+        types.string,
+        idaapi.member_t, internal.structure.member_t,
+        interface.bounds_t, interface.location_t, types.integer
+    )
+
 class region(object):
     """
     This namespace is for interacting with regions from Hex-Rays.
