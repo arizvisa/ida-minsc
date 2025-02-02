@@ -705,6 +705,57 @@ class variables(object):
         return locator
 
     @classmethod
+    def has(cls, func, locator):
+        '''Return whether the variable identified by `locator` can be found in the function `func`.'''
+        if isinstance(locator, (ida_hexrays.lvar_locator_t, ida_hexrays.lvar_t)):
+            fn = interface.function.by(locator.defea)
+            chunks = map(interface.range.unpack, interface.function.chunks(fn))
+            return any(left <= locator.defea < right for left, right in chunks)
+
+        # XXX: it might be a better idea to check `func` directly for the mba.
+        elif isinstance(locator, (ida_hexrays.var_ref_t, ida_hexrays.lvar_ref_t)):
+            lvar = locator.mba.vars[locator.idx]
+            locator = variable.get_locator(lvar)
+            return cls.has(func, locator)
+
+        # XXX: it might be a better idea to check `func` directly for the mba.
+        elif isinstance(locator, ida_hexrays.stkvar_ref_t):
+            lvars, stkoff = arg.mba.vars, arg.off
+            mptr, lvar = arg.get_stkvar(), None
+            if mptr:
+                msize = internal.structure.member.size(mptr)
+                lvar = mba.vars.find_stkvar(arg.off, msize)
+            if lvar:
+                locator = variable.get_locator(lvar)
+                return cls.has(func, locator)
+            return False
+
+        elif isinstance(locator, types.string):
+            ea, lvars, name = function.address(func), cls(func), locator
+            iterable = (lvars.find(locator) for locator in cls.iterate(lvars))
+            filtered = (lvar for lvar in iterable if lvar is not None)
+            return any(utils.string.of(lvar.name) == name for lvar in filtered)
+
+        elif isinstance(locator, (idaapi.member_t, internal.structure.member_t)):
+            mid = member.id if isinstance(member, idaapi.member_t) else member.ptr.id
+            mptr, _, sptr = idaapi.get_member_by_id(mid)
+            ea = idaapi.get_func_by_frame(sptr.id)
+            offset = interface.function.frame_offset(ea, mptr.soff)
+            loc = interface.location_t(offset, internal.structure.member.size(mptr))
+            return cls.has(func, loc)
+
+        elif isinstance(locator, (interface.bounds_t, interface.location_t, types.integer)):
+            bounds = locator.bounds if isinstance(locator, interface.location_t) else locator
+            ea, lvars = function.address(func), cls(func)
+            iterable = ((item, cls.storage(func, item)) for item in cls.iterate(lvars))
+            filtered = ((item, storage) for item, storage in iterable if isinstance(storage, interface.location_t))
+            matched = (item for item, storage in filtered if storage.bounds.overlaps(bounds))
+            return next(matched, None) is not None
+
+        ea = function.address(func)
+        raise exceptions.InvalidTypeOrValueError(u"{:s}.has({:#x}, {!r}) : Unable to locate a variable in the given function ({:#x}) with an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, arg, ea, arg.__class__))
+
+    @classmethod
     def storage(cls, func, locator):
         '''Return the storage location for the variable identified by the given `locator` in the function `func`.'''
         ea, locator = function.address(func), cls.by(func, locator)
