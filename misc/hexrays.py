@@ -396,6 +396,7 @@ class ida_hexrays_template(object):
     init_hexrays_plugin = use_callable(utils.fconstant(False))
     get_hexrays_version = use_callable(utils.fconstant('0.0.0.0'))
     decompile = use_callable(utils.fconstant(None))
+    has_cached_cfunc = use_callable(utils.fconstant(False))
 
     def __decompile_func(pfn, hf, decomp_flags):
         ea = interface.range.start(pfn)
