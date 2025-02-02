@@ -1121,55 +1121,13 @@ class blocks(object):
         fc_flags = external.pop('flags', idaapi.FC_PREDS)
         fc_flags |= 0 if any(external.get(item, False) for item in ['external', 'externals']) else FC_NOEXT
         fc_flags |= 0 if any(not external[item] for item in ['call', 'calls', 'split'] if item in external) else FC_CALL_ENDS
-        return cls.iterate(func, fc_flags, **external)
+        return cls.iterate(func, fc_flags)
     @utils.multicase(func=(idaapi.func_t, types.integer), flags=types.integer)
     @classmethod
-    def iterate(cls, func, flags, **silent):
+    def iterate(cls, func, flags):
         '''Returns each ``idaapi.BasicBlock`` from the flowchart built with the specified `flags` (``idaapi.FC_*``) for the function `func`.'''
-        fn, FC_CALL_ENDS, has_calls = interface.function.by(func), getattr(idaapi, 'FC_CALL_ENDS', 0x20), hasattr(idaapi, 'FC_CALL_ENDS')
-        boundaries = [bounds for bounds in chunks(fn)]
-
-        # iterate through all the basic-blocks in the flow chart and yield
-        # each of them back to the caller. we need to ensure that the bounds
-        # are actually contained by the function, so we collect this too.
-        for bb in cls.flowchart(fn, flags):
-            left, right = interface.range.unpack(bb)
-            bounds = interface.range.bounds(bb)
-            ea, _ = bounds
-
-            # if we're unable to split up calls, then we need to traverse this
-            # block so that we can figure out where we need to split.
-            if not has_calls and flags & FC_CALL_ENDS:
-                start, stop, locations = left, right, [ea for ea in block.iterate(bb) if interface.instruction.is_call(ea)]
-                for item in locations:
-                    left, right = start, idaapi.next_not_tail(item)
-                    yield idaapi.BasicBlock(bb.id, interface.range.pack(left, right), bb._fc)
-                    start = right
-
-                # if the addresses are diffrent, then we have one more block to yield.
-                if start < stop:
-                    yield idaapi.BasicBlock(bb.id, interface.range.pack(start, stop), bb._fc)
-
-                # if they're the same and we didn't have to chop it up, then this is external.
-                elif start == stop and not locations:
-                    yield idaapi.BasicBlock(bb.id, interface.range.pack(start, stop), bb._fc)
-
-            # if we've been asked to be silent, then just yield what we got.
-            elif silent.get('silent', False):
-                yield bb
-
-            # unpack the boundaries of the basic block to verify it's in one
-            # of them, so that way we can yield it to the user if so.
-            elif any(start <= ea <= stop for start, stop in boundaries) and left != right:
-                yield bb
-
-            # otherwise warn the user about it just in case they're processing
-            # them and are always expecting an address within the function.
-            else:
-                f, api, Flogging = interface.range.start(fn), idaapi.FlowChart, logging.warning if flags & idaapi.FC_NOEXT else logging.info
-                Flogging(u"{:s}.iterate({:#x}, {:#x}{:s}) : The current block {!s} ({:s}) being returned by `{:s}` is outside the boundaries of the requested function ({:#x}).".format('.'.join([__name__, cls.__name__]), f, flags, ", {:s}".format(utils.string.kwargs(silent)) if silent else '', bb, bounds, '.'.join([api.__module__, api.__name__]), f))
-                yield bb
-            continue
+        for bb in interface.function.blocks(func, flags):
+            yield bb
         return
 
     @utils.multicase()
