@@ -608,6 +608,119 @@ class variables(object):
             raise exceptions.ItemNotFoundError(u"{:s}.get({:#x}, {:s}) : Unable to find the variable for the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
         return lvar
 
+    @classmethod
+    def by_offset(cls, func, offset):
+        '''Return an ``ida_hexrays.lvar_locator_t`` for the variable at the given `offset` in the frame for the function `func`.'''
+        bounds = offset.bounds if isinstance(offset, interface.location_t) else offset
+        ea, lvars = function.address(func), cls(func)
+
+        # grab the storage location for each variable and filter them for only
+        # locations which implies that it is being stored within the frame.
+        iterable = ((item, cls.storage(func, item)) for item in cls.iterate(lvars))
+        filtered = ((item, storage) for item, storage in iterable if isinstance(storage, interface.location_t))
+
+        # now we will search for any variables that overlap the bounds that we
+        # were given and try to return the first one that we find.
+        matched = (item for item, storage in filtered if storage.bounds.overlaps(bounds))
+
+        res = next(matched, None)
+        if res is None:
+            description = "{:#x}".format(offset) if isinstance(offset, types.integer) else bounds
+            raise exceptions.MemberNotFoundError(u"{:s}.by_offset({:#x}, {:s}) : Unable to find a variable in the frame for the given function ({:#x}) at the specified offset {:s}.".format('.'.join([__name__, cls.__name__]), ea, description, ea, description))
+        return res
+
+    @classmethod
+    def by_member(cls, func, member):
+        '''Return an ``ida_hexrays.lvar_locator_t`` for the variable overlapping the given `member` in the function `func`.'''
+        mid = member.id if isinstance(member, idaapi.member_t) else member.ptr.id
+        mptr, _, sptr = idaapi.get_member_by_id(mid)
+        ea = idaapi.get_func_by_frame(sptr.id)
+
+        # now we need to use the member offset to get a location_t, and then we
+        # translate that location from frame member to the hexrays stack
+        # position. we include the size because we might miss it due to there
+        # being no correlation between the disassembler and decompiler frames.
+        offset = interface.function.frame_offset(ea, mptr.soff)
+        location = interface.location_t(offset, internal.structure.member.size(mptr))
+        return cls.by(func, location)
+
+    @classmethod
+    def by_string(cls, func, name):
+        '''Return an ``ida_hexrays.lvar_locator_t`` for the variable with the given `name` in the function `func`.'''
+        ea, lvars = function.address(func), cls(func)
+        for locator in cls.iterate(lvars):
+            lvar = lvars.find(locator)
+            if utils.string.of(lvar.name) == name:
+                return locator
+            continue
+        raise exceptions.ItemNotFoundError(u"{:s}.by_string({:#x}, {!r}) : Unable to find a variable with the given name in the variables for the chosen function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, name, ea))
+
+    ### Wildcard argument functions...
+    @classmethod
+    def by(cls, *args):
+        '''Return an ``ida_hexrays.lvar_locator_t`` for the variable identified by the given `args`.'''
+        if len(args) > 1:
+            [lvars, arg] = args
+            if isinstance(arg, (ida_hexrays.lvar_locator_t, ida_hexrays.lvar_t)):
+                locator = variable.get_locator(arg)
+            elif isinstance(arg, types.string):
+                locator = cls.by_string(lvars, arg)
+            elif isinstance(arg, (idaapi.member_t, internal.structure.member_t)):
+                locator = cls.by_member(lvars, arg)
+            elif isinstance(arg, (interface.bounds_t, interface.location_t, types.integer)):
+                locator = cls.by_offset(lvars, arg)
+            else:
+                ea = function.address(lvars)
+                raise exceptions.InvalidTypeOrValueError(u"{:s}.by({:#x}, {!r}) : Unable to locate a variable in the given function ({:#x}) using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, arg, ea, arg.__class__))
+            return locator
+
+        [locator] = args
+        if isinstance(locator, (ida_hexrays.var_ref_t, ida_hexrays.lvar_ref_t)):
+            ea, lvar = locator.mba.entry_ea, locator.mba.vars[locator.idx]
+            return variable.get_locator(lvar)
+
+        elif isinstance(locator, ida_hexrays.stkvar_ref_t):
+            ea, lvars, stkoff = locator.mba.entry_ea, locator.mba.vars, locator.off
+            mptr = locator.get_stkvar()
+            if not mptr:
+                raise exceptions.MemberNotFoundError(u"{:s}.by({:#x}, {!r}) : Unable to locate a member at the given offset ({:+#x}) of the frame for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, locator, stkoff, ea))
+            msize = internal.structure.member.size(mptr)
+            lvar = mba.vars.find_stkvar(locator.off, msize)
+            return variable.get_locator(lvar)
+
+        elif isinstance(locator, (idaapi.member_t, internal.structure.member_t)):
+            mid = locator.id if isinstance(locator, idaapi.member_t) else locator.ptr.id
+            mptr, _, sptr = idaapi.get_member_by_id(mid)
+            ea = idaapi.get_func_by_frame(sptr.id)
+            return cls.by_member(ea, mptr)
+
+        elif not isinstance(locator, (ida_hexrays.lvar_locator_t, ida_hexrays.lvar_t)):
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with  a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
+
+        ea, lvars = function.address(locator.defea), cls(locator.defea)
+        lvar = lvars.find(locator)
+        if lvar is None:
+            description = variable.repr_locator(locator)
+            raise exceptions.ItemNotFoundError(u"{:s}.by({:#x}, {:s}) : Unable to find a variable for the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
+        return locator
+
+    @classmethod
+    def storage(cls, func, locator):
+        '''Return the storage location for the variable identified by the given `locator` in the function `func`.'''
+        ea, locator = function.address(func), cls.by(func, locator)
+        if not any(start <= locator.defea < stop for start, stop in map(interface.range.bounds, interface.function.chunks(ea))):
+            description = variable.repr_locator(locator)
+            raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find the variable for the specified locator due to the function at {:#x} not containing the address of the locator ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, description, ea, locator.defea))
+
+        # next we need to grab the lvars for the function and use the locator to
+        # find our variable in order to grab the width to return its storage.
+        lvars = cls(func)
+        lvar = lvars.find(locator)
+        if lvar is None:
+            description = variable.repr_locator(locator)
+            raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find a variable with the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
+        return variable.get_storage(locator, lvar.width)
+
 class variable(object):
     """
     This namespace contains utilities that are related to an individual variable
