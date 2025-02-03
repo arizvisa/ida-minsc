@@ -1067,6 +1067,35 @@ class variable(object):
             raise exceptions.DisassemblerError(u"{:s}.set_comment({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), string, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_CMT, utils.string.of(lvarinfo.cmt), utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
         return res
 
+    @classmethod
+    def get_type(cls, *args):
+        '''Return the type from the variable identified by the given `args`.'''
+        lvar = variables.get(*args)
+        return interface.tinfo.copy(lvar.tif)
+
+    @classmethod
+    def set_type(cls, func, variable, type):
+        '''Apply the given `type` to the `variable` belonging to the function `func`.'''
+        ti = interface.tinfo.parse(None, type, idaapi.PT_SIL) if isinstance(type, types.string) else type
+        args = [variable] if isinstance(func, types.none) else [func, variable]
+
+        # grab the variable locator and entrypoint for the function owning it.
+        locator = variables.by(*args)
+        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+
+        # use everything to build the lvar_saved_info_t that we pass to the api.
+        lvarinfo = ida_hexrays.lvar_saved_info_t()
+        lvarinfo.ll = locator
+        lvarinfo.type = ti
+
+        # now we just need to apply the name to the variable, and return the old one.
+        ea, lvar = function.address(fn), variables.get(fn, locator)
+        res = interface.tinfo.copy(lvar.tif)
+        if not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_TYPE, lvarinfo):
+            name, description = utils.string.of(lvar.name), "{!s}".format(ti)
+            raise exceptions.DisassemblerError(u"{:s}.set_type({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), description, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_TYPE, description, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
+        return res
+
 class function(object):
     """
     This namespace contains tools for a function that is produced by the
