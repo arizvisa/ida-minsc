@@ -7516,7 +7516,7 @@ class typematch(object):
     masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
     full_type = {idaapi.BT_VOID, idaapi.BT_BOOL, idaapi.BT_FLOAT, idaapi.BT_COMPLEX}
     integer_types = {idaapi.BT_INT8, idaapi.BT_INT16, idaapi.BT_INT32, idaapi.BT_INT64, idaapi.BT_INT128, idaapi.BT_INT}
-    integer_sizes = {1: idaapi.BT_INT8, 2: idaapi.BT_INT16, 4: idaapi.BT_INT32, 8: idaapi.BT_INT64, 32: idaapi.BT_INT128}
+    integer_sizes = {1: idaapi.BT_INT8, 2: idaapi.BT_INT16, 4: idaapi.BT_INT32, 8: idaapi.BT_INT64, 16: idaapi.BT_INT128}
     flags_optional = {idaapi.BT_FUNC, idaapi.BT_BITFIELD}
     flags_none = {idaapi.BT_PTR, idaapi.BT_ARRAY, idaapi.BT_UNK}
 
