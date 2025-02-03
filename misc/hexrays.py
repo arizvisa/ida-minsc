@@ -1072,6 +1072,20 @@ class variable(object):
         return interface.tinfo.copy(lvar.tif)
 
     @classmethod
+    def remove_type(cls, *args):
+        '''Remove the type from the variable identified by the given `args`.'''
+        locator = variables.by(*args)
+        func, _ = args if len(args) == 2 else [locator.defea, None]
+        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+
+        # you really can't remove a type from a variable using the decompiler,
+        # so instead we decomplexify the type into a similar primitive that
+        # matches the original type size to avoid damaging any other variables.
+        lvar = variables.get(fn, locator)
+        reduced = interface.tinfo.reduce(lvar.tif, lvar.width)
+        return cls.set_type(fn, locator, reduced)
+
+    @classmethod
     def set_type(cls, func, variable, type):
         '''Apply the given `type` to the `variable` belonging to the function `func`.'''
         ti = interface.tinfo.parse(None, type, idaapi.PT_SIL) if isinstance(type, types.string) else type
