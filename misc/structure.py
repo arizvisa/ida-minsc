@@ -4375,7 +4375,7 @@ class members_t(object):
     @utils.multicase(offset=types.integer)
     def remove(self, offset):
         '''Remove the member at the specified `offset` of the structure.'''
-        cls, owner, items = self.__class__, self.owner, [packed for packed in members.at_offset(offset - self.baseoffset)]
+        cls, owner, items = self.__class__, self.owner, [packed for packed in members.at_offset(self.owner.ptr, offset - self.baseoffset)]
 
         # If there are no items or more than one at the requested offset than
         # we bail because of there being either no member or it's a union.
