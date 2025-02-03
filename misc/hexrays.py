@@ -1029,6 +1029,42 @@ class variable(object):
             raise exceptions.DisassemblerError(u"{:s}.set_name({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), packed, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_NAME, utils.string.of(lvarinfo.name), utils.string.escape(res, '"'), lvar.defea, lvar.defblk, lvar.width))
         return res
 
+    @classmethod
+    def get_comment(cls, *args):
+        '''Return the comment from the variable identified by the given `args`.'''
+        lvar = variables.get(*args)
+        return utils.string.of(lvar.cmt)
+
+    @classmethod
+    def remove_comment(cls, *args):
+        '''Remove the comment from the variable identified by the given `args`.'''
+        locator = variables.by(*args)
+        func, _ = args if len(args) == 2 else [locator.defea, None]
+        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+        return cls.set_comment(fn, locator, '')
+
+    @classmethod
+    def set_comment(cls, func, variable, string):
+        '''Modify the comment for the given `variable` in the function `func` to the specified `string`.'''
+        args = [variable] if isinstance(func, types.none) else [func, variable]
+
+        # grab the variable locator and the function information if available.
+        locator = variables.by(*args)
+        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+
+        # use everything to build the lvar_saved_info_t that we pass to the api.
+        lvarinfo = ida_hexrays.lvar_saved_info_t()
+        lvarinfo.ll = locator
+        lvarinfo.cmt = utils.string.to(string)
+
+        # now we just need to apply the comment to the variable, and return the old one.
+        ea, lvar = function.address(fn), variables.get(fn, locator)
+        res = utils.string.of(lvar.cmt)
+        if not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_CMT, lvarinfo):
+            name = utils.string.of(lvar.name)
+            raise exceptions.DisassemblerError(u"{:s}.set_comment({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), string, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_CMT, utils.string.of(lvarinfo.cmt), utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
+        return res
+
 class function(object):
     """
     This namespace contains tools for a function that is produced by the
