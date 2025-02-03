@@ -6457,6 +6457,172 @@ class tinfo(object):
         # Reduce all of the items we were given into something for ptr_type_data_t.taptr_bits.
         return functools.reduce(operator.or_, unique, idaapi.TAH_HASATTRS if any(unique) else 0)
 
+    @classmethod
+    def reduce(cls, type, *size):
+        '''Reduce the `type` with the given `size` down to a type composed of integer types.'''
+        ti = tinfo.parse(None, type) if isinstance(type, internal.types.string) else type
+
+        # create some tables that we'll use to reduce types with.
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+        integer_sizes = {
+            1: idaapi.BTMT_SIZE12 | idaapi.BT_VOID,
+            2: idaapi.BTMT_SIZE12 | idaapi.BT_UNK,
+            4: idaapi.BTMT_SIZE48 | idaapi.BT_VOID,
+            8: idaapi.BTMT_SIZE48 | idaapi.BT_UNK,
+            16: idaapi.BTMT_SIZE128 | idaapi.BT_VOID,
+        }
+        brute_factor = sorted(integer_sizes)[::-1]
+        word_size, _ = divmod(database.bits(), 8)
+
+        # define a closure for recursively reducing the types composing a type.
+        def reduce_individual_type(ti, *parameter):
+            '''Reduce the type specified in `ti` down to its base integer type.'''
+            decl, [size] = ti.get_decltype(), parameter if parameter else [ti.get_size()]
+
+            # unpack the type's declaration into its individual components.
+            base, flags, modifiers = (decl & mask for mask in masks)
+
+            # if it's a complex type that's a typedef, then we only need to
+            # extract what it targets and then recurse to find the base type.
+            if (base, flags) in {(idaapi.BT_COMPLEX, idaapi.BTMT_TYPEDEF)}:
+                til = ti.get_til()
+
+                # figure out whether we received the type by ordinal or name. if
+                # it was name, then query the type library for it and recurse.
+                ordinal = ti.get_ordinal()
+                if ordinal > 0:
+                    nexttype = tinfo.at_ordinal(ordinal, til)
+                elif ti.get_type_name():
+                    name = internal.utils.string.of(ti.get_type_name())
+                    nexttype = tinfo.at_name(name, til)
+                else:
+                    raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to determine whether the specified type information ({!r}) is a numbered or named type.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                return reduce_individual_type(nexttype)
+
+            # if it's any other complex type, then we simply return an array
+            # based on the largest integer factor of the udt alignment.
+            elif (base, flags) in {(idaapi.BT_COMPLEX, idaapi.BTMT_STRUCT), (idaapi.BT_COMPLEX, idaapi.BTMT_UNION)}:
+                utd = idaapi.udt_type_data_t()
+                if not ti.has_details():
+                    raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.is_udt():
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) is not a structure or union.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.get_udt_details(utd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to get the member data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+
+                # grab the alignment and use it to figure out the largest factor.
+                alignment = max(1, utd.effalign)
+                iterable = ((item, divmod(size, item)) for item in brute_factor)
+                filtered = (item for item, (quotient, remainder) in iterable if not remainder)
+
+                # we need to choose a factor, but we instead use the word size
+                # as the maximum factor instead of the available integer sizes.
+                available = (item for item in filtered if item <= word_size)
+                factor = next(available, integer_sizes[1])
+
+                # now we can figure out the array element type.
+                length, remainder = divmod(size, factor)
+                element = idaapi.tinfo_t(integer_sizes[factor])
+
+                # and then create our array with it.
+                atd, newtype = idaapi.array_type_data_t(), idaapi.tinfo_t()
+                atd.base, atd.nelems, atd.elem_type = 0, length, element
+
+                if not newtype.create_array(atd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create an array of type \"{:s}\" with {:d} element{:s} from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', utils.string.escape("{!s}".format(element), '"'), length, "{!s}".format(ti)))
+                return newtype
+
+            # if it's an enumeration, then we use its width to figure the type.
+            elif (base, flags) in {(idaapi.BT_COMPLEX, idaapi.BTMT_ENUM)}:
+                etd = idaapi.enum_type_data_t()
+                if not ti.has_details():
+                    raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.is_enum():
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) is not an enumeration.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.get_enum_details(etd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to get the enumeration type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+
+                # get the size of the enumeration and find the integer that fits it.
+                nbytes = etd.calc_nbytes()
+                iterable = ((item, divmod(size, item)) for item in brute_factor)
+                filtered = (item for item, (quotient, remainder) in iterable if not remainder)
+
+                # get the factor and use it to create the integer type to return.
+                factor = next(filtered, integer_sizes[1])
+                newtype = idaapi.tinfo_t(integer_sizes[factor])
+                return newtype
+
+            # if it's an array, then we reduce its element and re-create it.
+            elif base in {idaapi.BT_ARRAY}:
+                atd = idaapi.array_type_data_t()
+                if not ti.has_details():
+                    raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.is_array():
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) is not an array.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.get_array_details(atd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to get the array type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+
+                # unpack all the fields that compose the array to extract the
+                # element and count, and then reduce the array element.
+                index, length, element = atd.base, atd.nelems, tinfo.copy(atd.elem_type)
+                newelement = reduce_individual_type(element, element.get_size())
+
+                # create a new array_type_data_t using the fields we unpacked.
+                atd, newtype = idaapi.array_type_data_t(), idaapi.tinfo_t()
+                atd.base, atd.nelems, atd.elem_type = index, length, newelement
+
+                # now we can create an array and return it.
+                if not newtype.create_array(atd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create an array of type \"{:s}\" with the extracted base ({:d}) and length ({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', utils.string.escape("{!s}".format(ti), '"'), index, length))
+                return newtype
+
+            # if it's a function, then we reduce all of its members but preserve
+            # the calling convention.
+            elif base in {idaapi.BT_FUNC}:
+                info, ftd = tinfo.prototype_details(ti)
+
+                # grab all the types that are used for the result and parameters
+                # of the function. we then reduce each of them to their base type.
+                count = ftd.size()
+                iterable = itertools.chain([ftd.rettype], (ftd[index].type for index in builtins.range(ftd.size())))
+                newtypes = [reduce_individual_type(item) for item in map(tinfo.copy, iterable)]
+
+                # now can repopulate our func_type_data_t with the reduced types.
+                iterable = iter(newtypes)
+                ftd.rettype = next(iterable)
+                for index, newtype in enumerate(iterable):
+                    ftd[index].type = newtype
+
+                # after doing everything, we can then create the function and return it.
+                if not info.create_func(ftd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create a function with the extracted types from \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', utils.string.escape("{!s}".format(ti), '"')))
+                return info
+
+            # bitfields are easy since they're packed into an integer of some size.
+            elif base in {idaapi.BT_BITFIELD}:
+                btd = idaapi.bitfield_type_data_t()
+                if not ti.has_details():
+                    raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.is_bitfield():
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.reduce_individual_type({!r}{:s}) : The specified type information ({!r}) is not a bitfield.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+                elif not ti.get_bitfield_details(btd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to get the bitfield type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', "{!s}".format(ti)))
+
+                # we can simply use the number of bytes and bits inside the
+                # bitfield_type_data_t to figure out which integer to use.
+                nbytes = btd.nbytes
+                return idaapi.tinfo_t(integer_sizes[nbytes])
+
+            # any other type should be integer-like which means we can just use
+            # its size to find a base integer type that can fit it.
+            iterable = ((item, divmod(size, item)) for item in brute_factor)
+            filtered = (item for item, (quotient, remainder) in iterable if not remainder)
+            factor = next(filtered, integer_sizes[1])
+            newtype = idaapi.tinfo_t(integer_sizes[factor])
+            return newtype
+
+        return reduce_individual_type(ti, *size)
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
