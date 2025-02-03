@@ -955,6 +955,82 @@ class variable(object):
         location = interface.tinfo.location(size, microarchitecture, *alocinfo)
         return location + delta if isinstance(location, interface.integerish) else location
 
+    @classmethod
+    def get_name(cls, *args):
+        '''Return the name from the variable identified by the given `args`.'''
+        lvar = variables.get(*args)
+        return utils.string.of(lvar.name)
+
+    @classmethod
+    def remove_name(cls, *args):
+        '''Remove the name from the variable identified by the given `args`.'''
+        lvar = variables.get(*args)
+        lvarname = utils.string.of(lvar.name)
+
+        # grab all information about the function containing the variable.
+        func, _ = args if len(args) == 2 else [lvar.defea, None]
+        ea, locator = function.address(func), cls.get_locator(lvar)
+        fn, frame = (F(ea) for F in [interface.function.by, interface.function.frame])
+
+        # grab the storage location for the variable. if it's a register, figure
+        # out whether its an arg or var and suffix its name with the register.
+        store = cls.get_storage(locator, lvar.width)
+        if not isinstance(store, interface.location_t):
+            res = 'arg' if lvar.is_arg_var else 'var', store.name
+            return cls.set_name(func, locator, res)
+
+        # if it wasn't a register, then it's in the stack frame. so, we need to
+        # translate its offset to the frame member offset.
+        offset, size = store + fn.frsize + fn.frregs
+
+        # now we can use the offset to check for a frame member that overlaps
+        # the offset with size. if not, then use the offset to generate a name.
+        if not internal.structure.members.has_bounds(frame, offset, offset + size):
+            delta = fn.frregs
+            default = internal.structure.member.default_name(frame, None, offset)
+            res = default.replace(' ', '$') if default in {' r', ' s'} else default
+            return cls.set_name(func, locator, res)
+
+        # otherwise, a member exists at the given offset of the frame and we can
+        # use our store location to snag its name, check the size, and apply it.
+        candidates = [packed for packed in internal.structure.members.at_bounds(frame, offset, offset + size)]
+        if not candidates:
+            raise exceptions.MemberNotFoundError(u"{:s}.remove_name({:#x}, {:s}) : Unable to find a variable at the given offset ({:s}) of the frame for the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), interface.bounds_t(offset, offset+size), ea))
+        [(sptr, _, mptr)] = candidates[:1]
+
+        # now we need to check the size. we only warn the user about it and hope
+        # that we're actually doing what they wanted.
+        size = internal.structure.member.size(mptr)
+        if size != store.size:
+            fullname = internal.structure.member.fullname(mptr)
+            logging.warning(u"{:s}.remove_name({:#x}, {:s}) : The storage location {!s} for the variable named \"{:s}\" is not the same size ({:d}) as the frame member \"{:s}\" in the given function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), store, utils.string.escape(lvarname, '"'), size, utils.string.escape(fullname, '"'), ea))
+
+        # grab the member name, and then apply it.
+        res = internal.structure.member.get_name(mptr)
+        return cls.set_name(func, locator, res)
+
+    @classmethod
+    def set_name(cls, func, variable, string):
+        '''Modify the name of the given `variable` in the function `func` to the specified `string`.'''
+        args = [variable] if isinstance(func, types.none) else [func, variable]
+        packed = interface.tuplename(*itertools.chain([string] if isinstance(string, types.string) else string))
+
+        # grab the variable locator and entrypoint for the function owning it.
+        locator = variables.by(*args)
+        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+
+        # use everything to build the lvar_saved_info_t that we pass to the api.
+        lvarinfo = ida_hexrays.lvar_saved_info_t()
+        lvarinfo.ll = locator
+        lvarinfo.name = utils.string.to(packed)
+
+        # now we just need to apply the name to the variable, and return the old one.
+        ea, lvar = function.address(fn), variables.get(fn, locator)
+        res = utils.string.of(lvar.name)
+        if not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_NAME, lvarinfo):
+            raise exceptions.DisassemblerError(u"{:s}.set_name({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), packed, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_NAME, utils.string.of(lvarinfo.name), utils.string.escape(res, '"'), lvar.defea, lvar.defblk, lvar.width))
+        return res
+
 class function(object):
     """
     This namespace contains tools for a function that is produced by the
