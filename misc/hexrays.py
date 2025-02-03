@@ -1096,6 +1096,30 @@ class variable(object):
             raise exceptions.DisassemblerError(u"{:s}.set_type({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), description, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_TYPE, description, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
         return res
 
+    @classmethod
+    def get_size(cls, *args):
+        '''Return the size for the variable identified by the given `args`.'''
+        lvar = variables.get(*args)
+        return lvar.width
+
+    @classmethod
+    def set_size(cls, func, variable, size):
+        '''Apply the given `size` to the specified `variable` belonging to the function `func`.'''
+        args = [variable] if isinstance(func, types.none) else [func, variable]
+
+        # grab the variable locator and the function information if available.
+        locator = variables.by(*args)
+        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+
+        # only thing to do is to hand everything off to the set_width method.
+        ea, lvar = function.address(fn), variables.get(fn, locator)
+        result, ti = lvar.width, lvar.tif
+        svw_flags = ida_hexrays.SVW_FLOAT if ti.is_float() else ida_hexrays.SVW_SOFT if not ti.is_well_defined() else ida_hexrays.SVW_INT
+        if not lvar.set_width(size, svw_flags):
+            name = utils.string.of(lvar.name)
+            raise exceptions.DisassemblerError(u"{:s}.set_size({:#x}, {:s}, {:d}) : Unable to call `{:s}({:d}, {:#x})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), size, utils.pycompat.fullname(lvar.set_width), size, svw_flags, utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
+        return result
+
 class function(object):
     """
     This namespace contains tools for a function that is produced by the
