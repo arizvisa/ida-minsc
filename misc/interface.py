@@ -7486,7 +7486,7 @@ class instruction(object):
         target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
         if hasattr(idaapi, 'is_indirect_jump_insn'):
             return True if idaapi.is_indirect_jump_insn(target) else False
-        features, invalid, expected = cls.feature(ea), any([idaapi.is_call_insn(target), idaapi.is_ret_insn(target)]), idaapi.CF_STOP | idaapi.CF_JUMP
+        features, invalid, expected = cls.feature(ea), any([idaapi.is_call_insn(target), cls.is_return(target)]), idaapi.CF_STOP | idaapi.CF_JUMP
         ok = idaapi.is_basic_block_end(target, *bbargs) and not invalid and features & expected == expected
         return True if ok else False
 
@@ -7495,14 +7495,14 @@ class instruction(object):
         '''Return whether the instruction at the address `ea` is an unconditional (direct and indirect) branch instruction.'''
         features, expected = cls.feature(ea), idaapi.CF_STOP | idaapi.CF_HLL
         target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
-        ok = idaapi.is_basic_block_end(target, *bbargs) and not idaapi.is_ret_insn(target) and features & expected == expected
+        ok = idaapi.is_basic_block_end(target, *bbargs) and not cls.is_return(target) and features & expected == expected
         return True if ok else False
 
     @classmethod
     def is_conditional(cls, ea):
         '''Return whether the instruction at the address `ea` is an conditional branch instruction.'''
         target, bbargs = (ea, []) if idaapi.__version__ < 7.0 else (cls.at(ea), [False])
-        feature, invalid = cls.feature(ea), any([idaapi.is_call_insn(target), idaapi.is_ret_insn(target)])
+        feature, invalid = cls.feature(ea), any([idaapi.is_call_insn(target), cls.is_return(target)])
         xiterable = (True for _, xiscode, xrtype in xref.of(ea) if xiscode and xrtype != idaapi.fl_F)
         ok = idaapi.is_basic_block_end(target, *bbargs) and not invalid and not feature & idaapi.CF_STOP and next(xiterable, False)
         return True if ok else False
