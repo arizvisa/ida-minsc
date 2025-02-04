@@ -6,7 +6,7 @@ can be mindless when reading/writing/enumerating data out of a netnode.
 This is an internal module and is not expected to be used by the user.
 """
 
-import six, operator
+import functools, operator, itertools
 import idaapi
 
 import internal
@@ -854,14 +854,31 @@ class sup(object):
         return any(index == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
+    def __decode_integer(cls, bytes):
+        data = bytearray(bytes or b'')
+        return functools.reduce(lambda agg, by: agg * 0x100 + by, data[::-1], 0)
+    decode_integer = __decode_integer
+
+    @classmethod
+    def __encode_integer(cls, integer):
+        octets, count = [], internal.interface.database.bits() // 8
+        integer &= pow(2, 8 * count) - 1
+        while len(octets) < count:
+            integer, octet = divmod(integer, 0x100)
+            octets.append(octet)
+        return bytearray(octets)
+    encode_integer = __encode_integer
+
+    @classmethod
     def __value_and_transform__(cls, type):
         true = internal.utils.fconstant(True)
         table = {
-            None:                       (netnode.supval, true,  None),
-            internal.types.memoryview:  (netnode.supval, bool,  internal.types.memoryview),
-            internal.types.bytes:       (netnode.supval, bool,  None),
-            internal.types.bytearray:   (netnode.supval, bool,  bytearray),
-            internal.types.string:      (netnode.supstr, bool,  None),
+            None:                       (netnode.supval, true, None),
+            internal.types.memoryview:  (netnode.supval, bool, internal.types.memoryview),
+            internal.types.bytes:       (netnode.supval, bool, None),
+            internal.types.bytearray:   (netnode.supval, bool, bytearray),
+            internal.types.string:      (netnode.supstr, bool, None),
+            internal.types.integer:     (netnode.supval, true, cls.decode_integer),
         }
         if type in table:
             return table[type]
@@ -883,8 +900,14 @@ class sup(object):
     @classmethod
     def set(cls, nodeidx, index, value, tag=None):
         '''Assign the provided `value` to the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
-        node, value = utils.get(nodeidx), value.tobytes() if isinstance(value, memoryview) else internal.types.bytes(value)
-        return netnode.supset(node, index, value, netnode.suptag if tag is None else tag)
+        node = utils.get(nodeidx)
+        if isinstance(value, memoryview):
+            transformed = value.tobytes()
+        elif isinstance(value, internal.types.integer):
+            transformed = bytes(cls.encode_integer(value))
+        else:
+            transformed = bytes(value)
+        return netnode.supset(node, index, transformed, netnode.suptag if tag is None else tag)
 
     @classmethod
     def remove(cls, nodeidx, index, tag=None):
