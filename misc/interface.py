@@ -7451,7 +7451,34 @@ class instruction(object):
     def is_return(cls, ea):
         '''Return whether the instruction at the address `ea` is a return instruction.'''
         target = ea if idaapi.__version__ < 7.0 else cls.at(ea)
-        return True if idaapi.is_ret_insn(target) else False
+
+        # XXX: turns out that `is_ret_insn` doesn't work for every return
+        #      instruction on the Intel processor. from digging, it seems
+        #      that it's based on testing a supval in "$ vmm functions".
+        #      so, as a work around we clear the supval before using it.
+        #      i'm not sure what other processor modules are affected.
+
+        # FIXME: this netnode is only used for the pc and pc64 processor
+        #        modules. we really should be using whatever netnode name is
+        #        being used by the currently selected processor if this issue
+        #        exists in any of the other processor modules.
+        node, tag = '$ vmm functions', 'r'
+
+        # if there's no supval for this address, then we can trust it.
+        if not internal.netnode.sup.has(node, idaapi.ea2node(ea), tag=tag):
+            return True if idaapi.is_ret_insn(target) else False
+
+        # first we preserve the original supval and remove it for the address.
+        preserved = internal.netnode.sup.get(node, idaapi.ea2node(ea), tag=tag)
+        removed = internal.netnode.sup.remove(node, idaapi.ea2node(ea), tag=tag)
+
+        # now we can use the `is_ret_insn` api in its working form and then
+        # we'll need to restore the value that was just preserved.
+        try:
+            ok = idaapi.is_ret_insn(target)
+        finally:
+            restored = internal.netnode.sup.set(node, idaapi.ea2node(ea), preserved, tag=tag)
+        return True if ok else False
 
     @classmethod
     def is_indirect(cls, ea):
