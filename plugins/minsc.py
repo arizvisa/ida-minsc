@@ -493,12 +493,27 @@ class object_proxy(object):
         of properties that may be used or ignored when copying or removing
         attributes from an object into a proxy object.
         """
-        description = {'__module__', '__name__', '__doc__'}
+        description = {'__module__', '__name__', '__doc__', '__qualname__'}
         ignored = {'__class__', '__dict__', '__weakref__'}
         required = {'__eq__', '__ne__', '__hash__', '__str__', '__repr__', '__unicode__'}
 
         klass = {key for key, value in itertools.chain(object.__dict__.items(), type.__dict__.items()) if callable(value)} | ignored
         instance = (lambda klass=klass: {key for key in dir(object()) if key not in klass})() | ignored
+
+        # FIXME: we really should be tracking the type that owns these
+        #        attributes so that we can drop attributes that don't exist
+        #        within our currently running python version.
+
+        # attributes that cannot be modified or removed
+        readonly = {'__basicsize__', '__itemsize__', '__flags__', '__weakrefoffset__', '__base__', '__dictoffset__', '__mro__', '__text_signature__'}
+        unremovable = {'__type_params__', '__annotations__'}
+
+        # attributes that are type-constrained
+        constrained = {'__bases__': tuple}
+
+        # make a blacklist of the attributes that we can't really fuck with.
+        nomodification = {key for key in itertools.chain(description, readonly, constrained)}
+        noremoval = {key for key in itertools.chain(description, readonly, constrained, unremovable)}
 
     class attribute_descriptor(object):
         """
@@ -668,7 +683,7 @@ class object_proxy(object):
 
             # now we can update the proxy atributes we snagged and spin
             # until the user decides to close us.
-            [setattr(proxy, key, value) for key, value in state.items() if key not in cls.attributes.description]
+            [setattr(proxy, key, value) for key, value in state.items() if key not in cls.attributes.nomodification]
             [setattr(proxy, key, state[key]) for key in cls.attributes.description if state.get(key, None) is not None]
 
             # the last thing to do is to update the callable attributes since
@@ -679,7 +694,7 @@ class object_proxy(object):
 
         # remove any and all attributes that we added to the proxy's class.
         finally:
-            [delattr(proxy, key) for key in state if hasattr(proxy, key) and key not in cls.attributes.description]
+            [delattr(proxy, key) for key in state if hasattr(proxy, key) and key not in cls.attributes.noremoval]
         state.clear()
 
     @classmethod
