@@ -595,13 +595,15 @@ class variables(object):
 
     def __new__(cls, func):
         '''Return the ``ida_hexrays.lvars_t`` for the function specified by `func`.'''
+        MMAT_ZERO = ida_hexrays.CMAT_ZERO if hasattr(ida_hexrays, 'CMAT_ZERO') else ida_hexrays.MMAT_ZERO
         if isinstance(func, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t)):
-            return func.lvars
+            return func.lvars if func.maturity > MMAT_ZERO else func.mba.vars
         elif isinstance(func, ida_hexrays_types.mba_t):
             return func.vars
         elif isinstance(func, ida_hexrays_types.lvars_t):
             return func
-        return function.cached(func).lvars
+        func = function.cached(func)
+        return func.lvars if func.maturity > MMAT_ZERO else func.mba.vars
 
     @classmethod
     def iterate(cls, func):
