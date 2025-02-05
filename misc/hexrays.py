@@ -617,8 +617,10 @@ class variables(object):
     @classmethod
     def get(cls, *args):
         '''Return an ``ida_hexrays.lvar_t`` for the variable identified by the given `args`.'''
-        locator = cls.by(*args)
-        ea, lvars = function.address(locator.defea), cls(locator.defea)
+        fn = function(*args[:1]) if len(args) > 1 else None
+        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        cfunc = function(locator.defea) if fn is None else fn
+        ea, lvars = cfunc.entry_ea, cls(cfunc)
         lvar = lvars.find(locator)
         if lvar is None:
             description = variable.repr_locator(locator)
@@ -628,12 +630,11 @@ class variables(object):
     @classmethod
     def by_offset(cls, func, offset):
         '''Return an ``ida_hexrays.lvar_locator_t`` for the variable at the given `offset` in the frame for the function `func`.'''
-        bounds = offset.bounds if isinstance(offset, interface.location_t) else offset
-        ea, lvars = function.address(func), cls(func)
+        cfunc, bounds = function(func), offset.bounds if isinstance(offset, interface.location_t) else offset
 
         # grab the storage location for each variable and filter them for only
         # locations which implies that it is being stored within the frame.
-        iterable = ((item, cls.storage(func, item)) for item in cls.iterate(lvars))
+        iterable = ((item, cls.storage(func, item)) for item in cls.iterate(cfunc))
         filtered = ((item, storage) for item, storage in iterable if isinstance(storage, interface.location_t))
 
         # now we will search for any variables that overlap the bounds that we
@@ -642,7 +643,7 @@ class variables(object):
 
         res = next(matched, None)
         if res is None:
-            description = "{:#x}".format(offset) if isinstance(offset, types.integer) else bounds
+            ea, description = cfunc.entry_ea, "{:#x}".format(offset) if isinstance(offset, types.integer) else bounds
             raise exceptions.MemberNotFoundError(u"{:s}.by_offset({:#x}, {:s}) : Unable to find a variable in the frame for the given function ({:#x}) at the specified offset {:s}.".format('.'.join([__name__, cls.__name__]), ea, description, ea, description))
         return res
 
@@ -664,12 +665,14 @@ class variables(object):
     @classmethod
     def by_string(cls, func, name):
         '''Return an ``ida_hexrays.lvar_locator_t`` for the variable with the given `name` in the function `func`.'''
-        ea, lvars = function.address(func), cls(func)
+        cfunc = function(func)
+        lvars = cls(cfunc)
         for locator in cls.iterate(lvars):
             lvar = lvars.find(locator)
             if utils.string.of(lvar.name) == name:
                 return locator
             continue
+        ea = cfunc.entry_ea
         raise exceptions.ItemNotFoundError(u"{:s}.by_string({:#x}, {!r}) : Unable to find a variable with the given name in the variables for the chosen function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, name, ea))
 
     ### Wildcard argument functions...
@@ -714,10 +717,11 @@ class variables(object):
         elif not isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with  a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
 
-        ea, lvars = function.address(locator.defea), cls(locator.defea)
+        cfunc = function(locator.defea)
+        lvars = cls(locator.defea)
         lvar = lvars.find(locator)
         if lvar is None:
-            description = variable.repr_locator(locator)
+            ea, description = cfunc.entry_ea, variable.repr_locator(locator)
             raise exceptions.ItemNotFoundError(u"{:s}.by({:#x}, {:s}) : Unable to find a variable for the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
         return locator
 
