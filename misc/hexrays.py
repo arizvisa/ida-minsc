@@ -677,17 +677,17 @@ class variables(object):
     def by(cls, *args):
         '''Return an ``ida_hexrays.lvar_locator_t`` for the variable identified by the given `args`.'''
         if len(args) > 1:
-            [lvars, arg] = args
+            [func, arg] = args
             if isinstance(arg, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
                 locator = variable.get_locator(arg)
             elif isinstance(arg, types.string):
-                locator = cls.by_string(lvars, arg)
+                locator = cls.by_string(func, arg)
             elif isinstance(arg, (idaapi.member_t, internal.structure.member_t)):
-                locator = cls.by_member(lvars, arg)
+                locator = cls.by_member(func, arg)
             elif isinstance(arg, (interface.bounds_t, interface.location_t, types.integer)):
-                locator = cls.by_offset(lvars, arg)
+                locator = cls.by_offset(func, arg)
             else:
-                ea = function.address(lvars)
+                ea = function.address(func)
                 raise exceptions.InvalidTypeOrValueError(u"{:s}.by({:#x}, {!r}) : Unable to locate a variable in the given function ({:#x}) using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ea, arg, ea, arg.__class__))
             return locator
 
@@ -775,17 +775,18 @@ class variables(object):
     @classmethod
     def storage(cls, func, locator):
         '''Return the storage location for the variable identified by the given `locator` in the function `func`.'''
-        ea, locator = function.address(func), cls.by(func, locator)
-        if not any(start <= locator.defea < stop for start, stop in map(interface.range.bounds, interface.function.chunks(ea))):
-            description = variable.repr_locator(locator)
+        cfunc = function(func)
+        locator = cls.by(cfunc, locator)
+        if not any(start <= locator.defea < stop for start, stop in map(interface.range.bounds, interface.function.chunks(cfunc.entry_ea))):
+            ea, description = cfunc.entry_ea, variable.repr_locator(locator)
             raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find the variable for the specified locator due to the function at {:#x} not containing the address of the locator ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, description, ea, locator.defea))
 
         # next we need to grab the lvars for the function and use the locator to
         # find our variable in order to grab the width to return its storage.
-        lvars = cls(func)
+        lvars = cls(cfunc)
         lvar = lvars.find(locator)
         if lvar is None:
-            description = variable.repr_locator(locator)
+            ea, description = cfunc.entry_ea, variable.repr_locator(locator)
             raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find a variable with the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
         return variable.get_storage(locator, lvar.width)
 
