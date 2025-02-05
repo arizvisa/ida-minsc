@@ -676,7 +676,7 @@ class variables(object):
         '''Return an ``ida_hexrays.lvar_locator_t`` for the variable identified by the given `args`.'''
         if len(args) > 1:
             [lvars, arg] = args
-            if isinstance(arg, (ida_hexrays.lvar_locator_t, ida_hexrays.lvar_t)):
+            if isinstance(arg, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
                 locator = variable.get_locator(arg)
             elif isinstance(arg, types.string):
                 locator = cls.by_string(lvars, arg)
@@ -690,11 +690,11 @@ class variables(object):
             return locator
 
         [locator] = args
-        if isinstance(locator, (ida_hexrays.var_ref_t, ida_hexrays.lvar_ref_t)):
+        if isinstance(locator, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t)):
             ea, lvar = locator.mba.entry_ea, locator.mba.vars[locator.idx]
             return variable.get_locator(lvar)
 
-        elif isinstance(locator, ida_hexrays.stkvar_ref_t):
+        elif isinstance(locator, ida_hexrays_types.stkvar_ref_t):
             ea, lvars, stkoff = locator.mba.entry_ea, locator.mba.vars, locator.off
             mptr = locator.get_stkvar()
             if not mptr:
@@ -709,7 +709,7 @@ class variables(object):
             ea = idaapi.get_func_by_frame(sptr.id)
             return cls.by_member(ea, mptr)
 
-        elif not isinstance(locator, (ida_hexrays.lvar_locator_t, ida_hexrays.lvar_t)):
+        elif not isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with  a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
 
         ea, lvars = function.address(locator.defea), cls(locator.defea)
@@ -722,19 +722,19 @@ class variables(object):
     @classmethod
     def has(cls, func, locator):
         '''Return whether the variable identified by `locator` can be found in the function `func`.'''
-        if isinstance(locator, (ida_hexrays.lvar_locator_t, ida_hexrays.lvar_t)):
+        if isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
             fn = interface.function.by(locator.defea)
             chunks = map(interface.range.unpack, interface.function.chunks(fn))
             return any(left <= locator.defea < right for left, right in chunks)
 
         # XXX: it might be a better idea to check `func` directly for the mba.
-        elif isinstance(locator, (ida_hexrays.var_ref_t, ida_hexrays.lvar_ref_t)):
+        elif isinstance(locator, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t)):
             lvar = locator.mba.vars[locator.idx]
             locator = variable.get_locator(lvar)
             return cls.has(func, locator)
 
         # XXX: it might be a better idea to check `func` directly for the mba.
-        elif isinstance(locator, ida_hexrays.stkvar_ref_t):
+        elif isinstance(locator, ida_hexrays_types.stkvar_ref_t):
             lvars, stkoff = arg.mba.vars, arg.off
             mptr, lvar = arg.get_stkvar(), None
             if mptr:
