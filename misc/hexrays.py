@@ -1146,6 +1146,20 @@ class function(object):
     contents of the ``internal.interface`` module.
     """
 
+    def __new__(cls, func):
+        '''Return the ``ida_hexrays.cfunc_t`` for the function specified by `func`.'''
+        if isinstance(func, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
+            return func
+        elif isinstance(func, ida_hexrays_types.mba_t):
+            return cls(func.entry_ea)
+        elif isinstance(func, (types.integer, idaapi.func_t)):
+            return cls.cached(func)
+        elif isinstance(func, idaapi.lvar_locator_t):
+            return cls(func.defea)
+        elif isinstance(func, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
+            return cls(func.mba.entry_ea)
+        raise exceptions.InvalidTypeOrValueError(u"{:s}({!r}) : Unable to fetch a decompiled function using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, func.__class__))
+
     @classmethod
     def by_address(cls, ea, *flags):
         '''Decompile the function at the address `ea` with the given `flags` and return an ``idaapi.cfuncptr_t``.'''
