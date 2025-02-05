@@ -965,12 +965,13 @@ class variable(object):
     @classmethod
     def remove_name(cls, *args):
         '''Remove the name from the variable identified by the given `args`.'''
-        lvar = variables.get(*args)
+        fn = function(*args[:1]) if len(args) > 1 else None
+        lvar = variables.get(*itertools.chain(args if fn is None else [fn], args[1:]))
         lvarname = utils.string.of(lvar.name)
 
         # grab all information about the function containing the variable.
-        func, _ = args if len(args) == 2 else [lvar.defea, None]
-        ea, locator = function.address(func), cls.get_locator(lvar)
+        cfunc = function(lvar.defea) if fn is None else fn
+        ea, locator = cfunc.entry_ea, cls.get_locator(lvar)
         fn, frame = (F(ea) for F in [interface.function.by, interface.function.frame])
 
         # grab the storage location for the variable. if it's a register, figure
@@ -978,7 +979,7 @@ class variable(object):
         store = cls.get_storage(locator, lvar.width)
         if not isinstance(store, interface.location_t):
             res = 'arg' if lvar.is_arg_var else 'var', store.name
-            return cls.set_name(func, locator, res)
+            return cls.set_name(cfunc, locator, res)
 
         # if it wasn't a register, then it's in the stack frame. so, we need to
         # translate its offset to the frame member offset.
@@ -990,7 +991,7 @@ class variable(object):
             delta = fn.frregs
             default = internal.structure.member.default_name(frame, None, offset)
             res = default.replace(' ', '$') if default in {' r', ' s'} else default
-            return cls.set_name(func, locator, res)
+            return cls.set_name(cfunc, locator, res)
 
         # otherwise, a member exists at the given offset of the frame and we can
         # use our store location to snag its name, check the size, and apply it.
@@ -1008,17 +1009,17 @@ class variable(object):
 
         # grab the member name, and then apply it.
         res = internal.structure.member.get_name(mptr)
-        return cls.set_name(func, locator, res)
+        return cls.set_name(cfunc, locator, res)
 
     @classmethod
     def set_name(cls, func, variable, string):
         '''Modify the name of the given `variable` in the function `func` to the specified `string`.'''
-        args = [variable] if isinstance(func, types.none) else [func, variable]
+        fn = func if func is None else function(func)
         packed = interface.tuplename(*itertools.chain([string] if isinstance(string, types.string) else string))
 
         # grab the variable locator and entrypoint for the function owning it.
-        locator = variables.by(*args)
-        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+        locator = variables.by(*filter(None, [fn, variable]))
+        cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
         lvarinfo = ida_hexrays.lvar_saved_info_t()
@@ -1026,7 +1027,7 @@ class variable(object):
         lvarinfo.name = utils.string.to(packed)
 
         # now we just need to apply the name to the variable, and return the old one.
-        ea, lvar = function.address(fn), variables.get(fn, locator)
+        ea, lvar = cfunc.entry_ea, variables.get(cfunc, locator)
         res = utils.string.of(lvar.name)
         if not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_NAME, lvarinfo):
             raise exceptions.DisassemblerError(u"{:s}.set_name({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), packed, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_NAME, utils.string.of(lvarinfo.name), utils.string.escape(res, '"'), lvar.defea, lvar.defblk, lvar.width))
@@ -1041,19 +1042,19 @@ class variable(object):
     @classmethod
     def remove_comment(cls, *args):
         '''Remove the comment from the variable identified by the given `args`.'''
-        locator = variables.by(*args)
-        func, _ = args if len(args) == 2 else [locator.defea, None]
-        fn = function.address(locator.defea) if isinstance(func, types.none) else func
-        return cls.set_comment(fn, locator, '')
+        fn = function(*args[:1]) if len(args) > 1 else None
+        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        cfunc = function(locator.defea) if fn is None else fn
+        return cls.set_comment(cfunc, locator, '')
 
     @classmethod
     def set_comment(cls, func, variable, string):
         '''Modify the comment for the given `variable` in the function `func` to the specified `string`.'''
-        args = [variable] if isinstance(func, types.none) else [func, variable]
+        fn = func if func is None else function(func)
 
         # grab the variable locator and the function information if available.
-        locator = variables.by(*args)
-        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+        locator = variables.by(*filter(None, [fn, variable]))
+        cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
         lvarinfo = ida_hexrays.lvar_saved_info_t()
@@ -1061,7 +1062,7 @@ class variable(object):
         lvarinfo.cmt = utils.string.to(string)
 
         # now we just need to apply the comment to the variable, and return the old one.
-        ea, lvar = function.address(fn), variables.get(fn, locator)
+        ea, lvar = cfunc.entry_ea, variables.get(cfunc, locator)
         res = utils.string.of(lvar.cmt)
         if not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_CMT, lvarinfo):
             name = utils.string.of(lvar.name)
@@ -1077,26 +1078,26 @@ class variable(object):
     @classmethod
     def remove_type(cls, *args):
         '''Remove the type from the variable identified by the given `args`.'''
-        locator = variables.by(*args)
-        func, _ = args if len(args) == 2 else [locator.defea, None]
-        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+        fn = function(*args[:1]) if len(args) > 1 else None
+        locator = variables.by(*itertools.chain(args if fn is None else [fn], args[1:]))
+        cfunc = function(locator.defea) if fn is None else fn
 
         # you really can't remove a type from a variable using the decompiler,
         # so instead we decomplexify the type into a similar primitive that
         # matches the original type size to avoid damaging any other variables.
-        lvar = variables.get(fn, locator)
+        lvar = variables.get(cfunc, locator)
         reduced = interface.tinfo.reduce(lvar.tif, lvar.width)
-        return cls.set_type(fn, locator, reduced)
+        return cls.set_type(cfunc, locator, reduced)
 
     @classmethod
     def set_type(cls, func, variable, type):
         '''Apply the given `type` to the `variable` belonging to the function `func`.'''
         ti = interface.tinfo.parse(None, type, idaapi.PT_SIL) if isinstance(type, types.string) else type
-        args = [variable] if isinstance(func, types.none) else [func, variable]
+        fn = func if func is None else function(func)
 
         # grab the variable locator and entrypoint for the function owning it.
-        locator = variables.by(*args)
-        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+        locator = variables.by(*filter(None, [fn, variable]))
+        cfunc = function(locator.defea) if fn is None else fn
 
         # use everything to build the lvar_saved_info_t that we pass to the api.
         lvarinfo = ida_hexrays.lvar_saved_info_t()
@@ -1104,7 +1105,7 @@ class variable(object):
         lvarinfo.type = ti
 
         # now we just need to apply the name to the variable, and return the old one.
-        ea, lvar = function.address(fn), variables.get(fn, locator)
+        ea, lvar = cfunc.entry_ea, variables.get(cfunc, locator)
         res = interface.tinfo.copy(lvar.tif)
         if not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_TYPE, lvarinfo):
             name, description = utils.string.of(lvar.name), "{!s}".format(ti)
@@ -1120,14 +1121,14 @@ class variable(object):
     @classmethod
     def set_size(cls, func, variable, size):
         '''Apply the given `size` to the specified `variable` belonging to the function `func`.'''
-        args = [variable] if isinstance(func, types.none) else [func, variable]
+        fn = func if func is None else function(func)
 
         # grab the variable locator and the function information if available.
-        locator = variables.by(*args)
-        fn = function.address(locator.defea) if isinstance(func, types.none) else func
+        locator = variables.by(*filter(None, [fn, variable]))
+        cfunc = function(locator.defea) if fn is None else fn
 
         # only thing to do is to hand everything off to the set_width method.
-        ea, lvar = function.address(fn), variables.get(fn, locator)
+        ea, lvar = cfunc.entry_ea, variables.get(cfunc, locator)
         result, ti = lvar.width, lvar.tif
         svw_flags = ida_hexrays.SVW_FLOAT if ti.is_float() else ida_hexrays.SVW_SOFT if not ti.is_well_defined() else ida_hexrays.SVW_INT
         if not lvar.set_width(size, svw_flags):
