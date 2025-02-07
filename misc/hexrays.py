@@ -486,6 +486,13 @@ class ida_hexrays_template(object):
     ctree_item_t = missing_class
     treeloc_t = missing_class
 
+    has_cached_cfunc = use_callable(utils.fconstant(False))
+
+    user_labels_begin = user_labels_end = user_labels_next = user_labels_first = user_labels_second = missing_callable
+    user_iflags_begin = user_iflags_end = user_iflags_next = user_iflags_first = user_iflags_second = missing_callable
+    user_unions_begin = user_unions_end = user_unions_next = user_unions_first = user_unions_second = missing_callable
+    user_numforms_begin = user_numforms_end = user_numforms_next = user_numforms_first = user_numforms_second = missing_callable
+
 # Try and import the module. If we can, then all the attributes from our descriptor
 # should end up being forwarded directly to the module as they originally were.
 try:
