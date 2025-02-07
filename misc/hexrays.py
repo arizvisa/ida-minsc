@@ -1221,38 +1221,38 @@ class function(object):
         return res
 
     @classmethod
-    def by(cls, function, *flags):
-        '''Decompile the specified `function` using the given `flags` and return an ``idaapi.cfuncptr_t``.'''
-        fn = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else function
-        return cls.by_function(fn, *flags) if isinstance(fn, idaapi.func_t) else cls.by_address(fn, *flags)
+    def by(cls, func, *flags):
+        '''Decompile the function `func` using the given `flags` and return an ``idaapi.cfuncptr_t``.'''
+        ea = func.entry_ea if isinstance(func, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else func
+        return cls.by_function(ea, *flags) if isinstance(ea, idaapi.func_t) else cls.by_address(ea, *flags)
 
     @classmethod
-    def cached(cls, function, *flags):
-        '''Return the cached decompilation for the specified `function` as an ``idaapi.cfuncptr_t``.'''
-        ea = cls.address(function)
+    def cached(cls, func, *flags):
+        '''Return the cached decompilation for the function `func` as an ``idaapi.cfuncptr_t``.'''
+        ea = cls.address(func)
         if ida_hexrays.has_cached_cfunc(ea):
             return cls.by(ea, *flags)
         raise exceptions.MissingTypeOrAttribute(u"{:s}.cached({:#x}{:s}) : The specified function ({:#x}) does not have any decompilation information currently cached.".format('.'.join([__name__, cls.__name__]), ea, ", {:#x}".format(*flags) if flags else '', ea))
 
     @classmethod
-    def address(cls, function):
-        '''Return the address of the entry point for the given `function`.'''
-        res = function.entry_ea if isinstance(function, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else function
+    def address(cls, func):
+        '''Return the address of the entry point for the function `func`.'''
+        res = func.entry_ea if isinstance(func, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t, ida_hexrays_types.mba_t)) else func
         fn = res if isinstance(res, idaapi.func_t) else idaapi.get_func(int(res))
         if not fn:
             raise interface.function.missing(res, caller=['hexrays', 'function', 'address'])
         return interface.range.start(fn)
 
     @classmethod
-    def has(cls, function):
-        '''Return if the `function` has been cached by the decompiler.'''
-        ea = cls.address(function)
+    def has(cls, func):
+        '''Return if the function `func` has been cached by the decompiler.'''
+        ea = cls.address(func)
         return ida_hexrays.has_cached_cfunc(ea)
 
     @classmethod
-    def clear(cls, function):
-        '''Clear the decompiler cache for the given `function`.'''
-        ea = cls.address(function)
+    def clear(cls, func):
+        '''Clear the decompiler cache for the function described by `func`.'''
+        ea = cls.address(func)
         return ida_hexrays.mark_cfunc_dirty(ea)
 
     @classmethod
@@ -1310,28 +1310,33 @@ class function(object):
         return ((ea, [intvec[index] for index in range(intvec.size())]) for ea, intvec in iterable)
 
     @classmethod
-    def comments(cls, cfunc):
-        '''Yield each of the user-defined comments belonging to the decompiled function represented by `cfunc`.'''
+    def comments(cls, func):
+        '''Yield each of the user-defined comments from the decompilation of the function `func`.'''
+        cfunc = cls(func)
         return cls.user_comments(cfunc.user_cmts)
 
     @classmethod
-    def labels(cls, cfunc):
-        '''Yield each of the user-defined labels belonging to the decompiled function represented by `cfunc`.'''
+    def labels(cls, func):
+        '''Yield each of the user-defined labels from the decompilation of the function `func`.'''
+        cfunc = cls(func)
         return cls.user_labels(cfunc.user_labels)
 
     @classmethod
-    def itemflags(cls, cfunc):
-        '''Yield each of the user-defined item flags belonging to the decompiled function represented by `cfunc`.'''
+    def itemflags(cls, func):
+        '''Yield each of the user-defined item flags from the decompilation of the function `func`.'''
+        cfunc = cls(func)
         return cls.user_itemflags(cfunc.user_iflags)
 
     @classmethod
-    def unions(cls, cfunc):
-        '''Yield each of the user-selected unions belonging to the decompiled function represented by `cfunc`.'''
+    def unions(cls, func):
+        '''Yield each of the user-selected unions from the decompilation of the function `func`.'''
+        cfunc = cls(func)
         return cls.user_unions(cfunc.user_unions)
 
     @classmethod
-    def warnings(cls, cfunc):
-        '''Yield the address, id, and text for each warning produced by the decompiler for the function `cfunc`.'''
+    def warnings(cls, func):
+        '''Yield the address, id, and text for each warning produced by the decompiler for the function `func`.'''
+        cfunc = cls(func)
         hexwarns = cfunc.get_warnings()
         iterable = (hexwarns[index] for index in range(hexwarns.size()))
         warnings = [(item.ea, item.id, item.text) for item in iterable]
