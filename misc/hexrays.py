@@ -672,9 +672,14 @@ class variables(object):
     @classmethod
     def by_string(cls, func, name):
         '''Return an ``ida_hexrays.lvar_locator_t`` for the variable with the given `name` in the function `func`.'''
+        ea, locator = function.address(func), ida_hexrays.lvar_locator_t()
+        if hasattr(ida_hexrays, 'locate_lvar') and ida_hexrays.locate_lvar(locator, ea, name):
+            return locator
+
+        # otherwise we have to do the search linearly.
         cfunc = function(func)
         lvars = cls(cfunc)
-        for locator in cls.iterate(lvars):
+        for locator in cls.iterate(cfunc):
             lvar = lvars.find(locator)
             if utils.string.of(lvar.name) == name:
                 return locator
