@@ -1080,7 +1080,14 @@ class variable(object):
         # now we just need to apply the comment to the variable, and return the old one.
         ea, lvar = cfunc.entry_ea, variables.get(cfunc, locator)
         res = utils.string.of(lvar.cmt)
-        if res != string and ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_CMT, lvarinfo):
+        if res == string:
+            return res
+
+        # XXX: sometimes ida_hexrays.modify_user_lvar_info fails when modifying
+        #      a variable comment. however, if you just try it again it will
+        #      eventually succeed. so, we try to do it twice before failing.
+        ok = ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_CMT, lvarinfo)
+        if not ok and not ida_hexrays.modify_user_lvar_info(ea, ida_hexrays.MLI_CMT, lvarinfo):
             name = utils.string.of(lvar.name)
             raise exceptions.DisassemblerError(u"{:s}.set_comment({:#x}, {:s}, {!r}) : Unable to call `{:s}({:#x}, {:d}, {!r})` for variable \"{:s}\" defined at {:#x} ({:d}) with size {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), string, utils.pycompat.fullname(ida_hexrays.modify_user_lvar_info), ea, ida_hexrays.MLI_CMT, utils.string.of(lvarinfo.cmt), utils.string.escape(name, '"'), lvar.defea, lvar.defblk, lvar.width))
         return res
