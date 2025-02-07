@@ -1330,3 +1330,13 @@ class function(object):
     def unions(cls, cfunc):
         '''Yield each of the user-selected unions belonging to the decompiled function represented by `cfunc`.'''
         return cls.user_unions(cfunc.user_unions)
+
+    @classmethod
+    def warnings(cls, cfunc):
+        '''Yield the address, id, and text for each warning produced by the decompiler for the function `cfunc`.'''
+        hexwarns = cfunc.get_warnings()
+        iterable = (hexwarns[index] for index in range(hexwarns.size()))
+        warnings = [(item.ea, item.id, item.text) for item in iterable]
+        for ea, id, text in warnings:
+            yield ea, id, text
+        return
