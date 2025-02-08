@@ -877,20 +877,32 @@ class member(object):
         # because IDA will always figure it out and only want to include it iff the
         # user has created the type through some explicit action.
 
-        # The documentation says that we should be checking the NALT_AFLAGS(8) or really
-        # the aflags_t of the member which works on structures (since the user will always
-        # be creating them). However, for frames we miss out on types that are applied by
-        # prototypes or ones that have been propagated to the member by Hex-Rays. So for
-        # frames it definitely seems like NSUP_TYPEINFO(0x3000) is the way to go here.
-        user_tinfoQ = idaapi.get_aflags(mptr.id) & idaapi.AFL_USERTI == idaapi.AFL_USERTI
-        sup_tinfoQ = internal.netnode.sup.has(mptr.id, idaapi.NSUP_TYPEINFO)
-        has_typeinfo = sup_tinfoQ if sptr.props & getattr(idaapi, 'SF_FRAME', 0x40) else user_tinfoQ
-        if has_typeinfo:
-            ti = idaapi.tinfo_t()
+        # FIXME: We really should be tracking the application of types using a
+        #        hook. Checking the flags like we are trying to do will likely
+        #        fail on later versions of the disassembler.
+
+        # If we belong to a frame, then we can trust the MF_HASTI property. We
+        # can also use NSUP_TYPEINFO(0x3000) to confirm that type information of
+        # some sort was applied. Although, it's not really that unnecessary.
+        if sptr.props & getattr(idaapi, 'SF_FRAME', 0x40):
+            ti, has_typeinfo = idaapi.tinfo_t(), mptr.flag & idaapi.MF_HASTI
             ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
 
-            # Now we need to attach the member name to our type. Hopefully it's not
-            # mangled in some way that will need consideration if it's re-applied.
+        # Otherwise we need to do something different since structures defined
+        # by the user will _always_ be considered user-defined types and the
+        # MF_HASTI property will _always_ be set for them. So, to come up with
+        # some temporary way to accomplish this (without tracking it with a
+        # hook), we identify a type as being user specified by distinguishing
+        # whether it's a compiler type or an explicit one.
+        else:
+            ti = idaapi.tinfo_t()
+            ok = idaapi.get_or_guess_member_tinfo2(mptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, mptr)
+            has_typeinfo = ok and not interface.tinfo.basic(ti)
+
+        # Now we need to attach the member name to our type so that it can
+        # be rendered. Hopefully it's not mangled in some way that will need
+        # consideration if it's reapplied by the user.
+        if ok and has_typeinfo:
             ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(declaration.unmangled.parsable(aname) if aname else ''), '')
             res.setdefault('__typeinfo__', ti_s)
         return res
