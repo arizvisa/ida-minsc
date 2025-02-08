@@ -1988,7 +1988,6 @@ class prioritynotification(prioritybase):
 
         # Otherwise we need to complain about it and then we can try to remove the
         # start callable we attached. If that fails, we can complain about it too.
-        # attached, and we only need to update our dictionaries.
         logging.warning(u"{:s}.__attach_managers({!r}) : Unable to attach to the {:s} notification with the management callable ({:s}).".format('.'.join([__name__, cls.__name__]), notification, self.__formatter__(notification), internal.utils.pycompat.fullname(stop)))
 
         if not idaapi.notify_when(notification | idaapi.nw_remove, start):
