@@ -6622,6 +6622,51 @@ class tinfo(object):
 
         return reduce_individual_type(ti, *size)
 
+    @classmethod
+    def basic(cls, type):
+        '''Reduce whether the given `type` is a default data type used by the selected compiler.'''
+        decl, masks = type.get_decltype(), [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+
+        # assign some types that we'll use for our checks.
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+
+        # XXX: it's worth noting that our referral to these being "basic" types
+        #      is different from the documentation. we classify a "basic" type
+        #      as a type that is made using the data types rather than a type
+        #      applied using type information.
+
+        compiler_integer_types = {
+            idaapi.BT_INT8,
+            idaapi.BT_INT16,
+            idaapi.BT_INT32,
+            idaapi.BT_INT64,
+            idaapi.BT_INT128,
+            idaapi.BT_INT,
+        }
+
+        # unpack the type declaration into its components so that we can test.
+        base, flags, modifiers = (decl & mask for mask in masks)
+
+        # if there are any modifiers, then its definitely not a basic type.
+        if modifiers:
+            return False
+
+        # start out by checking if it's one of the basic integer types used by
+        # the selected compiler. we need to specially handle single-byte types,
+        # because they have a flag set for them to make them a "char".
+        if not flags and base in compiler_integer_types:
+            return True
+
+        elif (base, flags) == (idaapi.BT_INT8, idaapi.BTMT_CHAR):
+            return True
+
+        # floating-point numbers require us to test the flags for the type.
+        elif base == idaapi.BT_FLOAT and flags in {idaapi.BTMT_FLOAT, idaapi.BTMT_DOUBLE, idaapi.BTMT_SPECFLT}:
+            return True
+
+        # anything else was explicitly specified by the user or decompiler.
+        return False
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
