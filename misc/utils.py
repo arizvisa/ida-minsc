@@ -216,7 +216,7 @@ class pycompat(object):
         # huge performance hit and get the filename.
         else:
             module = cls.module(func)
-            filename, linenumber = __import__(module).__file__, None
+            filename, linenumber = getattr(__import__(module), '__file__', '<builtin>'), -1
         res = os.path.relpath(filename, idaapi.get_user_idadir())
         return os.path.abspath(filename) if res.startswith(''.join(['..', os.path.sep])) else res, linenumber
 
