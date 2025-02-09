@@ -3335,7 +3335,7 @@ class address(object):
     @classmethod
     def structure(cls, ea):
         '''Return the union or structure identifier for the item at address `ea`.'''
-        is_struct = idaapi.is_struct if hasattr(idaapi, 'is_struct') else utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU))
+        is_struct = idaapi.is_struct if hasattr(idaapi, 'is_struct') else internal.utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU))
 
         # First check if there's a structure/union at the specified address.
         ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
@@ -3367,7 +3367,7 @@ class address(object):
     @classmethod
     def string(cls, ea):
         '''Return the unpacked string type for the string at the address `ea`.'''
-        is_string = idaapi.is_strlit if hasattr(idaapi, 'is_strlit') else utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI))
+        is_string = idaapi.is_strlit if hasattr(idaapi, 'is_strlit') else internal.utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI))
 
         # Check that the suggested address has a string applied to it.
         ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
@@ -3383,7 +3383,7 @@ class address(object):
     @classmethod
     def custom(cls, ea):
         '''Return the custom data type id and a list of its formats for the item at address `ea`.'''
-        is_custom = idaapi.is_custom if hasattr(idaapi, 'is_custom') else utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_CUSTOM))
+        is_custom = idaapi.is_custom if hasattr(idaapi, 'is_custom') else internal.utils.fcompose(functools.partial(operator.and_, idaapi.DT_TYPE), functools.partial(operator.eq, idaapi.FF_CUSTOM))
 
         # Check if there's a custom data type applied to the address.
         ea, info, flags = int(ea), idaapi.opinfo_t(), cls.flags(int(ea))
@@ -5183,12 +5183,12 @@ class tinfo(object):
         for ti in wrapped[::-1]:
             td = idaapi.ptr_type_data_t()
             if not ti.get_ptr_details(td):
-                raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({!r}) : The preserved type \"{:s}\" does not contain the pointer details that were expected.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), utils.string.escape("{!s}".format(ti), '"')))
+                raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({!r}) : The preserved type \"{:s}\" does not contain the pointer details that were expected.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s}".format(ti), '"')))
 
             # Attach our resulting type to whatever pointer we collected.
             td.obj_type = info
             if not res.create_ptr(td):
-                raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({!r}) : Unable to create a pointer for the currently nested type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), utils.string.escape("{!s".format(info), '"')))
+                raise internal.exceptions.DisassemblerError(u"{:s}.update_prototype_details({!r}) : Unable to create a pointer for the currently nested type \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), internal.utils.string.escape("{!s".format(info), '"')))
             info = res
 
         # Before yielding our wrapped type, we need to concretize before yielding.
@@ -6528,7 +6528,7 @@ class tinfo(object):
                 atd.base, atd.nelems, atd.elem_type = 0, length, element
 
                 if not newtype.create_array(atd):
-                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create an array of type \"{:s}\" with {:d} element{:s} from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', utils.string.escape("{!s}".format(element), '"'), length, "{!s}".format(ti)))
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create an array of type \"{:s}\" with {:d} element{:s} from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', internal.utils.string.escape("{!s}".format(element), '"'), length, "{!s}".format(ti)))
                 return newtype
 
             # if it's an enumeration, then we use its width to figure the type.
@@ -6572,7 +6572,7 @@ class tinfo(object):
 
                 # now we can create an array and return it.
                 if not newtype.create_array(atd):
-                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create an array of type \"{:s}\" with the extracted base ({:d}) and length ({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', utils.string.escape("{!s}".format(ti), '"'), index, length))
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create an array of type \"{:s}\" with the extracted base ({:d}) and length ({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', internal.utils.string.escape("{!s}".format(ti), '"'), index, length))
                 return newtype
 
             # if it's a function, then we reduce all of its members but preserve
@@ -6594,7 +6594,7 @@ class tinfo(object):
 
                 # after doing everything, we can then create the function and return it.
                 if not info.create_func(ftd):
-                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create a function with the extracted types from \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', utils.string.escape("{!s}".format(ti), '"')))
+                    raise internal.exceptions.DisassemblerError(u"{:s}.reduce_individual_type({!r}{:s}) : Unable to create a function with the extracted types from \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ti), ", {:d}".format(size) if parameter else '', internal.utils.string.escape("{!s}".format(ti), '"')))
                 return info
 
             # bitfields are easy since they're packed into an integer of some size.
@@ -7831,7 +7831,7 @@ class typematch(object):
 
         description = ', '.join("{!r}".format("{!s}".format(ti)) for ti in candidates)
         for base, flags, modifiers, ti in errors:
-            logging.warning(u"{:s}.typematch({:s}) : Unable to index the unsupported \"{:s}\" type due to its base declaration ({:#x}), flags ({:#x}), or modifiers ({:#x}).".format('.'.join([__name__, cls.__name__]), '[' + description + ']', utils.string.escape("{!s}".format(ti), '"'), base, flags, modifiers))
+            logging.warning(u"{:s}.typematch({:s}) : Unable to index the unsupported \"{:s}\" type due to its base declaration ({:#x}), flags ({:#x}), or modifiers ({:#x}).".format('.'.join([__name__, cls.__name__]), '[' + description + ']', internal.utils.string.escape("{!s}".format(ti), '"'), base, flags, modifiers))
         return res
 
     @classmethod
@@ -8898,8 +8898,8 @@ class xref(object):
 
                 # Validate that the type of the mptr is what we're expecting.
                 if not isinstance(mptr, idaapi.member_t):
-                    name = utils.string.of(idaapi.get_member_fullname(xrfrom))
-                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.structure({:#x}) : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), this.id, mptr.__class__, utils.string.escape(name, '"')))
+                    name = internal.utils.string.of(idaapi.get_member_fullname(xrfrom))
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.structure({:#x}) : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), this.id, mptr.__class__, internal.utils.string.escape(name, '"')))
 
                 # Try and fetch the frame's address (which should fail if not a frame),
                 # and then use it to get the func_t that owns the member.
@@ -9233,7 +9233,7 @@ class function(object):
             if range.within(ea, bb):
                 return bb
             continue
-        raise internal.exceptions.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}{:s}) : Unable to locate `{:s}` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), range.start(fn), ea, ", {:#x}".format(*flags) if flags else '', utils.pycompat.fullname(idaapi.BasicBlock), ea, range.start(fn)))
+        raise internal.exceptions.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}{:s}) : Unable to locate `{:s}` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), range.start(fn), ea, ", {:#x}".format(*flags) if flags else '', internal.utils.pycompat.fullname(idaapi.BasicBlock), ea, range.start(fn)))
 
     @classmethod
     def frame_offset(cls, func, *offset):
@@ -10550,7 +10550,7 @@ class name(object):
         # exported and so we literally have no choice but to make an assumption.
         else:
             default = MANGLED_CODE if address.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE else MANGLED_DATA
-            Fmangled_type = internal.utils.fcompose(utils.frpartial(idaapi.demangle_name, idaapi.cvar.inf.long_demnames), internal.utils.fcondition(operator.truth)(default, MANGLED_UNKNOWN))
+            Fmangled_type = internal.utils.fcompose(internal.utils.frpartial(idaapi.demangle_name, idaapi.cvar.inf.long_demnames), internal.utils.fcondition(operator.truth)(default, MANGLED_UNKNOWN))
             mangled_t = Fmangled_type(string)
 
         # We convert the mangled_t into the flags (FF_CODE or FF_DATA) or 0 if it's not mangled.
