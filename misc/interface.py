@@ -2709,7 +2709,7 @@ class priorityaction(prioritybase):
     The following attributes can be used when registering a new action:
 
         * `label` - The label of the action, defaults to name if not provided.
-        * `shortcut` - The keyboard shortcut associated with the action.
+        * `shortcut` - The keyboard shortcut(s) associated with the action.
         * `tooltip` - The tooltip that the disassembler will display.
         * `icon` - An integer containing the icon to display.
 
@@ -2763,6 +2763,11 @@ class priorityaction(prioritybase):
     __action_attribute_order__ = ['name', 'label', 'handler', 'shortcut', 'tooltip', 'icon', 'flags']
 
     ## that should be all of our tables.
+
+    # FIXME: we should also track the shortcuts for each action too, so that we
+    #        can complain about it if there's a duplicate. it's worth knowing
+    #        that we can also interact with shortcuts for actions that we did
+    #        not register ourselves.
 
     def __init__(self):
         super(priorityaction, self).__init__()
@@ -3042,21 +3047,35 @@ class priorityaction(prioritybase):
             return '\n'.join([res] + items[1:])
         return "Actions currently being managed: {:s}".format('No actions are being managed.')
 
-    def list(self, *pattern):
-        '''List all of the managed and unmanaged actions for the given `pattern` with their callable and matching dictionary.'''
+    def list(self, *pattern, **shortcut):
+        """List all of the managed and unmanaged actions for the given `pattern` with their callable and matching dictionary.
+
+        If a glob is passed as `shortcut`, then only the actions with shortcuts
+        that match will be listed.
+        """
         unmanaged = [internal.utils.string.of(action) for action in idaapi.get_registered_actions()]
         managed = [action for action in self.__descriptor_params__]
 
         # If we were given a pattern, then filter both of our lists using it.
-        import fnmatch
+        import fnmatch, re
         if pattern:
             unmanaged = [action for action in fnmatch.filter(unmanaged, *pattern)]
             managed = [action for action in fnmatch.filter(managed, *pattern)]
 
-        # FIXME: the shortcuts are ','-delimited. so, we should probably split
-        #        them up when listing each action descriptor. Better yet,
-        #        display all of them grouped together so that you can easily
-        #        scan the list for a specific shortcut.
+        # If we were given a shortcut pattern, then generate a callable for
+        # matching it depending on whatever the given type was.
+        if 'shortcut' in shortcut and isinstance(shortcut['shortcut'], internal.types.string):
+            regex = re.compile(fnmatch.translate(shortcut['shortcut']), re.IGNORECASE)
+            Fmatch_shortcut = (lambda regex: lambda shortcut: True if regex.match(shortcut) else False)(regex)
+            filter_shortcut = True
+
+        elif 'shortcut' in shortcut and isinstance(shortcut['shortcut'], (internal.types.bool, internal.types.integer)):
+            Fmatch_shortcut = (lambda boolean: lambda shortcut: boolean == (True if shortcut else False))(True if shortcut['shortcut'] else False)
+            filter_shortcut = True
+
+        else:
+            Fmatch_shortcut = lambda shortcut: True
+            filter_shortcut = False
 
         # Figure out the column size of all the available actions for alignment.
         iterable = itertools.chain([''], unmanaged, managed)
@@ -3072,47 +3091,74 @@ class priorityaction(prioritybase):
             match = self.__registration__[action]
 
             # Extract the fields from the descriptor, and format the match
-            # dictionary so that it's a little bit more user-friendly.
+            # dictionary so that it's a little bit more user-friendly. We also
+            # split the shortcuts into their individual key combinations.
             fields = ['name', 'label', 'shortcut']
             iterable = ((attribute, getattr(desc, attribute)) for attribute in fields)
             name, label, shortcut = (internal.utils.string.of(value) for _, value in iterable)
             description = self.__describe_context_match(match)
+            shortcuts = shortcut.replace(' ', '').split(',')
 
-            # Now we grab the lengths and preserve everything that we captured.
+            # Check the shortcuts. If none of the shortcuts match, then we can
+            # skip doing anything with this action. Otherwise, filter the
+            # shortcuts so that we can display only the actions that match.
+            if filter_shortcut and not any(map(Fmatch_shortcut, shortcuts)):
+                continue
+            shortcuts = [shortcut for shortcut in filter(Fmatch_shortcut, shortcuts)]
+
+            # Now we grab the lengths that we'll need for aligning things into columns.
             columns['name'] = max(1 + len(name), columns['name']) if name else columns['name']
             columns['scope'] = max(len(scope), columns['scope'])
             columns['label'] = max(2 + len(label), columns['label']) if label else columns['label']
-            columns['shortcut'] = max(2 + len(shortcut), columns['shortcut']) if shortcut else columns['shortcut']
             columns['description'] = max(len(description), columns['description'])
 
-            items.append((name, scope, label, shortcut, description))
+            shortcut_length = max(2 + len(shortcut) for shortcut in shortcuts) if shortcuts else columns['shortcut']
+            columns['shortcut'] = max(shortcut_length, columns['shortcut'])
+
+            # That was it. We have all our attributes. We need to add a row for
+            # each individual shortcut if an action has multiple registered.
+            [items.append((name, scope, label, shortcut, description)) for shortcut in shortcuts]
 
         # Now we need to process the unmanaged actions. We need to extract the
         # same attributes for our own actions so that it looks okay.
-        unmanaged_items, columns['tooltip'] = [], 0
+        unmanaged_items, columns['tooltip'], columns['description'] = [], 0, max(len('<unmanaged>'), columns['description'])
         for action in unmanaged:
             if action in managed:
                 continue
 
+            # Extract all of the attributes for the current action. We also
+            # split up the shortcuts since they're comma-delimited.
             state = idaapi.get_action_state(action)
             _, state = state if isinstance(state, tuple) else (True, state)
             scope = self.__action_state_description__[state].upper() if state in self.__action_state_description__ else "{:#x}".format(state) if state else ''
             label = internal.utils.string.of(idaapi.get_action_label(action))
             shortcut = internal.utils.string.of(idaapi.get_action_shortcut(action))
             tooltip = internal.utils.string.of(idaapi.get_action_tooltip(action))
+            shortcuts = shortcut.replace(' ', '').split(',')
+
+            # Next up is to check the shortcuts to see if any of them match. If
+            # none of them match, then we skip this action. Otherwise, we need
+            # to filter the shortcuts so we only display the matching ones.
+            if filter_shortcut and not any(map(Fmatch_shortcut, shortcuts)):
+                continue
+            shortcuts = [shortcut for shortcut in filter(Fmatch_shortcut, shortcuts)]
 
             # Now we grab the lengths and preserve everything that we captured.
             columns['name'] = max(1 + len(action), columns['name']) if action else columns['name']
             columns['scope'] = max(len(scope), columns['scope'])
             columns['label'] = max(2 + len(label), columns['label']) if label else columns['label']
-            columns['shortcut'] = max(2 + len(shortcut), columns['shortcut']) if shortcut else columns['shortcut']
 
             # The tooltip is special though, because we don't want it to align
             # with the matching dictionary for the actions that we manage.
             columns['tooltip'] = max(2 + len(tooltip), columns['tooltip']) if tooltip else columns['tooltip']
 
-            # Then we add them.
-            unmanaged_items.append((action, scope, label, shortcut, tooltip))
+            # As multiple shortcuts can be assign to an action, we need to
+            # extract them from the action and add a row for each one found.
+            shortcut_length = max(2 + len(keycombo) for keycombo in shortcuts) if shortcuts else columns['shortcut']
+            columns['shortcut'] = max(shortcut_length, columns['shortcut'])
+
+            # Then we add a row for each shortcut that we found.
+            [unmanaged_items.append((action, scope, label, shortcut, tooltip)) for shortcut in shortcuts]
 
         # Now we just need to output everything and hope it fits. We start with
         # the managed actions, and then we can follow up with the managed ones.
@@ -3122,7 +3168,7 @@ class priorityaction(prioritybase):
             scope_formatted = scope
             shortcut_formatted = "\"{:s}\"".format(shortcut) if shortcut else ''
 
-            six.print_(u"{:<{:d}s} {:<{:d}s} : {:<{:d}s} {:>{:d}s}".format(name_formatted, columns['name'], shortcut_formatted, columns['shortcut'], scope_formatted, columns['scope'], '<unmanaged>', columns['description']))
+            six.print_(u"{:<{:d}s} {:>{:d}s} : {:<{:d}s} {:>{:d}s}".format(name_formatted, columns['name'], shortcut_formatted, columns['shortcut'], scope_formatted, columns['scope'], '<unmanaged>', columns['description']))
 
         for name, scope, label, shortcut, description in items:
             name_formatted = name
@@ -3130,7 +3176,7 @@ class priorityaction(prioritybase):
             scope_formatted = scope
             shortcut_formatted = "\"{:s}\"".format(shortcut) if shortcut else ''
 
-            six.print_(u"{:<{:d}s} {:<{:d}s} : {:<{:d}s} : {:<{:d}s}".format(name_formatted, columns['name'], shortcut_formatted, columns['shortcut'], scope_formatted, columns['scope'], description, columns['description']))
+            six.print_(u"{:<{:d}s} {:>{:d}s} : {:<{:d}s} {:<{:d}s}".format(name_formatted, columns['name'], shortcut_formatted, columns['shortcut'], scope_formatted, columns['scope'], description, columns['description']))
         return
 
     @property
@@ -3179,8 +3225,9 @@ class priorityaction(prioritybase):
         string. The `match` dictionary will be used to match the attributes of
         the ``idaapi.action_ctx_base_t`` that is provided by the disassembler.
 
-        The `label`, `shortcut`, and `tooltip` attributes take a string.
+        The `label` and `tooltip` attributes take a string.
         The `icon` and `flag` attributes both will take an integer.
+        The `shortcut` attribute can take a string or a list of strings.
         """
         attributes_description = internal.utils.string.kwargs(attributes)
         available_attributes = {
@@ -3224,6 +3271,19 @@ class priorityaction(prioritybase):
         elif not isinstance(match, internal.types.dictionary):
             cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
             raise internal.exceptions.InvalidParameterError(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add a new action due to the matching dictionary ({!r}) being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, match, match.__class__))
+
+        # Before we do any type-checking, we need to check if the shortcut we
+        # were given is a string or an unordered container. If it's an unordered
+        # container and it only contains strings, then we can join each key
+        # combination with a ',' to map multiple shortcuts to the action.
+        if isinstance(attributes.get('shortcut'), internal.types.unordered):
+            if not all(isinstance(item, internal.types.string) for item in attributes['shortcut']):
+                cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+                invalid = [item.__class__ for item in attributes['shortcut'] if not isinstance(item, internal.types.string)]
+                expected_packed = self.__action_attribute_types__['shortcut']
+                expected = next(iter(expected_packed)) if hasattr(expected_packed, '__iter__') else expected_packed
+                raise internal.exceptions.InvalidParameterError(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add a new action due to the \"{:s}\" attribute containing {:s} ({!s}) than what was expected ({!s}).".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, internal.utils.string.escape('shortcut', '"'), 'a different type' if len(invalid) == 1 else 'different types', ', '.join(map("{!s}".format, invalid)), expected))
+            attributes['shortcut'] = ','.join(attributes['shortcut'])
 
         # We'll need to do proper type-checking here to avoid a potential error
         # occurring when we try later to attach the action to an action_desc_t.
@@ -3280,7 +3340,7 @@ class priorityaction(prioritybase):
         method:
 
             * `label` - The label for the action.
-            * `shortcut` - The keyboard shortcut associated with the action.
+            * `shortcut` - The keyboard shortcut(s) associated with the action.
             * `tooltip` - The tooltip that the disassembler will display.
             * `icon` - An integer containing the icon to use for the action.
             * `state` - An integer containing the state of the action.
@@ -3302,6 +3362,20 @@ class priorityaction(prioritybase):
             cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
             raise internal.exceptions.InvalidParameterError(u"{:s}.update({!r}{:s}) : Unable to modify the attributes for action \"{:s}\" due to some of the given attributes being unavailable ({:s}).".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), ', '.join(sorted(missing))))
 
+        # before any type-checking is done on the attributes we were given, we
+        # need to special-case the "shortcut" since it can be given as a string
+        # or an unordered container of strings. If it's the latter, then we can
+        # join them together with a "," to map multiple shortcuts to the action.
+        if isinstance(attributes.get('shortcut'), internal.types.unordered):
+            if not all(isinstance(item, internal.types.string) for item in attributes['shortcut']):
+                cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+                invalid = [item.__class__ for item in attributes['shortcut'] if not isinstance(item, internal.types.string)]
+                expected_packed = self.__action_attribute_types__['shortcut']
+                expected = next(iter(expected_packed)) if hasattr(expected_packed, '__iter__') else expected_packed
+                raise internal.exceptions.InvalidParameterError(u"{:s}.update({!r}{:s}) : Unable to modify the attributes for action \"{:s}\" due to the \"{:s}\" attribute containing {:s} ({!s}) than what was expected ({!s}).".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), internal.utils.string.escape('shortcut', '"'), 'a different type' if len(invalid) == 1 else 'different types', ', '.join(map("{!s}".format, invalid)), expected))
+            attributes['shortcut'] = ','.join(attributes['shortcut'])
+
+        # then we can go ahead and verify their types are correct.
         invalid = []
         for attribute, value in attributes.items():
             expected = self.__action_attribute_types__[attribute]
@@ -3400,11 +3474,16 @@ class priorityaction(prioritybase):
         if name not in self.available:
             return name
 
-        # Otherwise, we need to update the parameters for the action's descriptor.
+        # Otherwise, we need to update the parameters for the instantiating the
+        # action descriptor and update the attributes of the descriptor itself.
         original = self.__descriptor_params__[name]
         zipped = zip(self.__action_attribute_order__, original)
         iterable = (modified.get(attribute, item) for attribute, item in zipped)
         self.__descriptor_params__[name] = [item for item in iterable]
+
+        descriptor = self.__descriptors__[name]
+        iterable = (attribute for attribute in modified if attribute in self.__action_attribute_types__)
+        [setattr(descriptor, attribute, modified[attribute]) for attribute in iterable]
 
         return name
 
