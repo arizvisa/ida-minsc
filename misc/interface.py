@@ -2746,7 +2746,8 @@ class priorityaction(prioritybase):
         __action_state_mapping__['WIDGET'] = (idaapi.AST_ENABLE_FOR_WIDGET, idaapi.AST_DISABLE_FOR_WIDGET)
 
     # define a dictionary that can be used for checking the attribute types for
-    # an action descriptor.
+    # an action descriptor. we also keep a list that's used to match an
+    # attribute by name to its idaapi.action_desc_t parameter number.
     __action_attribute_types__ = {
         'name': internal.types.string,
         'label': internal.types.string,
@@ -2758,6 +2759,8 @@ class priorityaction(prioritybase):
         'checked': internal.types.bool,
         'visibility': internal.types.bool,
     }
+
+    __action_attribute_order__ = ['name', 'label', 'handler', 'shortcut', 'tooltip', 'icon', 'flags']
 
     ## that should be all of our tables.
 
@@ -3180,7 +3183,6 @@ class priorityaction(prioritybase):
             'flags',
         }
 
-        attribute_order = ['name', 'label', 'handler', 'shortcut', 'tooltip', 'icon', 'flags']
         attribute_defaults = {
             'name': name, 'label': name,
             'handler': None, 'shortcut': None, 'tooltip': None, 'icon': -1, 'flags': 0,
@@ -3245,7 +3247,7 @@ class priorityaction(prioritybase):
         flags = [idaapi.ADF_OWN_HANDLER, idaapi.ADF_OT_PLUGIN]
 
         parameters = []
-        for attribute in attribute_order:
+        for attribute in self.__action_attribute_order__:
             value = attributes.get(attribute, attribute_defaults[attribute])
             parameters.append(internal.utils.string.to(value) if isinstance(value, internal.types.string) else value)
 
