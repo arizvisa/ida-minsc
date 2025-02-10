@@ -3126,9 +3126,8 @@ class priorityaction(prioritybase):
 
     @property
     def available(self):
-        '''Return all of the actions that have been registered and are attachable.'''
-        res = { action for action in self.__descriptor_params__}
-        return res
+        '''Return the actions that have been registered and are being managed.'''
+        return { action for action in self.__descriptor_params__}
 
     def __describe_context_match(self, match):
         '''Describe the dictionary in `match` and return the description formatted as a string.'''
@@ -3255,6 +3254,12 @@ class priorityaction(prioritybase):
         self.__action_scope__[name] = scope.upper()
         self.__registration__[name] = match
         return name
+
+    @classmethod
+    def has(cls, name):
+        '''Return whether an action with the given `name` has been registered into the disassembler.'''
+        unmanaged = {internal.utils.string.of(action) for action in idaapi.get_registered_actions()}
+        return name in unmanaged
 
     def add(self, name, activator, priority=0):
         '''Add the callable in `activator` to the queue for the action specified in `name` with the given `priority`.'''
