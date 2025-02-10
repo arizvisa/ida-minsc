@@ -3263,6 +3263,145 @@ class priorityaction(prioritybase):
         unmanaged = {internal.utils.string.of(action) for action in idaapi.get_registered_actions()}
         return name in unmanaged
 
+    def update(self, name, **attributes):
+        """Modify the attributes for the plugin action that is specified by `name`.
+
+        This method can modify the attributes of the descriptor for either a
+        managed or an unmanaged action. This allows changing the state for
+        actions that are not owned by this class.
+
+        The following attributes for a plugin action can be modified with this
+        method:
+
+            * `label` - The label for the action.
+            * `shortcut` - The keyboard shortcut associated with the action.
+            * `tooltip` - The tooltip that the disassembler will display.
+            * `icon` - An integer containing the icon to use for the action.
+            * `state` - An integer containing the state of the action.
+            * `checkable` - A boolean specifying that the action can be toggled.
+            * `checked` - A boolean used for toggling the action.
+            * `visiblity` - A boolean used for specifying action visibility.
+
+        """
+        attributes_description = internal.utils.string.kwargs(attributes)
+
+        # first make sure that the plugin actions actually exists.
+        if not self.has(name):
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.update({!r}{:s}) : Unable to modify the attributes for action \"{:s}\" due to it not having been registered.".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"')))
+
+        # now we need to go through and verify the attributes we were given.
+        missing = {attribute for attribute in attributes if attribute not in self.__action_attribute_types__}
+        if missing:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.InvalidParameterError(u"{:s}.update({!r}{:s}) : Unable to modify the attributes for action \"{:s}\" due to some of the given attributes being unavailable ({:s}).".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), ', '.join(sorted(missing))))
+
+        invalid = []
+        for attribute, value in attributes.items():
+            expected = self.__action_attribute_types__[attribute]
+            if not isinstance(value, expected):
+                invalid.append((attribute, value.__class__, expected))
+            continue
+
+        if invalid:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.update({!r}{:s}) : Unable to modify the attributes for action \"{:s}\" due to some of the given attributes ({:s}) having an unsupported type.".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), ', '.join(sorted(invalid))))
+
+        # If all the attributes have the correct type, then start going through
+        # them one-by-one and applying them to the specified plugin action. We
+        # track some of the attributes in case one of the actions we manage is
+        # being updated. This way we can keep the action descriptor in sync.
+        modified = {}
+
+        # Label
+        ok, value = True, attributes.get('label')
+        if 'label' in attributes:
+            ok = idaapi.update_action_label(*map(internal.utils.string.to, [name, value]))
+            ok and modified.setdefault('label', value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the label for action \"{:s}\" to the string \"{:s}\".".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), internal.utils.string.escape(value, '"')))
+
+        # Shortcut
+        ok, value = True, attributes.get('shortcut')
+        if 'shortcut' in attributes:
+            ok = idaapi.update_action_shortcut(*map(internal.utils.string.to, [name, value]))
+            ok and modified.setdefault('shortcut', value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the shortcut for action \"{:s}\" to the string \"{:s}\".".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), internal.utils.string.escape(value, '"')))
+
+        # Tooltip
+        ok, value = True, attributes.get('tooltip')
+        if 'tooltip' in attributes:
+            ok = idaapi.update_action_tooltip(*map(internal.utils.string.to, [name, value]))
+            ok and modified.setdefault('tooltip', value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the tooltip for action \"{:s}\" to the string \"{:s}\".".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), internal.utils.string.escape(value, '"')))
+
+        # Icon
+        ok, value = True, attributes.get('icon')
+        if 'icon' in attributes:
+            ok = idaapi.update_action_icon(internal.utils.string.to(name), value)
+            ok and modified.setdefault('icon', value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the icon for action \"{:s}\" to the integer {:#x}.".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), value))
+
+        # State
+        ok, value = True, attributes.get('state')
+        if 'state' in attributes:
+            ok = idaapi.update_action_state(internal.utils.string.to(name), value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the state for action \"{:s}\" to the integer {:#x}.".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), value))
+
+        # Checkable
+        ok, value = True, True if attributes.get('checkable') else False
+        if 'checkable' in attributes:
+            ok = idaapi.update_action_checkable(internal.utils.string.to(name), value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the checkable attribute for action \"{:s}\" to {!s}.".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), value))
+
+        # Checkable
+        ok, value = True, True if attributes.get('checked') else False
+        if 'checked' in attributes:
+            ok = idaapi.update_action_checked(internal.utils.string.to(name), value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the checked attribute for action \"{:s}\" to {!s}.".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), value))
+
+        # Visibility
+        ok, value = True, True if attributes.get('visibility') else False
+        if 'visibility' in attributes:
+            ok = idaapi.update_action_visibility(internal.utils.string.to(name), value)
+
+        if not ok:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.update({!r}{:s}) : Unable to set the visibility for action \"{:s}\" to {!s}.".format('.'.join([__name__, cls.__name__]), name, attributes_description, internal.utils.string.escape(name, '"'), value))
+
+        # If we aren't managing the action, then we're done and only need to
+        # return the action name that was modified so that it can be reused.
+        if name not in self.available:
+            return name
+
+        # Otherwise, we need to update the parameters for the action's descriptor.
+        original = self.__descriptor_params__[name]
+        zipped = zip(self.__action_attribute_order__, original)
+        iterable = (modified.get(attribute, item) for attribute, item in zipped)
+        self.__descriptor_params__[name] = [item for item in iterable]
+
+        return name
+
     def add(self, name, activator, priority=0):
         '''Add the callable in `activator` to the queue for the action specified in `name` with the given `priority`.'''
         if name not in self.__descriptor_params__:
