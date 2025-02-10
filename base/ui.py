@@ -1707,6 +1707,7 @@ class hook(object):
     idp = hook_descriptor('idp', getattr(idaapi, 'IDP_Hooks', None))
     idb = hook_descriptor('idb', getattr(idaapi, 'IDB_Hooks', None))
     ui = hook_descriptor('ui', getattr(idaapi, 'UI_Hooks', None))
+    action = hook_descriptor('action', None)
 
     # We're done, so we can remove the descriptor we defined.
     del(hook_descriptor)
@@ -1717,7 +1718,7 @@ class hook(object):
 
         # Iterate through all of our hook attributes so that we can attach the related
         # hooks object directly into our namespace for backwards compatibility.
-        for attribute in ['notification', 'idp', 'idb', 'ui']:
+        for attribute in ['notification', 'idp', 'idb', 'ui', 'action']:
 
             # If the attribute has been assigned to us, then we can just return it.
             if hasattr(ns, attribute):
