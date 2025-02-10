@@ -1831,6 +1831,7 @@ def del_func(pfn):
     for k in Ftags(fn):
         internal.comment.globals.dec(fn, k)
         logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Removing (global) tag {!s} from function at {:#x}.".format(__name__, start, stop, utils.string.repr(k), fn))
+
     return
 
 def set_func_start(pfn, new_start):
@@ -2796,12 +2797,18 @@ class module(object):
     if hasattr(idaapi, 'Hexrays_Hooks') and hasattr(idaapi, 'init_hexrays_plugin'):
         hexrays = singleton_descriptor(lambda *args: internal.interface.priorityhook(*args) if idaapi.init_hexrays_plugin() else None, idaapi.Hexrays_Hooks, {}, __repr__=staticmethod(lambda item=idaapi.Hexrays_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
 
+    # And a descriptor for managing any actions that we may want to register.
+    action = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityaction, __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  'Actions currently being managed.'))
+
     def close(self):
         '''Disconnect all of the hook instances associated with this object.'''
         try: hasattr(self, 'hx')
         except Exception:
             logging.info(u"{:s} : Unable to close the \"{:s}\" hook type due to an exception raised while trying to access it.".format(__name__, 'hx'), exc_info=True)
         else: delattr(self, 'hx')
+
+        # Disconnect the managed actions first.
+        hasattr(self, 'action') and delattr(self, 'action')
 
         # Iterate through the other attributes and close those too.
         for phook in ['idp', 'idb', 'ui', 'hexrays']:
