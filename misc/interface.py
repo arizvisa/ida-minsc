@@ -811,55 +811,59 @@ class prioritybase(object):
         '''Return all of the attached targets that are currently enabled.'''
         return {item for item in self.__cache} - {item for item in self.__disabled}
 
+    # Extract the parameters from a function. This is just a wrapper around
+    # utils.pycompat.function.arguments so that we can extract the names.
+    @classmethod
+    def __repr_parameters__(cls, func):
+        '''Yield each parameter from the function `func` formatted as a readable string.'''
+        args, defaults, (star, starstar) = internal.utils.pycompat.function.arguments(func)
+        for item in args:
+            yield "{:s}={!s}".format(item, defaults[item]) if item in defaults else item
+        if star:
+            yield "*{:s}".format(star)
+        if starstar:
+            yield "**{:s}".format(starstar)
+        return
+
+    @classmethod
+    def __repr_callable__(cls, object):
+        '''Return the callable in `object` as a readable string and tuple containing its named parameters.'''
+        parameters, pycompat = cls.__repr_parameters__, internal.utils.pycompat
+
+        # If a method is passed to us, then we need to extract all
+        # of the relevant components that describe it.
+        if isinstance(object, (internal.types.method, internal.types.descriptor)):
+            cls = pycompat.method.type(object)
+            func = pycompat.method.function(object)
+            module, name = func.__module__, pycompat.function.name(func)
+            iterable = parameters(func)
+            None if isinstance(object, internal.types.staticmethod) else next(iterable)
+            return '.'.join([module, cls.__name__, name]), tuple(iterable)
+
+        # If our object is a function-type, then it's easy to grab.
+        elif isinstance(object, internal.types.function):
+            module, name = object.__module__, pycompat.function.name(object)
+            iterable = parameters(object)
+            return '.'.join([module, name]), tuple(iterable)
+
+        # If it's still callable, then this is likely a class.
+        elif callable(object):
+            symbols, module, name = object.__dict__, object.__module__, object.__name__
+            cons = symbols.get('__init__', symbols.get('__new__', None))
+            iterable = parameters(cons) if cons else []
+            next(iterable)
+            return '.'.join([module, name]), tuple(iterable)
+
+        # Otherwise, we have no idea what it is...
+        return "{!r}".format(object), None
+
     def __repr__(self):
         cls, enabled = self.__class__, {item for item in self.__cache} - {item for item in self.__disabled}
-
-        # Extract the parameters from a function. This is just a wrapper around
-        # utils.pycompat.function.arguments so that we can extract the names.
-        def parameters(func):
-            args, defaults, (star, starstar) = internal.utils.pycompat.function.arguments(func)
-            for item in args:
-                yield "{:s}={!s}".format(item, defaults[item]) if item in defaults else item
-            if star:
-                yield "*{:s}".format(star)
-            if starstar:
-                yield "**{:s}".format(starstar)
-            return
-
-        # Render the callable as something readable.
-        def repr_callable(object, pycompat=internal.utils.pycompat):
-
-            # If a method is passed to us, then we need to extract all
-            # of the relevant components that describe it.
-            if isinstance(object, (internal.types.method, internal.types.descriptor)):
-                cls = pycompat.method.type(object)
-                func = pycompat.method.function(object)
-                module, name = func.__module__, pycompat.function.name(func)
-                iterable = parameters(func)
-                None if isinstance(object, internal.types.staticmethod) else next(iterable)
-                return '.'.join([module, cls.__name__, name]), tuple(iterable)
-
-            # If our object is a function-type, then it's easy to grab.
-            elif isinstance(object, internal.types.function):
-                module, name = object.__module__, pycompat.function.name(object)
-                iterable = parameters(object)
-                return '.'.join([module, name]), tuple(iterable)
-
-            # If it's still callable, then this is likely a class.
-            elif callable(object):
-                symbols, module, name = object.__dict__, object.__module__, object.__name__
-                cons = symbols.get('__init__', symbols.get('__new__', None))
-                iterable = parameters(cons) if cons else []
-                next(iterable)
-                return '.'.join([module, name]), tuple(iterable)
-
-            # Otherwise, we have no idea what it is...
-            return "{!r}".format(object), None
 
         # Unpack a prioritytuple into its components so we can describe it.
         def repr_prioritytuple(tuple):
             priority, callable = tuple
-            name, args = repr_callable(callable)
+            name, args = self.__repr_callable__(callable)
             return priority, name, args
 
         # If there aren't any targets available, then return immediately.
