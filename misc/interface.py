@@ -765,15 +765,17 @@ class prioritybase(object):
 
     def close(self):
         '''Disconnect from all of the targets that are currently attached'''
-        ok, items = True, {item for item in self.__cache}
+        res, items = True, {item for item in self.__cache}
 
         # Simply detach every available target one-by-one.
         for target in items:
-            if not self.detach(target):
+            ok = self.detach(target)
+            if ok:
+                self.__cache.pop(target)
+            else:
                 logging.warning(u"{:s}.close() : Error while attempting to detach from the specified target {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
-                ok = False
-            continue
-        return ok
+            res = res and ok
+        return res
 
     @property
     def available(self):
