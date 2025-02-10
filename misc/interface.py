@@ -3042,10 +3042,16 @@ class priorityaction(prioritybase):
             return '\n'.join([res] + items[1:])
         return "Actions currently being managed: {:s}".format('No actions are being managed.')
 
-    def list(self):
-        '''List all of the managed and unmanaged actions with their callable and matching dictionary.'''
+    def list(self, *pattern):
+        '''List all of the managed and unmanaged actions for the given `pattern` with their callable and matching dictionary.'''
         unmanaged = [internal.utils.string.of(action) for action in idaapi.get_registered_actions()]
         managed = [action for action in self.__descriptor_params__]
+
+        # If we were given a pattern, then filter both of our lists using it.
+        import fnmatch
+        if pattern:
+            unmanaged = [action for action in fnmatch.filter(unmanaged, *pattern)]
+            managed = [action for action in fnmatch.filter(managed, *pattern)]
 
         # FIXME: the shortcuts are ','-delimited. so, we should probably split
         #        them up when listing each action descriptor. Better yet,
