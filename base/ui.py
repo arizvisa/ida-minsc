@@ -1733,6 +1733,7 @@ class hook(object):
         return
 
 hooks = hook    # XXX: ns alias
+action = hook.action
 
 ### Helper classes to use or inherit from
 # XXX: why was this base class implemented again??
