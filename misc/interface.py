@@ -857,6 +857,90 @@ class prioritybase(object):
         # Otherwise, we have no idea what it is...
         return "{!r}".format(object), None
 
+    @classmethod
+    def __repr_object__(cls, object):
+        '''Return the specified `object` as a readable and user-friendly string.'''
+        string_t, integer_t = internal.types.string, internal.types.integer
+        callable_t = internal.types.function, internal.types.method, staticmethod, classmethod
+
+        # check if our cached object exists and use it if it does.
+        if hasattr(cls, '__describe_object__'):
+            object_t, describe = object.__class__, cls.__describe_object__
+            if object_t in describe:
+                format = describe[object_t]
+                return format(object)
+            elif callable(object) and isinstance(object, callable_t):
+                format = describe[callable]
+                return format(object)
+            elif isinstance(object, internal.types.type) and issubclass(object_t, internal.types.type):
+                iterable = itertools.chain([] if getattr(object, '__module__', None) is None else [object.__module__], [object.__name__])
+                return "{!s}".format('.'.join(iterable))
+            return "{!r}".format(object)
+
+        # otherwise, we'll need to generate some dicts for formatting.
+        describe = {}
+
+        # we'll need a way to represent strings and integers (atomics).
+        [describe.setdefault(type, "{!r}".format) for type in itertools.chain(string_t if isinstance(string_t, internal.types.unordered) else [string_t])]
+        [describe.setdefault(type, "{:#x}".format) for type in itertools.chain(integer_t if isinstance(integer_t, internal.types.unordered) else [integer_t])]
+
+        # then we'll do any callables. these aren't actually a type, but we
+        # stash them in our dictionary as "callable" anyways.
+        def format_callable(object):
+            name, args = cls.__repr_callable__(object)
+            return name if args is None else "{:s}({:s})".format(name, ', '.join(args))
+        describe[callable] = format_callable
+
+        # now we'll need to do the container types. these are pretty much always
+        # treated as a set, so we'll make sure to format them as a set. we also
+        # need a function that sorts as much as possible to keep the sortable
+        # elements close to the beginning of the container.
+        def sortable(iterable):
+            items = [item for item in iterable]
+            sortable, remaining = [], []
+            for item in items:
+                try: sorted([0, item])
+                except: remaining.append(item)
+                else: sortable.append(item)
+            iterable = itertools.chain(sorted(sortable), remaining)
+            return [item for item in iterable]
+
+        callable_t = internal.types.function, internal.types.method, staticmethod, classmethod
+        def format_elements(iterable):
+            res, items = [], [item for item in iterable]
+            for element in sortable(iterable):
+                element_t = element.__class__
+                if element_t in describe:
+                    format = describe[element_t]
+                    res.append(format(element))
+                elif callable(element) and isinstance(element, callable_t):
+                    format = describe[callable]
+                    res.append(format(element))
+                elif isinstance(element, internal.types.type) and issubclass(element_t, internal.types.type):
+                    iterable = itertools.chain([] if getattr(element, '__module__', None) is None else [element.__module__], [element.__name__])
+                    res.append("{!s}".format('.'.join(iterable)))
+                else:
+                    res.append("{!r}".format(element))
+                continue
+            return res
+
+        # XXX: we're treating dictionaries as sets here, because users of this
+        #      method really shouldn't need to render the values for each key.
+        formatters = {
+            internal.types.set: "{{{!s}}}".format,
+            internal.types.dictionary: "{{{!s}}}".format,
+            internal.types.list: "[{!s}]".format,
+        }
+
+        for type in [internal.types.set, internal.types.list, internal.types.dictionary]:
+            format = formatters[type]
+            describe[type] = lambda item: format(', '.join(format_elements(item)))
+
+        # assign our lookup dictionary as a property of the class, and then
+        # recurse in order to do what the user asked us to do.
+        cls.__describe_object__ = describe
+        return cls.__repr_object__(object)
+
     def __repr__(self):
         cls, enabled = self.__class__, {item for item in self.__cache} - {item for item in self.__disabled}
 
