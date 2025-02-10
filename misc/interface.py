@@ -2745,6 +2745,20 @@ class priorityaction(prioritybase):
 
         __action_state_mapping__['WIDGET'] = (idaapi.AST_ENABLE_FOR_WIDGET, idaapi.AST_DISABLE_FOR_WIDGET)
 
+    # define a dictionary that can be used for checking the attribute types for
+    # an action descriptor.
+    __action_attribute_types__ = {
+        'name': internal.types.string,
+        'label': internal.types.string,
+        'shortcut': internal.types.string,
+        'tooltip': internal.types.string,
+        'icon': internal.types.integer,
+        'state': internal.types.integer,
+        'checkable': internal.types.bool,
+        'checked': internal.types.bool,
+        'visibility': internal.types.bool,
+    }
+
     ## that should be all of our tables.
 
     def __init__(self):
@@ -3173,15 +3187,6 @@ class priorityaction(prioritybase):
             'handler': None, 'shortcut': None, 'tooltip': None, 'icon': -1, 'flags': 0,
         }
 
-        attribute_types = {
-            'name': internal.types.string,
-            'label': internal.types.string,
-            'tooltip': internal.types.string,
-            'shortcut': internal.types.string,
-            'flags': internal.types.integer,
-            'icon': internal.types.integer,
-        }
-
         # Start out by checking whether we were given a scope and dictionary, or
         # just the dictionary. This way the dictionary is always going to be
         # required, and we can give it a default of "APPLICATION" for the scope.
@@ -3217,7 +3222,7 @@ class priorityaction(prioritybase):
         # occurring when we try later to attach the action to an action_desc_t.
         invalid = []
         for key, value in attributes.items():
-            expected = attribute_types[key]
+            expected = self.__action_attribute_types__[key]
             if not isinstance(value, expected):
                 invalid.append((key, value, expected))
             continue
