@@ -765,15 +765,30 @@ class prioritybase(object):
 
     def close(self):
         '''Disconnect from all of the targets that are currently attached'''
-        ok, items = True, {item for item in self.__cache}
+        res, items = True, {item for item in self.__cache}
 
-        # Simply detach every available target one-by-one.
+        # Iterate through the targets trying to detach the ones with a scope. If
+        # there isn't one, then it's not a target and we skip to the next one.
         for target in items:
-            if not self.detach(target):
+            if target in self.__target_scopes:
+                ok = self.detach(target)
+
+            # A target without a scope isn't really attached. So, we can get by
+            # if we discard the target's queue and then try detaching the next.
+            else:
+                logging.debug(u"{:s}.close() : Discarding the target {:s} as it is not currently attached.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
+                self.__cache__.pop(target)
+                continue
+
+            # If we detached the target successfully, then discard its queue.
+            if ok:
+                self.__cache.pop(target)
+
+            # If we couldn't detach it, then throw up a warning and continue.
+            else:
                 logging.warning(u"{:s}.close() : Error while attempting to detach from the specified target {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target)))
-                ok = False
-            continue
-        return ok
+            res = res and ok
+        return res
 
     @property
     def available(self):
