@@ -2691,6 +2691,577 @@ class priorityhxevent(prioritybase):
         # Now we can modify our state that disables our class.
         self.__hexrays_ready__ = False
 
+class priorityaction(prioritybase):
+    """
+    Helper class for allowing one to register and unregister actions within the
+    disassembler and attach a callable to it when the action is activated.
+
+    To register an action, the `priorityaction.new` method must be called with
+    the action name, its scope, a dictionary containing the attributes to match,
+    and any other attributes that the action should have. The name of the action
+    and its scope are both required to register an action. The available scopes
+    are:
+
+        * "application" - Available while the application is running.
+        * "database" - Available only within the current database.
+        * "widget" - Available only within the widget it is attached to.
+
+    The following attributes can be used when registering a new action:
+
+        * `label` - The label of the action, defaults to name if not provided.
+        * `shortcut` - The keyboard shortcut associated with the action.
+        * `tooltip` - The tooltip that the disassembler will display.
+        * `icon` - An integer containing the icon to display.
+
+    After the action has been registered, a callable can be attached to it using
+    the `priorityaction.add` method. Activation of the action will then result
+    in executing the callables that are attached.
+    """
+
+    # convert an action_handler_t.update method result to a description.
+    __action_state_description__ = {
+        idaapi.AST_ENABLE_FOR_IDB: 'ENABLE_FOR_DATABASE',
+        idaapi.AST_ENABLE: 'ENABLE_FOR_APPLICATION',
+        idaapi.AST_DISABLE_FOR_IDB: 'DISABLE_FOR_DATABASE',
+        idaapi.AST_DISABLE: 'DISABLE_FOR_APPLICATION',
+    }
+
+    # create a dictionary for looking up the potential action update results.
+    __action_state_mapping__ = {
+        'APPLICATION': (idaapi.AST_ENABLE, idaapi.AST_DISABLE),
+        'DATABASE': (idaapi.AST_ENABLE_FOR_IDB, idaapi.AST_DISABLE_FOR_IDB),
+    }
+
+    # update the dicts we just defined the correct widget-related result.
+    if hasattr(idaapi, 'AST_ENABLE_FOR_FORM') and hasattr(idaapi, 'AST_DISABLE_FOR_FORM'):
+        __action_state_description__[idaapi.AST_ENABLE_FOR_FORM] = 'ENABLE_FOR_WIDGET'
+        __action_state_description__[idaapi.AST_DISABLE_FOR_FORM] = 'DISABLE_FOR_WIDGET'
+
+        __action_state_mapping__['WIDGET'] = (idaapi.AST_ENABLE_FOR_FORM, idaapi.AST_DISABLE_FOR_FORM)
+
+    else:
+        __action_state_description__[idaapi.AST_ENABLE_FOR_WIDGET] = 'ENABLE_FOR_WIDGET'
+        __action_state_description__[idaapi.AST_DISABLE_FOR_WIDGET] = 'DISABLE_FOR_WIDGET'
+
+        __action_state_mapping__['WIDGET'] = (idaapi.AST_ENABLE_FOR_WIDGET, idaapi.AST_DISABLE_FOR_WIDGET)
+
+    ## that should be all of our tables.
+
+    def __init__(self):
+        super(priorityaction, self).__init__()
+
+        # dictionaries containing descriptors and how to instantiate them.
+        self.__descriptors__ = {}           # action_desc_t
+        self.__descriptor_params__ = {}     # parameters for action_desc_t
+
+        # dictionaries containing the instantiated actions by their name.
+        self.__handlers__ = {}              # action_handler_t
+        self.__action_scope__ = {}          # matching scope (widget, idb, app)
+
+        # a dictionary containing the actions that have been registered
+        # and what attributes for idaapi.action_ctx_base_t to match for.
+        self.__registration__ = {}          # matching dict
+
+        # a dictionary containing the callables to register for activation.
+        # these are used when enabling an action, or disabling it. this doesn't
+        # really make sense for actions, but we need this because that's just
+        # how our parent class works.
+        self.__handler_scope__ = {}
+
+    def __formatter__(self, action_name):
+        return "\"{:s}\"".format(internal.utils.string.escape(action_name, '"'))
+
+    def __new_action_handler(self, action, callbacks):
+        '''Return an ``idaapi.action_handler_t`` class for executing the specified `action`.'''
+        packed = callbacks
+
+        # define a base class that our new class will inherit from.
+        class handler_t(idaapi.action_handler_t):
+            '''This class is used to implement the action for a handler.'''
+
+            def __repr__(self):
+                return "{:s}<{:s}>".format('action_handler_t', action)
+
+        handler_t.__name__ = "{:s}<{:s}>".format(handler_t.__name__, action)
+
+        # first we'll define the activation method. this is the method that's
+        # actually responsible for executing the callable(s) attached to the
+        # registered action.
+        def handler_activate(action_name, packed):
+            start, stop, resume = packed
+
+            # Even though you can only attach one callable to an action, we have
+            # 3 of them where each can return a result of some sort. We need to
+            # execute each callable and figure out which result to return.
+            def handler_activate_closure(self, context):
+                wants_refresh = 0
+
+                # Start everything and snag the first result. This result is
+                # used to tell the disassembler whether the affected views
+                # should be refreshed.
+                res = start(context)
+                wants_refresh = wants_refresh if res is None else res
+
+                # Now we can resume any others if they were attached. We track
+                # the result and assign it to "wants_refresh", but we only
+                # overwrite the previous value if it's non-zero.
+                res = resume(context)
+                if res is not None:
+                    wants_refresh = max(wants_refresh, res)
+
+                # To close everything out, we do the same thing and return our
+                # result of whether one of the callbacks wanted to refresh.
+                res = stop(context)
+                if res is not None:
+                    wants_refresh = max(wants_refresh, res)
+                return wants_refresh
+            return handler_activate_closure
+
+        # next we need the handler method that will be responsible for doing the
+        # actual selection against whatever context it's given. This takes the
+        # action mapping type which distinguishes whether the action is scoped
+        # to the database, widget, or the application (always).
+        def handler_update(action_name, packed):
+            mapping_scope = self.__action_scope__[action_name]
+            match_attributes = self.__registration__[action_name]
+
+            # this is just to capture any attributes that aren't associated with
+            # an idaapi.action_ctx_base_t. the method gets called repeatedly, so
+            # we only want to log the missing attributes only once.
+            warnings = []
+
+            # here is the method that we're going to use for matching.
+            yes, no = self.__action_state_mapping__[mapping_scope.upper()]
+            def handler_update_closure(self, context):
+                for attribute, check in match_attributes.items():
+                    if not hasattr(context, attribute):
+                        if warnings:
+                            continue
+
+                        # if the attribute didn't exist, then enumerate all the
+                        # ones that might be missing and log a warning for it.
+                        missing = sorted({missing for missing in match_attributes if not hasattr(context, missing)})
+                        logging.info(u"{:s}.update({!r}) : Some of the attributes requested to be matched do not exist ({:s}) and will be ignored.".format('.'.join([__name__, cls.__name__]), action_name, context, ', '.join(missing)))
+                        warnings.append(missing)
+                        continue
+
+                    # We found an attribute that we can use. Grab its value and
+                    # check against the callable to identify whether it matches.
+                    value = getattr(context, attribute)
+                    if callable(check) and check(value):
+                        return yes
+
+                    # The match isn't a callable, which instead requires us to
+                    # compare the value to see if it's an actual match.
+                    elif isinstance(check, internal.types.unordered) and value in check:
+                        return yes
+
+                    elif value == check:
+                        return yes
+                    continue
+                return no
+            return handler_update_closure
+
+        # Now we can create an action_handler_t with our methods attached.
+        namespace = {}
+        namespace['activate'] = handler_activate(action, packed)
+        namespace['update'] = handler_update(action, packed)
+        action_t = type("action_handler_t({:s})".format(action), (handler_t,), namespace)
+
+        # The class should now be ready for instantiation and can be attached.
+        return action_t
+
+    ### parent class
+    def attach(self, name):
+        '''Register the action with the specified `name` and attach any callables from its queue.'''
+        cls = self.__class__
+
+        # If the handler already exists, then the action was already attached.
+        if name in self.__handlers__:
+            logging.debug(u"{:s}.attach({!r}) : The action \"{:s}\" has already been attached and is currently being handled.".format('.'.join([__name__, cls.__name__]), name, internal.utils.string.escape(name, '"')))
+            return True
+
+        # Verify that we haven't attached any packed callables for this action.
+        elif name in self.__handler_scope__:
+            logging.debug(u"{:s}.attach({!r}) : The action \"{:s}\" has already been attached and is currently being handled.".format('.'.join([__name__, cls.__name__]), name, internal.utils.string.escape(name, '"')))
+            return True
+
+        # Ensure that the descriptor was properly added to our dictionary.
+        elif name not in self.__descriptor_params__:
+            logging.warning(u"{:s}.attach({!r}) : The action \"{:s}\" cannot be attached as it has not yet been registered.".format('.'.join([__name__, cls.__name__]), name, internal.utils.string.escape(name, '"')))
+            return False
+
+        # Grab our callables from the parent class, and stash a ref for them.
+        # Then we can use them to get an action_handler_t and attach an instance
+        # instance of it to the action_desc_t that we need for registration.
+        count, packed = super(priorityaction, self).attach(name)
+        action_handler_t = self.__new_action_handler(name, packed)
+        handler = action_handler_t()
+
+        # Now we can get the parameters used to instantiate the action_desc_t
+        # and add our callback into its list. Afterwards, we only need to try to
+        # register it and stash the descriptor if we were succesful.
+        parameters = self.__descriptor_params__[name]
+
+        if parameters[2] is not None:
+            cls = self.__class__
+            logging.warning(u"{:s}.attach({!r}) : Overwriting the user-specified callback ({!s}) with a new one.".format('.'.join([__name__, cls.__name__]), name, parameters[2], handler))
+        parameters[2] = handler
+
+        # FIXME: should probably describe more information about the action when
+        #        we're logging a critical failure.
+        descriptor = idaapi.action_desc_t(*parameters)
+        if not idaapi.register_action(descriptor):
+            logging.critical(u"{:s}.attach({!r}) : Unable to register the action \"{:s}\" due to the disassembler returning an error.".format('.'.join([__name__, cls.__name__]), name, name))
+            return False
+
+        # It registered and we can just stash everything that was constructed.
+        self.__descriptors__[name] = descriptor
+        self.__handler_scope__[name] = packed
+        self.__handlers__[name] = handler
+        return True
+
+    def detach(self, name):
+        '''Unregister the action with the specified `name` and detach any callables associated with it.'''
+        cls = self.__class__
+
+        # If there's no handler, then the action was never attached.
+        if name not in self.__handlers__:
+            logging.warning(u"{:s}.detach({!r}) : The action \"{:s}\" cannot be detached as it is not currently attached.".format('.'.join([__name__, cls.__name__]), name))
+            return False
+
+        # Check for the action descriptor, because we can't detach it if the
+        # descriptor wasn't allocated for it.
+        elif name not in self.__descriptors__:
+            logging.warning(u"{:s}.detach({!r}) : The action \"{:s}\" cannot be detached as its descriptor was never registered.".format('.'.join([__name__, cls.__name__]), name))
+            return False
+
+        # Verify that we haven't attached any packed callbacks for this action.
+        elif name not in self.__handler_scope__:
+            logging.warning(u"{:s}.detach({!r}) : The handlers for the action \"{:s}\" have already been removed.".format('.'.join([__name__, cls.__name__]), name))
+
+        # Now we can try to unregister the action.
+        if not idaapi.unregister_action(name):
+            logging.critical(u"{:s}.detach({!r}) : Unable to unregister the action \"{:s}\" due to the disassembler returning an error.".format('.'.join([__name__, cls.__name__]), name, name))
+            return False
+
+        # Remove the action from our attachment dictionaries, and delete them to
+        # ensure that there aren't any references left hanging.
+        descriptors = [descriptor_dictionary.pop(name, None) for descriptor_dictionary in [self.__descriptors__, self.__descriptor_params__]]
+        handlers = [handler_dictionary.pop(name, None) for handler_dictionary in [self.__handlers__, self.__action_scope__, self.__handler_scope__]]
+        registration = self.__registration__.pop(name, None)
+
+        del(descriptors, handlers, registration)
+
+        # Now we can finish the removal by telling our parent class.
+        return super(priorityaction, self).detach(name)
+
+    def close(self):
+        '''Remove all of the actions that have been attached and registered.'''
+        cls, ok = self.__class__, super(priorityaction, self).close()
+        if not ok:
+            count = len(self.__descriptors__)
+            logging.warning(u"{:s}.close() : Error trying to detach from {:d} action{:s} that are still remaining.".format('.'.join([__name__, cls.__name__]), count, '' if count == 1 else 's', count))
+
+        # If our parent class couldn't close all the actions, figure out which
+        # descriptors exist and complain about it before returning False.
+        if not ok:
+            for name in sorted(self.__descriptors__):
+                if name in self.__handler_scope__:
+                    logging.debug(u"{:s}.close() : Detaching action {:s} resulted in its callbacks remaining attached.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name)))
+
+                elif name in self.__handlers__:
+                    logging.debug(u"{:s}.close() : Detaching action {:s} resulted in its handler still remaining instantiated ({!s}).".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), self.__handlers__[name]))
+
+                elif name in self.__registration__:
+                    logging.debug(u"{:s}.close() : Detaching action {:s} resulted in its match dictionary not being removed ({!s}).".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), self.__registration__[name]))
+
+                elif name in self.__descriptor_params__:
+                    logging.debug(u"{:s}.close() : Detaching action {:s} resulted in its desciptor parameters not being removed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name)))
+
+                elif name in self.__action_scope__:
+                    logging.debug(u"{:s}.close() : Detaching action {:s} resulted in its scope description ({!r}) not being removed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), self.__action_scope__[name]))
+
+                else:
+                    logging.debug(u"{:s}.close() : Detaching action {:s} resulted in its action descriptor not being destroyed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name)))
+                continue
+            return False
+
+        # At this point our state should be pretty empty. If it isn't though,
+        # then something critical happened and we need to scream about it.
+        if self.__handler_scope__:
+            actions = len(self.__handler_scope__)
+            count = sum((1 for item in callbacks) for action, callbacks in self.__handler_scope__.items())
+            logging.critical(u"{:s}.close() : Error trying to release {:d} callback{:s} from {:d} remaining action{:s}.".format('.'.join([__name__, cls.__name__]), count, '' if count == 1 else 's', actions, '' if actions == 1 else 's'))
+
+            for name in sorted(self.__handler_scope__):
+                logging.info(u"{:s}.close() : Detaching action {:s} resulted in its callbacks remaining attached.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name)))
+
+        if self.__handlers__:
+            for name in self.__handlers__:
+                logging.info(u"{:s}.close() : Detaching action {:s} resulted in its handler still remaining instantiated ({!s}).".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), self.__handlers__[name]))
+
+        if self.__registration__:
+            for name in self.__registration__:
+                logging.info(u"{:s}.close() : Detaching action {:s} resulted in its match dictionary not being removed ({!s}).".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), self.__registration__[name]))
+
+        if self.__descriptor_params__:
+            for name in self.__descriptor_params__:
+                logging.info(u"{:s}.close() : Detaching action {:s} resulted in its desciptor parameters not being removed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name)))
+
+        if self.__action_scope__:
+            for name in self.__action_scope__:
+                logging.info(u"{:s}.close() : Detaching action {:s} resulted in its scope description ({!r}) not being removed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name), self.__action_scope__[name]))
+
+        if self.__descriptors__:
+            for name in self.__descriptors__:
+                logging.info(u"{:s}.close() : Detaching action {:s} resulted in its action descriptor not being destroyed.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name)))
+
+        return True
+
+    def __repr__(self):
+        if len(self):
+            res, items = 'Actions currently being managed:', super(priorityaction, self).__repr__().split('\n')
+            return '\n'.join([res] + items[1:])
+        return "Actions currently being managed: {:s}".format('No actions are being managed.')
+
+    def list(self):
+        '''List all of the managed and unmanaged actions with their callable and matching dictionary.'''
+        unmanaged = [internal.utils.string.of(action) for action in idaapi.get_registered_actions()]
+        managed = [action for action in self.__descriptor_params__]
+
+        # FIXME: the shortcuts are ','-delimited. so, we should probably split
+        #        them up when listing each action descriptor. Better yet,
+        #        display all of them grouped together so that you can easily
+        #        scan the list for a specific shortcut.
+
+        # Figure out the column size of all the available actions for alignment.
+        iterable = itertools.chain([''], unmanaged, managed)
+        column_unmanaged = max(len(action) + 1 for action in iterable)
+
+        # Before displaying anything, we need to know the column sizes for
+        # everything. This requires us to do a pass through our actions and the
+        # actions that we don't manage.
+        items, columns = [], {name: 0 for name in ['name', 'label', 'shortcut', 'scope', 'description']}
+        for action in managed:
+            desc = self.__descriptors__[action]
+            scope = self.__action_scope__[action]
+            match = self.__registration__[action]
+
+            # Extract the fields from the descriptor, and format the match
+            # dictionary so that it's a little bit more user-friendly.
+            fields = ['name', 'label', 'shortcut']
+            iterable = ((attribute, getattr(desc, attribute)) for attribute in fields)
+            name, label, shortcut = (internal.utils.string.of(value) for _, value in iterable)
+            description = self.__describe_context_match(match)
+
+            # Now we grab the lengths and preserve everything that we captured.
+            columns['name'] = max(1 + len(name), columns['name']) if name else columns['name']
+            columns['scope'] = max(len(scope), columns['scope'])
+            columns['label'] = max(2 + len(label), columns['label']) if label else columns['label']
+            columns['shortcut'] = max(2 + len(shortcut), columns['shortcut']) if shortcut else columns['shortcut']
+            columns['description'] = max(len(description), columns['description'])
+
+            items.append((name, scope, label, shortcut, description))
+
+        # Now we need to process the unmanaged actions. We need to extract the
+        # same attributes for our own actions so that it looks okay.
+        unmanaged_items, columns['tooltip'] = [], 0
+        for action in unmanaged:
+            if action in managed:
+                continue
+
+            state = idaapi.get_action_state(action)
+            _, state = state if isinstance(state, tuple) else (True, state)
+            scope = self.__action_state_description__[state].upper() if state in self.__action_state_description__ else "{:#x}".format(state) if state else ''
+            label = internal.utils.string.of(idaapi.get_action_label(action))
+            shortcut = internal.utils.string.of(idaapi.get_action_shortcut(action))
+            tooltip = internal.utils.string.of(idaapi.get_action_tooltip(action))
+
+            # Now we grab the lengths and preserve everything that we captured.
+            columns['name'] = max(1 + len(action), columns['name']) if action else columns['name']
+            columns['scope'] = max(len(scope), columns['scope'])
+            columns['label'] = max(2 + len(label), columns['label']) if label else columns['label']
+            columns['shortcut'] = max(2 + len(shortcut), columns['shortcut']) if shortcut else columns['shortcut']
+
+            # The tooltip is special though, because we don't want it to align
+            # with the matching dictionary for the actions that we manage.
+            columns['tooltip'] = max(2 + len(tooltip), columns['tooltip']) if tooltip else columns['tooltip']
+
+            # Then we add them.
+            unmanaged_items.append((action, scope, label, shortcut, tooltip))
+
+        # Now we just need to output everything and hope it fits. We start with
+        # the managed actions, and then we can follow up with the managed ones.
+        for name, scope, label, shortcut, tooltip in unmanaged_items:
+            name_formatted = name
+            label_formatted = "\"{:s}\"".format(label) if label else ''
+            scope_formatted = scope
+            shortcut_formatted = "\"{:s}\"".format(shortcut) if shortcut else ''
+
+            six.print_(u"{:<{:d}s} {:<{:d}s} : {:<{:d}s} {:>{:d}s}".format(name_formatted, columns['name'], shortcut_formatted, columns['shortcut'], scope_formatted, columns['scope'], '<unmanaged>', columns['description']))
+
+        for name, scope, label, shortcut, description in items:
+            name_formatted = name
+            label_formatted = "\"{:s}\"".format(label) if label else ''
+            scope_formatted = scope
+            shortcut_formatted = "\"{:s}\"".format(shortcut) if shortcut else ''
+
+            six.print_(u"{:<{:d}s} {:<{:d}s} : {:<{:d}s} : {:<{:d}s}".format(name_formatted, columns['name'], shortcut_formatted, columns['shortcut'], scope_formatted, columns['scope'], description, columns['description']))
+        return
+
+    @property
+    def available(self):
+        '''Return all of the actions that have been registered and are attachable.'''
+        res = { action for action in self.__descriptor_params__}
+        return res
+
+    def __describe_context_match(self, match):
+        '''Describe the dictionary in `match` and return the description formatted as a string.'''
+        context_t, ignored = idaapi.action_ctx_base_t, {'thisown'}
+
+        # if our order attribute exists, then use it to format the match dict.
+        if hasattr(self, '__describe_context_order__'):
+            ordered = self.__describe_context_order__
+
+            # now we'll use the order to gather the pairs in the match dictionary,
+            # and then we can figure out how to render each field.
+            fields = [(attribute, match[attribute]) for attribute in ordered if attribute in match]
+
+            descriptions = []
+            for key, value in fields:
+                descriptions.append((key, self.__repr_object__(value)))
+
+            # next we'll format our descriptions into a single-line description.
+            format = "match({:s})".format
+            return format(', '.join("{:s}={!s}".format(key, value) for key, value in descriptions))
+
+        # start out by gathering all the available attributes we can match with,
+        # and then order them in the way that they'll be displayed.
+        iterable = ((attribute, getattr(context_t, attribute)) for attribute in dir(context_t))
+        filtered = ((attribute, value) for attribute, value in iterable if not attribute.startswith('__'))
+        iterable = ((attribute, value) for attribute, value in filtered if not callable(value))
+        unordered = {attribute for attribute, _ in iterable} - ignored
+        ordered = ['action', 'widget_type', 'widget_title']
+        ordered += [attribute for attribute in sorted(unordered) if attribute not in ordered]
+
+        # we're done, so we just need to save these results in our object and
+        # then we can recurse to describe the match dictionary.
+        self.__describe_context_order__ = ordered
+        return self.__describe_context_match(match)
+
+    def new(self, name, scope, *match, **attributes):
+        """Create an action with the specified `name` and `scope` where the attributes of the context match the dictionary in `match`.
+
+        This method will initialize an action of the `scope` specified as a
+        string. The `match` dictionary will be used to match the attributes of
+        the ``idaapi.action_ctx_base_t`` that is provided by the disassembler.
+
+        The `label`, `shortcut`, and `tooltip` attributes take a string.
+        The `icon` and `flag` attributes both will take an integer.
+        """
+        attributes_description = internal.utils.string.kwargs(attributes)
+        available_attributes = {
+            'name', 'label',
+            'shortcut', 'tooltip', 'icon',
+            'flags',
+        }
+
+        attribute_order = ['name', 'label', 'handler', 'shortcut', 'tooltip', 'icon', 'flags']
+        attribute_defaults = {
+            'name': name, 'label': name,
+            'handler': None, 'shortcut': None, 'tooltip': None, 'icon': -1, 'flags': 0,
+        }
+
+        attribute_types = {
+            'name': internal.types.string,
+            'label': internal.types.string,
+            'tooltip': internal.types.string,
+            'shortcut': internal.types.string,
+            'flags': internal.types.integer,
+            'icon': internal.types.integer,
+        }
+
+        # Start out by checking whether we were given a scope and dictionary, or
+        # just the dictionary. This way the dictionary is always going to be
+        # required, and we can give it a default of "APPLICATION" for the scope.
+        if len(match) not in {0, 1}:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.InvalidParameterError(u"{:s}.new({!r}, {!r}{:s}{:s}) : Unable to add a new action without a dictionary to match attributes with.".format('.'.join([__name__, cls.__name__]), name, scope, ", {:s}".format(', '.join(map("{!r}".format, match))) if match else '', attributes_description, ', '.join(unavailable)))
+
+        [scope, match] = itertools.chain([scope], match) if match else ('APPLICATION', scope)
+
+        # Now we'll need to validate the parameters we were given.
+        if name in self.__descriptors__:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.DuplicateItemError(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add a new action due to one with the name \"{:s}\" already existing.".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, internal.utils.string.escape(name, '"')))
+
+        elif any(key not in available_attributes for key in attributes):
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            unavailable = [key for key in attributes if key not in available_attributes]
+            raise internal.exceptions.InvalidParameterError(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add a new action with the requested attributes due to some of them being unavailable ({:s}).".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, ', '.join(unavailable)))
+
+        elif not isinstance(scope, internal.types.string):
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add the specified action (\"{:s}\") due to its scope ({!r}) being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, internal.utils.string.escape(name, '"'), scope, scope.__class__))
+
+        elif scope.upper() not in self.__action_state_mapping__:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add the specified action (\"{:s}\") due to its scope ({!r}) being unsupported.".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, internal.utils.string.escape(name, '"'), scope))
+
+        elif not isinstance(match, internal.types.dictionary):
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            raise internal.exceptions.InvalidParameterError(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add a new action due to the matching dictionary ({!r}) being of an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, match, match.__class__))
+
+        # We'll need to do proper type-checking here to avoid a potential error
+        # occurring when we try later to attach the action to an action_desc_t.
+        invalid = []
+        for key, value in attributes.items():
+            expected = attribute_types[key]
+            if not isinstance(value, expected):
+                invalid.append((key, value, expected))
+            continue
+
+        if invalid:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            key, value, expected_packed = invalid[0]
+            expected = next(iter(expected_packed)) if hasattr(expected_packed, '__iter__') else expected_packed
+            raise internal.exceptions.InvalidParameterError(u"{:s}.new({!r}, {!r}, ...{:s}) : Unable to add a new action due to the \"{:s}\" attribute being assigned a different type ({!s}) than what was expected ({!s}).".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, internal.utils.string.escape(key, '"'), value.__class__, expected))
+
+        # If the matching dictionary is empty, then we issue a warning since
+        # it's literally going to match everything which is probably unwanted.
+        if not match:
+            cls, attributes_description = self.__class__, ", {:s}".format(attributes_description) if attributes else ''
+            logging.warning(u"{:s}.new({!r}, {!r}, ...{:s}) : Adding the \"{:s}\" action without matching any attributes ({!r}) will result in the action being activated everywhere and is not recommended.".format('.'.join([__name__, cls.__name__]), name, scope, attributes_description, internal.utils.string.escape(name, '"'), match))
+
+        # That should be everything, so now we just need to gather the
+        # parameters that will be used to instantiate the descriptor.
+
+        # FIXME: might need to add some default flags to the descriptor.
+        flags = [idaapi.ADF_OWN_HANDLER, idaapi.ADF_OT_PLUGIN]
+
+        parameters = []
+        for attribute in attribute_order:
+            value = attributes.get(attribute, attribute_defaults[attribute])
+            parameters.append(internal.utils.string.to(value) if isinstance(value, internal.types.string) else value)
+
+        # Then we add it to our dictionary of descriptors ready to be attached.
+        self.__descriptor_params__[name] = parameters
+        self.__action_scope__[name] = scope.upper()
+        self.__registration__[name] = match
+        return name
+
+    def add(self, name, activator, priority=0):
+        '''Add the callable in `activator` to the queue for the action specified in `name` with the given `priority`.'''
+        if name not in self.__descriptor_params__:
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={:s}) : Unable to add a callable for activating the specified action (\"{:s}\") due to the action not having been registered.".format('.'.join([__name__, cls.__name__]), name, activator, format(priority), internal.utils.string.escape(name, '"')))
+
+        if not self.attach(name):
+            cls, format = self.__class__, "{:+d}".format if isinstance(priority, internal.types.integer) else "{!r}".format
+            raise TypeError(u"{:s}.add({!r}, {!s}, priority={:s}) : Unable to attach the specified action (\"{:s}\").".format('.'.join([__name__, cls.__name__]), name, activator, format(priority), internal.utils.string.escape(name, '"')))
+        return super(priorityaction, self).add(name, activator, priority)
+
 class database(object):
     """
     This namespace provides tools that can be used to get specific
