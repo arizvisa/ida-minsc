@@ -11323,27 +11323,58 @@ class decode(object):
         elif info and dtype & idaapi.MS_0TYPE == idaapi.FF_0OFF or dtype & idaapi.MS_1TYPE == idaapi.FF_1OFF:
             length, items = cls.length_table[dsize], cls.integers(dtype, bytes, order=order)
 
-            # FIXME: We should be determining the length from the reference type and figuring out the
-            #        mask to apply to each value so that we can support REF_LOW8, REF_LOW16, REF_HIGH8,
-            #        and REF_HIGH16, but I'm not sure about the correct way to do this. So, instead we'll
-            #        use the element size (length) from the flags.. ignoring the reference type entirely.
+            # FIXME: We should also support the REF_LOW8, REF_LOW16, REF_HIGH8,
+            #        and REF_HIGH16 reference types. Unfortunately, I'm not sure
+            #        about the correct way to do this. So instead, if the type
+            #        is not REF_OFF8, REF_OFF16, REF_OFF32, or REF_OFF64 then we
+            #        use the element size (length) from the flags.. ignoring
+            #        the reference type entirely.
+
+            # This dictionary is used to determine the length for the reference
+            # type so that we can calculate a mask to apply to each integer.
+            rilength = {idaapi.REF_OFF8: 1, idaapi.REF_OFF16: 2, idaapi.REF_OFF32: 4, idaapi.REF_OFF64: 8}
+
+            # FIXME: I'm pretty sure that I'm not correctly processing the flags
+            #        since we're not supporting things like REFINFO_SELFREF or
+            #        REFINFO_NOBASE. This would be useful to have, but I just
+            #        haven't yet encountered a need for the other reftypes.
             ritype, riflags = info.ri.flags & idaapi.REFINFO_TYPE, info.ri.flags
 
             # If the reference info is signed, then take our items and convert them to fit within
             # the reference type size. Unfortunately, the idaapi.as_signed function doesn't clamp
             # its integer unless it has its signed bit set, so we need to clamp that ourselves.
             if riflags & idaapi.REFINFO_SIGNEDOP and ritype in {idaapi.REF_OFF8, idaapi.REF_OFF16, idaapi.REF_OFF32, idaapi.REF_OFF64}:
-                mask, signed = pow(2, 8 * length) - 1, (idaapi.as_signed(item, 8 * length) for item in items)
+                mask = pow(2, 8 * length) - 1
+                signed = (idaapi.as_signed(item, 8 * length) for item in items)
                 clamped = (item if item < 0 else item & mask for item in signed)
+
+            # If it's unsigned, then we just need to figure out which mask to
+            # use, and then we can apply it to each decoded integer.
+            elif ritype in {idaapi.REF_OFF8, idaapi.REF_OFF16, idaapi.REF_OFF32, idaapi.REF_OFF64}:
+                mask = pow(2, 8 * rilength[ritype]) - 1
+                clamped = (item & mask for item in items)
 
             # Otherwise, we use the items in their unsigned form and clamp them to the reference type.
             else:
                 mask = pow(2, 8 * length) - 1
                 clamped = (item & mask for item in items)
 
-            # Now we can translate each item according to the reference info and return it.
-            ribase = 0 if info.ri.base == idaapi.BADADDR else info.ri.base
-            op = functools.partial(operator.sub, ribase) if riflags & idaapi.REFINFO_SUBTRACT and ribase == info.ri.base else functools.partial(operator.add, ribase)
+            # Figure out which base to use for the refinfo_t. We only use the
+            # base if it's valid. If it isn't, and REFINFO_RVAOFF is set, then
+            # we use the imagebase. Otherwise we just fall back to 0.
+            refbase = 0 if info.ri.base == idaapi.BADADDR else info.ri.base
+            ribase = database.imagebase() if not refbase and riflags & idaapi.REFINFO_RVAOFF else refbase
+
+            # XXX: The following is commented out because as far as I can tell,
+            #      the REFINFO_SUBTRACT flag doesn't actually affect the
+            #      reference target that gets displayed in the disassembler.
+
+            # Figure out whether we add or subtract the base from the target.
+            # op = functools.partial(operator.sub, ribase) if riflags & idaapi.REFINFO_SUBTRACT and ribase == info.ri.base else functools.partial(operator.add, ribase)
+
+            # Now we can translate each item according to the reference info
+            # delta and then return the result.
+            op = functools.partial(operator.add, ribase)
             translated = (op(item + info.ri.tdelta) for item in clamped)
             return [ea for ea in translated]
 
