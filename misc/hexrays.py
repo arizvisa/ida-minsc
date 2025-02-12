@@ -485,6 +485,7 @@ class ida_hexrays_template(object):
     cexpr_t = missing_class
     ctree_item_t = missing_class
     treeloc_t = missing_class
+    qstring_printer_t = missing_class
 
     has_cached_cfunc = use_callable(utils.fconstant(False))
 
