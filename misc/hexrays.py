@@ -608,7 +608,7 @@ class variables(object):
     to the contents of the ``internal.interface`` module.
     """
 
-    def __new__(cls, func):
+    def __new__(cls, func, cached=True):
         '''Return the ``ida_hexrays.lvars_t`` for the function specified by `func`.'''
         MMAT_ZERO = ida_hexrays.CMAT_ZERO if hasattr(ida_hexrays, 'CMAT_ZERO') else ida_hexrays.MMAT_ZERO
         if isinstance(func, (ida_hexrays_types.cfuncptr_t, ida_hexrays_types.cfunc_t)):
@@ -617,8 +617,8 @@ class variables(object):
             return func.vars
         elif isinstance(func, ida_hexrays_types.lvars_t):
             return func
-        func = function.cached(func)
-        return func.lvars if func.maturity > MMAT_ZERO else func.mba.vars
+        cfunc = function(func, cached=cached)
+        return cfunc.lvars if cfunc.maturity > MMAT_ZERO else cfunc.mba.vars
 
     @classmethod
     def iterate(cls, func):
@@ -1181,14 +1181,14 @@ class function(object):
     contents of the ``internal.interface`` module.
     """
 
-    def __new__(cls, func):
+    def __new__(cls, func, cached=True):
         '''Return the ``ida_hexrays.cfunc_t`` for the function specified by `func`.'''
         if isinstance(func, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
             return func
         elif isinstance(func, ida_hexrays_types.mba_t):
             return cls(func.entry_ea)
         elif isinstance(func, (types.integer, idaapi.func_t)):
-            return cls.cached(func)
+            return cls.cached(func) if cls.has(func) and cached else cls.by_address(func)
         elif isinstance(func, idaapi.lvar_locator_t):
             return cls(func.defea)
         elif isinstance(func, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
