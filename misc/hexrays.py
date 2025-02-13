@@ -201,6 +201,18 @@ class ida_hexrays_template(object):
     m_fmul = 0x47
     m_fdiv = 0x48
 
+    cot_empty = 0
+    cot_call = 57
+    cot_num = 61
+    cot_fnum = 62
+    cot_str = 63
+    cot_helper = 68
+    cit_empty = 70
+    cit_block = 71
+    cit_return = 80
+    cit_goto = 81
+    cit_asm = 82
+
     MMIDX_GLBLOW = 0
     MMIDX_LVARS = 1
     MMIDX_RETADDR = 2
