@@ -856,6 +856,18 @@ class sup(object):
         return any(index == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
+    def __decode_string(cls, bytes):
+        if isinstance(bytes, internal.types.string):
+            return bytes
+        return bytes.decode('utf-8', 'replace')
+
+    @classmethod
+    def __encode_string(cls, string):
+        if isinstance(string, internal.types.string):
+            return string.encode('utf-8', 'replace')
+        return string
+
+    @classmethod
     def __decode_integer(cls, bytes):
         data = bytearray(bytes or b'')
         return functools.reduce(lambda agg, by: agg * 0x100 + by, data[::-1], 0)
@@ -883,7 +895,7 @@ class sup(object):
 
         # netnode.supstr doesn't really allow us to check whether a string is
         # truly empty or not. so, we treat it as bytes and decode it ourselves.
-        table[internal.types.string] = netnode.supval, bool, lambda bytes: bytes.rstrip(b'\0').decode('utf-8', 'replace')
+        table[internal.types.string] = netnode.supval, bool, lambda bytes: cls.__decode_string(bytes.rstrip(b'\0'))
 
         if type in table:
             return table[type]
@@ -911,7 +923,7 @@ class sup(object):
         elif isinstance(value, internal.types.integer):
             transformed = bytes(cls.__encode_integer(value))
         elif isinstance(value, internal.types.string):
-            encoded = value.encode('utf-8')
+            encoded = cls.__encode_string(value)
             transformed = encoded if encoded.endswith(b'\0') else encoded + b'\0'
         else:
             transformed = bytes(value)
