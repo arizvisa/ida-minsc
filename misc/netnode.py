@@ -1387,7 +1387,7 @@ class hash(object):
             return [(cls.decode_key(hidx), hval) for hidx, hval in result]
 
         description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fall({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.rall({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
     def repr(cls, nodeidx, tag=None):
