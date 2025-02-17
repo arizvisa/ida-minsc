@@ -972,7 +972,7 @@ class alt(object):
 
     @classmethod
     def rall(cls, nodeidx, tag=None):
-        '''Return a list of all elements for the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
+        '''Return a list of all elements for the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = utils.get(nodeidx)
         return utils.raltvals(node, tag=netnode.alttag if tag is None else tag)
 
@@ -1169,7 +1169,7 @@ class sup(object):
 
     @classmethod
     def rall(cls, nodeidx, type=None, tag=None):
-        '''Return a list of all elements for the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
+        '''Return a list of all elements for the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         value_transform = cls.__value_and_transform__(type)
 
         if value_transform:
