@@ -444,7 +444,7 @@ class utils(object):
         result.append((start or '', Fvalue(node, start or '', tag)))
         while start != end:
             start = Fnext(node, start or '', tag)
-            result.append((start or '', netnode.hashval(node, start or '', tag)))
+            result.append((start or '', Fvalue(node, start or '', tag)))
         return result
     @classmethod
     def rhashvals(cls, node, value=None, tag=netnode.hashtag):
