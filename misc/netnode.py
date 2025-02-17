@@ -882,6 +882,11 @@ class sup(object):
             internal.types.string:      (netnode.supstr, bool, None),
             internal.types.integer:     (netnode.supval, true, cls.decode_integer),
         }
+
+        # netnode.supstr doesn't really allow us to check whether a string is
+        # truly empty or not. so, we treat it as bytes and decode it ourselves.
+        table[internal.types.string] = netnode.supval, bool, lambda bytes: bytes.rstrip(b'\0').decode('utf-8', 'replace')
+
         if type in table:
             return table[type]
         iterable = (result for subclass, result in table.items() if subclass and issubclass(type, subclass))
@@ -907,6 +912,9 @@ class sup(object):
             transformed = value.tobytes()
         elif isinstance(value, internal.types.integer):
             transformed = bytes(cls.encode_integer(value))
+        elif isinstance(value, internal.types.string):
+            encoded = value.encode('utf-8')
+            transformed = encoded if encoded.endswith(b'\0') else encoded + b'\0'
         else:
             transformed = bytes(value)
         return netnode.supset(node, index, transformed, netnode.suptag if tag is None else tag)
