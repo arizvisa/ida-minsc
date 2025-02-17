@@ -1193,6 +1193,32 @@ class sup(object):
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.rall({:s}, type={!s}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
+    def fbounds(cls, nodeidx, start, stop, type=None, tag=None):
+        '''Return a list of all elements for the "supval" array belonging to the netnode identified by `nodeidx` in order from `start` to `stop`.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.fsuprange(node, start, stop, value, tag=netnode.suptag if tag is None else tag)
+            return [(nsup, transform(supval)) for nsup, supval in result] if transform else result
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fbounds({:s}, {:#x}, {:#x}, type={!s}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, start, stop, type, type))
+
+    @classmethod
+    def rbounds(cls, nodeidx, start, stop, type=None, tag=None):
+        '''Return a list of all elements for the "supval" array belonging to the netnode identified by `nodeidx` in reverse order from `start` to `stop`.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.rsuprange(node, start, stop, value, tag=netnode.suptag if tag is None else tag)
+            return [(nsup, transform(supval)) for nsup, supval in result] if transform else result
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.rbounds({:s}, {:#x}, {:#x}, type={!s}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), description, start, stop, type, type))
+
+    @classmethod
     def repr(cls, nodeidx, tag=None):
         '''Display the "supval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
