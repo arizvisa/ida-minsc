@@ -1033,11 +1033,30 @@ class hash(object):
     maximum length of 510, and is used to store bytes of a maximum
     length of 1024. IDA refers to this dictionary as a "hashval".
     """
+    STRING_DECODING = {b'\xFF': u''}
+    STRING_ENCODING = {u'': b'\xFF'}
 
     @classmethod
     def has(cls, nodeidx, key, tag=None):
         '''Return whether the netnode identified by `nodeidx` has a "hashval" for the specified `key`.'''
-        return any(key == item for item in cls.fiter(nodeidx, tag=tag))
+        key_encoded = cls.__encode_string(key)
+        return any(key_encoded == item for item in cls.fiter(nodeidx, tag=tag))
+
+    @classmethod
+    def __decode_string(cls, bytes):
+        if isinstance(bytes, internal.types.string):
+            return bytes
+        elif bytes in cls.STRING_DECODING:
+            return cls.STRING_DECODING[bytes]
+        return bytes.decode('utf-8', 'replace')
+    decode_string = __decode_string
+
+    @classmethod
+    def __encode_string(cls, string):
+        if isinstance(string, internal.types.string):
+            res = string.encode('utf-8', 'replace')
+            return cls.STRING_ENCODING.get(res, res)
+        return string
 
     @classmethod
     def __value_and_transform__(cls, type):
@@ -1063,23 +1082,26 @@ class hash(object):
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:s}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, key, type, type))
 
+        key_decoded = cls.__decode_string(key)
         node, [value, ok, transform] = utils.get(nodeidx), value_transform
-        res = value(node, key, netnode.hashtag if tag is None else tag)
+        res = value(node, key_decoded, netnode.hashtag if tag is None else tag)
         return transform(res) if ok(res) and transform else res
 
     @classmethod
     def set(cls, nodeidx, key, value, tag=None):
         '''Assign the provided `value` to the specified `key` for the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         node = utils.get(nodeidx)
+        key_decoded = cls.__decode_string(key)
+
         # in my testing the type really doesn't matter
         if isinstance(value, internal.types.memoryview):
-            return netnode.hashset(node, key, value.tobytes(), netnode.hashtag if tag is None else tag)
+            return netnode.hashset(node, key_decoded, value.tobytes(), netnode.hashtag if tag is None else tag)
         elif isinstance(value, (internal.types.bytes, internal.types.bytearray)):
-            return netnode.hashset(node, key, bytes(value), netnode.hashtag if tag is None else tag)
+            return netnode.hashset(node, key_decoded, bytes(value), netnode.hashtag if tag is None else tag)
         elif isinstance(value, internal.types.string):
-            return netnode.hashset_buf(node, key, value, netnode.hashtag if tag is None else tag)
+            return netnode.hashset_buf(node, key_decoded, value, netnode.hashtag if tag is None else tag)
         elif isinstance(value, internal.types.integer):
-            return netnode.hashset_idx(node, key, value, netnode.hashtag if tag is None else tag)
+            return netnode.hashset_idx(node, key_decoded, value, netnode.hashtag if tag is None else tag)
         description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:s}, {!r}, {!r}) : An unsupported type ({!r}) was specified for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, key, value, type(value)))
 
@@ -1087,14 +1109,16 @@ class hash(object):
     def remove(cls, nodeidx, key, tag=None):
         '''Remove the value assigned to the specified `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         node = utils.get(nodeidx)
-        return netnode.hashdel(node, key, netnode.hashtag if tag is None else tag)
+        key_decoded = cls.__decode_string(key)
+        return netnode.hashdel(node, key_decoded, netnode.hashtag if tag is None else tag)
 
     @classmethod
     def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the keys of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
         node = utils.get(nodeidx)
-        for idx, _ in utils.fhash(node, tag=netnode.hashtag if tag is None else tag):
-            yield idx
+        for key, _ in utils.fhash(node, tag=netnode.hashtag if tag is None else tag):
+            key_encoded = cls.__encode_string(key)
+            yield key_encoded
         return
 
     @classmethod
@@ -1104,8 +1128,9 @@ class hash(object):
 
         if value_transform:
             node, [value, ok, transform] = utils.get(nodeidx), value_transform
-            for idx, hashval in utils.fhash(node, value, tag=netnode.hashtag if tag is None else tag):
-                yield idx, transform(hashval) if transform else hashval
+            for key, hashval in utils.fhash(node, value, tag=netnode.hashtag if tag is None else tag):
+                key_encoded = cls.__encode_string(key)
+                yield key_encoded, transform(hashval) if transform else hashval
             return
 
         description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
@@ -1115,11 +1140,13 @@ class hash(object):
     def forward(cls, nodeidx, key, type=None, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order from `key`.'''
         value_transform = cls.__value_and_transform__(type)
+        key_decoded = cls.__decode_string(key)
 
         if value_transform:
             node, [value, ok, transform] = utils.get(nodeidx), value_transform
-            for idx, hashval in utils.fhashfrom(node, key, value, tag=netnode.hashtag if tag is None else tag):
-                yield idx, transform(hashval) if transform else hashval
+            for key, hashval in utils.fhashfrom(node, key_decoded, value, tag=netnode.hashtag if tag is None else tag):
+                key_encoded = cls.__encode_string(key)
+                yield key_encoded, transform(hashval) if transform else hashval
             return
 
         description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
@@ -1129,8 +1156,9 @@ class hash(object):
     def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the keys of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = utils.get(nodeidx)
-        for idx, _ in utils.rhash(node, tag=netnode.hashtag if tag is None else tag):
-            yield idx
+        for key, _ in utils.rhash(node, tag=netnode.hashtag if tag is None else tag):
+            key_encoded = cls.__encode_string(key)
+            yield key_encoded
         return
 
     @classmethod
@@ -1140,8 +1168,9 @@ class hash(object):
 
         if value_transform:
             node, [value, ok, transform] = utils.get(nodeidx), value_transform
-            for idx, hashval in utils.rhash(node, value, tag=netnode.hashtag if tag is None else tag):
-                yield idx, transform(hashval) if transform else hashval
+            for key, hashval in utils.rhash(node, value, tag=netnode.hashtag if tag is None else tag):
+                key_encoded = cls.__encode_string(key)
+                yield key_encoded, transform(hashval) if transform else hashval
             return
 
         description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
@@ -1151,11 +1180,13 @@ class hash(object):
     def backward(cls, nodeidx, key, type=None, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order from `key`.'''
         value_transform = cls.__value_and_transform__(type)
+        key_decoded = cls.__decode_string(key)
 
         if value_transform:
             node, [value, ok, transform] = utils.get(nodeidx), value_transform
-            for idx, hashval in utils.rhashfrom(node, key, value, tag=netnode.hashtag if tag is None else tag):
-                yield idx, transform(hashval) if transform else hashval
+            for key, hashval in utils.rhashfrom(node, key_decoded, value, tag=netnode.hashtag if tag is None else tag):
+                key_encoded = cls.__encode_string(key)
+                yield key_encoded, transform(hashval) if transform else hashval
             return
 
         description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
@@ -1199,7 +1230,7 @@ class hash(object):
 
         for index, key in enumerate(cls.fiter(nodeidx, tag=tag)):
             value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=tag)), l2, cls.get(nodeidx, key, None, tag=tag), cls.get(nodeidx, key, bytes, tag=tag), cls.get(nodeidx, key, int, tag=tag), cls.get(nodeidx, key, int, tag=tag))
-            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, key, l1, value))
+            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, cls.__decode_string(key), l1, value))
         if not res:
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, description))
