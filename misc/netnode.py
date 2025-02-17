@@ -1428,6 +1428,36 @@ class hash(object):
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.rall({:s}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, type, type))
 
     @classmethod
+    def fbounds(cls, nodeidx, start, stop, type=None, tag=None):
+        '''Return a list of all elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order from `start` to `stop`.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.fhashrange(node, cls.encode_key(start), cls.encode_key(stop), value, tag=netnode.hashtag if tag is None else tag)
+            if transform:
+                return [(cls.decode_key(hidx), transform(hval)) for hidx, hval in result] if transform else result
+            return [(cls.decode_key(hidx), hval) for hidx, hval in result]
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fbounds({:s}, {!r}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, start, stop, type, type))
+
+    @classmethod
+    def rbounds(cls, nodeidx, start, stop, type=None, tag=None):
+        '''Return a list of all elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order from `start` to `stop`.'''
+        value_transform = cls.__value_and_transform__(type)
+
+        if value_transform:
+            node, [value, ok, transform] = utils.get(nodeidx), value_transform
+            result = utils.rhashrange(node, cls.encode_key(start), cls.encode_key(stop), value, tag=netnode.hashtag if tag is None else tag)
+            if transform:
+                return [(cls.decode_key(hidx), transform(hval)) for hidx, hval in result]
+            return [(cls.decode_key(hidx), hval) for hidx, hval in result]
+
+        description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.rbounds({:s}, {!r}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, start, stop, type, type))
+
+    @classmethod
     def repr(cls, nodeidx, tag=None):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         res = []
