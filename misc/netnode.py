@@ -223,7 +223,8 @@ class utils(object):
         # need to verify that there's no value stored for the empty key. If
         # there's no value for the empty key, then we can be sure that there's
         # no keys to iterate through and thus we can leave.
-        if start is None and start == end and val(node, start or '', tag) is None:
+        Fhashval = netnode.hashval
+        if start is None and start == end and Fhashval(node, start or '', tag) is None:
             return
 
         # Otherwise we need to start at the first item and continue fetching
@@ -243,7 +244,8 @@ class utils(object):
         # need to verify that there's no value stored for the empty key. If
         # there's no value for the empty key, then we can be sure that there's
         # no keys to iterate through and thus we can leave.
-        if end is None and start == end and val(node, end or '', tag) is None:
+        Fhashval = netnode.hashval
+        if end is None and start == end and Fhashval(node, end or '', tag) is None:
             return
 
         # Otherwise we need to start at the last item and continue fetching the
@@ -417,19 +419,19 @@ class utils(object):
     @classmethod
     def fhashfrom(cls, node, key, value=None, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in order from `key`, and yield each (item, value) that was found.'''
-        realkey = cls.hforward(node, key, netnode.hashprev, netnode.hashnext, netnode.hashlast, tag)
+        realkey = cls.hforward(node, key or '', netnode.hashprev, netnode.hashnext, netnode.hashlast, tag)
         if realkey is None:
             return
-        for item in cls.hfiter(node, realkey, netnode.hashlast, netnode.hashnext, value or netnode.hashval, tag=tag):
+        for item in cls.hfiter(node, realkey or '', netnode.hashlast, netnode.hashnext, value or netnode.hashval, tag=tag):
             yield item
         return
     @classmethod
     def rhashfrom(cls, node, key, value=None, tag=netnode.hashtag):
         '''Iterate through each "hashval" for a given `node` in reverse order from `key`, and yield each (item, value) that was found.'''
-        realkey = cls.hbackward(node, key, netnode.hashprev, netnode.hashnext, netnode.hashfirst, tag)
+        realkey = cls.hbackward(node, key or '', netnode.hashprev, netnode.hashnext, netnode.hashfirst, tag)
         if realkey is None:
             return
-        for item in cls.hriter(node, netnode.hashfirst, realkey, netnode.hashprev, value or netnode.hashval, tag=tag):
+        for item in cls.hriter(node, netnode.hashfirst, realkey or '', netnode.hashprev, value or netnode.hashval, tag=tag):
             yield item
         return
 
@@ -439,10 +441,10 @@ class utils(object):
         result, Fnext, Fvalue = [], netnode.hashnext, value or netnode.hashval
         start, end = netnode.hashfirst(node, tag), netnode.hashlast(node, tag)
         if start == end and start in {None, idaapi.BADNODE}: return
-        result.append((start, Fvalue(node, start, tag)))
+        result.append((start or '', Fvalue(node, start or '', tag)))
         while start != end:
-            start = Fnext(node, start, tag)
-            result.append((start, netnode.hashval(node, start, tag)))
+            start = Fnext(node, start or '', tag)
+            result.append((start or '', netnode.hashval(node, start or '', tag)))
         return result
     @classmethod
     def rhashvals(cls, node, value=None, tag=netnode.hashtag):
@@ -450,10 +452,10 @@ class utils(object):
         result, Fprev, Fvalue = [], netnode.hashprev, value or netnode.hashval
         start, end = netnode.hashfirst(node, tag), netnode.hashlast(node, tag)
         if start == end and start in {None, idaapi.BADNODE}: return
-        result.append((end, Fvalue(node, end, tag)))
+        result.append((end or '', Fvalue(node, end or '', tag)))
         while start != end:
-            end = Fprev(node, end, tag)
-            result.append((end, Fvalue(node, end, tag)))
+            end = Fprev(node, end or '', tag)
+            result.append((end or '', Fvalue(node, end or '', tag)))
         return result
 
     @classmethod
