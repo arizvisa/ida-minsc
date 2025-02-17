@@ -351,6 +351,39 @@ class utils(object):
         return result
 
     @classmethod
+    def faltrange(cls, node, start, stop, tag=netnode.alttag):
+        '''Return a list of all "altval" for a given `node` in order from `start` to `stop`.'''
+        result, Fnext, Fvalue = [], netnode.altnext, netnode.altval
+        end = netnode.altlast(node, tag)
+
+        start, stop = sorted([start, stop])
+        current = cls.valforward(node, start, netnode.altprev, netnode.altnext, netnode.altlast, tag)
+        if current in {None, idaapi.BADNODE}:
+            return []
+
+        result.append((current, Fvalue(node, current, tag)))
+        while current != end and current < stop:
+            current = Fnext(node, current, tag)
+            result.append((current, Fvalue(node, current, tag)))
+        return result
+    @classmethod
+    def raltrange(cls, node, start, stop, tag=netnode.alttag):
+        '''Return a list of all "altval" for a given `node` in reverse order from `start` to `stop`.'''
+        result, Fprev, Fvalue = [], netnode.altprev, netnode.altval
+        end = netnode.altfirst(node, tag)
+
+        start, stop = sorted([start, stop])
+        current = cls.valbackward(node, stop, netnode.altprev, netnode.altnext, netnode.altfirst, tag)
+        if current in {None, idaapi.BADNODE}:
+            return []
+
+        result.append((current, Fvalue(node, current, tag)))
+        while current != end and current > start:
+            current = Fprev(node, current, tag)
+            result.append((current, Fvalue(node, current, tag)))
+        return result
+
+    @classmethod
     def fsup(cls, node, value=None, tag=netnode.suptag):
         '''Iterate through each "supval" for a given `node` in order, and yield each (item, value) that was found.'''
         for item in utils.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, value or netnode.supval, tag=tag):
@@ -402,6 +435,39 @@ class utils(object):
         while start != end:
             end = Fprev(node, end, tag)
             result.append((end, Fvalue(node, end, tag)))
+        return result
+
+    @classmethod
+    def fsuprange(cls, node, start, stop, value=None, tag=netnode.suptag):
+        '''Return a list of all "supval" for a given `node` in order from `start` to `stop`.'''
+        result, Fnext, Fvalue = [], netnode.supnext, value or netnode.supval
+        end = netnode.suplast(node, tag)
+
+        start, stop = sorted([start, stop])
+        current = cls.valforward(node, start, netnode.supprev, netnode.supnext, netnode.suplast, tag)
+        if current in {None, idaapi.BADNODE}:
+            return []
+
+        result.append((current, Fvalue(node, current, tag)))
+        while current != end and current < stop:
+            current = Fnext(node, current, tag)
+            result.append((current, Fvalue(node, current, tag)))
+        return result
+    @classmethod
+    def rsuprange(cls, node, start, stop, value=None, tag=netnode.suptag):
+        '''Return a list of all "supval" for a given `node` in reverse order from `start` to `stop`.'''
+        result, Fprev, Fvalue = [], netnode.supprev, value or netnode.supval
+        end = netnode.supfirst(node, tag)
+
+        start, stop = sorted([start, stop])
+        current = cls.valbackward(node, stop, netnode.supprev, netnode.supnext, netnode.supfirst, tag)
+        if current in {None, idaapi.BADNODE}:
+            return []
+
+        result.append((current, Fvalue(node, current, tag)))
+        while current != end and current > start:
+            current = Fprev(node, current, tag)
+            result.append((current, Fvalue(node, current, tag)))
         return result
 
     @classmethod
@@ -459,6 +525,55 @@ class utils(object):
         return result
 
     @classmethod
+    def fhashrange(cls, node, start, stop, value=None, tag=netnode.hashtag):
+        '''Return a list of all "hashval" for a given `node` in order from `start` to `stop`.'''
+        result, Fnext, Fvalue = [], netnode.hashnext, value or netnode.hashval
+        end = netnode.hashlast(node, tag)
+
+        # if the last and first key are the same, then we need to verify that
+        # there's no value stored for the empty key. if there's no value for the
+        # empty key, then we can assume that there's nothing to iterate through.
+        if end is None and netnode.hashfirst(node, tag) == end and Fvalue(node, end or '', tag) is None:
+            return []
+
+        # seek forward from start to find the first available key.
+        start, stop = sorted([start or '', stop or ''])
+        current = cls.hforward(node, start, netnode.hashprev, netnode.hashnext, netnode.hashlast, tag)
+        current_string = current or ''
+
+        # keep collecting keys as long as they come before stop.
+        current_string < stop and result.append((current_string, Fvalue(node, current_string, tag)))
+        while current != end and current_string < stop:
+            current = Fnext(node, current_string, tag)
+            current_string = current or ''
+            current_string < stop and result.append((current_string, Fvalue(node, current_string, tag)))
+        return result
+    @classmethod
+    def rhashrange(cls, node, start, stop, value=None, tag=netnode.hashtag):
+        '''Return a list of all "hashval" for a given `node` in reverse order from `start` to `stop`.'''
+        result, Fprev, Fvalue = [], netnode.hashprev, value or netnode.hashval
+        end = netnode.hashfirst(node, tag)
+
+        # if the first and last key are the same, then we verify that there's no
+        # value stored in the empty key. if there isn't one while the keys are
+        # the same, then we assume that there aren't any hashvals being used.
+        if end is None and netnode.hashlast(node, tag) == end and Fvalue(node, end or '', tag) is None:
+            return []
+
+        # seek backwards from stop until we find the previous key.
+        start, stop = sorted([start or '', stop or ''])
+        current = cls.hbackward(node, stop, netnode.hashprev, netnode.hashnext, netnode.hashfirst, tag)
+        current_string = current or ''
+
+        # continue collecting keys as long as it doesn't come before the start.
+        current_string > start and result.append((current_string, Fvalue(node, current_string, tag)))
+        while current != end and current_string > start:
+            current = Fprev(node, current_string, tag)
+            current_string = current or ''
+            current_string > start and result.append((current_string, Fvalue(node, current_string, tag)))
+        return result
+
+    @classmethod
     def fchar(cls, node, value=None, tag=netnode.chartag):
         '''Iterate through each "charval" for a given `node` in order, and yield each (item, value) that was found.'''
         for item in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, value or netnode.charval, tag=tag):
@@ -510,6 +625,39 @@ class utils(object):
         while start != end:
             end = Fprev(node, end, tag)
             result.append((end, Fvalue(node, end, tag)))
+        return result
+
+    @classmethod
+    def fcharrange(cls, node, start, stop, value=None, tag=netnode.chartag):
+        '''Return a list of all "charval" for a given `node` in order from `start` to `stop`.'''
+        result, Fnext, Fvalue = [], netnode.charnext, value or netnode.charval
+        end = netnode.charlast(node, tag)
+
+        start, stop = sorted([start, stop])
+        current = cls.valforward(node, start, netnode.charprev, netnode.charnext, netnode.charlast, tag)
+        if current in {None, idaapi.BADNODE}:
+            return []
+
+        result.append((current, Fvalue(node, current, tag)))
+        while current != end and current < stop:
+            current = Fnext(node, current, tag)
+            result.append((current, Fvalue(node, current, tag)))
+        return result
+    @classmethod
+    def rcharrange(cls, node, start, stop, value=None, tag=netnode.chartag):
+        '''Return a list of all "charval" for a given `node` in reverse order from `start` to `stop`.'''
+        result, Fprev, Fvalue = [], netnode.charprev, value or netnode.charval
+        end = netnode.charfirst(node, tag)
+
+        start, stop = sorted([start, stop])
+        current = cls.valbackward(node, stop, netnode.charprev, netnode.charnext, netnode.charfirst, tag)
+        if current in {None, idaapi.BADNODE}:
+            return []
+
+        result.append((current, Fvalue(node, current, tag)))
+        while current != end and current > start:
+            current = Fprev(node, current, tag)
+            result.append((current, Fvalue(node, current, tag)))
         return result
 
     @classmethod
