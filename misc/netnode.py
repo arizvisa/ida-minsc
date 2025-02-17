@@ -565,12 +565,11 @@ def get(name):
     '''Get (or create) a netnode with the given `name`, and return its identifier.'''
     if isinstance(name, internal.types.integer):
         node = utils.get(name)
-        node = name
     elif isinstance(name, internal.types.string):
         res = internal.utils.string.to(name)
         node = netnode.get(res, len(res))
     else:
-        node = name
+        raise internal.exceptions.InvalidParameterError(u"{:s}.get({!r}) : An unsupported type ({!r}) was specified as the identity of the netnode to get.".format(__name__, name, name.__class__))
     return netnode.index(node)
 
 def remove(nodeidx):
