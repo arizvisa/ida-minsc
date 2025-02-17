@@ -977,6 +977,18 @@ class alt(object):
         return utils.raltvals(node, tag=netnode.alttag if tag is None else tag)
 
     @classmethod
+    def fbounds(cls, nodeidx, start, stop, tag=None):
+        '''Return a list of all elements for the "altval" array belonging to the netnode identified by `nodeidx` in order from `start` to `stop`.'''
+        node = utils.get(nodeidx)
+        return utils.faltrange(node, start, stop, tag=netnode.alttag if tag is None else tag)
+
+    @classmethod
+    def rbounds(cls, nodeidx, start, stop, tag=None):
+        '''Return a list of all elements for the "altval" array belonging to the netnode identified by `nodeidx` in order from `start` to `stop`.'''
+        node = utils.get(nodeidx)
+        return utils.raltrange(node, start, stop, tag=netnode.alttag if tag is None else tag)
+
+    @classmethod
     def repr(cls, nodeidx, tag=None):
         '''Display the "altval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
