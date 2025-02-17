@@ -223,7 +223,8 @@ class utils(object):
         # need to verify that there's no value stored for the empty key. If
         # there's no value for the empty key, then we can be sure that there's
         # no keys to iterate through and thus we can leave.
-        if start is None and start == end and val(node, start or '', tag) is None:
+        Fhashval = netnode.hashval
+        if start is None and start == end and Fhashval(node, start or '', tag) is None:
             return
 
         # Otherwise we need to start at the first item and continue fetching
@@ -243,7 +244,8 @@ class utils(object):
         # need to verify that there's no value stored for the empty key. If
         # there's no value for the empty key, then we can be sure that there's
         # no keys to iterate through and thus we can leave.
-        if end is None and start == end and val(node, end or '', tag) is None:
+        Fhashval = netnode.hashval
+        if end is None and start == end and Fhashval(node, end or '', tag) is None:
             return
 
         # Otherwise we need to start at the last item and continue fetching the
