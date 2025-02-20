@@ -332,7 +332,7 @@ class utils(object):
         '''Return a list of all "altval" for a given `node` in order.'''
         result, Fnext, Fvalue = [], netnode.altnext, netnode.altval
         start, end = netnode.altfirst(node, tag), netnode.altlast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((start, Fvalue(node, start, tag)))
         while start != end:
             start = Fnext(node, start, tag)
@@ -343,7 +343,7 @@ class utils(object):
         '''Return a list of all "altval" for a given `node` in reverse order.'''
         result, Fprev, Fvalue = [], netnode.altprev, netnode.altval
         start, end = netnode.altfirst(node, tag), netnode.altlast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((end, Fvalue(node, end, tag)))
         while start != end:
             end = Fprev(node, end, tag)
@@ -419,7 +419,7 @@ class utils(object):
         '''Return a list of all "supval" for a given `node` in order.'''
         result, Fnext, Fvalue = [], netnode.supnext, value or netnode.supval
         start, end = netnode.supfirst(node, tag), netnode.suplast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((start, Fvalue(node, start, tag)))
         while start != end:
             start = Fnext(node, start, tag)
@@ -430,7 +430,7 @@ class utils(object):
         '''Return a list of all "supval" for a given `node` in reverse order.'''
         result, Fprev, Fvalue = [], netnode.supprev, value or netnode.supval
         start, end = netnode.supfirst(node, tag), netnode.suplast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((end, Fvalue(node, end, tag)))
         while start != end:
             end = Fprev(node, end, tag)
@@ -506,7 +506,7 @@ class utils(object):
         '''Return a list of all "hashval" for a given `node` in order.'''
         result, Fnext, Fvalue = [], netnode.hashnext, value or netnode.hashval
         start, end = netnode.hashfirst(node, tag), netnode.hashlast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((start or '', Fvalue(node, start or '', tag)))
         while start != end:
             start = Fnext(node, start or '', tag)
@@ -517,7 +517,7 @@ class utils(object):
         '''Return a list of all "hashval" for a given `node` in reverse order.'''
         result, Fprev, Fvalue = [], netnode.hashprev, value or netnode.hashval
         start, end = netnode.hashfirst(node, tag), netnode.hashlast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((end or '', Fvalue(node, end or '', tag)))
         while start != end:
             end = Fprev(node, end or '', tag)
@@ -609,7 +609,7 @@ class utils(object):
         '''Return a list of all "charval" for a given `node` in order.'''
         result, Fnext, Fvalue = [], netnode.charnext, value or netnode.charval
         start, end = netnode.charfirst(node, tag), netnode.charlast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((start, Fvalue(node, start, tag)))
         while start != end:
             start = Fnext(node, start, tag)
@@ -620,7 +620,7 @@ class utils(object):
         '''Return a list of all "charval" for a given `node` in reverse order.'''
         result, Fprev, Fvalue = [], netnode.charprev, value or netnode.charval
         start, end = netnode.charfirst(node, tag), netnode.charlast(node, tag)
-        if start == end and start in {None, idaapi.BADNODE}: return
+        if start == end and start in {None, idaapi.BADNODE}: return []
         result.append((end, Fvalue(node, end, tag)))
         while start != end:
             end = Fprev(node, end, tag)
