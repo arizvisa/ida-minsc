@@ -10168,13 +10168,14 @@ class function(object):
         return fn.fpd
 
     @classmethod
-    def frame(cls, func):
+    def frame(cls, func, *offset):
         '''Return the frame belonging to the function `func`.'''
         fn = func if isinstance(func, idaapi.func_t) else cls.by(func)
         sptr = idaapi.get_frame(fn)
         if fn.frame == idaapi.BADNODE or not sptr:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.frame({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), range.start(fn)))
-        return internal.structure.new(sptr.id, cls.frame_offset(fn))
+        base = itertools.chain(offset, [0])
+        return internal.structure.new(sptr.id, cls.frame_offset(fn) + next(base))
 
     @classmethod
     def name(cls, func):
