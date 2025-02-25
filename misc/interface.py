@@ -2656,21 +2656,24 @@ class priorityhxevent(prioritybase):
     ## Callbacks to enable class when the decompiler plugin has been loaded.
     __plugin_required = {'Hex-Rays Decompiler'}
     def __plugin_loaded__(self, plugin_info):
-        if plugin_info.name not in self.__plugin_required:
+        cls, plugin_name = self.__class__, internal.utils.string.of(plugin_info.name)
+        if plugin_name not in self.__plugin_required:
             return
 
         module = self.__hexrays_module__
 
         # Initialize the hexrays plugin so that we be sure that it's usable.
+        logging.debug(u"{:s} : Initializing the Hex-Rays plugin with `{:s}` due to receiving a plugin loaded event for \"{:s}\".".format('.'.join([__name__, cls.__name__]), internal.utils.pycompat.fullname(module.init_hexrays_plugin), internal.utils.string.escape(plugin_name, '"')))
         if not module.init_hexrays_plugin():
             cls = self.__class__
-            raise internal.exceptions.DisassemblerError(u"{:s} : Failure while trying initialize the Hex-Rays plugin ({:s}).".format('.'.join([__name__, cls.__name__]), 'init_hexrays_plugin'))
+            raise internal.exceptions.DisassemblerError(u"{:s} : Failure while trying initialize the Hex-Rays plugin with `{:s}`.".format('.'.join([__name__, cls.__name__]), internal.utils.pycompat.fullname(module.init_hexrays_plugin)))
 
         # Assign our protected properties that enable the class to do things.
         self.__hexrays_module__ = module
         self.__hexrays_ready__ = True
 
         # Now we can attach all currently monitored events.
+        logging.debug(u"{:s} : Attaching {:d} event{:s} for the Hex-Rays plugin due to receiving a plugin loaded event for \"{:s}\".".format('.'.join([__name__, cls.__name__]), len(self), '' if len(self) == 1 else 's', internal.utils.string.escape(plugin_name, '"')))
         for event in self:
             if not self.attach(event):
                 logging.warning(u"{:s} : Unable to attach the {:s} event during the loading process of the Hex-Rays plugin.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event)))
@@ -2678,11 +2681,12 @@ class priorityhxevent(prioritybase):
         return
 
     def __plugin_unloading__(self, plugin_info):
-        plugin_name = {'Hex-Rays Decompiler'}
-        if plugin_info.name not in self.__plugin_required:
+        cls, plugin_name = self.__class__, internal.utils.string.of(plugin_info.name)
+        if plugin_name not in self.__plugin_required:
             return
 
         # Go through and detach everything that we're monitoring.
+        logging.debug(u"{:s} : Detaching {:d} event{:s} for the Hex-Rays plugin due to receiving a plugin unloaded event for \"{:s}\".".format('.'.join([__name__, cls.__name__]), len(self), '' if len(self) == 1 else 's', internal.utils.string.escape(plugin_name, '"')))
         for event in self:
             if not self.detach(event):
                 logging.warning(u"{:s} : Unable to detach the {:s} event during the unloading process of the Hex-Rays plugin.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event)))
@@ -2983,7 +2987,7 @@ class priorityaction(prioritybase):
         cls, ok = self.__class__, super(priorityaction, self).close()
         if not ok:
             count = len(self.__descriptors__)
-            logging.warning(u"{:s}.close() : Error trying to detach from {:d} action{:s} that are still remaining.".format('.'.join([__name__, cls.__name__]), count, '' if count == 1 else 's', count))
+            logging.warning(u"{:s}.close() : Error trying to detach from {:d} action{:s} still remaining.".format('.'.join([__name__, cls.__name__]), count, ' that is' if count == 1 else 's that are', count))
 
         # If our parent class couldn't close all the actions, figure out which
         # descriptors exist and complain about it before returning False.
