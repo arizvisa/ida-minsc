@@ -2619,11 +2619,12 @@ class block(object):
 
 class frame(object):
     """
-    This namespace is for getting information about the selected
-    function's frame. By default, this namespace will return a
-    ``structure_t`` representing the frame belonging to the specified
-    function. The returned frame will include any preserved registers
-    so that offset 0 will point at the beginning of the parameters.
+    This namespace is for getting information about the frame from a selected
+    function. By default, this namespace will return a ``structure_t``
+    representing the frame belonging to the specified function. The offset of
+    the returned frame will be relative to the stack pointer at the time the
+    selected function was entered. This will result in offset 0 pointing at the
+    preserved return address when the function was called.
 
     Some ways of using this can be::
 
@@ -2644,6 +2645,47 @@ class frame(object):
         if fn.frame == idaapi.BADNODE:
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
         return interface.function.frame(fn)
+
+    class members(object):
+        """
+        This namespace is for interacting with the members from the frame for
+        the selected function. It's primarily a wrapper around the functionality
+        of the ``members_t`` class.
+        """
+        @utils.multicase()
+        def __new__(cls, **type):
+            '''Return the members for the frame belonging to the current function.'''
+            return cls(ui.current.function())
+        @utils.multicase(func=(idaapi.func_t, types.integer))
+        def __new__(cls, func, **type):
+            '''Return the members for the frame belonging to the function `func`.'''
+            fn = interface.function.by(func)
+            if fn.frame == idaapi.BADNODE:
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
+            frame = interface.function.frame(fn)
+            return frame.members(**type) if type else frame.members
+
+        @utils.multicase()
+        @classmethod
+        def list(cls, **type):
+            '''List the members from the frame belonging to the current function.'''
+            return cls(ui.current.function()).list(**type)
+        @utils.multicase()
+        @classmethod
+        def list(cls, func, **type):
+            '''List the members from the frame belonging to the function `func`.'''
+            return cls(func).list(**type)
+
+        @utils.multicase()
+        @classmethod
+        def iterate(cls, **type):
+            '''Iterate through the members in the frame belonging to the current function.'''
+            return cls(ui.current.function()).iterate(**type)
+        @utils.multicase()
+        @classmethod
+        def iterate(cls, func, **type):
+            '''Iterate through the members in the frame belonging to the function `func`.'''
+            return cls(func).iterate(**type)
 
     @utils.multicase()
     @classmethod
