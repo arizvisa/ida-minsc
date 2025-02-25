@@ -11882,3 +11882,70 @@ class entries(object):
                 return index
             continue
         raise internal.exceptions.ItemNotFoundError(u"{:s}.by_ordinal({:d}) : No entry point was found with the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, ordinal))
+
+class exceptions(object):
+    """
+    This namespace is used to extract exception information from the
+    disassembler.
+    """
+    __error_codes__ = [(attribute, getattr(idaapi, attribute)) for attribute in dir(idaapi) if attribute.startswith('TBERR_')]
+    __error_names__ = {value : attribute for attribute, value in __error_codes__}
+
+    # FIXME: the tryblks.hpp api doesn't actually expose anything that we can
+    #        use for identifying the handler associated with a RUNTIME_FUNCTION.
+
+    @classmethod
+    def format(cls, error):
+        if error in cls.__error_names__:
+            return "{:s}({:#x})".format(cls.__error_names__[error], error)
+        return "{:#x}".format(error)
+
+    @classmethod
+    def iterate(cls, start, stop):
+        TBERR_OK, TB_SEH, TB_CPP = (getattr(idaapi, attribute, index) for index, attribute in enumerate(['TBERR_OK', 'TB_SEH', 'TB_CPP']))
+        blks, area = idaapi.tryblks_t(), range.pack(start, stop)
+        count = idaapi.get_tryblks(blks, area)
+        if not count:
+            raise internal.exceptions.DisassemblerError(u"{:s}.iterate({:#x}, {:#x}) : {:s}".format('.'.join([__name__, cls.__name__]), start, stop, "{!s}".format(count)))
+        print('found {:d} tryblks'.format(count))
+
+        result, iterable = [], ((index, blks[index]) for index in builtins.range(blks.size()))
+        for index, tryblk in iterable:
+            level, kind = tryblk.level, tryblk.get_kind()
+            handler = cls.handler(tryblk)
+            result.append(handler)
+        return result
+
+    @classmethod
+    def handler(cls, tryblk):
+        TBERR_OK, TB_SEH, TB_CPP = (getattr(idaapi, attribute, index) for index, attribute in enumerate(['TBERR_OK', 'TB_SEH', 'TB_CPP']))
+
+        level, kind = tryblk.level, tryblk.get_kind()
+        if kind not in {TB_SEH, TB_CPP}:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.handler(...) : level={:#x} invalid kind {:#x}.".format('.'.join([__name__, cls.__name__]), level, kind))
+
+        iterable = [(index, tryblk[index]) for index in builtins.range(tryblk.size())]
+        ranges = [range.bounds(area) for index, area in iterable]
+
+        if kind == TB_SEH:
+            handler = tryblk.seh()
+            disp, fpreg = handler.disp, handler.fpreg
+
+            iterable = (handler[index] for index in builtins.range(handler.size()))
+            catches = [range.bounds(area) for area in iterable]
+
+            iterable = (handler.filter[index] for index in builtins.range(handler.filter.size()))
+            filters = [range.bounds(area) for area in iterable]
+
+            packed = handler.seh_code, filters
+            return level, ranges, (disp, fpreg, catches, packed)
+
+        handlers = tryblk.cpp()
+        iterable = (handlers[index] for index in builtins.range(handlers.size()))
+        packed = [(catch.obj, catch.type_id) for catch in iterable]
+        return level, ranges, packed
+
+    @classmethod
+    def blocks(cls, tryblk):
+        iterable = (tryblk[index] for index in builtins.range(tryblk.size()))
+        return [range.unpack(blk) for blk in iterable]
