@@ -193,9 +193,9 @@ class address(object):
         # within a function, then it's a contents tag that we need to adjust.
         if key not in state:
             if func and interface.function.has(ea) and not rt:
-                comment.contents.inc(ea, key)
+                internal.tagcache.contents.inc(ea, key)
             else:
-                comment.globals.inc(ea, key)
+                internal.tagcache.globals.inc(ea, key)
 
         # Grab the previous value from the correct dictionary that we discovered,
         # and update it with the new value that the user is modifying it with.
@@ -379,9 +379,9 @@ class address(object):
         # or outside a function, then it's a global tag being removed. Otherwise
         # it's within a function and thus a contents tag being removed.
         if func and interface.function.has(ea) and not rt:
-            comment.contents.dec(ea, key)
+            internal.tagcache.contents.dec(ea, key)
         else:
-            comment.globals.dec(ea, key)
+            internal.tagcache.globals.dec(ea, key)
 
         # Finally we can return the value of the tag that was removed.
         return res
@@ -564,7 +564,7 @@ class function(object):
         # If there wasn't a key in any of the dictionaries we decoded, then
         # we know one was added and so we need to update the tagcache.
         if res is None:
-            comment.globals.inc(interface.range.start(fn), key)
+            internal.tagcache.globals.inc(interface.range.start(fn), key)
 
         # return what we fetched from the dict
         return res
@@ -681,7 +681,7 @@ class function(object):
 
         # If we got here cleanly without an exception, then the tag was successfully
         # removed and we just need to update the tag cache with its removal.
-        comment.globals.dec(interface.range.start(fn), key)
+        internal.tagcache.globals.dec(interface.range.start(fn), key)
         return res
 
 class structure(object):
