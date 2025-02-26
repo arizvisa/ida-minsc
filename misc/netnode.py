@@ -137,6 +137,13 @@ class netnode(object):
     chartag = b'd' if idaapi.__version__ < 7.0 else 0x64    # found while reversing ida's shared library
     blobtag = b'B' if idaapi.__version__ < 7.0 else 0x42    # taking a guess at what we can use for this
 
+# assign some globals based on the tags from the `netnode` namespace.
+alttag = netnode.alttag
+suptag = netnode.suptag
+hashtag = netnode.hashtag
+chartag = netnode.chartag
+blobtag = netnode.blobtag
+
 class utils(object):
     """
     This namespace provides utilities for interacting with a netnode and each
