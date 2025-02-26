@@ -511,7 +511,7 @@ class functions(object):
     __matcher__.mapping('lumina', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, internal.tags.function.get, operator.methodcaller('keys'), internal.types.set)
     __matcher__.alias('tag', 'tagged')
-    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, internal.comment.contents.name, internal.types.set)
+    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), function.top, internal.tagcache.contents.name, internal.types.set)
     __matcher__.combinator('bounds', utils.fcondition(utils.finstance(interface.bounds_t))(operator.attrgetter('contains'), utils.fcompose(utils.funpack(interface.bounds_t), operator.attrgetter('contains'))))
     __matcher__.predicate('predicate', interface.function.by_address), __matcher__.alias('pred', 'predicate')
     __matcher__.combinator('convention', utils.fcondition(utils.finstance(internal.types.integer, internal.types.string, internal.types.none, internal.types.ellipsis))(internal.declaration.convention.matches, utils.funpack(internal.declaration.convention.matches)), interface.function.by_address, utils.fmap(utils.fidentity, function.type), utils.funpack(interface.tinfo.function_details), operator.itemgetter(1), utils.fgetattr('cc'), utils.fpartial(operator.and_, idaapi.CM_CC_MASK))
@@ -1837,7 +1837,7 @@ class exports(object):
     __matcher__.mapping('lumina', operator.truth, operator.itemgetter(1), utils.fcondition(interface.function.has)(utils.fcompose(interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000))), utils.fconstant(False)))
     __matcher__.boolean('tagged', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.tags.function.get(ea) if interface.function.has(ea) else internal.tags.address.get(ea), operator.methodcaller('keys'), internal.types.set)
     __matcher__.alias('tag', 'tagged')
-    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.comment.contents.name(ea) if interface.function.has(ea) else internal.tags.address.get(ea).keys(), internal.types.set)
+    __matcher__.boolean('contents', lambda parameter, keys: operator.truth(keys) == parameter if isinstance(parameter, internal.types.bool) else operator.contains(keys, parameter) if isinstance(parameter, internal.types.string) else keys & internal.types.set(parameter), operator.itemgetter(1), lambda ea: internal.tagcache.contents.name(ea) if interface.function.has(ea) else internal.tags.address.get(ea).keys(), internal.types.set)
     __matcher__.mapping('entrypoint', operator.truth, operator.itemgetter(0), utils.fthrough(interface.entries.ordinal, interface.entries.address), utils.funpack(operator.eq))
     __matcher__.mapping('export', operator.not_, operator.itemgetter(0), utils.fthrough(interface.entries.ordinal, interface.entries.address), utils.funpack(operator.eq))
     __matcher__.alias('entry', 'entrypoint')
@@ -2142,7 +2142,7 @@ entries = exports   # XXX: ns alias
 
 def tags():
     '''Return all of the tag names used globally within the database.'''
-    return internal.comment.globals.name()
+    return internal.tagcache.globals.name()
 
 @utils.multicase()
 def tag():
@@ -2206,7 +2206,7 @@ def select(**boolean):
 
     # Nothing specific was queried, so just yield all tags that are available.
     if not boolean:
-        for ea in internal.comment.globals.address():
+        for ea in internal.tagcache.globals.address():
             ui.navigation.set(ea)
             Ftag, owners = (internal.tags.function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (internal.tags.address.get, {ea})
             tags = Ftag(ea)
@@ -2218,7 +2218,7 @@ def select(**boolean):
     included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
 
     # Walk through every tagged address so we can cross-check them with the query.
-    for ea in internal.comment.globals.address():
+    for ea in internal.tagcache.globals.address():
         collected, _ = {}, ui.navigation.set(ea)
         Ftag, owners = (internal.tags.function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (internal.tags.address.get, {ea})
         tags = Ftag(ea)
@@ -2256,9 +2256,9 @@ def selectcontents(**boolean):
 
     # Nothing specific was queried, so just yield all tagnames that are available.
     if not boolean:
-        for ea, _ in internal.comment.contents.iterate():
+        for ea, _ in internal.tagcache.contents.iterate():
             if interface.function.has(ui.navigation.procedure(ea)):
-                contents, owners, Flogging = internal.comment.contents.name(ea, target=ea), {f for f in interface.function.owners(ea)}, logging.info
+                contents, owners, Flogging = internal.tagcache.contents.name(ea, target=ea), {f for f in interface.function.owners(ea)}, logging.info
             else:
                 contents, owners, Flogging = [], {f for f in []}, logging.warning
             if contents and ea in owners: yield ea, contents
@@ -2270,9 +2270,9 @@ def selectcontents(**boolean):
 
     # Walk through the index verifying that they're within a function. This
     # way we can cross-check their cache against the user's query.
-    for ea, cache in internal.comment.contents.iterate():
+    for ea, cache in internal.tagcache.contents.iterate():
         if interface.function.has(ui.navigation.procedure(ea)):
-            sup, contents = {key for key in cache}, internal.comment.contents._read(ea, ea) or {}
+            sup, contents = {key for key in cache}, internal.tagcache.contents._read(ea, ea) or {}
 
         # Otherwise if we're not within a function then our cache is lying to us
         # and we need to skip this iteration.
@@ -2292,7 +2292,7 @@ def selectcontents(**boolean):
             logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency between contents of {:s} address ({:#x}) and address ({:#x}) due to a difference between the supval ({:s}) and its corresponding blob ({:s}).".format(__name__, q, f, 'function', ea, sup_formatted, blob_formatted))
 
         # Now start aggregating the tagnames that the user is searching for.
-        collected, names, owners = {item for item in []}, internal.comment.contents.name(ea, target=ea), {item for item in interface.function.owners(ea)}
+        collected, names, owners = {item for item in []}, internal.tagcache.contents.name(ea, target=ea), {item for item in interface.function.owners(ea)}
 
         # included is the equivalent of Or(|) and yields the function address if any of the specified tagnames were used.
         collected.update(included & names)
