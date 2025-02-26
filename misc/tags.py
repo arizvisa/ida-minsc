@@ -1,7 +1,7 @@
 """
 This module is used for reading and writing tags to an address, function,
 structure, or structure member within the database. It primarily revolves
-around the tools provided by the `internal.comment` module, and uses them
+around the tools provided by the `internal.tagcache` module, and uses them
 to maintain any of the indices or caches that are necessary for performance.
 """
 import idaapi, internal, operator, logging
@@ -19,8 +19,8 @@ class address(object):
         `__extra_suffix__` - The posterior comment of the item at the given address.
         `__typeinfo__` - Any type information that is associated with the address.
 
-    The tags for each address are indexed and maintained using the
-    namespaces that inherit from the `internal.comment.tagging` namespace.
+    The tags for each address are indexed and maintained using the namespaces
+    that inherit from the `internal.tagcache.tagging` namespace.
     """
 
     @classmethod
@@ -398,7 +398,7 @@ class function(object):
         `__typeinfo__` - The type information of the function which contains its prototype.
 
     The tags for each individual function are indexed and maintained using
-    the `internal.comment.global` namespace.
+    the `internal.tagcache.global` namespace.
     """
 
     @classmethod
