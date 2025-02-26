@@ -61,7 +61,7 @@ import functools, operator, itertools
 import collections, heapq, string
 import sys, logging
 
-import idaapi, internal, internal.netnode
+import idaapi, internal, internal.netnode, internal.tagcache
 import codecs
 
 ### cheap data structure for doing pattern matching with
@@ -746,6 +746,11 @@ class tagging(object):
         '''Hook to create a new netnode that will contain our tag-cache.'''
         res = cls.node(cached=False)
         logging.debug(u"{:s}.init_tagcache('{:s}') : Successfully opened up the netnode \"{:s}\" for the tag cache and using the identifier ({:#x}) to reference it.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(idp_modname, '\''), internal.utils.string.escape(cls.__node__, '"'), res))
+
+        # Execute the hook for the copied version of this class inside the
+        # `internal.tagcache` module. This is to facilitate transitioning to its
+        # new location.
+        return internal.tagcache.tagging.__init_tagcache__(idp_modname)
 
     @classmethod
     def __nw_init_tagcache__(cls, nw_code, is_old_database):
