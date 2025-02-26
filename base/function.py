@@ -1476,7 +1476,7 @@ class blocks(object):
 
         # Grab the addresses that are actually tagged into a set, and then the basic
         # blocks in an ordered dictionary so that we can union them for our results.
-        available = {ea for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target))}
+        available = {ea for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target))}
         order, iterable = [], ((item, interface.range.bounds(item)) for item in blocks.iterate(target, flags))
         results = {bounds.left : [order.append(bounds.left), item].pop(1) for item, bounds in iterable }
 
@@ -3293,7 +3293,7 @@ def tags(ea):
     # Although if the chunk address wasn't in the owner list, then warn the user that we fixed it.
     if interface.range.start(fn) not in owners:
         logging.warning(u"{:s}.tags({:#x}) : Returning the tags for the function at address ({:#x}) as the chunk address ({:#x}) is not referencing a function ({:s}).".format(__name__, ea, item, interface.range.start(fn), ', '.join(map("{:#x}".format, owners))))
-    return internal.comment.contents.name(item, target=item)
+    return internal.tagcache.contents.name(item, target=item)
 @utils.multicase(func=(idaapi.func_t, types.string))
 def tags(func):
     '''Returns all of the content tags for the function `func`.'''
@@ -3340,7 +3340,7 @@ def select(func, **boolean):
 
     # If nothing specific was queried, then yield all tags that are available.
     if not boolean:
-        for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target)):
+        for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target)):
             ui.navigation.analyze(ea)
             address = internal.tags.address.get(ea)
             if address: yield ea, address
@@ -3350,7 +3350,7 @@ def select(func, **boolean):
     included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['Or', 'include', 'included', 'includes'], ['And', 'require', 'required', 'requires']])
 
     # Walk through every tagged address and cross-check it against the query.
-    for ea in internal.comment.contents.address(interface.range.start(target), target=interface.range.start(target)):
+    for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target)):
         ui.navigation.analyze(ea)
         collected, address = {}, internal.tags.address.get(ea)
 
