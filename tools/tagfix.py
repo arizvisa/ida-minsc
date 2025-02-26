@@ -139,13 +139,13 @@ def contents(ea):
     ui.navigation.set(ea)
     logging.debug(u"{:s}.contents({:#x}): Updating the name references in the cache belonging to function {:#x}.".format('.'.join([__name__]), ea, ea))
     for k, v in tags.items():
-        internal.comment.contents.set_name(f, k, v, target=f)
+        internal.tagcache.contents.set_name(f, k, v, target=f)
 
     logging.debug(u"{:s}.contents({:#x}): Updating the address references in the cache belonging to function {:#x}.".format('.'.join([__name__]), ea, ea))
     for k, v in address.items():
         if not func.within(k):
             continue
-        internal.comment.contents.set_address(k, v, target=f)
+        internal.tagcache.contents.set_address(k, v, target=f)
 
     return address, tags
 
@@ -158,11 +158,11 @@ def globals():
     # Update the the index containing the address and tags we counted.
     six.print_(u'globals: updating the name references in the index for the database', file=output)
     for k, v in tags.items():
-        internal.comment.globals.set_name(k, v)
+        internal.tagcache.globals.set_name(k, v)
 
     six.print_(u'globals: updating the address references in the index for the database', file=output)
     for k, v in address.items():
-        internal.comment.globals.set_address(k, v)
+        internal.tagcache.globals.set_address(k, v)
 
     return address, tags
 
@@ -184,7 +184,7 @@ def customnames():
     # FIXME: first delete all the custom names '__name__' tag
     left, right = db.config.bounds()
     for ea in db.address.iterate(left, right):
-        ctx = internal.comment.contents if func.within(ea) and func.address(ea) != ea else internal.comment.globals
+        ctx = internal.tagcache.contents if func.within(ea) and func.address(ea) != ea else internal.tagcache.globals
         if db.type.has_customname(ea):
             ctx.inc(ea, '__name__')
         continue
@@ -194,7 +194,7 @@ def extracomments():
     '''Iterate through all of the "extra" comments within the database and update their references in either the index or their associated function cache.'''
     left, right = db.config.bounds()
     for ea in db.address.iterate(left, right):
-        ctx = internal.comment.contents if func.within(ea) else internal.comment.globals
+        ctx = internal.tagcache.contents if func.within(ea) else internal.tagcache.globals
 
         count = db.extra.__count__(ea, idaapi.E_PREV)
         if count: [ ctx.inc(ea, '__extra_prefix__') for i in range(count) ]
@@ -210,7 +210,7 @@ def everything():
 
 def erase_globals():
     '''Remove the contents of the index from the database which is used for storing information about the global tags.'''
-    node = internal.comment.tagging.node()
+    node = internal.tagcache.tagging.node()
     hashes, alts, sups = map(list, (iterator(node) for iterator in [internal.netnode.hash.fiter, internal.netnode.alt.fiter, internal.netnode.sup.fiter]))
     total = sum(map(len, [hashes, alts, sups]))
 
@@ -235,7 +235,7 @@ def erase_globals():
 def erase_contents():
     '''Remove the cache associated with each function from the database.'''
     functions = [item for item in db.functions()]
-    total, tag = len(functions), internal.comment.contents.btag
+    total, tag = len(functions), internal.tagcache.contents.btag
     yield total
 
     for idx, ea in enumerate(map(ui.navigation.set, functions)):
@@ -260,7 +260,7 @@ def erase():
 
 def verify_index():
     '''Iterate through the index and verify that each contents entry is pointing at the right functions.'''
-    cls, ok = internal.comment.contents, True
+    cls, ok = internal.tagcache.contents, True
 
     # Iterate through the entire index of contents.
     for ea, available in cls.iterate():
@@ -290,7 +290,7 @@ def verify_index():
 
 def verify_content(ea):
     '''Iterate through the contents cache for an individual function and verify that the addresses in its cache are correct.'''
-    cls = internal.comment.contents
+    cls = internal.tagcache.contents
     try:
         cache = cls._read(ea, ea)
 
@@ -426,7 +426,7 @@ def verify_content(ea):
 
 def verify_globals():
     '''Verify the globals for every address from the database.'''
-    cls = internal.comment.globals
+    cls = internal.tagcache.globals
 
     # Calculate all the possible combinations for the implicit tags so that
     # we can use them to figure out which variation will match.
@@ -532,7 +532,7 @@ def verify_globals():
 
 def verify_contents():
     '''Verify the contents of every single function in the index.'''
-    index = sorted({ea for ea, _ in internal.comment.contents.iterate()})
+    index = sorted({ea for ea, _ in internal.tagcache.contents.iterate()})
 
     # Verify the index as the very first thing.
     ok = verify_index()
