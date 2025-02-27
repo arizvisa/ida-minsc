@@ -455,6 +455,42 @@ class contents(tagging):
         return sorted(res.keys())
 
     @classmethod
+    def erase(cls, ea):
+        '''Remove the contents of the function at the address `ea`.'''
+        target = ea if netnode.blob.has(ea, index=0, tag=cls.btag) else cls._key(ea)
+        if not target:
+            raise internal.exceptions.DisassemblerError(u"{:s}.erase({:#x}) : Unable to determine the key from function address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        result = cls._read(target, ea)
+        if not cls._write(target, ea, None):
+            raise internal.exceptions.DisassemblerError(u"{:s}.erase({:#x}) : Unable to erase the cache header for function address {:#x} associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea, target))
+        return result
+
+    @classmethod
+    def erase_address(cls, target, ea):
+        '''Remove the tags at the address `ea` from the contents of the function `target`.'''
+        fn = target if target is not None else ea if netnode.blob.has(ea, index=0, tag=cls.btag) else cls._key(ea)
+        if not fn:
+            target_description = "{:#x}".format(target) if isinstance(target, internal.types.integer) else "{!s}".format(target)
+            address_description = "{:#x}".format(ea) if target is None else "{:#x}".format(target)
+            raise internal.exceptions.DisassemblerError(u"{:s}.erase_address({!s}, {:#x}) : Unable to determine the key from function address {:#x}.".format('.'.join([__name__, cls.__name__]), target_description, ea, address_description))
+
+        # read the header contents and then set the reference count for the
+        # chosen address to 0. remove any dictionaries that are empty.
+        result = cls._read(fn, ea)
+
+        newresult = {key : value.copy() for key, value in result.items()}
+        newresult[cls.__address__].pop(ea, 0)
+        newresult[cls.__address__] or newresult.pop(cls.__address__, {})
+
+        # write the modified header back into where we got it from.
+        if not cls._write(fn, ea, newresult):
+            target_description = "{:#x}".format(target) if isinstance(target, internal.types.integer) else "{!s}".format(target)
+            address_description = "{:#x}".format(ea) if target is None else "{:#x}".format(target)
+            raise internal.exceptions.DisassemblerError(u"{:s}.erase_address({!s}, {:#x}) : Unable to erase the cache header for function address {:#x} associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target_description, ea, address_description, fn))
+        return result
+
+    @classmethod
     def set_name(cls, address, name, count, **target):
         """Set the contents tag count for the function `target` and `name` to `count`.
 
@@ -570,6 +606,17 @@ class globals(tagging):
     def address(cls):
         '''Return all the tag addresses in the specified database (globals and func-tags)'''
         return netnode.alt.fiter(tagging.node())
+
+    @classmethod
+    def erase(cls, address):
+        '''Remove the reference count for the global tags at the specified `address`.'''
+        Fget_tags = internal.tags.function.get if idaapi.get_func(address) else internal.tags.address.get
+        tags = {tag for tag in Fget_tags(address)}
+        [cls.dec(address, tag) for tag in tags]
+        count = cls.set_address(address, 0)
+        if count:
+            logging.debug(u"{:s}.erase({:#x}) : Erasing the tags at global address {:#x} results in an unexpected reference count ({:d}).".format('.'.join([__name__, cls.__name__]), address, address, count))
+        return count
 
     @classmethod
     def set_name(cls, name, count):
