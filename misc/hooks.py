@@ -220,8 +220,10 @@ class address(changingchanged):
     @classmethod
     def _update_refs(cls, ea, old, new):
         f, rt = cls.get_func_extern(ea)
-
         oldkeys, newkeys = ({item for item in content.keys()} for content in [old, new])
+
+        # check the original keys against the modified ones and iterate through
+        # them figuring out whether we're removing the key or just adding it.
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(oldkeys), utils.string.repr(newkeys), ' for runtime-linked function' if rt else ''))
         for key in oldkeys ^ newkeys:
             if key not in new:
@@ -1168,19 +1170,19 @@ def __relocate_function(old, new, size, iterable, moved=False):
 
 def __relocate_globals(old, new, size, iterable):
     '''Relocate the global tuples (address, count) in `iterable` from address `old` to `new` adjusting them by the specified `size`.'''
-    node = internal.tagcache.tagging.node()
     failure, total = [], [item for item in iterable]
     for i, (ea, count) in enumerate(total):
         offset = ea - old
 
         # Remove the old address from the netnode cache (altval) with our global.
-        ok = internal.netnode.alt.remove(node, ea)
-        if not ok:
+        Fget_tags = internal.tags.function.get if idaapi.get_func(new + offset) else internal.tags.address.get
+        tags = {tag for tag in Fget_tags(new + offset)}
+        if not internal.tagcache.globals.destroy(ea):
             logging.fatal(u"{:s}.relocate_globals({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to remove reference count ({!r}) for global {:#x}.".format(__name__, old, new, size, iterable, count, ea))
 
         # Now we can re-add the new address to the netnode cache (altval).
-        ok = internal.netnode.alt.set(node, new + offset, count)
-        if not ok:
+        incremented = [internal.tagcache.globals.inc(new + offset, tag) for tag in tags]
+        if len(incremented) != len(tags):
             logging.fatal(u"{:s}.relocate_globals({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to store reference count ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, new + offset))
             failure.append((ea, new + offset, count))
 
