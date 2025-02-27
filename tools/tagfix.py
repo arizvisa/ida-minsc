@@ -29,142 +29,138 @@ import idaapi
 output = sys.stderr
 
 def fetch_contents(fn):
-    """Fetch the number of references for the contents of function `fn` from the database.
+    """Fetch the tags for the contents of function `fn` from the database.
 
-    Returns the tuple `(function, address, tags)` where the `address` and
-    `tags` items are both dictionaries containing the number of references
-    for the addresses and tag names. The `function` item contains the address
-    of the function whose references were counted.
+    Returns the tuple `(function, address, tags)` where the `address` and `tags
+    elements are both dictionaries, and the `function` element is the address of
+    the function that was processed. The `address` dictionary contains each
+    contents address and the tags associated with it. The `tags` dictionary
+    contains the reference counts for each of the tags applied to the contents
+    of the function `fn`.
     """
-    address, tags = {}, {}
-
+    f, results, counts = func.address(fn), {}, {}
     for ea in map(ui.navigation.analyze, func.iterate(fn)):
         items = db.tag(ea)
-
-        # tally up all of the reference counts from the dictionary that we
-        # fetched for the current address we're iterating through.
-        for name in items:
-            address[ea] = address.get(ea, 0) + 1
-            tags[name] = tags.get(name, 0) + 1
+        results[ea] = {tag for tag in items}
+        for tag in items:
+            integer = counts.get(tag, 0)
+            counts[tag] = integer + 1
         continue
-    return func.address(fn), address, tags
+    return func.address(fn), results, counts
 
 def fetch_globals_functions():
-    """Fetch the number of references for all of the global tags (functions) from the database.
+    """Fetch all of the global tags (functions) from the database.
 
-    Returns the tuple `(address, tags)` where the `address` and `tags` items
-    are both dictionaries containing the number of references for both
-    addresses and tag names for each function from the database.
+    Returns a list of the tuple `(address, tags)` where each item describes the
+    set of tags that have been applied to the function at a given address. This
+    can then be used to calculate the reference counts or applied to the
+    database in bulk.
     """
-    address, tags = {}, {}
-    functions = [item for item in db.functions()]
+    result = []
+    functions = [item for item in db.functions.iterate()]
     for i, ea in enumerate(map(ui.navigation.analyze, functions)):
-        items = func.tag(ea)
-        six.print_(u"globals: counting the tags assigned to function {:#x} : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
-
-        # iterate through all of the items in the tags that we decoded, and
-        # tally up their keys in order to return their reference count.
-        # them. once decoded then we can just iterate through their keys and
-        for name in items:
-            address[ea] = address.get(ea, 0) + 1
-            tags[name] = tags.get(name, 0) + 1
-        continue
-    return address, tags
+        six.print_(u"globals: collecting the tags that were applied to function {:#x} : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
+        result.append((ea, {item for item in func.tag(ea)}))
+    return result
 
 def fetch_globals_data():
-    """Fetch the number of references for all of the global tags (non-functions) from the database.
+    """Fetch a list of all the global tags (non-functions) from the database.
 
-    Returns a tuple `(address, tags)` where the `address` and `tags` items
-    are both dictionaries containing the number of references for both
-    addresses and tag names for every non-function in the database.
+    Returns a list of the tuple `(address, tags)` where each item describes the
+    set of tags that have been applied to a global address. This list can be
+    used to calculate the reference counts of applied to the database in bulk.
     """
-    address, tags = {}, {}
-    left, right = db.config.bounds()
-    six.print_(u'globals: counting any tags that are assigned to global data', file=output)
+    result = []
+    left, right = db.information.bounds()
+    six.print_(u'globals: collecting any tags that have been applied to a global address', file=output)
     for ea in map(ui.navigation.analyze, db.address.iterate(left, right)):
-        if func.within(ea):
+        if idaapi.get_func(ea):
             continue
-        items = db.tag(ea)
-
-        # after grabbing the tags for the current address we're iterating
-        # through, tally up the number of keys and their values.
-        for name in items:
-            address[ea] = address.get(ea, 0) + 1
-            tags[name] = tags.get(name, 0) + 1
-        continue
-    return address, tags
+        result.append((ea, {item for item in db.tag(ea)}))
+    return result
 
 def fetch_globals():
-    """Fetch the number of references for all of the global tags associated with both functions and non-functions from the database.
+    """Fetch all of the global tags associated with both functions and non-functions from the database.
 
-    Returns the tuple `(address, tags)` where the `address` and `tags`
-    items are both dictionaries containing the number of references
-    for both addresses and tag names.
+    Returns the tuple `(address, tags)` where both elements are dictionaries.
+    The `address` dictionary contains the tags associated with each global
+    address. The `tags` dictionary contains the reference counts for the tags
+    being used by the `address` dictionary.
     """
     # Read both the address and tags from all functions and globals.
-    faddr, ftags = fetch_globals_functions()
-    daddr, dtags = fetch_globals_data()
+    fresults = fetch_globals_functions()
+    dresults = fetch_globals_data()
 
-    # Consolidate tags into individual dictionaries.
-    six.print_(u'globals: tallying up the database tags for building the index', file=output)
-
-    address, tags = {}, {}
-    for results, item in itertools.chain(zip(2 * [address], [faddr, daddr]), zip(2 * [tags], [ftags, dtags])):
-        matching = {ea for ea in results} & {ea for ea in item}
-        missing = {ea for ea in item} - {ea for ea in results}
-
-        # Update all of the keys that aren't in both our results
-        # and our items, and add up the ones that are.
-        results.update({ea : item[ea] for ea in missing})
-        results.update({ea : results[ea] + item[ea] for ea in matching})
+    # Consolidate tags into a dictionary, and collect the tags separately.
+    results, counts = {}, {}
+    six.print_(u'globals: collecting all addresses and tallying the database tags', file=output)
+    for ea, tags in itertools.chain(fresults, dresults):
+        results[ea] = tags
+        for tag in tags:
+            integer = counts.setdefault(tag, 0)
+            counts[tag] = integer + 1
+        continue
 
     # Output our results to the specified output.
-    six.print_(u"globals: found {:d} addresses to include in index".format(len(address)), file=output)
-    six.print_(u"globals: found {:d} tags to include in index".format(len(tags)), file=output)
-    return address, tags
+    six.print_(u"globals: found {:d} addresses to include in index".format(len(results)), file=output)
+    six.print_(u"globals: found {:d} tags to include in index".format(len(counts)), file=output)
+    return results, counts
 
-def contents(ea):
-    '''Generate the cache for the contents of the function `ea`.'''
+def contents(address):
+    '''Generate the cache for the contents of the function at the given `address`.'''
     try:
-        func.address(ea)
+        func.address(address)
     except internal.exceptions.FunctionNotFoundError:
-        logging.warning(u"{:s}.contents({:#x}): Unable to fetch cache the for the address {:#x} as it is not a function.".format('.'.join([__name__]), ea, ea))
+        logging.warning(u"{:s}.contents({:#x}): Unable to fetch cache the for the address {:#x} as it is not a function.".format('.'.join([__name__]), address, address))
         return {}, {}
 
     # Read the addresses and tags from the contents of the function.
-    logging.debug(u"{:s}.contents({:#x}): Fetching the cache for the function {:#x}.".format('.'.join([__name__]), ea, ea))
-    f, address, tags = fetch_contents(ui.navigation.procedure(ea))
+    logging.debug(u"{:s}.contents({:#x}): Fetching the cache for the function {:#x}.".format('.'.join([__name__]), address, address))
+    f, results, counts = fetch_contents(ui.navigation.procedure(address))
+    ui.navigation.set(address)
 
-    # Update the addresses and tags for the contents of the function.
-    ui.navigation.set(ea)
-    logging.debug(u"{:s}.contents({:#x}): Updating the name references in the cache belonging to function {:#x}.".format('.'.join([__name__]), ea, ea))
-    for k, v in tags.items():
-        internal.tagcache.contents.set_name(f, k, v, target=f)
+    # Gather the current reference counts for the function, and update its tags.
+    logging.debug(u"{:s}.contents({:#x}): Updating the tag references in the cache belonging to function {:#x}.".format('.'.join([__name__]), address, address))
+    original = {tag : count for tag, count in internal.tagcache.contents.counts(address)}
+    for ea, tags in results.items():
+        for tag in tags:
+            internal.tagcache.contents.inc(ea, tag)
+        continue
+    modified = {tag : count for tag, count in internal.tagcache.contents.counts(address)}
 
-    logging.debug(u"{:s}.contents({:#x}): Updating the address references in the cache belonging to function {:#x}.".format('.'.join([__name__]), ea, ea))
-    for k, v in address.items():
-        if not func.within(k):
-            continue
-        internal.tagcache.contents.set_address(k, v, target=f)
+    # Now we'll go through the original and modified counts to make sure that
+    # they correlate to the counts that we tallied when fetching the contents.
+    for tag, count in counts.items():
+        old, new = original.get(tag, 0), modified.get(tag, 0)
+        if new - old != count:
+            logging.debug(u"{:s}.contents({:#x}): Expected a reference count change of {:+d} for tag {!r} in function {:#x}, but change was {:+d} ({:d} - {:d}) instead.".format('.'.join([__name__]), address, count, tag, address, new - old, new, old))
+        continue
 
-    return address, tags
+    return {ea : len(tags) for ea, tags in results.items()}, counts
 
 def globals():
     '''Build the index of references for all of the globals in the database.'''
 
     # Read all of the data tags for each function and address.
-    address, tags = fetch_globals()
+    address, counts = fetch_globals()
 
-    # Update the the index containing the address and tags we counted.
-    six.print_(u'globals: updating the name references in the index for the database', file=output)
-    for k, v in tags.items():
-        internal.tagcache.globals.set_name(k, v)
+    # Gather the current reference counts for the globals, and update their tags.
+    original = {tag : count for tag, count in internal.tagcache.globals.counts()}
+    for ea, tags in address.items():
+        for tag in tags:
+            internal.tagcache.globals.inc(ea, tag)
+        continue
+    modified = {tag : count for tag, count in internal.tagcache.globals.counts()}
 
-    six.print_(u'globals: updating the address references in the index for the database', file=output)
-    for k, v in address.items():
-        internal.tagcache.globals.set_address(k, v)
+    # Now we'll go through both counts to make sure that they correlate to the
+    # counts that we tallied when fetching all the globals.
+    for tag, count in counts.items():
+        old, new = original.get(tag, 0), modified.get(tag, 0)
+        if new - old != count:
+            logging.debug(u"{:s}.globals(): Expected a reference count change of {:+d} for tag {!r} in database, but change was {:+d} ({:d} - {:d}) instead.".format('.'.join([__name__]), count, tag, new - old, new, old))
+        continue
 
-    return address, tags
+    return {ea : len(tags) for ea, tags in address.items()}, counts
 
 def all():
     '''Build the index of references for all the globals and generate the caches for every function in the database.'''
@@ -210,36 +206,30 @@ def everything():
 
 def erase_globals():
     '''Remove the contents of the index from the database which is used for storing information about the global tags.'''
-    node = internal.tagcache.tagging.node()
-    hashes, alts, sups = map(list, (iterator(node) for iterator in [internal.netnode.hash.fiter, internal.netnode.alt.fiter, internal.netnode.sup.fiter]))
-    total = sum(map(len, [hashes, alts, sups]))
+    addresses = {ea for ea, _ in internal.tagcache.globals.iterate()}
+    names = {tag for tag, _ in internal.tagcache.globals.counts()}
+    total = len(names) + len(addresses)
 
     yield total
 
     current = 0
-    for idx, k in enumerate(hashes):
-        internal.netnode.hash.remove(node, k)
+    for idx, k in enumerate(names):
+        internal.tagcache.globals.destroy_tag(k)
         yield current + idx, k
 
-    current += len(hashes)
-    for idx, ea in enumerate(sups):
-        internal.netnode.sup.remove(node, ea)
-        yield current + idx, ea
-
-    current += len(sups)
-    for idx, ea in enumerate(alts):
-        internal.netnode.alt.remove(node, ea)
+    current += len(names)
+    for idx, ea in enumerate(addresses):
+        internal.tagcache.globals.destroy(ea)
         yield current + idx, ea
     return
 
 def erase_contents():
     '''Remove the cache associated with each function from the database.'''
     functions = [item for item in db.functions()]
-    total, tag = len(functions), internal.tagcache.contents.btag
-    yield total
+    yield len(functions)
 
     for idx, ea in enumerate(map(ui.navigation.set, functions)):
-        internal.netnode.blob.remove(ea, tag=tag, index=0)
+        internal.tagcache.contents.destroy(ea)
         yield idx, ea
     return
 
