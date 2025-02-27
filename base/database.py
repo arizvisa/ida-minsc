@@ -2268,28 +2268,14 @@ def selectcontents(**boolean):
     # Collect each potential parameter into sets for checking tag membership.
     included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
 
-    # Walk through the index verifying that they're within a function. This
-    # way we can cross-check their cache against the user's query.
+    # Walk through the index verifying that they're within a function. This way
+    # we can cross-check their cache against the user's query. If we're not
+    # in a function then the cache is lying and we need to skip this iteration.
     for ea, cache in internal.tagcache.contents.iterate():
-        if interface.function.has(ui.navigation.procedure(ea)):
-            sup, contents = {key for key in cache}, internal.tagcache.contents._read(ea, ea) or {}
-
-        # Otherwise if we're not within a function then our cache is lying to us
-        # and we need to skip this iteration.
-        else:
+        if not interface.function.has(ui.navigation.procedure(ea)):
             q = utils.string.kwargs(boolean)
             logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency where address ({:#x}) should be referencing a function.".format(__name__, q, ea))
             continue
-
-        # Check to see that the global contents cache (supval) matches the actual
-        # function contents cache (blob). This isn't too serious because we always
-        # trust the real function cache, but it implies that there was an
-        # inconsistency when the global index of written tagnames was updated.
-        blob = {key for key in contents}
-        if blob != sup:
-            f, q = function.address(ea), utils.string.kwargs(boolean)
-            sup_formatted, blob_formatted = (', '.join(items) for items in [sup, blob])
-            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency between contents of {:s} address ({:#x}) and address ({:#x}) due to a difference between the supval ({:s}) and its corresponding blob ({:s}).".format(__name__, q, f, 'function', ea, sup_formatted, blob_formatted))
 
         # Now start aggregating the tagnames that the user is searching for.
         collected, names, owners = {item for item in []}, internal.tagcache.contents.name(ea, target=ea), {item for item in interface.function.owners(ea)}
