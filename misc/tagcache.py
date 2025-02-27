@@ -491,6 +491,14 @@ class contents(tagging):
         return result
 
     @classmethod
+    def destroy(cls, ea):
+        '''Destroy the contents associated with the function at address `ea`.'''
+        node, key = tagging.node(), cls._key(ea)
+        ok_sup = netnode.sup.remove(node, key)
+        ok_blob = internal.netnode.blob.remove(key, tag=cls.btag, index=0)
+        return ok_sup and ok_blob
+
+    @classmethod
     def set_name(cls, address, name, count, **target):
         """Set the contents tag count for the function `target` and `name` to `count`.
 
@@ -617,6 +625,30 @@ class globals(tagging):
         if count:
             logging.debug(u"{:s}.erase({:#x}) : Erasing the tags at global address {:#x} results in an unexpected reference count ({:d}).".format('.'.join([__name__, cls.__name__]), address, address, count))
         return count
+
+    @classmethod
+    def destroy(cls, *address):
+        '''Destroy the tags for the specified global `address` in the database.'''
+        node = tagging.node()
+        if address:
+            return internal.netnode.alt.remove(node, *address)
+
+        alts = [ea for ea in netnode.alt.fiter(node)]
+        for idx, ea in enumerate(alts):
+            internal.netnode.alt.remove(node, ea)
+        return True
+
+    @classmethod
+    def destroy_tag(cls, *name):
+        '''Destroy the tag with the specified `name`.'''
+        node = tagging.node()
+        if name:
+            return internal.netnode.hash.remove(node, *name)
+
+        hashes = [item for item in netnode.hash.fiter(node)]
+        for idx, tag in enumerate(hashes):
+            internal.netnode.hash.remove(node, tag)
+        return True
 
     @classmethod
     def set_name(cls, name, count):
