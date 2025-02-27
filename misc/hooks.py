@@ -956,7 +956,10 @@ def __process_functions(percentage=0.10):
             P.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
 
             # Iterate through each address in the function, only updating the
-            # references for tags that are not in our set of implicit ones.
+            # references for tags that are not in our set of implicit ones. If
+            # the address is a global, then we decrement out of the globals
+            # because we're at a function entrypoint and want to make sure that
+            # we only grab the contents address.
             for ea in interface.address.items(ui.navigation.analyze(l), r):
                 available = {k for k in internal.tags.address.get(ea)}
                 for k in available - implicit:
@@ -1071,7 +1074,6 @@ def __relocate_function(old, new, size, iterable, moved=False):
     as per "Move Segment(s)". Otherwise they're still at their original address
     which happens when the database has been relocated via "Rebase Program".
     """
-    key = internal.tagcache.tagging.__address__
     failure, total, index = [], [item for item in iterable], {ea : keys for ea, keys in internal.tagcache.contents.iterate() if old <= ea < old + size}
 
     for i, fn in enumerate(total):
@@ -1082,7 +1084,8 @@ def __relocate_function(old, new, size, iterable, moved=False):
         # already been moved, then use the function we were given. Otherwise we can just
         # use the old offset.
         try:
-            state = internal.tagcache.contents._read(target if moved else source, offset + old)
+            state = internal.tagcache.contents.function(target if moved else source, offset + old)
+            counts = internal.tagcache.contents.functiontags(target if moved else source, offset + old)
 
         except exceptions.FunctionNotFoundError:
             logging.fatal(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Unable to locate the original function address ({:#x}) while trying to transform to {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new), exc_info=True)
@@ -1104,24 +1107,21 @@ def __relocate_function(old, new, size, iterable, moved=False):
             logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Found contents for function {:#x} at old address {:#x} that wasn't in index.".format(__name__, old, new, size, iterable, fn, source))
         index.pop(source, None)
 
-        # Ensure that the function key is available in the loaded state.
-        if key not in state:
-            state.setdefault(key, {})
-            # FIXME: We should completely rebuild the contents here instead of
-            #        logging a warning and initializing it with an empty dict.
-            logging.warning(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Missing address cache while translating address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
-
         # Update the state containing the old addresses with the newly transformed ones.
-        res, state[key] = state[key], {ea - old + new : ref for ea, ref in state[key].items()}
+        res, newstate = state, {ea - old + new : ref for ea, ref in state.items()}
 
-        # And then we can write the modified state back to the function's netnode.
-        ok = internal.tagcache.contents._write(fn, fn, state)
-        if not ok:
-            logging.fatal(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to write reference count for function {:#x} while trying to update old reference count ({!s}) to new one ({!s}).".format(__name__, old, new, size, iterable, fn, utils.string.repr(res), utils.string.repr(state[key])))
-            failure.append((fn, res, state[key]))
+        # Copy the original counts into the new function, and write the modified
+        # state with translated addresses back to the function's tagcache.
+        copied = internal.tagcache.contents.setfunctiontags(fn, fn, counts)
+        replaced = internal.tagcache.contents.setfunction(fn, fn, newstate)
+
+        # If anything failed, then log it, stash it, and continue to the next one.
+        if copied is None or replaced is None:
+            logging.fatal(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to write reference count for function {:#x} while trying to update old reference count ({!s}) to new one ({!s}).".format(__name__, old, new, size, iterable, fn, utils.string.repr(res), utils.string.repr(newstate)))
+            failure.append((fn, res, newstate))
 
         # We successfully processed this function, so yield its index and offset.
-        logging.debug(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Relocated {:d} content locations for function {:#x} using delta {:+#x}.".format(__name__, old, new, size, iterable, len(state[key]), fn, new - old))
+        logging.debug(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Relocated {:d} content locations for function {:#x} using delta {:+#x}.".format(__name__, old, new, size, iterable, len(newstate), fn, new - old))
         yield i, offset
 
     # Now we need to gather all of our imports so that we can clean up any functions
