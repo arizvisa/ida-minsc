@@ -339,6 +339,63 @@ class contents(tagging):
             yield ea, res
         return
 
+    # FIXME: the next 4 functions are a hack in order to facilitate bulk updates
+    #        of the addresses in the contents of a function. this means things
+    #        like translating the addresses to a different base address. these
+    #        four functions should really be combined into a single one that
+    #        allows translating the addresses and writing them to the netnode of
+    #        a completely different function.
+
+    @classmethod
+    def function(cls, target, address):
+        '''Yield the address and reference count for every contents address in the function `target`.'''
+        key = address if target is None else target
+        items = cls._read(key, address)
+        if items is None:
+            return
+        return {ea : count for ea, count in items.get(cls.__address__, {}).items()}
+
+    @classmethod
+    def setfunction(cls, target, address, new):
+        '''Set the address and reference count for every address in the function `target` to `new`.'''
+        state = cls._read(target, address) or {}
+
+        # extract the address dictionary from the read state, and update it with
+        # the dictionary that we were given. the purpose of this function is to
+        # update the contents addresses for a function in bulk.
+        res, state[cls.__address__] = state.get(cls.__address__, {}), new
+
+        # attempt to write the modified state back where we had gotten it from.
+        if internal.tagcache.contents._write(target, address, state):
+            return res
+        return
+
+    @classmethod
+    def functiontags(cls, target, address):
+        '''Yield the address and reference count for every contents address in the function `target`.'''
+        key = address if target is None else target
+        items = cls._read(key, address)
+        if items is None:
+            return
+        return {tag : count for tag, count in items.get(cls.__tags__, {}).items()}
+
+    @classmethod
+    def setfunctiontags(cls, target, address, new):
+        '''Set the tag and reference count for every tag in the function `target` to `new`.'''
+        state = cls._read(target, address) or {}
+
+        # extract the address dictionary from the read state, and update it with
+        # the dictionary that we were given. the purpose of this function is to
+        # update the contents addresses for a function in bulk.
+        res, state[cls.__tags__] = state.get(cls.__tags__, {}), new
+
+        # attempt to write the modified state back where we had gotten it from.
+        if internal.tagcache.contents._write(target, address, state):
+            return res
+        return
+
+    # ...and now, back to our regularly scheduled programming.
+
     @classmethod
     def inc(cls, address, name, **target):
         """Increase the ref count for the given `address` and `name` belonging to the function `target`.
