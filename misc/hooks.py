@@ -392,13 +392,13 @@ class address(changingchanged):
         fn, rt = cls.get_func_extern(ea)
 
         # if we're in a function but not a runtime-linked one, then we need to
-        # to clear our contents here.
+        # to clear the tags for our contents address.
         if fn and not rt:
-            internal.tagcache.contents.set_address(ea, 0)
+            internal.tagcache.contents.erase_address(fn, ea)
 
-        # otherwise, we can simply clear the tags globally
+        # otherwise, we can simply clear the tags from the global address.
         else:
-            internal.tagcache.globals.set_address(ea, 0)
+            internal.tagcache.globals.erase(ea)
 
         # grab the comment and then re-create its references.
         res = internal.comment.decode(cmt)
@@ -616,7 +616,7 @@ class globals(changingchanged):
             return
 
         # we're using an old version of ida here, so start out empty
-        internal.tagcache.globals.set_address(ea, 0)
+        internal.tagcache.globals.erase(ea)
 
         # grab our comment here and re-create its refs
         res = internal.comment.decode(utils.string.of(cmt))
@@ -1095,7 +1095,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
             continue
 
         # Erase the old contents tags since we've already loaded its state.
-        internal.tagcache.contents._write(source, offset + old, None)
+        internal.tagcache.contents.erase(source)
         logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cleared contents of function {:#x} at old address {:#x}.".format(__name__, old, new, size, iterable, fn, offset + old))
 
         # If there wasn't a value in our contents index, then warn the user
@@ -1137,7 +1137,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
         offset = ea - new
         source, target = offset + old, offset + new
         logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Removing contents of runtime-linked function ({:#x}) from index at {:#x}.".format(__name__, old, new, size, iterable, target, source))
-        internal.tagcache.contents._write(source, offset + old, None)
+        internal.tagcache.contents.erase(source)
         index.pop(source)
 
     # Last thing to do is to clean up the stray contents from the index that weren't
@@ -1162,7 +1162,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
 
         # Now we know why this address is within our index, so all that
         # we really need to do is to remove it.
-        internal.tagcache.contents._write(ea, ea, None)
+        internal.tagcache.contents.erase(ea)
         logging.debug(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cleared stray contents for {:#x} at old address {:#x}.".format(__name__, old, new, size, iterable, offset + new, offset + old))
     return
 
