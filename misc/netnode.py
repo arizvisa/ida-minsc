@@ -365,13 +365,14 @@ class utils(object):
 
         start, stop = sorted([start, stop])
         current = cls.valforward(node, start, netnode.altprev, netnode.altnext, netnode.altlast, tag)
-        if current in {None, idaapi.BADNODE}:
+        if current in {None, idaapi.BADNODE, end}:
             return []
 
-        result.append((current, Fvalue(node, current, tag)))
+        current < stop and result.append((current, Fvalue(node, current, tag)))
+        current = Fnext(node, current, tag)
         while current != end and current < stop:
-            current = Fnext(node, current, tag)
             result.append((current, Fvalue(node, current, tag)))
+            current = Fnext(node, current, tag)
         return result
     @classmethod
     def raltrange(cls, node, start, stop, tag=netnode.alttag):
@@ -381,13 +382,14 @@ class utils(object):
 
         start, stop = sorted([start, stop])
         current = cls.valbackward(node, stop, netnode.altprev, netnode.altnext, netnode.altfirst, tag)
-        if current in {None, idaapi.BADNODE}:
+        if current in {None, idaapi.BADNODE, end}:
             return []
 
-        result.append((current, Fvalue(node, current, tag)))
+        current > start and result.append((current, Fvalue(node, current, tag)))
+        current = Fprev(node, current, tag)
         while current != end and current > start:
-            current = Fprev(node, current, tag)
             result.append((current, Fvalue(node, current, tag)))
+            current = Fprev(node, current, tag)
         return result
 
     @classmethod
@@ -452,13 +454,14 @@ class utils(object):
 
         start, stop = sorted([start, stop])
         current = cls.valforward(node, start, netnode.supprev, netnode.supnext, netnode.suplast, tag)
-        if current in {None, idaapi.BADNODE}:
+        if current in {None, idaapi.BADNODE, end}:
             return []
 
-        result.append((current, Fvalue(node, current, tag)))
+        current < stop and result.append((current, Fvalue(node, current, tag)))
+        current = Fnext(node, current, tag)
         while current != end and current < stop:
-            current = Fnext(node, current, tag)
             result.append((current, Fvalue(node, current, tag)))
+            current = Fnext(node, current, tag)
         return result
     @classmethod
     def rsuprange(cls, node, start, stop, value=None, tag=netnode.suptag):
@@ -468,13 +471,14 @@ class utils(object):
 
         start, stop = sorted([start, stop])
         current = cls.valbackward(node, stop, netnode.supprev, netnode.supnext, netnode.supfirst, tag)
-        if current in {None, idaapi.BADNODE}:
+        if current in {None, idaapi.BADNODE, end}:
             return []
 
-        result.append((current, Fvalue(node, current, tag)))
+        current > start and result.append((current, Fvalue(node, current, tag)))
+        current = Fprev(node, current, tag)
         while current != end and current > start:
-            current = Fprev(node, current, tag)
             result.append((current, Fvalue(node, current, tag)))
+            current = Fprev(node, current, tag)
         return result
 
     @classmethod
@@ -642,13 +646,14 @@ class utils(object):
 
         start, stop = sorted([start, stop])
         current = cls.valforward(node, start, netnode.charprev, netnode.charnext, netnode.charlast, tag)
-        if current in {None, idaapi.BADNODE}:
+        if current in {None, idaapi.BADNODE, end}:
             return []
 
-        result.append((current, Fvalue(node, current, tag)))
+        current < stop and result.append((current, Fvalue(node, current, tag)))
+        current = Fnext(node, current, tag)
         while current != end and current < stop:
-            current = Fnext(node, current, tag)
             result.append((current, Fvalue(node, current, tag)))
+            current = Fnext(node, current, tag)
         return result
     @classmethod
     def rcharrange(cls, node, start, stop, value=None, tag=netnode.chartag):
@@ -661,10 +666,11 @@ class utils(object):
         if current in {None, idaapi.BADNODE}:
             return []
 
-        result.append((current, Fvalue(node, current, tag)))
+        current > start and result.append((current, Fvalue(node, current, tag)))
+        current = Fprev(node, current, tag)
         while current != end and current > start:
-            current = Fprev(node, current, tag)
             result.append((current, Fvalue(node, current, tag)))
+            current = Fprev(node, current, tag)
         return result
 
     @classmethod
