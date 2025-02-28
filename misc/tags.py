@@ -847,8 +847,8 @@ class member(object):
     @classmethod
     def get(cls, mptr):
         '''Return a dictionary containing the tags for the structure member `mptr`.'''
-        repeatable, mptr = True, idaapi.get_struc(int(mptr)) if isinstance(mptr, internal.types.integer) else mptr
-        mptr, fullname, sptr = idaapi.get_member_by_id(mptr.id)
+        repeatable, mid = True, mptr.id if isinstance(mptr, (idaapi.member_t, internal.structure.member_t)) else int(mptr)
+        mptr, fullname, sptr = idaapi.get_member_by_id(mid)
 
         # Grab the repeatable and non-repeatable comment.
         d1 = comment.decode(utils.string.of(idaapi.get_member_cmt(mptr.id, False)))
