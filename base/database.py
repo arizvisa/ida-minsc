@@ -2204,38 +2204,13 @@ def select(**boolean):
     """
     boolean = {key : {item for item in value} if isinstance(value, internal.types.unordered) else {value} for key, value in boolean.items()}
 
-    # Nothing specific was queried, so just yield all tags that are available.
-    if not boolean:
-        for ea in internal.tagcache.globals.address():
-            ui.navigation.set(ea)
-            Ftag, owners = (internal.tags.function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (internal.tags.address.get, {ea})
-            tags = Ftag(ea)
-            if tags and ea in owners: yield ea, tags
-            elif ea not in owners: logging.info(u"{:s}.select() : Refusing to yield {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, len(tags), '' if len(tags) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
-        return
-
-    # Collect the tagnames to query as specified by the user.
-    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
-
-    # Walk through every tagged address so we can cross-check them with the query.
-    for ea in internal.tagcache.globals.address():
-        collected, _ = {}, ui.navigation.set(ea)
-        Ftag, owners = (internal.tags.function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (internal.tags.address.get, {ea})
-        tags = Ftag(ea)
-
-        # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
-        collected.update({key : value for key, value in tags.items() if key in included})
-
-        # required is the equivalent of And(&) which yields the address only if it uses all of the specified tagnames.
-        if required:
-            if required & six.viewkeys(tags) == required:
-                collected.update({key : value for key, value in tags.items() if key in required})
-            else: continue
-
-        # If we collected anything (matches), then yield the address and the matching tags.
-        if collected and ea in owners: yield ea, collected
-        elif ea not in owners: logging.info(u"{:s}.select({:s}) : Refusing to select from {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format(__name__, utils.string.kwargs(boolean), len(tags), '' if len(tags) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
-    return
+    # If we were given something to query with, unpack the selected tags from
+    # the parameter, and use them with `internal.tags.select`. If there wasn't
+    # anything, then we can just avoid using them to yield all the results.
+    if boolean:
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
+        return internal.tags.select.database(required, included)
+    return internal.tags.select.database()
 
 @utils.multicase(tag=internal.types.string)
 @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
@@ -2254,46 +2229,14 @@ def selectcontents(**boolean):
     """
     boolean = {key : {item for item in value} if isinstance(value, internal.types.unordered) else {value} for key, value in boolean.items()}
 
-    # Nothing specific was queried, so just yield all tagnames that are available.
-    if not boolean:
-        for ea, _ in internal.tagcache.contents.iterate():
-            if interface.function.has(ui.navigation.procedure(ea)):
-                contents, owners, Flogging = internal.tagcache.contents.name(ea, target=ea), {f for f in interface.function.owners(ea)}, logging.info
-            else:
-                contents, owners, Flogging = [], {f for f in []}, logging.warning
-            if contents and ea in owners: yield ea, contents
-            elif ea not in owners: Flogging(u"{:s}.selectcontents() : Refusing to yield {:d} contents tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format(__name__, len(contents), '' if len(contents) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
-        return
-
-    # Collect each potential parameter into sets for checking tag membership.
-    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
-
-    # Walk through the index verifying that they're within a function. This way
-    # we can cross-check their cache against the user's query. If we're not
-    # in a function then the cache is lying and we need to skip this iteration.
-    for ea, cache in internal.tagcache.contents.iterate():
-        if not interface.function.has(ui.navigation.procedure(ea)):
-            q = utils.string.kwargs(boolean)
-            logging.warning(u"{:s}.selectcontents({:s}) : Detected cache inconsistency where address ({:#x}) should be referencing a function.".format(__name__, q, ea))
-            continue
-
-        # Now start aggregating the tagnames that the user is searching for.
-        collected, names, owners = {item for item in []}, internal.tagcache.contents.name(ea, target=ea), {item for item in interface.function.owners(ea)}
-
-        # included is the equivalent of Or(|) and yields the function address if any of the specified tagnames were used.
-        collected.update(included & names)
-
-        # required is the equivalent of And(&) which yields the function address only if it uses all of the specified tagnames.
-        if required:
-            if required & names == required:
-                collected.update(required)
-            else: continue
-
-        # If anything was collected (tagnames were matched), then yield the
-        # address along with the matching tagnames.
-        if collected and ea in owners: yield ea, collected
-        elif ea not in owners: logging.info(u"{:s}.selectcontents({:s}) : Refusing to select from {:d} contents tag{:s} for {:s} address ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format(__name__, utils.string.kwargs(boolean), len(names), '' if len(names) == 1 else 's', 'function', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
-    return
+    # If we were given some tags to filter with, unpack them from our parameter
+    # and use them with the `internal.tags.contents` function to yield the
+    # results to the caller. If we weren't given any tags to filter with, then
+    # we just avoid giving any parameters to get it to yield all the results.
+    if boolean:
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
+        return internal.tags.select.contents(required, included)
+    return internal.tags.select.contents()
 selectcontent = utils.alias(selectcontents)
 
 ## imports
