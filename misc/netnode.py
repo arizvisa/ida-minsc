@@ -903,7 +903,9 @@ class alt(object):
     @classmethod
     def has(cls, nodeidx, index, tag=None):
         '''Return whether the netnode identified by `nodeidx` has an "altval" for the specified `index`.'''
-        return any(index == idx for idx in cls.fiter(nodeidx, tag=netnode.alttag if tag is None else tag))
+        node = utils.get(nodeidx)
+        res = netnode.altval(node, index, netnode.alttag if tag is None else tag)
+        return res != 0
 
     @classmethod
     def get(cls, nodeidx, index, tag=None):
@@ -1019,7 +1021,9 @@ class sup(object):
     @classmethod
     def has(cls, nodeidx, index, tag=None):
         '''Return whether the netnode identified by `nodeidx` has a "supval" for the specified `index`.'''
-        return any(index == item for item in cls.fiter(nodeidx, tag=tag))
+        node = utils.get(nodeidx)
+        res = netnode.supval(node, index, netnode.suptag if tag is None else tag)
+        return res is not None
 
     @classmethod
     def __decode_string(cls, bytes):
@@ -1253,8 +1257,9 @@ class hash(object):
     @classmethod
     def has(cls, nodeidx, key, tag=None):
         '''Return whether the netnode identified by `nodeidx` has a "hashval" for the specified `key`.'''
-        key_encoded = cls.encode_key(key)
-        return any(key_encoded == item for item in cls.fiter(nodeidx, tag=tag))
+        node, key_encoded = utils.get(nodeidx), cls.encode_key(key)
+        res = netnode.hashval(node, key_encoded, netnode.hashtag if tag is None else tag)
+        return res is not None
 
     @classmethod
     def encode_key(cls, data):
