@@ -1,11 +1,151 @@
 """
+Tags module (internal)
+
 This module is used for reading and writing tags to an address, function,
 structure, or structure member within the database. It primarily revolves
 around the tools provided by the `internal.tagcache` module, and uses them
 to maintain any of the indices or caches that are necessary for performance.
 """
-import idaapi, internal, operator, logging
+import logging, functools, operator, itertools
+import idaapi, internal
 from internal import utils, interface, declaration, comment
+
+class select(object):
+    """
+    This namespace is used to query different types of tags from the tagcache
+    and yield the results to the caller. The information yielded to the caller
+    is in the form of a tuple composed of the unique address or location of the
+    tags, and then the tags themselves. The results of these functions can be
+    used to create a dictionary by the caller if necessary.
+
+    Filtering of the results from the functions in this namespace is done by
+    specifying a group of "required" tags, which must exist for the location to
+    be yielded, and/or a group of "included" tags which will be included in the
+    yielded result if they are found. If no "required" or "included" tags are
+    specified, then all of the results from the tagcache will be yielded.
+    """
+    navigation = __import__('ui').navigation
+
+    @classmethod
+    def database(cls, required=[], included=[]):
+        '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
+        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+        required = {key for key in iterable}
+        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        included = {key for key in iterable}
+
+        # Nothing specific was queried, so just yield all tags that are available.
+        if not(required or included):
+            for ea in internal.tagcache.globals.address():
+                cls.navigation.set(ea)
+                Ftag, owners = (function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (address.get, {ea})
+                tags = Ftag(ea)
+                if tags and ea in owners: yield ea, tags
+                elif ea not in owners: logging.info(u"{:s}.database({!s}, {!s}) : Refusing to yield {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format('.'.join([__name__, cls.__name__]), sorted(required), sorted(included), len(tags), '' if len(tags) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
+            return
+
+        # Walk through every tagged address so we can cross-check them with the query.
+        for ea in internal.tagcache.globals.address():
+            Ftag, owners = (function.get, {f for f in interface.function.owners(ea)}) if interface.function.has(ea) else (address.get, {ea})
+            tags = Ftag(cls.navigation.set(ea))
+
+            # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
+            collected = {key : value for key, value in tags.items() if key in included}
+
+            # required is the equivalent of And(&) which yields the address only if it uses all of the specified tagnames.
+            if required:
+                if required & {tag for tag in tags} == required:
+                    collected.update({key : value for key, value in tags.items() if key in required})
+                else: continue
+
+            # If we collected anything (matches), then yield the address and the matching tags.
+            if collected and ea in owners: yield ea, collected
+            elif ea not in owners: logging.info(u"{:s}.database({!s}, {!s}) : Refusing to select from {:d} global tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing one of the candidate locations ({:s}).".format('.'.join([__name__, cls.__name__]), sorted(required), sorted(included), len(tags), '' if len(tags) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, ', '.join(map("{:#x}".format, owners))))
+        return
+
+    @classmethod
+    def contents(cls, required=[], included=[]):
+        '''Query the contents of each function and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
+        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+        required = {key for key in iterable}
+        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        included = {key for key in iterable}
+
+        # Nothing specific was queried, so just yield all tagnames that are available.
+        if not(required or included):
+            for ea, _ in internal.tagcache.contents.iterate():
+                if interface.function.has(cls.navigation.procedure(ea)):
+                    owners, Flogging = {f for f in interface.function.owners(ea)}, logging.info
+                    contents = internal.tagcache.contents.name(ea, target=ea)
+                else:
+                    owners, Flogging = {f for f in []}, logging.warning
+                    contents = []
+                if contents and ea in owners: yield ea, contents
+                elif ea not in owners: Flogging(u"{:s}.contents({!s}, {!s}) : Refusing to yield {:d} contents tag{:s} for {:s} ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format('.'.join([__name__, cls.__name__]), sorted(required), sorted(included), len(contents), '' if len(contents) == 1 else 's', 'function address' if interface.function.has(ea) else 'address', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
+            return
+
+        # Walk through the index verifying that they're within a function. This way
+        # we can cross-check their cache against the user's query. If we're not
+        # in a function then the cache is lying and we need to skip this iteration.
+        for ea, cache in internal.tagcache.contents.iterate():
+            if not interface.function.has(cls.navigation.procedure(ea)):
+                logging.warning(u"{:s}.contents({!s}, {!s}) : Detected cache inconsistency where address ({:#x}) should be referencing a function.".format('.'.join([__name__, cls.__name__]), sorted(required), sorted(included), ea))
+                continue
+
+            # Now start aggregating the tagnames that the user is searching for.
+            owners = {item for item in interface.function.owners(ea)}
+            names = internal.tagcache.contents.name(ea, target=ea)
+
+            # included is the equivalent of Or(|) and yields the function address if any of the specified tagnames were used.
+            collected = included & names
+
+            # required is the equivalent of And(&) which yields the function address only if it uses all of the specified tagnames.
+            if required:
+                if required & names == required:
+                    collected.update(required)
+                else: continue
+
+            # If anything was collected (tagnames were matched), then yield the
+            # address along with the matching tagnames.
+            if collected and ea in owners: yield ea, collected
+            elif ea not in owners: logging.info(u"{:s}.contents({!s}, {!s}) : Refusing to select from {:d} contents tag{:s} for {:s} address ({:#x}) possibly due to cache inconsistency as it is not referencing {:s}.".format('.'.join([__name__, cls.__name__]), sorted(required), sorted(included), len(names), '' if len(names) == 1 else 's', 'function', ea, "a candidate function address ({:s})".format(', '.join(map("{:#x}".format, owners)) if owners else 'a function')))
+        return
+
+    @classmethod
+    def function(cls, func, required=[], included=[]):
+        '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
+        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+        required = {key for key in iterable}
+        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        included = {key for key in iterable}
+
+        # First thing is to convert the argument to a proper function to query.
+        target = interface.function.by(func)
+
+        # If nothing specific was queried, then yield all tags that are available.
+        if not(required or included):
+            for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target)):
+                cls.navigation.analyze(ea)
+                address = internal.tags.address.get(ea)
+                if address: yield ea, address
+            return
+
+        # Walk through every tagged address and cross-check it against the query.
+        for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target)):
+            address = internal.tags.address.get(cls.navigation.analyze(ea))
+
+            # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
+            collected = {key : value for key, value in address.items() if key in included}
+
+            # required is the equivalent of And(&) which yields the addrss only if it uses all of the specified tagnames.
+            if required:
+                if required & {tag for tag in address} == required:
+                    collected.update({key : value for key, value in address.items() if key in required})
+                else: continue
+
+            # If anything was collected (matched), then yield the address and the matching tags.
+            if collected: yield ea, collected
+        return
 
 class address(object):
     """
