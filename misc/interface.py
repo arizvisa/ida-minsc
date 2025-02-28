@@ -11,6 +11,7 @@ import six, builtins, os
 import sys, logging, contextlib, threading, weakref
 import functools, operator, itertools
 import collections, heapq, bisect, traceback, ctypes, math, codecs, array as _array
+import fnmatch, re
 
 import idaapi, internal, architecture
 
@@ -786,8 +787,13 @@ class prioritybase(object):
 
         return {item for item in self.__cache}
 
-    def list(self):
-        '''List all of the targets that are available along with a description.'''
+    def list(self, *pattern):
+        """List all of the targets that are available along with a description.
+
+        If a glob is passed as a `pattern`, then only the targets matching said
+        pattern will be listed.
+        """
+        Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else internal.utils.fconstant(True)
 
         # This property is intended to be part of the public api and
         # thus it can reimplemented by one if considered necessary.
@@ -798,7 +804,10 @@ class prioritybase(object):
 
         if formatted:
             for item in targets:
-                six.print_(u"{:<{:d}s} {:s}".format(formatted[item], length, self.__formatter__(item)))
+                item_description, item_formatted = formatted[item], self.__formatter__(item)
+                if any(Fmatch(string) for string in [item_description, item_formatted]):
+                    six.print_(u"{:<{:d}s} {:s}".format(item_description, length, item_formatted))
+                continue
             return
         six.print_(u"There are no available targets.")
 
@@ -1690,11 +1699,15 @@ class priorityhook(prioritybase):
 
     @property
     def available(self):
-        '''Return all of the targets that may be attached to.'''
+        '''Return all of the hook targets that can be attached to.'''
         return {name for name in self.__attachable__}
 
-    def list(self):
-        '''List all of the available targets with their prototype and description.'''
+    def list(self, *pattern):
+        """List all of the available hook targets with their prototype and description.
+
+        If a glob is passed as a `pattern`, the only the events matching the
+        specified pattern will be listed.
+        """
         klass, targets = self.__klass__, sorted(self.available)
         attributes = {item : getattr(klass, item) for item in targets}
         documentation = {item : autodocumentation.__doc__ for item, autodocumentation in attributes.items()}
@@ -1714,15 +1727,20 @@ class priorityhook(prioritybase):
         # Figure out the lengths of each of the columns so that we can align them.
         length = max(map(len, map("{:s}:".format, targets)))
 
+        # Figure out what to match for if we were given a pattern.
+        Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else internal.utils.fconstant(True)
+
         # Iterate through all of the sorted items and output them.
         six.print_(u"List of events for {:s}".format(klass.__name__))
         for item in targets:
             doc = documentation[item]
-            six.print_(u"{:<{:d}s} {:s}".format("{:s}:".format(item), length, parameters(doc)))
+            if Fmatch(item):
+                six.print_(u"{:<{:d}s} {:s}".format("{:s}:".format(item), length, parameters(doc)))
+            continue
         return
 
     def close(self):
-        '''Detach from all of the targets that are currently attached and disconnect the instance.'''
+        '''Detach from all of the hook targets that are currently attached and disconnect the instance.'''
         cls = self.__class__
         ok = super(priorityhook, self).close()
         if not ok:
@@ -3061,7 +3079,6 @@ class priorityaction(prioritybase):
         managed = [action for action in self.__descriptor_params__]
 
         # If we were given a pattern, then filter both of our lists using it.
-        import fnmatch, re
         if pattern:
             unmanaged = [action for action in fnmatch.filter(unmanaged, *pattern)]
             managed = [action for action in fnmatch.filter(managed, *pattern)]
