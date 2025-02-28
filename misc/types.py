@@ -32,9 +32,10 @@ descriptor = staticmethod, classmethod
 tuple = tuple
 list = list
 set = set
+frozenset = frozenset
 dictionary = dict
 ordered = tuple, list
-unordered = ordered, set
+unordered = ordered, set, frozenset
 
 type = type
 object = object
