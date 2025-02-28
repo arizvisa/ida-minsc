@@ -3338,34 +3338,13 @@ def select(func, **boolean):
     target = interface.function.by(func)
     boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
-    # If nothing specific was queried, then yield all tags that are available.
-    if not boolean:
-        for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target)):
-            ui.navigation.analyze(ea)
-            address = internal.tags.address.get(ea)
-            if address: yield ea, address
-        return
-
-    # Collect the tagnames being queried as specified by the user.
-    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['Or', 'include', 'included', 'includes'], ['And', 'require', 'required', 'requires']])
-
-    # Walk through every tagged address and cross-check it against the query.
-    for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target)):
-        ui.navigation.analyze(ea)
-        collected, address = {}, internal.tags.address.get(ea)
-
-        # included is the equivalent of Or(|) and yields the address if any of the tagnames are used.
-        collected.update({key : value for key, value in address.items() if key in included})
-
-        # required is the equivalent of And(&) which yields the addrss only if it uses all of the specified tagnames.
-        if required:
-            if required & six.viewkeys(address) == required:
-                collected.update({key : value for key, value in address.items() if key in required})
-            else: continue
-
-        # If anything was collected (matched), then yield the address and the matching tags.
-        if collected: yield ea, collected
-    return
+    # If something was specified to query, then collect all of the selected
+    # tagnames and use them as parameters with the `internal.tags.select`
+    # function. Otherwise, we can just avoid them to get everything.
+    if boolean:
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['Or', 'include', 'included', 'includes'], ['And', 'require', 'required', 'requires']])
+        return internal.tags.select.function(target, required, included)
+    return internal.tags.select.function(target)
 
 @utils.multicase()
 def switches():
