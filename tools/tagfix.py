@@ -21,6 +21,7 @@ Likewise to rebuild the cache for just the globals or the contents::
 
 import six, sys, logging, builtins
 import functools, operator, itertools, types
+logging = logging.getLogger(__name__)
 
 import database as db, function as func, ui
 import internal
