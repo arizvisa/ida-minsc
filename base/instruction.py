@@ -42,6 +42,7 @@ import builtins, itertools, functools, logging, operator
 import database, function, structure, enumeration, architecture, ui
 import idaapi, internal, __catalog__ as catalog
 from internal import utils, interface, types, exceptions as E
+logging = logging.getLogger(__name__)
 
 ## general functions
 @utils.multicase()
