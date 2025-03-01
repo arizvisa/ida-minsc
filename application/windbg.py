@@ -16,6 +16,7 @@ import database as db, function as func, instruction as ins, structure as struc
 
 import logging, string
 from internal import utils
+logging = logging.getLogger(__name__)
 
 def reference(ea, **module):
     """Return a reference containing the module and offset of the address `ea`.
