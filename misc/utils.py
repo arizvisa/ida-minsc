@@ -12,6 +12,7 @@ import six, builtins
 import os, logging, weakref
 import functools, operator, itertools
 import sys, codecs, heapq, collections, array, math
+logging = logging.getLogger(__name__)
 
 import internal, internal.types
 import idaapi, ida, ctypes
