@@ -10,6 +10,7 @@ to be used by the average user.
 import six
 import builtins, sys, logging, heapq, traceback
 import functools, operator, itertools
+logging = logging.getLogger(__name__)
 
 import database, function, ui
 import internal
