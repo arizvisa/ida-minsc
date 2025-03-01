@@ -9,6 +9,7 @@ to maintain any of the indices or caches that are necessary for performance.
 import logging, functools, operator, itertools
 import idaapi, internal, internal.tagcache
 from internal import utils, interface, declaration, comment
+logging = logging.getLogger(__name__)
 
 class select(object):
     """
