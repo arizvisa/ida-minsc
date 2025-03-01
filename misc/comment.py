@@ -60,6 +60,7 @@ that is prefixed with a backslash.
 import functools, operator, itertools
 import collections, heapq, string
 import sys, logging
+logging = logging.getLogger(__name__)
 
 import idaapi, internal, internal.netnode
 import codecs
