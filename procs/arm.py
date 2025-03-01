@@ -8,7 +8,8 @@ for the 32-bit instructions (AArch32) of the ARM-architecture family.
 import idaapi, database, internal, __catalog__ as catalog
 from internal import interface, types
 
-import functools, operator, itertools, architecture
+import functools, operator, itertools, architecture, logging
+logging = logging.getLogger(__name__)
 
 class AArch(internal.architecture.architecture_t):
     """
