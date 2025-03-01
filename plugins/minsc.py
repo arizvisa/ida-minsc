@@ -242,6 +242,9 @@ class internal_submodule(internal_api):
         module = self.sys.modules[fullname] = self.new_module(fullname)
         # FIXME: make module a lazy-loaded object for fetching module-code on-demand
 
+        import traceback, logging
+        log = logging.getLogger(__name__)
+
         # Build a temporary cache for the module names and paths to load the api,
         # and use them to build their documentation.
         cache = { name : path for name, path in self.iterate_api(**self.attrs) }
@@ -265,8 +268,7 @@ class internal_submodule(internal_api):
             # If an exception was raised, then remember it so that we can let the user
             # know after we've completely loaded the module.
             except Exception as E:
-                import logging
-                logging.debug("{:s} : Error trying to import module `{:s}` from {!s}. Queuing it until later.".format(self.__name__, name, path), exc_info=True)
+                log.debug("{:s} : Error trying to import module `{:s}` from {!s}. Queuing it until later.".format(self.__name__, name, path), exc_info=True)
 
                 # If we caught an exception while trying to import the module, then stash
                 # our exception info state into a dictionary and decrease a counter. This
@@ -282,18 +284,16 @@ class internal_submodule(internal_api):
         # If we weren't able to load one of the submodules that should've been in our cache,
         # then go through all of our backtraces and log the exception that was raised.
         if stack:
-            import logging, traceback
             for name, path in stack:
-                logging.fatal("{:s} : Error trying to import module `{:s}` from {!s}.".format(self.__name__, name, path), exc_info=result[name])
+                log.fatal("{:s} : Error trying to import module `{:s}` from {!s}.".format(self.__name__, name, path), exc_info=result[name])
             return module
 
         # If we caught an exception despite our stack being empty, then this is because of a
         # recursion issue. In case someone wants to track these situations down, we go through
         # our caught exceptions and create some logging events with the backtrace. These errors
         # are considered non-fatal because importing another sub-module helped resolve it.
-        import logging
         for name, exc_info in result.items():
-            logging.info("{!s} : Encountered a non-fatal exception while trying to import recursive module `{:s}` from {!s}".format(self.__name__, name, cache[name]), exc_info=result[name])
+            log.info("{!s} : Encountered a non-fatal exception while trying to import recursive module `{:s}` from {!s}".format(self.__name__, name, cache[name]), exc_info=result[name])
 
         # Return the module that we just created.
         return module
@@ -354,6 +354,9 @@ class internal_submodule(internal_api):
         def exec_module(self, module):
             cache = self._api
 
+            import traceback, logging
+            log = logging.getLogger(__name__)
+
             # Build a temporary cache for the module names and paths to load the api,
             # and use them to build their documentation.
             maximum = max(map(len, cache)) if cache else 0
@@ -376,8 +379,7 @@ class internal_submodule(internal_api):
                 # If an exception was raised, then remember it so that we can let the user
                 # know after we've completely loaded the module.
                 except Exception as E:
-                    import logging
-                    logging.debug("{:s} : Error trying to import module `{:s}` from {!s}. Queuing it until later.".format(self._finder.__name__, name, path), exc_info=True)
+                    log.debug("{:s} : Error trying to import module `{:s}` from {!s}. Queuing it until later.".format(self._finder.__name__, name, path), exc_info=True)
 
                     # If we caught an exception while trying to import the module, then stash
                     # our exception info state into a dictionary and decrease a counter. This
@@ -393,18 +395,16 @@ class internal_submodule(internal_api):
             # If we weren't able to load one of the submodules that should've been in our cache,
             # then go through all of our backtraces and log the exception that was raised.
             if stack:
-                import logging, traceback
                 for name, path in stack:
-                    logging.fatal("{:s} : Error trying to import module `{:s}` from {!s}.".format(self._finder.__name__, name, path), exc_info=result[name])
+                    log.fatal("{:s} : Error trying to import module `{:s}` from {!s}.".format(self._finder.__name__, name, path), exc_info=result[name])
                 return module
 
             # If we caught an exception despite our stack being empty, then this is because of a
             # recursion issue. In case someone wants to track these situations down, we go through
             # our caught exceptions and create some logging events with the backtrace. These errors
             # are considered non-fatal because importing another sub-module helped resolve it.
-            import logging
             for name, exc_info in result.items():
-                logging.info("{!s} : Encountered a non-fatal exception while trying to import recursive module `{:s}` from {!s}".format(self._finder.__name__, name, cache[name]), exc_info=result[name])
+                log.info("{!s} : Encountered a non-fatal exception while trying to import recursive module `{:s}` from {!s}".format(self._finder.__name__, name, cache[name]), exc_info=result[name])
 
             # Return the module that we just created.
             return module
@@ -881,7 +881,7 @@ library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
 # yielding each of the objects that need to be added to its meta_path.
 def finders():
     '''Yield each finder that will be used by the plugin to locate its modules.'''
-
+    log = logging.getLogger(__name__)
     documentation = 'This is a ctypes-library to the shared object that is used by the IDA SDK.'
 
     # IDA's native lower-level api
@@ -898,7 +898,7 @@ def finders():
             yield internal_object('ida', library, idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64')), __name__='IDA', __doc__=documentation)
 
     else:
-        logging.warning("{:s} : Unable to load IDA's native api via ctypes. Ignoring...".format(__name__))
+        log.warning("{:s} : Unable to load IDA's native api via ctypes. Ignoring...".format(__name__))
 
     # private (internal) api
     documentation = 'This virtual package contains various tools that are used internally by the plugin.'
@@ -1143,7 +1143,7 @@ class DisplayHook(object):
 # Locate the user's dotfile and execute it within the specified namespace.
 def dotfile(namespace, filename=u'.idapythonrc.py'):
     '''Execute the user's dotfile within the specified namespace.'''
-    path = None
+    path, log = None, logging.getLogger(__name__)
 
     # A closure that just consumes paths until it finds one that
     # it can read and execute it within the specified namespace.
@@ -1155,7 +1155,7 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
                 with open(fp, 'r') as infile:
                     content = infile.read()
             except IOError:
-                logging.debug("{:s} : Error reading the dotfile at `{!s}`.".format(__name__, fp), exc_info=True)
+                log.debug("{:s} : Error reading the dotfile at `{!s}`.".format(__name__, fp), exc_info=True)
             else:
                 break
             path = (yield)
@@ -1183,7 +1183,7 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
 
     # If we stopped, then it was read and executed successfully.
     except StopIteration:
-        logging.debug("{:s} : Successfully read and executed the dotfile at `{!s}`.".format(__name__, os.path.join(path, filename)))
+        log.debug("{:s} : Successfully read and executed the dotfile at `{!s}`.".format(__name__, os.path.join(path, filename)))
 
     # If we received an OSError, then this likely happened while we
     # were trying to find the home directory. Pass it to the user.
@@ -1193,13 +1193,13 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
     # Any other exception is because of an issue in the user's script,
     # so we'll do our best to log the backtrace for them to debug.
     except Exception:
-        logging.warning("{:s} : Unexpected exception raised while trying to execute the dotfile at `{!s}`.".format(__name__, os.path.join(path, filename)), exc_info=True)
+        log.warning("{:s} : Unexpected exception raised while trying to execute the dotfile at `{!s}`.".format(__name__, os.path.join(path, filename)), exc_info=True)
 
     # If we didn't get an exception, then literally we couldn't find
     # any file that we were supposed to execute. Log it and move on.
     else:
         vowels, alpha = tuple('aeiou'), next((filename[index:] for index, item in enumerate(filename.lower()) if item in 'abcdefghijklmnopqrstuvwxyz'), filename)
-        logging.warning("{:s} : Unable to locate a{:s} {:s} dotfile in the user's {:s} directory ({!s}).".format(__name__, 'n' if alpha.startswith(vowels) else '', filename, var, path))
+        log.warning("{:s} : Unable to locate a{:s} {:s} dotfile in the user's {:s} directory ({!s}).".format(__name__, 'n' if alpha.startswith(vowels) else '', filename, var, path))
     finally:
         tribulations.close()
 
@@ -1208,8 +1208,8 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
     # explicitly handled by our loaders.
     busted = [(index, item) for index, item in enumerate(sys.path) if os.path.realpath(item) in {os.path.realpath(root)}]
     if busted:
-        logging.warning("{:s} : Execution of `{!s}` has resulted in a conflict between the repository path ({!r}) and the system path.".format(__name__, filename, root))
-        [ logging.warning("{:s} : The system path at index {:d} ({!r}) resolves to {!r} which conflicts with the plugin and may interfere with imports.".format(__name__, index, item, os.path.realpath(item))) for index, item in busted ]
+        log.warning("{:s} : Execution of `{!s}` has resulted in a conflict between the repository path ({!r}) and the system path.".format(__name__, filename, root))
+        [ log.warning("{:s} : The system path at index {:d} ({!r}) resolves to {!r} which conflicts with the plugin and may interfere with imports.".format(__name__, index, item, os.path.realpath(item))) for index, item in busted ]
     return
 
 # The following logic is actually responsible for starting up the whole
@@ -1217,6 +1217,7 @@ def dotfile(namespace, filename=u'.idapythonrc.py'):
 # to a timer, and then straight-up executing things if all else fails.
 def startup(namespace=None):
     '''Patch in a notification hander and start up everything left in the plugin.'''
+    log = logging.getLogger(__name__)
 
     # First check that we've installed the version patch and it's the
     # right type as everything literally revolves around that critical step.
@@ -1234,11 +1235,11 @@ def startup(namespace=None):
         internal.interface
 
     except ImportError:
-        logging.critical("{:s} : An error occured while trying to import the \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
+        log.critical("{:s} : An error occured while trying to import the \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
         raise SystemError("{:s} : Unable to start up plugin without being able to access its \"{:s}\" modules.".format(__name__, 'internal'))
 
     except AttributeError:
-        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, '.'.join(['internal', 'interface'])))
+        log.critical("{:s} : An error occured while trying to access the \"{:s}\" module.".format(__name__, '.'.join(['internal', 'interface'])))
         raise SystemError("{:s} : Unable to start up plugin due to an error while loading its \"{:s}\" modules.".format(__name__, 'internal'))
 
     # Now we need to make sure we have access to our hook module as this is the
@@ -1250,11 +1251,11 @@ def startup(namespace=None):
         hook.scheduler
 
     except ImportError:
-        logging.critical("{:s} : An error occured while trying to import the \"{:s}\" module.".format(__name__, 'hook'), exc_info=True)
+        log.critical("{:s} : An error occured while trying to import the \"{:s}\" module.".format(__name__, 'hook'), exc_info=True)
         raise SystemError("{:s} : Unable to start up plugin without loading the \"{:s}\" module.".format(__name__, 'hook'))
 
     except AttributeError:
-        logging.critical("{:s} : An error occured while trying to access the \"{:s}\" attribute.".format(__name__, '.'.join(['hook', 'notification'])))
+        log.critical("{:s} : An error occured while trying to access the \"{:s}\" attribute.".format(__name__, '.'.join(['hook', 'notification'])))
         raise SystemError("{:s} : Unable to start up plugin due to an error while loading its \"{:s}\" module.".format(__name__, 'hook'))
 
     # Now we can proceed to install our hooks that actually initialize and uninitialize
@@ -1282,7 +1283,7 @@ def startup(namespace=None):
     # If we couldn't access the hooks, then we can still proceed but as a typical
     # set of importable python modules. Log a warning and try the user's dotfile.
     except AttributeError:
-        logging.warning("{:s} : An error occured while trying to access the \"{:s}\" module which will result in missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
+        log.warning("{:s} : An error occured while trying to access the \"{:s}\" module which will result in missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
         namespace and dotfile(namespace) and hook.scheduler.modulate(hook.scheduler.database.unavailable)
         return
 
@@ -1304,16 +1305,16 @@ def startup(namespace=None):
 
         # Otherwise warn the user about this and register our hook with a timer.
         elif namespace is None:
-            logging.warning("{:s} : Unable to add a notification via `{:s}` for {:s}({:d}).".format(__name__, '.'.join(['idaapi', 'notify_when']), '.'.join(['idaapi', 'NW_INITIDA']), idaapi.NW_INITIDA))
-            logging.warning("{:s} : Registering {:.1f} second timer with `{:s}` in an attempt to load plugin...".format(__name__, TIMEOUT, '.'.join(['idaapi', 'register_timer'])))
+            log.warning("{:s} : Unable to add a notification via `{:s}` for {:s}({:d}).".format(__name__, '.'.join(['idaapi', 'notify_when']), '.'.join(['idaapi', 'NW_INITIDA']), idaapi.NW_INITIDA))
+            log.warning("{:s} : Registering {:.1f} second timer with `{:s}` in an attempt to load plugin...".format(__name__, TIMEOUT, '.'.join(['idaapi', 'register_timer'])))
             idaapi.register_timer(TIMEOUT, internal.hooks.ida_is_busy_sucking_cocks)
             six.print_('=' * 86)
 
         # If we were given a namespace to load into, then we register the closure
         # that we defined into the timer so that the user's dotfile gets executed.
         else:
-            logging.warning("{:s} : Unable to add a notification via `{:s}` for {:s}({:d}).".format(__name__, '.'.join(['idaapi', 'notify_when']), '.'.join(['idaapi', 'NW_INITIDA']), idaapi.NW_INITIDA))
-            logging.warning("{:s} : Registering {:.1f} second timer with `{:s}` in an attempt to load plugin...".format(__name__, TIMEOUT, '.'.join(['idaapi', 'register_timer'])))
+            log.warning("{:s} : Unable to add a notification via `{:s}` for {:s}({:d}).".format(__name__, '.'.join(['idaapi', 'notify_when']), '.'.join(['idaapi', 'NW_INITIDA']), idaapi.NW_INITIDA))
+            log.warning("{:s} : Registering {:.1f} second timer with `{:s}` in an attempt to load plugin...".format(__name__, TIMEOUT, '.'.join(['idaapi', 'register_timer'])))
             idaapi.register_timer(TIMEOUT, load_plugin_and_execute_user_dotfile)
             six.print_('=' * 86)
         del(TIMEOUT)
@@ -1328,7 +1329,7 @@ def startup(namespace=None):
 
         # Installing the termination hook failed, but it's not really too important...
         except Exception:
-            logging.warning("{:s} : Unable to add a notification for idaapi.NW_TERMIDA({:d}).".format(__name__, idaapi.NW_TERMIDA))
+            log.warning("{:s} : Unable to add a notification for idaapi.NW_TERMIDA({:d}).".format(__name__, idaapi.NW_TERMIDA))
     return
 
 # Now we can define our plugin_t that literally does nothing if we've already been
@@ -1346,7 +1347,7 @@ class MINSC(idaapi.plugin_t):
 
     def get_loader(self):
         '''Return the loader containing all the components needed for loading and initializing the plugin'''
-        imp = python_import_machinery
+        imp, log = python_import_machinery, logging.getLogger(__name__)
 
         # We explicitly create our own version of the loader from the current
         # file. The functionality we need is actually within our current module,
@@ -1357,18 +1358,18 @@ class MINSC(idaapi.plugin_t):
             module = imp.load_source("{:s}__loader__".format(__name__), filename)
 
         except IOError:
-            logging.critical("{:s} : A critical error occurred while trying to read the plugin loader from the file: {:s}".format(__name__, filename), exc_info=True)
+            log.critical("{:s} : A critical error occurred while trying to read the plugin loader from the file: {:s}".format(__name__, filename), exc_info=True)
 
         except ImportError:
-            logging.critical("{:s} : A critical error occurred while initializing the plugin loader in \"{:s}\"".format(__name__, filename), exc_info=True)
+            log.critical("{:s} : A critical error occurred while initializing the plugin loader in \"{:s}\"".format(__name__, filename), exc_info=True)
 
         except Exception:
-            logging.critical("{:s} : A critical error occurred while initializing the plugin loader".format(__name__, filename), exc_info=True)
+            log.critical("{:s} : A critical error occurred while initializing the plugin loader".format(__name__, filename), exc_info=True)
 
         return module
 
     def init(self):
-        version = getattr(idaapi, '__version__', None)
+        version, log = getattr(idaapi, '__version__', None), logging.getLogger(__name__)
 
         # Check our version.. but not really. We're only checking it to see
         # whether the plugin has been loaded yet. If our version if a float,
@@ -1380,7 +1381,7 @@ class MINSC(idaapi.plugin_t):
 
         # If our state is already initialized, then we've done this before.
         elif self.state:
-            logging.critical("{:s} : Loading plugin again despite it already being initialized ({:s}).".format(__name__, self.state))
+            log.critical("{:s} : Loading plugin again despite it already being initialized ({:s}).".format(__name__, self.state))
 
         # Now the version hasn't been assigned yet, then the user didn't
         # install this globally. This means that we don't control the primary
@@ -1416,7 +1417,7 @@ class MINSC(idaapi.plugin_t):
         # Anything else means that some plugin or somebody else did something
         # crazy, and we have no idea how to recover from this.
         else:
-            logging.warning("{:s} : Skipping installation of the display hook at \"{:s}\" due to a lack of awareness about the current one ({!r}).".format(__name__, '.'.join(['sys', 'displayhook']), sys.displayhook))
+            log.warning("{:s} : Skipping installation of the display hook at \"{:s}\" due to a lack of awareness about the current one ({!r}).".format(__name__, '.'.join(['sys', 'displayhook']), sys.displayhook))
 
         # Now we'll try and tamper with the user's namespace. We'll search through
         # Python's module list, and if we find it we'll just swap it out for root.
@@ -1427,7 +1428,7 @@ class MINSC(idaapi.plugin_t):
             [ns.__dict__.pop(item, None) for item in banner_required]
 
         else:
-            logging.warning("{:s} : Skipping the reset of the primary namespace as \"{:s}\" was not found in Python's module list.".format(__name__, '__main__'))
+            log.warning("{:s} : Skipping the reset of the primary namespace as \"{:s}\" was not found in Python's module list.".format(__name__, '__main__'))
 
         # We don't bother tampering with the user's namespace, since technically
         # we don't have access to it.. However, we'll still try to install the
@@ -1437,26 +1438,26 @@ class MINSC(idaapi.plugin_t):
             import internal
 
         except (ImportError, Exception):
-            logging.critical("{:s} : An error occurred while trying to import the critical \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
+            log.critical("{:s} : An error occurred while trying to import the critical \"{:s}\" module.".format(__name__, 'internal'), exc_info=True)
             ok = False
 
         try:
             import hook
 
         except AttributeError:
-            logging.warning("{:s} : One of the internal modules, \"{:s}\" was not properly loaded and may result in some missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
+            log.warning("{:s} : One of the internal modules, \"{:s}\" was not properly loaded and may result in some missing features.".format(__name__, '.'.join(['internal', 'hooks'])))
             ok = False
 
         try:
             ok and internal.interface
 
         except AttributeError:
-            logging.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was unable to be loaded.".format(__name__, '.'.join(['internal', 'interface'])))
+            log.critical("{:s} : One of the internal modules, \"{:s}\", is critical but was unable to be loaded.".format(__name__, '.'.join(['internal', 'interface'])))
 
         # Check to see if all is well, and if it is then we can proceed to install
         # the necessary hooks to kick everything off.
         if ok:
-            logging.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(__name__))
+            log.info("{:s} : Plugin has been successfully initialized and will now start attaching to the necessary handlers.".format(__name__))
             self.state = self.__class__.state = 'local'
             internal.hooks.make_ida_not_suck_cocks(idaapi.NW_INITIDA)
 
@@ -1464,7 +1465,7 @@ class MINSC(idaapi.plugin_t):
             '__main__' in sys.modules and dotfile(sys.modules['__main__'].__dict__)
 
         else:
-            logging.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(__name__))
+            log.warning("{:s} : Due to previous errors the plugin was not properly attached. Modules may still be imported, but a number of features will not be available.".format(__name__))
             self.state = self.__class__.state = 'disabled'
 
         # Modulate the scheduler now that we're loaded.
@@ -1474,13 +1475,17 @@ class MINSC(idaapi.plugin_t):
         return idaapi.PLUGIN_KEEP
 
     def term(self):
+        log = logging.getLogger(__name__)
+
+        # If no state describing how we were loaded exists, then we have no idea
+        # how to shut things down. log a warning and hope the disassember is ok.
         if self.state is None:
-            logging.warning("{:s} : Ignoring the host application request to terminate as the plugin has not yet been initialized.".format(__name__))
+            log.warning("{:s} : Ignoring the host application request to terminate as the plugin has not yet been initialized.".format(__name__))
             return
 
         # Figure out how we were started so that we can slowly tear things down.
         if self.state in {'disabled', 'persistent'}:
-            logging.debug("{:s} : Host application requested termination of {:s} plugin.".format(__name__, self.state))
+            log.debug("{:s} : Host application requested termination of {:s} plugin.".format(__name__, self.state))
             return
 
         # We were run locally, so we're only allowed to interact with the current
@@ -1490,20 +1495,20 @@ class MINSC(idaapi.plugin_t):
             internal.hooks
 
         except ImportError:
-            logging.critical("{:s} : An error occurred while trying to import the necessary module \"{:s}\" during plugin termination.".format(__name__, 'internal'), exc_info=True)
+            log.critical("{:s} : An error occurred while trying to import the necessary module \"{:s}\" during plugin termination.".format(__name__, 'internal'), exc_info=True)
             return
 
         except AttributeError:
-            logging.critical("{:s} : An error occurred while trying to access the critical module \"{:s}\" during plugin termination.".format(__name__, '.'.join(['internal', 'hooks'])), exc_info=True)
+            log.critical("{:s} : An error occurred while trying to access the critical module \"{:s}\" during plugin termination.".format(__name__, '.'.join(['internal', 'hooks'])), exc_info=True)
             return
 
         # Now we can just remove our hooks and all should be well.
         try:
-            logging.debug("{:s} : Detaching from the host application as requested.".format(__name__))
+            log.debug("{:s} : Detaching from the host application as requested.".format(__name__))
             internal.hooks.make_ida_suck_cocks(idaapi.NW_TERMIDA)
 
         except Exception:
-            logging.critical("{:s} : An error occurred while trying to detach from the host application during plugin termination. Application may become unstable.".format(__name__), exc_info=True)
+            log.critical("{:s} : An error occurred while trying to detach from the host application during plugin termination. Application may become unstable.".format(__name__), exc_info=True)
         return
 
     def run(self, args):
