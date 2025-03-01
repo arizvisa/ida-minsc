@@ -11,6 +11,7 @@ import database as db, function as func, instruction as ins, structure as struc
 
 import logging, string
 from internal import utils
+logging = logging.getLogger(__name__)
 
 def string(ea):
     '''Convert the string defined by IDA at the address `ea` into a delphi-style string and return its length.'''
