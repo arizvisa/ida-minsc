@@ -37,6 +37,7 @@ import builtins, math, fnmatch, re
 import database
 import idaapi, internal
 from internal import utils, interface, types, exceptions as E
+logging = logging.getLogger(__name__)
 
 # FIXME: complete this with more types similar to the 'structure' module.
 # FIXME: normalize the documentation.
