@@ -23,6 +23,7 @@ import logging, inspect, time
 
 import idaapi, internal, internal.utils
 import database as _database
+logging = logging.getLogger(__name__)
 
 ## TODO:
 # locate window under current cursor position
