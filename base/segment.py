@@ -41,6 +41,7 @@ import math, re, fnmatch
 import database, ui
 import idaapi, internal
 from internal import utils, interface, types, exceptions as E
+logging = logging.getLogger(__name__)
 
 ## enumerating
 __matcher__ = utils.matcher()
