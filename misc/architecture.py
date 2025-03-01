@@ -17,6 +17,7 @@ import functools, operator, itertools, logging, six
 import builtins, math, bisect
 import idaapi, internal
 from internal import interface, utils, types
+logging = logging.getLogger(__name__)
 
 class map_t(object):
     """
