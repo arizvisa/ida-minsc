@@ -40,6 +40,9 @@ del(load_source)
 # access it when figuring out which logic we need to use.
 loader.patch_version(idaapi)
 
+# we also need to configure logging.
+loader.configure_logging(__name__)
+
 # IDA 6.95 obnoxiously replaces the displayhook with their own
 # version which makes it so that we can't hook it with ours.
 if idaapi.__version__ >= 6.95 and hasattr(ida_idaapi, '_IDAPython_displayhook') and hasattr(ida_idaapi._IDAPython_displayhook, 'orig_displayhook'):
