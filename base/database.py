@@ -28,6 +28,7 @@ import function, segment, ui
 import structure as _structure
 import idaapi, idc, internal
 from internal import utils, interface, exceptions as E
+logging = logging.getLogger(__name__)
 
 ## properties
 def here():
