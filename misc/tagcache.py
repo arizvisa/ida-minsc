@@ -17,6 +17,7 @@ prior to their existence here.
 
 import idaapi, internal, logging
 from internal import utils, interface, netnode
+logging = logging.getLogger(__name__)
 
 class tagging(object):
     """
