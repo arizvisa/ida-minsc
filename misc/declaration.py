@@ -8,6 +8,7 @@ TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
 import functools, operator, itertools, logging, string as _string
+logging = logging.getLogger(__name__)
 
 import internal, idaapi
 from internal import utils, exceptions, types
