@@ -14,6 +14,7 @@ import collections, heapq, bisect, traceback, ctypes, math, codecs, array as _ar
 import fnmatch, re
 
 import idaapi, internal, architecture
+logging = logging.getLogger(__name__)
 
 class typemap(object):
     """
