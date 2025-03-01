@@ -10,6 +10,7 @@ document this to allow curious individuals to determine how it all works.
 import functools, operator, itertools, logging
 import idaapi, internal, microarchitecture
 from internal import utils, interface, types, exceptions
+log = logging.getLogger(__name__)
 
 ### some decorators to help guard the available of certain functions.
 def guarded(callable):
@@ -79,7 +80,7 @@ def simulate_missing_callable(level, Fcallable):
                 discard = Fraise_exception(*args, **kwargs)
                 raise AssertionError(u"An unexpected error has occurred when trying to raise an exception for the missing attribute \"{:s}\".".format(utils.string.escape('.'.join([object.__name__, attribute]), '"')))
             except internal.exceptions.UnsupportedCapability as E:
-                logging.log(level, u"Simulating the requested function \"{:s}\" due to it being currently inaccessible or missing.".format(utils.string.escape('.'.join([object.__name__, attribute]), '"')))
+                log(level, u"Simulating the requested function \"{:s}\" due to it being currently inaccessible or missing.".format(utils.string.escape('.'.join([object.__name__, attribute]), '"')))
             return Fcallable(*args, **kwargs)
         return functools.partial(simulate_missing_callable, Fcallable, missing_callable(object, attribute))
     return simulate_missing_callable
@@ -1043,7 +1044,7 @@ class variable(object):
         size = internal.structure.member.size(mptr)
         if size != store.size:
             fullname = internal.structure.member.fullname(mptr)
-            logging.warning(u"{:s}.remove_name({:#x}, {:s}) : The storage location {!s} for the variable named \"{:s}\" is not the same size ({:d}) as the frame member \"{:s}\" in the given function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), store, utils.string.escape(lvarname, '"'), size, utils.string.escape(fullname, '"'), ea))
+            log.warning(u"{:s}.remove_name({:#x}, {:s}) : The storage location {!s} for the variable named \"{:s}\" is not the same size ({:d}) as the frame member \"{:s}\" in the given function ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, cls.repr_locator(locator), store, utils.string.escape(lvarname, '"'), size, utils.string.escape(fullname, '"'), ea))
 
         # grab the member name, and then apply it.
         res = internal.structure.member.get_name(mptr)
