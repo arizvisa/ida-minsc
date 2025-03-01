@@ -966,10 +966,15 @@ def host_version():
     return major, minor, float(major)
 
 def patch_version(module):
-    '''Patch the version of the host application into a given module.'''
+    '''Patch the version of the host application into a given `module`.'''
     version = host_version()
     module.__version_major__, module.__version_minor__, module.__version__ = version
     return version
+
+def configure_logging(owner):
+    '''Configure and enable all logging-related functionality for the plugin.'''
+    format = ':'.join(['%(levelname)s', 'MINSC', '%(message)s'])
+    logging.basicConfig(format=format)
 
 # The following logic is the display hook that we install in order to
 # control how all of our output renders in the REPL.
@@ -1399,6 +1404,9 @@ class MINSC(idaapi.plugin_t):
         # Seed the metapath, then patch the version into the idaapi module.
         sys.meta_path.extend(loader.finders())
         _, _, version = loader.patch_version(idaapi)
+
+        # Enable logging.
+        loader.configure_logging(__name__)
 
         # Check if IDAPython (6.95) has replaced the display hook with their
         # own version. We're going to undo exactly what they did, because
