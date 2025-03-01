@@ -12,6 +12,7 @@ definitions of these classes having to reside in a base module.
 
 import builtins, six, operator, functools, itertools, logging, math
 import re, fnmatch, pickle, heapq, bisect
+logging = logging.getLogger(__name__)
 
 import idaapi, internal, internal.tags
 from internal import utils, interface, types, exceptions as E
