@@ -18,6 +18,7 @@ prior to their existence here.
 import functools, operator, itertools, logging, bz2
 import idaapi, ida, internal
 from internal import utils, interface, netnode
+logging = logging.getLogger(__name__)
 
 class tagging(object):
     """
