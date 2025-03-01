@@ -24,6 +24,7 @@ import functools, operator, itertools, logging
 import database, instruction, structure, ui
 import idaapi, internal
 from internal import utils, interface, types, exceptions as E
+logging = logging.getLogger(__name__)
 
 @utils.multicase()
 def has():
