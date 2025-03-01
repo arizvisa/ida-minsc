@@ -16,7 +16,7 @@ existence as they eventually find their place.
 
 import six, sys, logging, builtins
 import functools, operator, itertools, types
-import logging
+logging = logging.getLogger(__name__)
 
 import database, function as func, instruction, segment
 import ui, internal
