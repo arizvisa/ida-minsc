@@ -234,6 +234,50 @@ class select(object):
             if collected: yield item, collected
         return
 
+    @classmethod
+    def blocks(cls, func, required=[], included=[]):
+        '''Query the basic blocks of the function `func` and yield a tuple containing the block and all of the `required` tags with any `included` ones.'''
+        flags = getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+        fn = interface.function.by(func)
+        ea = interface.range.start(fn)
+
+        # Grab all of the blocks and build a map for their starting address. We
+        # preserve the order so that we can yield results for our map in order.
+        blockmap = [(interface.range.start(bb), bb) for bb in interface.function.blocks(fn, flags)]
+        order = [ea for ea, _ in blockmap]
+        blocks = {ea : bb for ea, bb in blockmap}
+
+        # Now we just need to union our tagged addresses with the ones which
+        # are basic-blocks to get a list of the addresses actually selected.
+        available = {ea for ea in internal.tagcache.contents.address(ea, target=ea)}
+        selected = {ea for ea in available} & {ea for ea in order}
+        ordered = [ea for ea in order if ea in selected]
+
+        # If nothing specific was queried, then iterate through our ordered
+        # blocks and yield absolutely everything that we found.
+        if not(required or included):
+            for ea in ordered:
+                res = block.get(blocks[cls.navigation.analyze(ea)])
+                if res: yield blocks[ea], res
+            return
+
+        # Walk through every tagged address and cross-check it against the query.
+        for ea in ordered:
+            res = block.get(blocks[cls.navigation.analyze(ea)])
+
+            # included is the equivalent of Or(|) and yields a block if any of the specified tagnames are used.
+            collected = {key : value for key, value in res.items() if key in included}
+
+            # required is the equivalent of And(&) which yields a block only if it uses all of the specified tagnames.
+            if required:
+                if required & {tag for tag in res} == required:
+                    collected.update({key : value for key, value in res.items() if key in required})
+                else: continue
+
+            # If anything was collected (matched), then yield the block and the matching tags.
+            if collected: yield blocks[ea], collected
+        return
+
 class address(object):
     """
     This namespace is responsible for reading from and writing tags to
