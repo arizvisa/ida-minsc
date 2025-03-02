@@ -1470,51 +1470,22 @@ class blocks(object):
         If `require` is given as an iterable of tag names then require that each returned block uses them.
         If `include` is given as an iterable of tag names then include the tags for each returned block if available.
         """
-        target, flags = interface.function.by(func), getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
-
-        # Turn all of our parameters into a dict of sets that we can iterate through.
         boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
-        # Grab the addresses that are actually tagged into a set, and then the basic
-        # blocks in an ordered dictionary so that we can union them for our results.
-        available = {ea for ea in internal.tagcache.contents.address(interface.range.start(target), target=interface.range.start(target))}
-        order, iterable = [], ((item, interface.range.bounds(item)) for item in blocks.iterate(target, flags))
-        results = {bounds.left : [order.append(bounds.left), item].pop(1) for item, bounds in iterable }
+        # If we were given some parameters, then unpack both the required and/or
+        # the included tags from them so that we can use them with the
+        # `internal.tags.select.blocks` function.
+        if boolean:
+            included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['Or', 'include', 'included', 'includes'], ['And', 'require', 'required', 'requires']])
+            iterable = internal.tags.select.blocks(func, required, included)
 
-        # Now we just need to union both our tagged addresses with the ones which
-        # are basic-blocks to get a list of the selected addresses.
-        selected = {ea for ea in available} & {ea for ea in order}
-        ordered = [ea for ea in order if ea in selected]
+        # If there weren't any parameters, then we can avoid using them to yield
+        # all the available results.
+        else:
+            iterable = internal.tags.select.blocks(func)
 
-        # If nothing specific was queried, then iterate through our ordered
-        # blocks and yield absolutely everything that we found.
-        if not boolean:
-            for ea in ordered:
-                ui.navigation.analyze(ea)
-                address = block.tag(ea)
-                if address: yield interface.range.bounds(results[ea]), address
-            return
-
-        # Collect the tagnames being queried as specified by the user.
-        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['Or', 'include', 'included', 'includes'], ['And', 'require', 'required', 'requires']])
-
-        # Walk through every tagged address and cross-check it against the query.
-        for ea in ordered:
-            ui.navigation.analyze(ea)
-            collected, address = {}, block.tag(ea)
-
-            # included is the equivalent of Or(|) and yields a block if any of the specified tagnames are used.
-            collected.update({key : value for key, value in address.items() if key in included})
-
-            # required is the equivalent of And(&) which yields a block only if it uses all of the specified tagnames.
-            if required:
-                if required & six.viewkeys(address) == required:
-                    collected.update({key : value for key, value in address.items() if key in required})
-                else: continue
-
-            # If anything was collected (matched), then yield the block and the matching tags.
-            if collected: yield interface.range.bounds(results[ea]), collected
-        return
+        # Last thing to do is to convert each basic block into its range/bounds.
+        return ((interface.range.bounds(bb), res) for bb, res in iterable)
 
     @utils.multicase()
     @classmethod
