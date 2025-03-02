@@ -4046,7 +4046,8 @@ class members_t(object):
     def iterate(self, **type):
         '''Iterate through all of the members in the structure that match the keyword specified by `type`.'''
         if not type: type = {'predicate': lambda item: True}
-        listable = [item for item in self.__iterate__()]
+        owner, iterable = self.owner, members.iterate(self.owner.ptr)
+        listable = [member_t(owner, mindex) for _, mindex, _ in iterable]
         for key, value in type.items():
             listable = [item for item in self.__members_matcher.match(key, value, listable)]
         for item in listable: yield item
@@ -4480,13 +4481,6 @@ class members_t(object):
     __members_matcher.mapping('referenced', operator.truth, 'ptr', member.has_references, bool)
     __members_matcher.predicate('predicate'), __members_matcher.predicate('pred')
 
-    def __iterate__(self):
-        '''Yield each of the members within the structure.'''
-        owner = self.owner
-        for sptr, mindex, mptr in members.iterate(owner.ptr):
-            yield member_t(owner, mindex)
-        return
-
     @utils.multicase(tag=types.string)
     @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
     def select(self, tag, *required, **boolean):
@@ -4525,10 +4519,11 @@ class members_t(object):
         # For some reason the user wants to iterate through everything, so
         # we'll try and do as we're told but only if they have tags.
         if not boolean:
-            for m in self.__iterate__():
-                content = m.tag()
+            for sptr, mindex, mptr in members.iterate(self.owner.ptr):
+                item = internal.structure.member_t(self.owner, mindex)
+                content = internal.tags.member.get(mptr)
                 if content:
-                    yield m, content
+                    yield item, content
                 continue
             return
 
@@ -4538,11 +4533,12 @@ class members_t(object):
 
         # All that's left to do is to slowly iterate through all of our
         # members while looking for the matches requested by the user.
-        for m in self.__iterate__():
-            collected, content = {}, m.tag()
+        for sptr, mindex, mptr in members.iterate(self.owner.ptr):
+            item = internal.structure.member_t(self.owner, mindex)
+            content = internal.tags.member.get(mptr)
 
             # Start out by collecting any tagnames that should be included which is similar to Or(|).
-            collected.update({key : value for key, value in content.items() if key in included})
+            collected = {key : value for key, value in content.items() if key in included}
 
             # Then we need to include any specific tags that are required which is similar to And(&).
             if required:
@@ -4551,7 +4547,7 @@ class members_t(object):
                 else: continue
 
             # Easy to do and easy to yield.
-            if collected: yield m, collected
+            if collected: yield item, collected
         return
 
     ### Private methods
