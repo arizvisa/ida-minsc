@@ -148,6 +148,45 @@ class select(object):
             if collected: yield ea, collected
         return
 
+    @classmethod
+    def structures(cls, required=[], included=[]):
+        '''Query the structures in the database and yield a tuple containing each and all of the `required` tags with any `included` ones.'''
+        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+        required = {key for key in iterable}
+        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        included = {key for key in iterable}
+
+        # user doesn't want anything specific, so yield all of them and their tags.
+        if not(required or included):
+            for sptr in internal.structure.iterate():
+                content = structure.get(sptr)
+                item = internal.structure.new(sptr.id, 0)
+
+                # if the structure had some content (tags), then we have a match
+                # and can yield the structure and its content to the user.
+                if content:
+                    yield item, content
+                continue
+            return
+
+        # now we just slowly iterate through our structures looking for any matches.
+        for sptr in internal.structure.iterate():
+            content = internal.tags.structure.get(sptr)
+            item = internal.structure.new(sptr.id, 0)
+
+            # included is the equivalent of Or(|) and yields the structure if any of the tagnames are used.
+            collected = {key : value for key, value in content.items() if key in included}
+
+            # required is the equivalent of And(&) which yields the structure only if it uses all of the tagnames.
+            if required:
+                if required & {tag for tag in content} == required:
+                    collected.update({key : value for key, value in content.items() if key in required})
+                else: continue
+
+            # that's all folks.. yield it if you got it.
+            if collected: yield item, collected
+        return
+
 class address(object):
     """
     This namespace is responsible for reading from and writing tags to
