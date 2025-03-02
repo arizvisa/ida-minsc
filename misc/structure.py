@@ -4516,39 +4516,13 @@ class members_t(object):
         """
         boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
-        # For some reason the user wants to iterate through everything, so
-        # we'll try and do as we're told but only if they have tags.
-        if not boolean:
-            for sptr, mindex, mptr in members.iterate(self.owner.ptr):
-                item = internal.structure.member_t(self.owner, mindex)
-                content = internal.tags.member.get(mptr)
-                if content:
-                    yield item, content
-                continue
-            return
-
-        # Do the same thing we've always done to consoldate our parameters
-        # into a form that we can do basic set arithmetic with.
-        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
-
-        # All that's left to do is to slowly iterate through all of our
-        # members while looking for the matches requested by the user.
-        for sptr, mindex, mptr in members.iterate(self.owner.ptr):
-            item = internal.structure.member_t(self.owner, mindex)
-            content = internal.tags.member.get(mptr)
-
-            # Start out by collecting any tagnames that should be included which is similar to Or(|).
-            collected = {key : value for key, value in content.items() if key in included}
-
-            # Then we need to include any specific tags that are required which is similar to And(&).
-            if required:
-                if required & six.viewkeys(content) == required:
-                    collected.update({key : value for key, value in content.items() if key in required})
-                else: continue
-
-            # Easy to do and easy to yield.
-            if collected: yield item, collected
-        return
+        # If we got something to filter the members with, unpack them from the
+        # parameter and use them with `internal.tags.select`. Otherwise we can
+        # avoid giving parameters to cause it to yield all the tagged results.
+        if boolean:
+            included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
+            return internal.tags.select.structure(self.owner, required, included)
+        return internal.tags.select.structure(self.owner)
 
     ### Private methods
     def __str__(self):
