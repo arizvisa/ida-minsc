@@ -188,39 +188,13 @@ def select(**boolean):
     """
     boolean = {key : {item for item in value} if isinstance(value, types.unordered) else {value} for key, value in boolean.items()}
 
-    # user doesn't want anything specific, so yield all of them and their tags.
-    if not boolean:
-        for sptr in internal.structure.iterate():
-            content = internal.tags.structure.get(sptr)
-            item = internal.structure.new(sptr.id, 0)
-
-            # if the structure had some content (tags), then we have a match
-            # and can yield the structure and its content to the user.
-            if content:
-                yield item, content
-            continue
-        return
-
-    # collect the tagnames we're supposed to look for in the typical lame way.
-    included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
-
-    # now we just slowly iterate through our structures looking for any matches.
-    for sptr in internal.structure.iterate():
-        content = internal.tags.structure.get(sptr)
-        item = internal.structure.new(sptr.id, 0)
-
-        # included is the equivalent of Or(|) and yields the structure if any of the tagnames are used.
-        collected = {key : value for key, value in content.items() if key in included}
-
-        # required is the equivalent of And(&) which yields the structure only if it uses all of the tagnames.
-        if required:
-            if required & six.viewkeys(content) == required:
-                collected.update({key : value for key, value in content.items() if key in required})
-            else: continue
-
-        # that's all folks.. yield it if you got it.
-        if collected: yield item, collected
-    return
+    # if we were given some parameters to use when querying, unpack them into
+    # separate variables, and use them with `internal.tags.structure`. If there
+    # wasn't any parameters given, then just avoid using them to get everything.
+    if boolean:
+        included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
+        return internal.tags.select.structures(required, included)
+    return internal.tags.select.structures()
 
 @utils.multicase(string=(types.string, types.tuple))
 @utils.string.decorate_arguments('string', 'suffix')
