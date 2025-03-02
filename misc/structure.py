@@ -48,6 +48,21 @@ def frame(sptr):
     SF_FRAME = getattr(idaapi, 'SF_FRAME', 0x40)
     return True if sptr.props & SF_FRAME else False
 
+def iterate():
+    '''Iterate through the structures defined in the database.'''
+    res = idaapi.get_first_struc_idx()
+    if res == idaapi.BADADDR: return
+
+    while res not in { idaapi.get_last_struc_idx(), idaapi.BADADDR }:
+        sid = idaapi.get_struc_by_idx(res)
+        yield idaapi.get_struc(sid)
+        res = idaapi.get_next_struc_idx(res)
+
+    res = idaapi.get_last_struc_idx()
+    if res != idaapi.BADADDR:
+        yield idaapi.get_struc(idaapi.get_struc_by_idx(res))
+    return
+
 class address(object):
     """
     This namespace is a placeholder for some of the functions that
