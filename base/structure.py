@@ -109,21 +109,6 @@ __matcher__.combinator('structure', utils.fcondition(utils.finstance(idaapi.stru
 __matcher__.alias('structures', 'structure')
 __matcher__.predicate('predicate'), __matcher__.alias('pred', 'predicate')
 
-def __iterate__():
-    '''Iterate through all structures defined in the database.'''
-    res = idaapi.get_first_struc_idx()
-    if res == idaapi.BADADDR: return
-
-    while res not in { idaapi.get_last_struc_idx(), idaapi.BADADDR }:
-        id = idaapi.get_struc_by_idx(res)
-        yield by_identifier(id)
-        res = idaapi.get_next_struc_idx(res)
-
-    res = idaapi.get_last_struc_idx()
-    if res != idaapi.BADADDR:
-        yield by_identifier(idaapi.get_struc_by_idx(res))
-    return
-
 @utils.multicase(string=types.string)
 @utils.string.decorate_arguments('string', 'suffix')
 def iterate(string, *suffix):
@@ -135,7 +120,8 @@ def iterate(string, *suffix):
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
     if not type: type = {'predicate': lambda item: True}
-    listable = [item for item in __iterate__()]
+    iterable = (sptr.id for sptr in internal.structure.iterate())
+    listable = [internal.structure.new(sid, 0) for sid in iterable]
     for key, value in type.items():
         listable = [item for item in __matcher__.match(key, value, listable)]
     for item in listable: yield item
@@ -204,8 +190,9 @@ def select(**boolean):
 
     # user doesn't want anything specific, so yield all of them and their tags.
     if not boolean:
-        for item in __iterate__():
-            content = item.tag()
+        for sptr in internal.structure.iterate():
+            content = internal.tags.structure.get(sptr)
+            item = internal.structure.new(sptr.id, 0)
 
             # if the structure had some content (tags), then we have a match
             # and can yield the structure and its content to the user.
@@ -218,11 +205,12 @@ def select(**boolean):
     included, required = ({item for item in itertools.chain(*(boolean.get(B, []) for B in Bs))} for Bs in [['include', 'included', 'includes', 'Or'], ['require', 'required', 'requires', 'And']])
 
     # now we just slowly iterate through our structures looking for any matches.
-    for item in __iterate__():
-        collected, content = {}, item.tag()
+    for sptr in internal.structure.iterate():
+        content = internal.tags.structure.get(sptr)
+        item = internal.structure.new(sptr.id, 0)
 
         # included is the equivalent of Or(|) and yields the structure if any of the tagnames are used.
-        collected.update({key : value for key, value in content.items() if key in included})
+        collected = {key : value for key, value in content.items() if key in included}
 
         # required is the equivalent of And(&) which yields the structure only if it uses all of the tagnames.
         if required:
