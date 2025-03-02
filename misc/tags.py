@@ -911,6 +911,71 @@ class function(object):
         internal.tagcache.globals.dec(interface.range.start(fn), key)
         return res
 
+class block(object):
+    """
+    This namespace is responsible for reading and writing any tags that are
+    associated with a basic block from a function. A basic block is represented
+    by the ``idaapi.BasicBlock`` that is fetched from an instance of the
+    ``idaapi.FlowChart`` class for the desired function.
+
+    The tags for a basic block can include the following implicit tags:
+
+        `__color__` - The color of the basic block when displayed by the disassembler.
+
+    The tags for a basic block are not indexed, and are instead grabbed from the
+    function by iterating through the contents of the block.
+    """
+
+    @classmethod
+    def get(cls, bb):
+        '''Returns all the tags defined for the ``idaapi.BasicBlock`` given in `bb`.'''
+        DEFCOLOR, ea = 0xffffffff, interface.range.start(bb)
+
+        # first thing to do is to read the tags for the address. this
+        # gives us "__extra_prefix__", "__extra_suffix__", and "__name__".
+        res = address.get(ea)
+
+        # next, we're going to replace the one implicit tag that we
+        # need to handle...and that's the "__color__" tag.
+        col = interface.function.blockcolor(bb)
+        if col not in {None, DEFCOLOR}: res.setdefault('__color__', col)
+
+        # that was pretty much it, so we can just return our results.
+        return res
+
+    @classmethod
+    def set(cls, bb, key, value):
+        '''Sets the value for the tag `key` to `value` in the ``idaapi.BasicBlock`` given by `bb`.'''
+        DEFCOLOR, ea = 0xffffffff, interface.range.start(bb)
+
+        # the only real implicit tag we need to handle is "__color__", because our
+        # database.tag function does "__extra_prefix__", "__extra_suffix__", and "__name__".
+        if key == '__color__':
+            res = interface.function.blockcolor(bb, value)
+            iterable = interface.address.items(*interface.range.unpack(bb))
+            [ interface.address.color(ea, value) for ea in iterable ]
+            return None if res == DEFCOLOR else res
+
+        # now we can passthrough our key and value to the address namespace for
+        # any of the explicit tags.
+        return address.set(ea, key, value)
+
+    @classmethod
+    def remove(cls, bb, key, none):
+        '''Removes the tag identified by `key` from the ``idaapi.BasicBlock`` given by `bb`.'''
+        DEFCOLOR, ea = 0xffffffff, interface.range.start(bb)
+
+        # if the '__color__' tag was specified, then explicitly clear it.
+        if key == '__color__':
+            res = interface.function.blockcolor(bb, DEFCOLOR)
+            iterable = interface.address.items(*interface.range.unpack(bb))
+            [ interface.address.color(ea, DEFCOLOR) for ea in iterable ]
+            return None if res == DEFCOLOR else res
+
+        # passthrough to the address namespace for removing whatever we don't
+        # handle ourselves.
+        return address.remove(ea, key, none)
+
 class structure(object):
     """
     This namespace is responsible for the tags belonging to a structure,
