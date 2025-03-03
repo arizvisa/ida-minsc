@@ -148,6 +148,52 @@ class address(object):
         ok = idaapi.get_opinfo(ea, opnum, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, opnum, flags)
         return info if ok else None
 
+class naming(object):
+    """
+    This namespace is just a basic wrapper around the names that can be applied
+    to a structure. Since more recent versions of the disassembler (9.0)
+    deprecate the structure api and remove it entirely, we copy the name getting
+    and setting functionality into its own namespace so that we can swap out its
+    implementation for one using the newer type information api.
+    """
+
+    @classmethod
+    def get(cls, sptr):
+        '''Return the name that has been applied to the structure specified by `sptr`.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+        res = idaapi.get_struc_name(sid)
+        return utils.string.of(res)
+
+    @classmethod
+    def set(cls, sptr, string):
+        '''Apply the specified `string` to the structure in `sptr` as its name.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+        res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(string))
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}) : Unable to set the name of the specified structure ({:#x}) to \"{:s}\".".format(__name__, sid, string, sid, utils.string.escape(string, '"')))
+        return utils.string.of(res)
+
+    @classmethod
+    def remove(cls, sptr):
+        '''Removed the name from the structure specified by `sptr`.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+        # FIXME: rather than removing the name, we should figure out what kind
+        #        of structure it is, and then set a default name matching what
+        #        the disassembler will actually choose. this way we can
+        #        differentiate a custom name from a general one.
+        res, ok = idaapi.get_struc_name(sid), idaapi.set_struc_name(sid, utils.string.to(''))
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.remove({:#x}) : Unable to remove the name from the specified structure ({:#x}).".format(__name__, sid, sid))
+        return utils.string.of(res)
+
+    @classmethod
+    def netnode(cls, sptr):
+        '''Return the name of the netnode for the structure specified by `sptr`.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+        if not internal.netnode.name.has(sid):
+            raise E.DisassemblerError(u"{:s}.netnode({:#x}) : Unable to return the name of the netnode for the specified structure ({:#x}).".format(__name__, sid, sid))
+        return internal.netnode.name.get(sid)
+
 class comment(object):
     """
     This namespace is just a wrapper around the comments for a structure. Since
