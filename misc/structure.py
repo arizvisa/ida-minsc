@@ -2795,7 +2795,7 @@ class members(object):
         # Next we'll grab all of the identifiers for the members we added, and use them
         # to filter the old references. This way we can filter those references and
         # identify which member the reference was moved to during our reassignment.
-        name = utils.string.of(idaapi.get_struc_name(sptr.id))
+        name = naming.get(sptr)
         oldmembers = {id : (name, offset) for offset, (id, name, _, location, _, _) in olditems.items()}
         newmembers = {id : (member.get_name(id), offset) for offset, id, packed in results}
         oldmembers[sptr.id] = name, oldsize
@@ -3012,7 +3012,7 @@ class structure_t(object):
         # grab the name using its id. We cache both the sptr and the
         # structure's name in case one of them changes. This way we
         # can figure out the other one in that situation.
-        name = idaapi.get_struc_name(ptr.id)
+        name = naming.get(ptr)
         self.__ptr__, self.__name__ = ptr, name
 
         # The final thing to do is instantiate the members property
@@ -3090,7 +3090,7 @@ class structure_t(object):
         # Now we can check if we okay with returning the ptr. We also
         # update our cached name with whatever the current name is.
         if identifier == ptr.id:
-            result, self.__name__ = ptr, idaapi.get_struc_name(identifier)
+            result, self.__name__ = ptr, naming.get(identifier)
 
         # Otherwise we need to use the identifier to grab the
         # sptr from the identifier we just grabbed.
@@ -3135,7 +3135,7 @@ class structure_t(object):
         # otherwise we can extract the identifier and get the actual name, but
         # go figure that sometimes IDAPython will return None when the structure
         # was deleted, so we need to check what it actually gave us.
-        res = idaapi.get_struc_name(ptr.id)
+        res = naming.get(ptr)
         if res is not None:
             return utils.string.of(res)
 
@@ -3165,14 +3165,10 @@ class structure_t(object):
             logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
-        # now we can set the name of the structure
-        oldname = idaapi.get_struc_name(self.id)
-        if not idaapi.set_struc_name(self.id, ida_string):
-            cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).name({!r}) : Unable to assign the specified name ({:s}) to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(ida_string), utils.string.repr(oldname)))
-
-        # verify that the name was actually assigned properly
-        assigned = idaapi.get_struc_name(self.id) or ''
+        # now we can set the name of the structure, and verify that the name was
+        # assigned properly.
+        oldname = naming.set(self, ida_string)
+        assigned = naming.get(self) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
             cls = self.__class__
             logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
@@ -3210,7 +3206,7 @@ class structure_t(object):
     def alignment(self, size):
         '''Modify the alignment of the structure to the specifyed `size`.'''
         sptr, shift = self.ptr, pow(2, 7)
-        alignment, name = int(size), utils.string.of(idaapi.get_struc_name(sptr.id))
+        alignment, name = int(size), naming.get(sptr)
         res, _ = divmod(sptr.props & idaapi.SF_ALIGN, shift)
         e = math.floor(math.log(alignment, 2)) if alignment else 0
         if pow(2, math.trunc(e)) != alignment:
@@ -3368,7 +3364,7 @@ class structure_t(object):
         idx = idaapi.get_struc_idx(sptr.id)
 
         # then its name...which we need to check since we wouldn't be able to parse it.
-        originalname = utils.string.of(idaapi.get_struc_name(sptr.id) or '')
+        originalname = naming.get(sptr) or ''
         validname = internal.declaration.unmangled.parsable(originalname)
         if originalname != validname:
             logging.warning(u"{:s}({:#x}) : Structure name \"{:s}\" will not be parsable by the disassembler and could be changed to \"{:s}\" during deserialization.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(originalname, '"'), utils.string.escape(validname, '"')))
@@ -4721,7 +4717,7 @@ class members_t(object):
     def __getstate__(self):
         sptr, items = self.owner.ptr, [self[idx] for idx in range(len(self))]
 
-        originalname = utils.string.of(idaapi.get_struc_name(sptr.id) or '')
+        originalname = naming.get(sptr) or ''
         validname = internal.declaration.unmangled.parsable(originalname)
         name = originalname if originalname == validname else (originalname, validname)
         parent = sptr.props, name
