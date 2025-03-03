@@ -1041,8 +1041,8 @@ class structure(object):
         repeatable, sptr = True, idaapi.get_struc(int(sptr)) if isinstance(sptr, internal.types.integer) else sptr
 
         # grab the repeatable and non-repeatable comment for the structure
-        d1 = comment.decode(utils.string.of(idaapi.get_struc_cmt(sptr.id, False)))
-        d2 = comment.decode(utils.string.of(idaapi.get_struc_cmt(sptr.id, True)))
+        d1 = comment.decode(internal.structure.comment.get(sptr, False))
+        d2 = comment.decode(internal.structure.comment.get(sptr, True))
         d1keys, d2keys = ({key for key in item} for item in [d1, d2])
 
         # check for duplicate keys
@@ -1093,8 +1093,8 @@ class structure(object):
         repeatable = True
 
         # First we need to read both comments to figure out what the user is trying to say.
-        comment_right = utils.string.of(idaapi.get_struc_cmt(sptr.id, repeatable))
-        comment_wrong = utils.string.of(idaapi.get_struc_cmt(sptr.id, not repeatable))
+        comment_right = internal.structure.comment.get(sptr, repeatable)
+        comment_wrong = internal.structure.comment.get(sptr, not repeatable)
 
         # Decode the tags that are written to both comment types to figure out which
         # comment type the user actually means. The logic here reads weird because the
@@ -1111,7 +1111,10 @@ class structure(object):
 
         # Now we can just update the dict and re-encode to the proper comment location.
         res, state[key] = state.get(key, None), value
-        if not idaapi.set_struc_cmt(sptr.id, utils.string.to(comment.encode(state)), where):
+        try:
+            old = internal.structure.comment.set(sptr, comment.encode(state), where)
+
+        except internal.exceptions.DisassemblerError:
             sometimes_name = utils.string.of(idaapi.get_struc_name(sptr.id))
             raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format(cls.__name__, sptr.id, key, value, 'repeatable' if where else 'non-repeatable', "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
         return res
@@ -1138,8 +1141,8 @@ class structure(object):
             raise internal.exceptions.InvalidParameterError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to remove the implicit tag \"{:s}\" due to the structure being {:s}.".format(cls.__name__, sptr.id, key, none, utils.string.escape(key, '"'), message))
 
         # We need to read both comments to figure out where the tag is that we're trying to remove.
-        comment_right = utils.string.of(idaapi.get_struc_cmt(sptr.id, repeatable))
-        comment_wrong = utils.string.of(idaapi.get_struc_cmt(sptr.id, not repeatable))
+        comment_right = internal.structure.comment.get(sptr, repeatable)
+        comment_wrong = internal.structure.comment.get(sptr, not repeatable)
 
         # Decode the tags that are written to both comment types, and then test them
         # to figure out which comment the key is encoded in. In this, we want
@@ -1162,7 +1165,10 @@ class structure(object):
 
         # Now we can just pop the value out of the dict and re-encode back into the comment.
         res = state.pop(key)
-        if not idaapi.set_struc_cmt(sptr.id, utils.string.to(comment.encode(state)), where):
+        try:
+            old = internal.structure.comment.set(sptr, comment.encode(state), where)
+
+        except internal.exceptions.DisassemblerError:
             sometimes_name = utils.string.of(idaapi.get_struc_name(sptr.id))
             raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the structure {:s}.".format(cls.__name__, sptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', "{:#x}".format(sptr.id) if sometimes_name is None else utils.string.repr(sometimes_name)))
         return res
