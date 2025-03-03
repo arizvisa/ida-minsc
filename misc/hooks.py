@@ -283,7 +283,7 @@ class address(changingchanged):
         # this event is being violently closed due to receiving a
         # changing event more than once for the very same address.
         except GeneratorExit:
-            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
             return
 
         # Now to fix the comment the user typed.
@@ -291,7 +291,7 @@ class address(changingchanged):
             ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
 
             if (ncmt or '') != new:
-                logging.warning(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                logging.warning(u"{:s}.updater() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
             # If the comment is of the correct format, then we can simply
             # write the comment to the given address.
@@ -309,12 +309,12 @@ class address(changingchanged):
             return
 
         # If the changed event doesn't happen in the right order.
-        logging.fatal(u"{:s}.event() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
+        logging.fatal(u"{:s}.updater() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
         # Delete the old comment and its references.
         cls._delete_refs(ea, o)
         idaapi.set_cmt(ea, '', rpt)
-        logging.warning(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
+        logging.warning(u"{:s}.updater() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
         # Create the references for the new comment.
         new = utils.string.of(idaapi.get_cmt(newea, nrpt))
@@ -324,12 +324,12 @@ class address(changingchanged):
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
         if interface.node.identifier(ea):
-            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring address.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Construct our new state, and then grab our old comment. This is because
         # we're going to submit this to the state that we've constructed after we've
         # disabled the necessary events.
-        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received address.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         event, oldcmt = cls.new(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
@@ -355,11 +355,11 @@ class address(changingchanged):
     @classmethod
     def changed(cls, ea, repeatable_cmt):
         if interface.node.identifier(ea):
-            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring address.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Resume the state that was created by the changing event, and then grab
         # our new comment that we will later submit to it.
-        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received address.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         event, newcmt = cls.resume(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
@@ -387,10 +387,10 @@ class address(changingchanged):
     @classmethod
     def old_changed(cls, ea, repeatable_cmt):
         if interface.node.identifier(ea):
-            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring address.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # first we'll grab our comment that the user updated
-        logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received address.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         fn, rt = cls.get_func_extern(ea)
 
@@ -483,7 +483,7 @@ class globals(changingchanged):
             newea, nrpt, none = (yield)
 
         except GeneratorExit:
-            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
             return
 
         # Now we can fix the user's new comment.
@@ -491,7 +491,7 @@ class globals(changingchanged):
             ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
 
             if (ncmt or '') != new:
-                logging.warning(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                logging.warning(u"{:s}.updater() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
             # If the comment is correctly formatted as a tag, then we
             # can simply write the comment at the given address.
@@ -510,12 +510,12 @@ class globals(changingchanged):
             return
 
         # If the changed event doesn't happen in the right order.
-        logging.fatal(u"{:s}.event() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
+        logging.fatal(u"{:s}.updater() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
         # Delete the old function comment and its references.
         cls._delete_refs(fn, o)
         idaapi.set_func_cmt(fn, '', rpt)
-        logging.warning(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
+        logging.warning(u"{:s}.updater() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
         # Create the references for the new function comment.
         newfn = idaapi.get_func(newea)
@@ -526,11 +526,11 @@ class globals(changingchanged):
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
         if interface.node.identifier(interface.range.start(a)):
-            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring globals.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
-        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received globals.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
@@ -564,11 +564,11 @@ class globals(changingchanged):
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
         if interface.node.identifier(interface.range.start(a)):
-            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring globals.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
-        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received globals.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
@@ -605,11 +605,11 @@ class globals(changingchanged):
     @classmethod
     def old_changed(cls, cb, a, cmt, repeatable):
         if interface.node.identifier(interface.range.start(a)):
-            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring globals.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # first thing to do is to identify whether we're in a function or not,
         # so we first grab the address from the area_t...
-        logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received globals.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         ea = interface.range.start(a)
 
         # then we can use it to verify that we're in a function. if not, then
@@ -667,7 +667,7 @@ class typeinfo(changingchanged):
         # this event is being violently closed due to receiving a
         # changing event more than once for the very same address.
         except GeneratorExit:
-            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the type information at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(original), bytes().join(expected)))
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the type information at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(original), bytes().join(expected)))
             return
 
         # Verify that the typeinfo we're changing to is the exact same as given
@@ -675,12 +675,12 @@ class typeinfo(changingchanged):
         # an assumption and that assumption is to take the values given to us
         # by the changing_ti event.
         if (ea, expected) != (new_ea, tidata):
-            logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(tidata), 'changing_ti', 'ti_changed'))
+            logging.warning(u"{:s}.updater() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(tidata), 'changing_ti', 'ti_changed'))
         elif ea != new_ea:
-            logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
+            logging.warning(u"{:s}.updater() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
             new_ea = ea
         elif expected != tidata:
-            logging.warning(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was received by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
+            logging.warning(u"{:s}.updater() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was received by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
             tidata, _, _ = interface.address.typeinfo(ea)
 
         # Okay, we now have the data that we need to compare in order to determine
@@ -689,13 +689,13 @@ class typeinfo(changingchanged):
         # only need to determine if we need to add its reference back.
         if any(tidata):
             ctx.inc(new_ea, '__typeinfo__')
-            logging.debug(u"{:s}.event() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
+            logging.debug(u"{:s}.updater() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
 
         # For the sake of debugging, log that we just removed the typeinfo
         # from the current address. We don't need to decrease our reference
         # here because we did it already when we git our "changing" event.
         else:
-            logging.debug(u"{:s}.event() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
+            logging.debug(u"{:s}.updater() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
         return
 
     @classmethod
@@ -1261,7 +1261,7 @@ class naming(changingchanged):
             new_ea, new_name, local_name = (yield)
 
         except GeneratorExit:
-            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the name at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the name at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
             return
 
         # And then we double-check that everything matches. If expected is
@@ -1272,7 +1272,7 @@ class naming(changingchanged):
 
             # If the prefix is in one of our known names, then demote the loglevel.
             Flogging = logging.info if prefix[0] in {'sub', 'byte', 'loc'} else logging.fatal
-            Flogging(u"{:s}.event() : Rename is at address {:#x} has desynchronized. Target address at {:#x} should have been renamed from {!r} to {!r} but {!r} was received instead.".format('.'.join([__name__, cls.__name__]), ea, new_ea, original, expected, new_name))
+            Flogging(u"{:s}.updater() : Rename is at address {:#x} has desynchronized. Target address at {:#x} should have been renamed from {!r} to {!r} but {!r} was received instead.".format('.'.join([__name__, cls.__name__]), ea, new_ea, original, expected, new_name))
             return
 
         # Now we use the address to figure out which context that we'll
@@ -1281,7 +1281,7 @@ class naming(changingchanged):
         fn = idaapi.get_func(ea)
         if fn is None or idaapi.segtype(ea) in {idaapi.SEG_XTRN}:
             if local_name and fn is None:
-                logging.warning(u"{:s}.event() : Received rename for address {:#x} where \"{:s}\" is set ({!s}) but the address is not within a function.".format('.'.join([__name__, cls.__name__]), ea, 'local_name', local_name))
+                logging.warning(u"{:s}.updater() : Received rename for address {:#x} where \"{:s}\" is set ({!s}) but the address is not within a function.".format('.'.join([__name__, cls.__name__]), ea, 'local_name', local_name))
             context, target = internal.tagcache.globals, None
 
         # If we're renaming the beginning of a function, then we're also
@@ -1301,20 +1301,20 @@ class naming(changingchanged):
         # If our new_name is cleared, then we're removing it.
         elif not expected:
             context.dec(new_ea, '__name__') if target is None else context.dec(new_ea, '__name__', target=target)
-            logging.info(u"{:s}.event() : Decremented {:s} reference for rename at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original, expected))
+            logging.info(u"{:s}.updater() : Decremented {:s} reference for rename at {:#x} due to removal of {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original))
 
         # If our previous name nonexistent, or is a label (and not custom) then we add the reference.
         elif not original or (labelQ and not customQ):
             context.inc(new_ea, '__name__') if target is None else context.inc(new_ea, '__name__', target=target)
-            logging.info(u"{:s}.event() : Incremented {:s} reference for rename at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original, expected))
+            logging.info(u"{:s}.updater() : Incremented {:s} reference for rename at {:#x} from original {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original, expected))
 
         # If it was both a label and it was custom, then log a warning because we have no idea.
         elif labelQ and customQ:
-            logging.debug(u"{:s}.event() : Ignoring existing symbol rename ({:s}) received as a {:s} reference for at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ', '.join(itertools.chain(['FF_LABL'] if labelQ else [], ['FF_NAME'] if customQ else [])), 'global' if target is None else 'content', ea, original, expected))
+            logging.debug(u"{:s}.updater() : Ignoring existing symbol rename ({:s}) received as a {:s} reference for at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ', '.join(itertools.chain(['FF_LABL'] if labelQ else [], ['FF_NAME'] if customQ else [])), 'global' if target is None else 'content', ea, original, expected))
 
         # Debug log showing that we didn't have to do anything.
         else:
-            logging.debug(u"{:s}.event() : Skipping rename at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
+            logging.debug(u"{:s}.updater() : Skipping rename at {:#x} from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, original, expected))
         return
 
     @classmethod
@@ -1423,7 +1423,7 @@ class extra_cmt(changingchanged):
         try:
             ea = interface.address.within(ea)
         except exceptions.OutOfBoundsError:
-            return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
+            return logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Determine whether we'll be updating the contents or a global.
         logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Processing event at address {:#x} for index {:d}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, utils.string.repr(cmt), ea, line_idx))
@@ -1464,14 +1464,14 @@ class extra_cmt(changingchanged):
         # First check that we're not an identifier, because we don't care about
         # caching these.
         if interface.node.identifier(ea):
-            return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not an address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
+            return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (not an address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # Verify that the address is within our database boundaries because IDA
         # can actually create "extra" comments outside of the database.
         try:
             ea = interface.address.within(ea)
         except exceptions.OutOfBoundsError:
-            return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring comment.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
+            return logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Ignoring extra_cmt.changed event (not a valid address) for extra comment at index {:d} for {:#x}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, line_idx, ea))
 
         # XXX: this function is now busted in later versions of IDA because for some
         #      reason, Ilfak, is now updating the extra comment prior to dispatching
@@ -2036,7 +2036,7 @@ class entrymethods(object):
     """
     Define all of the functions that will be used as entrymethods for the
     situation when the code generated by SWIG for the original hook depends
-    on the numnber of arguments defined for the method. These functions only
+    on the number of arguments defined for the method. These functions only
     apply to the priorityhook class from the hooks module.
 
     The way that IDAPython implemented it prevents us from using wildargs
