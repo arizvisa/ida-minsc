@@ -1995,6 +1995,14 @@ class supermethods(object):
             supermethod = getattr(supercls, 'segm_deleted')
             return supermethod(start_ea, end_ea, flags)
 
+        # idaapi.__version__ >= 8.0
+        def struc_renamed(self, sptr):
+            '''This patch is needed due to the supermethod wanting a boolean to control whether the rename was successful.'''
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, 'struc_renamed')
+            return supermethod(sptr, True)
+
         # Populate the dictionary with each of the supermethods that need
         # to be patched for the IDB_Hooks class by checking the version
         # in order to determine whether it should be assigned or not.
@@ -2002,6 +2010,7 @@ class supermethods(object):
         idaapi.__version__ >= 7.6 and mapping.setdefault('renamed', renamed)
         idaapi.__version__ >= 7.6 and mapping.setdefault('bookmark_changed', bookmark_changed)
         idaapi.__version__ >= 7.7 and mapping.setdefault('segm_deleted', segm_deleted)
+        idaapi.__version__ >= 8.0 and mapping.setdefault('struc_renamed', struc_renamed)
 
     class UI_Hooks(object):
         """
