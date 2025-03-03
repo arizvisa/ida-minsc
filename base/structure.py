@@ -541,8 +541,7 @@ def comment(id, **repeatable):
     if not sptr:
         number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
         raise E.StructureNotFoundError(u"{:s}.comment({:s}{:s}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', description, number))
-    res = idaapi.get_struc_cmt(sptr.id, repeatable.get('repeatable', True))
-    return utils.string.of(res)
+    return internal.structure.comment.get(sptr, repeatable.get('repeatable', True))
 @utils.multicase(structure=(idaapi.struc_t, structure_t))
 def comment(structure, **repeatable):
     '''Return the comment for the specified `structure`.'''
@@ -567,15 +566,15 @@ def comment(id, string, **repeatable):
     if not sptr:
         number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
         raise E.StructureNotFoundError(u"{:s}.comment({:s}, {!r}, {:s}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, string, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', description, number))
-
-    res, ok = idaapi.get_struc_cmt(sptr.id, repeatable.get('repeatable', True)), idaapi.set_struc_cmt(sptr.id, utils.string.to(string), repeatable.get('repeatable', True))
-    if not ok:
-        raise E.StructureNotFoundError(u"{:s}.comment({:#x}, {!r}, {:s}) : Unable to set the comment of the specified structure ({:#x}) to \"{:s}\".".format(__name__, id, string, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', id, utils.string.escape(string, '"')))
-    return utils.string.of(res)
+    return internal.structure.comment.set(sptr, string, repeatable.get('repeatable', True))
 @utils.multicase(id=types.integer, none=types.none)
 def comment(id, none, **repeatable):
     '''Remove the comment from the structure identified by `id`.'''
-    return comment(id, none or '', **repeatable)
+    sptr = internal.structure.by_index(id)
+    if not sptr:
+        number, description = ("{:#x}".format(id), 'identifier') if interface.node.identifier(id) else ("{:d}".format(id), 'index')
+        raise E.StructureNotFoundError(u"{:s}.comment({:s}, {!s}, {:s}) : Unable to locate a structure with the specified {:s} ({:s}).".format(__name__, number, none, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', description, number))
+    return internal.structure.comment.remove(sptr, repeatable.get('repeatable', True))
 @utils.multicase(tinfo=idaapi.tinfo_t)
 def comment(tinfo, **repeatable):
     '''Return the comment from the structure specified by `tinfo`.'''
