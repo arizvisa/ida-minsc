@@ -148,6 +148,40 @@ class address(object):
         ok = idaapi.get_opinfo(ea, opnum, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, opnum, flags)
         return info if ok else None
 
+class comment(object):
+    """
+    This namespace is just a wrapper around the comments for a structure. Since
+    more recent versions of the disassembler (9.0) deprecate the structure api
+    and remove it entirely, we capture the comment functionality in its own
+    namespace so that we can exchange its implementation for one using the more
+    recent type information api.
+    """
+
+    @classmethod
+    def get(cls, sptr, repeatable=True):
+        '''Return the `repatable` or nonrepeatable comment for the structure specified by `sptr`.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+        res = idaapi.get_struc_cmt(sid, True if repeatable else False)
+        return utils.string.of(res)
+
+    @classmethod
+    def set(cls, sptr, string, repeatable=True):
+        '''Apply the specified `string` as a `repeatable` or nonrepeatable comment to the structure in `sptr`.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+        res, ok = idaapi.get_struc_cmt(sid, True if repeatable else False), idaapi.set_struc_cmt(sid, utils.string.to(string), True if repeatable else False)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.set({:#x}, {!r}, {!s}) : Unable to set the {:s} of the specified structure ({:#x}) to \"{:s}\".".format(__name__, sid, string, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid, utils.string.escape(string, '"')))
+        return utils.string.of(res)
+
+    @classmethod
+    def remove(cls, sptr, repeatable=True):
+        '''Removed the `repeatable` or nonrepeatable comment from the structure in `sptr`.'''
+        sid = sptr.id if isinstance(sptr, (idaapi.struc_t, structure_t)) else int(sptr)
+        res, ok = idaapi.get_struc_cmt(sid, True if repeatable else False), idaapi.set_struc_cmt(sid, utils.string.to(u''), True if repeatable else False)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.remove({:#x}, {!s}) : Unable to remove the {:s} from the specified structure ({:#x}).".format(__name__, sid, True if repeatable else False, 'repeatable comment' if repeatable else 'comment', sid))
+        return utils.string.of(res)
+
 class xref(object):
     """
     This namespace is a placeholder for some of the functions that
