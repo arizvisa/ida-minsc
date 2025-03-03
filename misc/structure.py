@@ -2441,7 +2441,7 @@ class members(object):
                 flag = idaapi.struflag() if idaapi.__version__ < 7.0 else idaapi.stru_flag()
 
                 # Copy any repeatable comment from the structure as a non-repeatable comment.
-                cmt = idaapi.get_struc_cmt(mptr.id, True)
+                cmt = comment.get(mptr.id, True)
                 comments = [utils.string.of(cmt)]   # index 0 (false) is non-repeatable.
 
             # Make an exact copy of the member information, comments, type information, and all.
@@ -3135,22 +3135,22 @@ class structure_t(object):
     @property
     def comment(self, repeatable=True):
         '''Return the repeatable comment for the structure.'''
-        res = idaapi.get_struc_cmt(self.id, repeatable) or idaapi.get_struc_cmt(self.id, not repeatable)
-        return utils.string.of(res)
+        res = comment.get(self, repeatable)
+        return res or comment.get(self, not repeatable)
     @comment.setter
     @utils.string.decorate_arguments('value')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
-        res = utils.string.to(value or '')
-        if not idaapi.set_struc_cmt(self.id, res, repeatable):
+        ok = comment.set(self, value, repeatable) if value else comment.remove(self, repeatable)
+        if not ok:
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
 
         # verify that the comment was actually assigned
-        assigned = idaapi.get_struc_cmt(self.id, repeatable)
-        if utils.string.of(assigned) != utils.string.of(res):
+        assigned = comment.get(self, repeatable)
+        if utils.string.of(assigned) != utils.string.of(value or ''):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
+            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(value or '')))
         return assigned
 
     @property
@@ -3329,7 +3329,7 @@ class structure_t(object):
         name = originalname if originalname == validname else (originalname, validname)
 
         # decode the comments that we found in the structure
-        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), [True, False])
+        cmtt, cmtf = map(functools.partial(comment.get, self), [True, False])
         comments = tuple(utils.string.of(cmt) for cmt in [cmtt, cmtf])
 
         # pack our state into a tuple.
@@ -3376,8 +3376,8 @@ class structure_t(object):
             identifier = idaapi.add_struc(idaapi.BADADDR, utils.string.to(name), True if props & idaapi.SF_UNION else False)
 
         # now we can apply the comments to it
-        idaapi.set_struc_cmt(identifier, utils.string.to(cmtt), True)
-        idaapi.set_struc_cmt(identifier, utils.string.to(cmtf), False)
+        comment.set(identifier, cmtt, True)
+        comment.set(identifier, cmtf, False)
 
         # set its individual properties (ignoring SF_FRAME and SF_GHOST of course)
         sptr = idaapi.get_struc(identifier)
