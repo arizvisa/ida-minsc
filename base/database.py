@@ -6455,7 +6455,7 @@ class types(object):
     def size(cls, name):
         '''Return the size of the type with the given `name`.'''
         res = interface.tinfo.for_name(name)
-        res = res if res else interface.tinfo.parse(None, string, idaapi.PT_SIL)
+        res = res if res else interface.tinfo.parse(None, name, idaapi.PT_SIL)
         if not res:
             raise E.ItemNotFoundError(u"{:s}.size({!r}) : No type was found with the name \"{:s}\" in the current type library.".format('.'.join([__name__, cls.__name__]), name, utils.string.escape(name, '"')))
         return res.get_size()
