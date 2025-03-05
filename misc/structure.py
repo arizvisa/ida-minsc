@@ -285,6 +285,15 @@ class member(object):
     """
 
     @classmethod
+    def has(cls, mid):
+        '''Return whether a member with the specified `mid` exists within the database.'''
+        id = mid.id if isinstance(mid, (idaapi.member_t, member_t)) else int(mid)
+        if hasattr(idaapi, 'is_member_id'):
+            return idaapi.is_member_id(mid)
+        exists = interface.node.identifier(id) and idaapi.get_member_by_id(id) is not None
+        return True if exists else False
+
+    @classmethod
     def index(cls, mptr):
         '''Return the index of the member specified by `mptr`.'''
         packed = idaapi.get_member_by_id(mptr if isinstance(mptr, internal.types.integer) else mptr.id)
