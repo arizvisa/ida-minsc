@@ -29,14 +29,22 @@ def has(id):
     '''Return whether a structure with the specified `id` exists within the database.'''
     return True if interface.node.identifier(id) and idaapi.get_struc(id) else False
 
-def by_index(index):
-    '''Return the structure at the specified `index` or identifier from the database.'''
-    if interface.node.identifier(index):
-        return idaapi.get_struc(index)
+def by_index_or_identifier(index_or_identifier):
+    '''Return the structure at the specified `index_or_identifier` from the database.'''
+    if interface.node.identifier(index_or_identifier):
+        return idaapi.get_struc(index_or_identifier)
 
     # otherwise, the index is definitely an index and we'll use it to grab the sptr.
-    sid = idaapi.get_struc_by_idx(index)
+    sid = idaapi.get_struc_by_idx(index_or_identifier)
     return None if sid == idaapi.BADADDR else idaapi.get_struc(sid)
+
+def by_index(index):
+    '''Return the structure at the specified `index` from the database.'''
+    return by_index_or_identifier(index)
+
+def by_identifier(identifier):
+    '''Return the structure at the specified `identifier` from the database.'''
+    return by_index_or_identifier(identifier)
 
 def union(sptr):
     '''Return whether the structure in `sptr` is defined as a union.'''
