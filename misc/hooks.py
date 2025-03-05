@@ -143,6 +143,7 @@ class changingchanged(object):
     def new(cls, ea):
         '''This registers a new state for a given address that can later be fetched.'''
         states = cls.__states__
+        description = "{:#x}".format(ea) if isinstance(ea, internal.types.integer) else "{!r}".format(ea)
 
         # If we're being asked to recreate the state for an address that is still
         # incomplete, then warn the user about it. This will only happen when the
@@ -150,7 +151,7 @@ class changingchanged(object):
         # the "changed" event being used to complete it.
         if ea in states:
             res = states.pop(ea)
-            logging.info(u"{:s}.new({:#x}) : Forcefully closing the state for address {:#x} by request.".format('.'.join([__name__, cls.__name__]), ea, ea))
+            logging.info(u"{:s}.new({:s}) : Forcefully closing the state for key {:s} by request.".format('.'.join([__name__, cls.__name__]), description, description))
             res.close()
 
         # Define a closure that is responsible for keeping track
@@ -190,7 +191,8 @@ class changingchanged(object):
         states = cls.__states__
         if ea in states:
             return states[ea]
-        raise exceptions.AddressNotFoundError(u"{:s}.resume({:#x}) : Unable to locate a currently available state for address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        description = "{:#x}".format(ea) if isinstance(ea, internal.types.integer) else "{!r}".format(ea)
+        raise exceptions.AddressNotFoundError(u"{:s}.resume({:s}) : Unable to locate a currently available state for key {:s}.".format('.'.join([__name__, cls.__name__]), description, description))
 
     @classmethod
     def updater(cls):
