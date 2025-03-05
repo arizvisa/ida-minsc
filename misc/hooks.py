@@ -305,7 +305,7 @@ class address(changingchanged):
 
             # Otherwise, we can just delete all the references at the address.
             else:
-                cls._delete_refs(ea, n)
+                cls._delete_refs(ea, o)
             return
 
         # If the changed event doesn't happen in the right order.
@@ -506,7 +506,7 @@ class globals(changingchanged):
             # Otherwise, there's no comment there and we need to delete
             # all references at the address.
             else:
-                cls._delete_refs(fn, n)
+                cls._delete_refs(fn, o)
             return
 
         # If the changed event doesn't happen in the right order.
