@@ -575,6 +575,13 @@ class member(object):
         return result
 
     @classmethod
+    def has_typeinfo(cls, mptr):
+        '''Return whether there is type information applied to the member in `mptr`.'''
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        ti, mid = idaapi.tinfo_t(), mptr if isinstance(mptr, internal.types.integer) else mptr.id
+        return True if get_tinfo(ti, mid) else False
+
+    @classmethod
     def get_typeinfo(cls, mptr):
         '''Return the type information of the member given by `mptr` guessing it if necessary.'''
         ti = idaapi.tinfo_t()
