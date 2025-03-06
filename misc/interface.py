@@ -6533,11 +6533,19 @@ class tinfo(object):
 
     @classmethod
     def equals(cls, type, other):
-        '''Return whether the specified `type` is the same as `other`.'''
+        '''Return whether the specified `type` is essentially equivalent to the `other` type.'''
         if idaapi.__version__ < 6.8:
             til = cls.library(type)
             return idaapi.equal_types(til, type, other)
         return type.equals_to(other)
+
+    @classmethod
+    def same(cls, type, other):
+        '''Return whether the specified `type` is the exact same as the `other` type.'''
+        if idaapi.__version__ < 6.8:
+            til = cls.library(type)
+            return idaapi.equal_types(til, type, other)
+        return type.serialize() == other.serialize()
 
     @classmethod
     def resolve(cls, type):
