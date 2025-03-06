@@ -1613,7 +1613,7 @@ class priorityhook(prioritybase):
     Helper class for allowing one to apply a number of hooks to the
     different hook points within IDA.
     """
-    def __init__(self, klass, mapping={}):
+    def __init__(self, klass, mapping={}, entries={}):
         '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
         super(priorityhook, self).__init__()
 
@@ -1633,6 +1633,11 @@ class priorityhook(prioritybase):
         # stash away our mapping of supermethods so that we can return the
         # right one when we're asked to generate them for __supermethod__.
         self.__mapping__ = mapping
+
+        # stash away our mapping for entrymethods so that we can use it to
+        # generate our closure to convince IDAPython's SWIG that we're using the
+        # correct number of arguments for a hook point.
+        self.__entries__ = entries
 
     def __supermethod__(self, name):
         '''Generate a method that calls the super method specified by `name`.'''
@@ -1672,9 +1677,25 @@ class priorityhook(prioritybase):
             # Assign some parameters that we need to feed into our closure.
             locals['target'], locals['callable'] = name, callable
             locals['supermethod'] = self.__supermethod__(name)
+            locals['entrypoint'] = self.__entries__.get(name)
 
-            # Generate a closure that will later be converted into a method.
+            # Generate a closure that will later be converted into a method. The
+            # function (method) being returned is responsible for dispatching to
+            # a callable and then checking its result. If a non-`None` result
+            # was returned, then we can just return it. Otherwise, we chain into
+            # the supermethod for the hook so that we don't interfere with
+            # anything that the disassembler wants to do.
             def closure(locals):
+                """
+                Returns a function that will be attached as a method to the hook
+                object associated with this class. The job of the returned
+                function is to dispatch to the user function that is stored in
+                `locals` as "callable".
+
+                After dispatching to the callable, we check if a result was
+                returned, and return it if so. Otherwise, we dispatch to the
+                supermethod that is in `locals` under "supermethod".
+                """
                 def method(instance, *args, **kwargs):
                     target, callable, supermethod = (locals[item] for item in ['target', 'callable', 'supermethod'])
                     result = callable(*args, **kwargs)
@@ -1687,6 +1708,26 @@ class priorityhook(prioritybase):
                     # Otherwise we return the code that was given to us.
                     logging.debug(u"{:s}.method({:s}) : Received a value ({!r}) to return from the callable ({:s}) for target {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__formatter__(target), result, internal.utils.pycompat.fullname(callable), self.__formatter__(target)))
                     return result
+
+                # The first parameter in the following function (that we ignore)
+                # basically contains the template function that we are wrapping
+                # with the `utils.wrap` decorator. The function that is returned
+                # by the decorator will call our "entrymethodwrapper" function
+                # with the template as its first parameter, followed by rest of
+                # the arguments from the template function.
+                def entrymethodwrapper(_, instance, *args, **kwargs):
+                    """
+                    This function is basically a dispatcher that will dispatch
+                    to the "method" function above us. It is intended to be
+                    called by the entrypoint that we attach in "target".
+                    """
+                    return method(instance, *args, **kwargs)
+
+                # If a custom entrypoint was specified, then we return a wrapper
+                # with the same definitionkas the entrypoint which will call the
+                # "method" function in response to the hook being dispatched.
+                if locals['entrypoint']:
+                    return internal.utils.wrap(locals['entrypoint'], entrymethodwrapper)
                 return method
 
             # We've generated the closure to use and so we can store it in
