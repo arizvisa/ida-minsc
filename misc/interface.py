@@ -4924,6 +4924,27 @@ class node(object):
         flag = AFL_BNOT1 if opnum else AFL_BNOT0
         return result & flag == flag
 
+    @classmethod
+    def has_typeinfo(cls, id):
+        '''Return whether the address or identifier in `id` has type information associated with it.'''
+        get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
+        return True if get_tinfo(idaapi.tinfo_t(), int(id)) else False
+
+    @classmethod
+    def guessed_typeinfo(cls, id, *origin):
+        '''Return whether the address or identifier in `id` has guessed type information associated with it.'''
+        id, flags, AFL_TYPE_GUESSED = int(id), idaapi.AFL_USERTI, getattr(idaapi, 'AFL_TYPE_GUESSED', 0xC2000000)
+        res = node.aflags(id, operator.or_(flags, AFL_TYPE_GUESSED if origin else 0))
+        guessed = cls.has_typeinfo(id) and not res
+        if not origin:
+            return True if guessed else False
+        elif len(origin) != 1:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.guessed_typeinfo({:#x}{:s}) : An unsupported number of parameters ({:d}) was provided to the specified function.".format('.'.join([__name__, cls.__name__]), id, ", {:s}".format(', '.join(map("{!r}".format, origin))), len(origin)))
+        [whom] = origin
+        iterable = itertools.chain([whom] if isinstance(whom, internal.types.integer) else whom)
+        unsigned = {idaapi.as_uint32(candidate) for candidate in iterable}
+        return res & AFL_TYPE_GUESSED in unsigned
+
 class strpath(object):
     """
     This namespace contains utilities that interact with a structure path
