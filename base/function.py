@@ -1440,26 +1440,26 @@ class blocks(object):
     @utils.multicase(tag=types.string)
     @classmethod
     @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
-    def select(cls, tag, *included, **boolean):
-        '''Query the basic blocks of the current function for the given `tag` or any others that should be `included`.'''
-        res = {tag} | {item for item in included}
-        boolean['included'] = {item for item in boolean.get('included', [])} | res
+    def select(cls, tag, *required, **boolean):
+        '''Query the basic blocks of the current function for the given `tag` and any others that should be `required` or `included`.'''
+        res = {tag} | {item for item in required}
+        boolean['required'] = {item for item in boolean.get('required', [])} | res
         return cls.select(ui.current.function(), **boolean)
     @utils.multicase(func=(idaapi.func_t, types.integer), tag=types.string)
     @classmethod
     @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
-    def select(cls, func, tag, *included, **boolean):
-        '''Query the basic blocks of the function `func` for the given `tag` or any others that should be `included`.'''
-        res = {tag} | {item for item in included}
-        boolean['included'] = {item for item in boolean.get('included', [])} | res
+    def select(cls, func, tag, *required, **boolean):
+        '''Query the basic blocks of the function `func` for the given `tag` and any others that should be `required` or `included`.'''
+        res = {tag} | {item for item in required}
+        boolean['required'] = {item for item in boolean.get('required', [])} | res
         return cls.select(func, **boolean)
     @utils.multicase(func=(idaapi.func_t, types.integer), tags=types.unordered)
     @classmethod
     @utils.string.decorate_arguments('tags', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
-    def select(cls, func, tags, *included, **boolean):
-        '''Query the basic blocks of the function `func` for the given `tags` or any others that should be `included`.'''
-        res = {item for item in tags} | {item for item in included}
-        boolean['included'] = {item for item in boolean.get('included', [])} | res
+    def select(cls, func, tags, *required, **boolean):
+        '''Query the basic blocks of the function `func` for the given `tags` and any others that should be `required` or `included`.'''
+        res = {item for item in tags} | {item for item in required}
+        boolean['required'] = {item for item in boolean.get('required', [])} | res
         return cls.select(func, **boolean)
     @utils.multicase(func=(idaapi.func_t, types.integer))
     @classmethod
@@ -3249,24 +3249,24 @@ def select(**boolean):
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=types.string)
 @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
-def select(tag, *included, **boolean):
-    '''Query the contents of the current function for the given `tag` or any others that should be `included`.'''
-    res = {tag} | {item for item in included}
-    boolean['included'] = {item for item in boolean.get('included', [])} | res
+def select(tag, *required, **boolean):
+    '''Query the contents of the current function for the given `tag` and any others that should be `required` or `included`.'''
+    res = {tag} | {item for item in required}
+    boolean['required'] = {item for item in boolean.get('required', [])} | res
     return select(ui.current.function(), **boolean)
 @utils.multicase(func=(idaapi.func_t, types.integer), tag=types.string)
 @utils.string.decorate_arguments('tag', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
-def select(func, tag, *included, **boolean):
-    '''Query the contents of the function `func` for the given `tag` or any others that should be `included`.'''
-    res = {tag} | {item for item in included}
-    boolean['included'] = {item for item in boolean.get('included', [])} | res
+def select(func, tag, *required, **boolean):
+    '''Query the contents of the function `func` for the given `tag` and any others that should be `required` or `included`.'''
+    res = {tag} | {item for item in required}
+    boolean['required'] = {item for item in boolean.get('required', [])} | res
     return select(func, **boolean)
 @utils.multicase(func=(idaapi.func_t, types.integer), tags=types.unordered)
 @utils.string.decorate_arguments('tags', 'And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
-def select(func, tags, *included, **boolean):
-    '''Query the contents of the function `func` for the given `tags` or any others that should be `included`.'''
-    res = {item for item in tags} | {item for item in included}
-    boolean['included'] = {item for item in boolean.get('included', [])} | res
+def select(func, tags, *required, **boolean):
+    '''Query the contents of the function `func` for the given `tags` and any others that should be `required` or `included`.'''
+    res = {item for item in tags} | {item for item in required}
+    boolean['required'] = {item for item in boolean.get('required', [])} | res
     return select(func, **boolean)
 @utils.multicase(func=(idaapi.func_t, types.integer))
 @utils.string.decorate_arguments('And', 'Or', 'require', 'requires', 'required', 'include', 'includes', 'included')
