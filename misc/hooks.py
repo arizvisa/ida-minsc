@@ -2058,10 +2058,20 @@ class entrymethods(object):
         """
         mapping = {}
 
+        # idaapi.__version__ >= 7.6
+        def compiler_changed(self, adjust_inf_fields):
+            '''introduced by commit c22e07185389adaef1698314071f2c6cd31dd08b to patch_codegen/idp.py.'''
+
+        # idaapi.__version__ < 8.4
+        def busted_local_types_changed(self):
+            '''this variation is defined in v7.7 of the disassembler as having no parameters (making it useless).'''
+
         # idaapi.__version__ >= 8.4
         def local_types_changed(self, ltc, ordinal, name):
             '''introduced by commit ae62cd4df534f18c8c3dc47bd159d50c9822d82d to patch_codegen/idp.py.'''
 
+        idaapi.__version__ >= 7.6 and mapping.setdefault('compiler_changed', compiler_changed)
+        idaapi.__version__ < 8.4 and mapping.setdefault('local_types_changed', busted_local_types_changed)
         idaapi.__version__ >= 8.4 and mapping.setdefault('local_types_changed', local_types_changed)
 
     class IDP_Hooks(object):
@@ -2802,9 +2812,9 @@ class module(object):
 
     # Create some descriptors for each of the available hooks with the supermethods
     # that we'll need to patch for compatibility with older versions of the disassembler.
-    idp = singleton_descriptor(internal.interface.priorityhook, idaapi.IDP_Hooks, supermethods.IDP_Hooks.mapping,   __repr__=staticmethod(lambda item=idaapi.IDP_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
-    idb = singleton_descriptor(internal.interface.priorityhook, idaapi.IDB_Hooks, supermethods.IDB_Hooks.mapping,   __repr__=staticmethod(lambda item=idaapi.IDB_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
-    ui  = singleton_descriptor(internal.interface.priorityhook, idaapi.UI_Hooks,  supermethods.UI_Hooks.mapping,    __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+    idp = singleton_descriptor(internal.interface.priorityhook, idaapi.IDP_Hooks, supermethods.IDP_Hooks.mapping, entrymethods.IDP_Hooks.mapping,  __repr__=staticmethod(lambda item=idaapi.IDP_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+    idb = singleton_descriptor(internal.interface.priorityhook, idaapi.IDB_Hooks, supermethods.IDB_Hooks.mapping, entrymethods.IDB_Hooks.mapping,  __repr__=staticmethod(lambda item=idaapi.IDB_Hooks: "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+    ui  = singleton_descriptor(internal.interface.priorityhook, idaapi.UI_Hooks,  supermethods.UI_Hooks.mapping,  entrymethods.UI_Hooks.mapping,  __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
 
     # Can't forget to create a descriptor for events related to the Hex-Rays decompiler...
     hx = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityhxevent, __repr__=staticmethod(lambda: 'Events currently connected to the Hex-Rays (decompiler) callbacks.'))
