@@ -5739,7 +5739,7 @@ class types(object):
         if not info:
             parameter = "{:#x}".format(ordinal) if interface.node.identifier(ordinal) else "{:d}".format(ordinal)
             description = "for the specified identifier ({!s}) in".format(parameter) if interface.node.identifier(ordinal) else "at ordinal ({!s}) of".format(parameter)
-            raise E.ItemNotFoundError(u"{:s}.by({:d}) : No type was found {:s} the current type library.".format('.'.join([__name__, cls.__name__]), parameter, description))
+            raise E.ItemNotFoundError(u"{:s}.by({!s}) : No type was found {:s} the current type library.".format('.'.join([__name__, cls.__name__]), parameter, description))
         return info
     @utils.multicase(name=internal.types.string)
     @classmethod
