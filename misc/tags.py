@@ -1334,3 +1334,142 @@ class member(object):
         if not idaapi.set_member_cmt(mptr, utils.string.to(comment.encode(state)), where):
             raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
         return res
+
+class reference(object):
+    """
+    This namespace is basically a frontend to whatever backend is currently
+    selected. Its only purpose is to abstract around references for global
+    addresses or content addresses that are associated with a function.
+
+    This specific implementation is used to support the `internal.tagcache`
+    backend.
+    """
+
+    class tags(object):
+        """
+        Basically a frontend to all of the tags used in the database.
+        """
+        @classmethod
+        def has(cls, name):
+            return name in internal.tagcache.globals.name()
+        @classmethod
+        def get(cls, name):
+            iterable = (count for tag, count in internal.tagcache.globals.counts() if tag == name)
+            return next(iterable, 0)
+        @classmethod
+        def name(cls):
+            return internal.tagcache.globals.name()
+        @classmethod
+        def counts(cls):
+            return {tag : count for tag, count in internal.tagcache.globals.counts()}
+
+    class globals(object):
+        """
+        Basically a frontend to the addresses in a database that do not belong
+        to a function.
+        """
+        @classmethod
+        def get(cls, ea):
+            res = function.get(ea) if interface.function.has(ea) else address.get(ea)
+            return {tag for tag in res}
+        @classmethod
+        def has(cls, ea):
+            res = function.get(ea) if interface.function.has(ea) else address.get(ea)
+            return True if res else False
+        @classmethod
+        def increment(cls, address, name):
+            return internal.tagcache.globals.inc(address, name)
+        @classmethod
+        def decrement(cls, address, name):
+            return internal.tagcache.globals.dec(address, name)
+        @classmethod
+        def name(cls):
+            return internal.tagcache.globals.name()
+        @classmethod
+        def address(cls):
+            return internal.tagcache.globals.address()
+        @classmethod
+        def iterate(cls):
+            return internal.tagcache.globals.iterate()
+        @classmethod
+        def counts(cls):
+            return {tag : count for tag, count in internal.tagcache.globals.counts()}
+        @classmethod
+        def erase_address(cls, ea):
+            start, stop = interface.address.bounds()
+            if start <= ea < stop and any(idaapi.get_cmt(ea, repeatable) for repeatable in [True, False]):
+                return internal.tagcache.globals.erase(ea)
+            return internal.tagcache.globals.destroy(ea)
+
+    class contents(object):
+        """
+        Basically a frontend to the addresses in a database belonging to a
+        function.
+        """
+        @classmethod
+        def has(cls, ea, **target):
+            res = address.get(ea)
+            return True if res else False
+        @classmethod
+        def get(cls, ea, **target):
+            res = address.get(ea)
+            return {tag for tag in res}
+        @classmethod
+        def increment(cls, address, name, **target):
+            return internal.tagcache.contents.inc(address, name, target=target.get('target'))
+        @classmethod
+        def decrement(cls, address, name, **target):
+            return internal.tagcache.contents.dec(address, name, target=target.get('target'))
+        @classmethod
+        def iterate(cls):
+            return internal.tagcache.contents.iterate()
+        @classmethod
+        def name(cls, address, **target):
+            return internal.tagcache.contents.name(address, target=target.get('target'))
+        @classmethod
+        def address(cls, address, **target):
+            return internal.tagcache.contents.address(address, target=target.get('target'))
+        @classmethod
+        def counts(cls, address):
+            return internal.tagcache.contents.counts(address)
+        @classmethod
+        def erase_address(cls, func, ea):
+            return internal.tagcache.contents.erase_address(func, ea)
+        @classmethod
+        def erase(cls, func):
+            return internal.tagcache.contents.erase(func)
+
+    class structure(object):
+        """
+        Basically a frontend for the structures in a database. There is no
+        implementation because the `internal.tagcache` backend does not have
+        support for structures or members.
+        """
+        @classmethod
+        def increment(cls, sid, name):
+            return 0
+        @classmethod
+        def decrement(cls, sid, name):
+            return 0
+        @classmethod
+        def erase(cls, sid):
+            return []
+
+    class members(object):
+        """
+        Basically a frontend for the members from all the structures in the
+        database. This has no implementation because the `internal.tagcache`
+        backend does not have support for counting structures or members.
+        """
+        @classmethod
+        def increment(cls, mid, name):
+            return 0
+        @classmethod
+        def decrement(cls, mid, name):
+            return 0
+        @classmethod
+        def erase_member(cls, sid, mid):
+            return []
+        @classmethod
+        def erase(cls, sid):
+            return []
