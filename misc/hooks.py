@@ -13,7 +13,7 @@ import functools, operator, itertools
 logging = logging.getLogger(__name__)
 
 import database, function, ui
-import internal
+import internal, internal.tags
 from internal import utils, interface, exceptions
 
 import idaapi
@@ -646,6 +646,8 @@ class globals(changingchanged):
         return
 
 class typeinfo(changingchanged):
+    # FIXME: should check whether the type was applied as a solid type, or if it
+    #        was guessed.
     @classmethod
     def updater(cls):
         # All typeinfo are global tags unless they're being applied to an
@@ -1905,6 +1907,1630 @@ def set_func_end(pfn, new_end):
         return
     return
 
+class structures(changingchanged):
+    """
+    This namespace handles the 2-part event that can be dispatched by the
+    disassembler when a repeatable or non-repeatable comment has been applied to
+    a structure. This is done by monitoring the "changing_struc_cmt" and the
+    "struc_cmt_changed" event types, and verifying that the identifier given by
+    each event corresponds to an actual structure (rather than a member).
+
+    It is worth noting that on some later versions of the disassembler (8.4),
+    when a repeatable comment gets applied to a structure it destroys the
+    non-repeatable comment that is currently applied. The inverse of this holds
+    true in that there can only be a single comment type applied to a structure.
+    So, to deal with the differences between these versions we provide two flags
+    to an implementer to allow specifying how tags should be tracked.
+
+    The "combined" flag, when set, will result in combining the tags from both
+    repeatable and non-repeatable comments (giving priority to what the user
+    specified), and then encoding them as a single comment which is then
+    re-applied to the structure. The other flag, "single", when set will
+    configure the namespace so that any modifications to a repeatable or
+    non-repeatable comment will result in deleting references to the other
+    comment.
+    """
+
+    # These flags specify whether we destroy the other comment when a comment is
+    # applied to a structure (single), or that we should combine both comment
+    # types into the comment chosen by the user (combined).
+    single, combined = False, False
+
+    @classmethod
+    def update_refs(cls, sid, old, new):
+        '''Update the reference counts for the structure in `sid` by comparing the `old` tags with the ones in `new`.'''
+        oldkeys, newkeys = ({item for item in content} for content in [old, new])
+
+        # compare the original keys against the modified ones in order to figure
+        # out whether we're removing a key or simply adding it.
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old tags ({!s}) to new tags ({!s}) for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(oldkeys), utils.string.repr(newkeys), sid))
+        for key in oldkeys ^ newkeys:
+            if key not in new:
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
+                internal.tags.reference.structure.decrement(sid, key)
+            if key not in old:
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
+                internal.tags.reference.structure.increment(sid, key)
+            continue
+        return
+
+    @classmethod
+    def create_refs(cls, sid, new):
+        '''Create the references for the structure in `sid` using the tags in `new`.'''
+        available = internal.tags.reference.structure.get(sid)
+        contentkeys = {item for item in new}
+
+        if available - contentkeys:
+            logging.debug(u"{:s}.create_refs({:#x}) : Some of the tags ({!s}) in structure {:#x} already exist and do not need to be created.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(available - contentkeys), sid))
+
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating tags ({!s}) for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(contentkeys), sid))
+        for key in contentkeys - available:
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
+            internal.tags.reference.structure.increment(sid, key)
+        return
+
+    @classmethod
+    def delete_refs(cls, sid, old):
+        '''Delete the references from the structure in `sid` using the tags in `old`.'''
+        available = internal.tags.reference.structure.get(sid)
+        contentkeys = {item for item in old}
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting tags ({!s}) from structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(sorted(contentkeys)), sid))
+        for key in (contentkeys & available):
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
+            internal.tags.reference.structure.decrement(sid, key)
+
+        if contentkeys ^ available:
+            logging.warning(u"{:s}.delete_refs({:#x}) : Due to a discrepancy for some of the tags ({!s}), not all keys may have been removed ({!s}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(contentkeys - available), utils.string.repr(available - contentkeys)))
+        return
+
+    @classmethod
+    def updater(cls):
+        sid, repeatable, newcmt = (yield)
+
+        # First verify that the structure id actually points to a valid structure.
+        if not internal.structure.has(sid):
+            return logging.fatal(u"{:s}.updater() : Terminating state for {:s} \"{:s}\" due to the specified structure ({:#x}) not being found.".format('.'.join([__name__, cls.__name__]), 'repeatable comment' if repeatable else 'comment', utils.string.escape(newcmt, '"'), sid))
+        sptr = internal.structure.by_identifier(sid)
+
+        # Then we can use it to grab the right comment, and then attempt to
+        # decode the tags out of both the old comment and the new one. We also
+        # need to grab the "other" comment since later versions of the
+        # disassembler will overwrite the other comment with the new one.
+        oldcmt = internal.structure.comment.get(sptr, repeatable)
+        othercmt = internal.structure.comment.get(sptr, not repeatable)
+        old, new, other = (internal.comment.decode(cmt) for cmt in [oldcmt, newcmt, othercmt])
+
+        # Wait until we receive the second "changed" event, and unpack the new
+        # information that it gave us. If we were asked to exit, then honor it.
+        try:
+            newsid, newrepeatable, changedcmt = (yield)
+
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the {:s} for structure {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'repeatable comment' if repeatable else 'comment', sptr.id, oldcmt, newcmt))
+            return
+
+        # now we can fix the comment that was typed by the user. we compare them
+        # to make sure that we received the events in the correct order.
+        if (newsid, newrepeatable) == (sid, repeatable):
+            if changedcmt != newcmt:
+                logging.debug(u"{:s}.updater() : {:s} from event for structure {:#x} is different from what was stored in the database. Expected comment ({!s}) is different from the changed comment ({!s})".format('.'.join([__name__, cls.__name__]), 'Repeatable comment' if repeatable else 'Comment', sid, newcmt, changedcmt))
+
+            # If we've been configured to preserve both comment types when they
+            # have been modified, then we need to combine both the "other" tags
+            # with the "new" ones. We do this by merging both tags into the same
+            # dictionary (giving priority to "new"), and then re-encoding them
+            # back into whatever comment the user has modified.
+            if cls.combined:
+                fixed = other
+                for key, value in new.items():
+                    fixed[key] = value
+                fixedcmt = internal.comment.encode(fixed)
+                internal.structure.comment.set(sid, None, not repeatable)
+
+            # If our configuration specifies that only one comment can be
+            # applied to a structure at a given time, then we need to delete the
+            # tag references for the other comment from the member.
+            elif cls.single:
+                cls.delete_refs(sid, other)
+                fixed, fixedcmt = new, newcmt
+
+            # Otherwise, we can leave everything alone as both comments have
+            # nothing to do with each other.
+            else:
+                fixed, fixedcmt = new, newcmt
+
+            # If the comment is of the correct format, then we can simply
+            # update the refs, and write the comment to the given address.
+            if internal.comment.check(fixedcmt):
+                cls.update_refs(sid, old, fixed)
+                internal.structure.comment.set(sid, fixedcmt, repeatable)
+
+            # If the format was incorrect, but there's a comment to assign, then
+            # we use the internal.structure api to set it correctly.
+            elif fixedcmt:
+                cls.update_refs(sid, old, fixed)
+                internal.structure.comment.set(sid, fixedcmt, repeatable)
+
+            # If there wasn't a new comment, then we need to delete all the
+            # references to the keys from the old tag on the structure.
+            else:
+                cls.delete_refs(sid, old)
+            return
+
+        # If the changed and changing events didn't have comments that matched,
+        # then they didn't happen in the right order. So, we fix it deleting all
+        # the references, decoding the comment, and recreating them.
+        logging.fatal(u"{:s}.updater() : {:s} events are out of sync for structure {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), 'Repeatable comment' if newrepeatable else 'Comment', sid, utils.string.repr(oldcmt), utils.string.repr(newcmt)))
+
+        # Now we can delete all the comments and their references.
+        cls.delete_refs(sid, old), cls.delete_refs(sid, new)
+        internal.structure.comment.remove(sid, newrepeatable)
+        logging.warning(u"{:s}.updater() : Deleted {:s} from structure {:#x} which was originally {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable comment' if newrepeatable else 'comment', sid, utils.string.repr(oldcmt)))
+
+        # Now we can recreate the references for the new comment.
+        new = internal.comment.decode(changedcmt)
+        cls.create_refs(sid, new)
+
+    @classmethod
+    def changing(cls, struc_id, repeatable, newcmt):
+        '''changing_struc_cmt(struc_id, repeatable, newcmt)'''
+        if not internal.structure.has(struc_id):
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Ignoring structures.changing event for a {:s} comment on structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), struc_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', struc_id))
+        logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Received structures.changing event for a {:s} comment on structure {:#x}.".format('.'.join([__name__, cls.__name__]), struc_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', struc_id))
+
+        # Now try and grab the structure using its identifier. This should not
+        # fail due to the test we did at the beginning.
+        # then log a warning and abort so that we don't interrupt the user.
+        sptr = internal.structure.by_identifier(struc_id)
+
+        # Create a new event using sid and repeatable as a unique key. We also
+        # grab the old comment prior to renaming so that we can compare it.
+        event, oldcmt = cls.new((sptr.id, repeatable)), internal.structure.comment.get(sptr, repeatable)
+
+        # Disable the hooks to prevent re-entrancy issues that might occur.
+        hooks = [name for name in ['changing_struc_cmt', 'struc_cmt_changed'] if name in ui.hook.idb.available]
+        [ ui.hook.idb.disable(item) for item in hooks ]
+
+        # Now we can send the data received to the coroutine that we allocated.
+        try:
+            event.send((sptr.id, True if repeatable else False, newcmt))
+
+        # If the coroutine raised a StopIteration, then we let the user know.
+        except StopIteration:
+            logging.fatal(u"{:s}.changing({:#x}, {!s}, {!r}) : Abandoning structures.changing event for a {:s} comment on structure {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), struc_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', sptr.id))
+
+        # Then, we restore the hooks that we disabled and wait for the next event.
+        finally:
+            [ ui.hook.idb.enable(item) for item in hooks ]
+        return
+
+    @classmethod
+    def changed(cls, struc_id, repeatable):
+        '''struc_cmt_changed(struc_id, repeatable_cmt)'''
+        if not internal.structure.has(struc_id):
+            return logging.debug(u"{:s}.changed({:#x}, {!s}) : Ignoring structures.changed event for a {:s} comment on structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), struc_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', struc_id))
+        logging.debug(u"{:s}.changed({:#x}, {!s}) : Received structures.changed event for a {:s} comment on structure {:#x}.".format('.'.join([__name__, cls.__name__]), struc_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', struc_id))
+
+        # Go ahead and grab the structure that had its comment changed. This
+        # shouldn't fail if the test at the beginning passed.
+        sptr = internal.structure.by_identifier(struc_id)
+
+        # Now we'll use the parameters to try and resume the coroutine. We also
+        # extract the comment since by now the new comment has been applied.
+        event, newcmt = cls.resume((sptr.id, repeatable)), internal.structure.comment.get(sptr, repeatable)
+
+        # Before submitting the changes to our coroutine, disable all the hooks
+        # since the coroutine might write to the same comment which could cause
+        # a recursion issue.
+        hooks = [name for name in ['changing_struc_cmt', 'struc_cmt_changed'] if name in ui.hook.idb.available]
+        [ ui.hook.idb.disable(item) for item in hooks ]
+
+        # Send the parameters and our new comment to the coroutine so that it
+        # could finish what it started.
+        try:
+            event.send((sptr.id, True if repeatable else False, newcmt))
+
+        # If we received a StopIteration, then the coroutine has aborted for
+        # some reason and we can't do anything else but whine about it.
+        except StopIteration:
+            logging.fatal(u"{:s}.changed({:#x}, {!s}) : Abandoning structures.changed event for a {:s} comment on structure {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), sptr.id, repeatable, 'repeatable' if repeatable else 'non-repeatable', sptr.id))
+
+        # Restore the hooks that we disabled, and close the coroutine since this
+        # event signals that the comment has been completely applied.
+        finally:
+            [ ui.hook.idb.enable(item) for item in hooks ]
+        event.close()
+
+class structures_84(structures):
+    """
+    This namespace is intended to support the updating of comments for
+    structures in v8.4 of the disassembler. This version of the disassembler
+    changes the way that comments can be applied to a structure or member by
+    deleting the other comment that was previously applied. So, we set the
+    correct flags here to mirror what we expect the disassembler will do.
+    """
+    single = True
+
+class structurenaming(changingchanged):
+    """
+    This class handles the 2-part event that is dispatched by the disassembler
+    when a structure is renamed. This is responsible for tracking the reference
+    count for the "__name__" tag applied to a structure. The structure name is
+    checked in order to distinguish a user-specified name from the default one
+    that might be specified by the disassembler.
+
+    We also implement the hooks for managing the structure scope. Although, the
+    disassembler implements structure removal as a 2-part with the hook names
+    "deleting_struc" and "struc_deleted", it turns out that only the
+    "struc_deleted" hook appears to be called. So, on creation we check if the
+    name is user-specified or general and adjust the "__name__" tag accordingly,
+    and on deletion we remove all the tags associated with the structure.
+
+    During creation of a structure, we try to detect whether it was created by
+    the user or the disassembler. We distinguish this by making the assumption
+    that anything pre-analysis belongs to the disassembler, and post-analysis
+    belongs to the user. This is specifically to control the existence of the
+    "__typeinfo__" tag for the structure.
+    """
+
+    # FIXME: this doesn't work in 8.4, but it does in 8.3
+
+    @classmethod
+    def is_general_name(cls, sid, name):
+        '''Return true if the structure or union in `sid` has a given `name` that is generic and was decided by the disassembler.'''
+        sptr = internal.structure.by_identifier(sid) if internal.structure.has(sid) else None
+        prefixes = {'struc', 'union'}
+
+        # If we couldn't get the structure, then we can only do a test for the
+        # prefixes since we can't check if the structure if a frame or a union.
+        if not sptr:
+            prefix, suffix = name.split('_', 1) if name.startswith(('struc_', 'union_')) else ('', name)
+            return prefix in prefixes and all(digit in '0123456789' for digit in suffix)
+
+        # Otherwise, we need to check if we were given a frame. Normally, the
+        # user shouldn't be able to rename a frame structure as the disassembler
+        # won't really like it, but we support doing this anyways.
+        if sptr.props & idaapi.SF_FRAME:
+            prefix, suffix = name.split(' ', 1) if name.startswith('$ ') else ('', name)
+            return prefix == '$' and all(digit in '0123456789ABCDEF' for digit in suffix.upper())
+
+        # Now we have a regular structure. We can just test its prefix normally.
+        prefix, suffix = name.split('_', 1) if name.startswith(('struc_', 'union_')) else ('', name)
+        return prefix in prefixes and all(digit in '0123456789' for digit in suffix)
+
+    @classmethod
+    def is_tracked(cls, sid, name):
+        '''Return true if the structure `sid` with specified `name` should not be tracked with tags.'''
+        sptr = internal.structure.by_identifier(sid) if internal.structure.has(sid) else None
+
+        # If we couldn't get the structure, then it doesn't exist and as such it
+        # is untrackable.
+        if not sptr:
+            return False
+
+        # If the flags for the structure suggest that it's unlisted, then we
+        # treat it as untracked since the user wouldn't normally see it.
+        elif sptr.props & idaapi.SF_NOLIST:
+            return False
+
+        # If it's a frame, then it is also unlisted and untracked.
+        elif sptr.props & idaapi.SF_FRAME:
+            return False
+
+        # Next we need to check if the structure was copied from the type
+        # library. If so, then it was created automatically, and so we avoid
+        # tracking it since it is owned by the disassembler. We used to care
+        # about SF_GHOST types, but since the disassembler is getting rid of
+        # these in v9.0, we stick to only things from the type library.
+        elif sptr.props & getattr(idaapi, 'SF_TYPLIB', 0):
+            return False
+        return True
+
+    @classmethod
+    def created(cls, struc_id):
+        '''struc_created(struc_id)'''
+        if not internal.structure.has(struc_id):
+            return logging.warning(u"{:s}.created({:#x}) : Received structurenaming.created event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), struc_id, struc_id))
+
+        # Grab the structure from the database using its id and then check if it
+        # belongs to a frame. If it does, then we can ignore it entirely.
+        sptr = internal.structure.by_identifier(struc_id)
+        if sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.created({:#x}) : Ignoring structurenaming.created event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), struc_id, struc_id))
+        logging.debug(u"{:s}.created({:#x}) : Received structurenaming.created event for structure {:#x}.".format('.'.join([__name__, cls.__name__]), struc_id, struc_id))
+
+        # All we need to do is grab its name and check if it's a general name or
+        # a user-specified one. We also check that the structure is listed,
+        # since if it isn't then it's technically nameless. If we discover it is
+        # listed and a user-specified name, then we can go ahead and increment
+        # its reference count for the "__name__" tag.
+        name = internal.structure.naming.get(sptr)
+        if not cls.is_general_name(sptr.id, name) and not sptr.props & idaapi.SF_NOLIST:
+            internal.tags.reference.structure.increment(sptr.id, '__name__')
+
+        # Next we need to increment the "__typeinfo__" tag. We don't have a real
+        # way of distinguishing whether a structure has been created by the user
+        # or the disassembler, so we rely on whether the structure was created
+        # at the same time as the database or after the analysis has completed.
+        if cls.is_tracked(sptr.id, name):
+            internal.tags.reference.structure.increment(sptr.id, '__typeinfo__')
+        return
+
+    # XXX: the following is not implemented because as it turns out, the event
+    #      is never called by the disassembler (at least in 8.4).
+    #@classmethod
+    #def deleting(cls, sptr):
+    #    '''deleting_struc(sptr)'''
+
+    @classmethod
+    def deleted(cls, struc_id):
+        '''struc_deleted(struc_id)'''
+        logging.debug(u"{:s}.deleted({:#x}) : Received structurenaming.deleted event for structure {:#x}.".format('.'.join([__name__, cls.__name__]), struc_id, struc_id))
+
+        # The only thing we have to do is to remove all tags associated with the
+        # structure. So we grab them, and decrement each one-by-one.
+        tags = internal.tags.reference.structure.get(struc_id)
+        logging.debug(u"{:s}.deleted({:#x}) : Found {:d} tag{:s} ({!s}) associated with structure {:#x} that will be removed.".format('.'.join([__name__, cls.__name__]), struc_id, len(tags), '' if len(tags) == 1 else 's', tags, struc_id))
+        [ internal.tags.reference.structure.decrement(struc_id, tag) for tag in tags ]
+        return
+
+    @classmethod
+    def updater(cls):
+        '''This coroutine is responsible for accepting both "changed" and "changing" events in order to adjust the reference count for the "__name__" tag.'''
+
+        # Start out by grabbing the names suggested by the "changing" event.
+        sid, oldname, newname = (yield)
+
+        # Next we can grab whatever is sent by the "changed" event. This
+        # contains the actual name that was applied to the structure.
+        try:
+            newsid, applied = (yield)
+
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while name for structure {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), sid, oldname, newname))
+            return
+
+        # Verify that both structure ids are correct, and that the new name
+        # matches the applied name. If the former, then we log a warning and
+        # assume that the new structure id is correct. If the latter, then log a
+        # warning since the disassembler might have just filtered the name.
+        if newsid != sid:
+            logging.fatal(u"{:s}.updater() : Structure renaming events for structure {:#x} are out of sync. Expected structure {:#x}, but event gave us structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, sid, newsid))
+
+        if applied != newname:
+            logging.warning(u"{:s}.updater() : Structure renaming events for structure {:#x} are out of sync. Expected structure {:#x} to have name \"{:s\", but the name \"{:s}\" was applied.".format('.'.join([__name__, cls.__name__]), newsid, utils.string.escape(newname, '"'), utils.string.escape(applied, '"')))
+
+        # Now we'll figure out whether we are renaming to a default-ish name, or
+        # something that was user-specified. We use this to compare the names
+        # and determine whether to remove it since the disassembler doesn't let
+        # us apply an empty name to a structure anyways.
+        renamed = cls.is_general_name(sid, oldname), cls.is_general_name(newsid, applied)
+
+        # If we're switching from general to user-specified, then increment.
+        if renamed == (True, False):
+            internal.tags.reference.structure.increment(newsid, '__name__')
+
+        # If we're going from user-specified to general, then decrement.
+        elif renamed == (False, True):
+            internal.tags.reference.structure.decrement(newsid, '__name__')
+
+        # If the old name is user-specified, but the tag doesn't exist then we
+        # need to add it since we must've missed it.
+        elif not renamed[0] and '__name__' not in internal.tags.reference.structure.get(newsid):
+            internal.tags.reference.structure.increment(newsid, '__name__')
+
+        # If both are general or user-specified, then there's nothing to do
+        # since it should already be tagged with "__name__" if the name has been
+        # customized and not be tagged when it has a general name.
+        else:
+            logging.debug(u"{:s}.updater() : Structure renaming event for structure {:#x} from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), newsid, utils.string.escape(oldname, '"'), utils.string.escape(applied, '"')))
+        return
+
+    @classmethod
+    def renaming(cls, sid, oldname, newname):
+        '''renaming_struc(id, oldname, newname)'''
+        logging.debug(u"{:s}.renaming({:#x}, {!s}, {!r}) : Received structurenaming.renaming event for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
+
+        # First thing is to re-grab the structure and make sure it actually exists.
+        if not internal.structure.has(sid):
+            return logging.warning(u"{:s}.renaming({:#x}, {!s}, {!r}) : Received structurenaming.renaming event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
+        sptr = internal.structure.by_identifier(sid)
+
+        # Now we need to create a new state for the structure, and then send it
+        # our parameters so that we can track what the name has been changed to.
+        event = cls.new(sptr.id)
+        try:
+            event.send((sptr.id, oldname, newname))
+        except StopIteration:
+            logging.fatal(u"{:s}.renaming({:#x}, {!s}, {!r}) : Abandoning rename for structure {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
+        return
+
+    @classmethod
+    def renamed(cls, sptr):
+        '''struc_renamed(sptr, success)'''
+        logging.debug(u"{:s}.renamed({:#x}) : Received structurenaming.renamed event for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sptr.id, sptr.id))
+
+        # Unpack the structure id, and then use it to regrab the structure from
+        # the database. If it doesn't exist, then abort and don't do anything.
+        sid, sptr = sptr.id, internal.structure.by_identifier(sptr.id) if internal.structure.has(sptr.id) else None
+        if not sptr:
+            logging.warning(u"{:s}.renamed({:#x}) : Received structurenaming.renamed event for an unknown structure ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, "{!r}".format(oldname), "{!r}".format(newname), sid))
+            return
+
+        # Now we can use the id to resume our event state, get the current
+        # name, and then send them both to the event before closing it.
+        event, name = cls.resume(sptr.id), internal.structure.naming.get(sptr)
+        try:
+            event.send((sptr.id, name))
+
+        except StopIteration:
+            logging.fatal(u"{:s}.renamed({:#x}) : Abandoning rename for structure {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sptr.id, sptr.id))
+        event.close()
+
+class membertagscommon(changingchanged):
+    """
+    This namespace is responsible for tracking all of the tags that are applied
+    to a structure or frame member. It does this by monitoring both commenting
+    event types, "changing_struc_cmt" and "struc_cmt_changed", that are
+    dispatched by the disassembler. The namespace is intended to be derived from
+    so that subclasses can add specific details as required by the current
+    version of the disassembler.f
+
+    It is worth noting that on later versions of the disassembler, when a
+    repeatable comment is applied to a member, it will result in destroying the
+    other non-repeatable comment. This goes the same for the inverse. So, to
+    accommodate this difference we support specifying two flags which can be
+    used to configure how this namespace responds.
+
+    The "combined" flag, when set to true, will result in taking both repeatable
+    and non-repeatable comments and encoding them into a single comment before
+    writing it back to the comment that was specified by the user. If the
+    "single" flag is set to true, modifying one comment type will assume that
+    the other comment type is properly destroyed. This will result in removing
+    any of the tags that were stored in the other comment type.
+    """
+
+    # These flags specify whether modifying one comment via the disassembler
+    # will destroy the other one (single), or that when modifying a comment both
+    # comments should be combined into whatever was modified (combined).
+    single, combined = False, False
+
+    @classmethod
+    def update_refs(cls, mid, old, new):
+        '''Update the reference counts for the member in `mid` by comparing the `old` tags with the ones in `new`.'''
+        oldkeys, newkeys = ({item for item in content} for content in [old, new])
+
+        # compare the original keys against the modified ones in order to figure
+        # out whether we're removing a key or simply adding it.
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old tags ({!s}) to new tags ({!s}) for member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(oldkeys), utils.string.repr(newkeys), mid))
+        for key in oldkeys ^ newkeys:
+            if key not in new:
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for tag {!s} in member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(key), mid))
+                internal.tags.reference.members.decrement(mid, key)
+            if key not in old:
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for tag {!s} in member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(key), mid))
+                internal.tags.reference.members.increment(mid, key)
+            continue
+        return
+
+    @classmethod
+    def create_refs(cls, mid, new):
+        '''Create the references for the member in `mid` using the tags in `new`.'''
+        available = internal.tags.reference.members.get(mid)
+        contentkeys = {item for item in new}
+
+        if available - contentkeys:
+            logging.debug(u"{:s}.create_refs({:#x}) : Some of the tags ({!s}) in member {:#x} already exist and do not need to be created.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(available - contentkeys), mid))
+
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating tags ({!s}) for member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(contentkeys), mid))
+        for key in contentkeys - available:
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for tag {!s} in member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(key), mid))
+            internal.tags.reference.members.increment(mid, key)
+        return
+
+    @classmethod
+    def delete_refs(cls, mid, old):
+        '''Delete the references from the member in `mid` using the tags in `old`.'''
+        available = internal.tags.reference.members.get(mid)
+        contentkeys = {item for item in old}
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting tags ({!s}) from member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(sorted(contentkeys)), mid))
+        for key in (contentkeys & available):
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for tag {!s} in member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(key), mid))
+            internal.tags.reference.members.decrement(mid, key)
+
+        if contentkeys ^ available:
+            logging.warning(u"{:s}.delete_refs({:#x}) : Due to a discrepancy for some of the tags ({!s}), not all keys may have been removed ({!s}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(contentkeys - available), utils.string.repr(available - contentkeys)))
+        return
+
+    @classmethod
+    def updater(cls):
+        mid, repeatable, newcmt = (yield)
+
+        # First verify that the member id actually points to a valid member.
+        if not internal.structure.member.has(mid):
+            return logging.warning(u"{:s}.updater() : Terminating state for {:s} \"{:s}\" due to the specified member ({:#x}) not being found.".format('.'.join([__name__, cls.__name__]), 'repeatable comment' if repeatable else 'comment', utils.string.escape(newcmt, '"'), mid))
+
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+
+        # Then we can use it to grab the right comment, and then attempt to
+        # decode the tags out of both the old comment and the new one. We also
+        # capture the "other" comment since later versions of the disassembler
+        # will overwrite the other comment with the new one.
+        oldcmt = internal.structure.member.get_comment(mptr, repeatable)
+        othercmt = internal.structure.member.get_comment(mptr, not repeatable)
+        old, new, other = (internal.comment.decode(cmt) for cmt in [oldcmt, newcmt, othercmt])
+
+        # Wait until we receive the second "changed" event, and unpack the new
+        # information that it gave us. If we were asked to exit, then honor it.
+        try:
+            newmid, newrepeatable, changedcmt = (yield)
+
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the {:s} for member {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'repeatable comment' if repeatable else 'comment', mid, oldcmt, newcmt))
+            return
+
+        # now we can fix the comment that was typed by the user. we compare them
+        # to make sure that we received the events in the correct order.
+        if (newmid, newrepeatable) == (mid, repeatable):
+            if changedcmt != newcmt:
+                logging.debug(u"{:s}.updater() : {:s} from event for member {:#x} is different from what was stored in the database. Expected comment ({!s}) is different from the changed comment ({!s})".format('.'.join([__name__, cls.__name__]), 'Repeatable comment' if repeatable else 'Comment', mid, newcmt, changedcmt))
+
+            # If we've been configured to combine repeatable and non-repeatable
+            # comments, then we overwrite the "other" decoded comment with any
+            # of the new tags, and re-encode both of them into a new comment.
+            if cls.combined:
+                fixed = other
+                for key, value in new.items():
+                    fixed[key] = value
+                fixedcmt = internal.comment.encode(fixed)
+                internal.structure.member.set_comment(mptr, None, not newrepeatable)
+
+            # If our configuration specifies that applying a comment results in
+            # destroying the other comment, then we need to delete the refs for
+            # the other tags since they won't actually exist anymore.
+            elif cls.single:
+                cls.delete_refs(mid, other)
+                fixed, fixedcmt = new, newcmt
+
+            # Otherwise, we can leave everything alone since things should work
+            # as they're supposed to and getting the tag for the mebmer results
+            # in decoding them from both comment types anyways.
+            else:
+                fixed, fixedcmt = new, newcmt
+
+            # write the comment to the given address.
+            if internal.comment.check(fixedcmt):
+                cls.update_refs(mid, old, fixed)
+                internal.structure.member.set_comment(mptr, fixedcmt, repeatable)
+
+            # If the format wasn't right, but there's a comment to assign, then
+            # use the internal.structure.member api to set it correctly.
+            elif fixedcmt:
+                cls.update_refs(mid, old, fixed)
+                internal.structure.member.set_comment(mptr, fixedcmt, repeatable)
+
+            # If there wasn't a new comment, then we need to delete all the
+            # references to the keys from the old tag on the structure.
+            else:
+                cls.delete_refs(mid, old)
+            return
+
+        # If the changed and changing events didn't have comments that matched,
+        # then they didn't happen in the right order. So, we fix it by deleting
+        # all the references, decoding the comment, and then recreating them.
+        logging.fatal(u"{:s}.updater() : {:s} events are out of sync for member {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), 'Repeatable comment' if newrepeatable else 'Comment', mid, utils.string.repr(oldcmt), utils.string.repr(newcmt)))
+
+        # Now we can delete the old and other comments with their references.
+        cls.delete_refs(mid, old), cls.delete_refs(mid, other)
+        internal.structure.member.set_comment(mptr, None, newrepeatable)
+        logging.warning(u"{:s}.updater() : Deleted {:s} from member {:#x} which was originally {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable comment' if newrepeatable else 'comment', mid, utils.string.repr(oldcmt)))
+
+        # Now we recreate the references for the new comment.
+        new = internal.comment.decode(changedcmt)
+        cls.create_refs(mid, new)
+
+    @classmethod
+    def changing(cls, mid, repeatable, newcmt):
+        '''changing_struc_cmt(member_id, repeatable, newcmt)'''
+        description = cls.__name__
+
+        # Now we can go ahead and grab the struc_t and member_t using the
+        # identifier we were given. This should always succeed because the
+        # identifier should have already been checked by the caller.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Received {:s}.changing event for a {:s} comment on member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, repeatable, newcmt, description, 'repeatable' if repeatable else 'non-repeatable', mptr.id))
+
+        # Create a new event using the owning structure, the member id, and the
+        # repeatable value as the key. Grab its old comment so we can compare.
+        event, oldcmt = cls.new((mowner.id, mptr.id, repeatable)), internal.structure.member.get_comment(mptr, repeatable)
+
+        # Disable the hooks to prevent re-entrancy issues that might occur.
+        hooks = [name for name in ['changing_struc_cmt', 'struc_cmt_changed'] if name in ui.hook.idb.available]
+        [ ui.hook.idb.disable(item) for item in hooks ]
+
+        # Now we can send the data received to the coroutine that we allocated.
+        try:
+            event.send((mptr.id, True if repeatable else False, newcmt))
+
+        # If the coroutine raised a StopIteration, then we let the user know.
+        except StopIteration:
+            logging.fatal(u"{:s}.changing({:#x}, {!s}, {!r}) : Abandoning {:s}.changing event for a {:s} comment on member {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), member_id, repeatable, newcmt, description, 'repeatable' if repeatable else 'non-repeatable', mptr.id))
+
+        # Then, we restore the hooks that we disabled and wait for the next event.
+        finally:
+            [ ui.hook.idb.enable(item) for item in hooks ]
+        return
+
+    @classmethod
+    def changed(cls, mid, repeatable):
+        '''struc_cmt_changed(member_id, repeatable_cmt)'''
+        description = cls.__name__
+
+        # First we'll need to get the struc_t and member_t using the identifier
+        # that we given to us by the caller. This should never fail as the
+        # caller should have already checked that these identifiers are valid.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        logging.debug(u"{:s}.changed({:#x}, {!s}) : Received {:s}.changed event for a {:s} comment on member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, repeatable, description, 'repeatable' if repeatable else 'non-repeatable', mptr.id))
+
+        # Now we'll use the parameters to try and resume the coroutine. We also
+        # extract the comment since by now the new comment has been applied.
+        event, newcmt = cls.resume((mowner.id, mptr.id, repeatable)), internal.structure.member.get_comment(mptr, repeatable)
+
+        # Before submitting the changes to our coroutine, disable all the hooks
+        # since the coroutine might write to the same comment which could cause
+        # a recursion issue.
+        hooks = [name for name in ['changing_struc_cmt', 'struc_cmt_changed'] if name in ui.hook.idb.available]
+        [ ui.hook.idb.disable(item) for item in hooks ]
+
+        # Send the parameters and our new comment to the coroutine so that it
+        # could finish what it started.
+        try:
+            event.send((mptr.id, True if repeatable else False, newcmt))
+
+        # If we received a StopIteration, then the coroutine has aborted for
+        # some reason and we can't do anything else but whine about it.
+        except StopIteration:
+            logging.fatal(u"{:s}.changed({:#x}, {!s}) : Abandoning {:s}.changed event for a {:s} comment on member {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), mptr.id, repeatable, description, 'repeatable' if repeatable else 'non-repeatable', mptr.id))
+
+        # Restore the hooks that we disabled, and close the coroutine since this
+        # event signals that the comment has been completely applied.
+        finally:
+            [ ui.hook.idb.enable(item) for item in hooks ]
+        event.close()
+
+class members(membertagscommon):
+    """
+    This class handles the 2-part event that is dispatched by the disassembler
+    when a repeatable or non-repeatable comment is applied to a member inside a
+    structure. It turns out that the disassembler dispatches to the same hooks,
+    "changing_struc_cmt" and "struc_cmt_changed", in order to handle member
+    comments. The only difference is that the id that we are given belongs to a
+    structure member, rather than a structure. The resulting comment is also
+    reformatted as a tag so that the tag names can be indexed as necessary.
+    """
+
+    @classmethod
+    def changing(cls, member_id, repeatable, newcmt):
+        '''changing_struc_cmt(member_id, repeatable, newcmt)'''
+        if not internal.structure.member.has(member_id):
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Ignoring members.changing event for a {:s} comment on member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', member_id))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above. We use this to
+        # determine whether the member belongs to a frame or a structure.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Ignoring members.changing event for a {:s} comment on member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', member_id))
+        return super(members, cls).changing(mptr.id, repeatable, newcmt)
+
+    @classmethod
+    def changed(cls, member_id, repeatable):
+        '''struc_cmt_changed(member_id, repeatable_cmt)'''
+        if not internal.structure.member.has(member_id):
+            return logging.debug(u"{:s}.changed({:#x}, {!s}) : Ignoring members.changed event for a {:s} comment on member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', member_id))
+
+        # Now we can grab the member that had its comment changed and its parent
+        # structure using the identifier that we had just verified.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changed({:#x}, {!s}) : Ignoring members.changed event for a {:s} comment on member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', member_id))
+        return super(members, cls).changed(mptr.id, repeatable)
+
+class framemembers(members):
+    """
+    This class handles the 2-part event that is dispatched by the disassembler
+    when a repeatable or non-repeatable comment is applied to a member inside a
+    frame. The disassembler dispatches to the exact same hooks that is used for
+    structures, which includes "changing_struc_cmt" and "struc_cmt_changed".
+    Thus, for us to support frame members we distinguish whether the id
+    represents a member, and check its owning structure to see if it actually is
+    a frame.
+
+    We inherit from the `members` namespace, since the only thing that differs
+    between this one and `members` is that we distinguish the owning structure.
+    """
+
+    @classmethod
+    def changing(cls, member_id, repeatable, newcmt):
+        '''changing_struc_cmt(member_id, repeatable, newcmt)'''
+        if not internal.structure.member.has(member_id):
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Ignoring framemembers.changing event for a {:s} comment on member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', member_id))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!r}) : Ignoring framemembers.changing event for a {:s} comment on member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, newcmt, 'repeatable' if repeatable else 'non-repeatable', member_id))
+        return super(members, cls).changing(mptr.id, repeatable, newcmt)
+
+    @classmethod
+    def changed(cls, member_id, repeatable):
+        '''struc_cmt_changed(member_id, repeatable_cmt)'''
+        if not internal.structure.member.has(member_id):
+            return logging.debug(u"{:s}.changed({:#x}, {!s}) : Ignoring framemembers.changed event for a {:s} comment on member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', member_id))
+
+        # Now we can grab the member that had its comment changed and its parent
+        # by using the identifier that we just verified.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, member_id)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changed({:#x}, {!s}) : Ignoring framemembers.changed event for a {:s} comment on member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), member_id, repeatable, 'repeatable' if repeatable else 'non-repeatable', member_id))
+        return super(members, cls).changed(mptr.id, repeatable)
+
+class members_84(members):
+    """
+    This namespace is used to support updating the comments in v8.4 of the
+    disassembler. This specific version of the disassembler changes the way
+    comments can be applied to a structure or a member by deleting the other
+    comment that might be applied. So, we set the correct flags to mirror what
+    we expect the disassembler will do.
+    """
+    single = True
+
+class framemembers_84(framemembers):
+    """
+    This namespace is used to support updating the updating of comments for v8.4
+    of the disassembler. This specific version changes the way comments can be
+    applied to a structure or a member by deleting the other comment that might
+    be applied. So, we set the correct flags to mirror what the disassembler
+    will do.
+    """
+    single = True
+
+class memberscopecommon(changingchanged):
+    """
+    This namespace handles the 2-part event that is dispatched by the
+    disassembler when a structure or frame member has been deleted. Since the
+    logic is similar, it also handles the event when the member has been
+    created.
+    """
+
+    @classmethod
+    def delete_refs(cls, sid, mid):
+        '''Remove all the references from the member `mid` belonging to the structure in `sid`.'''
+        if not internal.structure.member.has(mid):
+            return internal.tags.reference.members.erase_member(sid, mid)
+
+        used = internal.tags.reference.members.get(mid)
+        [internal.tags.reference.members.decrement(mid, key) for key in used]
+
+    @classmethod
+    def updater(cls):
+        '''This coroutine is responsible for accepting both "deleting" and "deleted" events in order to remove the reference counts for the member.'''
+        sid, mid = (yield)
+        try:
+            oldsid, oldmid, offset = (yield)
+
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while member {:#x} was being removed from structure {:#x}.".format('.'.join([__name__, cls.__name__]), mid, sid))
+            return
+
+        # The only thing we need to do is to grab all the tags for the member,
+        # and remove them by decrementing each of them one-by-one.
+        if (sid, mid) == (oldsid, oldmid):
+            return cls.delete_refs(sid, mid)
+
+        # If the ids didn't match, then we assume only the ones from the second
+        # "deleted" event need to be removed.
+        logging.fatal(u"{:s}.updater() : Events are out of sync for removal of member {:#x}, as member {:#x} was originally selected. Assuming that member {:#x} was deleted.".format('.'.join([__name__, cls.__name__]), oldmid, mid, oldmid))
+        cls.delete_refs(oldsid, oldmid)
+
+    @classmethod
+    def created(cls, sid, mid):
+        '''struc_member_created(sptr, mptr)'''
+        description = cls.__name__
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+
+        # There really isn't anything for us to do, so we can just return.
+        logging.debug(u"{:s}.created({:#x}, {:#x}) : Received memberscope.created event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, mid))
+        return
+
+    @classmethod
+    def deleting(cls, sid, mid):
+        '''deleting_struc_member(sptr, mptr)'''
+        description = cls.__name__
+
+        # Grab the structure and the member using the identifiers we were given
+        # by the caller. These should always succeed since the caller should've
+        # already checked them before giving them to us.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+
+        # Now we can create a new event using the ids from the parameters. After
+        # it's been created, we can send both ids to the event updater coroutine.
+        logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Received {:s}.deleting event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, description, mid))
+
+        event = cls.new((sid, mid))
+        try:
+            event.send((sid, mid))
+        except StopIteration:
+            logging.fatal(u"{:s}.deleting({:#x}, {:#x}) : Abandoning {:s}.deleting event for member {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, description, mid))
+        return
+
+    @classmethod
+    def deleted(cls, sid, mid, offset):
+        '''struc_member_deleted(sptr, member_id, offset)'''
+        description = cls.__name__
+        logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Received {:s}.deleted event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, mid))
+
+        # Now we'll resume our event coroutine using the ids we received. We
+        # don't need the struc_t or member_t since the member doesn't actually
+        # exist anymore. So, all we need to do is send parameters to the event.
+        event = cls.resume((sid, mid))
+
+        try:
+            event.send((sid, mid, offset))
+        except StopIteration:
+            logging.fatal(u"{:s}.deleting({:#x}, {:#x}, {:+#x}) : Abandoning {:s}.deleted event for member {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, mid))
+        finally:
+            event.close()
+        return
+
+class memberscope(memberscopecommon):
+    """
+    This class handles the 2-part event that is dispatched by the disassembler
+    when a structure member has been deleted. It also handles the event when a
+    structure member is created (despite not doing anything). This is supported
+    by the "struc_member_created" event, the "deleting_struc_member" event, and
+    the "struc_member_deleted" event.
+
+    These events (according to the documentation) are supposed to be dispatched
+    when ever a structure member is created or deleted. However, on some
+    versions of the disassembler (8.4) these events are only dispatched on frame
+    members. Due to this constraint, this namespace is distinctly separate from
+    the `framememberscope` namespace despite their functionality being the same.
+    """
+
+    @classmethod
+    def created(cls, sptr, mptr):
+        '''struc_member_created(sptr, mptr)'''
+        if not internal.structure.has(sptr.id):
+            return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring memberscope.created event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
+        elif not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring memberscope.created event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+        elif sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring memberscope.created event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
+        return super(memberscope, cls).created(sptr.id, mptr.id)
+
+    @classmethod
+    def deleting(cls, sptr, mptr):
+        '''deleting_struc_member(sptr, mptr)'''
+        sid, mid = sptr.id, mptr.id
+        if not internal.structure.has(sid):
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring memberscope.deleting event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
+        elif not internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring memberscope.deleting event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sid, mid, mid))
+        elif sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring memberscope.deleting event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
+        return super(memberscope, cls).deleting(sid, mid)
+
+    @classmethod
+    def deleted(cls, sptr, member_id, offset):
+        '''struc_member_deleted(sptr, member_id, offset)'''
+        sid, mid = sptr.id, member_id
+        if not internal.structure.has(sid):
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring memberscope.deleted event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
+        elif internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring memberscope.deleted event for member {:#x} (not actually deleted).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, mid))
+        elif sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring memberscope.deleted event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
+        return super(memberscope, cls).deleted(sid, mid, offset)
+
+class memberscope_84(memberscopecommon):
+    """
+    It seems that v8.4 of the disassembler can fuck this up pretty bad in that
+    during the "struc_member_deleted" eventk, it can give us the completely
+    wrong member id. So, we reimplement the base class to use the offset as the
+    member key, rather than just the id.
+    """
+
+    @classmethod
+    def updater(cls):
+        '''This coroutine is responsible for accepting both "deleting" and "deleted" events in order to remove the reference counts for the member.'''
+        sid, mid, moffset = (yield)
+        try:
+            oldsid, wrongmid, offset = (yield)
+
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while member {:#x} was being removed from structure {:#x}.".format('.'.join([__name__, cls.__name__]), mid, sid))
+            return
+
+        # The only thing we need to do is to grab all the tags for the member,
+        # and remove them by decrementing each of them one-by-one.
+        if (sid, moffset) == (oldsid, offset):
+            return cls.delete_refs(sid, mid)
+
+        # If the ids didn't match, then we assume only the ones from the second
+        # "deleted" event need to be removed.
+        logging.fatal(u"{:s}.updater() : Events are out of sync for removal of member {:#x}, as member {:#x} was originally selected. Assuming that member {:#x} was deleted.".format('.'.join([__name__, cls.__name__]), mid, mid, mid))
+        cls.delete_refs(sid, mid)
+
+    @classmethod
+    def deleting(cls, sptr, mptr):
+        '''deleting_struc_member(sptr, mptr)'''
+        description, sid, mid = cls.__name__, sptr.id, mptr.id
+        if not internal.structure.has(sid):
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring {:s}.deleting event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, description, sid))
+        elif not internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring {:s}.deleting event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sid, mid, description, mid))
+        elif sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring {:s}.deleting event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, description, sid))
+
+        # Grab the structure and the member using the identifiers we were given
+        # by the caller. These should always succeed since we just verified that
+        # the they already exist and are correct.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+
+        # Now we can create a new event using the structure id and the member
+        # offset. Afterwards, we can send both ids to the event updater.
+        logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Received {:s}.deleting event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, description, mid))
+
+        event = cls.new((sid, mptr.soff))
+        try:
+            event.send((sid, mid, mptr.soff))
+        except StopIteration:
+            logging.fatal(u"{:s}.deleting({:#x}, {:#x}) : Abandoning {:s}.deleting event for member {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, description, mid))
+        return
+
+    @classmethod
+    def deleted(cls, sptr, member_id, offset):
+        description, sid, mid = cls.__name__, sptr.id, member_id
+        if not internal.structure.has(sid):
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring {:s}.deleted event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, sid))
+        elif sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring {:s}.deleted event for structure {:#x} (is a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, sid))
+        description = cls.__name__
+        logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Received {:s}.deleted event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, mid))
+
+        # Now we'll resume our event coroutine using the offset we were given,
+        # since the disassembler at least gets this one right.
+        event = cls.resume((sid, offset))
+        try:
+            event.send((sid, mid, offset))
+        except StopIteration:
+            logging.fatal(u"{:s}.deleting({:#x}, {:#x}, {:+#x}) : Abandoning {:s}.deleted event for member {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, offset, description, mid))
+        finally:
+            event.close()
+        return
+
+class framememberscope(memberscopecommon):
+    """
+    This class handles the 2-part event that is dispatched by the disassembler
+    when a frame member is deleted. It handles the event when a frame member
+    is created. This is done by using the "struc_member_created" event, the
+    "deleting_struc_member" event, and the "struc_member_deleted" event.
+
+    These events (according to the documentation) are supposed to be dispatched
+    when ever a structure member is created or deleted. However, on some
+    versions of the disassembler (8.4) these events are only dispatched on frame
+    members. Due to this constraint, this class will explicitly test the
+    member id that is given to verify that it actually belongs to a frame.
+    """
+
+    @classmethod
+    def created(cls, sptr, mptr):
+        '''struc_member_created(sptr, mptr)'''
+        if not internal.structure.has(sptr.id):
+            return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring framememberscope.created event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
+        elif not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring framememberscope.created event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+        elif not sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.created({:#x}, {:#x}) : Ignoring framememberscope.created event for structure {:#x} (not a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, sptr.id))
+        return super(framememberscope, cls).created(sptr.id, mptr.id)
+
+    @classmethod
+    def deleting(cls, sptr, mptr):
+        '''deleting_struc_member(sptr, mptr)'''
+        sid, mid = sptr.id, mptr.id
+        if not internal.structure.has(sid):
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring framememberscope.deleting event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
+        elif not internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring framememberscope.deleting event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sid, mid, mid))
+        elif not sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.deleting({:#x}, {:#x}) : Ignoring framememberscope.deleting event for structure {:#x} (not a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, sid))
+        return super(framememberscope, cls).deleting(sid, mid)
+
+    @classmethod
+    def deleted(cls, sptr, member_id, offset):
+        '''struc_member_deleted(sptr, member_id, offset)'''
+        sid, mid = sptr.id, member_id
+        if not internal.structure.has(sid):
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring framememberscope.deleted event for structure {:#x} (unknown structure).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
+        elif internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring framememberscope.deleted event for member {:#x} (not actually deleted).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, mid))
+        elif not sptr.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.deleted({:#x}, {:#x}, {:+#x}) : Ignoring framememberscope.deleted event for structure {:#x} (not a frame).".format('.'.join([__name__, cls.__name__]), sid, mid, offset, sid))
+        return super(framememberscope, cls).deleted(sid, mid, offset)
+
+class membernamingcommon(changingchanged):
+    """
+    This namespace is a base class that is used when renaming members or frame
+    members. Member names for either are tracked via the private "__name__" tag.
+    The existence of this tag is used for distinguishing members with a custom,
+    user-specified name from members that were named by the disassembler.
+    """
+
+    @classmethod
+    def is_general_field(cls, sid, mid, name):
+        '''Return true if the specified `name` is the default field name that was chosen by the disassembler for the member `mid` of structure `sid`.'''
+        ok = internal.structure.has(sid) and internal.structure.member.has(mid)
+
+        # If our structure id or member id is unknown, then we assume the name
+        # is default, since they don't actually exist in the database.
+        if not ok:
+            return True
+
+        # First we use the identifiers to grab the struc_t and member_t from the
+        # disassembler api. Then we can use them to grab the default name for
+        # the member. Only thing left to do is to return the comparison result.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+        expected = internal.structure.member.default_name(mowner, mptr)
+
+        # FIXME: should we check for things like "anonymous" too?
+        return name == expected
+
+    @classmethod
+    def updater(cls):
+        oldsid, oldmid, newname = (yield)
+
+        # Before doing anything, we need to grab the old name for the member
+        # that we were given. This way we can check if the name has been changed
+        # or stayed the same. Afterwards, we grab whatever the next "renamed"
+        # event has sent to us.
+        oldname = internal.structure.member.get_name(oldmid)
+
+        try:
+            newsid, newmid = (yield)
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while name for member {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), oldmid, oldname, newname))
+            return
+
+        # Next we need to sanity-check that our ids are correct. Regardless, we
+        # explicitly trust the "newsid" and "newmid" given to us by "renamed".
+        if oldsid != newsid:
+            logging.fatal(u"{:s}.updater() : Member renaming events for member {:#x} are out of sync. Expected structure {:#x}, but event gave us structure {:#x}.".format('.'.join([__name__, cls.__name__]), oldmid, oldsid, newsid))
+
+        if oldmid != newmid:
+            logging.fatal(u"{:s}.updater() : Member renaming events for member {:#x} are out of sync. Expected member {:#x}, but event gave us member {:#x}.".format('.'.join([__name__, cls.__name__]), oldmid, oldmid, newmid))
+
+        # Now we'll check both the old name and new name to figure out which
+        # ones are generalized, and which ones are user-specified.
+        sid, mid = newsid, newmid
+        gold, gnew = (cls.is_general_field(sid, mid, name) for name in [oldname, newname])
+        renamed = gold, gnew
+
+        # Only thing left is to figure out whether we increment our reference
+        # count for "__name__" or decrement it. If the rename is from a general
+        # name to a user-specified one, then we increment.
+        if renamed == (True, False):
+            internal.tags.reference.members.increment(mid, '__name__')
+
+        # Otherwise, the name was cleared to a default, which we'll decrement.
+        elif renamed == (False, True):
+            internal.tags.reference.members.decrement(mid, '__name__') if '__name__' in internal.tags.reference.members.get(mid) else ()
+
+        # If the old name is fancy but there's no name tag for the member, then
+        # the user renamed a member that the disassembler had initialized with a
+        # custom name. So, we increment to add the "__name__" tag to the member.
+        elif not gold and '__name__' not in internal.tags.reference.members.get(mid):
+            internal.tags.reference.members.increment(mid, '__name__')
+
+        # If both are the same, the state of the "__name__" tag hasn't changed.
+        else:
+            logging.debug(u"{:s}.updater() : Member renaming event for member {:#x} from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), mid, oldname, newname))
+        return
+
+    @classmethod
+    def renaming(cls, sid, mid, newname):
+        '''renaming_struc_member(sptr, mptr, newname)'''
+        description = cls.__name__
+
+        # Now grab the member using its identifier. This should always succeed
+        # since the identifiers should've already been checked by caller.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+
+        # Next we need to create a new coroutine for the member so that we can
+        # send our parameters to it for processing.
+        logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Received {:s}.renaming event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, newname, description, mptr.id))
+        event = cls.new((mowner.id, mptr.id))
+
+        # All that's left to do is to send our parameters to it. The coroutine
+        # is responsible for figuring out the previous name of the member.
+        try:
+            event.send((mowner.id, mptr.id, newname))
+        except StopIteration:
+            logging.fatal(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Abandoning rename for member {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, newname, mptr.id))
+        return
+
+    @classmethod
+    def renamed(cls, sid, mid):
+        '''struc_member_renamed(sptr, mptr)'''
+        description = cls.__name__
+
+        # Now grab the member that was renamed using its identifier. Our caller
+        # method should've checked the identifiers before giving them to us.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+
+        # Then we need to grab our coroutine in order to resume its execution.
+        # After grabbing it, we send out the parameters to complete the rename.
+        logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Received {:s}.renamed event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, description, mptr.id))
+        event = cls.resume((mowner.id, mptr.id))
+        try:
+            event.send((mowner.id, mptr.id))
+        except StopIteration:
+            logging.fatal(u"{:s}.renamed({:#x}, {:#x}) : Abandoning rename for member {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, mptr.id))
+        event.close()
+
+class membernaming(membernamingcommon):
+    """
+    This class handles the 2-part event dispatched by the disassembler when a
+    frame member has been renamed. It is primarily responsible for tracking the
+    reference count for the "__name__" tags that are applied to members. The
+    existence of the "__name__" tag is only for identifying members that have a
+    customized or user-specified name.
+
+    The implementation of this namespace is the same implementation as the
+    `framemembernaming` namespace. The reason for the existence of two different
+    namespaces are because later versions of the disassembler (8.4) are actually
+    broken and do not dispatch any of the member hooks if the target is a
+    regular structure. For some reason this still works on frames, though.
+    """
+
+    @classmethod
+    def renaming(cls, sptr, mptr, newname):
+        '''renaming_struc_member(sptr, mptr, newname)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring membernaming.renaming event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring membernaming.renaming event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
+        return super(membernaming, cls).renaming(mowner.id, mptr.id, newname)
+
+    @classmethod
+    def renamed(cls, sptr, mptr):
+        '''struc_member_renamed(sptr, mptr)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring membernaming.renamed event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+
+        # Now try and grab the member that was renamed using its identifier.
+        # This always succeeds since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring membernaming.renamed event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+        return super(membernaming, cls).renamed(mowner.id, mptr.id)
+
+class framemembernaming(membernamingcommon):
+    """
+    This class handles the 2-part event dispatched by the disassembler when a
+    frame member has been renamed. It is primarily responsible for tracking the
+    reference count for the "__name__" tags that are applied to members. The
+    existence of the "__name__" tag is only for identifying members that have a
+    customized or user-specified name.
+
+    The implementation of this namespace is the same implementation as the
+    `membernaming` namespace. The reason for the existence of two different
+    namespaces are because later versions of the disassembler (8.4) are actually
+    broken and do not dispatch any of the member hooks if the target is a
+    regular structure. For some reason this still works on frames, though.
+    """
+
+    @classmethod
+    def renaming(cls, sptr, mptr, newname):
+        '''renaming_struc_member(sptr, mptr, newname)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring framemembernaming.renaming event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.renaming({:#x}, {:#x}, {!r}) : Ignoring framemembernaming.renaming event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, newname, mptr.id))
+        return super(framemembernaming, cls).renaming(mowner.id, mptr.id, newname)
+
+    @classmethod
+    def renamed(cls, sptr, mptr):
+        '''struc_member_renamed(sptr, mptr)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring framemembernaming.renamed event for member {:#x} (unknown frame member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+
+        # Now try and grab the member that was renamed using its identifier.
+        # This always succeeds since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.renamed({:#x}, {:#x}) : Ignoring framemembernaming.renamed event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+        return super(framemembernaming, cls).renamed(mowner.id, mptr.id)
+
+class membertypeinfocommon(changingchanged):
+    """
+    This namespace is intended to be inherited from and is used to track the
+    type information applied to a structure member. It supports the 2-part
+    events that are dispatched by the disassembler using both the "changing_ti"
+    and "ti_changed" events. The purpose of monitoring the application of a type
+    is specifically for the "__typeinfo__" tag.
+    """
+
+    @classmethod
+    def updater(cls):
+        oldsid, oldmid, typedata, fnamesdata = (yield)
+
+        # Now we use the identifiers we were given to get both the struc_t and
+        # member_t. This way we can grab the old values before the change.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, oldmid)
+
+        # So, it turns out that the parameters we receive for "changing_ti" and
+        # the following "ti_changed" event are always the same. The disassembler
+        # doesn't give us the original type and instead always give us the new
+        # one. So at this point we fetch the old type from the member ourselves
+        # and use the data we were given to deserialize the actual target type.
+        oldtype = internal.structure.member.get_typeinfo(mptr) if internal.structure.member.has_typeinfo(mptr) else None
+        newtype = interface.tinfo.get(None, typedata, fnamesdata) if typedata else None
+
+        # Now we can just wait until we receive the next parameters since
+        # they're really only needed to match the identifiers.
+        try:
+            newsid, newmid, newtypedata, newfnamesdata = (yield)
+        except GeneratorExit:
+            description = "\"{!s}\"".format(utils.string.escape("{!s}".format(newtype), '"')) if newtype else None
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while type for member {:#x} was being {!s}.".format('.'.join([__name__, cls.__name__]), oldmid, "changed to {!s}".format(description) if description else 'removed'))
+            return
+
+        # Verify that our identifiers are all the same. Once they're confirmed,
+        # we can start comparing the types to figure out whether we need to
+        # increment the reference count for the "__typeinfo__" tag.
+        sid, mid = newsid, newmid
+        if (oldsid, oldmid) == (newsid, newmid):
+            oldtyped, newtyped = oldtype is not None, newtype is not None
+            applied = oldtyped, newtyped
+
+            # If the change added a type, then increment the reference.
+            if applied == (False, True):
+                internal.tags.reference.members.increment(mid, '__typeinfo__')
+
+            # If the change removed the type, then decrement the reference.
+            elif applied == (True, False):
+                internal.tags.reference.members.decrement(mid, '__typeinfo__') if '__typeinfo__' in internal.tags.reference.members.get(mid) else ()
+
+            # If the old type exists but the "__typeinfo__" tag is missing, then
+            # we need to add a reference to "__typeinfo__" since we missed it.
+            elif oldtyped and '__typeinfo__' not in internal.tags.reference.members.get(mid):
+                internal.tags.reference.members.increment(mid, '__typeinfo__')
+
+            # Otherwise there is nothing to do since the updating of the type
+            # didn't actually affect the previous type.
+            else:
+                old = "\"{!s}\"".format(utils.string.escape("{!s}".format(oldtype), '"') if oldtype else '')
+                new = "\"{!s}\"".format(utils.string.escape("{!s}".format(newtype), '"') if newtype else '')
+                logging.debug(u"{:s}.updater() : Member type information update for member {:#x} from {!s} to {!s} did not need an adjustment.".format('.'.join([__name__, cls.__name__]), mid, old, new))
+            return
+
+        # If the events didn't match at all, then somehow the events didn't
+        # arrive in the correct order. So, we fix it by deleting the reference
+        # to the "__typeinfo__" tag, and then recreating if it exists.
+        logging.fatal(u"{:s}.updater() : Member type events for member {:#x} are out of sync. Expected member {:#x}, but event gave us member {:#x}.".format('.'.join([__name__, cls.__name__]), oldmid, oldmid, newmid))
+
+        if '__typeinfo__' in internal.tags.reference.members.get(mid):
+            internal.tags.reference.members.decrement(mid, '__typeinfo__')
+
+        if newtype is not None:
+            internal.tags.reference.members.increment(mid, '__typeinfo__')
+        return
+
+    @classmethod
+    def changing(cls, mid, new_type, new_fnames):
+        '''changing_ti(ea, new_type, new_fnames)'''
+        description = cls.__name__
+        logging.debug(u"{:s}.changing({:#x}, {!r}, {!r}) : Received {:s}.changing event for member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, "{!s}".format(new_type), new_fnames, description, mid))
+
+        # Grab the member using the member id we were given. This will always
+        # succeeed since it should've already been checked by the caller.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+
+        # Only thing to do is to create a new coroutine for managing this event,
+        # and then sending all of our parameters to it until the next event.
+        event = cls.new((mowner.id, mptr.id))
+
+        try:
+            event.send((mowner.id, mptr.id, new_type, new_fnames))
+        except StopIteration:
+            logging.fatal(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!r}, {:+#x}) : Abandoning the change of type information for member {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, flag, 2 + 8, "{!s}".format(ti) if ti else '', nbytes, mptr.id))
+        return
+
+    @classmethod
+    def changed(cls, mid, type, fnames):
+        '''ti_changed(ea, type, fnames)'''
+        description = cls.__name__
+        logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Received {:s}.changed event for member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, type, fnames, description, mid))
+
+        # Snag the member using the identifier given to us by the caller.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+
+        # Now we need to grab the matching coroutine from our state, and then
+        # send the completion parameters to complete the type modification.
+        event = cls.resume((mowner.id, mptr.id))
+        try:
+            event.send((mowner.id, mptr.id, type, fnames))
+        except StopIteration:
+            logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Abandoning the change of type information for member {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), mid, type, fnames, mptr.id))
+        event.close()
+
+class membertypeinfo(membertypeinfocommon):
+    """
+    This namespace handles the 2-part event that is dispatched by the
+    disassembler when a type has been applied to a structure member. Is is
+    intended for tracking whether the "__typeinfo__" tag should be attached to
+    the structure member.
+
+    This namespace is the same implementation as the `framemembertypeinfo`
+    namespace, with the only difference being that this one is used for tracking
+    types applied to structure members, and the other one being used to track
+    any of the types applied to frame members.
+    """
+
+    @classmethod
+    def changing(cls, mid, new_type, new_fnames):
+        '''changing_ti(ea, new_type, new_fnames)'''
+        if not internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.changing({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changing event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), mid, new_type, new_fnames, mid))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changing({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changing event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), mid, new_type, new_fnames, mptr.id))
+        return super(membertypeinfo, cls).changing(mptr.id, new_type, new_fnames)
+
+    @classmethod
+    def changed(cls, mid, type, fnames):
+        '''ti_changed(ea, type, fnames)'''
+        if not internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changed event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), mid, type, fnames, mid))
+
+        # We just need to grab our own versions of the structure and member, and
+        # then check if it belongs to a frame. Afterwards just call our parent.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changed event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), mid, type, fnames, mptr.id))
+        return super(membertypeinfo, cls).changed(mptr.id, type, fnames)
+
+class framemembertypeinfo(membertypeinfocommon):
+    """
+    This namespace handles the 2-part event that is dispatched by the
+    disassembler when a type has been applied to a frame member. Is is intended
+    for tracking whether the "__typeinfo__" tag should be attached to the
+    corresponding frame member or not.
+
+    This namespace is the same implementation as the `membertypeinfo` namespace,
+    with the only difference between the two being that this one is only used
+    for frame members. The reason why we split these up are because later
+    versions of the disassembler break some of the hooks that use for tracking,
+    so this way we can split up the implementation depending on the version.
+    """
+    @classmethod
+    def changing(cls, mid, new_type, new_fnames):
+        '''changing_ti(ea, new_type, new_fnames)'''
+        if not internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.changing({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changing event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), mid, new_type, new_fnames, mid))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changing({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changing event for member {:#x} (does not belong to a frame).".format('.'.join([__name__, cls.__name__]), mid, new_type, new_fnames, mptr.id))
+        return super(framemembertypeinfo, cls).changing(mptr.id, new_type, new_fnames)
+
+    @classmethod
+    def changed(cls, mid, type, fnames):
+        '''ti_changed(ea, type, fnames)'''
+        if not internal.structure.member.has(mid):
+            return logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changed event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), mid, type, fnames, mid))
+
+        # We just need to grab our own versions of the structure and member, and
+        # then check if it belongs to a frame. Afterwards just call our parent.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changed({:#x}, {!r}, {!r}) : Ignoring membertypeinfo.changed event for member {:#x} (does not belong to a frame).".format('.'.join([__name__, cls.__name__]), mid, type, fnames, mptr.id))
+        return super(framemembertypeinfo, cls).changed(mptr.id, type, fnames)
+
+class memberchangecommon(changingchanged):
+    """
+    This namespace contains the common logic that is used when the "type" of a
+    member has been changed. This type is different from the type information in
+    that it is always guaranteed to exist on a frame member. Presently the
+    implementation of this namespace doesn't actually do anything since this
+    information really isn't worth tracking for any reason. Hence, the namespace
+    exists strictly as a placeholder in case we decide we want to track member
+    types for some reason.
+    """
+
+    @classmethod
+    def updater(cls):
+        oldsid, oldmid, newflags, newinfo, newsize = (yield)
+
+        # We first need to verify that the member id actually points to a valid
+        # member. Then we can grab the original attributes for the member so
+        # that we can compare them to the new ones.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(oldsid, oldmid)
+        oldflags, oldsize = idaapi.as_uint32(mptr.flag), internal.structure.member.size(mptr.id)
+
+        oldinfo = idaapi.opinfo_t()
+        ok = idaapi.retrieve_member_info(mptr, oldinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(oldinfo, mptr)
+        if not ok:
+            oldinfo = None
+
+        # FIXME: if we're a frame, we should grab the function and use it to
+        #        figure out the member offset so that we can get a proper type.
+
+        try:
+            newsid, newmid = (yield)
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while name for member {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), oldmid, oldname, newname))
+            return
+
+        # Verify that our identifiers are all the same. Once they're confirmed,
+        # we can start comparing the types to figure out what we need to do.
+        sid, mid = newsid, newmid
+        if (oldsid, oldmid) == (newsid, newmid):
+            oldpythonic = interface.typemap.dissolve(oldflags, oldinfo.tid if oldinfo is not None else idaapi.BADNODE, oldsize)
+            newpythonic = interface.typemap.dissolve(newflags, newinfo.tid if newinfo is not None else idaapi.BADNODE, newsize)
+            logging.debug(u"{:s}.updater() : Member type update for member {:#x} from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), mid, oldpythonic, newpythonic))
+            return
+
+        # If the events didn't match at all, then somehow the events didn't
+        # arrive in the correct order. It's okay though, because we don't really
+        # need to do anything as this implementation is just a placeholder.
+        logging.fatal(u"{:s}.updater() : Member type events for member {:#x} are out of sync. Expected member {:#x}, but event gave us member {:#x}.".format('.'.join([__name__, cls.__name__]), oldmid, oldmid, newmid))
+
+        oldpythonic = interface.typemap.dissolve(oldflags, oldinfo.tid if oldinfo is not None else idaapi.BADNODE, oldsize)
+        newpythonic = interface.typemap.dissolve(newflags, newinfo.tid if newinfo is not None else idaapi.BADNODE, newsize)
+        logging.debug(u"{:s}.updater() : Member type update for member {:#x} from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), mid, oldpythonic, newpythonic))
+
+    @classmethod
+    def changing(cls, sid, mid, flag, newinfo, newsize):
+        '''changing_struc_member(sptr, mptr, flag, ti, nbytes)'''
+        description = cls.__name__
+
+        # Grab the member using the identifiers we were given. This will always
+        # succeeed since they should've been checked by the caller.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+        logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Received {:s}.changing event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, flag, 2 + 8, newinfo, newsize, description, mptr.id))
+
+        # Only thing to do is to create a new coroutine for managing this event,
+        # and then sending all of our parameters to it until the next event.
+        event = cls.new((mowner.id, mptr.id))
+
+        try:
+            event.send((mowner.id, mptr.id, flag, newinfo, newsize))
+        except StopIteration:
+            logging.fatal(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Abandoning the change of type for member {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, flag, 2 + 8, newinfo, newsize, mptr.id))
+        return
+
+    @classmethod
+    def changed(cls, sid, mid):
+        '''struc_member_changed(sptr, mptr)'''
+        description = cls.__name__
+
+        # Snag the member using the identifiers given to us by the caller.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sid, mid)
+        logging.debug(u"{:s}.changed({:#x}, {:#x}) : Received {:s}.changed event for member {:#x}.".format('.'.join([__name__, cls.__name__]), sid, mid, description, mptr.id))
+
+        # Now we need to grab the matching coroutine from our state, and then
+        # send the completion parameters to complete the type modification.
+        event = cls.resume((mowner.id, mptr.id))
+        try:
+            event.send((mowner.id, mptr.id))
+        except StopIteration:
+            logging.debug(u"{:s}.changed({:#x}, {:#x}) : Abandoning the change of type for member {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), sid, mid, mptr.id))
+        event.close()
+
+class memberchange(memberchangecommon):
+    """
+    This namespace handles the 2-part event that is dispatched by the
+    disassembler when the type of a structure member has been updated. The
+    implementation is basically the same as the `framememberchange` namespace
+    with the only difference being that this namespace is intended to be used on
+    structure members, whereas the other one is only for frame members.
+
+    The reason why we split up this namespace from `framememberchange` is that
+    later versions of the disassembler do not correctly dispatch the initial
+    "changing_struc_member" event on a non-frame member.
+
+    Due to a member type being guaranteed to exist on a member, this namespace
+    doesn't really do anything. Hence, this namespace only exists as a
+    placeholder in case someone in the future finds something worth tracking.
+    """
+
+    @classmethod
+    def changing(cls, sptr, mptr, flag, newinfo, nbytes):
+        '''changing_struc_member(sptr, mptr, flag, newinfo, nbytes)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring memberchange.changing event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring memberchange.changing event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
+        return super(memberchange, cls).changing(mowner.id, mptr.id, flag, newinfo, nbytes)
+
+    @classmethod
+    def changed(cls, sptr, mptr):
+        '''struc_member_changed(sptr, mptr)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring memberchange.changed event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+
+        # We just need to grab our own versions of the structure and member, and
+        # then check if it belongs to a frame. Afterwards just call our parent.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring memberchange.changed event for member {:#x} (belongs to a frame).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+        return super(memberchange, cls).changed(mowner.id, mptr.id)
+
+class framememberchange(memberchangecommon):
+    """
+    This namespace handles the 2-part event that can be dispatched by the
+    disassembler when the type of a frame member has been changed or updated.
+    The implementation is the exact same as the `memberchange` namespace with
+    the only difference being that the hooks in this namespace are intended to
+    be used with only frame members.
+
+    The reason why this namespace is split up from the `memberchange` namespace
+    is that later verions of the disassembler actually break structure member
+    events for members that do not belong to frames. So, we split up the
+    implementation so that we can specially handle structure members that are
+    broken.
+
+    Due to the frame member type always being guaranteed to exist on a frame
+    member, this namespace really doesn't do anything important. The namespace
+    only exists in case someone in the future has something that they want to
+    track about how a frame member changes.
+    """
+    @classmethod
+    def changing(cls, sptr, mptr, flag, newinfo, nbytes):
+        '''changing_struc_member(sptr, mptr, flag, newinfo, nbytes)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring framememberchange.changing event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
+
+        # Now try and grab the member using its identifier. This should always
+        # succeed since we just checked the member id up above.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changing({:#x}, {:#x}, {:#0{:d}x}, {!s}, {:+#x}) : Ignoring framememberchange.changing event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, flag, 2 + 8, newinfo, nbytes, mptr.id))
+        return super(framememberchange, cls).changing(mowner.id, mptr.id, flag, newinfo, nbytes)
+
+    @classmethod
+    def changed(cls, sptr, mptr):
+        '''struc_member_changed(sptr, mptr)'''
+        if not internal.structure.member.has(mptr.id):
+            return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring framememberchange.changed event for member {:#x} (unknown member).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+
+        # We just need to grab our own versions of the structure and member, and
+        # then check if it belongs to a frame. Afterwards just call our parent.
+        mowner, mindex, mptr = internal.structure.members.by_identifier(sptr.id, mptr.id)
+        if not mowner.props & idaapi.SF_FRAME:
+            return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring framememberchange.changed event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
+        return super(framememberchange, cls).changed(mowner.id, mptr.id)
+
 class supermethods(object):
     """
     Define all of the functions that will be used as supermethods for
@@ -2147,14 +3773,18 @@ def make_ida_not_suck_cocks(nw_code):
     scheduler.default(hook.idb, 'closebase', on_close, 10000) if 'closebase' in hook.idb.available else scheduler.default(hook.idp, 'closebase', on_close, 10000)
 
     ## create the tagcache netnode when a database is created
+    import internal.tagcache, internal.tagindex
     if idaapi.__version__ >= 7.0:
         scheduler.default(hook.idp, 'ev_init', internal.tagcache.tagging.__init_tagcache__, -1)
+        scheduler.default(hook.idp, 'ev_init', internal.tagindex.init_tagindex, -1)
 
     elif idaapi.__version__ >= 6.9:
         scheduler.default(hook.idp, 'init', internal.tagcache.tagging.__init_tagcache__, -1)
+        scheduler.default(hook.idp, 'init', internal.tagindex.init_tagindex, -1)
 
     else:
         scheduler.default(hook.notification, idaapi.NW_OPENIDB, internal.tagcache.tagging.__nw_init_tagcache__, -40)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, internal.tagindex.nw_init_tagcache, -40)
 
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
@@ -2263,6 +3893,119 @@ def make_ida_not_suck_cocks(nw_code):
     if idaapi.__version__ >= 6.9:
         scheduler.default(hook.idb, 'extra_cmt_changed', extra_cmt.changed, 0)
         # XXX: we schedule extra comments by default because they give us segment boundaries.
+
+    ## start by initializing the states for all our structure-related hooks.
+    namespaces = []
+    namespaces+= [structures, structurenaming]
+    namespaces+= [members, memberscope, membernaming, memberchange, membertypeinfo]
+    namespaces+= [framemembers, framememberscope, framemembernaming, framememberchange, framemembertypeinfo]
+
+    # now for the 8.4 specific hooks...
+    namespaces+= [structures_84, members_84, memberscope_84]
+
+    if idaapi.__version__ >= 7.0:
+        [scheduler.default(hook.idp, 'ev_init', namespace.database_init, -100) for namespace in namespaces]
+
+    elif idaapi.__version__ >= 6.9:
+        [scheduler.default(hook.idp, 'init', namespace.database_init, -100) for namespace in namespaces]
+
+    else:
+        [scheduler.default(hook.notification, idaapi.NW_OPENIDB, namespace.nw_database_init, -100) for namespace in namespaces]
+
+    # now for structures if they are actually available. we support structure
+    # comments (changing/changed), created/deleted, and renaming/renamed.
+    if idaapi.__version__ >= 7.7:
+        scheduler.default(hook.idb, 'struc_created', structurenaming.created, -75)
+        scheduler.default(hook.idb, 'struc_deleted', structurenaming.deleted, +75)
+        scheduler.default(hook.idb, 'renaming_struc', structurenaming.renaming, -75)
+        scheduler.default(hook.idb, 'struc_renamed', structurenaming.renamed, -75)
+
+    # v8.4 of the disassembler changes the way repeatable comments and
+    # non-repeatable comments can be applied to a structure. So, because of this
+    # we need to support both variations of applying comments to structures.
+    if idaapi.__version__ < 8.4:
+        scheduler.default(hook.idb, 'changing_struc_cmt', structures.changing, -50)
+        scheduler.default(hook.idb, 'struc_cmt_changed', structures.changed, -50)
+
+    else:
+        scheduler.default(hook.idb, 'changing_struc_cmt', structures_84.changing, -50)
+        scheduler.default(hook.idb, 'struc_cmt_changed', structures_84.changed, -50)
+
+    # Next we have to do members and frame members. All of the member events
+    # should work work until we hit 8.4 where the renaming/renamed events don't
+    # work for regular structure members. To list the handled events, we handle
+    # comments (changing/changed) and created/deleting/deleted for both members
+    # and frame members. We also handle naming (renaming/renamed) for only frame
+    # members since they aren't affected by 8.4.
+
+    if idaapi.__version__ >= 7.7:
+        scheduler.default(hook.idb, 'struc_member_created', memberscope.created, -75)
+
+        # modification of member type information
+        scheduler.default(hook.idb, 'changing_ti', membertypeinfo.changing, -75)
+        scheduler.default(hook.idb, 'ti_changed', membertypeinfo.changed, -75)
+
+    # Here are the events for supporting the tag index with frame members.
+    if idaapi.__version__ >= 7.7:
+        scheduler.default(hook.idb, 'struc_member_created', framememberscope.created, -75)
+
+        # applying a comment to a frame member works in both 8.3 and 8.4.
+        scheduler.default(hook.idb, 'changing_struc_cmt', framemembers.changing, -75)
+        scheduler.default(hook.idb, 'struc_cmt_changed', framemembers.changed, -75)
+
+        # deleting a frame member.
+        scheduler.default(hook.idb, 'deleting_struc_member', framememberscope.deleting, +75)
+        scheduler.default(hook.idb, 'struc_member_deleted', framememberscope.deleted, +75)
+
+        # updating the name for a frame member.
+        scheduler.default(hook.idb, 'renaming_struc_member', framemembernaming.renaming, -50)
+        scheduler.default(hook.idb, 'struc_member_renamed', framemembernaming.renamed, -50)
+
+        # modification of frame member types
+        scheduler.default(hook.idb, 'changing_struc_member', framememberchange.changing, -75)
+        scheduler.default(hook.idb, 'struc_member_changed', framememberchange.changed, -75)
+
+        # modification of member type information
+        scheduler.default(hook.idb, 'changing_ti', framemembertypeinfo.changing, -50)
+        scheduler.default(hook.idb, 'ti_changed', framemembertypeinfo.changed, -50)
+
+    # Similar to structures, v8.4 of the disassembler changes the way that
+    # comments can be applied to a member. So, we support the variation where
+    # repeatable and non-repeatable comments can be applied to a member at the
+    # same time, or the variation where only one can exist at a given time.
+    if idaapi.__version__ < 8.4:
+        scheduler.default(hook.idb, 'changing_struc_cmt', members.changing, -75)
+        scheduler.default(hook.idb, 'struc_cmt_changed', members.changed, -75)
+
+        # deletion of members.
+        scheduler.default(hook.idb, 'deleting_struc_member', memberscope.deleting, +75)
+        scheduler.default(hook.idb, 'struc_member_deleted', memberscope.deleted, +75)
+
+    else:
+        scheduler.default(hook.idb, 'changing_struc_cmt', members_84.changing, -75)
+        scheduler.default(hook.idb, 'struc_cmt_changed', members_84.changed, -75)
+
+        # deletion of members.
+        scheduler.default(hook.idb, 'deleting_struc_member', memberscope_84.deleting, +75)
+        scheduler.default(hook.idb, 'struc_member_deleted', memberscope_84.deleted, +75)
+
+    # If we're earlier than 8.4, then the structure renaming/renamed events
+    # actually work and we can add them. However, if we're using 8.4 then we
+    # have to do some trickery with a different event (local_types_changed) to
+    # monitor the renaming of a structure member in v8.4.
+    if 7.7 <= idaapi.__version__ < 8.4:
+        scheduler.default(hook.idb, 'renaming_struc_member', membernaming.renaming, -50)
+        scheduler.default(hook.idb, 'struc_member_renamed', membernaming.renamed, -50)
+
+        scheduler.default(hook.idb, 'changing_struc_member', memberchange.changing, -75)
+        scheduler.default(hook.idb, 'struc_member_changed', memberchange.changed, -75)
+
+    # FIXME: This hasn't been implemented yet because the implementation will
+    #        likely overlap with 9.0 due to the deprecation of the structure api
+    #        in favor of the local types library.
+    else:
+        logging.warning(u"{:s} : Tags involving the renaming of structure members is currently unimplemented in v{:.1f}.".format(__name__, idaapi.__version__))
+        logging.warning(u"{:s} : Tags involving the application of types to structure members is currently unimplemented in v{:.1f}.".format(__name__, idaapi.__version__))
 
     # add any hooks that are tied to the existence of any plugins.
     if hasattr(hook, 'hx'):
