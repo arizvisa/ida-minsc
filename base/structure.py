@@ -50,7 +50,7 @@ The different types that one can filter structures with are the following:
     `gt` - Match structures that are larger (exclusive) than the specified size
     `less` or `le` - Match structures that are smaller (inclusive) than the specified size
     `lt` - Match structures that are smaller (exclusive) than the specified size
-    `visible` - Match structures that are not hidden or folded within the structure list
+    `visible` - Match structures that are not hidden (listed) within the structure list
     `folded` - Match structures that have been folded within the structure list
     `union` - Match structures that are defined as a union
     `library` - Match structures that originate from a type library
@@ -95,7 +95,7 @@ __matcher__.boolean('ge', operator.le, operator.attrgetter('ptr'), idaapi.get_st
 __matcher__.boolean('gt', operator.lt, operator.attrgetter('ptr'), idaapi.get_struc_size), __matcher__.alias('greater', 'gt')
 __matcher__.boolean('le', operator.ge, operator.attrgetter('ptr'), idaapi.get_struc_size)
 __matcher__.boolean('lt', operator.gt, operator.attrgetter('ptr'), idaapi.get_struc_size), __matcher__.alias('less', 'lt')
-__matcher__.mapping('visible', operator.not_, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_NOLIST', 0x8) | getattr(idaapi, 'SF_HIDDEN', 0x20)))
+__matcher__.mapping('visible', operator.not_, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_NOLIST', 0x8)))
 __matcher__.mapping('folded', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_HIDDEN', 0x20)))
 __matcher__.mapping('union', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_UNION', 0x2)))
 __matcher__.mapping('library', operator.truth, operator.attrgetter('ptr'), operator.attrgetter('props'), functools.partial(operator.and_, getattr(idaapi, 'SF_GHOST', 0x1000) | getattr(idaapi, 'SF_TYPLIB', 0x10)))
