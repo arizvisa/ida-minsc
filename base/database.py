@@ -5532,31 +5532,6 @@ class types(object):
     __matcher__.boolean('less', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('le', operator.ge, operator.itemgetter(2), operator.methodcaller('get_size'))
     __matcher__.boolean('lt', operator.gt, operator.itemgetter(2), operator.methodcaller('get_size'))
 
-    @utils.multicase()
-    @classmethod
-    def __iterate__(cls):
-        '''Iterate through the types within the current type library.'''
-        return cls.__iterate__(interface.tinfo.library())
-    @utils.multicase(library=idaapi.til_t)
-    @classmethod
-    def __iterate__(cls, library):
-        '''Iterate through the types within the specified type `library`.'''
-        for ordinal in builtins.range(1, idaapi.get_ordinal_qty(library)):
-            name, ti = idaapi.get_numbered_type_name(library, ordinal), interface.tinfo.at_ordinal(ordinal, library)
-
-            # if we didn't get any information returned, then this ordinal was probably deleted.
-            if not ti:
-                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at ordinal {:d} of the specified type library due to it having been deleted.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(library), ordinal))
-                continue
-
-            # if the type is empty, then we can just issue a warning and skip it.
-            elif ti.empty():
-                logging.info(u"{:s}.__iterate__({:s}) : Skipping the type at ordinal {:d} of the specified type library due to it being empty.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(library), ordinal))
-                continue
-
-            yield ordinal, utils.string.of(name or ''), ti
-        return
-
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -5582,7 +5557,7 @@ class types(object):
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def iterate(cls, library, **type):
         '''Iterate through the types in a type `library` that match the keywords specified by `type`.'''
-        iterable = cls.__iterate__(library)
+        iterable = ((ordinal, name, ti) for ordinal, name, ti in interface.tinfo.iterate(library) if ti and not ti.empty())
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
         for ordinal, name, tinfo in iterable:
@@ -5658,7 +5633,7 @@ class types(object):
     @utils.string.decorate_arguments('name', 'like', 'type', 'regex', 'iregex')
     def list(cls, library, **type):
         '''List the types within a type `library` that match the keywords specified by `type`.'''
-        iterable = cls.__iterate__(library)
+        iterable = ((ordinal, name, ti) for ordinal, name, ti in interface.tinfo.iterate(library) if ti and not ti.empty())
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
 
@@ -6392,12 +6367,12 @@ class types(object):
     @classmethod
     def count(cls):
         '''Return the number of types within the current type library.'''
-        return cls.count(interface.tinfo.library())
+        return interface.tinfo.quantity()
     @utils.multicase(library=idaapi.til_t)
     @classmethod
     def count(cls, library):
         '''Return the number of types within the specified type `library`.'''
-        return idaapi.get_ordinal_qty(library)
+        return interface.tinfo.quantity(library)
 
     @utils.multicase(string=internal.types.string)
     @classmethod
