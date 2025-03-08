@@ -6322,7 +6322,7 @@ class tinfo(object):
         if idaapi.get_type_ordinal(library, internal.utils.string.to(name or '')) == ordinal:
             return "<{:s}; #{:d} \"{:s}\">".format('.'.join([lclass.__module__, lclass.__name__]), ordinal, name)
 
-        count = idaapi.get_ordinal_qty(library)
+        count = cls.quantity(library)
         if name is None:
             return "<{:s}; #{:s}>".format('.'.join([lclass.__module__, lclass.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???')
         return "<{:s}; #{:s} \"{:s}\">".format('.'.join([lclass.__module__, lclass.__name__]), "{:d}".format(ordinal) if 0 < ordinal < count else '???', name)
@@ -6337,6 +6337,13 @@ class tinfo(object):
         except (RuntimeError, AssertionError):
             library = idaapi.til_t()
         return library
+
+    @classmethod
+    def quantity(cls, *library):
+        '''Return the number of ordinals within the specified type `library`.'''
+        [til] = library if library else [cls.library()]
+        res = idaapi.get_ordinal_qty(til) if idaapi.__version__ < 8.4 else idaapi.get_ordinal_limit(til)
+        return -1 if idaapi.as_signed(res) == -1 else res
 
     @classmethod
     def size(cls, type, *variable):
