@@ -231,12 +231,12 @@ class address(changingchanged):
         for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
-                if f and not rt: internal.tagcache.contents.dec(ea, key)
-                else: internal.tagcache.globals.dec(ea, key)
+                if f and not rt: internal.tags.reference.contents.decrement(ea, key)
+                else: internal.tags.reference.globals.decrement(ea, key)
             if key not in old:
                 logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
-                if f and not rt: internal.tagcache.contents.inc(ea, key)
-                else: internal.tagcache.globals.inc(ea, key)
+                if f and not rt: internal.tags.reference.contents.increment(ea, key)
+                else: internal.tags.reference.globals.increment(ea, key)
             continue
         return
 
@@ -248,8 +248,8 @@ class address(changingchanged):
         logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(contentkeys), ' for runtime-linked function' if rt else ''))
         for key in contentkeys:
             logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
-            if f and not rt: internal.tagcache.contents.inc(ea, key)
-            else: internal.tagcache.globals.inc(ea, key)
+            if f and not rt: internal.tags.reference.contents.increment(ea, key)
+            else: internal.tags.reference.globals.increment(ea, key)
         return
 
     @classmethod
@@ -260,8 +260,8 @@ class address(changingchanged):
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(contentkeys), ' from runtime-linked function' if rt else ''))
         for key in contentkeys:
             logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
-            if f and not rt: internal.tagcache.contents.dec(ea, key)
-            else: internal.tagcache.globals.dec(ea, key)
+            if f and not rt: internal.tags.reference.contents.decrement(ea, key)
+            else: internal.tags.reference.globals.decrement(ea, key)
         return
 
     @classmethod
@@ -399,11 +399,11 @@ class address(changingchanged):
         # if we're in a function but not a runtime-linked one, then we need to
         # to clear the tags for our contents address.
         if fn and not rt:
-            internal.tagcache.contents.erase_address(fn, ea)
+            internal.tags.reference.contents.erase_address(fn, ea)
 
         # otherwise, we can simply clear the tags from the global address.
         else:
-            internal.tagcache.globals.erase(ea)
+            internal.tags.reference.globals.erase_address(ea)
 
         # grab the comment and then re-create its references.
         res = internal.comment.decode(cmt)
@@ -441,10 +441,10 @@ class globals(changingchanged):
         for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
-                internal.tagcache.globals.dec(interface.range.start(fn), key)
+                internal.tags.reference.globals.decrement(interface.range.start(fn), key)
             if key not in old:
                 logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
-                internal.tagcache.globals.inc(interface.range.start(fn), key)
+                internal.tags.reference.globals.increment(interface.range.start(fn), key)
             continue
         return
 
@@ -454,7 +454,7 @@ class globals(changingchanged):
         logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(contentkeys)))
         for key in contentkeys:
             logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
-            internal.tagcache.globals.inc(interface.range.start(fn), key)
+            internal.tags.reference.globals.increment(interface.range.start(fn), key)
         return
 
     @classmethod
@@ -463,7 +463,7 @@ class globals(changingchanged):
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(contentkeys)))
         for key in contentkeys:
             logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
-            internal.tagcache.globals.dec(interface.range.start(fn), key)
+            internal.tags.reference.globals.decrement(interface.range.start(fn), key)
         return
 
     @classmethod
@@ -621,7 +621,7 @@ class globals(changingchanged):
             return
 
         # we're using an old version of ida here, so start out empty
-        internal.tagcache.globals.erase(ea)
+        internal.tags.reference.globals.erase_address(ea)
 
         # grab our comment here and re-create its refs
         res = internal.comment.decode(utils.string.of(cmt))
@@ -650,7 +650,7 @@ class typeinfo(changingchanged):
     def updater(cls):
         # All typeinfo are global tags unless they're being applied to an
         # operand...which is never handled by this class.
-        ctx = internal.tagcache.globals
+        ctx = internal.tags.reference.globals
 
         # Receive the changing_ti event...
         ea, original, expected = (yield)
@@ -658,7 +658,7 @@ class typeinfo(changingchanged):
         # First check if we need to remove the typeinfo that's stored at the
         # given address. Afterwards we can unpack our original values.
         if any(original):
-            ctx.dec(ea, '__typeinfo__')
+            ctx.decrement(ea, '__typeinfo__')
         old_type, old_fname = original
 
         # Wait until we get the ti_changed event...
@@ -690,7 +690,7 @@ class typeinfo(changingchanged):
         # already decremented the tag from the previous address, we really
         # only need to determine if we need to add its reference back.
         if any(tidata):
-            ctx.inc(new_ea, '__typeinfo__')
+            ctx.increment(new_ea, '__typeinfo__')
             logging.debug(u"{:s}.updater() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
 
         # For the sake of debugging, log that we just removed the typeinfo
@@ -900,7 +900,7 @@ def __process_functions(percentage=0.10):
     It's intended to be called once the database is ready to be tampered with.
     """
     implicit = {'__typeinfo__', '__name__'}
-    P, globals = ui.Progress(), {ea : count for ea, count in internal.tagcache.globals.iterate()}
+    P, globals = ui.Progress(), {ea : count for ea, count in internal.tags.reference.globals.iterate()}
 
     # Now we need to gather all of our imports so that we can clean up any functions
     # that are runtime-linked addresses. This is because IDA seems to create a
@@ -951,12 +951,13 @@ def __process_functions(percentage=0.10):
         # If the current function is not in our globals, but it has a name tag, then
         # we need to include it. IDA seems to name some addresses before promoting
         # them to a function.
-        if fn not in globals and internal.tags.function.get(fn):
-            [ internal.tagcache.globals.inc(fn, k) for k in implicit if k in internal.tags.function.get(fn) ]
+        available = {} if fn in globals else internal.tags.function.get(fn)
+        if fn not in globals and available:
+            [ internal.tags.reference.globals.increment(fn, k) for k in implicit if k in available ]
 
         # Grab the currently existing cache for the current function, and use
         # it to tally up all of the reference counts for the tags.
-        contents = {item for item in internal.tagcache.contents.address(fn, target=fn)}
+        contents = {item for item in internal.tags.reference.contents.address(fn, target=fn)}
         for ci, (l, r) in enumerate(chunks):
             P.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
 
@@ -967,9 +968,10 @@ def __process_functions(percentage=0.10):
             # we only grab the contents address.
             for ea in interface.address.items(ui.navigation.analyze(l), r):
                 available = {k for k in internal.tags.address.get(ea)}
+                used_globally = internal.tags.reference.globals.get(ea)
                 for k in available - implicit:
-                    if ea in globals: internal.tagcache.globals.dec(ea, k)
-                    if ea not in contents: internal.tagcache.contents.inc(ea, k, target=fn)
+                    if ea in globals and k in used_globally: internal.tags.reference.globals.decrement(ea, k)
+                    if ea not in contents: internal.tags.reference.contents.increment(ea, k, target=fn)
                     total += 1
                 continue
             continue
@@ -1004,7 +1006,7 @@ def relocate(info):
     relocated the netnodes or not.
     """
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
-    functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.tagcache.globals.iterate()])
+    functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.tags.reference.globals.iterate()])
 
     # First we need to sanity check what we've been asked to do and then we
     # disable the auto-analysis so that IDA doesn't change anything as we're
@@ -1079,7 +1081,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
     as per "Move Segment(s)". Otherwise they're still at their original address
     which happens when the database has been relocated via "Rebase Program".
     """
-    failure, total, index = [], [item for item in iterable], {ea : keys for ea, keys in internal.tagcache.contents.iterate() if old <= ea < old + size}
+    failure, total, index = [], [item for item in iterable], {ea : keys for ea, keys in internal.tags.reference.contents.iterate() if old <= ea < old + size}
 
     for i, fn in enumerate(total):
         offset = fn - new
@@ -1103,7 +1105,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
             continue
 
         # Erase the old contents tags since we've already loaded its state.
-        internal.tagcache.contents.erase(source)
+        internal.tags.reference.contents.erase(source)
         logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cleared contents of function {:#x} at old address {:#x}.".format(__name__, old, new, size, iterable, fn, offset + old))
 
         # If there wasn't a value in our contents index, then warn the user
@@ -1142,7 +1144,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
         offset = ea - new
         source, target = offset + old, offset + new
         logging.info(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Removing contents of runtime-linked function ({:#x}) from index at {:#x}.".format(__name__, old, new, size, iterable, target, source))
-        internal.tagcache.contents.erase(source)
+        internal.tags.reference.contents.erase(source)
         index.pop(source)
 
     # Last thing to do is to clean up the stray contents from the index that weren't
@@ -1167,7 +1169,7 @@ def __relocate_function(old, new, size, iterable, moved=False):
 
         # Now we know why this address is within our index, so all that
         # we really need to do is to remove it.
-        internal.tagcache.contents.erase(ea)
+        internal.tags.reference.contents.erase(ea)
         logging.debug(u"{:s}.relocate_function({:#x}, {:#x}, {:+#x}, {!r}) : Cleared stray contents for {:#x} at old address {:#x}.".format(__name__, old, new, size, iterable, offset + new, offset + old))
     return
 
@@ -1180,11 +1182,11 @@ def __relocate_globals(old, new, size, iterable):
         # Remove the old address from the netnode cache (altval) with our global.
         Fget_tags = internal.tags.function.get if idaapi.get_func(new + offset) else internal.tags.address.get
         tags = {tag for tag in Fget_tags(new + offset)}
-        if not internal.tagcache.globals.destroy(ea):
+        if not internal.tags.reference.globals.erase_address(ea):
             logging.fatal(u"{:s}.relocate_globals({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to remove reference count ({!r}) for global {:#x}.".format(__name__, old, new, size, iterable, count, ea))
 
         # Now we can re-add the new address to the netnode cache (altval).
-        incremented = [internal.tagcache.globals.inc(new + offset, tag) for tag in tags]
+        incremented = [internal.tags.reference.globals.increment(new + offset, tag) for tag in tags]
         if len(incremented) != len(tags):
             logging.fatal(u"{:s}.relocate_globals({:#x}, {:#x}, {:+#x}, {!r}) : Failure trying to store reference count ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, new + offset))
             failure.append((ea, new + offset, count))
@@ -1217,7 +1219,7 @@ def segm_moved(source, destination, size, changed_netmap):
     # Pre-calculate our search boundaries, collect all of the functions and globals,
     # and then total the number of items that we expect to process.
     functions = sorted(ea for ea in database.functions() if destination <= ea < destination + size)
-    globals = sorted((ea, count) for ea, count in internal.tagcache.globals.iterate() if source <= ea < source + size)
+    globals = sorted((ea, count) for ea, count in internal.tags.reference.globals.iterate() if source <= ea < source + size)
     logging.info(u"{:s}.segm_moved({:#x}, {:#x}, {:+#x}) : Relocating tagcache for segment {:s}.".format(__name__, source, destination, size, get_segment_name(seg)))
     count = sum(map(len, [functions, globals]))
 
@@ -1284,16 +1286,16 @@ class naming(changingchanged):
         if fn is None or idaapi.segtype(ea) in {idaapi.SEG_XTRN}:
             if local_name and fn is None:
                 logging.warning(u"{:s}.updater() : Received rename for address {:#x} where \"{:s}\" is set ({!s}) but the address is not within a function.".format('.'.join([__name__, cls.__name__]), ea, 'local_name', local_name))
-            context, target = internal.tagcache.globals, None
+            context, target = internal.tags.reference.globals, None
 
         # If we're renaming the beginning of a function, then we're also
         # in the global context unless it's considered a "local_name".
         elif interface.range.start(fn) == ea and not local_name:
-            context, target = internal.tagcache.globals, None
+            context, target = internal.tags.reference.globals, None
 
         # Otherwise, we're inside a function and we should be good.
         else:
-            context, target = internal.tagcache.contents, interface.range.start(fn)
+            context, target = internal.tags.reference.contents, interface.range.start(fn)
 
         # Next thing to do is to verify whether we're adding a new name,
         # removing one, or adding one. If the names are the same, then skip.
@@ -1302,12 +1304,12 @@ class naming(changingchanged):
 
         # If our new_name is cleared, then we're removing it.
         elif not expected:
-            context.dec(new_ea, '__name__') if target is None else context.dec(new_ea, '__name__', target=target)
+            context.decrement(new_ea, '__name__') if target is None else context.decrement(new_ea, '__name__', target=target)
             logging.info(u"{:s}.updater() : Decremented {:s} reference for rename at {:#x} due to removal of {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original))
 
         # If our previous name nonexistent, or is a label (and not custom) then we add the reference.
         elif not original or (labelQ and not customQ):
-            context.inc(new_ea, '__name__') if target is None else context.inc(new_ea, '__name__', target=target)
+            context.increment(new_ea, '__name__') if target is None else context.increment(new_ea, '__name__', target=target)
             logging.info(u"{:s}.updater() : Incremented {:s} reference for rename at {:#x} from original {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), 'global' if target is None else 'content', ea, original, expected))
 
         # If it was both a label and it was custom, then log a warning because we have no idea.
@@ -1363,19 +1365,19 @@ class naming(changingchanged):
         fn = idaapi.get_func(ea)
 
         # figure out whether a global or function name is being changed, otherwise it's the function's contents
-        ctx = internal.tagcache.globals if not fn or (interface.range.start(fn) == ea) else internal.tagcache.contents
+        ctx = internal.tags.reference.globals if not fn or (interface.range.start(fn) == ea) else internal.tags.reference.contents
 
         # if a name is being removed
         if not new_name:
             # if it's a custom name
             if (not labelQ and customQ):
-                ctx.dec(ea, '__name__')
+                ctx.decrement(ea, '__name__')
                 logging.debug(u"{:s}.rename({:#x}, {!r}) : Decreasing reference count for tag {!r} at address due to an empty name.".format('.'.join([__name__, cls.__name__]), ea, new_name, '__name__'))
             return
 
         # if it's currently a label or is unnamed
         if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
-            ctx.inc(ea, '__name__')
+            ctx.increment(ea, '__name__')
             logging.debug(u"{:s}.rename({:#x}, {!r}) : Increasing reference count for tag {!r} at address due to a new name.".format('.'.join([__name__, cls.__name__]), ea, new_name, '__name__'))
         return
 
@@ -1429,7 +1431,7 @@ class extra_cmt(changingchanged):
 
         # Determine whether we'll be updating the contents or a global.
         logging.debug(u"{:s}.changed({:#x}, {:d}, {!r}) : Processing event at address {:#x} for index {:d}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, utils.string.repr(cmt), ea, line_idx))
-        ctx = internal.tagcache.contents if idaapi.get_func(ea) else internal.tagcache.globals
+        ctx = internal.tags.reference.contents if idaapi.get_func(ea) else internal.tags.reference.globals
 
         # Figure out what the line_idx boundaries are so that we can use it to check
         # whether there's an "extra" comment at the given address, or not.
@@ -1447,13 +1449,13 @@ class extra_cmt(changingchanged):
 
         # Now we need to figure out whether we've added an extra_cmt, or removed it.
         if cmt is None:
-            return ctx.dec(ea, tag)
+            return ctx.decrement(ea, tag)
 
         # XXX: If an "extra" comment is updated more than once, then we unfortunately
         #      lose track of the reference and it's permanently cached. There's nothing
         #      we can really do here except for keep a complete state of all of the
         #      extra comments that the user has created.
-        return ctx.inc(ea, tag)
+        return ctx.increment(ea, tag)
 
     @classmethod
     def changed_multiple(cls, ea, line_idx, cmt):
@@ -1487,7 +1489,7 @@ class extra_cmt(changingchanged):
         oldcmt = internal.netnode.sup.get(ea, line_idx, type=memoryview)
         if oldcmt is not None: oldcmt = oldcmt.tobytes().rstrip(b'\0')
         logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}) : Processing event at address {:#x} for line {:d} with previous comment set to {!r}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, ea, line_idx, oldcmt))
-        ctx = internal.tagcache.contents if idaapi.get_func(ea) else internal.tagcache.globals
+        ctx = internal.tags.reference.contents if idaapi.get_func(ea) else internal.tags.reference.globals
 
         MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV - idaapi.E_NEXT
         prefix = (idaapi.E_PREV, idaapi.E_PREV + MAX_ITEM_LINES, '__extra_prefix__')
@@ -1495,8 +1497,8 @@ class extra_cmt(changingchanged):
 
         for l, r, key in [prefix, suffix]:
             if l <= line_idx < r:
-                if oldcmt is None and cmt is not None: ctx.inc(ea, key)
-                elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
+                if oldcmt is None and cmt is not None: ctx.increment(ea, key)
+                elif oldcmt is not None and cmt is None: ctx.decrement(ea, key)
                 logging.debug(u"{:s}.changed_multiple({:#x}, {:d}, {!r}, oldcmt={!r}) : {:s} reference count at address for tag {!r}.".format('.'.join([__name__, cls.__name__]), ea, line_idx, cmt, oldcmt, 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', key))
             continue
         return
@@ -1514,7 +1516,7 @@ def item_color_changed(ea, color):
 
     # Now we need to distinguish between a content or global tag so
     # that we can look it up to see if we need to remove it or add it.
-    ctx = internal.tagcache.contents if idaapi.get_func(ea) else internal.tagcache.globals
+    ctx = internal.tags.reference.contents if idaapi.get_func(ea) else internal.tags.reference.globals
 
     # FIXME: we need to figure out if the color is being changed, updated or
     #        removed. unfortunately, the event we receive only happens after the
@@ -1526,11 +1528,11 @@ def item_color_changed(ea, color):
 
     # If the color was restored, then we need to decrease its ref.
     if color in {DEFCOLOR}:
-        ctx.dec(ea, '__color__')
+        ctx.decrement(ea, '__color__')
 
     # The color is being applied, so we can just increase its reference.
     else:
-        ctx.inc(ea, '__color__')
+        ctx.increment(ea, '__color__')
     return
 
 ### function scope
@@ -1560,7 +1562,7 @@ def func_tail_appended(pfn, tail):
         # the tags for the function in pfn.
         for ea in interface.address.items(*bounds):
             for k in internal.tags.address.get(ea):
-                internal.tagcache.contents.inc(ea, k, target=interface.range.start(pfn))
+                internal.tags.reference.contents.increment(ea, k, target=interface.range.start(pfn))
                 logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Adding reference for tag ({:s}) at {:#x} to cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
             continue
         return
@@ -1575,8 +1577,8 @@ def func_tail_appended(pfn, tail):
     # any references by exchanging them with the cache for pfn.
     for ea in interface.address.items(*bounds):
         for k in internal.tags.address.get(ea):
-            internal.tagcache.globals.dec(ea, k)
-            internal.tagcache.contents.inc(ea, k, target=interface.range.start(pfn))
+            internal.tags.reference.globals.decrement(ea, k)
+            internal.tags.reference.contents.increment(ea, k, target=interface.range.start(pfn))
             logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Exchanging (decreasing) reference count for global tag ({:s}) at {:#x} and (increasing) reference count for contents tag in the cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
         continue
     return
@@ -1600,7 +1602,7 @@ def removing_func_tail(pfn, tail):
     # the database and we need to manually delete the tail's contents. Since we
     # can't trust anything, we use the entire contents index filtered by bounds.
     except exceptions.OutOfBoundsError:
-        iterable = (ea for ea, _ in internal.tagcache.contents.iterate() if bounds.contains(ea))
+        iterable = (ea for ea, _ in internal.tags.reference.contents.iterate() if bounds.contains(ea))
 
         results = remove_contents(pfn, iterable)
         for tag, items in results.items():
@@ -1618,7 +1620,7 @@ def removing_func_tail(pfn, tail):
         # there is a removal from the cache for pfn.
         for ea in iterable:
             for k in internal.tags.address.get(ea):
-                internal.tagcache.contents.dec(ea, k, target=interface.range.start(pfn))
+                internal.tags.reference.contents.decrement(ea, k, target=interface.range.start(pfn))
                 logging.debug(u"{:s}.removing_func_tail({:#x}, {!s}) : Decreasing reference for tag ({:s}) at {:#x} in cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
             continue
         return
@@ -1631,8 +1633,8 @@ def removing_func_tail(pfn, tail):
     # be promoting the relevant addresses in the cache from contents to globals.
     for ea in iterable:
         for k in internal.tags.address.get(ea):
-            internal.tagcache.contents.dec(ea, k, target=interface.range.start(pfn))
-            internal.tagcache.globals.inc(ea, k)
+            internal.tags.reference.contents.decrement(ea, k, target=interface.range.start(pfn))
+            internal.tags.reference.globals.increment(ea, k)
             logging.debug(u"{:s}.removing_func_tail({:#x}, {!s}) : Exchanging (increasing) reference count for global tag ({:s}) at {:#x} and (decreasing) reference count for contents tag in the cache for function {:#x}.".format(__name__, interface.range.start(pfn), bounds, utils.string.repr(k), ea, interface.range.start(pfn)))
         continue
     return
@@ -1646,7 +1648,7 @@ def func_tail_removed(pfn, ea):
     start, stop = interface.range.unpack(pfn)
 
     # first we'll grab the addresses from our refs
-    listable = internal.tagcache.contents.address(ea, target=start)
+    listable = internal.tags.reference.contents.address(ea, target=start)
 
     # these should already be sorted, so our first step is to filter out what
     # doesn't belong. in order to work around one of the issues posed in the
@@ -1666,8 +1668,8 @@ def func_tail_removed(pfn, ea):
     # our event.
     for ea in interface.address.items(min(missing), max(missing)):
         for k in internal.tags.address.get(ea):
-            internal.tagcache.contents.dec(ea, k, target=start)
-            internal.tagcache.globals.inc(ea, k)
+            internal.tags.reference.contents.decrement(ea, k, target=start)
+            internal.tags.reference.globals.increment(ea, k)
             logging.debug(u"{:s}.func_tail_removed({:#x}..{:#x}, {:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, tail, ea, utils.string.repr(k), utils.string.repr(k)))
         continue
     return
@@ -1685,8 +1687,8 @@ def tail_owner_changed(tail, owner_func):
     # to owner_func
     for ea in interface.address.items(interface.range.bounds(tail)):
         for k in internal.tags.address.get(ea):
-            internal.tagcache.contents.dec(ea, k)
-            internal.tagcache.contents.inc(ea, k, target=owner_func)
+            internal.tags.reference.contents.decrement(ea, k)
+            internal.tags.reference.contents.increment(ea, k, target=owner_func)
             logging.debug(u"{:s}.tail_owner_changed({:#x}, {:#x}) : Exchanging (increasing) reference count for contents tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(tail), owner_func, utils.string.repr(k), utils.string.repr(k)))
         continue
     return
@@ -1713,7 +1715,7 @@ def add_func(pfn):
     # in order to deal with the events that we didn't receive.
     excluded = {'__typeinfo__', '__name__'}
     available = {k for k in internal.tags.function.get(start)}
-    [ internal.tagcache.globals.inc(start, k) for k in available - excluded ]
+    [ internal.tags.reference.globals.increment(start, k) for k in available - excluded ]
 
     # convert all globals into contents whilst making sure that we don't
     # add any of the implicit tags that are handled by other events.
@@ -1721,8 +1723,8 @@ def add_func(pfn):
         for ea in interface.address.items(l, r):
             available = {item for item in internal.tags.address.get(ea)}
             for k in available - excluded:
-                internal.tagcache.globals.dec(ea, k)
-                internal.tagcache.contents.inc(ea, k, target=start)
+                internal.tags.reference.globals.decrement(ea, k)
+                internal.tags.reference.contents.increment(ea, k, target=start)
                 logging.debug(u"{:s}.add_func({:#x}..{:#x}) : Exchanging (decreasing) reference count at {:#x} for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, start, stop, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         continue
@@ -1741,8 +1743,8 @@ def remove_contents(fn, iterable):
         logging.debug(u"{:s}.remove_contents({:#x}) : Removing both repeatable references ({:d}) and non-repeatable references ({:d}) from {:s} ({:#x}).".format(__name__, func, len(repeatable), len(nonrepeatable), 'contents', ea))
 
         # After decoding it, we can now decrease their refcount and remove them.
-        [ internal.tagcache.contents.dec(ea, k, target=func) for k in repeatable ]
-        [ internal.tagcache.contents.dec(ea, k, target=func) for k in nonrepeatable ]
+        [ internal.tags.reference.contents.decrement(ea, k, target=func) for k in repeatable ]
+        [ internal.tags.reference.contents.decrement(ea, k, target=func) for k in nonrepeatable ]
 
         # Update our results with the keys at whatever address we just removed.
         [ results.setdefault(k, []).append(ea) for k in itertools.chain(repeatable, nonrepeatable) ]
@@ -1750,15 +1752,15 @@ def remove_contents(fn, iterable):
         # Now we need to do a couple of the implicit tags which means we need to
         # check the name, type information, and color.
         if idaapi.get_item_color(ea) == DEFCOLOR:
-            internal.tagcache.contents.dec(ea, '__color__', target=func)
+            internal.tags.reference.contents.decrement(ea, '__color__', target=func)
         if internal.comment.extra.get_prefix(ea) is not None:
-            internal.tagcache.contents.dec(ea, '__extra_prefix__', target=func)
+            internal.tags.reference.contents.decrement(ea, '__extra_prefix__', target=func)
         if internal.comment.extra.get_suffix(ea) is not None:
-            internal.tagcache.contents.dec(ea, '__extra_suffix__', target=func)
+            internal.tags.reference.contents.decrement(ea, '__extra_suffix__', target=func)
 
         get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
         if get_flags(ea) & idaapi.FF_NAME:
-            internal.tagcache.contents.dec(ea, '__name__', target=func)
+            internal.tags.reference.contents.decrement(ea, '__name__', target=func)
         continue
     return results
 
@@ -1792,7 +1794,7 @@ def del_func(pfn):
         # we know which function it's in and we know its boundaries. So at the
         # very least we can manually remove its contents from our storage.
         fn, _ = bounds
-        iterable = (ea for ea in internal.tagcache.contents.address(fn, target=fn) if bounds.contains(ea))
+        iterable = (ea for ea in internal.tags.reference.contents.address(fn, target=fn) if bounds.contains(ea))
 
         results = remove_contents(pfn, iterable)
         for tag, items in results.items():
@@ -1805,28 +1807,28 @@ def del_func(pfn):
         logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Removing both repeatable references ({:d}) and non-repeatable references ({:d}) from {:s} ({:#x}).".format(__name__, start, stop, len(repeatable), len(nonrepeatable), 'globals', fn))
 
         # After decoding them, we can try to decrease our reference count.
-        [ internal.tagcache.globals.dec(fn, k) for k in repeatable ]
-        [ internal.tagcache.globals.dec(fn, k) for k in nonrepeatable ]
+        [ internal.tags.reference.globals.decrement(fn, k) for k in repeatable ]
+        [ internal.tags.reference.globals.decrement(fn, k) for k in nonrepeatable ]
 
         # We also need to handle any implicit tags as well to be properly done.
         DEFCOLOR = 0xffffffff
         if pfn.color == DEFCOLOR:
-            internal.tagcache.globals.dec(fn, '__color__')
+            internal.tags.reference.globals.decrement(fn, '__color__')
 
         get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
         if get_flags(fn) & idaapi.FF_NAME:
-            internal.tagcache.globals.dec(fn, '__name__')
+            internal.tags.reference.globals.decrement(fn, '__name__')
 
         get_tinfo = (lambda ti, ea: idaapi.get_tinfo2(ea, ti)) if idaapi.__version__ < 7.0 else idaapi.get_tinfo
         if get_tinfo(idaapi.tinfo_t(), fn):
-            internal.tagcache.globals.dec(fn, '__typeinfo__')
+            internal.tags.reference.globals.decrement(fn, '__typeinfo__')
         return
 
     # convert all contents into globals
-    for ea in internal.tagcache.contents.address(fn, target=fn):
+    for ea in internal.tags.reference.contents.address(fn, target=fn):
         for k in internal.tags.address.get(ea):
-            internal.tagcache.contents.dec(ea, k, target=fn)
-            internal.tagcache.globals.inc(ea, k)
+            internal.tags.reference.contents.decrement(ea, k, target=fn)
+            internal.tags.reference.globals.increment(ea, k)
             logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, ea, utils.string.repr(k), utils.string.repr(k)))
         continue
 
@@ -1834,7 +1836,7 @@ def del_func(pfn):
     # is part of a function, runtime-linked, or neither.
     Ftags = internal.tags.address.get if rt else internal.tags.function.get
     for k in Ftags(fn):
-        internal.tagcache.globals.dec(fn, k)
+        internal.tags.reference.globals.decrement(fn, k)
         logging.debug(u"{:s}.del_func({:#x}..{:#x}) : Removing (global) tag {!s} from function at {:#x}.".format(__name__, start, stop, utils.string.repr(k), fn))
 
     return
@@ -1853,8 +1855,8 @@ def set_func_start(pfn, new_start):
     if start > new_start:
         for ea in interface.address.items(new_start, start):
             for k in internal.tags.address.get(ea):
-                internal.tagcache.contents.dec(ea, k, target=start)
-                internal.tagcache.globals.inc(ea, k)
+                internal.tags.reference.contents.decrement(ea, k, target=start)
+                internal.tags.reference.globals.increment(ea, k)
                 logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_start, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
@@ -1864,8 +1866,8 @@ def set_func_start(pfn, new_start):
     elif start < new_start:
         for ea in interface.address.items(start, new_start):
             for k in internal.tags.address.get(ea):
-                internal.tagcache.globals.dec(ea, k)
-                internal.tagcache.contents.inc(ea, k, target=start)
+                internal.tags.reference.globals.decrement(ea, k)
+                internal.tags.reference.contents.increment(ea, k, target=start)
                 logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Exchanging (decreasing) reference count at {:#x} for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_start, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
@@ -1885,8 +1887,8 @@ def set_func_end(pfn, new_end):
     if new_end > stop:
         for ea in interface.address.items(stop, new_end):
             for k in internal.tags.address.get(ea):
-                internal.tagcache.globals.dec(ea, k)
-                internal.tagcache.contents.inc(ea, k, target=start)
+                internal.tags.reference.globals.decrement(ea, k)
+                internal.tags.reference.contents.increment(ea, k, target=start)
                 logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Exchanging (decreasing) reference count at {:#x} for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_end, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
@@ -1896,8 +1898,8 @@ def set_func_end(pfn, new_end):
     elif new_end < stop:
         for ea in interface.address.items(new_end, stop):
             for k in internal.tags.address.get(ea):
-                internal.tagcache.contents.dec(ea, k, target=start)
-                internal.tagcache.globals.inc(ea, k)
+                internal.tags.reference.contents.decrement(ea, k, target=start)
+                internal.tags.reference.globals.increment(ea, k)
                 logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, start, stop, new_end, ea, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
