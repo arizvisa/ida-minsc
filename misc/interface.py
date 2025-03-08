@@ -6346,6 +6346,15 @@ class tinfo(object):
         return -1 if idaapi.as_signed(res) == -1 else res
 
     @classmethod
+    def iterate(cls, *library):
+        '''Iterate through the types within the specified type `library`.'''
+        [til] = library if library else [cls.library()]
+        for ordinal in builtins.range(1, cls.quantity(til)):
+            name, ti = idaapi.get_numbered_type_name(til, ordinal), cls.at_ordinal(ordinal, til)
+            yield ordinal, internal.utils.string.of(name or ''), ti
+        return
+
+    @classmethod
     def size(cls, type, *variable):
         '''Return the size of the specified `type` as an integer or a pythonic atom if `variable` is true.'''
         realtype, size, [use_atom] = type.get_realtype(), type.get_size(), variable if variable else [False]
