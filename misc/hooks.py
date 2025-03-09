@@ -4234,9 +4234,20 @@ class localtypesmonitor_84(object):
         else:
             newordinal, newname = ordinal, name
 
-        # Now we can update our data cache, and log the addition.
-        newsid, newname, newmembers = cls.state.added(newordinal)
-        logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
+        # We need to create a callback to execute in the ui thread since this
+        # hook gets dispatched before the local type actually gets created. This
+        # callback just updates our state cache and logs the type addition.
+        def ui_async_callback(ordinal):
+            newsid, newname, newmembers = cls.state.added(newordinal)
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
+
+        # Since our "local_types_changed" event gets dispatched before the
+        # structure can have an identifier, we need to execute this passively as
+        # a UI request so that we are able to grab and cache the identifier.
+        Fget_identifier = functools.partial(ui_async_callback, newordinal)
+        if not idaapi.execute_ui_requests([Fget_identifier]):
+            logging.error(u"{:s}.local_type_added({!s}, {!s}) : Error dispatching a user interface request for the new type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal))
+        return
 
     @classmethod
     def local_type_deleted(cls, ordinal, name):
