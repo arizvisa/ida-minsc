@@ -5836,14 +5836,14 @@ class types(object):
         '''Return whether the current type library has a type for the specified `structure`.'''
         ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
         identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
-        return interface.tinfo.has_identifier(identifier)
+        return interface.tinfo.has_struc_enum(identifier)
     @utils.multicase(structure=(idaapi.struc_t, internal.structure.structure_t, idaapi.member_t, internal.structure.member_t), library=idaapi.til_t)
     @classmethod
     def has(cls, structure, library):
         '''Return whether a type `library` has a type for the specified `structure`.'''
         ptr = structure.ptr if isinstance(structure, (internal.structure.structure_t, internal.structure.member_t)) else structure
         identifier = idaapi.get_sptr(ptr).id if isinstance(ptr, idaapi.member_t) and idaapi.get_sptr(ptr) else ptr.id
-        return interface.tinfo.has_identifier(identifier, library)
+        return interface.tinfo.has_struc_enum(identifier, library)
     @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
     def has(cls, info):
