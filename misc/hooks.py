@@ -3636,10 +3636,35 @@ class localtypesmonitor_84(object):
                 rows.append("[{:d}] {!r} : {:d} member{:s} cached{:s}".format(ordinal, name, count, '' if count == 1 else 's', '' if count == actual else ", expected {:d} member{:s}".format(actual, '' if actual == 1 else 's')))
             return '\n'.join(itertools.chain([header], rows))
 
-        @staticmethod
-        def get_members(ordinal):
+        @classmethod
+        def get_type(cls, ordinal):
+            '''Return the type that is specified by `ordinal` and has member identifiers directly attached to it.'''
+            if isinstance(ordinal, internal.types.integer):
+                tinfo, description = interface.tinfo.for_ordinal(ordinal), "{:d}".format(ordinal)
+            elif isinstance(ordinal, internal.types.string):
+                tinfo, description = interface.tinfo.for_name(ordinal), "{!r}".format("{!s}".format(ordinal))
+            elif isinstance(ordinal, idaapi.tinfo_t):
+                tinfo, description = interface.tinfo.copy(ordinal), "{!r}".format("{!s}".format(ordinal))
+            else:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.get_type({!s}) : Unable to locate a type within the local types library using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), description, ordinal.__class__))
+
+            # If we couldn't get the type, then just raise an exception.
+            if not tinfo:
+                raise internal.exceptions.LocalTypeNotFoundError(u"{:s}.get_type({!s}) : Unable to locate the specified type in the local types library.".format('.'.join([__name__, cls.__name__]), description))
+
+            # If our type is a type reference pointing to a type reference, then
+            # we need to dereference it in order to find the actual local type
+            # that will return the member ids that we are looking for.
+            res = tinfo
+            while tinfo and tinfo.present() and tinfo.is_typeref():
+                res, name, ordinal = tinfo, tinfo.get_type_name(), interface.tinfo.ordinal(tinfo)
+                tinfo = interface.tinfo.at_ordinal(ordinal) if ordinal else interface.tinfo.at_name(name)
+            return res
+
+        @classmethod
+        def get_members(cls, ordinal):
             '''Iterate through all of the members in the structure or union specified by `ordinal`.'''
-            tinfo = interface.tinfo.for_ordinal(ordinal)
+            tinfo = cls.get_type(ordinal)
             iterable = (itertools.chain([index], items) for index, items in enumerate(interface.tinfo.members(tinfo)))
             for mindex, mname, moffset, msize, mtype, malign in map(tuple, iterable):
                 yield mindex, mname, moffset, msize, mtype, malign
@@ -3663,7 +3688,7 @@ class localtypesmonitor_84(object):
                 raise internal.exceptions.InvalidParameterError(u"{:s}.get_member_by_udm({:d}, {:d}, {!s}) : Unable to find a member using an unsupported key type ({:d}) with the given key ({!s}).".format('.'.join([__name__, 'localtypesmonitor_84', cls.__name__]), ordinal, key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value), key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value)))
 
             # Grab the index for the member and verify that it is valid.
-            tinfo = interface.tinfo.for_ordinal(ordinal)
+            tinfo = cls.get_type(ordinal)
             mindex = tinfo.find_udm(udm, key)
             if mindex < 0:
                 raise internal.exceptions.MemberNotFoundError(u"{:s}.get_member_by_udm({:d}, {:d}, {!r}) : Unable to find a member matching the specified key type ({:d}) with the given key ({!s}).".format('.'.join([__name__, 'localtypesmonitor_84', cls.__name__]), ordinal, key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value), key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value)))
@@ -3739,13 +3764,13 @@ class localtypesmonitor_84(object):
 
         def name(self, ordinal):
             '''Return the current name of the type specified by `ordinal`.'''
-            tinfo = interface.tinfo.for_ordinal(ordinal)
+            tinfo = self.get_type(ordinal)
             res = tinfo.get_type_name()
             return utils.string.of(res)
 
         def renamed(self, ordinal):
             '''Synchronize the cached name for the type specified by `ordinal` with the current name from the local types library.'''
-            tinfo = interface.tinfo.for_ordinal(ordinal)
+            tinfo = self.get_type(ordinal)
             res, self.structurecache[ordinal] = self.structurecache[ordinal], utils.string.of(tinfo.get_type_name())
             return res
 
