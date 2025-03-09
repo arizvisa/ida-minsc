@@ -4419,6 +4419,42 @@ class localtypesmonitor_84(object):
         # Finally we can do our tests against the field prefix and its suffix.
         return field in prefixes and suffix.lower() in {expected_base10, expected_base16}
 
+    @classmethod
+    def is_type_tracked(cls, ordinal, tid, name):
+        '''Return true if the type at the specified `ordinal` and `name` should be tracked with tags.'''
+        tinfo = cls.state.get_type(ordinal)
+
+        # The local type library really doesn't have a way of distinguishing
+        # whether a type was created by the user or the disassembler. So, we
+        # verify that the type is not an anonymous struct or union.
+        if tinfo.is_anonymous_udt():
+            return False
+
+        # If the type identifier we were given is invalid, then this is
+        # definitely not a type we should track. However, our type monitor
+        # is supposed to guarantee that the type id is valid. So, checking this
+        # identifier likely doesn't make a difference.
+        elif tid == idaapi.BADADDR:
+            return False
+
+        # For last, we check if the type actually belongs to a type library of
+        # some kind. Really, since we're grabbing it from the local type
+        # library, it will always come from one. This is what we have for now.
+        til = tinfo.get_til()
+        return til is not None
+
+    @classmethod
+    def is_field_tracked(cls, ordinal, mindex, type):
+        '''Return true if the `type` for the member at `mindex` of the specified `ordinal` should be tracked with tags.'''
+        basic = interface.tinfo.basic(type)
+
+        # We only need to check if the type is considered a basic type or a
+        # non-trivial type. This way we can track members with types that have
+        # significantly more details than the others.
+        if type and not basic:
+            return True
+        return False
+
 class supermethods(object):
     """
     Define all of the functions that will be used as supermethods for
