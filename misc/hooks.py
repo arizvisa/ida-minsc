@@ -4457,6 +4457,197 @@ class localtypesmonitor_84(object):
             return True
         return False
 
+    @classmethod
+    def type_updater(cls, ltc, ordinal):
+        '''Check the changes for the type specified in `ordinal` and update any tags resulting from them.'''
+        if not hasattr(cls, 'state'):
+            return logging.error(u"{:s}.type_updater({:d}, {:d}) : Unable to handle an update for type at ordinal {:d} due to the monitor state being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal))
+
+        # First thing to do is to grab the identifier for the type at the given
+        # ordinal. We try the cached version first, and then fall back to to the
+        # most recent identifier.
+        oldsid = cls.state.cachedidentifier(ordinal)
+        newsid = cls.state.identifier(ordinal) if oldsid == idaapi.BADADDR else oldsid
+        if newsid == idaapi.BADADDR:
+            return logging.warning(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} due to it having an invalid identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid))
+
+        # Grab the current state of the tags so we can log something useful.
+        else:
+            original = internal.tags.reference.structure.get(newsid)
+
+        # Then we'll need to snag the old and new names for the type that we'll
+        # be comparing. Then we can do some basic checks to figure out whether
+        # we should update its tags or not.
+        oldname = cls.state.cachedname(ordinal)
+        newname = cls.state.name(ordinal)
+
+        # Next we can compare the names to see how exactly they were changed. If
+        # we switched from a general name to user-specified, then increment it.
+        renamed = not cls.is_name_general(ordinal, oldsid, oldname), not cls.is_name_general(ordinal, newsid, newname)
+        if renamed == (False, True):
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
+            internal.tags.reference.structure.increment(newsid, '__name__')
+
+        # If the name was from user-specified to a general name, then decrement.
+        elif renamed == (True, False):
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
+            internal.tags.reference.structure.decrement(newsid, '__name__')
+
+        # If the name was originally user-specified but the tag doesn't exist,
+        # then our monitor didn't track this change and we need to adjust it.
+        elif renamed[0] and '__name__' not in original:
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
+            internal.tags.reference.structure.increment(newsid, '__name__')
+
+        # If there was no change from general name to a user-specified name,
+        # then we don't have to do anything since the current state is the same.
+        elif oldname != newname:
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
+
+        # The next thing we need to check is if the type being updated is
+        # something that we're supposed to track or not. This is easy since if
+        # it's tracked, we increment the tag. If it's not, we decrement the tag.
+        tracked = cls.is_type_tracked(ordinal, newsid, newname)
+        if tracked and '__typeinfo__' not in original:
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Change for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to track it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
+            internal.tags.reference.structure.increment(newsid, '__typeinfo__')
+
+        elif not tracked and '__typeinfo__' in original:
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Change for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to track it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
+            internal.tags.reference.structure.decrement(newsid, '__typeinfo__')
+
+        else:
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Tracking for type at ordinal {:d} ({:#x}) did not need to be adjusted.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid))
+
+        # Grab the current tags that have been applied to the structure and log
+        # exactly how they were modified during this update.
+        modified = internal.tags.reference.structure.get(newsid)
+        logging.debug(u"{:s}.type_updater({:d}, {:d}) : The tags for the type at ordinal {:d} ({:#x}) were changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, sorted(original), sorted(modified)))
+
+    @classmethod
+    def member_updater(cls, ltc, ordinal, changes):
+        '''Iterate through the specified `changes` for the type in `ordinal` and update the tags for each of its members.'''
+        if not hasattr(cls, 'state'):
+            parameter = "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal)
+            return logging.error(u"{:s}.member_updater({:d}, {:#x}, {!s}) : Unable to handle an update for the members of type {!s} due to the monitor state being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', parameter))
+
+        # First we'll need to get the type identifier for our parameters. We try
+        # the cached version first, and then use the noncached one if it fails.
+        sid = cls.state.cachedidentifier(ordinal)
+        sid = cls.state.identifier(ordinal) if sid == idaapi.BADADDR else sid
+        parameter = "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal)
+
+        if sid == idaapi.BADADDR:
+            return logging.error(u"{:s}.member_updater({:d}, {:#x}, {!s}) : Unable to handle an update for the members of type {!s} due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', parameter, sid))
+
+        # Now we can iterate through the changes that were made to the members of
+        # the ordinal. If we have an old state and a new state, then we be doing
+        # a comparison of the changes to figure out what tags to apply.
+        for count, old, new in changes:
+            if old and new:
+                oldindex, oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+                newindex, newmid, newname, newoffset, newsize, newtype, newalign = new
+
+                # Now we'll assign the member index, and then figure out the
+                # correct identifier that we should be using.
+                mindex, mid = newindex, oldmid if newmid == idaapi.BADADDR else newmid
+                if mid == idaapi.BADADDR:
+                    logging.error(u"{:s}.member_updater({:d}, {!s}, {!s}) : Unable to adjust the tags for the changed member at index {:d} of type {!s} due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, parameter, mid))
+                    continue
+
+                # Grab the tags that are currently applied to the member.
+                else:
+                    original = internal.tags.reference.members.get(mid)
+
+                # Then we'll check the name change first. If we're switching
+                # from a general name to a user-specified one, then increment.
+                renamed = not cls.is_field_general(ordinal, oldindex, oldname), not cls.is_field_general(ordinal, newindex, newname)
+                if renamed == (False, True):
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
+                    internal.tags.reference.members.increment(mid, '__name__')
+
+                # If it's been switched the other way, then decrement the tag.
+                elif renamed == (True, False):
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
+                    internal.tags.reference.members.decrement(mid, '__name__')
+
+                # If the name was originally user-specified, but there's no
+                # count for the tag attached to the member, then fix it.
+                elif renamed[0] and '__name__' not in original:
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
+                    internal.tags.reference.members.increment(mid, '__name__')
+
+                # If the names aren't the same but the generality is, then we
+                # just log that we didn't need to do anything for it.
+                elif oldname != newname:
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the changed member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
+
+                # Last thing we need to do is to figure out whether the type was
+                # changed between a trivial (basic) type to non-trivial one. If
+                # it was switched to one that we track, then increment its tag.
+                tracked = cls.is_field_tracked(ordinal, oldindex, oldtype), cls.is_field_tracked(ordinal, newindex, newtype)
+                if tracked == (False, True):
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    internal.tags.reference.members.increment(mid, '__typeinfo__')
+
+                # If the new type was lowered to a trivial (basic) type, then go
+                # ahead and decrement it.
+                elif tracked == (True, False):
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    internal.tags.reference.members.decrement(mid, '__typeinfo__')
+
+                # If the original type was something for us to track, but it
+                # doesn't include our tag, then we fix it by incrementing.
+                elif tracked[0] and '__typeinfo__' not in original:
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    internal.tags.reference.members.increment(mid, '__typeinfo__')
+
+                # Next we'll figure out whether we should log that no changes to
+                # the reference counts for "__typeinfo__" were needed.
+                elif not interface.tinfo.same(oldtype, newtype):
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+
+                modified = internal.tags.reference.members.get(mid)
+                logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : The tags for the member at index {:d} ({:#x}) of type {!s} ({:#x}) were changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, sorted(original), sorted(modified)))
+
+            # The member was removed, so we can just delete all the tag
+            # information for the specified identifier.
+            elif old:
+                mindex, mid, mname, moffset, msize, mtype, malign = old
+                if mid == idaapi.BADADDR:
+                    logging.error(u"{:s}.member_updater({:d}, {!s}, {!s}) : Unable to adjust the tags for the deleted member at index {:d} of type {!s} ({:#x}) due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, parameter, sid, mid))
+                    continue
+
+                removed = internal.tags.reference.members.erase_member(sid, mid)
+                logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Removed the tags for the member at index {:d} ({:#x}) of type {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid))
+
+            # A member was added, so we need to check if the field uses a
+            # non-general type or a user-specified name to update its tags.
+            elif new:
+                mindex, mid, mname, moffset, msize, mtype, malign = new
+                if mid == idaapi.BADADDR:
+                    logging.error(u"{:s}.member_updater({:d}, {!s}, {!s}) : Unable to adjust the tags for the added member at index {:d} of type {!s} ({:#x}) due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, parameter, sid, mid))
+                    continue
+
+                # First we'll delete anything that exists at the identifier for
+                # the member. This shouldn't do anything since there's really
+                # isn't any reason for a new member to have any tag data
+                # associated with it.
+                removed = internal.tags.reference.members.erase_member(sid, mid)
+
+                # If the field name is not a general one, then increment the
+                # reference count for its "__name__" tag.
+                changed = []
+                if not cls.is_field_general(ordinal, mindex, mname):
+                    internal.tags.reference.members.increment(mid, '__name__'), changed.append('__name__')
+
+                if cls.is_field_tracked(ordinal, mindex, mtype):
+                    internal.tags.reference.members.increment(mid, '__typeinfo__'), changed.append('__typeinfo__')
+
+                logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Added the specified tags ({!s}) to the member at index {:d} ({:#x}) of type {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', ', '.join(map("{!r}".format, changed)), mindex, mid, parameter, sid))
+            continue
+        return
+
 class supermethods(object):
     """
     Define all of the functions that will be used as supermethods for
