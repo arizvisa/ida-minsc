@@ -8,7 +8,7 @@ to be used by the average user.
 """
 
 import six
-import builtins, sys, logging, heapq, traceback
+import builtins, sys, logging, heapq, traceback, contextlib
 import functools, operator, itertools
 logging = logging.getLogger(__name__)
 
@@ -3538,14 +3538,14 @@ class localtypesmonitor_84(object):
     structures api for the next major version, v9.0. This is because of their
     choice to favor the type library instead. Unfortunately that means that all
     of the indexing we do for structure members don't actually work. So, to be
-    able to. To be able to still support structure members, this namespace
-    monitors the changes applied to the local types library and stores updates
-    to it in a class that can be accessed to track the renaming of things in
-    the type library, and the changing of members defined in those types.
+    able to still support structure members, this namespace monitors the changes
+    applied to the local types library and stores updates to it in a class that
+    can be used to track both the renaming of things in the local types library,
+    and any changes made to the members defined in those types.
 
-    The `changed` function in this namespace is the main dispatcher that is
-    responsible for chaining to the correct function to handle the event that
-    dispatched by the disassembler.
+    The `changed` function in this namespace is the primary dispatcher and is
+    responsible for figuring out the correct function to call in order to handle
+    the event that was dispatched by the disassembler.
     """
 
     # Find all of the available local type changes events, and save a map for
@@ -3610,6 +3610,7 @@ class localtypesmonitor_84(object):
             # This is a cache of all the structures and unions in a local types
             # library. It is keyed by the ordinal of the structure/union type.
             self.structurecache = {}
+            self.structureid = {}
 
             # This is a cache of all the members belonging to a structure in the
             # type library. It is keyed by the ordinal number, and stores a
@@ -3631,9 +3632,11 @@ class localtypesmonitor_84(object):
             rows = []
             for ordinal in sorted(self.structurecache):
                 name = self.structurecache[ordinal]
+                sid = self.structureid[ordinal]
                 count = len(self.memberindexcache[ordinal])
                 actual = sum(1 for item in self.get_members(ordinal))
-                rows.append("[{:d}] {!r} : {:d} member{:s} cached{:s}".format(ordinal, name, count, '' if count == 1 else 's', '' if count == actual else ", expected {:d} member{:s}".format(actual, '' if actual == 1 else 's')))
+                iterable = map(operator.itemgetter(0), self.memberindexcache[ordinal].values())
+                rows.append("[{:d}] {!r} ({:#x}) : {:d} member{:s} cached{:s}{!s}".format(ordinal, name, sid, count, '' if count == 1 else 's', '' if count == actual else ", expected {:d} member{:s}".format(actual, '' if actual == 1 else 's'), " : {:s}".format(','.join(map("{:#x}".format, iterable))) if count else ''))
             return '\n'.join(itertools.chain([header], rows))
 
         @classmethod
@@ -3667,7 +3670,8 @@ class localtypesmonitor_84(object):
             tinfo = cls.get_type(ordinal)
             iterable = (itertools.chain([index], items) for index, items in enumerate(interface.tinfo.members(tinfo)))
             for mindex, mname, moffset, msize, mtype, malign in map(tuple, iterable):
-                yield mindex, mname, moffset, msize, mtype, malign
+                mid = tinfo.get_udm_tid(mindex)
+                yield mindex, mid, mname, moffset, msize, mtype, malign
             return
 
         @classmethod
@@ -3694,9 +3698,10 @@ class localtypesmonitor_84(object):
                 raise internal.exceptions.MemberNotFoundError(u"{:s}.get_member_by_udm({:d}, {:d}, {!r}) : Unable to find a member matching the specified key type ({:d}) with the given key ({!s}).".format('.'.join([__name__, 'localtypesmonitor_84', cls.__name__]), ordinal, key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value), key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value)))
 
             mname = utils.string.of(udm.name)
+            mid = tinfo.get_udm_tid(mindex)
             moffset, msize, malign = udm.offset, udm.size, udm.effalign
             mtype = interface.tinfo.concretize(udm.type)
-            return mindex, moffset, msize, mtype, malign
+            return mindex, mid, moffset, msize, mtype, malign
 
         @classmethod
         def get_member_by_bitoffset(cls, ordinal, bitoffset):
@@ -3710,19 +3715,60 @@ class localtypesmonitor_84(object):
         @classmethod
         def get_member_by_offset(cls, ordinal, index_or_offset):
             return cls.get_member_by_udm(ordinal, idaapi.STRMEM_AUTO, index_or_offset)
+        @classmethod
+        def get_member_by_mid(cls, ordinal, mid):
+            res, tinfo = idaapi.udm_t(), cls.get_type(ordinal)
+            mindex = tinfo.get_udm_by_tid(mid)
+            mname = utils.string.of(udm.name)
+            mid = tinfo.get_udm_tid(mindex)
+            moffset, msize, malign = udm.offset, udm.size, udm.effalign
+            mtype = interface.tinfo.concretize(udm.type)
+            return mindex, mid, moffset, msize, mtype, malign
+
+        @classmethod
+        @contextlib.contextmanager
+        def ignore_changes(cls, *events):
+            '''This context manager disables any type changes that might occur inside the managed code by disabling the specified `events`.'''
+            iterable = itertools.chain(['local_types_changed'], events)
+
+            # Import our hook module, accepting that we don't care about the
+            # perform of the handler for the "local_types_changed" event.
+            import hook
+
+            # Start by disabling all of the required events and storing whether
+            # they were successful for not. If they weren't disabled, then we
+            # raise an exception and abort the context manager entirely.
+            required = {event for event in iterable} - hook.idb.disabled
+            disabled = [hook.idb.disable(event) for event in required]
+            try:
+                if not all(disabled):
+                    raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to disable {:d} of {:d} requested event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in disabled if not ok), len(required), '' if len(required) == 1 else 's'))
+                yield
+
+            # Now that we're done, we can go ahead and re-enable all of the
+            # events that we just disabled.
+            finally:
+                enabled = [hook.idb.enable(event) for event in required]
+
+            if not all(enabled):
+                raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to enable {:d} of {:d} disabled event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in enabled if not ok), len(required), '' if len(required) == 1 else 's'))
+            return
 
         def unload(self, *library):
             '''Clear all of the cached information from the current state.'''
             count = len(self.structurecache)
             self.structurecache = {}
+            self.structureid = {}
             self.memberoffsetcache = {}
             self.memberindexcache = {}
             self.loaded = False
             return count
 
-        def load(self, *library):
+        def __load_unguarded(self, *library):
             '''Load information from the specified type `library` into the current state.'''
-            cls, structurecache, memberoffsetcache, memberindexcache = self.__class__, {}, {}, {}
+            cls = self.__class__
+            structurecache, structureid = {}, {}
+            memberoffsetcache, memberindexcache = {}, {}
 
             # Iterate through all the types only looking for structures or
             # unions since they're the only thing that really counts.
@@ -3739,6 +3785,7 @@ class localtypesmonitor_84(object):
                 # previous name will be. We also create a dictionary for the
                 # structure so that we can store information about its members.
                 structurecache[ordinal] = name
+                structureid[ordinal] = interface.tinfo.identifier(tinfo)
                 memberoffsets = memberoffsetcache.setdefault(ordinal, {})
                 memberindices = memberindexcache.setdefault(ordinal, {})
 
@@ -3746,21 +3793,38 @@ class localtypesmonitor_84(object):
                 # the structure/union so that we can add their information to
                 # our cache.
                 iterable = self.get_members(ordinal)
-                for mindex, mname, moffset, msize, mtype, malign in iterable:
+                for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
                     memberoffsets[moffset] = mindex
-                    memberindices[mindex] = mname, moffset, msize, mtype, malign
+                    memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
                 continue
 
             # Now we can assign them as members of our class.
             self.structurecache = structurecache
+            self.structureid = structureid
             self.memberoffsetcache = memberoffsetcache
             self.memberindexcache = memberindexcache
             self.loaded = interface.tinfo.quantity() >= 0
             return len(structurecache)
 
+        def load(self, *library):
+            '''Disable any related events and load information from the specified type `library` into the current instance.'''
+            with self.ignore_changes():
+                res = self.__load_unguarded(*library)
+            return res
+
         def cachedname(self, ordinal):
-            '''Return the cached name of the type specified by `ordinal`.'''
-            return self.structurecache[ordinal]
+            '''Return the cached name of the type specified by `ordinal` or an empty string.'''
+            return self.structurecache.get(ordinal, '')
+
+        def cachedidentifier(self, ordinal):
+            '''Return the cached identifier for the type specified by `ordinal`.'''
+            return self.structureid.get(ordinal, idaapi.BADADDR)
+
+        def identifier(self, ordinal):
+            '''Return the current identifier for the type specified by `ordinal`.'''
+            with self.ignore_changes():
+                tid = interface.tinfo.identifier(ordinal)
+            return tid
 
         def name(self, ordinal):
             '''Return the current name of the type specified by `ordinal`.'''
@@ -3774,26 +3838,39 @@ class localtypesmonitor_84(object):
             res, self.structurecache[ordinal] = self.structurecache[ordinal], utils.string.of(tinfo.get_type_name())
             return res
 
-        def added(self, ordinal):
+        def added(self, ordinal, update=True):
             '''Update the cache with the addition of the type specified by `ordinal`.'''
-            self.structurecache[ordinal] = res = self.name(ordinal)
+            tinfo = self.get_type(ordinal)
+            res, sid = self.name(tinfo), self.identifier(tinfo)
+
+            # Verify the identifier and whine if we couldn't find a valid one.
+            if sid == idaapi.BADADDR:
+                logging.warning(u"{:s}.added({:d}) : An invalid identifier ({:#x}) was found for the recently created type at ordinal {:d} named \"{:s}\" ({!r}).".format('.'.join([__name__, self.__class__.__name__]), ordinal, sid, ordinal, utils.string.escape(res or '', '"'), "{!s}".format(tinfo)))
 
             # Now we can go through all of its members and collect them.
             memberoffsets, memberindices = {}, {}
             iterable = self.get_members(ordinal)
-            for mindex, mname, moffset, msize, mtype, malign in iterable:
+            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
                 memberoffsets[moffset] = mindex
-                memberindices[mindex] = mname, moffset, msize, mtype, malign
+                memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
 
-            # Then we can update the member cache for the type.
-            self.memberoffsetcache[ordinal] = memberoffsets
-            self.memberindexcache[ordinal] = memberindices
-            return res, memberindices
+            # Then we can update the cache for the members if it was specified.
+            if update:
+                self.structurecache[ordinal] = res
+                self.structureid[ordinal] = sid
+                self.memberoffsetcache[ordinal] = memberoffsets
+                self.memberindexcache[ordinal] = memberindices
+            return sid, res, memberindices
 
-        def removed(self, ordinal):
+        def removed(self, ordinal, update=True):
             '''Update the cache with the removal of the type specified by `ordinal`.'''
-            res = self.structurecache.pop(ordinal)
-            return res, self.memberindexcache.pop(ordinal)
+            Fget_from_dict = operator.methodcaller('pop', ordinal) if update else operator.methodcaller('get', ordinal)
+            if self.structureid[ordinal] == idaapi.BADADDR:
+                logging.warning(u"{:s}.removed({:d}) : An invalid identifier ({:#x}) was found in the cache for the type at ordinal {:d}.".format('.'.join([__name__, self.__class__.__name__]), ordinal, self.structureid[ordinal], ordinal))
+
+            # Clear the specified ordinal out of all of our dictionaries.
+            res, sid = (Fget_from_dict(structure) for structure in [self.structurecache, self.structureid])
+            return sid, res, Fget_from_dict(self.memberindexcache)
 
         def synchronize(self, ordinal):
             '''Update the cache for the members belonging to the type specified by `ordinal`.'''
@@ -3801,9 +3878,9 @@ class localtypesmonitor_84(object):
 
             # Iterate through all the members and collect their attributes.
             currentmemberoffsets, currentmemberindices = {}, {}
-            for mindex, mname, moffset, msize, mtype, malign in iterable:
+            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
                 currentmemberoffsets[moffset] = mindex
-                currentmemberindices[mindex] = mname, moffset, msize, mtype, malign
+                currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
 
             # All we need to do is to assign them into our cache and we're done.
             res = self.memberindexcache[ordinal]
@@ -3819,9 +3896,9 @@ class localtypesmonitor_84(object):
             # First start by enumerating all of the members for the type with
             # the specified ordinal. This is so we can compare them later.
             iterable = self.get_members(ordinal)
-            for mindex, mname, moffset, msize, mtype, malign in iterable:
+            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
                 currentmemberoffsets[moffset] = mindex
-                currentmemberindices[mindex] = mname, moffset, msize, mtype, malign
+                currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
 
             # Then we'll combine all our dictionaries into a pair that can be
             # used as a parameter for the functions we'll use for comparing.
@@ -3830,9 +3907,9 @@ class localtypesmonitor_84(object):
 
             # Now we'll create a bunch of lists that we'll use to do our
             # comparisons and figure out what changed in the structure/union.
-            currentbounds, bounds = ([(moffset, msize) for _, moffset, msize, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
-            currentnames, names = ([mname for mname, _, _, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
-            currenttypes, types = ([mtype for _, _, _, mtype, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+            currentbounds, bounds = ([(moffset, msize) for _, _, moffset, msize, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+            currentnames, names = ([mname for _, mname, _, _, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+            currenttypes, types = ([mtype for _, _, _, _, mtype, _ in indices.values()] for indices in [currentmemberindices, memberindices])
 
             # After capturing the current state, if we were asked to update our
             # cache, then assign the current changes that we just grabbed.
@@ -3871,19 +3948,23 @@ class localtypesmonitor_84(object):
 
             # Start by gathering all of the information we can use as a unique
             # key for matching the members.
-            cached_byname = {mname : mindex for mindex, (mname, _, _, _, _) in cachedmemberindices.items()}
-            current_byname = {mname : mindex for mindex, (mname, _, _, _, _) in currentmemberindices.items()}
+            cached_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in cachedmemberindices.items()}
+            current_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in currentmemberindices.items()}
 
-            cached_bybitoffset = {moffset : mindex for mindex, (_, moffset, _, _, _) in cachedmemberindices.items()}
-            current_bybitoffset = {moffset : mindex for mindex, (_, moffset, _, _, _) in currentmemberindices.items()}
+            cached_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in cachedmemberindices.items()}
+            current_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in currentmemberindices.items()}
 
             # Before doing anything, empty out all of the elements that haven't
             # changed from all of our dictionaries.
             matching = {mindex for mindex in cachedmemberindices} & {mindex for mindex in currentmemberindices}
             for mindex in matching:
-                oldname, oldoffset, oldsize, oldtype, oldalign = old = cachedmemberindices[mindex]
-                newname, newoffset, newsize, newtype, newalign = new = currentmemberindices[mindex]
+                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old = cachedmemberindices[mindex]
+                newmid, newname, newoffset, newsize, newtype, newalign = new = currentmemberindices[mindex]
 
+                # Compare all the member attributes that we use to consider it
+                # the same member. We ignore the member identifier since it
+                # really is just a reference number that can change (despite the
+                # disassembler not currently changing it).
                 if (oldname, oldoffset, oldsize) == (newname, newoffset, newsize) and interface.tinfo.same(oldtype, newtype):
                     [memberindices.pop(mindex) for memberindices in [cachedmemberindices, currentmemberindices]]
                 continue
@@ -3900,8 +3981,8 @@ class localtypesmonitor_84(object):
                 old = cachedmemberindices[mindex]
                 new = currentmemberindices[mindex]
 
-                oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newname, newoffset, newsize, newtype, newalign = new
+                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+                newmid, newname, newoffset, newsize, newtype, newalign = new
 
                 # If the names and offsets are the same, then this member wasn't
                 # moved and we can add its pair since they're already matching.
@@ -3928,8 +4009,8 @@ class localtypesmonitor_84(object):
                 old = cachedmemberindices.pop(oldindex)
                 new = currentmemberindices.pop(newindex)
 
-                oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newname, newoffset, newsize, newtype, newalign = new
+                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+                newmid, newname, newoffset, newsize, newtype, newalign = new
 
                 # Now we can just tally up the number of changes and yield them
                 # back to the caller.
@@ -3957,8 +4038,8 @@ class localtypesmonitor_84(object):
                 old = cachedmemberindices.pop(oldindex)
                 new = currentmemberindices.pop(newindex)
 
-                oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newname, newoffset, newsize, newtype, newalign = new
+                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+                newmid, newname, newoffset, newsize, newtype, newalign = new
 
                 # Now we can tally up whatever the changes are. This should be
                 # much lighter than what we did the first time since we know
@@ -4000,8 +4081,8 @@ class localtypesmonitor_84(object):
                 # If both the old and new members exist, then the old member was
                 # modified and we can just compare the values to figure it out.
                 if old and new:
-                    oldname, oldoffset, oldsize, oldtype, oldalign = old
-                    newname, newoffset, newsize, newtype, newalign = new
+                    oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+                    newmid, newname, newoffset, newsize, newtype, newalign = new
 
                     # First check the potential keys that we use for matching
                     # members. At least one thing should match, if nothing
@@ -4030,16 +4111,18 @@ class localtypesmonitor_84(object):
 
                 # Next we can check the details about what member was removed.
                 elif new:
-                    mname, moffset, msize, mtype, malign = new
+                    mid, mname, moffset, msize, mtype, malign = new
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
 
                 # And finally information about the member that was added.
                 elif old:
-                    mname, moffset, msize, mtype, malign = old
+                    mid, mname, moffset, msize, mtype, malign = old
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
@@ -4151,8 +4234,8 @@ class localtypesmonitor_84(object):
             newordinal, newname = ordinal, name
 
         # Now we can update our data cache, and log the addition.
-        newname, newmembers = cls.state.added(newordinal)
-        logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname))
+        newsid, newname, newmembers = cls.state.added(newordinal)
+        logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
 
     @classmethod
     def local_type_deleted(cls, ordinal, name):
@@ -4171,8 +4254,8 @@ class localtypesmonitor_84(object):
             oldordinal, oldname = ordinal, name
 
         # Now we can update our data cache, and log what just happened.
-        oldname, oldmembers = cls.state.removed(oldordinal)
-        logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Discovered a removed type at ordinal {:d} of the local type library named \"{:s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), oldordinal, oldname))
+        oldsid, oldname, oldmembers = cls.state.removed(oldordinal)
+        logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Discovered a removed type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), oldordinal, oldname, oldsid))
 
     @classmethod
     def local_type_edited(cls, ordinal, name):
