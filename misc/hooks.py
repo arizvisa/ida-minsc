@@ -3603,9 +3603,32 @@ class localtypesmonitor_state(object):
         '''Iterate through all of the members in the structure or union specified by `ordinal`.'''
         tinfo = cls.get_type(ordinal)
         iterable = (itertools.chain([index], items) for index, items in enumerate(interface.tinfo.members(tinfo)))
+
+        # Now we can iterate through all of the members that were found in 8.4.
+        # Still, we have to filter the members being yielded due to the
+        # existence of "gap" fields. The disassembler treats these as if the
+        # member is deleted. So, if a member was replaced with a gap, then skip.
         for mindex, mname, moffset, msize, mtype, malign in map(tuple, iterable):
-            mid = tinfo.get_udm_tid(mindex)
-            yield mindex, mid, mname, moffset, msize, mtype, malign
+            udm = idaapi.udm_t()
+            udm.offset = mindex
+
+            # Populate the udm structure and double-check the index is valid. If
+            # the `tinfo_t.find_udm` method returns a negative index, suggesting
+            # that the member wasn't found, then we just skip it.
+            newindex = tinfo.find_udm(udm, idaapi.STRMEM_INDEX)
+            if newindex < 0:
+                pass
+
+            # If the udm structure tells us that this member is a gap, then we
+            # skip over it since essentially the member was deleted.
+            elif udm.is_gap():
+                pass
+
+            # Now we can yield the info for the current member being processed.
+            else:
+                mid = tinfo.get_udm_tid(mindex)
+                yield mindex, mid, mname, moffset, msize, mtype, malign
+            continue
         return
 
     @classmethod
