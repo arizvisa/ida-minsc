@@ -3531,6 +3531,560 @@ class framememberchange(memberchangecommon):
             return logging.debug(u"{:s}.changed({:#x}, {:#x}) : Ignoring framememberchange.changed event for member {:#x} (belongs to a structure).".format('.'.join([__name__, cls.__name__]), sptr.id, mptr.id, mptr.id))
         return super(framememberchange, cls).changed(mowner.id, mptr.id)
 
+class localtypesmonitor_state(object):
+    """
+    This class maintains the state of the local type library from the current
+    database. It does this in order to extract information about the library
+    from the parameters of the "local_types_changed". The data inside the class
+    is not persisted. Instead, the class is instantiated and populated when the
+    database is created.
+    """
+
+    def __init__(self):
+        self.loaded = False
+
+        # This is a cache of all the structures and unions in a local types
+        # library. It is keyed by the ordinal of the structure/union type.
+        self.structurecache = {}
+        self.structureid = {}
+
+        # This is a cache of all the members belonging to a structure in the
+        # type library. It is keyed by the ordinal number, and stores a
+        # dictionary that is keyed by index.
+        self.memberoffsetcache = {}
+        self.memberindexcache = {}
+
+    def count(self):
+        '''Return the number of types that are currently cached.'''
+        return len(self.structurecache)
+
+    def __repr__(self):
+        if not self.loaded:
+            return "{!s} // the local types library has not been loaded".format(self.__class__)
+        header = "{!s} // {:d}/{:d} type{:s} cached".format(self.__class__, len(self.structurecache), interface.tinfo.quantity(), '' if len(self.structurecache) == 1 else 's')
+
+        # Iterate through all of the structures we've cached and display any
+        # information that might be relevant.
+        rows = []
+        for ordinal in sorted(self.structurecache):
+            name = self.structurecache[ordinal]
+            sid = self.structureid[ordinal]
+            count = len(self.memberindexcache[ordinal])
+            actual = sum(1 for item in self.get_members(ordinal))
+            iterable = map(operator.itemgetter(0), self.memberindexcache[ordinal].values())
+            rows.append("[{:d}] {!r} ({:#x}) : {:d} member{:s} cached{:s}{!s}".format(ordinal, name, sid, count, '' if count == 1 else 's', '' if count == actual else ", expected {:d} member{:s}".format(actual, '' if actual == 1 else 's'), " : {:s}".format(','.join(map("{:#x}".format, iterable))) if count else ''))
+        return '\n'.join(itertools.chain([header], rows))
+
+    @classmethod
+    def get_type(cls, ordinal):
+        '''Return the type that is specified by `ordinal` and has member identifiers directly attached to it.'''
+        if isinstance(ordinal, internal.types.integer):
+            tinfo, description = interface.tinfo.for_ordinal(ordinal), "{:d}".format(ordinal)
+        elif isinstance(ordinal, internal.types.string):
+            tinfo, description = interface.tinfo.for_name(ordinal), "{!r}".format("{!s}".format(ordinal))
+        elif isinstance(ordinal, idaapi.tinfo_t):
+            tinfo, description = interface.tinfo.copy(ordinal), "{!r}".format("{!s}".format(ordinal))
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.get_type({!s}) : Unable to locate a type within the local types library using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), description, ordinal.__class__))
+
+        # If we couldn't get the type, then just raise an exception.
+        if not tinfo:
+            raise internal.exceptions.LocalTypeNotFoundError(u"{:s}.get_type({!s}) : Unable to locate the specified type in the local types library.".format('.'.join([__name__, cls.__name__]), description))
+
+        # If our type is a type reference pointing to a type reference, then
+        # we need to dereference it in order to find the actual local type
+        # that will return the member ids that we are looking for.
+        res = tinfo
+        while tinfo and tinfo.present() and tinfo.is_typeref():
+            res, name, ordinal = tinfo, tinfo.get_type_name(), interface.tinfo.ordinal(tinfo)
+            tinfo = interface.tinfo.at_ordinal(ordinal) if ordinal else interface.tinfo.at_name(name)
+        return res
+
+    @classmethod
+    def get_members(cls, ordinal):
+        '''Iterate through all of the members in the structure or union specified by `ordinal`.'''
+        tinfo = cls.get_type(ordinal)
+        iterable = (itertools.chain([index], items) for index, items in enumerate(interface.tinfo.members(tinfo)))
+        for mindex, mname, moffset, msize, mtype, malign in map(tuple, iterable):
+            mid = tinfo.get_udm_tid(mindex)
+            yield mindex, mid, mname, moffset, msize, mtype, malign
+        return
+
+    @classmethod
+    def get_member_by_udm(cls, ordinal, key, value):
+        '''Return the member of the structure or union in `ordinal` using given `key` and matching `value`.'''
+        udm = idaapi.udm_t()
+        if key in {idaapi.STRMEM_OFFSET, idaapi.STRMEM_INDEX, idaapi.STRMEM_AUTO}:
+            udm.offset = bitoffset
+        elif key == idaapi.STRMEM_NAME:
+            udm.name = utils.string.to(value)
+        elif key == idaapi.STRMEM_TYPE:
+            udm.type = value
+        elif key == idaapi.STRMEM_SIZE:
+            udm.size = value
+        elif key in {idaapi.STRMEM_MINS, idaapi.STRMEM_MAXS}:
+            pass
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.get_member_by_udm({:d}, {:d}, {!s}) : Unable to find a member using an unsupported key type ({:d}) with the given key ({!s}).".format('.'.join([__name__, 'localtypesmonitor_84', cls.__name__]), ordinal, key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value), key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value)))
+
+        # Grab the index for the member and verify that it is valid.
+        tinfo = cls.get_type(ordinal)
+        mindex = tinfo.find_udm(udm, key)
+        if mindex < 0:
+            raise internal.exceptions.MemberNotFoundError(u"{:s}.get_member_by_udm({:d}, {:d}, {!r}) : Unable to find a member matching the specified key type ({:d}) with the given key ({!s}).".format('.'.join([__name__, 'localtypesmonitor_84', cls.__name__]), ordinal, key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value), key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value)))
+
+        mname = utils.string.of(udm.name)
+        mid = tinfo.get_udm_tid(mindex)
+        moffset, msize, malign = udm.offset, udm.size, udm.effalign
+        mtype = interface.tinfo.concretize(udm.type)
+        return mindex, mid, moffset, msize, mtype, malign
+
+    @classmethod
+    def get_member_by_bitoffset(cls, ordinal, bitoffset):
+        return cls.get_member_by_udm(ordinal, idaapi.STRMEM_OFFSET, bitoffset)
+    @classmethod
+    def get_member_by_name(cls, ordinal, name):
+        return cls.get_member_by_udm(ordinal, idaapi.STRMEM_NAME, name)
+    @classmethod
+    def get_member_by_index(cls, ordinal, index):
+        return cls.get_member_by_udm(ordinal, idaapi.STRMEM_INDEX, index)
+    @classmethod
+    def get_member_by_offset(cls, ordinal, index_or_offset):
+        return cls.get_member_by_udm(ordinal, idaapi.STRMEM_AUTO, index_or_offset)
+    @classmethod
+    def get_member_by_mid(cls, ordinal, mid):
+        res, tinfo = idaapi.udm_t(), cls.get_type(ordinal)
+        mindex = tinfo.get_udm_by_tid(mid)
+        mname = utils.string.of(udm.name)
+        mid = tinfo.get_udm_tid(mindex)
+        moffset, msize, malign = udm.offset, udm.size, udm.effalign
+        mtype = interface.tinfo.concretize(udm.type)
+        return mindex, mid, moffset, msize, mtype, malign
+
+    @classmethod
+    @contextlib.contextmanager
+    def ignore_changes(cls, *events):
+        '''This context manager disables any type changes that might occur inside the managed code by disabling the specified `events`.'''
+        iterable = itertools.chain(['local_types_changed'], events)
+
+        # Import our hook module, accepting that we don't care about the
+        # perform of the handler for the "local_types_changed" event.
+        import hook
+
+        # Start by disabling all of the required events and storing whether
+        # they were successful for not. If they weren't disabled, then we
+        # raise an exception and abort the context manager entirely.
+        required = {event for event in iterable} - hook.idb.disabled
+        disabled = [hook.idb.disable(event) for event in required]
+        try:
+            if not all(disabled):
+                raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to disable {:d} of {:d} requested event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in disabled if not ok), len(required), '' if len(required) == 1 else 's'))
+            yield
+
+        # Now that we're done, we can go ahead and re-enable all of the
+        # events that we just disabled.
+        finally:
+            enabled = [hook.idb.enable(event) for event in required]
+
+        if not all(enabled):
+            raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to enable {:d} of {:d} disabled event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in enabled if not ok), len(required), '' if len(required) == 1 else 's'))
+        return
+
+    def unload(self, *library):
+        '''Clear all of the cached information from the current state.'''
+        count = len(self.structurecache)
+        self.structurecache = {}
+        self.structureid = {}
+        self.memberoffsetcache = {}
+        self.memberindexcache = {}
+        self.loaded = False
+        return count
+
+    def __load_unguarded(self, *library):
+        '''Load information from the specified type `library` into the current state.'''
+        cls = self.__class__
+        structurecache, structureid = {}, {}
+        memberoffsetcache, memberindexcache = {}, {}
+
+        # Iterate through all the types only looking for structures or
+        # unions since they're the only thing that really counts.
+        for ordinal, name, tinfo in interface.tinfo.iterate():
+            if not(tinfo) or tinfo.empty():
+                logging.debug(u"{:s}.load({:s}) : Skipping deleted or empty type \"{:s}\" at ordinal {:d} of the local types library.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(*library) if library else '', utils.string.escape(name, '"'), ordinal))
+                continue
+
+            elif not(tinfo.is_struct() or tinfo.is_union()):
+                logging.debug(u"{:s}.load({:s}) : Ignoring type \"{:s}\" at ordinal {:d} that is not a structure or a union.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(*library) if library else '', utils.string.escape(name, '"'), ordinal))
+                continue
+
+            # Stash the original structure name so that we can know what the
+            # previous name will be. We also create a dictionary for the
+            # structure so that we can store information about its members.
+            structurecache[ordinal] = name
+            structureid[ordinal] = interface.tinfo.identifier(tinfo)
+            memberoffsets = memberoffsetcache.setdefault(ordinal, {})
+            memberindices = memberindexcache.setdefault(ordinal, {})
+
+            # Now we'll need to go through and enumerate all the members of
+            # the structure/union so that we can add their information to
+            # our cache.
+            iterable = self.get_members(ordinal)
+            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+                memberoffsets[moffset] = mindex
+                memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+            continue
+
+        # Now we can assign them as members of our class.
+        self.structurecache = structurecache
+        self.structureid = structureid
+        self.memberoffsetcache = memberoffsetcache
+        self.memberindexcache = memberindexcache
+        self.loaded = interface.tinfo.quantity() >= 0
+        return len(structurecache)
+
+    def load(self, *library):
+        '''Disable any related events and load information from the specified type `library` into the current instance.'''
+        with self.ignore_changes():
+            res = self.__load_unguarded(*library)
+        return res
+
+    def cachedname(self, ordinal):
+        '''Return the cached name of the type specified by `ordinal` or an empty string.'''
+        return self.structurecache.get(ordinal, '')
+
+    def cachedidentifier(self, ordinal):
+        '''Return the cached identifier for the type specified by `ordinal`.'''
+        return self.structureid.get(ordinal, idaapi.BADADDR)
+
+    def identifier(self, ordinal):
+        '''Return the current identifier for the type specified by `ordinal`.'''
+        with self.ignore_changes():
+            tid = interface.tinfo.identifier(ordinal)
+        return tid
+
+    def name(self, ordinal):
+        '''Return the current name of the type specified by `ordinal`.'''
+        tinfo = self.get_type(ordinal)
+        res = tinfo.get_type_name()
+        return utils.string.of(res)
+
+    def renamed(self, ordinal):
+        '''Synchronize the cached name for the type specified by `ordinal` with the current name from the local types library.'''
+        tinfo = self.get_type(ordinal)
+        res, self.structurecache[ordinal] = self.structurecache[ordinal], utils.string.of(tinfo.get_type_name())
+        return res
+
+    def added(self, ordinal, update=True):
+        '''Update the cache with the addition of the type specified by `ordinal`.'''
+        tinfo = self.get_type(ordinal)
+        res, sid = self.name(tinfo), self.identifier(tinfo)
+
+        # Verify the identifier and whine if we couldn't find a valid one.
+        if sid == idaapi.BADADDR:
+            logging.warning(u"{:s}.added({:d}) : An invalid identifier ({:#x}) was found for the recently created type at ordinal {:d} named \"{:s}\" ({!r}).".format('.'.join([__name__, self.__class__.__name__]), ordinal, sid, ordinal, utils.string.escape(res or '', '"'), "{!s}".format(tinfo)))
+
+        # Now we can go through all of its members and collect them.
+        memberoffsets, memberindices = {}, {}
+        iterable = self.get_members(ordinal)
+        for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+            memberoffsets[moffset] = mindex
+            memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+
+        # Then we can update the cache for the members if it was specified.
+        if update:
+            self.structurecache[ordinal] = res
+            self.structureid[ordinal] = sid
+            self.memberoffsetcache[ordinal] = memberoffsets
+            self.memberindexcache[ordinal] = memberindices
+        return sid, res, memberindices
+
+    def removed(self, ordinal, update=True):
+        '''Update the cache with the removal of the type specified by `ordinal`.'''
+        Fget_from_dict = operator.methodcaller('pop', ordinal) if update else operator.methodcaller('get', ordinal)
+        if self.structureid[ordinal] == idaapi.BADADDR:
+            logging.warning(u"{:s}.removed({:d}) : An invalid identifier ({:#x}) was found in the cache for the type at ordinal {:d}.".format('.'.join([__name__, self.__class__.__name__]), ordinal, self.structureid[ordinal], ordinal))
+
+        # Clear the specified ordinal out of all of our dictionaries.
+        res, sid = (Fget_from_dict(structure) for structure in [self.structurecache, self.structureid])
+        return sid, res, Fget_from_dict(self.memberindexcache)
+
+    def synchronize(self, ordinal):
+        '''Update the cache for the members belonging to the type specified by `ordinal`.'''
+        iterable = self.get_members(ordinal)
+
+        # Iterate through all the members and collect their attributes.
+        currentmemberoffsets, currentmemberindices = {}, {}
+        for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+            currentmemberoffsets[moffset] = mindex
+            currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+
+        # All we need to do is to assign them into our cache and we're done.
+        res = self.memberindexcache[ordinal]
+        self.memberindexcache[ordinal] = currentmemberindices
+        self.memberoffsetcache[ordinal] = currentmemberoffsets
+        return res
+
+    def changes(self, ordinal, update=True):
+        '''Iterate through the members for type `ordinal`, and yield the index or offset of each one that has changed.'''
+        memberoffsets, memberindices = (cache[ordinal] for cache in [self.memberoffsetcache, self.memberindexcache])
+        currentmemberoffsets, currentmemberindices = {}, {}
+
+        # First start by enumerating all of the members for the type with
+        # the specified ordinal. This is so we can compare them later.
+        iterable = self.get_members(ordinal)
+        for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+            currentmemberoffsets[moffset] = mindex
+            currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+
+        # Then we'll combine all our dictionaries into a pair that can be
+        # used as a parameter for the functions we'll use for comparing.
+        cached = memberoffsets, memberindices
+        current = currentmemberoffsets, currentmemberindices
+
+        # Now we'll create a bunch of lists that we'll use to do our
+        # comparisons and figure out what changed in the structure/union.
+        currentbounds, bounds = ([(moffset, msize) for _, _, moffset, msize, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+        currentnames, names = ([mname for _, mname, _, _, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+        currenttypes, types = ([mtype for _, _, _, _, mtype, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+
+        # After capturing the current state, if we were asked to update our
+        # cache, then assign the current changes that we just grabbed.
+        if update:
+            self.memberindexcache[ordinal] = currentmemberindices
+            self.memberoffsetcache[ordinal] = currentmemberoffsets
+
+        # Check if the number of members have changed, because if so then a
+        # member was added or deleted and we'll need to know which one.
+        if len({mindex for mindex in memberindices}) != len({mindex for mindex in currentmemberindices}):
+            return self.__changed_member_count(ordinal, cached, current)
+
+        # Now we'll attempt to determine how the type was actually edited.
+        # We start by comparing the boundaries (offset and size) of the
+        # member to figure out if a member was moved.
+        elif currentbounds != bounds and currentnames == names:
+            return self.__changed_member_positions(ordinal, cached, current)
+
+        # If the names are different, then a member was renamed.
+        elif currentnames != names:
+            return self.__changed_member_names(ordinal, cached, current)
+
+        # If a type was changed, then we need to handle that too.
+        elif any(not(interface.tinfo.same(currenttype, type)) for currenttype, type in zip(currenttypes, types)):
+            return self.__changed_member_types(ordinal, cached, current)
+
+        # Otherwise there weren't any changes that occurred, and we just
+        # return nothing so that it looks like we actually did something.
+        return []
+
+    @classmethod
+    def __changed_members(cls, cached, current):
+        '''Compare the fields in `cached` to `current` and yield the number of changes, the old field, and the new field that was changed.'''
+        cachedmemberoffsets, cachedmemberindices = ({key : value for key, value in dictionary.items()} for dictionary in cached)
+        currentmemberoffsets, currentmemberindices = ({key : value for key, value in dictionary.items()} for dictionary in current)
+
+        # Start by gathering all of the information we can use as a unique
+        # key for matching the members.
+        cached_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in cachedmemberindices.items()}
+        current_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in currentmemberindices.items()}
+
+        cached_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in cachedmemberindices.items()}
+        current_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in currentmemberindices.items()}
+
+        # Before doing anything, empty out all of the elements that haven't
+        # changed from all of our dictionaries.
+        matching = {mindex for mindex in cachedmemberindices} & {mindex for mindex in currentmemberindices}
+        for mindex in matching:
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old = cachedmemberindices[mindex]
+            newmid, newname, newoffset, newsize, newtype, newalign = new = currentmemberindices[mindex]
+
+            # Compare all the member attributes that we use to consider it
+            # the same member. We ignore the member identifier since it
+            # really is just a reference number that can change (despite the
+            # disassembler not currently changing it).
+            if (oldname, oldoffset, oldsize) == (newname, newoffset, newsize) and interface.tinfo.same(oldtype, newtype):
+                [memberindices.pop(mindex) for memberindices in [cachedmemberindices, currentmemberindices]]
+            continue
+
+        # The very first thing we need to do is to figure out which members
+        # have been moved around and collect them so that we can match from
+        # their old location to the new one. We grab a union of everything
+        # and then iterate through them to check their names.
+        pairs = []
+        for mindex in {index for index in cachedmemberindices} | {index for index in currentmemberindices}:
+            if not all(mindex in memberindices for memberindices in [cachedmemberindices, currentmemberindices]):
+                continue
+
+            old = cachedmemberindices[mindex]
+            new = currentmemberindices[mindex]
+
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+            newmid, newname, newoffset, newsize, newtype, newalign = new
+
+            # If the names and offsets are the same, then this member wasn't
+            # moved and we can add its pair since they're already matching.
+            if (oldname, oldoffset) == (newname, newoffset):
+                oldindex, newindex = mindex, mindex
+
+            # If the name doesn't exist in the current names, then skip it
+            # as we treat it as removed and we'll be handling those later.
+            elif oldname not in current_byname:
+                continue
+
+            # Now we can extract the index for the new member using the new
+            # offset.
+            else:
+                oldindex, newindex = mindex, current_byname[oldname]
+
+            # That should give us a pair that we can append for later.
+            pairs.append((oldindex, newindex))
+
+        # Iterate through both pairs and figure out what has changed between
+        # the matching members. Every time we process a member, we remove it
+        # from its corresponding dictionary of indices.
+        for oldindex, newindex in pairs:
+            old = cachedmemberindices.pop(oldindex)
+            new = currentmemberindices.pop(newindex)
+
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+            newmid, newname, newoffset, newsize, newtype, newalign = new
+
+            # Now we can just tally up the number of changes and yield them
+            # back to the caller.
+            count = 0 if oldname == newname else 1
+            count+= 0 if oldoffset == newoffset else 1
+            count+= 0 if oldsize == newsize else 1
+            count+= 0 if interface.tinfo.same(oldtype, newtype) else 1
+            count+= 0 if oldalign == newalign else 1
+
+            # Append the indices that we processed, and then yield the
+            # changes for the pair of members back to the caller.
+            yield count, old, new
+
+        # Before figuring out removals, we go through all the ones with
+        # matching offsets to see if the types and sizes are the same so
+        # that we can treat this as a single change...really for renames.
+        unmoved = {moffset for moffset in cached_bybitoffset} & {moffset for moffset in current_bybitoffset}
+        for moffset in unmoved:
+            oldindex, newindex = (cached[moffset] for cached in [cached_bybitoffset, current_bybitoffset])
+
+            # Make sure we haven't processed these indices already.
+            if not(oldindex in cachedmemberindices and newindex in currentmemberindices):
+                continue
+
+            old = cachedmemberindices.pop(oldindex)
+            new = currentmemberindices.pop(newindex)
+
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+            newmid, newname, newoffset, newsize, newtype, newalign = new
+
+            # Now we can tally up whatever the changes are. This should be
+            # much lighter than what we did the first time since we know
+            # that the offsets here match between both members.
+            count = 0 if oldname == newname else 1
+            count+= 0 if oldoffset == newoffset else 1
+            count+= 0 if oldsize == newsize else 1
+            count+= 0 if interface.tinfo.same(oldtype, newtype) else 1
+            count+= 0 if oldalign == newalign else 1
+
+            # If nothing changed, then we don't need to do anything.
+            if count:
+                yield count, old, new
+            continue
+
+        # Now we'll figure out what members were removed by removing the
+        # members that we already processed from the cached member indices.
+        removed = {mindex for mindex in cachedmemberindices}
+        for mindex in removed:
+            old = cachedmemberindices.pop(mindex)
+            yield -len(old), old, ()
+
+        # Finally we can figure out what members were added by removing the
+        # ones that were already processed from the current member indices.
+        added = {mindex for mindex in currentmemberindices}
+        for mindex in added:
+            new = currentmemberindices.pop(mindex)
+            yield +len(new), (), new
+        return
+
+    @classmethod
+    def __changed_members_compare(cls, ordinal, cached, current):
+        '''Compare the fields in `cached` from the given `ordinal` to the fields in `current` and log each field that is different.'''
+        res, iterable = [], cls.__changed_members(cached, current)
+        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : Comparing the members for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
+        for changes, old, new in iterable:
+            res.append((changes, old, new))
+
+            # If both the old and new members exist, then the old member was
+            # modified and we can just compare the values to figure it out.
+            if old and new:
+                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+                newmid, newname, newoffset, newsize, newtype, newalign = new
+
+                # First check the potential keys that we use for matching
+                # members. At least one thing should match, if nothing
+                # matches then it's an unexpected condition and we complain.
+                if oldname != newname and oldoffset == newoffset:
+                    moffset = newoffset
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The name for the member at offset {:+#x} has been changed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', moffset, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
+                elif oldname == newname and oldoffset != newoffset:
+                    mname = newname
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" has been moved from offset {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, oldoffset, newoffset))
+                elif (oldname, oldoffset) == (newname, newoffset):
+                    mname, moffset = newname, newoffset
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had {:d} change{:s} made to it.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if changes == 1 else 's'))
+                else:
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had {:d} change{:s} made and changed it to \"{!s}\" at offset {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', utils.string.escape(oldname, '"'), oldoffset, changes, '' if changes == 1 else 's', utils.string.escape(newname, '"'), newoffset))
+
+                # Now we can figure out what changed from what we grabbed.
+                mname, moffset = newname, newoffset
+                if oldsize != newsize:
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its size changed from {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldsize, newsize))
+                if not(interface.tinfo.same(oldtype, newtype)):
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its type changed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                if oldalign != newalign:
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its alignment changed from {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldalign, newalign))
+                continue
+
+            # Next we can check the details about what member was removed.
+            elif new:
+                mid, mname, moffset, msize, mtype, malign = new
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
+
+            # And finally information about the member that was added.
+            elif old:
+                mid, mname, moffset, msize, mtype, malign = old
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
+            continue
+        return res
+
+    def __changed_member_count(self, ordinal, cached, current):
+        cls = self.__class__
+        logging.info(u"{:s}.__changed_members_count({:d}, {!s}, {!s}) : The number of members for the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
+        return self.__changed_members_compare(ordinal, cached, current)
+
+    def __changed_member_positions(self, ordinal, cached, current):
+        cls = self.__class__
+        logging.info(u"{:s}.__changed_members_positions({:d}, {!s}, {!s}) : The positions of the members for the type at ordinal {:d} have been moved.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
+        return self.__changed_members_compare(ordinal, cached, current)
+
+    def __changed_member_names(self, ordinal, cached, current):
+        cls = self.__class__
+        logging.info(u"{:s}.__changed_members_names({:d}, {!s}, {!s}) : The names of the members for the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
+        return self.__changed_members_compare(ordinal, cached, current)
+
+    def __changed_member_types(self, ordinal, cached, current):
+        cls = self.__class__
+        logging.info(u"{:s}.__changed_members_types({:d}, {!s}, {!s}) : The types of the members in the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
+        return self.__changed_members_compare(ordinal, cached, current)
+
 class localtypesmonitor_84(object):
     """
     In v8.4 of the disassembler, a number of important hooks on structure
@@ -3563,7 +4117,7 @@ class localtypesmonitor_84(object):
         """
         descriptions = [parameter for parameter in map("{!r}".format, idp_modname)]
         logging.info(u"{:s}.init_local_types_monitor({!s}) : Initializing the local type monitor for v{:.1f} and instantiating the class for tracking their changes.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions), idaapi.__version__))
-        cls.state = cls.monitoring_state()
+        cls.state = localtypesmonitor_state()
 
     @classmethod
     def load_local_types_monitor(cls, *args):
@@ -3595,559 +4149,6 @@ class localtypesmonitor_84(object):
         '''Initialize the state for the local types monitor as a notification.'''
         idp_modname = idaapi.get_idp_name()
         return cls.init_local_types_monitor(idp_modname)
-
-    class monitoring_state(object):
-        """
-        This class maintains the current state of the local type library in the
-        current database. It does this in order to extract meaning from the
-        "local_types_changed" event dispatched by the disassembler. The data
-        inside the class is not persisted. Instead, the class is instantiated
-        and populated when the database is created.
-        """
-        def __init__(self):
-            self.loaded = False
-
-            # This is a cache of all the structures and unions in a local types
-            # library. It is keyed by the ordinal of the structure/union type.
-            self.structurecache = {}
-            self.structureid = {}
-
-            # This is a cache of all the members belonging to a structure in the
-            # type library. It is keyed by the ordinal number, and stores a
-            # dictionary that is keyed by index.
-            self.memberoffsetcache = {}
-            self.memberindexcache = {}
-
-        def count(self):
-            '''Return the number of types that are currently cached.'''
-            return len(self.structurecache)
-
-        def __repr__(self):
-            if not self.loaded:
-                return "{!s} // the local types library has not been loaded".format(self.__class__)
-            header = "{!s} // {:d}/{:d} type{:s} cached".format(self.__class__, len(self.structurecache), interface.tinfo.quantity(), '' if len(self.structurecache) == 1 else 's')
-
-            # Iterate through all of the structures we've cached and display any
-            # information that might be relevant.
-            rows = []
-            for ordinal in sorted(self.structurecache):
-                name = self.structurecache[ordinal]
-                sid = self.structureid[ordinal]
-                count = len(self.memberindexcache[ordinal])
-                actual = sum(1 for item in self.get_members(ordinal))
-                iterable = map(operator.itemgetter(0), self.memberindexcache[ordinal].values())
-                rows.append("[{:d}] {!r} ({:#x}) : {:d} member{:s} cached{:s}{!s}".format(ordinal, name, sid, count, '' if count == 1 else 's', '' if count == actual else ", expected {:d} member{:s}".format(actual, '' if actual == 1 else 's'), " : {:s}".format(','.join(map("{:#x}".format, iterable))) if count else ''))
-            return '\n'.join(itertools.chain([header], rows))
-
-        @classmethod
-        def get_type(cls, ordinal):
-            '''Return the type that is specified by `ordinal` and has member identifiers directly attached to it.'''
-            if isinstance(ordinal, internal.types.integer):
-                tinfo, description = interface.tinfo.for_ordinal(ordinal), "{:d}".format(ordinal)
-            elif isinstance(ordinal, internal.types.string):
-                tinfo, description = interface.tinfo.for_name(ordinal), "{!r}".format("{!s}".format(ordinal))
-            elif isinstance(ordinal, idaapi.tinfo_t):
-                tinfo, description = interface.tinfo.copy(ordinal), "{!r}".format("{!s}".format(ordinal))
-            else:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.get_type({!s}) : Unable to locate a type within the local types library using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), description, ordinal.__class__))
-
-            # If we couldn't get the type, then just raise an exception.
-            if not tinfo:
-                raise internal.exceptions.LocalTypeNotFoundError(u"{:s}.get_type({!s}) : Unable to locate the specified type in the local types library.".format('.'.join([__name__, cls.__name__]), description))
-
-            # If our type is a type reference pointing to a type reference, then
-            # we need to dereference it in order to find the actual local type
-            # that will return the member ids that we are looking for.
-            res = tinfo
-            while tinfo and tinfo.present() and tinfo.is_typeref():
-                res, name, ordinal = tinfo, tinfo.get_type_name(), interface.tinfo.ordinal(tinfo)
-                tinfo = interface.tinfo.at_ordinal(ordinal) if ordinal else interface.tinfo.at_name(name)
-            return res
-
-        @classmethod
-        def get_members(cls, ordinal):
-            '''Iterate through all of the members in the structure or union specified by `ordinal`.'''
-            tinfo = cls.get_type(ordinal)
-            iterable = (itertools.chain([index], items) for index, items in enumerate(interface.tinfo.members(tinfo)))
-            for mindex, mname, moffset, msize, mtype, malign in map(tuple, iterable):
-                mid = tinfo.get_udm_tid(mindex)
-                yield mindex, mid, mname, moffset, msize, mtype, malign
-            return
-
-        @classmethod
-        def get_member_by_udm(cls, ordinal, key, value):
-            '''Return the member of the structure or union in `ordinal` using given `key` and matching `value`.'''
-            udm = idaapi.udm_t()
-            if key in {idaapi.STRMEM_OFFSET, idaapi.STRMEM_INDEX, idaapi.STRMEM_AUTO}:
-                udm.offset = bitoffset
-            elif key == idaapi.STRMEM_NAME:
-                udm.name = utils.string.to(value)
-            elif key == idaapi.STRMEM_TYPE:
-                udm.type = value
-            elif key == idaapi.STRMEM_SIZE:
-                udm.size = value
-            elif key in {idaapi.STRMEM_MINS, idaapi.STRMEM_MAXS}:
-                pass
-            else:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.get_member_by_udm({:d}, {:d}, {!s}) : Unable to find a member using an unsupported key type ({:d}) with the given key ({!s}).".format('.'.join([__name__, 'localtypesmonitor_84', cls.__name__]), ordinal, key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value), key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value)))
-
-            # Grab the index for the member and verify that it is valid.
-            tinfo = cls.get_type(ordinal)
-            mindex = tinfo.find_udm(udm, key)
-            if mindex < 0:
-                raise internal.exceptions.MemberNotFoundError(u"{:s}.get_member_by_udm({:d}, {:d}, {!r}) : Unable to find a member matching the specified key type ({:d}) with the given key ({!s}).".format('.'.join([__name__, 'localtypesmonitor_84', cls.__name__]), ordinal, key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value), key, "{:d}".format(value) if isinstance(value, internal.types.integer) else "{!r}".format(value)))
-
-            mname = utils.string.of(udm.name)
-            mid = tinfo.get_udm_tid(mindex)
-            moffset, msize, malign = udm.offset, udm.size, udm.effalign
-            mtype = interface.tinfo.concretize(udm.type)
-            return mindex, mid, moffset, msize, mtype, malign
-
-        @classmethod
-        def get_member_by_bitoffset(cls, ordinal, bitoffset):
-            return cls.get_member_by_udm(ordinal, idaapi.STRMEM_OFFSET, bitoffset)
-        @classmethod
-        def get_member_by_name(cls, ordinal, name):
-            return cls.get_member_by_udm(ordinal, idaapi.STRMEM_NAME, name)
-        @classmethod
-        def get_member_by_index(cls, ordinal, index):
-            return cls.get_member_by_udm(ordinal, idaapi.STRMEM_INDEX, index)
-        @classmethod
-        def get_member_by_offset(cls, ordinal, index_or_offset):
-            return cls.get_member_by_udm(ordinal, idaapi.STRMEM_AUTO, index_or_offset)
-        @classmethod
-        def get_member_by_mid(cls, ordinal, mid):
-            res, tinfo = idaapi.udm_t(), cls.get_type(ordinal)
-            mindex = tinfo.get_udm_by_tid(mid)
-            mname = utils.string.of(udm.name)
-            mid = tinfo.get_udm_tid(mindex)
-            moffset, msize, malign = udm.offset, udm.size, udm.effalign
-            mtype = interface.tinfo.concretize(udm.type)
-            return mindex, mid, moffset, msize, mtype, malign
-
-        @classmethod
-        @contextlib.contextmanager
-        def ignore_changes(cls, *events):
-            '''This context manager disables any type changes that might occur inside the managed code by disabling the specified `events`.'''
-            iterable = itertools.chain(['local_types_changed'], events)
-
-            # Import our hook module, accepting that we don't care about the
-            # perform of the handler for the "local_types_changed" event.
-            import hook
-
-            # Start by disabling all of the required events and storing whether
-            # they were successful for not. If they weren't disabled, then we
-            # raise an exception and abort the context manager entirely.
-            required = {event for event in iterable} - hook.idb.disabled
-            disabled = [hook.idb.disable(event) for event in required]
-            try:
-                if not all(disabled):
-                    raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to disable {:d} of {:d} requested event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in disabled if not ok), len(required), '' if len(required) == 1 else 's'))
-                yield
-
-            # Now that we're done, we can go ahead and re-enable all of the
-            # events that we just disabled.
-            finally:
-                enabled = [hook.idb.enable(event) for event in required]
-
-            if not all(enabled):
-                raise exceptions.DisassemblerError(u"{:s}.ignore_changes({!s}) : Unable to enable {:d} of {:d} disabled event{:s}.".format('.'.join([__name__, cls.__name__]), sum(1 for ok in enabled if not ok), len(required), '' if len(required) == 1 else 's'))
-            return
-
-        def unload(self, *library):
-            '''Clear all of the cached information from the current state.'''
-            count = len(self.structurecache)
-            self.structurecache = {}
-            self.structureid = {}
-            self.memberoffsetcache = {}
-            self.memberindexcache = {}
-            self.loaded = False
-            return count
-
-        def __load_unguarded(self, *library):
-            '''Load information from the specified type `library` into the current state.'''
-            cls = self.__class__
-            structurecache, structureid = {}, {}
-            memberoffsetcache, memberindexcache = {}, {}
-
-            # Iterate through all the types only looking for structures or
-            # unions since they're the only thing that really counts.
-            for ordinal, name, tinfo in interface.tinfo.iterate():
-                if not(tinfo) or tinfo.empty():
-                    logging.debug(u"{:s}.load({:s}) : Skipping deleted or empty type \"{:s}\" at ordinal {:d} of the local types library.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(*library) if library else '', utils.string.escape(name, '"'), ordinal))
-                    continue
-
-                elif not(tinfo.is_struct() or tinfo.is_union()):
-                    logging.debug(u"{:s}.load({:s}) : Ignoring type \"{:s}\" at ordinal {:d} that is not a structure or a union.".format('.'.join([__name__, cls.__name__]), interface.tinfo.format_library(*library) if library else '', utils.string.escape(name, '"'), ordinal))
-                    continue
-
-                # Stash the original structure name so that we can know what the
-                # previous name will be. We also create a dictionary for the
-                # structure so that we can store information about its members.
-                structurecache[ordinal] = name
-                structureid[ordinal] = interface.tinfo.identifier(tinfo)
-                memberoffsets = memberoffsetcache.setdefault(ordinal, {})
-                memberindices = memberindexcache.setdefault(ordinal, {})
-
-                # Now we'll need to go through and enumerate all the members of
-                # the structure/union so that we can add their information to
-                # our cache.
-                iterable = self.get_members(ordinal)
-                for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
-                    memberoffsets[moffset] = mindex
-                    memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
-                continue
-
-            # Now we can assign them as members of our class.
-            self.structurecache = structurecache
-            self.structureid = structureid
-            self.memberoffsetcache = memberoffsetcache
-            self.memberindexcache = memberindexcache
-            self.loaded = interface.tinfo.quantity() >= 0
-            return len(structurecache)
-
-        def load(self, *library):
-            '''Disable any related events and load information from the specified type `library` into the current instance.'''
-            with self.ignore_changes():
-                res = self.__load_unguarded(*library)
-            return res
-
-        def cachedname(self, ordinal):
-            '''Return the cached name of the type specified by `ordinal` or an empty string.'''
-            return self.structurecache.get(ordinal, '')
-
-        def cachedidentifier(self, ordinal):
-            '''Return the cached identifier for the type specified by `ordinal`.'''
-            return self.structureid.get(ordinal, idaapi.BADADDR)
-
-        def identifier(self, ordinal):
-            '''Return the current identifier for the type specified by `ordinal`.'''
-            with self.ignore_changes():
-                tid = interface.tinfo.identifier(ordinal)
-            return tid
-
-        def name(self, ordinal):
-            '''Return the current name of the type specified by `ordinal`.'''
-            tinfo = self.get_type(ordinal)
-            res = tinfo.get_type_name()
-            return utils.string.of(res)
-
-        def renamed(self, ordinal):
-            '''Synchronize the cached name for the type specified by `ordinal` with the current name from the local types library.'''
-            tinfo = self.get_type(ordinal)
-            res, self.structurecache[ordinal] = self.structurecache[ordinal], utils.string.of(tinfo.get_type_name())
-            return res
-
-        def added(self, ordinal, update=True):
-            '''Update the cache with the addition of the type specified by `ordinal`.'''
-            tinfo = self.get_type(ordinal)
-            res, sid = self.name(tinfo), self.identifier(tinfo)
-
-            # Verify the identifier and whine if we couldn't find a valid one.
-            if sid == idaapi.BADADDR:
-                logging.warning(u"{:s}.added({:d}) : An invalid identifier ({:#x}) was found for the recently created type at ordinal {:d} named \"{:s}\" ({!r}).".format('.'.join([__name__, self.__class__.__name__]), ordinal, sid, ordinal, utils.string.escape(res or '', '"'), "{!s}".format(tinfo)))
-
-            # Now we can go through all of its members and collect them.
-            memberoffsets, memberindices = {}, {}
-            iterable = self.get_members(ordinal)
-            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
-                memberoffsets[moffset] = mindex
-                memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
-
-            # Then we can update the cache for the members if it was specified.
-            if update:
-                self.structurecache[ordinal] = res
-                self.structureid[ordinal] = sid
-                self.memberoffsetcache[ordinal] = memberoffsets
-                self.memberindexcache[ordinal] = memberindices
-            return sid, res, memberindices
-
-        def removed(self, ordinal, update=True):
-            '''Update the cache with the removal of the type specified by `ordinal`.'''
-            Fget_from_dict = operator.methodcaller('pop', ordinal) if update else operator.methodcaller('get', ordinal)
-            if self.structureid[ordinal] == idaapi.BADADDR:
-                logging.warning(u"{:s}.removed({:d}) : An invalid identifier ({:#x}) was found in the cache for the type at ordinal {:d}.".format('.'.join([__name__, self.__class__.__name__]), ordinal, self.structureid[ordinal], ordinal))
-
-            # Clear the specified ordinal out of all of our dictionaries.
-            res, sid = (Fget_from_dict(structure) for structure in [self.structurecache, self.structureid])
-            return sid, res, Fget_from_dict(self.memberindexcache)
-
-        def synchronize(self, ordinal):
-            '''Update the cache for the members belonging to the type specified by `ordinal`.'''
-            iterable = self.get_members(ordinal)
-
-            # Iterate through all the members and collect their attributes.
-            currentmemberoffsets, currentmemberindices = {}, {}
-            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
-                currentmemberoffsets[moffset] = mindex
-                currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
-
-            # All we need to do is to assign them into our cache and we're done.
-            res = self.memberindexcache[ordinal]
-            self.memberindexcache[ordinal] = currentmemberindices
-            self.memberoffsetcache[ordinal] = currentmemberoffsets
-            return res
-
-        def changes(self, ordinal, update=True):
-            '''Iterate through the members for type `ordinal`, and yield the index or offset of each one that has changed.'''
-            memberoffsets, memberindices = (cache[ordinal] for cache in [self.memberoffsetcache, self.memberindexcache])
-            currentmemberoffsets, currentmemberindices = {}, {}
-
-            # First start by enumerating all of the members for the type with
-            # the specified ordinal. This is so we can compare them later.
-            iterable = self.get_members(ordinal)
-            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
-                currentmemberoffsets[moffset] = mindex
-                currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
-
-            # Then we'll combine all our dictionaries into a pair that can be
-            # used as a parameter for the functions we'll use for comparing.
-            cached = memberoffsets, memberindices
-            current = currentmemberoffsets, currentmemberindices
-
-            # Now we'll create a bunch of lists that we'll use to do our
-            # comparisons and figure out what changed in the structure/union.
-            currentbounds, bounds = ([(moffset, msize) for _, _, moffset, msize, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
-            currentnames, names = ([mname for _, mname, _, _, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
-            currenttypes, types = ([mtype for _, _, _, _, mtype, _ in indices.values()] for indices in [currentmemberindices, memberindices])
-
-            # After capturing the current state, if we were asked to update our
-            # cache, then assign the current changes that we just grabbed.
-            if update:
-                self.memberindexcache[ordinal] = currentmemberindices
-                self.memberoffsetcache[ordinal] = currentmemberoffsets
-
-            # Check if the number of members have changed, because if so then a
-            # member was added or deleted and we'll need to know which one.
-            if len({mindex for mindex in memberindices}) != len({mindex for mindex in currentmemberindices}):
-                return self.__changed_member_count(ordinal, cached, current)
-
-            # Now we'll attempt to determine how the type was actually edited.
-            # We start by comparing the boundaries (offset and size) of the
-            # member to figure out if a member was moved.
-            elif currentbounds != bounds and currentnames == names:
-                return self.__changed_member_positions(ordinal, cached, current)
-
-            # If the names are different, then a member was renamed.
-            elif currentnames != names:
-                return self.__changed_member_names(ordinal, cached, current)
-
-            # If a type was changed, then we need to handle that too.
-            elif any(not(interface.tinfo.same(currenttype, type)) for currenttype, type in zip(currenttypes, types)):
-                return self.__changed_member_types(ordinal, cached, current)
-
-            # Otherwise there weren't any changes that occurred, and we just
-            # return nothing so that it looks like we actually did something.
-            return []
-
-        @classmethod
-        def __changed_members(cls, cached, current):
-            '''Compare the fields in `cached` to `current` and yield the number of changes, the old field, and the new field that was changed.'''
-            cachedmemberoffsets, cachedmemberindices = ({key : value for key, value in dictionary.items()} for dictionary in cached)
-            currentmemberoffsets, currentmemberindices = ({key : value for key, value in dictionary.items()} for dictionary in current)
-
-            # Start by gathering all of the information we can use as a unique
-            # key for matching the members.
-            cached_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in cachedmemberindices.items()}
-            current_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in currentmemberindices.items()}
-
-            cached_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in cachedmemberindices.items()}
-            current_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in currentmemberindices.items()}
-
-            # Before doing anything, empty out all of the elements that haven't
-            # changed from all of our dictionaries.
-            matching = {mindex for mindex in cachedmemberindices} & {mindex for mindex in currentmemberindices}
-            for mindex in matching:
-                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old = cachedmemberindices[mindex]
-                newmid, newname, newoffset, newsize, newtype, newalign = new = currentmemberindices[mindex]
-
-                # Compare all the member attributes that we use to consider it
-                # the same member. We ignore the member identifier since it
-                # really is just a reference number that can change (despite the
-                # disassembler not currently changing it).
-                if (oldname, oldoffset, oldsize) == (newname, newoffset, newsize) and interface.tinfo.same(oldtype, newtype):
-                    [memberindices.pop(mindex) for memberindices in [cachedmemberindices, currentmemberindices]]
-                continue
-
-            # The very first thing we need to do is to figure out which members
-            # have been moved around and collect them so that we can match from
-            # their old location to the new one. We grab a union of everything
-            # and then iterate through them to check their names.
-            pairs = []
-            for mindex in {index for index in cachedmemberindices} | {index for index in currentmemberindices}:
-                if not all(mindex in memberindices for memberindices in [cachedmemberindices, currentmemberindices]):
-                    continue
-
-                old = cachedmemberindices[mindex]
-                new = currentmemberindices[mindex]
-
-                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newmid, newname, newoffset, newsize, newtype, newalign = new
-
-                # If the names and offsets are the same, then this member wasn't
-                # moved and we can add its pair since they're already matching.
-                if (oldname, oldoffset) == (newname, newoffset):
-                    oldindex, newindex = mindex, mindex
-
-                # If the name doesn't exist in the current names, then skip it
-                # as we treat it as removed and we'll be handling those later.
-                elif oldname not in current_byname:
-                    continue
-
-                # Now we can extract the index for the new member using the new
-                # offset.
-                else:
-                    oldindex, newindex = mindex, current_byname[oldname]
-
-                # That should give us a pair that we can append for later.
-                pairs.append((oldindex, newindex))
-
-            # Iterate through both pairs and figure out what has changed between
-            # the matching members. Every time we process a member, we remove it
-            # from its corresponding dictionary of indices.
-            for oldindex, newindex in pairs:
-                old = cachedmemberindices.pop(oldindex)
-                new = currentmemberindices.pop(newindex)
-
-                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newmid, newname, newoffset, newsize, newtype, newalign = new
-
-                # Now we can just tally up the number of changes and yield them
-                # back to the caller.
-                count = 0 if oldname == newname else 1
-                count+= 0 if oldoffset == newoffset else 1
-                count+= 0 if oldsize == newsize else 1
-                count+= 0 if interface.tinfo.same(oldtype, newtype) else 1
-                count+= 0 if oldalign == newalign else 1
-
-                # Append the indices that we processed, and then yield the
-                # changes for the pair of members back to the caller.
-                yield count, old, new
-
-            # Before figuring out removals, we go through all the ones with
-            # matching offsets to see if the types and sizes are the same so
-            # that we can treat this as a single change...really for renames.
-            unmoved = {moffset for moffset in cached_bybitoffset} & {moffset for moffset in current_bybitoffset}
-            for moffset in unmoved:
-                oldindex, newindex = (cached[moffset] for cached in [cached_bybitoffset, current_bybitoffset])
-
-                # Make sure we haven't processed these indices already.
-                if not(oldindex in cachedmemberindices and newindex in currentmemberindices):
-                    continue
-
-                old = cachedmemberindices.pop(oldindex)
-                new = currentmemberindices.pop(newindex)
-
-                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newmid, newname, newoffset, newsize, newtype, newalign = new
-
-                # Now we can tally up whatever the changes are. This should be
-                # much lighter than what we did the first time since we know
-                # that the offsets here match between both members.
-                count = 0 if oldname == newname else 1
-                count+= 0 if oldoffset == newoffset else 1
-                count+= 0 if oldsize == newsize else 1
-                count+= 0 if interface.tinfo.same(oldtype, newtype) else 1
-                count+= 0 if oldalign == newalign else 1
-
-                # If nothing changed, then we don't need to do anything.
-                if count:
-                    yield count, old, new
-                continue
-
-            # Now we'll figure out what members were removed by removing the
-            # members that we already processed from the cached member indices.
-            removed = {mindex for mindex in cachedmemberindices}
-            for mindex in removed:
-                old = cachedmemberindices.pop(mindex)
-                yield -len(old), old, ()
-
-            # Finally we can figure out what members were added by removing the
-            # ones that were already processed from the current member indices.
-            added = {mindex for mindex in currentmemberindices}
-            for mindex in added:
-                new = currentmemberindices.pop(mindex)
-                yield +len(new), (), new
-            return
-
-        @classmethod
-        def __changed_members_compare(cls, ordinal, cached, current):
-            '''Compare the fields in `cached` from the given `ordinal` to the fields in `current` and log each field that is different.'''
-            res, iterable = [], cls.__changed_members(cached, current)
-            logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : Comparing the members for the specified ordinal ({:d}).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
-            for changes, old, new in iterable:
-                res.append((changes, old, new))
-
-                # If both the old and new members exist, then the old member was
-                # modified and we can just compare the values to figure it out.
-                if old and new:
-                    oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-                    newmid, newname, newoffset, newsize, newtype, newalign = new
-
-                    # First check the potential keys that we use for matching
-                    # members. At least one thing should match, if nothing
-                    # matches then it's an unexpected condition and we complain.
-                    if oldname != newname and oldoffset == newoffset:
-                        moffset = newoffset
-                        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The name for the member at offset {:+#x} has been changed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', moffset, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-                    elif oldname == newname and oldoffset != newoffset:
-                        mname = newname
-                        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" has been moved from offset {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, oldoffset, newoffset))
-                    elif (oldname, oldoffset) == (newname, newoffset):
-                        mname, moffset = newname, newoffset
-                        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had {:d} change{:s} made to it.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if changes == 1 else 's'))
-                    else:
-                        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had {:d} change{:s} made and changed it to \"{!s}\" at offset {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', utils.string.escape(oldname, '"'), oldoffset, changes, '' if changes == 1 else 's', utils.string.escape(newname, '"'), newoffset))
-
-                    # Now we can figure out what changed from what we grabbed.
-                    mname, moffset = newname, newoffset
-                    if oldsize != newsize:
-                        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its size changed from {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldsize, newsize))
-                    if not(interface.tinfo.same(oldtype, newtype)):
-                        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its type changed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
-                    if oldalign != newalign:
-                        logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its alignment changed from {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldalign, newalign))
-                    continue
-
-                # Next we can check the details about what member was removed.
-                elif new:
-                    mid, mname, moffset, msize, mtype, malign = new
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
-
-                # And finally information about the member that was added.
-                elif old:
-                    mid, mname, moffset, msize, mtype, malign = old
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
-                continue
-            return res
-
-        def __changed_member_count(self, ordinal, cached, current):
-            cls = self.__class__
-            logging.info(u"{:s}.__changed_members_count({:d}, {!s}, {!s}) : The number of members for the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
-            return self.__changed_members_compare(ordinal, cached, current)
-
-        def __changed_member_positions(self, ordinal, cached, current):
-            cls = self.__class__
-            logging.info(u"{:s}.__changed_members_positions({:d}, {!s}, {!s}) : The positions of the members for the type at ordinal {:d} have been moved.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
-            return self.__changed_members_compare(ordinal, cached, current)
-
-        def __changed_member_names(self, ordinal, cached, current):
-            cls = self.__class__
-            logging.info(u"{:s}.__changed_members_names({:d}, {!s}, {!s}) : The names of the members for the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
-            return self.__changed_members_compare(ordinal, cached, current)
-
-        def __changed_member_types(self, ordinal, cached, current):
-            cls = self.__class__
-            logging.info(u"{:s}.__changed_members_types({:d}, {!s}, {!s}) : The types of the members in the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
-            return self.__changed_members_compare(ordinal, cached, current)
 
     @classmethod
     def changed(cls, ltc, ordinal, name):
