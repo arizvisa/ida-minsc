@@ -231,6 +231,11 @@ class NetNodeNotFoundError(ItemNotFoundError):
     Unable to locate the specified netnode.
     """
 
+class LocalTypeNotFoundError(ItemNotFoundError):
+    """
+    Unable to locate the specified type in the local types library.
+    """
+
 class ReadOrWriteError(UnicodeException, E.IOError, E.ValueError):
     """
     Unable to read or write the specified number of bytes .
