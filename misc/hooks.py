@@ -4285,12 +4285,25 @@ class localtypesmonitor_84(object):
         else:
             newordinal, newname = ordinal, name
 
-        # Start out by figuring out if the type was renamed or not. Afterwards
-        # we can go ahead and check if any of its members have changed.
+        # Start out by figuring out if the type was renamed or not.
         res = cls.state.renamed(newordinal)
         if res != newname:
             logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has been renamed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, res, newname))
-        return cls.state.changes(newordinal)
+
+        # We need to create a callback that executes in the ui thread since this
+        # hook can be dispatched before the members for the local type actually
+        # get a type id allocated to them.
+        def ui_async_callback(ordinal):
+            res = cls.state.changes(ordinal)
+            logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(res), '' if len(res) == 1 else 's') if res else 'no members'))
+
+        # Afterwards we tell the disassembler to dispatch to our callback so
+        # that it can check if any of its members have changed and safely grab
+        # the identifier for all recently added members.
+        Fget_changes = functools.partial(ui_async_callback, newordinal)
+        if not idaapi.execute_ui_requests([Fget_changes]):
+            logging.error(u"{:s}.local_type_edited({!s}, {!s}) : Error dispatching a user interface request for the changed type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), ordinal))
+        return
 
 class supermethods(object):
     """
