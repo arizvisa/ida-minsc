@@ -7201,6 +7201,51 @@ class tinfo(object):
         return True if ordinal else False
 
     @classmethod
+    def identifier(cls, type, *always):
+        '''Return the identifier for the specified `type` from the current type library.'''
+        type_description = "{:d}".format(type) if isinstance(type, internal.types.integer) else "{!r}".format("{!s}".format(type))
+        tinfo = cls.for_ordinal(type) if isinstance(type, internal.types.integer) else cls.for_name(type) if isinstance(type, internal.types.string) else cls.concretize(type)
+
+        # If we couldn't get the type using what we were given, then we abort.
+        if not tinfo:
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.identifier({!s}{:s}) : Unable to find the specified type within the current local types library.".format('.'.join([__name__, cls.__name__]), type_description, ", {!s}".format(*always) if always else ''))
+
+        # If we're using 8.4, then we can just process this with the new api.
+        # XXX: It's worth noting that this api is not side-effect free and can
+        #      result in a type being added to the library regardless of whether
+        #      its "force_tid" parameter is set to true or not.
+        elif idaapi.__version__ >= 8.4:
+            res = idaapi.get_tinfo_tid(tinfo, *itertools.chain(always if always else [False]))
+            return res
+
+        # If it's not a type that we can return an identifier for, then raise an
+        # exception since we have no way to process this on earlier than v8.4.
+        elif not tinfo.is_sue():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.identifier({!s}{:s}) : Unable to return an identifier for the specified type due to it not being a structure, union, or enumeration.".format('.'.join([__name__, cls.__name__]), type_description, ", {!s}".format(*always) if always else ''))
+
+        # If we got a typedef, then we need to continuously resolve it until we
+        # get to a type (structure or union) that matches the type name.
+        while tinfo.is_typeref():
+            name = internal.utils.string.of(tinfo.get_type_name())
+            candidates = (F(internal.utils.string.to(name)) for F in [idaapi.get_enum, idaapi.get_struc_id])
+            if not all(candidate == idaapi.BADADDR for candidate in candidates):
+                break
+            ordinal = cls.ordinal(tinfo)
+            tinfo = cls.at_ordinal(ordinal) if ordinal else cls.at_name(internal.utils.string.of(tinfo.get_type_name()))
+
+        # The rest, we need to figure this out ourselves. We accomplish this by
+        # concretizing the type and extracting its typename. Then we can use it
+        # to look up the structure, union, or enumeration by name.
+        res = cls.concretize(tinfo)
+        name = internal.utils.string.of(res.get_type_name())
+
+        tid = idaapi.get_enum(internal.utils.string.to(name)) if res.is_enum() else idaapi.get_struc_id(internal.utils.string.to(name))
+        if tid == idaapi.BADADDR:
+            exception_t = internal.exceptions.EnumerationNotFoundError if res.is_enum() else internal.exceptions.StructureNotFoundError
+            raise exception_t(u"{:s}.identifier({!s}{:s}) : Unable to return an identifier for the specified type \"{!s}\" due to it not being a structure, union, or enumeration.".format('.'.join([__name__, cls.__name__]), type_description, ", {!s}".format(*always) if always else '', internal.utils.string.escape("{!s}".format(tinfo), '"')))
+        return tid
+
+    @classmethod
     def at_ordinal(cls, ordinal, *library):
         '''Return the type information for the given `ordinal` from the specified type `library`.'''
         [til] = library if library else [cls.library()]
