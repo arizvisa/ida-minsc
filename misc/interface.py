@@ -843,26 +843,23 @@ class prioritybase(object):
         # If a method is passed to us, then we need to extract all
         # of the relevant components that describe it.
         if isinstance(object, (internal.types.method, internal.types.descriptor)):
-            cls = pycompat.method.type(object)
             func = pycompat.method.function(object)
-            module, name = func.__module__, pycompat.function.name(func)
             iterable = parameters(func)
             None if isinstance(object, internal.types.staticmethod) else next(iterable)
-            return '.'.join([module, cls.__name__, name]), tuple(iterable)
+            return pycompat.fullname(object), tuple(iterable)
 
         # If our object is a function-type, then it's easy to grab.
         elif isinstance(object, internal.types.function):
-            module, name = object.__module__, pycompat.function.name(object)
             iterable = parameters(object)
-            return '.'.join([module, name]), tuple(iterable)
+            return pycompat.fullname(object), tuple(iterable)
 
         # If it's still callable, then this is likely a class.
         elif callable(object):
-            symbols, module, name = object.__dict__, object.__module__, object.__name__
+            symbols = object.__dict__
             cons = symbols.get('__init__', symbols.get('__new__', None))
-            iterable = parameters(cons) if cons else []
-            next(iterable)
-            return '.'.join([module, name]), tuple(iterable)
+            iterable = iter(parameters(cons) if cons else [])
+            next(iterable, None)
+            return pycompat.fullname(object), tuple(iterable)
 
         # Otherwise, we have no idea what it is...
         return "{!r}".format(object), None
