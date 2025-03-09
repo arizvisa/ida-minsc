@@ -4328,6 +4328,99 @@ class localtypesmonitor_84(object):
             logging.error(u"{:s}.local_type_edited({!s}, {!s}) : Error dispatching a user interface request for the changed type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), ordinal))
         return
 
+    @classmethod
+    def is_name_general(cls, ordinal, tid, name):
+        '''Return true if the `name` for the given `ordinal` and type `tid` is the default type name that was chosen by the disassembler.'''
+        prefixes = {'struct', 'struc', 'union', 'enum'}
+
+        # XXX: IDA uses both "struct" (in types) and "struc" (in structures)
+
+        # Technically the default name chosen by the disassembler for a new type
+        # is prefixed with either "struc_" or "enum_" and not "union_". Still,
+        # we check for it just in case the user explicitly specified it.
+        if not name.startswith(tuple(map("{:s}_".format, prefixes))):
+            return False
+
+        # Check if the type is anonymous. The disassembler assumes that a type
+        # is anonymous if it begins with a '$', but we also verify the length
+        # since in v8.4 the disassembler uses an MD5 hash for anonymous types.
+        elif name.startswith('$') and len(name[1:]) == 0x20:
+            return True
+
+        # Split up the prefix from its suffix, then verify the prefix is valid
+        # and that the suffix is numeric.
+        prefix, suffix = name.split('_', 1)
+        return prefix in prefixes and all(digit in '0123456789' for digit in suffix)
+
+    @classmethod
+    def is_field_general(cls, ordinal, mindex, name):
+        '''Return true if the `name` for the member at `mindex` of the type in `ordinal` is a default field name that was chosen by the disassembler.'''
+        prefixes, tinfo = {'field'}, cls.state.get_type(ordinal)
+
+        # Start by populating the `idaapi.udm_t` with the information for the
+        # given member. This way we can extract the offset and do a proper
+        # comparison of what we expect the field name to actually be.
+        udm = idaapi.udm_t()
+        udm.offset = mindex
+
+        # Now we can search for the member at the given index. If we couldn't
+        # find it then we can't really check its name. So, log our failure and
+        # return that the field is a general name (since it doesn't have one).
+        newindex = tinfo.find_udm(udm, idaapi.STRMEM_INDEX)
+        if newindex < 0:
+            logging.warning(u"{:s}.is_field_general({:d}, {:d}, {!r}) : Unable to find a member at index {:d} of the type at ordinal {:d}.".format('.'.join([__name__, cls.__name__]), ordinal, mindex, name, mindex, ordinal))
+            return True
+
+        # Before doing anything, we need to check if the name of the member is
+        # anonymous. Normally we explicitly check, but the disassembler gives us
+        # the `udm_t.is_anonymous_udm` method which we can use.
+        elif udm.is_anonymous_udm():
+            return True
+
+        # Next we'll figure out what the expected name should be. If our type is
+        # a union, then the field is suffixed with the index. Otherwise, the
+        # field is suffixed with the byte offset.
+        elif tinfo.is_union():
+            expected, suffix_integer = "field_{:d}".format(newindex), newindex
+
+        elif tinfo.is_struct():
+            bits = udm.offset
+            bytes, _ = divmod(bits, 8)
+            expected, suffix_integer = "field_{:X}".format(bytes), bytes
+
+        else:
+            logging.error(u"{:s}.is_field_general({:d}, {:d}, {!r}) : Unable to determine the default field name for the member at index {:d} of the unsupported type \"{:s}\" (ordinal {:d}).".format('.'.join([__name__, cls.__name__]), ordinal, mindex, name, mindex, utils.string.escape("{!s}".format(tinfo), '"'), ordinal))
+            return True
+
+        # The only default field name that exists in v8.4 of the type library
+        # are names that begin with "field_". There are some defaults chosen
+        # when using "Create struct from selection" (CreateStructFromData), but
+        # since the default name for those is dependent on the type being used
+        # for the field we don't bother trying to track figure it out.
+
+        # FIXME: Is is worth attempting to distinguish the default field names
+        #        from the "CreateStrucFromData" action?
+
+        # So we now have a name that we expect to be used for the field. If we
+        # have an exact match, then can be sure that it was not from the user.
+        if name == expected:
+            return True
+
+        # Next in order to allow the user to specify a field name that will be
+        # treated as a default one, we'll check if it uses the "field_" prefix.
+        elif not name.startswith('field_'):
+            return False
+
+        # We now know that the member name is prefixed correctly, so we need
+        # to split it and then check that the pieces meet our requirements. Our
+        # requirements are that the suffix, containing the offset, is specified
+        # as either decimal (the default) or hexadecimal.
+        field, suffix = name.split('_', 1) if '_' in name else (name, '')
+        expected_base10, expected_base16 = (string.format(suffix_integer) for string in ["{:x}", "{:d}"])
+
+        # Finally we can do our tests against the field prefix and its suffix.
+        return field in prefixes and suffix.lower() in {expected_base10, expected_base16}
+
 class supermethods(object):
     """
     Define all of the functions that will be used as supermethods for
