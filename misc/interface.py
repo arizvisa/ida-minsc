@@ -7176,8 +7176,8 @@ class tinfo(object):
         return True if ordinal else False
 
     @classmethod
-    def has_identifier(cls, identifier, *library):
-        '''Return whether the given `identifier` is associated with a type in the specified type `library`.'''
+    def has_struc_enum(cls, identifier, *library):
+        '''Return whether the given structure, union, or enumeration `identifier` is associated with a type in the specified type `library`.'''
         identifier = identifier if isinstance(identifier, internal.types.integer) else identifier.id
 
         # if the identifier is not a structure/union, then check if it's an enumeration.
@@ -7202,7 +7202,7 @@ class tinfo(object):
         serialized = type.serialize()
         defaults = [b'', b'', b'', b'', getattr(idaapi, 'sc_unk', 0), 0]
         type, fields, cmt, fields_cmt, sclass, ordinal = [item for item in itertools.chain(serialized, defaults[len(serialized) - len(defaults):])][:len(defaults)]
-        return hashlib.md5(bytes().join([type, fields])).hexdigest().upper()
+        return hashlib.md5(bytes().join([type, fields or b''])).hexdigest().upper()
 
     @classmethod
     def identifier(cls, type, *always):
