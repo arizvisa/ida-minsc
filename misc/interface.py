@@ -7246,6 +7246,68 @@ class tinfo(object):
         return tid
 
     @classmethod
+    def member_identifier(cls, type, index_or_name):
+        '''Return the identifier for the specified `index_or_name` from the given `type`.'''
+        type_description = "{:d}".format(type) if isinstance(type, internal.types.integer) else "{!r}".format("{!s}".format(type))
+        key_description = "{:d}".format(index_or_name) if isinstance(index_or_name, internal.types.integer) else "{!r}".format(index_or_name)
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        tinfo = cls.for_ordinal(type) if isinstance(type, internal.types.integer) else cls.for_name(type) if isinstance(type, internal.types.string) else cls.concretize(type)
+
+        # If it's not a type that we can return an identifier for, then raise an
+        # exception since we have no way to process this on earlier than v8.4.
+        udm = udm_t()
+        if not tinfo.is_sue():
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.member_identifier({!s}, {!s}) : Unable to return an identifier for a member of the specified type due to it not being a structure, union, or enumeration.".format('.'.join([__name__, cls.__name__]), type_description, key_description))
+        elif idaapi.__version__ >= 8.4 and isinstance(index_or_name, internal.types.integer):
+            F, flags, udm.offset = tinfo.find_udm, idaapi.STRMEM_INDEX, index_or_name
+        elif idaapi.__version__ >= 8.4 and isinstance(index_or_name, internal.types.string):
+            F, flags, udm.name = tinfo.find_udm, idaapi.STRMEM_NAME, internal.utils.string.to(index_or_name)
+        elif tinfo.is_enum():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.member_identifier({!s}, {!s}) : Return the identifier for an enumeration is currently unimplemented.".format('.'.join([__name__, cls.__name__]), type_description, key_description))
+        elif isinstance(index_or_name, internal.types.integer):
+            F, flags, udm.offset = tinfo.find_udt_member, idaapi.STRMEM_INDEX, index_or_name
+        elif isinstance(index_or_name, internal.types.string):
+            F, flags, udm.name = tinfo.find_udt_member, idaapi.STRMEM_NAME, internal.utils.string.to(index_or_name)
+        else:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.member_identifier({!s}, {!s}) : Unable to return an identifier for a member of the specified type using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), type_description, key_description, index_or_name.__class__))
+
+        # Now we can query for the udm_t using the index or name we were given.
+        res = F(udm, flags)
+        if res < 0:
+            raise internal.exceptions.MemberNotFoundError(u"{:s}.member_identifier({!s}, {!s}) : Unable to find a member in the given type that matches the specified {:s} ({!s}).".format('.'.join([__name__, cls.__name__]), type_description, key_description, 'index' if isinstance(index_or_name, internal.types.integer) else 'name', key_description))
+
+        # If we're using a recent version of the disassembler, we can just use
+        # the index with the `get_udm_tid` api to get the member id to return.
+        if idaapi.__version__ >= 8.4:
+            return tinfo.get_udm_tid(res)
+
+        # If we're using anything else, then we need to figure the struct for
+        # our type. We use the name instead of index because the disassembler
+        # might include a gap that could affect the member indexing.
+        sid = eid = cls.identifier(tinfo)
+        if sid == idaapi.BADADDR:
+            exception_t = internal.exceptions.EnumerationNotFoundError if tinfo.is_enum() else internal.exceptions.StructureNotFoundError
+            raise exception_t(u"{:s}.member_identifier({!s}, {!s}) : Unable to find the identifier for the specified type ({!r}).".format('.'.join([__name__, cls.__name__]), type_description, key_description, 'index' if isinstance(index_or_name, internal.types.integer) else name, key_description, "{!s}".format(tinfo)))
+
+        # Enumerations require us to use the enumeration api, which requires us
+        # to process the `enum_type_data_t` in order to figure out the correct
+        # identifier using its name or index. As such, this is unimplemented.
+        if tinfo.is_enum():
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.member_identifier({!s}, {!s}) : Unable to find the identifier for the specified type ({!r}).".format('.'.join([__name__, cls.__name__]), type_description, key_description, 'index' if isinstance(index_or_name, internal.types.integer) else name, key_description, "{!s}".format(tinfo)))
+
+        # Otherwise, we need to grab the structure/union using its identifier,
+        # then we can use the name from `udm_t` to get the correct `member_t.`
+        sptr = idaapi.get_struc(sid)
+        if not sptr:
+            raise internal.exceptions.StructureNotFoundError(u"{:s}.member_identifier({!s}, {!s}) : Unable to find a structure with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), type_description, key_description, 'index' if isinstance(index_or_name, internal.types.integer) else name, key_description, sid))
+
+        name = internal.utils.string.of(udm.name)
+        mptr = idaapi.get_member_by_name(sptr, internal.utils.string.to(name))
+        if not mptr:
+            raise internal.exceptions.MemberNotFoundError(u"{:s}.member_identifier({!s}, {!s}) : Unable to find a member with the name \"{:s}\" inside the specified structure ({:#x}).".format('.'.join([__name__, cls.__name__]), type_description, key_description, 'index' if isinstance(index_or_name, internal.types.integer) else name, key_description, internal.utils.string.escape(name, '"'), sid))
+        return mptr.id
+
+    @classmethod
     def at_ordinal(cls, ordinal, *library):
         '''Return the type information for the given `ordinal` from the specified type `library`.'''
         [til] = library if library else [cls.library()]
