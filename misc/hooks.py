@@ -3977,9 +3977,9 @@ class localtypesmonitor_state(object):
             count+= 0 if interface.tinfo.same(oldtype, newtype) else 1
             count+= 0 if oldalign == newalign else 1
 
-            # Append the indices that we processed, and then yield the
+            # Prepend the indices that we processed, and then yield the
             # changes for the pair of members back to the caller.
-            yield count, old, new
+            yield count, tuple(itertools.chain([oldindex], old)), tuple(itertools.chain([newindex], new))
 
         # Before figuring out removals, we go through all the ones with
         # matching offsets to see if the types and sizes are the same so
@@ -4009,7 +4009,7 @@ class localtypesmonitor_state(object):
 
             # If nothing changed, then we don't need to do anything.
             if count:
-                yield count, old, new
+                yield count, tuple(itertools.chain([oldindex], old)), tuple(itertools.chain([newindex], new))
             continue
 
         # Now we'll figure out what members were removed by removing the
@@ -4017,14 +4017,14 @@ class localtypesmonitor_state(object):
         removed = {mindex for mindex in cachedmemberindices}
         for mindex in removed:
             old = cachedmemberindices.pop(mindex)
-            yield -len(old), old, ()
+            yield -len(old[1:]), tuple(itertools.chain([mindex], old)), ()
 
         # Finally we can figure out what members were added by removing the
         # ones that were already processed from the current member indices.
         added = {mindex for mindex in currentmemberindices}
         for mindex in added:
             new = currentmemberindices.pop(mindex)
-            yield +len(new), (), new
+            yield +len(new[1:]), (), tuple(itertools.chain([mindex], new))
         return
 
     @classmethod
@@ -4038,8 +4038,8 @@ class localtypesmonitor_state(object):
             # If both the old and new members exist, then the old member was
             # modified and we can just compare the values to figure it out.
             if old and new:
-                oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newmid, newname, newoffset, newsize, newtype, newalign = new
+                _, oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
+                _, newmid, newname, newoffset, newsize, newtype, newalign = new
 
                 # First check the potential keys that we use for matching
                 # members. At least one thing should match, if nothing
@@ -4068,8 +4068,8 @@ class localtypesmonitor_state(object):
 
             # Next we can check the details about what member was removed.
             elif new:
-                mid, mname, moffset, msize, mtype, malign = new
-                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
+                _, mid, mname, moffset, msize, mtype, malign = new
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with {:d} change{:s} (including the offset).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
@@ -4077,8 +4077,8 @@ class localtypesmonitor_state(object):
 
             # And finally information about the member that was added.
             elif old:
-                mid, mname, moffset, msize, mtype, malign = old
-                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with {:d} change{:s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
+                _, mid, mname, moffset, msize, mtype, malign = old
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with {:d} change{:s} (including the offset).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
