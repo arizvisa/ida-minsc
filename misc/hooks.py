@@ -4458,6 +4458,30 @@ class localtypesmonitor_84(object):
         return False
 
     @classmethod
+    def delete_member_refs(cls, sid, mid):
+        '''Remove all of the tags associated with the member `mid` belonging to the type `sid`.'''
+        return internal.tags.reference.members.erase_member(sid, mid)
+
+    @classmethod
+    def delete_type(cls, sid):
+        '''Remove all of the tags associated with the type `sid` and its members.'''
+        tinfo = idaapi.tinfo_t()
+
+        # Try and get the type using the identifier in `sid`, and use it to grab
+        # the ordinal for the type that is associated with it. If we can grab
+        # it, then we can use it to enumerate all of the member identifiers in
+        # order to remove them.
+        if tinfo.get_type_by_tid(sid):
+            erased = internal.tags.reference.members.erase(sid)
+            erased and logging.debug(u"{:s}.delete_type({:#x}) : Deleted the tags for {:d} member{:s} from the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, len(erased), '' if len(erased) == 1 else 's', sid))
+
+        # Otherwise, the only thing left to do is to erase the structure id.
+        removed = internal.tags.reference.structure.erase(sid)
+        if removed:
+            logging.debug(u"{:s}.delete_type({:#x}) : Deleted the tags associated with the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, sid))
+        return removed, erased
+
+    @classmethod
     def type_updater(cls, ltc, ordinal):
         '''Check the changes for the type specified in `ordinal` and update any tags resulting from them.'''
         if not hasattr(cls, 'state'):
