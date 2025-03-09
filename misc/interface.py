@@ -8,7 +8,7 @@ individuals to attempt to understand this craziness.
 """
 
 import six, builtins, os
-import sys, logging, contextlib, threading, weakref
+import sys, logging, contextlib, hashlib, threading, weakref
 import functools, operator, itertools
 import collections, heapq, bisect, traceback, ctypes, math, codecs, array as _array
 import fnmatch, re
@@ -7199,6 +7199,14 @@ class tinfo(object):
         if library:
             return cls.has_ordinal(ordinal, *library)
         return True if ordinal else False
+
+    @classmethod
+    def anonymous_name(cls, type):
+        '''Return the anonymous name for the specified `type`.'''
+        serialized = type.serialize()
+        defaults = [b'', b'', b'', b'', getattr(idaapi, 'sc_unk', 0), 0]
+        type, fields, cmt, fields_cmt, sclass, ordinal = [item for item in itertools.chain(serialized, defaults[len(serialized) - len(defaults):])][:len(defaults)]
+        return hashlib.md5(bytes().join([type, fields])).hexdigest().upper()
 
     @classmethod
     def identifier(cls, type, *always):
