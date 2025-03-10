@@ -4244,7 +4244,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def local_type_added(cls, ordinal, name):
         '''Handle the event when a new type has been added to the type library.'''
-        event = 'LTC_ADDED'
+        ltc, event = cls.table['LTC_ADDED'], 'LTC_ADDED'
         logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Received local type change event of type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), event, cls.table[event]))
 
         # Figure out the correct ordinal number for the type. If the ordinal
@@ -4259,24 +4259,35 @@ class localtypesmonitor_84(object):
 
         # We need to create a callback to execute in the ui thread since this
         # hook gets dispatched before the local type actually gets created. This
-        # callback just updates our state cache and logs the type addition.
+        # callback is responsible for updating our state cache and its tags.
         def ui_async_callback(ordinal):
-            newsid, newname, newmembers = cls.state.added(newordinal)
+            newsid, newname, newmembers = cls.state.added(newordinal, True)
             logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
+
+            # Now we need to format our new members as a list of changes.
+            iterable = ((mindex, mid, mname, moffset, msize, mtype, malign) for mindex, (mid, mname, moffset, msize, mtype, malign) in newmembers.items())
+            changes = [(len(field[2:]), (), field) for field in iterable]
+
+            # Then we can update the tags for the type and also the members that
+            # were included alongside the addition of the type.
+            cls.type_updater(ltc, ordinal)
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Finished updating tags for the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
+            cls.member_updater(ltc, ordinal, changes)
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Finished updating tags for {:d} member{:s} belonging to the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), len(changes), '' if len(changes) == 1 else 's', newordinal, newname, newsid))
 
         # Since our "local_types_changed" event gets dispatched before the
         # structure can have an identifier, we need to execute this passively as
         # a UI request so that we are able to grab and cache the identifier.
-        Fget_identifier = functools.partial(ui_async_callback, newordinal)
-        if not idaapi.execute_ui_requests([Fget_identifier]):
+        Fupdate_identifier = functools.partial(ui_async_callback, newordinal)
+        if not idaapi.execute_ui_requests([Fupdate_identifier]):
             logging.error(u"{:s}.local_type_added({!s}, {!s}) : Error dispatching a user interface request for the new type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal))
         return
 
     @classmethod
     def local_type_deleted(cls, ordinal, name):
         '''Handle the event when a type has been removed from the type library.'''
-        event = 'LTC_DELETED'
-        logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Received local type change event of type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), event, cls.table[event]))
+        ltc, event = cls.table['LTC_DELETED'], 'LTC_DELETED'
+        logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Received local type change event of type {:s}({:d}) for the type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), event, cls.table[event], ordinal))
 
         # Figure out the correct ordinal number for the type. If the ordinal
         # isn't set, then we figure it out by searching for the name.
@@ -4292,10 +4303,16 @@ class localtypesmonitor_84(object):
         oldsid, oldname, oldmembers = cls.state.removed(oldordinal)
         logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Discovered a removed type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), oldordinal, oldname, oldsid))
 
+        # Since we're removing a type from the local type library, we really
+        # should be deleting its references if it's a supported type. But, since
+        # the type doesn't really exist anymore we just delete the entire sid.
+        removed, removedmembers = cls.delete_type(oldsid)
+        logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Removal of {:s} at ordinal {:d} named \"{:s}\" ({:#x}) resulted in erasing {:d} member{:s}.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), "{:d} type".format(len(removed)) if len(removed) == 1 else "{:d} types".format(len(removed)), oldordinal, oldname, oldsid, len(removedmembers), '' if len(removedmembers) == 1 else 's'))
+
     @classmethod
     def local_type_edited(cls, ordinal, name):
         '''Handle the event when a type in the type library has been modified.'''
-        event = 'LTC_EDITED'
+        ltc, event = cls.table['LTC_EDITED'], 'LTC_EDITED'
         logging.debug(u"{:s}.local_type_edited({!s}, {!s}) : Received local type change event of type {:s}({:d}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), event, cls.table[event]))
 
         # Figure out the correct ordinal number for the type. If the ordinal
@@ -4308,17 +4325,21 @@ class localtypesmonitor_84(object):
         else:
             newordinal, newname = ordinal, name
 
-        # Start out by figuring out if the type was renamed or not.
-        res = cls.state.renamed(newordinal)
-        if res != newname:
-            logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has been renamed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, res, newname))
-
         # We need to create a callback that executes in the ui thread since this
         # hook can be dispatched before the members for the local type actually
-        # get a type id allocated to them.
+        # get a type id allocated to them. After getting the member changes and
+        # then updating them, we then need to tally the tags used for the
+        # members that were modified.
         def ui_async_callback(ordinal):
-            res = cls.state.changes(ordinal)
-            logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(res), '' if len(res) == 1 else 's') if res else 'no members'))
+            changes = cls.state.changes(ordinal, True)
+            logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(changes), '' if len(changes) == 1 else 's') if changes else 'no members'))
+
+            # Now we just need to update the tags for the members of the type.
+            cls.member_updater(ltc, ordinal, changes)
+
+        # Start out by processing the type in case it was renamed or changed in
+        # another way.
+        cls.type_updater(ltc, newordinal)
 
         # Afterwards we tell the disassembler to dispatch to our callback so
         # that it can check if any of its members have changed and safely grab
@@ -4642,7 +4663,7 @@ class localtypesmonitor_84(object):
                     logging.error(u"{:s}.member_updater({:d}, {!s}, {!s}) : Unable to adjust the tags for the deleted member at index {:d} of type {!s} ({:#x}) due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, parameter, sid, mid))
                     continue
 
-                removed = internal.tags.reference.members.erase_member(sid, mid)
+                removed = cls.delete_member_refs(sid, mid)
                 logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Removed the tags for the member at index {:d} ({:#x}) of type {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid))
 
             # A member was added, so we need to check if the field uses a
@@ -4657,7 +4678,7 @@ class localtypesmonitor_84(object):
                 # the member. This shouldn't do anything since there's really
                 # isn't any reason for a new member to have any tag data
                 # associated with it.
-                removed = internal.tags.reference.members.erase_member(sid, mid)
+                removed = cls.delete_member_refs(sid, mid)
 
                 # If the field name is not a general one, then increment the
                 # reference count for its "__name__" tag.
