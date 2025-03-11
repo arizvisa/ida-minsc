@@ -7765,6 +7765,15 @@ class tinfo(object):
             idaapi.BT_INT,
         }
 
+        # We also treat the primitive types that have practically no information
+        # associated with them as a basic type.
+        void_types = {
+            idaapi.BTMT_SIZE0,
+            idaapi.BTMT_SIZE12,
+            idaapi.BTMT_SIZE48,
+            idaapi.BTMT_SIZE128,
+        }
+
         # unpack the type declaration into its components so that we can test.
         base, flags, modifiers = (decl & mask for mask in masks)
 
@@ -7772,12 +7781,18 @@ class tinfo(object):
         if modifiers:
             return False
 
-        # start out by checking if it's one of the basic integer types used by
-        # the selected compiler. we need to specially handle single-byte types,
-        # because they have a flag set for them to make them a "char".
-        if not flags and base in compiler_integer_types:
+        # start out by checking if it's a user-specified basic type. these
+        # include things like _BYTE, _WORD, _DWORD, _QWORD, and _OWORD.
+        if base in {idaapi.BT_VOID, idaapi.BT_UNK} and flags in void_types:
             return True
 
+        # now we can check if it's one of the basic integer types used by the
+        # compiler.
+        elif not flags and base in compiler_integer_types:
+            return True
+
+        # we need to specially handle single-byte types, because they have a
+        # special flag set for them to make them into a "char".
         elif (base, flags) == (idaapi.BT_INT8, idaapi.BTMT_CHAR):
             return True
 
