@@ -1939,16 +1939,16 @@ class structures(changingchanged):
     @classmethod
     def update_refs(cls, sid, old, new):
         '''Update the reference counts for the structure in `sid` by comparing the `old` tags with the ones in `new`.'''
-        oldkeys, newkeys = ({item for item in content} for content in [old, new])
+        oldkeys, newkeys, tags = ({item for item in content} for content in [old, new, internal.tags.reference.structure.get(sid)])
 
         # compare the original keys against the modified ones in order to figure
         # out whether we're removing a key or simply adding it.
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old tags ({!s}) to new tags ({!s}) for structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(oldkeys), utils.string.repr(newkeys), sid))
         for key in oldkeys ^ newkeys:
-            if key not in new:
+            if key not in new and key in tags:
                 logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
                 internal.tags.reference.structure.decrement(sid, key)
-            if key not in old:
+            if key not in old and key not in tags:
                 logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for tag {!s} in structure {:#x}.".format('.'.join([__name__, cls.__name__]), sid, utils.string.repr(key), sid))
                 internal.tags.reference.structure.increment(sid, key)
             continue
@@ -2269,10 +2269,14 @@ class structurenaming(changingchanged):
 
         # The only thing we have to do is to remove all tags associated with the
         # structure. So we grab them, and decrement each one-by-one.
-        tags = internal.tags.reference.structure.get(struc_id)
+        erased, tags = [], internal.tags.reference.structure.get(struc_id)
         logging.debug(u"{:s}.deleted({:#x}) : Found {:d} tag{:s} ({!s}) associated with structure {:#x} that will be removed.".format('.'.join([__name__, cls.__name__]), struc_id, len(tags), '' if len(tags) == 1 else 's', tags, struc_id))
-        [ internal.tags.reference.structure.decrement(struc_id, tag) for tag in tags ]
-        return
+
+        if internal.structure.by_identifier(struc_id):
+            erased = internal.tags.reference.members.erase(struc_id)
+
+        removed = {sid for sid in internal.tags.reference.structure.erase(struc_id)}
+        logging.debug(u"{:s}.deleted({:#x}) : Removed {:d} member{:s} that were associated with {:s}.".format('.'.join([__name__, cls.__name__]), struc_id, len(erased), '' if len(erased) == 1 else 's', "{:d} structure ({:#x})".format(len(removed), *sorted(removed)) if len(removed) == 1 else "{:d} structures ({:s})".format(len(removed), ', '.join(map("{:#x}".format, sorted(removed))))))
 
     @classmethod
     def updater(cls):
@@ -2305,18 +2309,19 @@ class structurenaming(changingchanged):
         # and determine whether to remove it since the disassembler doesn't let
         # us apply an empty name to a structure anyways.
         renamed = cls.is_general_name(sid, oldname), cls.is_general_name(newsid, applied)
+        available = internal.tags.reference.structure.get(newsid)
 
         # If we're switching from general to user-specified, then increment.
         if renamed == (True, False):
-            internal.tags.reference.structure.increment(newsid, '__name__')
+            internal.tags.reference.structure.increment(newsid, '__name__') if '__name__' not in available else ()
 
         # If we're going from user-specified to general, then decrement.
         elif renamed == (False, True):
-            internal.tags.reference.structure.decrement(newsid, '__name__')
+            internal.tags.reference.structure.decrement(newsid, '__name__') if '__name__' in available else ()
 
         # If the old name is user-specified, but the tag doesn't exist then we
         # need to add it since we must've missed it.
-        elif not renamed[0] and '__name__' not in internal.tags.reference.structure.get(newsid):
+        elif not renamed[0] and '__name__' not in available:
             internal.tags.reference.structure.increment(newsid, '__name__')
 
         # If both are general or user-specified, then there's nothing to do
@@ -2398,16 +2403,16 @@ class membertagscommon(changingchanged):
     @classmethod
     def update_refs(cls, mid, old, new):
         '''Update the reference counts for the member in `mid` by comparing the `old` tags with the ones in `new`.'''
-        oldkeys, newkeys = ({item for item in content} for content in [old, new])
+        oldkeys, newkeys, tags = ({item for item in content} for content in [old, new, internal.tags.reference.members.get(mid)])
 
         # compare the original keys against the modified ones in order to figure
         # out whether we're removing a key or simply adding it.
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old tags ({!s}) to new tags ({!s}) for member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(oldkeys), utils.string.repr(newkeys), mid))
         for key in oldkeys ^ newkeys:
-            if key not in new:
+            if key not in new and key in tags:
                 logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for tag {!s} in member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(key), mid))
                 internal.tags.reference.members.decrement(mid, key)
-            if key not in old:
+            if key not in old and key not in tags:
                 logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for tag {!s} in member {:#x}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(key), mid))
                 internal.tags.reference.members.increment(mid, key)
             continue
@@ -3013,7 +3018,7 @@ class membernamingcommon(changingchanged):
 
         # Now we'll check both the old name and new name to figure out which
         # ones are generalized, and which ones are user-specified.
-        sid, mid = newsid, newmid
+        sid, mid, available = newsid, newmid, internal.tags.reference.members.get(newmid)
         gold, gnew = (cls.is_general_field(sid, mid, name) for name in [oldname, newname])
         renamed = gold, gnew
 
@@ -3021,16 +3026,16 @@ class membernamingcommon(changingchanged):
         # count for "__name__" or decrement it. If the rename is from a general
         # name to a user-specified one, then we increment.
         if renamed == (True, False):
-            internal.tags.reference.members.increment(mid, '__name__')
+            internal.tags.reference.members.increment(mid, '__name__') if '__name__' not in available else ()
 
         # Otherwise, the name was cleared to a default, which we'll decrement.
         elif renamed == (False, True):
-            internal.tags.reference.members.decrement(mid, '__name__') if '__name__' in internal.tags.reference.members.get(mid) else ()
+            internal.tags.reference.members.decrement(mid, '__name__') if '__name__' in available else ()
 
         # If the old name is fancy but there's no name tag for the member, then
         # the user renamed a member that the disassembler had initialized with a
         # custom name. So, we increment to add the "__name__" tag to the member.
-        elif not gold and '__name__' not in internal.tags.reference.members.get(mid):
+        elif not gold and '__name__' not in available:
             internal.tags.reference.members.increment(mid, '__name__')
 
         # If both are the same, the state of the "__name__" tag hasn't changed.
@@ -3198,22 +3203,22 @@ class membertypeinfocommon(changingchanged):
         # Verify that our identifiers are all the same. Once they're confirmed,
         # we can start comparing the types to figure out whether we need to
         # increment the reference count for the "__typeinfo__" tag.
-        sid, mid = newsid, newmid
+        sid, mid, available = newsid, newmid, internal.tags.reference.members.get(newmid)
         if (oldsid, oldmid) == (newsid, newmid):
             oldtyped, newtyped = oldtype is not None, newtype is not None
             applied = oldtyped, newtyped
 
             # If the change added a type, then increment the reference.
             if applied == (False, True):
-                internal.tags.reference.members.increment(mid, '__typeinfo__')
+                internal.tags.reference.members.increment(mid, '__typeinfo__') if '__typeinfo__' not in available else ()
 
             # If the change removed the type, then decrement the reference.
             elif applied == (True, False):
-                internal.tags.reference.members.decrement(mid, '__typeinfo__') if '__typeinfo__' in internal.tags.reference.members.get(mid) else ()
+                internal.tags.reference.members.decrement(mid, '__typeinfo__') if '__typeinfo__' in available else ()
 
             # If the old type exists but the "__typeinfo__" tag is missing, then
             # we need to add a reference to "__typeinfo__" since we missed it.
-            elif oldtyped and '__typeinfo__' not in internal.tags.reference.members.get(mid):
+            elif oldtyped and '__typeinfo__' not in available:
                 internal.tags.reference.members.increment(mid, '__typeinfo__')
 
             # Otherwise there is nothing to do since the updating of the type
@@ -3229,7 +3234,7 @@ class membertypeinfocommon(changingchanged):
         # to the "__typeinfo__" tag, and then recreating if it exists.
         logging.fatal(u"{:s}.updater() : Member type events for member {:#x} are out of sync. Expected member {:#x}, but event gave us member {:#x}.".format('.'.join([__name__, cls.__name__]), oldmid, oldmid, newmid))
 
-        if '__typeinfo__' in internal.tags.reference.members.get(mid):
+        if '__typeinfo__' in available:
             internal.tags.reference.members.decrement(mid, '__typeinfo__')
 
         if newtype is not None:
@@ -4534,7 +4539,7 @@ class localtypesmonitor_84(object):
     @classmethod
     def delete_type(cls, sid):
         '''Remove all of the tags associated with the type `sid` and its members.'''
-        tinfo = idaapi.tinfo_t()
+        tinfo, erased = idaapi.tinfo_t(), []
 
         # Try and get the type using the identifier in `sid`, and use it to grab
         # the ordinal for the type that is associated with it. If we can grab
