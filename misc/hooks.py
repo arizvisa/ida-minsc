@@ -3547,6 +3547,7 @@ class localtypesmonitor_state(object):
         # library. It is keyed by the ordinal of the structure/union type.
         self.structurecache = {}
         self.structureid = {}
+        self.structurecomment = {}
 
         # This is a cache of all the members belonging to a structure in the
         # type library. It is keyed by the ordinal number, and stores a
@@ -3719,6 +3720,7 @@ class localtypesmonitor_state(object):
         count = len(self.structurecache)
         self.structurecache = {}
         self.structureid = {}
+        self.structurecomment = {}
         self.memberoffsetcache = {}
         self.memberindexcache = {}
         self.loaded = False
@@ -3727,7 +3729,7 @@ class localtypesmonitor_state(object):
     def __load_unguarded(self, *library):
         '''Load information from the specified type `library` into the current state.'''
         cls = self.__class__
-        structurecache, structureid = {}, {}
+        structurecache, structureid, structurecomment = {}, {}, {}
         memberoffsetcache, memberindexcache = {}, {}
 
         # Iterate through all the types only looking for structures or
@@ -3746,6 +3748,7 @@ class localtypesmonitor_state(object):
             # structure so that we can store information about its members.
             structurecache[ordinal] = name
             structureid[ordinal] = interface.tinfo.identifier(tinfo)
+            structurecomment[ordinal] = utils.string.of(tinfo.get_type_cmt())
             memberoffsets = memberoffsetcache.setdefault(ordinal, {})
             memberindices = memberindexcache.setdefault(ordinal, {})
 
@@ -3761,6 +3764,7 @@ class localtypesmonitor_state(object):
         # Now we can assign them as members of our class.
         self.structurecache = structurecache
         self.structureid = structureid
+        self.structurecomment = structurecomment
         self.memberoffsetcache = memberoffsetcache
         self.memberindexcache = memberindexcache
         self.loaded = interface.tinfo.quantity() >= 0
@@ -3780,16 +3784,26 @@ class localtypesmonitor_state(object):
         '''Return the cached identifier for the type specified by `ordinal`.'''
         return self.structureid.get(ordinal, idaapi.BADADDR)
 
+    def cachedcomment(self, ordinal):
+        '''Return the cached comment for the type specified by `ordinal` or an empty string.'''
+        return self.structurecomment.get(ordinal, '')
+
+    def name(self, ordinal):
+        '''Return the current name of the type specified by `ordinal`.'''
+        tinfo = self.get_type(ordinal)
+        res = tinfo.get_type_name()
+        return utils.string.of(res)
+
     def identifier(self, ordinal):
         '''Return the current identifier for the type specified by `ordinal`.'''
         with self.ignore_changes():
             tid = interface.tinfo.identifier(ordinal)
         return tid
 
-    def name(self, ordinal):
-        '''Return the current name of the type specified by `ordinal`.'''
+    def comment(self, ordinal):
+        '''Return the current comment for the type specified by `ordinal`.'''
         tinfo = self.get_type(ordinal)
-        res = tinfo.get_type_name()
+        res = tinfo.get_type_cmt()
         return utils.string.of(res)
 
     def renamed(self, ordinal):
@@ -3798,10 +3812,16 @@ class localtypesmonitor_state(object):
         res, self.structurecache[ordinal] = self.structurecache[ordinal], utils.string.of(tinfo.get_type_name())
         return res
 
+    def commented(self, ordinal):
+        '''Synchronize the cached comment for the type specified by `ordinal` with the current comment from the local types library.'''
+        tinfo = self.get_type(ordinal)
+        res, self.structurecomment[ordinal] = self.structurecomment[ordinal], utils.string.of(tinfo.get_type_cmt())
+        return res
+
     def added(self, ordinal, update=True):
         '''Update the cache with the addition of the type specified by `ordinal`.'''
         tinfo = self.get_type(ordinal)
-        res, sid = self.name(tinfo), self.identifier(tinfo)
+        res, sid, comment = self.name(tinfo), self.identifier(tinfo), self.comment(tinfo)
 
         # Verify the identifier and whine if we couldn't find a valid one.
         if sid == idaapi.BADADDR:
@@ -3818,9 +3838,10 @@ class localtypesmonitor_state(object):
         if update:
             self.structurecache[ordinal] = res
             self.structureid[ordinal] = sid
+            self.structurecomment[ordinal] = comment
             self.memberoffsetcache[ordinal] = memberoffsets
             self.memberindexcache[ordinal] = memberindices
-        return sid, res, memberindices
+        return sid, res, comment, memberindices
 
     def removed(self, ordinal, update=True):
         '''Update the cache with the removal of the type specified by `ordinal`.'''
@@ -3829,8 +3850,8 @@ class localtypesmonitor_state(object):
             logging.warning(u"{:s}.removed({:d}) : An invalid identifier ({:#x}) was found in the cache for the type at ordinal {:d}.".format('.'.join([__name__, self.__class__.__name__]), ordinal, self.structureid[ordinal], ordinal))
 
         # Clear the specified ordinal out of all of our dictionaries.
-        res, sid = (Fget_from_dict(structure) for structure in [self.structurecache, self.structureid])
-        return sid, res, Fget_from_dict(self.memberindexcache)
+        res, sid, comment = (Fget_from_dict(structure) for structure in [self.structurecache, self.structureid, self.structurecomment])
+        return sid, res, comment, Fget_from_dict(self.memberindexcache)
 
     def synchronize(self, ordinal):
         '''Update the cache for the members belonging to the type specified by `ordinal`.'''
@@ -4287,7 +4308,7 @@ class localtypesmonitor_84(object):
         # hook gets dispatched before the local type actually gets created. This
         # callback is responsible for updating our state cache and its tags.
         def ui_async_callback(ordinal):
-            newsid, newname, newmembers = cls.state.added(newordinal, True)
+            newsid, newname, newcomment, newmembers = cls.state.added(newordinal, True)
             logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
 
             # Now we need to format our new members as a list of changes.
@@ -4326,7 +4347,7 @@ class localtypesmonitor_84(object):
             oldordinal, oldname = ordinal, name
 
         # Now we can update our data cache, and log what just happened.
-        oldsid, oldname, oldmembers = cls.state.removed(oldordinal)
+        oldsid, oldname, oldcomment, oldmembers = cls.state.removed(oldordinal, True)
         logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Discovered a removed type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), oldordinal, oldname, oldsid))
 
         # Since we're removing a type from the local type library, we really
@@ -4363,9 +4384,10 @@ class localtypesmonitor_84(object):
             # Now we just need to update the tags for the members of the type.
             cls.member_updater(ltc, ordinal, changes)
 
-        # Start out by processing the type in case it was renamed or changed in
-        # another way.
+        # Start out by processing the type in case it was renamed or changed.
+        # Once we're done, we can go ahead and update its name and comment.
         cls.type_updater(ltc, newordinal)
+        oldname, oldcomment = cls.state.renamed(ordinal), cls.state.commented(ordinal)
 
         # Afterwards we tell the disassembler to dispatch to our callback so
         # that it can check if any of its members have changed and safely grab
@@ -4547,6 +4569,24 @@ class localtypesmonitor_84(object):
         return
 
     @classmethod
+    def update_type_comments(cls, sid, old, new):
+        '''Update the type in `sid` using the tags in `old` that have been changed to `new`.'''
+        oldkeys, newkeys = ({item for item in tags} for tags in [old, new])
+
+        # check the original keys against the modified ones and iterate through
+        # them figuring out whether we're removing the key or just adding it.
+        logging.debug(u"{:s}.update_type_comments({:#x}, {!s}, {!s}) : Updating old keys ({!s}) to new keys ({!s}) for the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, '...', '...', utils.string.repr(oldkeys), utils.string.repr(newkeys), sid))
+        for key in oldkeys ^ newkeys:
+            if key not in newkeys:
+                logging.debug(u"{:s}.update_type_comments({:#x}, {!s}, {!s}) : Decreasing reference count for {!s} from the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, '...', '...', utils.string.repr(key), sid))
+                internal.tags.reference.structure.decrement(sid, key)
+            if key not in oldkeys:
+                logging.debug(u"{:s}.update_type_comments({:#x}, {!s}, {!s}) : Increasing reference count for {!s} in the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, '...', '...', utils.string.repr(key), sid))
+                internal.tags.reference.structure.increment(sid, key)
+            continue
+        return
+
+    @classmethod
     def type_updater(cls, ltc, ordinal):
         '''Check the changes for the type specified in `ordinal` and update any tags resulting from them.'''
         if not hasattr(cls, 'state'):
@@ -4607,6 +4647,13 @@ class localtypesmonitor_84(object):
 
         else:
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Tracking for type at ordinal {:d} ({:#x}) did not need to be adjusted.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid))
+
+        # Grab the comment that's been applied to the type, and update its refs.
+        oldcomment, newcomment = cls.state.cachedcomment(ordinal), cls.state.comment(ordinal)
+        oldtags, newtags = ({tag for tag in decoded} for decoded in map(internal.comment.decode, [oldcomment, newcomment]))
+        if oldtags != newtags:
+            logging.debug(u"{:s}.type_updater({:d}, {:d}) : Comment tags for type at ordinal {:d} ({:#x}) were changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, sorted(oldtags), sorted(newtags)))
+            cls.update_type_comments(newsid, oldtags, newtags)
 
         # Grab the current tags that have been applied to the structure and log
         # exactly how they were modified during this update.
