@@ -3629,7 +3629,8 @@ class localtypesmonitor_state(object):
             # Now we can yield the info for the current member being processed.
             else:
                 mid = tinfo.get_udm_tid(mindex)
-                yield mindex, mid, mname, moffset, msize, mtype, malign
+                mcomment = utils.string.of(udm.cmt)
+                yield mindex, mid, mname, moffset, msize, mtype, malign, mcomment
             continue
         return
 
@@ -3752,9 +3753,9 @@ class localtypesmonitor_state(object):
             # the structure/union so that we can add their information to
             # our cache.
             iterable = self.get_members(ordinal)
-            for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+            for mindex, mid, mname, moffset, msize, mtype, malign, mcomment in iterable:
                 memberoffsets[moffset] = mindex
-                memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+                memberindices[mindex] = mid, mname, moffset, msize, mtype, malign, mcomment
             continue
 
         # Now we can assign them as members of our class.
@@ -3809,9 +3810,9 @@ class localtypesmonitor_state(object):
         # Now we can go through all of its members and collect them.
         memberoffsets, memberindices = {}, {}
         iterable = self.get_members(ordinal)
-        for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+        for mindex, mid, mname, moffset, msize, mtype, malign, mcomment in iterable:
             memberoffsets[moffset] = mindex
-            memberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+            memberindices[mindex] = mid, mname, moffset, msize, mtype, malign, mcomment
 
         # Then we can update the cache for the members if it was specified.
         if update:
@@ -3837,9 +3838,9 @@ class localtypesmonitor_state(object):
 
         # Iterate through all the members and collect their attributes.
         currentmemberoffsets, currentmemberindices = {}, {}
-        for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+        for mindex, mid, mname, moffset, msize, mtype, malign, mcomment in iterable:
             currentmemberoffsets[moffset] = mindex
-            currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+            currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign, mcomment
 
         # All we need to do is to assign them into our cache and we're done.
         res = self.memberindexcache[ordinal]
@@ -3855,9 +3856,9 @@ class localtypesmonitor_state(object):
         # First start by enumerating all of the members for the type with
         # the specified ordinal. This is so we can compare them later.
         iterable = self.get_members(ordinal)
-        for mindex, mid, mname, moffset, msize, mtype, malign in iterable:
+        for mindex, mid, mname, moffset, msize, mtype, malign, mcomment in iterable:
             currentmemberoffsets[moffset] = mindex
-            currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign
+            currentmemberindices[mindex] = mid, mname, moffset, msize, mtype, malign, mcomment
 
         # Then we'll combine all our dictionaries into a pair that can be
         # used as a parameter for the functions we'll use for comparing.
@@ -3866,9 +3867,10 @@ class localtypesmonitor_state(object):
 
         # Now we'll create a bunch of lists that we'll use to do our
         # comparisons and figure out what changed in the structure/union.
-        currentbounds, bounds = ([(moffset, msize) for _, _, moffset, msize, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
-        currentnames, names = ([mname for _, mname, _, _, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
-        currenttypes, types = ([mtype for _, _, _, _, mtype, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+        currentbounds, bounds = ([(moffset, msize) for _, _, moffset, msize, _, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+        currentnames, names = ([mname for _, mname, _, _, _, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+        currenttypes, types = ([mtype for _, _, _, _, mtype, _, _ in indices.values()] for indices in [currentmemberindices, memberindices])
+        currentcomments, comments = ([mcomment for _, _, _, _, _, _, mcomment in indices.values()] for indices in [currentmemberindices, memberindices])
 
         # After capturing the current state, if we were asked to update our
         # cache, then assign the current changes that we just grabbed.
@@ -3895,6 +3897,10 @@ class localtypesmonitor_state(object):
         elif any(not(interface.tinfo.same(currenttype, type)) for currenttype, type in zip(currenttypes, types)):
             return self.__changed_member_types(ordinal, cached, current)
 
+        # If the comments were changed, then that needs to also be handled.
+        elif currentcomments != comments:
+            return self.__changed_member_comments(ordinal, cached, current)
+
         # Otherwise there weren't any changes that occurred, and we just
         # return nothing so that it looks like we actually did something.
         return []
@@ -3907,24 +3913,24 @@ class localtypesmonitor_state(object):
 
         # Start by gathering all of the information we can use as a unique
         # key for matching the members.
-        cached_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in cachedmemberindices.items()}
-        current_byname = {mname : mindex for mindex, (_, mname, _, _, _, _) in currentmemberindices.items()}
+        cached_byname = {mname : mindex for mindex, (_, mname, _, _, _, _, _) in cachedmemberindices.items()}
+        current_byname = {mname : mindex for mindex, (_, mname, _, _, _, _, _) in currentmemberindices.items()}
 
-        cached_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in cachedmemberindices.items()}
-        current_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _) in currentmemberindices.items()}
+        cached_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _, _) in cachedmemberindices.items()}
+        current_bybitoffset = {moffset : mindex for mindex, (_, _, moffset, _, _, _, _) in currentmemberindices.items()}
 
         # Before doing anything, empty out all of the elements that haven't
         # changed from all of our dictionaries.
         matching = {mindex for mindex in cachedmemberindices} & {mindex for mindex in currentmemberindices}
         for mindex in matching:
-            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old = cachedmemberindices[mindex]
-            newmid, newname, newoffset, newsize, newtype, newalign = new = currentmemberindices[mindex]
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign, oldcomment = old = cachedmemberindices[mindex]
+            newmid, newname, newoffset, newsize, newtype, newalign, newcomment = new = currentmemberindices[mindex]
 
             # Compare all the member attributes that we use to consider it
             # the same member. We ignore the member identifier since it
             # really is just a reference number that can change (despite the
             # disassembler not currently changing it).
-            if (oldname, oldoffset, oldsize) == (newname, newoffset, newsize) and interface.tinfo.same(oldtype, newtype):
+            if (oldname, oldoffset, oldsize, oldcomment) == (newname, newoffset, newsize, newcomment) and interface.tinfo.same(oldtype, newtype):
                 [memberindices.pop(mindex) for memberindices in [cachedmemberindices, currentmemberindices]]
             continue
 
@@ -3940,8 +3946,8 @@ class localtypesmonitor_state(object):
             old = cachedmemberindices[mindex]
             new = currentmemberindices[mindex]
 
-            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-            newmid, newname, newoffset, newsize, newtype, newalign = new
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign, oldcomment = old
+            newmid, newname, newoffset, newsize, newtype, newalign, newcomment = new
 
             # If the names and offsets are the same, then this member wasn't
             # moved and we can add its pair since they're already matching.
@@ -3968,8 +3974,8 @@ class localtypesmonitor_state(object):
             old = cachedmemberindices.pop(oldindex)
             new = currentmemberindices.pop(newindex)
 
-            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-            newmid, newname, newoffset, newsize, newtype, newalign = new
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign, oldcomment = old
+            newmid, newname, newoffset, newsize, newtype, newalign, newcomment = new
 
             # Now we can just tally up the number of changes and yield them
             # back to the caller.
@@ -3978,6 +3984,7 @@ class localtypesmonitor_state(object):
             count+= 0 if oldsize == newsize else 1
             count+= 0 if interface.tinfo.same(oldtype, newtype) else 1
             count+= 0 if oldalign == newalign else 1
+            count+= 0 if oldcomment == newcomment else 1
 
             # Prepend the indices that we processed, and then yield the
             # changes for the pair of members back to the caller.
@@ -3997,8 +4004,8 @@ class localtypesmonitor_state(object):
             old = cachedmemberindices.pop(oldindex)
             new = currentmemberindices.pop(newindex)
 
-            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-            newmid, newname, newoffset, newsize, newtype, newalign = new
+            oldmid, oldname, oldoffset, oldsize, oldtype, oldalign, oldcomment = old
+            newmid, newname, newoffset, newsize, newtype, newalign, newcomment = new
 
             # Now we can tally up whatever the changes are. This should be
             # much lighter than what we did the first time since we know
@@ -4008,6 +4015,7 @@ class localtypesmonitor_state(object):
             count+= 0 if oldsize == newsize else 1
             count+= 0 if interface.tinfo.same(oldtype, newtype) else 1
             count+= 0 if oldalign == newalign else 1
+            count+= 0 if oldcomment == newcomment else 1
 
             # If nothing changed, then we don't need to do anything.
             if count:
@@ -4040,8 +4048,8 @@ class localtypesmonitor_state(object):
             # If both the old and new members exist, then the old member was
             # modified and we can just compare the values to figure it out.
             if old and new:
-                _, oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-                _, newmid, newname, newoffset, newsize, newtype, newalign = new
+                _, oldmid, oldname, oldoffset, oldsize, oldtype, oldalign, oldcomment = old
+                _, newmid, newname, newoffset, newsize, newtype, newalign, newcomment = new
 
                 # First check the potential keys that we use for matching
                 # members. At least one thing should match, if nothing
@@ -4066,25 +4074,38 @@ class localtypesmonitor_state(object):
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its type changed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
                 if oldalign != newalign:
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its alignment changed from {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldalign, newalign))
+
+                # Process any comments by decoding them into tags that we can
+                # compare directly for changes.
+                olddecoded, newdecoded = (internal.comment.decode(comment) for comment in [oldcomment, newcomment])
+                oldtags, newtags = ({tag for tag in decoded} for decoded in [olddecoded, newdecoded])
+                if oldtags != newtags:
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its comment tags changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldtags, newtags))
                 continue
 
-            # Next we can check the details about what member was removed.
+            # Next we can check the details about what member was added.
             elif new:
-                _, mid, mname, moffset, msize, mtype, malign = new
+                _, mid, mname, moffset, msize, mtype, malign, mcomment = new
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with {:d} change{:s} (including the offset).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
 
-            # And finally information about the member that was added.
+                mtags = {tag for tag in internal.comment.decode(mcomment)}
+                mtags and logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the specified tags ({!s}).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mtags))
+
+            # And finally information about the member that was just removed.
             elif old:
-                _, mid, mname, moffset, msize, mtype, malign = old
+                _, mid, mname, moffset, msize, mtype, malign, mcomment = old
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with {:d} change{:s} (including the offset).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
+
+                mtags = {tag for tag in internal.comment.decode(mcomment)}
+                mtags and logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the specified tags ({!s}).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mtags))
             continue
         return res
 
@@ -4105,7 +4126,12 @@ class localtypesmonitor_state(object):
 
     def __changed_member_types(self, ordinal, cached, current):
         cls = self.__class__
-        logging.info(u"{:s}.__changed_members_types({:d}, {!s}, {!s}) : The types of the members in the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
+        logging.info(u"{:s}.__changed_members_types({:d}, {!s}, {!s}) : The types of the members for the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
+        return self.__changed_members_compare(ordinal, cached, current)
+
+    def __changed_member_comments(self, ordinal, cached, current):
+        cls = self.__class__
+        logging.info(u"{:s}.__changed_members_comments({:d}, {!s}, {!s}) : The comments of the members from the type at ordinal {:d} have been changed.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', ordinal))
         return self.__changed_members_compare(ordinal, cached, current)
 
 class localtypesmonitor_84(object):
@@ -4265,7 +4291,7 @@ class localtypesmonitor_84(object):
             logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
 
             # Now we need to format our new members as a list of changes.
-            iterable = ((mindex, mid, mname, moffset, msize, mtype, malign) for mindex, (mid, mname, moffset, msize, mtype, malign) in newmembers.items())
+            iterable = ((mindex, mid, mname, moffset, msize, mtype, malign, mcomment) for mindex, (mid, mname, moffset, msize, mtype, malign, mcomment) in newmembers.items())
             changes = [(len(field[2:]), (), field) for field in iterable]
 
             # Then we can update the tags for the type and also the members that
@@ -4503,6 +4529,24 @@ class localtypesmonitor_84(object):
         return removed, erased
 
     @classmethod
+    def update_member_comments(cls, sid, mid, old, new):
+        '''Update the member `mid` for the type in `sid` using the tags from the comment in `old` that is modified to `new`.'''
+        oldkeys, newkeys = ({item for item in tags} for tags in [old, new])
+
+        # check the original keys against the modified ones and iterate through
+        # them figuring out whether we're removing the key or just adding it.
+        logging.debug(u"{:s}.update_member_comments({:#x}, {:#x}, {!s}, {!s}) : Updating old keys ({!s}) to new keys ({!s}) for member {:#x} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, mid, '...', '...', sorted(oldkeys), sorted(newkeys), mid, sid))
+        for key in oldkeys ^ newkeys:
+            if key not in newkeys:
+                logging.debug(u"{:s}.update_member_comments({:#x}, {:#x}, {!s}, {!s}) : Decreasing reference count for {!s} in member {:#x} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, mid, '...', '...', utils.string.repr(key), mid, sid))
+                internal.tags.reference.members.decrement(mid, key)
+            if key not in oldkeys:
+                logging.debug(u"{:s}.update_member_comments({:#x}, {:#x}, {!s}, {!s}) : Increasing reference count for {!s} in member {:#x} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, mid, '...', '...', utils.string.repr(key), mid, sid))
+                internal.tags.reference.members.increment(mid, key)
+            continue
+        return
+
+    @classmethod
     def type_updater(cls, ltc, ordinal):
         '''Check the changes for the type specified in `ordinal` and update any tags resulting from them.'''
         if not hasattr(cls, 'state'):
@@ -4590,8 +4634,8 @@ class localtypesmonitor_84(object):
         # a comparison of the changes to figure out what tags to apply.
         for count, old, new in changes:
             if old and new:
-                oldindex, oldmid, oldname, oldoffset, oldsize, oldtype, oldalign = old
-                newindex, newmid, newname, newoffset, newsize, newtype, newalign = new
+                oldindex, oldmid, oldname, oldoffset, oldsize, oldtype, oldalign, oldcomment = old
+                newindex, newmid, newname, newoffset, newsize, newtype, newalign, newcomment = new
 
                 # Now we'll assign the member index, and then figure out the
                 # correct identifier that we should be using.
@@ -4652,13 +4696,22 @@ class localtypesmonitor_84(object):
                 elif not interface.tinfo.same(oldtype, newtype):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
 
+                # The very last thing we need to do is to check the tags that
+                # have been encoded into the comments. We pretty much just hand
+                # this off to the "update_member_comments" classmethod.
+                oldtags, newtags = ({tag for tag in tags} for tags in map(internal.comment.decode, [oldcomment, newcomment]))
+                if oldtags != newtags:
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the comment tags for the member at index {:d} ({:#x}) of type {!s} ({:#x}) resulted in modifying the tags from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, sorted(oldtags), sorted(newtags)))
+                    cls.update_member_comments(sid, mid, oldtags, newtags)
+
+                # Now we can output all of the tags that we changed.
                 modified = internal.tags.reference.members.get(mid)
                 logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : The tags for the member at index {:d} ({:#x}) of type {!s} ({:#x}) were changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, sorted(original), sorted(modified)))
 
             # The member was removed, so we can just delete all the tag
             # information for the specified identifier.
             elif old:
-                mindex, mid, mname, moffset, msize, mtype, malign = old
+                mindex, mid, mname, moffset, msize, mtype, malign, mcomment = old
                 if mid == idaapi.BADADDR:
                     logging.error(u"{:s}.member_updater({:d}, {!s}, {!s}) : Unable to adjust the tags for the deleted member at index {:d} of type {!s} ({:#x}) due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, parameter, sid, mid))
                     continue
@@ -4669,7 +4722,7 @@ class localtypesmonitor_84(object):
             # A member was added, so we need to check if the field uses a
             # non-general type or a user-specified name to update its tags.
             elif new:
-                mindex, mid, mname, moffset, msize, mtype, malign = new
+                mindex, mid, mname, moffset, msize, mtype, malign, mcomment= new
                 if mid == idaapi.BADADDR:
                     logging.error(u"{:s}.member_updater({:d}, {!s}, {!s}) : Unable to adjust the tags for the added member at index {:d} of type {!s} ({:#x}) due to its identifier ({:#x}) being invalid.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, parameter, sid, mid))
                     continue
