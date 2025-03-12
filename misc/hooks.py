@@ -4552,16 +4552,16 @@ class localtypesmonitor_84(object):
     @classmethod
     def update_member_comments(cls, sid, mid, old, new):
         '''Update the member `mid` for the type in `sid` using the tags from the comment in `old` that is modified to `new`.'''
-        oldkeys, newkeys = ({item for item in tags} for tags in [old, new])
+        oldkeys, newkeys, tags = ({item for item in tags} for tags in [old, new, internal.tagindex.members.get(mid)])
 
         # check the original keys against the modified ones and iterate through
         # them figuring out whether we're removing the key or just adding it.
         logging.debug(u"{:s}.update_member_comments({:#x}, {:#x}, {!s}, {!s}) : Updating old keys ({!s}) to new keys ({!s}) for member {:#x} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, mid, '...', '...', sorted(oldkeys), sorted(newkeys), mid, sid))
         for key in oldkeys ^ newkeys:
-            if key not in newkeys:
+            if key not in newkeys and key in tags:
                 logging.debug(u"{:s}.update_member_comments({:#x}, {:#x}, {!s}, {!s}) : Decreasing reference count for {!s} in member {:#x} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, mid, '...', '...', utils.string.repr(key), mid, sid))
                 internal.tagindex.members.decrement(mid, key)
-            if key not in oldkeys:
+            if key not in oldkeys and key not in tags:
                 logging.debug(u"{:s}.update_member_comments({:#x}, {:#x}, {!s}, {!s}) : Increasing reference count for {!s} in member {:#x} of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, mid, '...', '...', utils.string.repr(key), mid, sid))
                 internal.tagindex.members.increment(mid, key)
             continue
@@ -4570,16 +4570,16 @@ class localtypesmonitor_84(object):
     @classmethod
     def update_type_comments(cls, sid, old, new):
         '''Update the type in `sid` using the tags in `old` that have been changed to `new`.'''
-        oldkeys, newkeys = ({item for item in tags} for tags in [old, new])
+        oldkeys, newkeys, tags = ({item for item in tags} for tags in [old, new, internal.tagindex.structure.get(sid)])
 
         # check the original keys against the modified ones and iterate through
         # them figuring out whether we're removing the key or just adding it.
         logging.debug(u"{:s}.update_type_comments({:#x}, {!s}, {!s}) : Updating old keys ({!s}) to new keys ({!s}) for the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, '...', '...', utils.string.repr(oldkeys), utils.string.repr(newkeys), sid))
         for key in oldkeys ^ newkeys:
-            if key not in newkeys:
+            if key not in newkeys and key in tags:
                 logging.debug(u"{:s}.update_type_comments({:#x}, {!s}, {!s}) : Decreasing reference count for {!s} from the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, '...', '...', utils.string.repr(key), sid))
                 internal.tagindex.structure.decrement(sid, key)
-            if key not in oldkeys:
+            if key not in oldkeys and key not in tags:
                 logging.debug(u"{:s}.update_type_comments({:#x}, {!s}, {!s}) : Increasing reference count for {!s} in the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), sid, '...', '...', utils.string.repr(key), sid))
                 internal.tagindex.structure.increment(sid, key)
             continue
@@ -4614,12 +4614,12 @@ class localtypesmonitor_84(object):
         renamed = not cls.is_name_general(ordinal, oldsid, oldname), not cls.is_name_general(ordinal, newsid, newname)
         if renamed == (False, True):
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-            internal.tagindex.structure.increment(newsid, '__name__')
+            internal.tagindex.structure.increment(newsid, '__name__') if '__name__' not in original else ()
 
         # If the name was from user-specified to a general name, then decrement.
         elif renamed == (True, False):
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Rename for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-            internal.tagindex.structure.decrement(newsid, '__name__') if internal.tagindex.tags.has('__name__') else ()
+            internal.tagindex.structure.decrement(newsid, '__name__') if '__name__' in original else ()
 
         # If the name was originally user-specified but the tag doesn't exist,
         # then our monitor didn't track this change and we need to adjust it.
@@ -4638,11 +4638,11 @@ class localtypesmonitor_84(object):
         tracked = cls.is_type_tracked(ordinal, newsid, newname)
         if tracked and '__typeinfo__' not in original:
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Change for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to track it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-            internal.tagindex.structure.increment(newsid, '__typeinfo__')
+            internal.tagindex.structure.increment(newsid, '__typeinfo__') if '__typeinfo__' not in original else ()
 
         elif not tracked and '__typeinfo__' in original:
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Change for type at ordinal {:d} ({:#x}) from \"{!s}\" to \"{!s}\" required us to track it.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(oldname, '"'), utils.string.escape(newname, '"')))
-            internal.tagindex.structure.decrement(newsid, '__typeinfo__') if internal.tagindex.tags.has('__typeinfo__') else ()
+            internal.tagindex.structure.decrement(newsid, '__typeinfo__') if '__typeinfo__' in original else ()
 
         else:
             logging.debug(u"{:s}.type_updater({:d}, {:d}) : Tracking for type at ordinal {:d} ({:#x}) did not need to be adjusted.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid))
@@ -4699,12 +4699,12 @@ class localtypesmonitor_84(object):
                 renamed = not cls.is_field_general(ordinal, oldindex, oldname), not cls.is_field_general(ordinal, newindex, newname)
                 if renamed == (False, True):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
-                    internal.tagindex.members.increment(mid, '__name__')
+                    internal.tagindex.members.increment(mid, '__name__') if '__name__' not in original else ()
 
                 # If it's been switched the other way, then decrement the tag.
                 elif renamed == (True, False):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Rename for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, oldname, newname))
-                    internal.tagindex.members.decrement(mid, '__name__') if internal.tagindex.tags.has('__name__') else ()
+                    internal.tagindex.members.decrement(mid, '__name__') if '__name__' in original else ()
 
                 # If the name was originally user-specified, but there's no
                 # count for the tag attached to the member, then fix it.
@@ -4723,13 +4723,13 @@ class localtypesmonitor_84(object):
                 tracked = cls.is_field_tracked(ordinal, oldindex, oldtype), cls.is_field_tracked(ordinal, newindex, newtype)
                 if tracked == (False, True):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
-                    internal.tagindex.members.increment(mid, '__typeinfo__')
+                    internal.tagindex.members.increment(mid, '__typeinfo__') if '__typeinfo__' not in original else ()
 
                 # If the new type was lowered to a trivial (basic) type, then go
                 # ahead and decrement it.
                 elif tracked == (True, False):
                     logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
-                    internal.tagindex.members.decrement(mid, '__typeinfo__') if internal.tagindex.tags.has('__typeinfo__') else ()
+                    internal.tagindex.members.decrement(mid, '__typeinfo__') if '__typeinfo__' in original else ()
 
                 # If the original type was something for us to track, but it
                 # doesn't include our tag, then we fix it by incrementing.
