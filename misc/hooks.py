@@ -2177,7 +2177,7 @@ class structurenaming(changingchanged):
     def is_general_name(cls, sid, name):
         '''Return true if the structure or union in `sid` has a given `name` that is generic and was decided by the disassembler.'''
         sptr = internal.structure.by_identifier(sid) if internal.structure.has(sid) else None
-        prefixes = {'struc', 'union'}
+        prefixes = {'struc', 'struct', 'union'}
 
         # If we couldn't get the structure, then we can only do a test for the
         # prefixes since we can't check if the structure if a frame or a union.
