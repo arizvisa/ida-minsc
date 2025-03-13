@@ -3609,7 +3609,12 @@ class localtypesmonitor_state(object):
     def get_members(cls, ordinal):
         '''Iterate through all of the members in the structure or union specified by `ordinal`.'''
         tinfo = cls.get_type(ordinal)
-        iterable = (itertools.chain([index], items) for index, items in enumerate(interface.tinfo.members(tinfo)))
+        has_members = tinfo.is_struct() or tinfo.is_union()
+
+        # First we want to make sure that the type is something that we can get
+        # members for. If it's not, then don't attempt to return any members.
+        enumerable = enumerate(interface.tinfo.members(tinfo) if has_members else ())
+        iterable = (itertools.chain([index], items) for index, items in enumerable)
 
         # Now we can iterate through all of the members that were found in 8.4.
         # Still, we have to filter the members being yielded due to the
@@ -3850,8 +3855,14 @@ class localtypesmonitor_state(object):
     def removed(self, ordinal, update=True):
         '''Update the cache with the removal of the type specified by `ordinal`.'''
         Fget_from_dict = operator.methodcaller('pop', ordinal) if update else operator.methodcaller('get', ordinal)
-        if self.structureid[ordinal] == idaapi.BADADDR:
-            logging.warning(u"{:s}.removed({:d}) : An invalid identifier ({:#x}) was found in the cache for the type at ordinal {:d}.".format('.'.join([__name__, self.__class__.__name__]), ordinal, self.structureid[ordinal], ordinal))
+
+        # Since the type has been removed, we can't access its attributes to try
+        # and figure out whether it's an enumeration or another type that we
+        # don't support. So, we access the cached attributes of the type so that
+        # we can privately complain (info) about not figuring out its tid.
+        sid = self.structureid[ordinal]
+        if sid == idaapi.BADADDR:
+            logging.info(u"{:s}.removed({:d}) : An invalid identifier ({:#x}) was found in the cache for the type at ordinal {:d}.".format('.'.join([__name__, self.__class__.__name__]), ordinal, self.structureid[ordinal], ordinal))
 
         # Clear the specified ordinal out of all of our dictionaries.
         res, sid, comment = (Fget_from_dict(structure) for structure in [self.structurecache, self.structureid, self.structurecomment])
@@ -3875,7 +3886,7 @@ class localtypesmonitor_state(object):
 
     def changes(self, ordinal, update=True):
         '''Iterate through the members for type `ordinal`, and yield the index or offset of each one that has changed.'''
-        memberoffsets, memberindices = (cache[ordinal] for cache in [self.memberoffsetcache, self.memberindexcache])
+        memberoffsets, memberindices = (cache.get(ordinal, {}) for cache in [self.memberoffsetcache, self.memberindexcache])
         currentmemberoffsets, currentmemberindices = {}, {}
 
         # First start by enumerating all of the members for the type with
@@ -4343,6 +4354,11 @@ class localtypesmonitor_84(object):
         else:
             oldordinal, oldname = ordinal, name
 
+        # First check that we've cached this type. The only time the type isn't
+        # cached is if it's a type we don't support (enumeration).
+        if not cls.state.cached(oldordinal):
+            return logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Ignoring the removal of a non-cached type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), sid))
+
         # Now we can update our data cache, and log what just happened.
         oldsid, oldname, oldcomment, oldmembers = cls.state.removed(oldordinal, True)
         logging.debug(u"{:s}.local_type_deleted({!s}, {!s}) : Discovered a removed type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), oldordinal, oldname, oldsid))
@@ -4379,7 +4395,7 @@ class localtypesmonitor_84(object):
             changes and logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(changes), '' if len(changes) == 1 else 's') if changes else 'no members'))
 
             # Now we just need to update the tags for the members of the type.
-            cls.member_updater(ltc, ordinal, changes)
+            changes and cls.member_updater(ltc, ordinal, changes)
 
         # Start out by processing the type in case it was renamed or changed.
         # Once we're done, we can go ahead and update its name and comment.
@@ -4593,11 +4609,15 @@ class localtypesmonitor_84(object):
         # Grab all the old information about the type, and then go ahead and add
         # it so that we can grab its current information for processing. We'll
         # also figure out which type id it uses.
-        oldname, oldsid, oldcomment, oldmembers = cls.state.renamed(ordinal), cls.state.identifier(ordinal), cls.state.commented(ordinal), []
         newsid, newname, newcomment, newmembers = cls.state.added(ordinal, True)
         sid = oldsid if newsid == idaapi.BADADDR else newsid
 
-        # First check if we need to add a tag for the name or its type.
+        # First check its type, we only support structures and unions atm.
+        tinfo = cls.state.get_type(ordinal)
+        if not (tinfo.is_struct() or tinfo.is_union()):
+            return sid, newname, newcomment, newmembers
+
+        # Now check if we need to add a tag for the name or its type.
         user_specified = not cls.is_name_general(ordinal, sid, newname)
         if user_specified:
             logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) with the name \"{!s}\" resulted in adding the implicit name tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(newname, '"')))
@@ -4635,10 +4655,15 @@ class localtypesmonitor_84(object):
         # First thing to do is to grab the identifier for the type at the given
         # ordinal. We try the cached version first, and then fall back to to the
         # most recent identifier.
-        oldsid = cls.state.cachedidentifier(ordinal)
+        oldsid, tinfo = cls.state.cachedidentifier(ordinal), cls.state.get_type(ordinal)
         newsid = cls.state.identifier(ordinal) if oldsid == idaapi.BADADDR else oldsid
         if newsid == idaapi.BADADDR:
-            return logging.warning(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} due to it having an invalid identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid))
+            return logging.warning(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to the identifier being unavailable for the type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
+
+        # If it's not a type that we support, then we don't need to track any
+        # edits to it.
+        elif not (tinfo.is_struct() or tinfo.is_union()):
+            return logging.info(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to being an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
 
         # Grab the current state of the tags so we can log something useful.
         else:
@@ -4819,6 +4844,13 @@ class localtypesmonitor_84(object):
                 # isn't any reason for a new member to have any tag data
                 # associated with it.
                 removed = cls.delete_member_refs(sid, mid)
+
+                # Next, we need to check if the member is _actually_ a member
+                # since there's a chance this member can be a bitfield that
+                # won't show up in the structure interface.
+                if not internal.structure.member.has(mid):
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Skipping the specified member at index {:d} ({:#x}) of type {!s} ({:#x}) due to it not existing within the structure.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid))
+                    continue
 
                 # If the field name is not a general one, then increment the
                 # reference count for its "__name__" tag.
