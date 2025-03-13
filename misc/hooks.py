@@ -3813,13 +3813,13 @@ class localtypesmonitor_state(object):
     def renamed(self, ordinal):
         '''Synchronize the cached name for the type specified by `ordinal` with the current name from the local types library.'''
         tinfo = self.get_type(ordinal)
-        res, self.structurecache[ordinal] = self.structurecache[ordinal], utils.string.of(tinfo.get_type_name())
+        res, self.structurecache[ordinal] = self.structurecache.get(ordinal, ''), utils.string.of(tinfo.get_type_name())
         return res
 
     def commented(self, ordinal):
         '''Synchronize the cached comment for the type specified by `ordinal` with the current comment from the local types library.'''
         tinfo = self.get_type(ordinal)
-        res, self.structurecomment[ordinal] = self.structurecomment[ordinal], utils.string.of(tinfo.get_type_cmt())
+        res, self.structurecomment[ordinal] = self.structurecomment.get(ordinal, ''), utils.string.of(tinfo.get_type_cmt())
         return res
 
     def added(self, ordinal, update=True):
@@ -4312,19 +4312,12 @@ class localtypesmonitor_84(object):
         # hook gets dispatched before the local type actually gets created. This
         # callback is responsible for updating our state cache and its tags.
         def ui_async_callback(ordinal):
-            newsid, newname, newcomment, newmembers = cls.state.added(newordinal, True)
-            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
+            sid = cls.state.identifier(ordinal)
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, sid))
 
-            # Now we need to format our new members as a list of changes.
-            iterable = ((mindex, mid, mname, moffset, msize, mtype, malign, mcomment) for mindex, (mid, mname, moffset, msize, mtype, malign, mcomment) in newmembers.items())
-            changes = [(len(field[2:]), (), field) for field in iterable]
-
-            # Then we can update the tags for the type and also the members that
-            # were included alongside the addition of the type.
-            cls.type_updater(ltc, ordinal)
-            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Finished updating tags for the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, newsid))
-            cls.member_updater(ltc, ordinal, changes)
-            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Finished updating tags for {:d} member{:s} belonging to the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), len(changes), '' if len(changes) == 1 else 's', newordinal, newname, newsid))
+            # Now we can just go ahead and add the type.
+            addedsid, addedname, addedcomment, addedmembers = cls.type_added(ltc, ordinal)
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Finished updating tags for {:d} member{:s} belonging to the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), len(addedmembers), '' if len(addedmembers) == 1 else 's', newordinal, newname, sid))
 
         # Since our "local_types_changed" event gets dispatched before the
         # structure can have an identifier, we need to execute this passively as
@@ -4383,7 +4376,7 @@ class localtypesmonitor_84(object):
         # members that were modified.
         def ui_async_callback(ordinal):
             changes = cls.state.changes(ordinal, True)
-            logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(changes), '' if len(changes) == 1 else 's') if changes else 'no members'))
+            changes and logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(changes), '' if len(changes) == 1 else 's') if changes else 'no members'))
 
             # Now we just need to update the tags for the members of the type.
             cls.member_updater(ltc, ordinal, changes)
@@ -4590,6 +4583,48 @@ class localtypesmonitor_84(object):
                 internal.tagindex.structure.increment(sid, key)
             continue
         return
+
+    @classmethod
+    def type_added(cls, ltc, ordinal):
+        '''Add the type specified in `ordinal` and update any tags that it was created with.'''
+        if not hasattr(cls, 'state'):
+            return logging.error(u"{:s}.type_added({:d}, {:d}) : Unable to handle an addition for type at ordinal {:d} due to the monitor state being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal))
+
+        # Grab all the old information about the type, and then go ahead and add
+        # it so that we can grab its current information for processing. We'll
+        # also figure out which type id it uses.
+        oldname, oldsid, oldcomment, oldmembers = cls.state.renamed(ordinal), cls.state.identifier(ordinal), cls.state.commented(ordinal), []
+        newsid, newname, newcomment, newmembers = cls.state.added(ordinal, True)
+        sid = oldsid if newsid == idaapi.BADADDR else newsid
+
+        # First check if we need to add a tag for the name or its type.
+        user_specified = not cls.is_name_general(ordinal, sid, newname)
+        if user_specified:
+            logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) with the name \"{!s}\" resulted in adding the implicit name tag.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(newname, '"')))
+            internal.tagindex.structure.increment(sid, '__name__')
+
+        if cls.is_type_tracked(ordinal, sid, newname):
+            logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) with the name \"{!s}\" was detected as needing to be tracked.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, utils.string.escape(newname, '"')))
+            internal.tagindex.structure.increment(sid, '__typeinfo__')
+
+        # Now we can go ahead and decode its comments if it has any.
+        newtags = internal.comment.decode(newcomment)
+        if newtags:
+            logging.debug(u"{:s}.type_added({:d}, {:d}) : Addition of type at ordinal {:d} ({:#x}) required {:d} additional tag{:s} ({!s}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, len(newtags), '' if len(newtags) == 1 else 's', sorted(newtags)))
+            cls.update_type_comments(sid, {}, newtags)
+
+        # Grab the tags that were applied, and log what we added.
+        modified = internal.tagindex.structure.get(sid)
+        logging.debug(u"{:s}.type_added({:d}, {:d}) : Finished added the tags ({!s}) for the new type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, sorted(modified), ordinal, utils.string.escape(newname, '"'), newsid))
+
+        # That was it, all we need to do now is update the members. We do this
+        # by formatting them as a list of changes so that we can hand them off
+        # to the "member_updater" classmethod.
+        iterable = ((mindex, mid, mname, moffset, msize, mtype, malign, mcomment) for mindex, (mid, mname, moffset, msize, mtype, malign, mcomment) in newmembers.items())
+        changes = [(len(field[2:]), (), field) for field in iterable]
+        cls.member_updater(ltc, ordinal, changes)
+
+        return sid, newname, newcomment, newmembers
 
     @classmethod
     def type_updater(cls, ltc, ordinal):
