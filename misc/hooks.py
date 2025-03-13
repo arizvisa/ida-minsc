@@ -3785,6 +3785,10 @@ class localtypesmonitor_state(object):
             res = self.__load_unguarded(*library)
         return res
 
+    def cached(self, ordinal):
+        '''Return whether the type specified by `ordinal` exists within the cache.'''
+        return ordinal in self.structurecache
+
     def cachedname(self, ordinal):
         '''Return the cached name of the type specified by `ordinal` or an empty string.'''
         return self.structurecache.get(ordinal, '')
@@ -3826,6 +3830,30 @@ class localtypesmonitor_state(object):
         tinfo = self.get_type(ordinal)
         res, self.structurecomment[ordinal] = self.structurecomment.get(ordinal, ''), utils.string.of(tinfo.get_type_cmt())
         return res
+
+    def created(self, ordinal, update=True):
+        '''Add the type at the specified `ordinal` to the cache.'''
+        tinfo = self.get_type(ordinal)
+        res, sid, comment = self.name(tinfo), self.identifier(tinfo), self.comment(tinfo)
+
+        # Now we can go through all of its members and collect them. We add the
+        # identifier, but there's a chance that we weren't able to grab it.
+        memberoffsets, memberindices = {}, {}
+        iterable = self.get_members(ordinal)
+        for mindex, mid, mname, moffset, msize, mtype, malign, mcomment in iterable:
+            memberoffsets[moffset] = mindex
+            memberindices[mindex] = mid, mname, moffset, msize, mtype, malign, mcomment
+
+        # Then we can update the cache for the members if it was specified. We
+        # might have an invalid identifier for this type, but we still copy
+        # everything else and assume that someone later will fix it.
+        if update:
+            self.structurecache[ordinal] = res
+            self.structureid[ordinal] = sid
+            self.structurecomment[ordinal] = comment
+            self.memberoffsetcache[ordinal] = memberoffsets
+            self.memberindexcache[ordinal] = memberindices
+        return sid, res, comment, memberindices
 
     def added(self, ordinal, update=True):
         '''Update the cache with the addition of the type specified by `ordinal`.'''
@@ -4324,11 +4352,24 @@ class localtypesmonitor_84(object):
         # callback is responsible for updating our state cache and its tags.
         def ui_async_callback(ordinal):
             sid = cls.state.identifier(ordinal)
-            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newname, sid))
+
+            # Check to ensure that the ordinal exists. If it doesn't, then
+            # there's a chance that we've been raced by a deletion event and we
+            # need to abort since we won't be able to update the ids anyways.
+            if not cls.state.cached(ordinal):
+                logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Ignoring the addition of a non-cached type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), sid))
+                return
 
             # Now we can just go ahead and add the type.
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), sid))
             addedsid, addedname, addedcomment, addedmembers = cls.type_added(ltc, ordinal)
             logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Finished updating tags for {:d} member{:s} belonging to the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), len(addedmembers), '' if len(addedmembers) == 1 else 's', newordinal, newname, sid))
+
+        # Start by creating the type in our cache. Due to the time that the
+        # disassembler dispatches our event, we won't have the correct
+        # identifier. Fortunately, it can always be added later.
+        addedsid, addedname, addedcomment, addedmembers = cls.state.created(newordinal, True)
+        logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Created a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), addedsid))
 
         # Since our "local_types_changed" event gets dispatched before the
         # structure can have an identifier, we need to execute this passively as
@@ -4651,6 +4692,12 @@ class localtypesmonitor_84(object):
         '''Check the changes for the type specified in `ordinal` and update any tags resulting from them.'''
         if not hasattr(cls, 'state'):
             return logging.error(u"{:s}.type_updater({:d}, {:d}) : Unable to handle an update for type at ordinal {:d} due to the monitor state being uninitialized.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal))
+
+        # If the type isn't cached, then there is really nothing to update. This
+        # can happen because the disassembler can dispatch the "LTC_DELETED"
+        # event before the "LTC_EDITED" event. Thanks, IDA!
+        elif not cls.state.cached(ordinal):
+            return logging.debug(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} due to the type not being cached.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal))
 
         # First thing to do is to grab the identifier for the type at the given
         # ordinal. We try the cached version first, and then fall back to to the
