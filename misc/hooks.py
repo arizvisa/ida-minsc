@@ -4654,8 +4654,11 @@ class localtypesmonitor_84(object):
         sid = oldsid if newsid == idaapi.BADADDR else newsid
 
         # First check its type, we only support structures and unions atm.
-        tinfo = cls.state.get_type(ordinal)
+        tinfo, aliased = cls.state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
         if not (tinfo.is_struct() or tinfo.is_union()):
+            return sid, newname, newcomment, newmembers
+
+        elif aliased and aliased.is_typeref():
             return sid, newname, newcomment, newmembers
 
         # Now check if we need to add a tag for the name or its type.
@@ -4702,7 +4705,7 @@ class localtypesmonitor_84(object):
         # First thing to do is to grab the identifier for the type at the given
         # ordinal. We try the cached version first, and then fall back to to the
         # most recent identifier.
-        oldsid, tinfo = cls.state.cachedidentifier(ordinal), cls.state.get_type(ordinal)
+        oldsid, tinfo, aliased = cls.state.cachedidentifier(ordinal), cls.state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
         newsid = cls.state.identifier(ordinal) if oldsid == idaapi.BADADDR else oldsid
         if newsid == idaapi.BADADDR:
             return logging.warning(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to the identifier being unavailable for the type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
@@ -4710,6 +4713,9 @@ class localtypesmonitor_84(object):
         # If it's not a type that we support, then we don't need to track any
         # edits to it.
         elif not (tinfo.is_struct() or tinfo.is_union()):
+            return logging.info(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to being an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
+
+        elif aliased and aliased.is_typeref():
             return logging.info(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to being an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
 
         # Grab the current state of the tags so we can log something useful.
