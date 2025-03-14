@@ -2199,13 +2199,34 @@ class structurenaming(changingchanged):
         return prefix in prefixes and all(digit in '0123456789' for digit in suffix)
 
     @classmethod
+    def enable_tracking(cls, *atype):
+        '''Enable tracking on the structures created in the database.'''
+        if any([not atype, atype and operator.eq(idaapi.AU_TYPE, *atype)]):
+            cls.__tracking_enabled__ = True
+        return
+
+    @classmethod
+    def disable_tracking(cls, *ignored):
+        '''Disable tracking on the structures created in the database.'''
+        cls.__tracking_enabled__ = False
+
+    @classmethod
     def is_tracked(cls, sid, name):
         '''Return true if the structure `sid` with specified `name` should not be tracked with tags.'''
         sptr = internal.structure.by_identifier(sid) if internal.structure.has(sid) else None
 
+        # FIXME: distinguish between types that were created after the database
+        #        was loaded and types that were created while it was being
+        #        loaded. Use the `IDB_Hooks.auto_empty_finally` hook event.
+
+        # Before actually checking if this structure should be tracked, check
+        # our flag to ensure that the database has done its initial analysis.
+        if not getattr(cls, '__tracking_enabled__', False):
+            return False
+
         # If we couldn't get the structure, then it doesn't exist and as such it
         # is untrackable.
-        if not sptr:
+        elif not sptr:
             return False
 
         # If the flags for the structure suggest that it's unlisted, then we
@@ -4546,14 +4567,31 @@ class localtypesmonitor_84(object):
         return field in prefixes and suffix.lower() in {expected_base10, expected_base16}
 
     @classmethod
+    def enable_tracking(cls, *atype):
+        '''Enable tracking on the types created within the database.'''
+        if any([not atype, atype and operator.eq(idaapi.AU_TYPE, *atype)]):
+            cls.__tracking_enabled__ = True
+        return
+
+    @classmethod
+    def disable_tracking(cls, *ignored):
+        '''Disable tracking on the types created within the database.'''
+        cls.__tracking_enabled__ = False
+
+    @classmethod
     def is_type_tracked(cls, ordinal, tid, name):
         '''Return true if the type at the specified `ordinal` and `name` should be tracked with tags.'''
         tinfo = cls.state.get_type(ordinal)
 
+        # First figure out if we're ready to begin tracking types from the local
+        # type library that have been created or edited.
+        if not getattr(cls, '__tracking_enabled__', False):
+            return False
+
         # The local type library really doesn't have a way of distinguishing
         # whether a type was created by the user or the disassembler. So, we
         # verify that the type is not an anonymous struct or union.
-        if tinfo.is_anonymous_udt():
+        elif tinfo.is_anonymous_udt():
             return False
 
         # If the type identifier we were given is invalid, then this is
@@ -5307,6 +5345,11 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.default(hook.idb, 'renaming_struc', structurenaming.renaming, -75)
         scheduler.default(hook.idb, 'struc_renamed', structurenaming.renamed, -75)
 
+        # now for some events that track when the database has finished
+        # initializing so that we can update the tag index with created types.
+        scheduler.default(hook.idp, 'ev_auto_queue_empty', structurenaming.enable_tracking, -100)
+        scheduler.default(hook.idb, 'closebase', structurenaming.disable_tracking, 0)
+
     # v8.4 of the disassembler changes the way repeatable comments and
     # non-repeatable comments can be applied to a structure. So, because of this
     # we need to support both variations of applying comments to structures.
@@ -5396,6 +5439,9 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.default(hook.idp, 'ev_newfile', localtypesmonitor_84.load_local_types_monitor, -100)
         scheduler.default(hook.idb, 'closebase', localtypesmonitor_84.unload_local_types_monitor, +10000)
         scheduler.default(hook.idb, 'local_types_changed', localtypesmonitor_84.changed, 0)
+
+        scheduler.default(hook.idp, 'ev_auto_queue_empty', localtypesmonitor_84.enable_tracking, -100)
+        scheduler.default(hook.idb, 'closebase', localtypesmonitor_84.disable_tracking, 0)
 
         logging.warning(u"{:s} : Tags involving the renaming of structure members is currently unimplemented in v{:.1f}.".format(__name__, idaapi.__version__))
         logging.warning(u"{:s} : Tags involving the application of types to structure members is currently unimplemented in v{:.1f}.".format(__name__, idaapi.__version__))
