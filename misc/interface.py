@@ -6671,7 +6671,7 @@ class tinfo(object):
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.members({!r}) : The specified type information ({!r}) does not contain any details.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
 
         # We only support udt and array types with this function.
-        elif not any([type.is_udt(), type.is_array()]):
+        elif not any([type.is_udt(), type.is_array(), type.is_enum()]):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.members({!r}) : The specified type information ({!r}) does not contain any members.".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
 
         # If our type is an array, then our job is fairly easy here.
@@ -6689,6 +6689,82 @@ class tinfo(object):
             # Now we can create our iterator that gets returned to the caller.
             index_offset = ((base + index, index * element.get_size()) for index in builtins.range(count))
             iterable = ((index, 8 * offset, 8 * element.get_size(), element, declared_alignment) for index, offset in index_offset)
+
+        # If our type is an enumeration (or enumeration bitmask), then we have
+        # to do all the work to calculate the member information for the enum.
+        elif type.is_enum():
+            etd, tabits = idaapi.enum_type_data_t(), [idaapi.TAENUM_64BIT, idaapi.TAENUM_UNSIGNED, idaapi.TAENUM_SIGNED]
+            if not type.get_enum_details(etd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.members({!r}) : Unable to get the enumeration type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+
+            # start by taking our group sizes and aggregating them into a list
+            # of indices and eventually the boundaries for our bit masks.
+            group_sizes = [etd.group_sizes[index] for index in builtins.range(etd.group_sizes.size())]
+            group_indices = functools.reduce(lambda gsizes, gsize: gsizes + [gsize + gsizes[-1]], group_sizes, [0])
+            group_bounds = [(gindex, gsize) for gindex, gsize in zip(group_indices, group_sizes + [0])]
+
+            # then we grab any information about the enumeration that we can and
+            # create an integer type for our enumeration that we'll use later.
+            size_exponent, out_format = etd.bte & idaapi.BTE_SIZE_MASK, etd.bte & idaapi.BTE_OUT_MASK
+            integer_size, tah = pow(2, size_exponent), {bit : etd.taenum_bits & bit for bit in tabits}
+
+            integer_types = {0: idaapi.BT_VOID | idaapi.BTMT_SIZE0, 1: idaapi.BT_INT8, 2: idaapi.BT_INT16, 4: idaapi.BT_INT32, 8: idaapi.BT_INT64, 16: idaapi.BT_INT128}
+            integer_type = idaapi.tinfo_t(integer_types[integer_size])
+
+            iterable = (etd[index] for index in builtins.range(etd.size()))
+            members = [(internal.utils.string.of(edm.name), edm.value, internal.utils.string.of(edm.cmt)) for edm in iterable]
+
+            # if the enumeration is a bitmask, then we need to figure out its
+            # individual sizes so that we can create a bitfield for them.
+            if len(group_bounds) > 1:
+                group_bits = {}
+
+                # iterate through all of the indices (other than the length at
+                # the end), and figure out the number of bits for each member.
+                # we calculate the total number of bits rather than the bits
+                # that are set to ensure that the size of the type is correct.
+                group_offsets = {}
+                for index in group_indices[:-1]:
+                    _, value, _ = members[index]
+                    maximum = pow(2, value.bit_length()) - 1
+
+                    group_offsets[index] = lsb = (+value & -value).bit_length() - 1
+                    mask, _ = divmod(maximum, pow(2, lsb))
+                    group_bits[index] = width = mask.bit_length()
+
+                # now we have the number of bits for each group, and can use
+                # them to create a bitfield for each one.
+                group_types = {}
+                for index, width in group_bits.items():
+                    btd = idaapi.bitfield_type_data_t()
+                    btd.nbytes, btd.width = integer_size, width
+
+                    # try and create the bitfield. if we failed at creating it,
+                    # then we fall back to the integer type for the enumeration.
+                    group_type = idaapi.tinfo_t()
+                    if not group_type.create_bitfield(btd):
+                        group_type = integer_type
+                    group_types[index] = cls.copy(group_type)
+
+                # all that's left is to update our member types with the indices
+                # for the types so that we can use them in our member iterator.
+                iterable = (zip([index] * size, builtins.range(index, index + size)) for index, size in group_bounds)
+                chained = [pair for pair in itertools.chain(*iterable)]
+                member_types = {index : cls.copy(group_types[gindex]) for gindex, index in chained}
+                member_offsets = {index : group_offsets[gindex] for gindex, index in chained}
+                member_sizes = {index : group_bits[gindex] for gindex, index in chained}
+
+            # if the enumeration is not a bitmask, meaning its group_indices are
+            # empty, then we can just create a type for its integer size.
+            else:
+                member_types = {index: integer_type for index, _ in enumerate(members)}
+                member_offsets = {index : 0 for index, _ in enumerate(members)}
+                member_sizes = {index : integer_size for index, _ in enumerate(members)}
+
+            # now we can return our iterator for the members and their types. if
+            # there are any bitmasks, then we just skip over them.
+            member_information = ((member_offsets[index], member_sizes[index], member_types[index]) for index, _ in enumerate(members))
+            iterable = ((mname, moffset, msize, mtype, 1) for (mname, mvalue, mcomment), (moffset, msize, mtype) in zip(members, member_information))
 
         # Otherwise we need to extract the members differently.
         elif type.is_udt():
