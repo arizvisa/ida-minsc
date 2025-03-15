@@ -5499,6 +5499,10 @@ class types(object):
         `structure` - Filter the local types for any that describe a structure.
         `union` - Filter the local types for any that describe a union.
         `enumeration` - Filter the local types for any that describe an enumeration.
+        `basic` - Filter the local types for any that are an alias for a basic type.
+        `anonymous` - Filter the local types for any that are anonymously named
+        `tagged` - Filter the local types for any that use the specified tag(s).
+        `members` - Filter the local types for any with members that use the specified tag(s).
         `predicate` - Filter the types by passing their ordinal and ``idaapi.tinfo_t`` to a callable.
 
     Some examples of using these keywords are as follows::
@@ -5525,6 +5529,11 @@ class types(object):
     __matcher__.mapping('defined', operator.truth, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
     __matcher__.mapping('undefined', operator.not_, operator.itemgetter(2), operator.methodcaller('present')), __matcher__.mapping('present', operator.truth, operator.itemgetter(2), operator.methodcaller('present'))
 
+    # FIXME: should we split the names up by namespace ('::') and check each
+    #        one to figure out if its an anonymous name? we could also verify
+    #        that the character set (ucase hex) and length (32) is correct.
+    __matcher__.mapping('anonymous', operator.truth, operator.itemgetter(1), operator.methodcaller('startswith', '$'))
+
     __matcher__.mapping('integer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_integral'))
     __matcher__.mapping('pointer', operator.truth, operator.itemgetter(2), operator.methodcaller('is_ptr'))
     __matcher__.mapping('function', operator.truth, operator.itemgetter(2), operator.methodcaller('is_func'))
@@ -5533,6 +5542,11 @@ class types(object):
     __matcher__.mapping('structure', operator.truth, operator.itemgetter(2), operator.methodcaller('is_struct'))
     __matcher__.mapping('union', operator.truth, operator.itemgetter(2), operator.methodcaller('is_union'))
     __matcher__.mapping('enumeration', operator.truth, operator.itemgetter(2), operator.methodcaller('is_enum'))
+    __matcher__.mapping('basic', operator.truth, operator.itemgetter(2), interface.tinfo.basic)
+
+    __matcher__.combinator('tagged', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, utils.nth(0)), utils.fpartial(utils.imap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.structures), utils.fpartial(utils.imap, utils.nth(0)), utils.fpartial(utils.imap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.structures, utils.fpartial(utils.itermap, utils.nth(0)), utils.fpartial(utils.imap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.structures, utils.fpartial(utils.itermap, utils.nth(0)), utils.fpartial(utils.imap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), operator.itemgetter(0), interface.tinfo.for_ordinal, interface.tinfo.identifier)
+    __matcher__.alias('tag', 'tagged'), __matcher__.alias('tags', 'tagged')
+    __matcher__.combinator('members', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.owners), utils.fpartial(utils.imap, utils.nth(0)), utils.fpartial(utils.imap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.owners), utils.fpartial(utils.imap, utils.nth(0)), utils.fpartial(utils.imap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.owners, utils.fpartial(utils.itermap, utils.nth(0)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.owners, utils.fpartial(utils.itermap, utils.nth(0)), utils.fpartial(utils.itermap, operator.attrgetter('id')), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), operator.itemgetter(0), interface.tinfo.for_ordinal, interface.tinfo.identifier)
 
     __matcher__.combinator('size', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(2), operator.methodcaller('get_size'))
     __matcher__.boolean('greater', operator.le, operator.itemgetter(2), operator.methodcaller('get_size')), __matcher__.boolean('ge', operator.le, operator.itemgetter(2), operator.methodcaller('get_size'))
