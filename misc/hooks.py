@@ -3869,9 +3869,23 @@ class localtypesmonitor_state(object):
         return res
 
     def created(self, ordinal, update=True):
-        '''Add the type at the specified `ordinal` to the cache.'''
+        '''Add the type at the specified `ordinal` to the cache if `update` is true.'''
         tinfo = self.get_type(ordinal)
-        res, sid, comment = self.name(tinfo), self.identifier(tinfo), self.comment(tinfo)
+
+        # First we get all the information about the type that was created
+        # except for the identifier. This is because the api has a side-effect
+        # where it can modify the type library. Afterwards, we can use said
+        # information to update the cache for the type.
+        res, sid, comment = self.name(tinfo), idaapi.BADADDR, self.comment(tinfo)
+
+        # If we were asked to update the cache, then cache the attributes as
+        # fast as possible. This way if an edit event occurs, it can immediately
+        # know that the type has been cached and is in the process of having its
+        # identifier assigned.
+        if update:
+            self.structurecache[ordinal] = res
+            self.structureid[ordinal] = sid
+            self.structurecomment[ordinal] = comment
 
         # Now we can go through all of its members and collect them. We add the
         # identifier, but there's a chance that we weren't able to grab it.
@@ -3881,13 +3895,10 @@ class localtypesmonitor_state(object):
             memberoffsets[moffset] = mindex
             memberindices[mindex] = mid, mname, moffset, msize, mtype, malign, mcomment
 
-        # Then we can update the cache for the members if it was specified. We
+        # Then we can update the cache for the members if we were asked to.
         # might have an invalid identifier for this type, but we still copy
         # everything else and assume that someone later will fix it.
         if update:
-            self.structurecache[ordinal] = res
-            self.structureid[ordinal] = sid
-            self.structurecomment[ordinal] = comment
             self.memberoffsetcache[ordinal] = memberoffsets
             self.memberindexcache[ordinal] = memberindices
         return sid, res, comment, memberindices
@@ -3895,11 +3906,25 @@ class localtypesmonitor_state(object):
     def added(self, ordinal, update=True):
         '''Update the cache with the addition of the type specified by `ordinal`.'''
         tinfo = self.get_type(ordinal)
-        res, sid, comment = self.name(tinfo), self.identifier(tinfo), self.comment(tinfo)
 
-        # Verify the identifier and whine if we couldn't find a valid one.
+        # Grab all the attributes for the type that we can grab immediately and
+        # write them into the cache if we were asked to (update). We do the
+        # identifier later since it has a side effect that can modify the type.
+        res, comment = self.name(tinfo), self.comment(tinfo)
+
+        if update:
+            self.structurecache[ordinal] = res
+            self.structurecomment[ordinal] = comment
+
+        # Grab the identifier and try to verify it. If it wasn't a valid one
+        # then we just whine about it. Either way, the identifier needs to be
+        # written into the cache. Editing should fix the identifier anyways.
+        res, sid, comment = self.name(tinfo), self.identifier(tinfo), self.comment(tinfo)
         if sid == idaapi.BADADDR:
             logging.warning(u"{:s}.added({:d}) : An invalid identifier ({:#x}) was found for the recently created type at ordinal {:d} named \"{:s}\" ({!r}).".format('.'.join([__name__, self.__class__.__name__]), ordinal, sid, ordinal, utils.string.escape(res or '', '"'), "{!s}".format(tinfo)))
+
+        if update:
+            self.structureid[ordinal] = sid
 
         # Now we can go through all of its members and collect them.
         memberoffsets, memberindices = {}, {}
@@ -3908,11 +3933,8 @@ class localtypesmonitor_state(object):
             memberoffsets[moffset] = mindex
             memberindices[mindex] = mid, mname, moffset, msize, mtype, malign, mcomment
 
-        # Then we can update the cache for the members if it was specified.
+        # Then we can update the cache for the members belonging to the type.
         if update:
-            self.structurecache[ordinal] = res
-            self.structureid[ordinal] = sid
-            self.structurecomment[ordinal] = comment
             self.memberoffsetcache[ordinal] = memberoffsets
             self.memberindexcache[ordinal] = memberindices
         return sid, res, comment, memberindices
@@ -4387,20 +4409,20 @@ class localtypesmonitor_84(object):
         # We need to create a callback to execute in the ui thread since this
         # hook gets dispatched before the local type actually gets created. This
         # callback is responsible for updating our state cache and its tags.
-        def ui_async_callback(ordinal):
-            sid = cls.state.identifier(ordinal)
+        def update_identifier_and_type(newordinal):
+            sid = cls.state.identifier(newordinal)
 
             # Check to ensure that the ordinal exists. If it doesn't, then
             # there's a chance that we've been raced by a deletion event and we
             # need to abort since we won't be able to update the ids anyways.
-            if not cls.state.cached(ordinal):
-                logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Ignoring the addition of a non-cached type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), sid))
+            if not cls.state.cached(newordinal):
+                logging.debug(u"{:s}.local_type_added({!s}, {!s}).update_identifier_and_type({:d}) : Ignoring the addition of a non-cached type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newordinal, utils.string.escape(newname, '"'), sid))
                 return
 
             # Now we can just go ahead and add the type.
-            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), sid))
-            addedsid, addedname, addedcomment, addedmembers = cls.type_added(ltc, ordinal)
-            logging.debug(u"{:s}.local_type_added({!s}, {!s}) : Finished updating tags for {:d} member{:s} belonging to the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), len(addedmembers), '' if len(addedmembers) == 1 else 's', newordinal, newname, sid))
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}).update_identifier_and_type({:d}) : Discovered a new type at ordinal {:d} of the local type library named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, newordinal, utils.string.escape(newname, '"'), sid))
+            addedsid, addedname, addedcomment, addedmembers = cls.type_added(ltc, newordinal)
+            logging.debug(u"{:s}.local_type_added({!s}, {!s}).update_identifier_and_type({:d}) : Finished updating tags for {:d} member{:s} belonging to the newly added type at ordinal {:d} named \"{:s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, len(addedmembers), '' if len(addedmembers) == 1 else 's', newordinal, newname, sid))
 
         # Start by creating the type in our cache. Due to the time that the
         # disassembler dispatches our event, we won't have the correct
@@ -4411,7 +4433,7 @@ class localtypesmonitor_84(object):
         # Since our "local_types_changed" event gets dispatched before the
         # structure can have an identifier, we need to execute this passively as
         # a UI request so that we are able to grab and cache the identifier.
-        Fupdate_identifier = functools.partial(ui_async_callback, newordinal)
+        Fupdate_identifier = functools.partial(update_identifier_and_type, newordinal)
         if not idaapi.execute_ui_requests([Fupdate_identifier]):
             logging.error(u"{:s}.local_type_added({!s}, {!s}) : Error dispatching a user interface request for the new type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal))
         return
@@ -4468,12 +4490,12 @@ class localtypesmonitor_84(object):
         # get a type id allocated to them. After getting the member changes and
         # then updating them, we then need to tally the tags used for the
         # members that were modified.
-        def ui_async_callback(ordinal):
-            changes = cls.state.changes(ordinal, True)
-            changes and logging.info(u"{:s}.local_type_edited({!s}, {!s}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(changes), '' if len(changes) == 1 else 's') if changes else 'no members'))
+        def update_member_changes(newordinal):
+            changes = cls.state.changes(newordinal, True)
+            changes and logging.info(u"{:s}.local_type_edited({!s}, {!s}).update_member_changes({:d}) : The type \"{!s}\" at ordinal {:d} has had {!s} changed.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), newordinal, utils.string.escape(newname, '"'), newordinal, "{:d} member{:s}".format(len(changes), '' if len(changes) == 1 else 's') if changes else 'no members'))
 
             # Now we just need to update the tags for the members of the type.
-            changes and cls.member_updater(ltc, ordinal, changes)
+            changes and cls.member_updater(ltc, newordinal, changes)
 
         # Start out by processing the type in case it was renamed or changed.
         # Once we're done, we can go ahead and update its name and comment.
@@ -4483,8 +4505,8 @@ class localtypesmonitor_84(object):
         # Afterwards we tell the disassembler to dispatch to our callback so
         # that it can check if any of its members have changed and safely grab
         # the identifier for all recently added members.
-        Fget_changes = functools.partial(ui_async_callback, newordinal)
-        if not idaapi.execute_ui_requests([Fget_changes]):
+        Fupdate_changes = functools.partial(update_member_changes, newordinal)
+        if not idaapi.execute_ui_requests([Fupdate_changes]):
             logging.error(u"{:s}.local_type_edited({!s}, {!s}) : Error dispatching a user interface request for the changed type at ordinal {:d} of the local type library.".format('.'.join([__name__, cls.__name__]), "{!s}".format(ordinal) if ordinal is None else "{!r}".format(ordinal), "{!s}".format(name) if name is None else "{!r}".format(name), ordinal))
         return
 
