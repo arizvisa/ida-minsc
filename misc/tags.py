@@ -3,8 +3,9 @@ Tags module (internal)
 
 This module is used for reading and writing tags to an address, function,
 structure, or structure member within the database. It primarily revolves
-around the tools provided by the `internal.tagcache` module, and uses them
-to maintain any of the indices or caches that are necessary for performance.
+around the tools provided by either the `internal.tagcache` or the newer
+`internal.tagindex` modules. These modules are responsible for maintaining
+any of the indices or caches that are necessary for performance.
 """
 import logging, functools, operator, itertools
 import idaapi, internal, internal.tagcache, internal.tagindex
@@ -841,8 +842,8 @@ class address(object):
         `__extra_suffix__` - The posterior comment of the item at the given address.
         `__typeinfo__` - Any type information that is associated with the address.
 
-    The tags for each address are indexed and maintained using the namespaces
-    that inherit from the `internal.tagcache.tagging` namespace.
+    The tags for each address are indexed and maintained using the `reference`
+    namespace that can be found within this module.
     """
 
     @classmethod
@@ -1015,9 +1016,9 @@ class address(object):
         # within a function, then it's a contents tag that we need to adjust.
         if key not in state:
             if func and interface.function.has(ea) and not rt:
-                internal.tagcache.contents.inc(ea, key)
+                reference.contents.increment(ea, key)
             else:
-                internal.tagcache.globals.inc(ea, key)
+                reference.globals.increment(ea, key)
 
         # Grab the previous value from the correct dictionary that we discovered,
         # and update it with the new value that the user is modifying it with.
@@ -1201,9 +1202,9 @@ class address(object):
         # or outside a function, then it's a global tag being removed. Otherwise
         # it's within a function and thus a contents tag being removed.
         if func and interface.function.has(ea) and not rt:
-            internal.tagcache.contents.dec(ea, key)
+            reference.contents.decrement(ea, key)
         else:
-            internal.tagcache.globals.dec(ea, key)
+            reference.globals.decrement(ea, key)
 
         # Finally we can return the value of the tag that was removed.
         return res
@@ -1220,7 +1221,7 @@ class function(object):
         `__typeinfo__` - The type information of the function which contains its prototype.
 
     The tags for each individual function are indexed and maintained using
-    the `internal.tagcache.global` namespace.
+    the `internal.tags.reference.global` namespace (in this module).
     """
 
     @classmethod
@@ -1384,9 +1385,9 @@ class function(object):
             [ hooker.idb.enable(item) for item in targets ]
 
         # If there wasn't a key in any of the dictionaries we decoded, then
-        # we know one was added and so we need to update the tagcache.
+        # we know one was added and so we need to update the tagging index.
         if res is None:
-            internal.tagcache.globals.inc(interface.range.start(fn), key)
+            reference.globals.increment(interface.range.start(fn), key)
 
         # return what we fetched from the dict
         return res
@@ -1502,8 +1503,8 @@ class function(object):
             [ hooker.idb.enable(item) for item in targets ]
 
         # If we got here cleanly without an exception, then the tag was successfully
-        # removed and we just need to update the tag cache with its removal.
-        internal.tagcache.globals.dec(interface.range.start(fn), key)
+        # removed and we just need to update the tagging index with its removal.
+        reference.globals.decrement(interface.range.start(fn), key)
         return res
 
 class block(object):
