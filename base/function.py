@@ -3234,7 +3234,7 @@ def tags(ea):
     # Although if the chunk address wasn't in the owner list, then warn the user that we fixed it.
     if interface.range.start(fn) not in owners:
         logging.warning(u"{:s}.tags({:#x}) : Returning the tags for the function at address ({:#x}) as the chunk address ({:#x}) is not referencing a function ({:s}).".format(__name__, ea, item, interface.range.start(fn), ', '.join(map("{:#x}".format, owners))))
-    return internal.tagcache.contents.name(item, target=item)
+    return internal.tags.reference.contents.name(item, target=item)
 @utils.multicase(func=(idaapi.func_t, types.string))
 def tags(func):
     '''Returns all of the content tags for the function `func`.'''
