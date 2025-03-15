@@ -440,10 +440,10 @@ class globals(changingchanged):
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(oldkeys), utils.string.repr(newkeys)))
         for key in oldkeys ^ newkeys:
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global address', interface.range.start(fn)))
                 internal.tags.reference.globals.decrement(interface.range.start(fn), key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global address', interface.range.start(fn)))
                 internal.tags.reference.globals.increment(interface.range.start(fn), key)
             continue
         return
@@ -453,7 +453,7 @@ class globals(changingchanged):
         contentkeys = {item for item in content.keys()}
         logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(contentkeys)))
         for key in contentkeys:
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global address', interface.range.start(fn)))
             internal.tags.reference.globals.increment(interface.range.start(fn), key)
         return
 
@@ -462,7 +462,7 @@ class globals(changingchanged):
         contentkeys = {item for item in content.keys()}
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(contentkeys)))
         for key in contentkeys:
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global address', interface.range.start(fn)))
             internal.tags.reference.globals.decrement(interface.range.start(fn), key)
         return
 
@@ -485,7 +485,7 @@ class globals(changingchanged):
             newea, nrpt, none = (yield)
 
         except GeneratorExit:
-            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
             return
 
         # Now we can fix the user's new comment.
@@ -493,7 +493,7 @@ class globals(changingchanged):
             ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
 
             if (ncmt or '') != new:
-                logging.warning(u"{:s}.updater() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                logging.warning(u"{:s}.updater() : Comment from event for {:s} {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), 'function' if fn else 'global address', ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
             # If the comment is correctly formatted as a tag, then we
             # can simply write the comment at the given address.
@@ -512,12 +512,12 @@ class globals(changingchanged):
             return
 
         # If the changed event doesn't happen in the right order.
-        logging.fatal(u"{:s}.updater() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
+        logging.fatal(u"{:s}.updater() : Comment events are out of sync for {:s} {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), 'function' if fn else 'global address', ea, utils.string.repr(o), utils.string.repr(n)))
 
         # Delete the old function comment and its references.
         cls._delete_refs(fn, o)
         idaapi.set_func_cmt(fn, '', rpt)
-        logging.warning(u"{:s}.updater() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
+        logging.warning(u"{:s}.updater() : Deleted comment for {:s} ({:#x}) was ({!s}).".format('.'.join([__name__, cls.__name__]), 'function' if fn else 'global address', ea, utils.string.repr(o)))
 
         # Create the references for the new function comment.
         newfn = idaapi.get_func(newea)
@@ -539,7 +539,7 @@ class globals(changingchanged):
 
         # Construct our new state and grab our old comment so that we can send the
         # old comment to the state after we've disabled the necessary events.
-        event, oldcmt = cls.new(interface.range.start(a)), utils.string.of(idaapi.get_func_cmt(fn, repeatable))
+        ea, event, oldcmt = interface.range.start(fn), cls.new(interface.range.start(a)), utils.string.of(idaapi.get_func_cmt(fn, repeatable))
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
         hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
@@ -548,7 +548,7 @@ class globals(changingchanged):
         # Now we can use our coroutine to begin the comment update, so that
         # later, the "changed" event can do the actual update.
         try:
-            event.send((interface.range.start(fn), bool(repeatable), utils.string.of(cmt)))
+            event.send((ea, bool(repeatable), utils.string.of(cmt)))
 
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then something terrible has happened and we need to let
@@ -579,7 +579,7 @@ class globals(changingchanged):
         # our new comment. As the state keeps track of the old comment and the new
         # one we're going to send to it once we disable some events, it will know
         # what to do.
-        event, newcmt = cls.resume(interface.range.start(a)), utils.string.of(idaapi.get_func_cmt(fn, repeatable))
+        ea, event, newcmt = interface.range.start(fn), cls.resume(interface.range.start(a)), utils.string.of(idaapi.get_func_cmt(fn, repeatable))
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
         hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
