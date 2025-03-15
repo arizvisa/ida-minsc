@@ -8797,7 +8797,7 @@ class get(object):
         if isinstance(type, internal.types.list):
             _, length = type
             if length * element != expected:
-                raise E.InvalidParameterError(u"{:s}.array({:s}, {!s}) : The given element type ({!s}) is an array of {:d} element{:s} with a size ({:+#x}) that is different from the specified boundaries ({:+#x}).".format('.'.join([__name__, cls.__name__]), interface.bounds_t(*bounds), type, type, length, '' if length == 1 else 's', lenth * element, expected))
+                raise E.InvalidParameterError(u"{:s}.array({:s}, {!s}) : The given element type ({!s}) is an array of {:d} element{:s} with a size ({:+#x}) that is different from the specified boundaries ({:+#x}).".format('.'.join([__name__, cls.__name__]), interface.bounds_t(*bounds), type, type, length, '' if length == 1 else 's', length * element, expected))
             logging.warning(u"{:s}.array({:s}, {!s}) : The given element type ({!s}) is an array that will have its length ({:d}) discarded due to an address range being given ({:s}).".format('.'.join([__name__, cls.__name__]), interface.bounds_t(*bounds), type, type, length, interface.bounds_t(*bounds)))
             type, _ = type
 
