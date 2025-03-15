@@ -1490,3 +1490,183 @@ class reference(object):
         @classmethod
         def erase(cls, sid):
             return []
+
+class reference_v1(object):
+    """
+    This namespace is basically a frontend to whatever backend is currently
+    selected. It is basically an abstraction around the entirety of the tagging
+    index implemented by the `internal.tagindex` module. This includes global or
+    function addresses, addresses belonging to the contents of a function,
+    structures or unions, and the members for said structures or unions.
+    """
+
+    class tags(object):
+        """
+        Basically a frontend for all of the tags used in the database. It is
+        primarily used to access global information about the tags, and is not
+        really too useful.
+        """
+        @classmethod
+        def has(cls, name):
+            return internal.tagindex.tags.has(name)
+        @classmethod
+        def get(cls, name):
+            position, count = internal.tagindex.tags.get(name)
+            return count
+        @classmethod
+        def name(cls):
+            used = internal.tagindex.tags.usage()
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def counts(cls):
+            iterable = internal.tagindex.tags.counts()
+            return {name : count for name, count in iterable}
+
+    class globals(object):
+        """
+        This namespace is a frontend for the addresses and functions inside a
+        database. Addresses belonging to a function, but excluding the function
+        entrypoint are excluded.
+        """
+        @classmethod
+        def get(cls, ea):
+            return internal.tagindex.globals.get(ea)
+        @classmethod
+        def has(cls, ea):
+            res = internal.tagindex.globals.get(ea)
+            return True if res else False
+        @classmethod
+        def increment(cls, address, name):
+            position, count = internal.tagindex.globals.increment(address, name)
+            return count
+        @classmethod
+        def decrement(cls, address, name):
+            position, count = internal.tagindex.globals.decrement(address, name) if internal.tagindex.tags.has(name) else (0, 0)
+            return count
+        @classmethod
+        def name(cls):
+            used = internal.tagindex.globals.usage()
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def address(cls):
+            iterable = (ea for ea, _ in internal.tagindex.globals.forward())
+            return iterable
+        @classmethod
+        def iterate(cls):
+            iterable = ((ea, used) for ea, used in internal.tagindex.globals.forward())
+            return ((ea, len(internal.tagindex.tags.names(used))) for ea, used in iterable)
+        @classmethod
+        def counts(cls):
+            res, used = {}, (integer for ea, integer in internal.tagindex.globals.forward())
+            for name in itertools.chain(*map(internal.tagindex.tags.names, used)):
+                res[name] = res.setdefault(name, 0) + 1
+            return res
+        @classmethod
+        def erase_address(cls, ea):
+            count = internal.tagindex.globals.erase(ea)
+            return count
+
+    class contents(object):
+        """
+        This namespace is just a frontend for the addresses that belong to a
+        function. Each address associated with a function is considered a
+        "contents" address.
+        """
+        @classmethod
+        def has(cls, ea, **target):
+            res = internal.tagindex.contents.get(ea)
+            return True if res else False
+        @classmethod
+        def get(cls, ea, **target):
+            return internal.tagindex.contents.get(ea)
+        @classmethod
+        def increment(cls, address, name, **target):
+            position, counts = internal.tagindex.contents.increment(address, name, **target)
+            owner = interface.function.by_address(target.get('target', address))
+            return counts.get(interface.range.start(owner), 0)
+        @classmethod
+        def decrement(cls, address, name, **target):
+            position, counts = internal.tagindex.contents.decrement(address, name, **target) if internal.tagindex.tags.has(name) else (0, {})
+            owner = interface.function.by_address(target.get('target', address))
+            return counts.get(interface.range.start(owner), 0)
+        @classmethod
+        def iterate(cls):
+            iterable = internal.tagindex.contents.select()
+            return ((ea, internal.tagindex.tags.names(used)) for ea, used in iterable)
+        @classmethod
+        def name(cls, address, **target):
+            used = internal.tagindex.contents.usage(address)
+            return internal.tagindex.tags.names(used)
+        @classmethod
+        def address(cls, address, **target):
+            return [ea for ea, _ in internal.tagindex.contents.function(address)]
+        @classmethod
+        def counts(cls, address):
+            res, used = {}, (integer for ea, integer in internal.tagindex.contents.function(address))
+            for name in itertools.chain(*map(internal.tagindex.tags.names, used)):
+                res[name] = res.setdefault(name, 0) + 1
+            return res
+        @classmethod
+        def erase_address(cls, func, ea):
+            names = internal.tagindex.contents.get(ea)
+            removed = [internal.tagindex.contents.decrement(ea, name, target=func) for name in names]
+            return len(names)
+        @classmethod
+        def erase(cls, func):
+            return internal.tagindex.contents.erase(func)
+
+    class structure(object):
+        """
+        This namespace handles the tags that can be applied to a structure or a
+        union. This is just a frontend to its implementation which resides in
+        the `internal.tagindex.structure` namespace.
+        """
+        @classmethod
+        def has(cls, sid):
+            res = internal.tagindex.structure.get(sid)
+            return True if res else False
+        @classmethod
+        def get(cls, sid):
+            return internal.tagindex.structure.get(sid)
+        @classmethod
+        def increment(cls, sid, name):
+            position, count = internal.tagindex.structure.increment(sid, name)
+            return count
+        @classmethod
+        def decrement(cls, sid, name):
+            position, count = internal.tagindex.structure.decrement(sid, name) if internal.tagindex.tags.has(name) else (0, 0)
+            return count
+        @classmethod
+        def erase(cls, sid):
+            return internal.tagindex.structure.erase([sid])
+
+    class members(object):
+        """
+        This namespace contains all the tools required for tracking the tags
+        that have been applied to members belonging to a structure or a union.
+        It is primarily just a frontend to its implementation which resides
+        within the `internal.tagindex.members` namespace.
+        """
+        @classmethod
+        def has(cls, mid):
+            res = internal.tagindex.members.get(mid)
+            return True if res else False
+        @classmethod
+        def get(cls, mid):
+            return internal.tagindex.members.get(mid)
+        @classmethod
+        def increment(cls, mid, name):
+            position, count = internal.tagindex.members.increment(mid, name)
+            return count
+        @classmethod
+        def decrement(cls, mid, name):
+            position, count = internal.tagindex.members.decrement(mid, name) if internal.tagindex.tags.has(name) else (0, 0)
+            return count
+        @classmethod
+        def erase_member(cls, sid, mid):
+            return internal.tagindex.members.erase(sid, [mid])
+        @classmethod
+        def erase(cls, sid):
+            iterable = internal.tagindex.members.structure([sid])
+            selected = [mid for mid, used in iterable]
+            return internal.tagindex.members.erase([sid], selected)
