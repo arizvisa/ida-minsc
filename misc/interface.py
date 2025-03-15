@@ -7885,6 +7885,38 @@ class tinfo(object):
         # anything else was explicitly specified by the user or decompiler.
         return False
 
+    @classmethod
+    def compiler(cls, type):
+        '''Return whether the given `type` is used by the selected compiler (without modifiers) including signed or unsigned attributes.'''
+        flags = idaapi.BTMT_SIGNED | idaapi.BTMT_UNSIGNED
+        return cls.basic(type, flags)
+
+    @classmethod
+    def boolean(cls, type, *sizes):
+        '''Return whether the given `type` is a boolean type per the selected compiler.'''
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+
+        # This table is used to map sizes to the flags for a boolean type. If we
+        # were given any sizes, then we use the table to build a set that we can
+        # use to check if one of the sizes were selected. It's worth noting that
+        # the existence of a 2-byte or 8-byte boolean depends on the database.
+        boolean_sizes = {
+            1 : idaapi.BTMT_BOOL1,
+            2 : idaapi.BTMT_BOOL2,
+            8 : idaapi.BTMT_BOOL8,
+            4 : idaapi.BTMT_BOOL4,
+        }
+
+        remove = {8} if database.bits() != 64 else {2}
+        filtered = {size for size in sizes} - removed if sizes else boolean_sizes.keys()
+        requested = {boolean_sizes[size] for size in filtered} | {0}
+
+        # Grab the declaration type and unpack all of its components so that we
+        # can test them. Booleans are easy since there's only one type to check.
+        decl = type.get_decltype()
+        base, flags, modifiers = (decl & mask for mask in masks)
+        return base == idaapi.BT_BOOL and not modifiers and flags in requested
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
