@@ -2143,7 +2143,7 @@ entries = exports   # XXX: ns alias
 
 def tags():
     '''Return all of the tag names used globally within the database.'''
-    return internal.tagcache.globals.name()
+    return internal.tags.reference.globals.name()
 
 @utils.multicase()
 def tag():
