@@ -3630,10 +3630,24 @@ class localtypesmonitor_state(object):
     def get_members(cls, ordinal):
         '''Iterate through all of the members in the structure or union specified by `ordinal`.'''
         tinfo = cls.get_type(ordinal)
-        has_members = tinfo.is_struct() or tinfo.is_union()
 
-        # First we want to make sure that the type is something that we can get
-        # members for. If it's not, then don't attempt to return any members.
+        # First we want to make sure that the type is a structure, union or
+        # something that we can actually get the members for.
+
+        # XXX: We need to verify that the type is correct, because occasionally
+        #      a type being loaded from symbols can result in a type that is
+        #      missing the type for one of its members (referenced by ordinal).
+        #      These types have the symptom of having details (`has_details`),
+        #      but failing whenever we try to get them. So, we treat these types
+        #      that are not "correct" (`is_correct`) as having no members.
+        if tinfo.is_correct():
+            has_members = tinfo.is_struct() or tinfo.is_union()
+
+        else:
+            has_members = False
+
+        # Now we can go through and enumerate all the members for the type if it
+        # has members. We also prefix our results with the index for the member.
         enumerable = enumerate(interface.tinfo.members(tinfo) if has_members else ())
         iterable = (itertools.chain([index], items) for index, items in enumerable)
 
