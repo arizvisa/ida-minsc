@@ -11,7 +11,7 @@ import idaapi, internal, internal.tagcache
 from internal import utils, interface, declaration, comment
 logging = logging.getLogger(__name__)
 
-class select(object):
+class select_v0(object):
     """
     This namespace is used to query different types of tags from the tagcache
     and yield the results to the caller. The information yielded to the caller
@@ -277,6 +277,9 @@ class select(object):
             # If anything was collected (matched), then yield the block and the matching tags.
             if collected: yield blocks[ea], collected
         return
+
+# Select the namespace that uses the tagging cache by default.
+select = select_v0
 
 class address(object):
     """
