@@ -7917,6 +7917,32 @@ class tinfo(object):
         base, flags, modifiers = (decl & mask for mask in masks)
         return base == idaapi.BT_BOOL and not modifiers and flags in requested
 
+    @classmethod
+    def quoted(cls, type):
+        '''Format the specified `type` as a double-quoted and escaped string.'''
+        masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+
+        # XXX: so, as i complained about to support...it turns out that the type
+        #      is racy as shit and can give us a busted type that raises an
+        #      internal error when trying to access any of its type attributes.
+        #      this means things like `tinfo_t.is_correct`, `tinfo.is_present`,
+        #      and most importantly rendering it as a string is fucking busted.
+
+        # To work around the above issue, we search for malformed types using
+        # apis that don't try to access the type's attributes. This limits us to
+        # explicitly checking the `tinfo_t.typid` directly for an unknown type.
+        tinfo, decl = type, type.get_decltype()
+        base, flags, modifiers = (decl & mask for mask in masks)
+
+        # If we got an unknown type, then don't even attempt to render it.
+        if base == idaapi.BT_UNK and flags == idaapi.BTMT_SIZE128:
+            return '<UNKNOWN>'
+
+        # Hopefully we can just try to render it as a string without any issues.
+        string = "{!s}".format(tinfo)
+        escaped = internal.utils.string.escape(string, '"')
+        return "\"{:s}\"".format(escaped)
+
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = (("{:x}".format(abs(int(item))) if isinstance(item, internal.types.integer) or hasattr(item, '__int__') else item) for item in names)
