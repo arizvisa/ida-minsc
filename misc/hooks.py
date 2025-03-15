@@ -3677,7 +3677,7 @@ class localtypesmonitor_state(object):
             else:
                 mid = tinfo.get_udm_tid(mindex)
                 mcomment = utils.string.of(udm.cmt)
-                yield mindex, mid, mname, moffset, msize, mtype, malign, mcomment
+                yield mindex, mid, mname, moffset, msize, interface.tinfo.copy(mtype), malign, mcomment
             continue
         return
 
@@ -4194,7 +4194,7 @@ class localtypesmonitor_state(object):
                 if oldsize != newsize:
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its size changed from {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldsize, newsize))
                 if not(interface.tinfo.same(oldtype, newtype)):
-                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its type changed from \"{!s}\" to \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its type changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                 if oldalign != newalign:
                     logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has had its alignment changed from {:+#x} to {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, oldalign, newalign))
 
@@ -4212,7 +4212,7 @@ class localtypesmonitor_state(object):
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with {:d} change{:s} (including the offset).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
-                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, interface.tinfo.quoted(mtype)))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been added with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
 
                 mtags = {tag for tag in internal.comment.decode(mcomment)}
@@ -4224,7 +4224,7 @@ class localtypesmonitor_state(object):
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with {:d} change{:s} (including the offset).".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, changes, '' if abs(changes) == 1 else 's'))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the identifier {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, mid))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the size {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, msize))
-                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, utils.string.escape("{!s}".format(mtype), '"')))
+                logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the type \"{!s}\".".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, interface.tinfo.quoted(mtype)))
                 logging.info(u"{:s}.__changed_members_compare({:d}, {!s}, {!s}) : The member with the name \"{!s}\" at offset {:+#x} has been removed with the alignment {:+#x}.".format('.'.join([__name__, cls.__name__]), ordinal, '...', '...', mname, moffset, malign))
 
                 mtags = {tag for tag in internal.comment.decode(mcomment)}
@@ -4571,7 +4571,7 @@ class localtypesmonitor_84(object):
             expected, suffix_integer = "field_{:X}".format(bytes), bytes
 
         else:
-            logging.error(u"{:s}.is_field_general({:d}, {:d}, {!r}) : Unable to determine the default field name for the member at index {:d} of the unsupported type \"{:s}\" (ordinal {:d}).".format('.'.join([__name__, cls.__name__]), ordinal, mindex, name, mindex, utils.string.escape("{!s}".format(tinfo), '"'), ordinal))
+            logging.error(u"{:s}.is_field_general({:d}, {:d}, {!r}) : Unable to determine the default field name for the member at index {:d} of the unsupported type \"{:s}\" (ordinal {:d}).".format('.'.join([__name__, cls.__name__]), ordinal, mindex, name, mindex, interface.tinfo.quoted(tinfo), ordinal))
             return True
 
         # The only default field name that exists in v8.4 of the type library
@@ -4783,15 +4783,15 @@ class localtypesmonitor_84(object):
         oldsid, tinfo, aliased = cls.state.cachedidentifier(ordinal), cls.state.get_type(ordinal), interface.tinfo.at_ordinal(ordinal)
         newsid = cls.state.identifier(ordinal) if oldsid == idaapi.BADADDR else oldsid
         if newsid == idaapi.BADADDR:
-            return logging.warning(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to the identifier being unavailable for the type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
+            return logging.warning(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to the identifier for the type {!s} being unavailable.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, interface.tinfo.quoted(tinfo)))
 
         # If it's not a type that we support, then we don't need to track any
         # edits to it.
         elif not (tinfo.is_struct() or tinfo.is_union()):
-            return logging.info(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to being an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
+            return logging.info(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to {!s} being an unsupported type.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, interface.tinfo.quoted(tinfo)))
 
         elif aliased and aliased.is_typeref():
-            return logging.info(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to being an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, "{!s}".format(tinfo)))
+            return logging.info(u"{:s}.type_updater({:d}, {:d}) : Refusing to update type at ordinal {:d} ({:#x}) due to {!s} being an unsupported type.".format('.'.join([__name__, cls.__name__]), ltc, ordinal, ordinal, newsid, interface.tinfo.quoted(tinfo)))
 
         # Grab the current state of the tags so we can log something useful.
         else:
@@ -4916,25 +4916,25 @@ class localtypesmonitor_84(object):
                 # it was switched to one that we track, then increment its tag.
                 tracked = cls.is_field_tracked(ordinal, oldindex, oldtype), cls.is_field_tracked(ordinal, newindex, newtype)
                 if tracked == (False, True):
-                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} resulted in the addition of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                     internal.tags.reference.members.increment(mid, '__typeinfo__') if '__typeinfo__' not in original else ()
 
                 # If the new type was lowered to a trivial (basic) type, then go
                 # ahead and decrement it.
                 elif tracked == (True, False):
-                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} resulted in the removal of the tag.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                     internal.tags.reference.members.decrement(mid, '__typeinfo__') if '__typeinfo__' in original else ()
 
                 # If the original type was something for us to track, but it
                 # doesn't include our tag, then we fix it by incrementing.
                 elif tracked[0] and '__typeinfo__' not in original:
-                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} required us to fix it.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
                     internal.tags.reference.members.increment(mid, '__typeinfo__')
 
                 # Next we'll figure out whether we should log that no changes to
                 # the reference counts for "__typeinfo__" were needed.
                 elif not interface.tinfo.same(oldtype, newtype):
-                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from \"{!s}\" to \"{!s}\" did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, utils.string.escape("{!s}".format(oldtype), '"'), utils.string.escape("{!s}".format(newtype), '"')))
+                    logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Changing the type for the member at index {:d} ({:#x}) of type {!s} ({:#x}) from {!s} to {!s} did not need an adjustment.".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', mindex, mid, parameter, sid, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
 
                 # The very last thing we need to do is to check the tags that
                 # have been encoded into the comments. We pretty much just hand
