@@ -1335,14 +1335,19 @@ class member(object):
             raise internal.exceptions.DisassemblerError(u"{:s}({:#x}).tag({!r}, {!r}) : Unable to update the {:s} comment for the member {:s}.".format('.'.join([__name__, cls.__name__]), mptr.id, key, none, 'repeatable' if repeatable else 'non-repeatable', utils.string.repr(utils.string.of(idaapi.get_member_fullname(mptr.id)))))
         return res
 
-class reference(object):
+class reference_v0(object):
     """
-    This namespace is basically a frontend to whatever backend is currently
-    selected. Its only purpose is to abstract around references for global
-    addresses or content addresses that are associated with a function.
+    This namespace is a frontend to the tagging backend that resides within the
+    `internal.tagcache` module. The purpose of this is to simplify the interface
+    that is used for accessing the tagcache. The implementation abstracts around
+    global addresses, which include function entrypoints and addresses, that do
+    not belong to a function. It also abstracts around content addresses which
+    are associated with the contents of a function.
 
-    This specific implementation is used to support the `internal.tagcache`
-    backend.
+    There are also placeholder namespaces for accessing cached information about
+    structures, unions, and their members. The implementation of the tagcache
+    does not support applying tags to these types, so the implementation returns
+    empty results for each of them.
     """
 
     class tags(object):
@@ -1491,7 +1496,7 @@ class reference(object):
         def erase(cls, sid):
             return []
 
-class reference_v1(object):
+class reference_v2(object):
     """
     This namespace is basically a frontend to whatever backend is currently
     selected. It is basically an abstraction around the entirety of the tagging
@@ -1670,3 +1675,7 @@ class reference_v1(object):
             iterable = internal.tagindex.members.structure([sid])
             selected = [mid for mid, used in iterable]
             return internal.tagindex.members.erase([sid], selected)
+
+# Select the v0 frontend by default. This using the functionality provided
+# by the tagcache which has since been redesigned into the tagging index.
+reference = reference_v0
