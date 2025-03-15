@@ -6692,7 +6692,8 @@ class tinfo(object):
 
             # Now we can create our iterator that gets returned to the caller.
             index_offset = ((base + index, index * element.get_size()) for index in builtins.range(count))
-            iterable = ((index, 8 * offset, 8 * element.get_size(), element, declared_alignment) for index, offset in index_offset)
+            copied = [(index, 8 * offset, 8 * element.get_size(), cls.copy(element), declared_alignment) for index, offset in index_offset]
+            iterable = (item for item in copied)
 
         # If our type is an enumeration (or enumeration bitmask), then we have
         # to do all the work to calculate the member information for the enum.
@@ -6768,7 +6769,8 @@ class tinfo(object):
             # now we can return our iterator for the members and their types. if
             # there are any bitmasks, then we just skip over them.
             member_information = ((member_offsets[index], member_sizes[index], member_types[index]) for index, _ in enumerate(members))
-            iterable = ((mname, moffset, msize, mtype, 1) for (mname, mvalue, mcomment), (moffset, msize, mtype) in zip(members, member_information))
+            copied = [(mname, moffset, msize, cls.copy(mtype), 1) for (mname, mvalue, mcomment), (moffset, msize, mtype) in zip(members, member_information)]
+            iterable = (item for item in copied)
 
         # Otherwise we need to extract the members differently.
         elif type.is_udt():
@@ -6782,7 +6784,8 @@ class tinfo(object):
 
             # Now we can create an iterator that returns information about each member.
             index_member = ((index, utd[index]) for index in builtins.range(count))
-            iterable = ((internal.utils.string.of(member.name), member.offset, member.size, member.type, pow(2, member.fda)) for index, member in index_member)
+            copied = [(internal.utils.string.of(member.name), member.offset, member.size, cls.copy(member.type), pow(2, member.fda)) for index, member in index_member]
+            iterable = (item for item in copied)
 
         # Any other type is pretty much unknown and so we just bail the search.
         else:
