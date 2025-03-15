@@ -6688,13 +6688,13 @@ class tinfo(object):
 
             # Now we can create our iterator that gets returned to the caller.
             index_offset = ((base + index, index * element.get_size()) for index in builtins.range(count))
-            iterable = ((index, offset, element.get_size(), element, declared_alignment) for index, offset in index_offset)
+            iterable = ((index, 8 * offset, 8 * element.get_size(), element, declared_alignment) for index, offset in index_offset)
 
         # Otherwise we need to extract the members differently.
         elif type.is_udt():
             utd = idaapi.udt_type_data_t()
             if not type.get_udt_details(utd):
-                raise internal.exceptions.DisassemblerError(u"{:s}.members({!r}) : Unable to get the member type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+                raise internal.exceptions.DisassemblerError(u"{:s}.members({!r}) : Unable to get the udt type data from the specified type information ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
 
             # Grab literally all the fields just in case we might need them.
             effective_alignment, declared_alignment, pack_alignment = utd.effalign, pow(2, utd.sda - 1) if utd.sda else 0, pow(2, utd.pack)
@@ -6702,11 +6702,11 @@ class tinfo(object):
 
             # Now we can create an iterator that returns information about each member.
             index_member = ((index, utd[index]) for index in builtins.range(count))
-            iterable = ((internal.utils.string.of(member.name), member.offset >> 3, member.size >> 3, member.type, pow(2, member.fda)) for index, member in index_member)
+            iterable = ((internal.utils.string.of(member.name), member.offset, member.size, member.type, pow(2, member.fda)) for index, member in index_member)
 
         # Any other type is pretty much unknown and so we just bail the search.
         else:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.members({!r}) : Unable to determine the members from an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.members({!r}) : Unable to access the type data for an unsupported type ({!r}).".format('.'.join([__name__, cls.__name__]), "{!s}".format(type), "{!s}".format(type)))
 
         # Now we need to process our iterable to concretize each type being returned.
         # To do this, we first make an iterable with a copy of the original that we'll
