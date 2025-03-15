@@ -7,7 +7,7 @@ around the tools provided by the `internal.tagcache` module, and uses them
 to maintain any of the indices or caches that are necessary for performance.
 """
 import logging, functools, operator, itertools
-import idaapi, internal, internal.tagcache
+import idaapi, internal, internal.tagcache, internal.tagindex
 from internal import utils, interface, declaration, comment
 logging = logging.getLogger(__name__)
 
@@ -433,6 +433,398 @@ class select_v0(object):
     def blocks(cls, func, *args):
         '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
         return query_v0.blocks(func, *args)
+
+class query_v1(object):
+    """
+    This namespace is an abstraction layer around the various types of indices
+    provided by the `internal.tagindex` module. It is responsible for
+    simplifying the interaction with the tag index and providing a clean
+    interface for the `select` namespace defined aftwards. The parameters for
+    the functions in this namespace directly correlate to the parameters of the
+    `select namespace.
+
+    Each function within this namespace takes 2 important parameters that are
+    relevant for filtering the results returned from the tag index. The first
+    parameter is named "required" and is used to specify the tags that must
+    exist in order for the address or location to be returned. The second
+    parameter is named "included" and is used to specify any other tags that
+    should be included in the yielded result. If none of these parameters are
+    specified, each function will return all locations that have some kind of
+    tag applied to them.
+    """
+
+    @classmethod
+    def mask(cls, names):
+        '''Return an integer that can be used to test the existence of the specified tag `names`.'''
+        wanted = {name for name in names} if isinstance(names, (internal.types.unordered, internal.types.dictionary)) else {names}
+        available = {name for name in wanted if internal.tagindex.tags.has(name)}
+        missing = wanted - available
+        if missing and wanted:
+            logging.warning(u"{:s}.mask({!s}) : Error due to {:d} wanted tag{:s} ({!s}) being unavailable out of the {:d} tag{:s} being requested.".format('.'.join([__name__, cls.__name__]), names, len(missing), '' if len(missing) == 1 else 's', ', '.join(map("{!r}".format, sorted(missing))), len(wanted), '' if len(wanted) == 1 else 's'))
+        return internal.tagindex.tags.mask(available)
+
+    @classmethod
+    def tags(cls):
+        '''Return all of the tag names used by the globals in the database.'''
+        used = internal.tagindex.globals.usage()
+        return internal.tagindex.tags.names(used)
+
+    @classmethod
+    def functiontags(cls, func):
+        '''Return all of the tag names used by the contents of the function `func`.'''
+        fn = interface.function.by(func)
+        ea, _ = interface.range.unpack(fn)
+        used = internal.tagindex.contents.usage(ea)
+        return internal.tagindex.tags.names(used)
+
+    @classmethod
+    def globals(cls, require=frozenset(), include=frozenset()):
+        '''Yield the address and tags from the globals that contain all the tags in `require` and including any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for ea, used in internal.tagindex.globals.iterate():
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield ea, internal.tagindex.tags.names(used)
+            continue
+        return
+
+    @classmethod
+    def contents(cls, require=frozenset(), include=frozenset()):
+        '''Yield the function address and tags from the contents of each function containing all the tags in `require` and including any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for ea, used in internal.tagindex.contents.select():
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield ea, internal.tagindex.tags.names(used)
+            continue
+        return
+
+    @classmethod
+    def function(cls, func, require=frozenset(), include=frozenset()):
+        '''Yield the contents address and tags from the contents of the function `func` containing all the tags in `require` and including any from `include`.'''
+        fn = interface.function.by(func)
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for ea, used in internal.tagindex.contents.function(interface.range.start(fn)):
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield ea, internal.tagindex.tags.names(used)
+            continue
+        return
+
+    @classmethod
+    def structures(cls, require=frozenset(), include=frozenset()):
+        '''Yield the structure id and tags from each structure containing all the tags in `require` and including any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for sid, used in internal.tagindex.structure.iterate():
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield sid, internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield sid, internal.tagindex.tags.names(used)
+            continue
+        return
+
+    @classmethod
+    def structure(cls, sid, require=frozenset(), include=frozenset()):
+        '''Yield the member id and tags for each member belonging to the structure `sid` which contain all the tags in `require` and include any from `include`.'''
+        struc_t = idaapi.struc_t, internal.structure.structure_t
+        listable = sid if isinstance(sid, internal.types.ordered) else [sid]
+        sids = {(sid.id if isinstance(sid, struc_t) else int(sid)) for sid in listable}
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for mid, used in internal.tagindex.members.structure(sids):
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield mid, internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield mid, internal.tagindex.tags.names(used)
+            continue
+        return
+
+    @classmethod
+    def owners(cls, require=frozenset(), include=frozenset()):
+        '''Yield the owning structure id and tags for each structure with members that use all the tags in `require` and include any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for sid, used in internal.tagindex.members.select():
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield sid, internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield sid, internal.tagindex.tags.names(used)
+            continue
+        return
+
+    @classmethod
+    def members(cls, require=frozenset(), include=frozenset()):
+        '''Yield the member id and tags for each member in the database using all the tags in `require` and including any from `include`.'''
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+        for mid, used in internal.tagindex.members.forward():
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield mid, internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield mid, internal.tagindex.tags.names(used)
+            continue
+        return
+
+    @classmethod
+    def blocks(cls, func, require=frozenset(), include=frozenset()):
+        '''Yield the basic block and tags from the basib blocks of the function `func` containing all the tags in `require` and including any from `include`.'''
+        flags = getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+        iterable = require if isinstance(require, (internal.types.unordered, internal.types.dictionary)) else {require}
+        required = {key for key in iterable}
+        iterable = include if isinstance(include, (internal.types.unordered, internal.types.dictionary)) else {include}
+        included = {key for key in iterable}
+
+        # First thing is to figure out which function we're supposed to query
+        # for basic block tags.
+        fn = interface.function.by(func)
+        ea = interface.range.start(fn)
+
+        # Enumerate all the basic blocks and build a map so that we can fetch
+        # them by address. We also preserve the order that we received them so
+        # that we can yield our results within the same order.
+        blockmap = [(interface.range.start(bb), bb) for bb in interface.function.blocks(fn, flags)]
+        order = [ea for ea, _ in blockmap]
+        blocks = {ea : bb for ea, bb in blockmap}
+
+        # Now we just need to union our tagged addresses with the ones which
+        # are basic-blocks to get a list of the addresses actually selected.
+        available = {ea for ea, _ in cls.function(fn)}
+        selected = {ea for ea in available} & {ea for ea in order}
+        ordered = [ea for ea in order if ea in selected]
+
+        # If we weren't ask to query anything specific, then iterate using our
+        # ordered blocks and yield anything that has tags associated with them.
+        if not(required or included):
+            for ea in ordered:
+                res = block.get(blocks[ea])
+                if res: yield blocks[ea], res
+            return
+
+        # Otherwise, walk through every matching address, and cross-check it
+        # against the query that we were asked to make.
+        # FIXME: we really should be using the tagindex here.
+        for ea in ordered:
+            res = block.get(blocks[ea])
+            collected = {key : value for key, value in res.items() if key in included}
+
+            # If we were given any tags that are required, add them to our
+            # collection so that they can be yielded. If none of the required
+            # tags exist, then continue onto the next basic block.
+            if required:
+                if required & {tag for tag in res} == required:
+                    collected.update({key : value for key, value in res.items() if key in required})
+                else: continue
+
+            # If any tags were collected, then we can just yield them.
+            if collected:
+                yield blocks[ea], collected
+            continue
+        return
+
+    @classmethod
+    def blocks(cls, func, require=frozenset(), include=frozenset()):
+        '''Yield the basic block and tags from the basic blocks of the function `func` containing all the tags in `require` and including any from `include`.'''
+        flags = getattr(idaapi, 'FC_NOEXT', 2) | getattr(idaapi, 'FC_CALL_ENDS', 0x20)
+        rmask, imask = (cls.mask(names) for names in [require, include])
+        requested, selection = rmask | imask, require or include
+
+        # Enumerate all the basic blocks and build a map so that we can fetch
+        # them by address. We also preserve the order that we received them so
+        # that we can yield our results within the same order.
+        fn = interface.function.by(func)
+        blockmap = [(interface.range.start(bb), bb) for bb in interface.function.blocks(fn, flags)]
+        order = [ea for ea, _ in blockmap]
+        blocks = {ea : bb for ea, bb in blockmap}
+        ranges = {ea : interface.range.unpack(bb) for ea, bb in blockmap}
+
+        # Now we just need to union our tagged addresses with the ones which
+        # are basic-blocks to get a list of the addresses actually selected.
+        available = {ea for ea, _ in cls.function(fn)}
+        selected = {ea for ea in available} & {ea for ea in order}
+        ordered = [ea for ea in order if ea in selected]
+
+        # Otherwise, walk through every matching address, and cross-check it
+        # against the query that we were asked to make.
+        for ea in ordered:
+            items = internal.tagindex.contents.range(*ranges[ea])
+            iterable = (integer for ea, integer in items)
+            used = functools.reduce(operator.or_, iterable, 0)
+            if not(used):
+                continue
+            elif rmask and used & rmask != rmask:
+                continue
+            elif not(rmask) and imask and not(used & imask):
+                continue
+            elif selection and used & requested:
+                yield blocks[ea], internal.tagindex.tags.names(used & requested)
+            elif not selection and used:
+                yield blocks[ea], internal.tagindex.tags.names(used)
+            continue
+        return
+
+class select_v1(object):
+    """
+    This namespace is used to query different types of tags from the tagindex
+    and yield the results to the caller. The information yielded to the caller
+    is in the form of a tuple composed of the unique address or location of the
+    tags, and then the tags themselves. The results of these functions can be
+    used to create a dictionary by the caller if necessary.
+
+    Filtering of the results from the functions in this namespace is done by
+    specifying a group of "required" tags, which must exist for the location to
+    be yielded, and/or a group of "included" tags which will be included in the
+    yielded result if they are found. If no "required" or "included" tags are
+    specified, then all of the results from the index will be yielded.
+    """
+
+    navigation = __import__('ui').navigation
+
+    @classmethod
+    def database(cls, *args):
+        '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
+        selection = True if any(args) else False
+        for ea, used in query_v1.globals(*args):
+            is_function = interface.function.has(cls.navigation.set(ea))
+            Ftag = function.get if is_function else address.get
+            tags, owners = Ftag(ea), {f for f in interface.function.owners(ea)} if is_function else {ea}
+            selected = {key : value for key, value in tags.items() if key in used}
+            if ea not in owners:
+                continue
+            yield ea, selected if selection else tags
+        return
+
+    @classmethod
+    def contents(cls, *args):
+        '''Query the contents of each function and yield a tuple containing its address and a set of the matching `required` tags with any `included` ones.'''
+        selection = True if any(args) else False
+        for ea, used in query_v1.contents(*args):
+            is_function = interface.function.has(cls.navigation.procedure(ea))
+            owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
+            if ea not in owners:
+                continue
+            yield ea, used
+        return
+
+    @classmethod
+    def function(cls, func, *args):
+        '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
+        selection = True if any(args) else False
+        for ea, used in query_v1.function(func, *args):
+            tags = address.get(cls.navigation.analyze(ea))
+            selected = {key : value for key, value in tags.items() if key in used}
+            yield ea, selected if selection else tags
+        return
+
+    @classmethod
+    def structures(cls, *args):
+        '''Query the structures in the database and yield a tuple containing each structure and all of the `required` tags with any `included` ones.'''
+        selection = True if any(args) else False
+        for sid, used in query_v1.structures(*args):
+            tags = structure.get(sid)
+            selected = {key : value for key, value in tags.items() if key in used}
+            res = internal.structure.new(sid, 0)
+            yield res, selected if selection else tags
+        return
+
+    @classmethod
+    def owners(cls, *args):
+        '''Query the members in the database and yield a tuple containing the owning structure for the member and a set of the matching `required` tags with any `included` ones.'''
+        # FIXME: we should be using an offset other than 0 if the structure
+        #        being yielded belongs to a frame.
+        for sid, used in query_v1.owners(*args):
+            yield internal.structure.new(sid, 0), used
+        return
+
+    @classmethod
+    def members(cls, *args):
+        '''Query the members in the database and yield a tuple containing the member and a set of the matching `required` tags with any `included` ones.'''
+        cache = {}
+        # FIXME: we should be using an offset other than 0 if the owner of the
+        #        member being yielded is a frame for a function.
+        for mid, used in query_v1.members(*args):
+            mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+            owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
+            yield owner.members[mindex], used
+        return
+
+    @classmethod
+    def structure(cls, sid, *args):
+        '''Query the members of the structure `sid` and yield a tuple containing each member and all of the `required` tags with any `included` ones.'''
+        selection, cache = True if any(args) else False, {}
+        for mid, used in query_v1.structure(sid, *args):
+            tags = member.get(mid)
+            selected = {key : value for key, value in tags.items() if key in used}
+            sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+            if sptr.id not in cache:
+                mowner = cache.setdefault(sptr.id, internal.structure.new(sptr.id, 0))
+            else:
+                mowner = cache[sptr.id]
+            yield mowner.members[mindex], selected if selection else tags
+        return
+
+    @classmethod
+    def blocks(cls, func, *args):
+        '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
+        selection, cache = True if any(args) else False, {}
+        for bb, used in query_v1.blocks(func, *args):
+            tags = block.get(bb)
+            selected = {key : value for key, value in tags.items() if key in used}
+            yield bb, selected if selection else tags
+        return
+
+    @classmethod
+    def blocks(cls, func, *args):
+        '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
+        return query_v1.blocks(func, *args)
 
 # Select the namespace that uses the tagging cache by default.
 query, select = query_v0, select_v0
@@ -1655,7 +2047,7 @@ class reference_v0(object):
         def erase(cls, sid):
             return []
 
-class reference_v2(object):
+class reference_v1(object):
     """
     This namespace is basically a frontend to whatever backend is currently
     selected. It is basically an abstraction around the entirety of the tagging
