@@ -7823,12 +7823,15 @@ class tinfo(object):
         return reduce_individual_type(ti, *size)
 
     @classmethod
-    def basic(cls, type):
-        '''Reduce whether the given `type` is a default data type used by the selected compiler.'''
-        decl, masks = type.get_decltype(), [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+    def basic(cls, type, *integer_flags):
+        '''Return whether the given `type` is a default data type (without modifiers) chosen by the disassembler with the selected compiler.'''
+        decl = type.get_decltype()
 
-        # assign some types that we'll use for our checks.
+        # assign some types that we'll use for our checks. in order to allow
+        # using this same function with signed and unsigned compiler integers,
+        # we take any flags we were given and create mask to test them with.
         masks = [idaapi.TYPE_BASE_MASK, idaapi.TYPE_FLAGS_MASK, idaapi.TYPE_MODIF_MASK]
+        integer_flags_mask = operator.invert(*integer_flags) if integer_flags else idaapi.TYPE_FLAGS_MASK
 
         # XXX: it's worth noting that our referral to these being "basic" types
         #      is different from the documentation. we classify a "basic" type
@@ -7867,7 +7870,7 @@ class tinfo(object):
 
         # now we can check if it's one of the basic integer types used by the
         # compiler.
-        elif not flags and base in compiler_integer_types:
+        elif not (flags & integer_flags_mask) and base in compiler_integer_types:
             return True
 
         # we need to specially handle single-byte types, because they have a
