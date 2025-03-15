@@ -11,13 +11,13 @@ import idaapi, internal, internal.tagcache
 from internal import utils, interface, declaration, comment
 logging = logging.getLogger(__name__)
 
-class select_v0(object):
+class query_v0(object):
     """
     This namespace is used to query different types of tags from the tagcache
-    and yield the results to the caller. The information yielded to the caller
-    is in the form of a tuple composed of the unique address or location of the
-    tags, and then the tags themselves. The results of these functions can be
-    used to create a dictionary by the caller if necessary.
+    and yield the results to the caller. Its purpose is to return raw
+    unprocessed numbers rather than user-friendly types representing the results
+    of the selection. This is intended to be used by the matchers which can be
+    used to filter the results of certain types of artifacts.
 
     Filtering of the results from the functions in this namespace is done by
     specifying a group of "required" tags, which must exist for the location to
@@ -28,7 +28,7 @@ class select_v0(object):
     navigation = __import__('ui').navigation
 
     @classmethod
-    def database(cls, required=[], included=[]):
+    def globals(cls, required=[], included=[]):
         '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
         iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
         required = {key for key in iterable}
@@ -160,19 +160,17 @@ class select_v0(object):
         if not(required or included):
             for sptr in internal.structure.iterate():
                 content = structure.get(sptr)
-                item = internal.structure.new(sptr.id, 0)
 
                 # if the structure had some content (tags), then we have a match
                 # and can yield the structure and its content to the user.
                 if content:
-                    yield item, content
+                    yield sptr.id, content
                 continue
             return
 
         # now we just slowly iterate through our structures looking for any matches.
         for sptr in internal.structure.iterate():
             content = structure.get(sptr)
-            item = internal.structure.new(sptr.id, 0)
 
             # included is the equivalent of Or(|) and yields the structure if any of the tagnames are used.
             collected = {key : value for key, value in content.items() if key in included}
@@ -184,7 +182,7 @@ class select_v0(object):
                 else: continue
 
             # that's all folks.. yield it if you got it.
-            if collected: yield item, collected
+            if collected: yield sptr.id, collected
         return
 
     @classmethod
@@ -195,30 +193,18 @@ class select_v0(object):
         iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
         included = {key for key in iterable}
 
-        # If we were given a structure_t or members_t, then preserve them and
-        # extract the sid so that we can return items with the same base offset.
-        if isinstance(sid, internal.structure.structure_t):
-            owner, sptr = sid, sid.ptr
-        elif isinstance(sid, internal.structure.members_t):
-            owner, sptr = sid.owner, sid.owner.ptr
-        else:
-            owner = internal.structure.new(sid, 0)
-            sptr = owner.ptr
-
         # If there were no tags to filter with, then we're being asked to yield
         # everything. so, we do just that for every member in the structure.
         if not(required or included):
-            for mowner, mindex, mptr in internal.structure.members.iterate(sptr):
-                item = internal.structure.member_t(owner, mindex)
+            for mowner, mindex, mptr in internal.structure.members.iterate(sid):
                 content = member.get(mptr)
                 if content:
-                    yield item, content
+                    yield mptr.id, content
                 continue
             return
 
         # Otherwise, we iterate through the structure and yield its members.
-        for mowner, mindex, mptr in internal.structure.members.iterate(sptr):
-            item = internal.structure.member_t(owner, mindex)
+        for mowner, mindex, mptr in internal.structure.members.iterate(sid):
             content = member.get(mptr)
 
             # Start out by collecting any tagnames that should be included which is similar to Or(|).
@@ -231,7 +217,93 @@ class select_v0(object):
                 else: continue
 
             # Easy to do and easy to yield.
-            if collected: yield item, collected
+            if collected: yield mptr.id, collected
+        return
+
+    @classmethod
+    def owners(cls, required=[], included=[]):
+        '''Query the members in the database and yield a tuple containing the owning structure and all of the `required` tags with any `included` ones.'''
+        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+        required = {key for key in iterable}
+        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        included = {key for key in iterable}
+
+        # If we weren't given anything to query with, then we need to yield
+        # the members tags for every single structure that we can find.
+        if not(required or included):
+            for sptr in internal.structure.iterate():
+                iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id))
+                names = {tag for tag in itertools.chain(*iterable)}
+                if names:
+                    yield sptr.id, names
+                continue
+            return
+
+        # If we were given something to query the members of each structure
+        # with, then we first grab the tags for every single structure member.
+        for sptr in internal.structure.iterate():
+            iterable = (member.get(mptr) for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id))
+            names = {tag for tag in itertools.chain(*iterable)}
+
+            # Then we select any of the tag names that we were asked to include.
+            # If any tag names are required, make sure they exist and skip to
+            # the next structure if they don't.
+            collected = included & names
+            if required:
+                if required & names == required:
+                    collected.update(required)
+                else: continue
+
+            # If we have anything left, then it is worth yielding to the caller.
+            if collected:
+                yield sptr.id, collected
+            continue
+        return
+
+    @classmethod
+    def members(cls, required=[], included=[]):
+        '''Query the members in the database and yield a tuple containing the member and all of the `required` tags with any `included` ones.'''
+        iterable = required if isinstance(required, (internal.types.unordered, internal.types.dictionary)) else {required}
+        required = {key for key in iterable}
+        iterable = included if isinstance(included, (internal.types.unordered, internal.types.dictionary)) else {included}
+        included = {key for key in iterable}
+
+        # If there were no parameters to filter with, then we can just yield
+        # every tag that we find.
+        if not(required or included):
+            for sptr in internal.structure.iterate():
+                for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id):
+                    content = member.get(mptr)
+
+                    # If there's content for the member, then yield it.
+                    # Otherwise we can continue to the next one.
+                    if content:
+                        yield mptr.id, content
+                    continue
+                continue
+            return
+
+        # If we were given something to query the members of each structure
+        # with, then we first grab the tags for every single structure member.
+        for sptr in internal.structure.iterate():
+            for mowner, mindex, mptr in internal.structure.members.iterate(sptr.id):
+                content = member.get(mptr)
+
+                # Filter our tags for any that were specified to be included.
+                collected = {key : value for key, value in content.items() if key in included}
+
+                # Now check for all the tags that must be required. If we didn't
+                # find a match, then continue onto the next member that we find.
+                if required:
+                    if required & {tag for tag in content} == required:
+                        collected.update({key : value for key, value in content.items() if key in required})
+                    else: continue
+
+                # Check if our filtering left us some results and yield them.
+                if collected:
+                    yield mptr.id, collected
+                continue
+            continue
         return
 
     @classmethod
@@ -278,8 +350,92 @@ class select_v0(object):
             if collected: yield blocks[ea], collected
         return
 
+class select_v0(object):
+    """
+    This namespace is used to query different types of tags from the tagcache
+    and yield the results to the caller. The information yielded to the caller
+    is in the form of a tuple composed of the unique address or location of the
+    tags, and then the tags themselves. The results of these functions can be
+    used to create a dictionary by the caller if necessary.
+
+    This specific implementation wraps the results of the `query_v0` namespace
+    and post-processes the results to yield user-friendly types with the tags.
+    """
+    @classmethod
+    def database(cls, *args):
+        '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
+        return query_v0.globals(*args)
+
+    @classmethod
+    def contents(cls, *args):
+        '''Query the contents of each function and yield a tuple containing its address and a set of the matching `required` tags with any `included` ones.'''
+        return query_v0.contents(*args)
+
+    @classmethod
+    def function(cls, func, *args):
+        '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
+        return query_v0.function(func, *args)
+
+    @classmethod
+    def structures(cls, *args):
+        '''Query the structures in the database and yield a tuple containing each structure and all of the `required` tags with any `included` ones.'''
+        for sid, res in query_v0.structures(*args):
+            yield internal.structure.new(sid, 0), res
+        return
+
+    @classmethod
+    def structure(cls, sid, *args):
+        '''Query the members of the structure `sid` from the database and yield a tuple containing all the chosen tags.'''
+
+        # If we were given a structure_t or members_t, then preserve them and
+        # extract the sid so that we can return items with the same base offset.
+        if isinstance(sid, internal.structure.structure_t):
+            owner, sptr = sid, sid.ptr
+        elif isinstance(sid, internal.structure.members_t):
+            owner, sptr = sid.owner, sid.owner.ptr
+        else:
+            owner = internal.structure.new(sid, 0)
+            sptr = owner.ptr
+
+        for mid, res in query_v0.structure(sptr.id, *args):
+            mowner, mindex, mptr = internal.structure.members.by_identifier(sptr, mid)
+            yield internal.structure.member_t(owner, mindex), res
+        return
+
+    @classmethod
+    def owners(cls, *args):
+        '''Query the members in the database and yield a tuple containing the owning structure and a set of the matching `required` tags with any `included` ones.'''
+        cache = {}
+
+        # FIXME: we should be using something other than an offset of 0 if the
+        #        structure belongs to a frame.
+        for sid, res in query_v0.owners(*args):
+            owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
+            yield owner, res
+        return
+
+    @classmethod
+    def members(cls, *args):
+        '''Query the members in the database and yield a tuple containing the member and all of the `required` tags with any `included` ones.'''
+        cache = {}
+        for mid, res in query_v0.members(*args):
+            mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+
+            # FIXME: we should be detecting the frame base offset for the owner
+            #        in case the structure is a frame belonging to a function.
+            owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
+            if res:
+                yield owner.members[mindex], res
+            continue
+        return
+
+    @classmethod
+    def blocks(cls, func, *args):
+        '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
+        return query_v0.blocks(func, *args)
+
 # Select the namespace that uses the tagging cache by default.
-select = select_v0
+query, select = query_v0, select_v0
 
 class address(object):
     """
