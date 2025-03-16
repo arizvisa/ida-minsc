@@ -1659,7 +1659,11 @@ class priorityhook(prioritybase):
 
     def __formatter__(self, name):
         cls = self.__klass__
-        return '.'.join([cls.__name__, name])
+        if isinstance(name, internal.types.string):
+            return '.'.join([cls.__name__, name])
+        elif isinstance(name, internal.types.integer):
+            return "{:#x}".format(name)
+        return "{!s}".format(name)
 
     def __new_instance__(self, attributes):
         '''Create a new instance of the hook object with the callables in `attributes` attached as methods.'''
