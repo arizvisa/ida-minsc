@@ -1825,21 +1825,21 @@ class priorityhook(prioritybase):
 
         # Then we'll unpack our callables, and instantiate the two required objects.
         start_attributes, resume_attributes, stop_attributes = ({name : callable} for callable in packed)
-        instance_start, instance_stop = (self.__new_instance__(attributes) for attributes in [start_attributes, stop_attributes])
+        start_instance, stop_instance = (self.__new_instance__(attributes) for attributes in [start_attributes, stop_attributes])
 
         # Now we'll try to start them. The disassembler's hooks appear to be
         # stored in a stack, so we need to enable them in reverse order.
         cls = self.__class__
-        if not instance_stop.hook():
+        if not stop_instance.hook():
             logging.debug(u"{:s}._attach_managers({!r}) : Unable to hook the management instance ({!s}) for the target {:s} which will result in the target remaining detached.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name)))
             return False
 
         # If we failed at enabling the starting hook, then we need to
         # remove the hook that did succeed and then return failure.
-        if not instance_start.hook():
+        if not start_instance.hook():
             logging.debug(u"{:s}._attach_managers({!r}) : Unable to hook the management instance ({!s}) for the target {:s} which will result in the target remaining detached.".format('.'.join([__name__, cls.__name__]), name, start_instance, self.__formatter__(name)))
 
-            if not instance_stop.unhook():
+            if not stop_instance.unhook():
                 logging.warning(u"{:s}._attach_managers({!r}) : Another error occurred while trying to detach the management instance ({!s}) from the target {:s}.".format('.'.join([__name__, cls.__name__]), name, stop_instance, self.__formatter__(name)))
 
             return False
@@ -1847,7 +1847,7 @@ class priorityhook(prioritybase):
         # Now we can assign our instances that manage the scope for our
         # hook, and stash our callables within our "attached" dictionary.
         self.__attached__[name] = packed
-        self.__attached_scope[name] = instance_start, instance_stop
+        self.__attached_scope[name] = start_instance, stop_instance
         self.__attached_instances[name] = []
 
         return True
