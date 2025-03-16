@@ -498,6 +498,7 @@ class ida_hexrays_template(object):
     cexpr_t = missing_class
     ctree_item_t = missing_class
     treeloc_t = missing_class
+    ctext_position_t = missing_class
     qstring_printer_t = missing_class
 
     has_cached_cfunc = use_callable(utils.fconstant(False))
@@ -543,6 +544,7 @@ class ida_hexrays_types(object):
     cinsn_t             = Fget_type_from_module(ida_hexrays, 'cinsn_t')
     citem_t             = Fget_type_from_module(ida_hexrays, 'citem_t')
     cnumber_t           = Fget_type_from_module(ida_hexrays, 'cnumber_t')
+    ctext_position_t    = Fget_type_from_module(ida_hexrays, 'ctext_position_t')
     ctree_item_t        = Fget_type_from_module(ida_hexrays, 'ctree_item_t')
     gco_info_t          = Fget_type_from_module(ida_hexrays, 'gco_info_t')
     hexrays_failure_t   = Fget_type_from_module(ida_hexrays, 'hexrays_failure_t')
