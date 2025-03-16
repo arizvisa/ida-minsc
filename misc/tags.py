@@ -834,7 +834,7 @@ class select_v1(object):
     specifying a group of "required" tags, which must exist for the location to
     be yielded, and/or a group of "included" tags which will be included in the
     yielded result if they are found. If no "required" or "included" tags are
-    specified, then all of the results from the index will be yielded.
+    specified, then all of the explicit tags from the index will be yielded.
     """
 
     navigation = __import__('ui').navigation
@@ -848,9 +848,14 @@ class select_v1(object):
             Ftag = function.get if is_function else address.get
             tags, owners = Ftag(ea), {f for f in interface.function.owners(ea)} if is_function else {ea}
             selected = {key : value for key, value in tags.items() if key in used}
+            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             if ea not in owners:
-                continue
-            yield ea, selected if selection else tags
+                pass
+            elif selection:
+                yield ea, selected
+            elif explicit:
+                yield ea, explicit
+            continue
         return
 
     @classmethod
@@ -860,9 +865,14 @@ class select_v1(object):
         for ea, used in query_v1.contents(*args):
             is_function = interface.function.has(cls.navigation.procedure(ea))
             owners = {f for f in interface.function.owners(ea)} if is_function else {ea}
+            explicit = {key for key in used if key and not key.startswith('__')}
             if ea not in owners:
-                continue
-            yield ea, used
+                pass
+            elif selection:
+                yield ea, used
+            elif explicit:
+                yield ea, explicit
+            continue
         return
 
     @classmethod
@@ -872,7 +882,12 @@ class select_v1(object):
         for ea, used in query_v1.function(func, *args):
             tags = address.get(cls.navigation.analyze(ea))
             selected = {key : value for key, value in tags.items() if key in used}
-            yield ea, selected if selection else tags
+            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            if selection:
+                yield ea, selected
+            elif explicit:
+                yield ea, explicit
+            continue
         return
 
     @classmethod
@@ -882,29 +897,54 @@ class select_v1(object):
         for sid, used in query_v1.structures(*args):
             tags = structure.get(sid)
             selected = {key : value for key, value in tags.items() if key in used}
-            res = internal.structure.new(sid, 0)
-            yield res, selected if selection else tags
+            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            if selection:
+                yield internal.structure.new(sid, 0), selected
+            elif explicit:
+                yield internal.structure.new(sid, 0), explicit
+            continue
         return
 
     @classmethod
     def owners(cls, *args):
         '''Query the members in the database and yield a tuple containing the owning structure for the member and a set of the matching `required` tags with any `included` ones.'''
+        selection = True if any(args) else False
+
         # FIXME: we should be using an offset other than 0 if the structure
         #        being yielded belongs to a frame.
         for sid, used in query_v1.owners(*args):
-            yield internal.structure.new(sid, 0), used
+            explicit = {key for key in used if key and not key.startswith('__')}
+            if selection:
+                yield internal.structure.new(sid, 0), used
+            elif explicit:
+                yield internal.structure.new(sid, 0), explicit
+            continue
         return
 
     @classmethod
     def members(cls, *args):
         '''Query the members in the database and yield a tuple containing the member and a set of the matching `required` tags with any `included` ones.'''
-        cache = {}
-        # FIXME: we should be using an offset other than 0 if the owner of the
-        #        member being yielded is a frame for a function.
+        cache, selection = {}, True if any(args) else False
+
+        # Go through each member from our query, and use it to get the structure
+        # that owns it. We can then instantiate a `structure_t`. We cache the
+        # result from this in case more than one member from the structure is
+        # being yielded.
         for mid, used in query_v1.members(*args):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+
+            # FIXME: we should be using an offset other than 0 if the owner of the
+            #        member being yielded is a frame for a function.
             owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
-            yield owner.members[mindex], used
+
+            # Now we just need to filter out the empty tag and any implicit ones
+            # so that we're only left with explicit tags.
+            explicit = {key for key in used if key and not key.startswith('__')}
+            if selection:
+                yield owner.members[mindex], used
+            elif explicit:
+                yield owner.members[mindex], explicit
+            continue
         return
 
     @classmethod
@@ -914,12 +954,14 @@ class select_v1(object):
         for mid, used in query_v1.structure(sid, *args):
             tags = member.get(mid)
             selected = {key : value for key, value in tags.items() if key in used}
+            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
             sptr, mindex, mptr = internal.structure.members.by_identifier(None, mid)
-            if sptr.id not in cache:
-                mowner = cache.setdefault(sptr.id, internal.structure.new(sptr.id, 0))
-            else:
-                mowner = cache[sptr.id]
-            yield mowner.members[mindex], selected if selection else tags
+            mowner = cache[sptr.id] if sptr.id in cache else cache.setdefault(sptr.id, internal.structure.new(sptr.id, 0))
+            if selection:
+                yield mowner.members[mindex], selected
+            elif explicit:
+                yield mowner.members[mindex], explicit
+            continue
         return
 
     @classmethod
@@ -929,13 +971,13 @@ class select_v1(object):
         for bb, used in query_v1.blocks(func, *args):
             tags = block.get(bb)
             selected = {key : value for key, value in tags.items() if key in used}
-            yield bb, selected if selection else tags
+            explicit = {key : value for key, value in tags.items() if key and not key.startswith('__')}
+            if selection:
+                yield bb, selected
+            elif explicit:
+                yield bb, explicit
+            continue
         return
-
-    @classmethod
-    def blocks(cls, func, *args):
-        '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
-        return query_v1.blocks(func, *args)
 
 # Select the namespace that uses the tagging cache by default.
 query, select = query_v0, select_v0
