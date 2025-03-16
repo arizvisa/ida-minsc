@@ -5490,6 +5490,10 @@ def make_ida_not_suck_cocks(nw_code):
         hook.ui.add('plugin_loaded', hook.hx.__plugin_loaded__, -10000)
         hook.ui.add('plugin_unloading', hook.hx.__plugin_unloading__, +10000)
 
+    if hasattr(hook, 'hexrays'):
+        hook.ui.add('plugin_loaded', hook.hexrays.__plugin_loaded__, -10000)
+        hook.ui.add('plugin_unloading', hook.hexrays.__plugin_unloading__, +10000)
+
     # add any hooks that are required to automatically prepare the
     # microarchitecture module that is tied to the decompiler.
     if hasattr(hook, 'hx'):
