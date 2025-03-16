@@ -213,14 +213,16 @@ def erase_globals():
 
     yield total
 
-    current = 0
-    for idx, k in enumerate(names):
-        internal.tagcache.globals.destroy_tag(k)
-        yield current + idx, k
+    # XXX: decrementing all referenced tags should result in destroying the
+    #      specified tag... but there's a chance that a bug might prevent it.
+    #current = 0
+    #for idx, k in enumerate(names):
+    #    internal.tags.reference.destroy_tag(k)
+    #    yield current + idx, k
 
     current += len(names)
     for idx, ea in enumerate(addresses):
-        internal.tagcache.globals.destroy(ea)
+        internal.tags.reference.globals.erase_address(ea)
         yield current + idx, ea
     return
 
@@ -230,7 +232,7 @@ def erase_contents():
     yield len(functions)
 
     for idx, ea in enumerate(map(ui.navigation.set, functions)):
-        internal.tagcache.contents.destroy(ea)
+        internal.tags.reference.contents.erase(ea)
         yield idx, ea
     return
 
