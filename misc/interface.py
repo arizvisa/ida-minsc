@@ -3562,6 +3562,100 @@ class priorityaction(prioritybase):
             raise TypeError(u"{:s}.add({!r}, {!s}, priority={:s}) : Unable to attach the specified action (\"{:s}\").".format('.'.join([__name__, cls.__name__]), name, activator, format(priority), internal.utils.string.escape(name, '"')))
         return super(priorityaction, self).add(name, activator, priority)
 
+class priorityhook_hexrays(priorityhook):
+    """
+    This is a helper class that allows one to dispatch a callable in response to
+    an event produced by the disassembler or decompiler. Specifically, this
+    class is intended to be used with the `idaapi.Hexrays_Hooks` class that is
+    exposed by the python api. It is derived from the `priorityhook` helper
+    class with the only difference being that no hooks are attached until the
+    "Hex-Rays Decompiler" plugin has been loaded into the disassembler.
+
+    The class accomplishes this by assigning the attribute "__hexrays_ready__"
+    as a protected property that can be enabled to deny the attachment of a
+    callable to an event. After this, the "plugin_loaded" and "plugin_unloaded"
+    hooks are used to toggle this value. Upon detecting that the correct plugin
+    has been loaded, all of the events that are associated with a callable are
+    attached, and then the flag is set so that the instance works the same as
+    the `priorityhook` base class. Once the associated plugin has been unloaded,
+    this instance will detach all of the attached events and then clear the
+    "__hexrays_ready__" attribute until the next time the plugin is loaded.
+    """
+
+    def __init__(self, klass, mapping={}, entries={}):
+        '''Create an instance of the priority hook class that is only enabled when the decompiler plugin has been loaded.'''
+        super(priorityhook_hexrays, self).__init__(klass, mapping=mapping, entries=entries)
+
+        # Set the current state for hexrays to non-ready so that nothing gets
+        # attached until the plugin we're waiting for gets loaded.
+        self.__hexrays_ready__ = False
+
+    def add(self, name, callable, priority=0):
+        '''Add the `callable` to the queue for the specified `name` with the given `priority`.'''
+        cls = self.__class__
+
+        # If the decompiler plugin is not ready, then simulate an attachment.
+        if not self.__hexrays_ready__:
+            return super(priorityhook, self).add(name, callable, priority)
+
+        # Otherwise, since the decompiler has been loaded we can just attach it.
+        if not self.attach(name):
+            raise internal.exceptions.DisassemblerError(u"{:s}.add({:#x}, {!s}, {:+d}) : Unable to attach to the {:s} event.".format('.'.join([__name__, cls.__name__]), name, callable, priority, self.__formatter__(name)))
+
+        # Add the callable to the queue for the given target name.
+        return super(priorityhook_hexrays, self).add(name, callable, priority)
+
+    def __repr__(self):
+        message = 'attached' if getattr(self, '__hexrays_ready__', False) else 'being monitored (decompiler not loaded)'
+        if len(self):
+            res, items = "Events currently {:s}:".format(message), super(priorityhook_hexrays, self).__repr__().split('\n')
+            return '\n'.join([res] + items[1:])
+        return "Events currently {:s}: {:s}".format(message, 'No events are being monitored.')
+
+    # Callbacks to enable the attachment of hooks once the decompiler has been loaded.
+    __plugin_required = {'Hex-Rays Decompiler'}
+    def __plugin_loaded__(self, plugin_info):
+        cls, plugin_name = self.__class__, internal.utils.string.of(plugin_info.name)
+        if plugin_name not in self.__plugin_required:
+            return
+
+        import ida_hexrays as module
+
+        # Initialize the hexrays plugin so that we know that it is available.
+        logging.debug(u"{:s} : Initializing the Hex-Rays plugin with `{:s}` due to receiving a plugin loaded event for \"{:s}\".".format('.'.join([__name__, cls.__name__]), internal.utils.pycompat.fullname(module.init_hexrays_plugin), internal.utils.string.escape(plugin_name, '"')))
+        if not module.init_hexrays_plugin():
+            cls = self.__class__
+            raise internal.exceptions.DisassemblerError(u"{:s} : Failure while trying initialize the Hex-Rays plugin with `{:s}`.".format('.'.join([__name__, cls.__name__]), internal.utils.pycompat.fullname(module.init_hexrays_plugin)))
+
+        # Toggle our boolean that we use for keeping track of when the
+        # decompiler plugin has been loaded or not.
+        self.__hexrays_ready__ = True
+
+        # Now we need to go through all of the events that were hooked by the
+        # user and attach each of them so that they will get dispatched to by
+        # the disassembler and decompiler.
+        logging.debug(u"{:s} : Attaching {:d} event{:s} for the Hex-Rays plugin due to receiving a plugin loaded event for \"{:s}\".".format('.'.join([__name__, cls.__name__]), len(self), '' if len(self) == 1 else 's', internal.utils.string.escape(plugin_name, '"')))
+        for name in sorted(self):
+            if not self.attach(name):
+                logging.warning(u"{:s} : Unable to attach the {:s} event during the loading process of the Hex-Rays plugin.".format('.'.join([__name__, cls.__name__]), self.__formatter__(name)))
+            continue
+        return
+
+    def __plugin_unloading__(self, plugin_info):
+        cls, plugin_name = self.__class__, internal.utils.string.of(plugin_info.name)
+        if plugin_name not in self.__plugin_required:
+            return
+
+        # Go through and detach everything that is currently hooked.
+        logging.debug(u"{:s} : Detaching {:d} event{:s} for the Hex-Rays plugin due to receiving a plugin unloaded event for \"{:s}\".".format('.'.join([__name__, cls.__name__]), len(self), '' if len(self) == 1 else 's', internal.utils.string.escape(plugin_name, '"')))
+        for event in self:
+            if not self.detach(event):
+                logging.warning(u"{:s} : Unable to detach the {:s} event during the unloading process of the Hex-Rays plugin.".format('.'.join([__name__, cls.__name__]), self.__formatter__(event)))
+            continue
+
+        # Now we can modify our state that disables our instance.
+        self.__hexrays_ready__ = False
+
 class database(object):
     """
     This namespace provides tools that can be used to get specific
