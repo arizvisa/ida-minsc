@@ -5467,10 +5467,9 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.default(hook.idb, 'changing_struc_member', memberchange.changing, -75)
         scheduler.default(hook.idb, 'struc_member_changed', memberchange.changed, -75)
 
-    # FIXME: This hasn't been implemented yet because the implementation will
-    #        likely overlap with 9.0 due to the deprecation of the structure api
-    #        in favor of the local types library.
-    else:
+    # If we're using 8.4, then we can use the monitor for the local types library.
+    # FIXME: This hasn't been tested in 8.5 which came out a little bit ago.
+    elif idaapi.__version__ <= 8.4:
         scheduler.default(hook.idp, 'ev_init', localtypesmonitor_84.init_local_types_monitor, -10000)
         scheduler.default(hook.idp, 'ev_oldfile', localtypesmonitor_84.load_local_types_monitor, -100)
         scheduler.default(hook.idp, 'ev_newfile', localtypesmonitor_84.load_local_types_monitor, -100)
@@ -5480,6 +5479,9 @@ def make_ida_not_suck_cocks(nw_code):
         scheduler.default(hook.idp, 'ev_auto_queue_empty', localtypesmonitor_84.enable_tracking, -100)
         scheduler.default(hook.idb, 'closebase', localtypesmonitor_84.disable_tracking, 0)
 
+    # FIXME: This hasn't been implemented yet because the implementation of the
+    #        `localtypesmonitor_84` class was developed exclusively against 8.4.
+    else:
         logging.warning(u"{:s} : Tags involving the renaming of structure members is currently unimplemented in v{:.1f}.".format(__name__, idaapi.__version__))
         logging.warning(u"{:s} : Tags involving the application of types to structure members is currently unimplemented in v{:.1f}.".format(__name__, idaapi.__version__))
 
