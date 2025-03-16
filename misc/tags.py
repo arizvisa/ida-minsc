@@ -353,35 +353,86 @@ class query_v0(object):
 
 class select_v0(object):
     """
-    This namespace is used to query different types of tags from the tagcache
+    This namespace is used to select different types of tags from the tagcache
     and yield the results to the caller. The information yielded to the caller
     is in the form of a tuple composed of the unique address or location of the
     tags, and then the tags themselves. The results of these functions can be
-    used to create a dictionary by the caller if necessary.
+    used to create a dictionary by the caller if necessary. If no required or
+    included tags are specified, the empty tag ("") and any dunder-prefixed tags
+    are excluded.
 
     This specific implementation wraps the results of the `query_v0` namespace
     and post-processes the results to yield user-friendly types with the tags.
     """
+
     @classmethod
     def database(cls, *args):
         '''Query the globals in the database and yield a tuple containing its address and all of the `required` tags with any `included` ones.'''
-        return query_v0.globals(*args)
+        if args:
+            for pair in query_v0.globals(*args):
+                yield pair
+            return
+
+        # Nothing specific was queried, so just yield all tags that are
+        # available while making sure to exclude any implicit ones.
+        for ea, res in query_v0.globals(*args):
+            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            if explicit:
+                yield ea, explicit
+            continue
+        return
 
     @classmethod
     def contents(cls, *args):
         '''Query the contents of each function and yield a tuple containing its address and a set of the matching `required` tags with any `included` ones.'''
-        return query_v0.contents(*args)
+        if args:
+            for pair in query_v0.contents(*args):
+                yield pair
+            return
+
+        # No specific tags were selected, so just yield all tagnames that are
+        # available while being sure to exclude the empty and any implicit tags.
+        for ea, res in query_v0.contents(*args):
+            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            if explicit:
+                yield ea, explicit
+            continue
+        return
 
     @classmethod
     def function(cls, func, *args):
         '''Query the contents of the function `func` and yield a tuple containing each address and all of the `required` tags with any `included` ones.'''
-        return query_v0.function(func, *args)
+        if args:
+            for pair in query_v0.function(func, *args):
+                yield pair
+            return
+
+        # If nothing specific was selected, then yield all tags that are not the
+        # empty tag or are an implicit tag that is dunder-prefixed.
+        for ea, res in query_v0.function(func, *args):
+            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            if explicit:
+                yield ea, explicit
+            continue
+        return
 
     @classmethod
     def structures(cls, *args):
         '''Query the structures in the database and yield a tuple containing each structure and all of the `required` tags with any `included` ones.'''
+        if args:
+            for sid, res in query_v0.structures(*args):
+                item = internal.structure.new(sid, 0)
+                yield item, res
+            return
+
+        # If nothing specified to filter the tags, then we need to filter the
+        # empty tag and any dunder-prefixed tags from our query. We also need to
+        # convert the structure id into an `internal.structure.structure_t`.
         for sid, res in query_v0.structures(*args):
-            yield internal.structure.new(sid, 0), res
+            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            if explicit:
+                yield internal.structure.new(sid, 0), explicit
+            continue
         return
 
     @classmethod
@@ -398,9 +449,23 @@ class select_v0(object):
             owner = internal.structure.new(sid, 0)
             sptr = owner.ptr
 
+        # If we were given some args to use for selecting certain tags, then we
+        # can just trust our query and only need to convert its member id
+        # into one of our `internal.structure.member_t` types.
+        if args:
+            for mid, res in query_v0.structure(sptr.id, *args):
+                mowner, mindex, mptr = internal.structure.members.by_identifier(sptr, mid)
+                yield internal.structure.member_t(owner, mindex), res
+            return
+
+        # Otherwise we're being asked to yield everything but the empty tag and
+        # any implicit tags. We also convert the member id into a `member_t`.
         for mid, res in query_v0.structure(sptr.id, *args):
             mowner, mindex, mptr = internal.structure.members.by_identifier(sptr, mid)
-            yield internal.structure.member_t(owner, mindex), res
+            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            if explicit:
+                yield internal.structure.member_t(owner, mindex), explicit
+            continue
         return
 
     @classmethod
@@ -408,32 +473,77 @@ class select_v0(object):
         '''Query the members in the database and yield a tuple containing the owning structure and a set of the matching `required` tags with any `included` ones.'''
         cache = {}
 
+        # If we were given some tags to select with, then we can just trust
+        # whatever the query gives us whilst still yielding a `member_t`.
+        if args:
+            for sid, res in query_v0.owners(*args):
+                owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
+                yield owner, res
+            return
+
         # FIXME: we should be using something other than an offset of 0 if the
         #        structure belongs to a frame.
+
+        # We weren't given any tags, meaning we are being asked to yield all of
+        # them. So we filter out the empty tag and any implicit tags by default.
         for sid, res in query_v0.owners(*args):
-            owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
-            yield owner, res
+            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            if explicit:
+                owner = cache[sid] if sid in cache else cache.setdefault(sid, internal.structure.new(sid, 0))
+                yield owner, explicit
+            continue
         return
 
     @classmethod
     def members(cls, *args):
         '''Query the members in the database and yield a tuple containing the member and all of the `required` tags with any `included` ones.'''
         cache = {}
+
+        # If we were given some tags to select the members with, then we can
+        # just return whatever the query gives us. We only need to convert the
+        # member id to an actual member that can be returned.
+        if args:
+            for mid, res in query_v0.members(*args):
+                mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
+
+                # FIXME: we should be detecting the frame base offset for the owner
+                #        in case the structure is a frame belonging to a function.
+                owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
+                if res:
+                    yield owner.members[mindex], res
+                continue
+            return
+
+        # If no tags were provided, then we're supposed to yield all of them.
+        # Still, be filter out the empty tag along with any implicit ones.
         for mid, res in query_v0.members(*args):
             mowner, mindex, mptr = internal.structure.members.by_identifier(None, mid)
 
             # FIXME: we should be detecting the frame base offset for the owner
             #        in case the structure is a frame belonging to a function.
-            owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
-            if res:
-                yield owner.members[mindex], res
+            explicit = {tag for tag in res if tag and not tag.startswith('__')}
+            if explicit:
+                owner = cache[mowner.id] if mowner.id in cache else cache.setdefault(mowner.id, internal.structure.new(mowner.id, 0))
+                yield owner.members[mindex], explicit
             continue
         return
 
     @classmethod
     def blocks(cls, func, *args):
         '''Query the basic blocks of the func `func` and yield a tuple containing each block and all of the `required` tags with any `included` ones.'''
-        return query_v0.blocks(func, *args)
+        if args:
+            for bb, res in query_v0.blocks(func, *args):
+                yield bb, res
+            return
+
+        # If we weren't asked to select anything specifically, then we yield
+        # everything but the empty tag and any implicit tags.
+        for bb, res in query_v0.blocks(func, *args):
+            explicit = {tag : value for tag, value in res.items() if tag and not tag.startswith('__')}
+            if explicit:
+                yield bb, explicit
+            continue
+        return
 
 class query_v1(object):
     """
