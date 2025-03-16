@@ -6042,7 +6042,7 @@ class module(object):
     # Can't forget to create a descriptor for events related to the Hex-Rays decompiler...
     hx = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityhxevent, __repr__=staticmethod(lambda: 'Events currently connected to the Hex-Rays (decompiler) callbacks.'))
     if hasattr(idaapi, 'Hexrays_Hooks') and hasattr(idaapi, 'init_hexrays_plugin'):
-        hexrays = singleton_descriptor(lambda *args: internal.interface.priorityhook(*args) if idaapi.init_hexrays_plugin() else None, idaapi.Hexrays_Hooks, {}, __repr__=staticmethod(lambda item=idaapi.Hexrays_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
+        hexrays = singleton_descriptor(internal.interface.priorityhook_hexrays, idaapi.Hexrays_Hooks, {}, __repr__=staticmethod(lambda item=idaapi.Hexrays_Hooks:  "Events currently connected to {:s}.".format('.'.join(getattr(item, attribute) for attribute in ['__module__', '__name__'] if hasattr(item, attribute)))))
 
     # And a descriptor for managing any actions that we may want to register.
     action = singleton_descriptor(lambda cons, *args: cons(*args), internal.interface.priorityaction, __repr__=staticmethod(lambda item=idaapi.UI_Hooks:  'Actions currently being managed.'))
