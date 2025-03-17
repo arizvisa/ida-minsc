@@ -402,6 +402,7 @@ class ida_hexrays_template(object):
     vdloc_t = missing_class
     lvar_saved_info_t = missing_class
     mblock_t = missing_class
+    mbl_graph_t = missing_class
     op_parent_info_t = missing_class
     voff_t = missing_class
     vivl_t = missing_class
@@ -558,6 +559,7 @@ class ida_hexrays_types(object):
     mba_ranges_t        = Fget_type_from_module(ida_hexrays, 'mba_ranges_t')
     mba_t               = Fget_type_from_module(ida_hexrays, 'mba_t')
     mblock_t            = Fget_type_from_module(ida_hexrays, 'mblock_t')
+    mbl_graph_t         = Fget_type_from_module(ida_hexrays, 'mbl_graph_t')
     minsn_t             = Fget_type_from_module(ida_hexrays, 'minsn_t')
     mlist_t             = Fget_type_from_module(ida_hexrays, 'mlist_t')
     mop_t               = Fget_type_from_module(ida_hexrays, 'mop_t')
