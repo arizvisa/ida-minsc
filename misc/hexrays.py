@@ -1302,6 +1302,11 @@ class function(object):
         res = ida_hexrays.decompile(fn, failure) if argcount < 3 else ida_hexrays.decompile(fn, failure, defaults)
         if res is None:
             raise exceptions.DisassemblerError(u"{:s}.by_address({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
+
+        # XXX: to ensure that the ctree is immediately available for the
+        #      decompiled function, we use the get_pseudocode() method before
+        #      returning it to the caller.
+        discarded = res.get_pseudocode()
         return res
 
     @classmethod
@@ -1319,8 +1324,9 @@ class function(object):
             ea = cls.address(func)
             raise exceptions.DisassemblerError(u"{:s}.by_function({:#x}, {:#x}): Unable to decompile function due to error {:#x} at address {:#x} ({:s}).".format('.'.join([__name__, 'function']), ea, defaults, failure.code, failure.errea, utils.string.of(failure.desc())))
 
-        # XXX: to ensure that the ctree is immediately available for the
-        #      decompiled function, we use the get_pseudocode() method.
+        # XXX: to ensure that the ctree items are immediately available for the
+        #      decompiled function, we use the get_pseudocode() method before
+        #      returning the decompiled function to the caller.
         discarded = res.get_pseudocode()
         return res
 
