@@ -750,7 +750,7 @@ class variables(object):
             return cls.by_member(ea, mptr)
 
         elif not isinstance(locator, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
-            raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with  a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.by({!r}) : Unable to locate a variable with a locator type ({!s}) that is unsupported.".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
 
         cfunc = function(locator.defea)
         lvars = cls(locator.defea)
@@ -828,6 +828,63 @@ class variables(object):
             ea, description = cfunc.entry_ea, variable.repr_locator(locator)
             raise exceptions.ItemNotFoundError(u"{:s}.storage({:#x}, {:s}) : Unable to find a variable with the specified locator in the function at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, description, ea))
         return variable.get_storage(locator, lvar.width)
+
+    @classmethod
+    def address(cls, *args):
+        '''Attempt to return the address for the variable identified by the given `args`.'''
+        cfunc, locator = itertools.chain([None] if len(args) < 2 else [], args)
+
+        # If it's a variable reference, then we can get an `lvar_locator_t`
+        # without needing the function. we can just hand it off here.
+        if isinstance(locator, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t)):
+            return variable.address(locator)
+
+        # If it's a `stkvar_ref_t` or an instance of our `structure.member_t`,
+        # then we can get an `idaapi.member_t` out of it.
+        elif isinstance(locator, internal.structure.member_t):
+            mptr = locator.ptr
+
+        elif isinstance(locator, ida_hexrays_types.stkvar_ref_t):
+            mptr = locator.get_stkvar()
+
+        # If we were given a `cfunc_t` and the class allows us to use it for
+        # finding an `lvar_locator_t`, then use both of them to get it.
+        elif cfunc and cls.has(cfunc, locator):
+            return variable.address(cls.by(cfunc, locator))
+
+        # If it was anything else, such as a string, `location_t`, or even a
+        # `bounds_t`, then we don't support it and can't do anything.
+        else:
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to fetch the address from an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), locator, locator.__class__))
+
+        # Using an `idaapi.member_t`, we can use the id to get the owner, which
+        # should be a frame. With the frame, we can get the function and thus
+        # its address. This doesn't give us the exact member, but we can use it
+        # to find an `lvar_locator_t` and then recurse to get the address.
+        if isinstance(mptr, idaapi.member_t):
+            mowner, _, mptr = internal.structure.members.by_identifier(mptr.id)
+            if not(mowner.props & idaapi.SF_FRAME):
+                raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to fetch a location from a member ({:#x}) that does not belong to a frame ({:#x}).".format('.'.join([__name__, cls.__name__]), locator, mptr.id, mowner.sid))
+
+            # First we figure out what function this member is associated with.
+            ea, sid = idaapi.get_func_by_frame(mowner.id), mowner.id
+            if ea == idaapi.BADADDR:
+                raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to determine the address of the function that owns the specified frame ({:#x}).".format('.'.join([__name__, cls.__name__]), locator, sid))
+
+            # Now we can grab its variables, and figure out what index
+            # represents the `idaapi.member_t` that we have.
+            lvars = cls(ea if cfunc is None else cfunc)
+            index = lvars.find_stkvar(mptr.soff, internal.structure.member.size(mptr))
+
+            # We now have an index we can use. If we don't, then we need to
+            # complain about it since there's no other way to proceed.
+            if index < 0:
+                raise exceptions.MemberNotFoundError(u"{:s}.address({!r}) : Unable to find a variable for the specified member \"{!s}\" ({:#x}).".format('.'.join([__name__, cls.__name__]), locator, utils.string.escape(internal.structure.member.fullname(mptr), '"'), mptr.id))
+            return variable.address(lvars[index])
+
+        # If we got this far, then we have no idea what type this is, nor how
+        # to use whatever it was we were given.
+        raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to fetch an address from an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), locator, mptr.__class__))
 
 class variable(object):
     """
@@ -948,6 +1005,28 @@ class variable(object):
         if isinstance(alocinfo, internal.types.list):
             return ea, atype, tuple(alocinfo)
         return ea, atype, alocinfo
+
+    @classmethod
+    def address(cls, locator):
+        '''Attempt to return the address for the variable specified by `locator`.'''
+        variable = locator
+
+        # If it's a variable reference, then we can get an `lvar_locator_t` out
+        # of it which contains the address that it was created at.
+        if isinstance(variable, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t)):
+            mba, index = variable.mba, variable.idx
+            lvar = mba.vars[index]
+            ea = variable.defea
+
+        # If it's an `lvar_locator_t`, then we can extract the address directly.
+        elif isinstance(variable, (ida_hexrays_types.lvar_locator_t, ida_hexrays_types.lvar_t)):
+            ea = variable.defea
+
+        # If we don't have an integer yet, then we couldn't figure out the
+        # `lvar_locator_t` for the variable. If we do, then just return it.
+        elif not isinstance(variable, internal.types.integer):
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to fetch an address from an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), locator, variable.__class__))
+        return ea
 
     @classmethod
     def get_storage(cls, locator, size):
