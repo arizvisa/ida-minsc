@@ -141,6 +141,11 @@ class DisassemblerError(UnicodeException, E.EnvironmentError):
     An api call has thrown an error or was unsuccessful.
     """
 
+class DecompilerError(DisassemblerError):
+    """
+    An api call for the decompiler has thrown an error or was unsuccessful.
+    """
+
 class MissingTypeOrAttribute(UnicodeException, E.TypeError):
     """
     The specified location is missing some specific attribute or type.
