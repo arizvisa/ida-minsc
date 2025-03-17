@@ -405,6 +405,7 @@ class ida_hexrays_template(object):
     op_parent_info_t = missing_class
     voff_t = missing_class
     vivl_t = missing_class
+    scif_t = missing_class
 
     init_hexrays_plugin = use_callable(utils.fconstant(False))
     get_hexrays_version = use_callable(utils.fconstant('0.0.0.0'))
@@ -562,6 +563,7 @@ class ida_hexrays_types(object):
     mop_t               = Fget_type_from_module(ida_hexrays, 'mop_t')
     op_parent_info_t    = Fget_type_from_module(ida_hexrays, 'op_parent_info_t')
     rlist_t             = Fget_type_from_module(ida_hexrays, 'rlist_t')
+    scif_t              = Fget_type_from_module(ida_hexrays, 'scif_t')
     stkvar_ref_t        = Fget_type_from_module(ida_hexrays, 'stkvar_ref_t')
     treeloc_t           = Fget_type_from_module(ida_hexrays, 'treeloc_t')
     var_ref_t           = Fget_type_from_module(ida_hexrays, 'var_ref_t')
