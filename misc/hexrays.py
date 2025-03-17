@@ -1459,3 +1459,63 @@ class function(object):
         for ea, id, text in warnings:
             yield ea, id, text
         return
+
+class code(object):
+    """
+    This namespace is for interacting with the microcode produced by the
+    decompiler as an ``ida_hexrays.mba_t`` belonging to a completely decompiled
+    function. It provides utilities for extracting said microcode using either
+    an ``ida_hexrays.cfunc_t``, ``ida_hexrays.cfuncptr_t``, or another type that
+    can be used with the `function` namespace. Some of the functionality inside
+    this namespace can be used for extracting the basic blocks containing the
+    microcode used by the decompiler, accessing variables that are used when
+    building the tree, and converting frame offsets between the disassembler and
+    the decompiler.
+
+    The functions within this namespace are intended to be used with complete
+    functions. If the given parameter is not a proper ``ida_hexrays.cfunc_t`` or
+    similar, the function will attempt to extract an address and decompile it
+    in order to return the ``ida_hexrays.mba_t`` for it. This is also done if a
+    function is given an already existing ``ida_hexrays.mba_t``.
+    """
+
+    def __new__(cls, func, cached=True):
+        '''Return the ``ida_hexrays.mba_t`` for the function specified by `func`.'''
+        if isinstance(func, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
+            return func.mba
+        elif isinstance(func, ida_hexrays_types.mba_t):
+            return cls(func.entry_ea)
+        elif isinstance(func, (types.integer, idaapi.func_t)):
+            cfunc = function.cached(func) if function.has(func) and cached else function.by(func)
+            return cls(cfunc)
+        elif isinstance(func, ida_hexrays_types.lvar_locator_t):
+            return cls(func.defea)
+        elif isinstance(func, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
+            return cls(func.mba.entry_ea)
+        raise exceptions.InvalidTypeOrValueError(u"{:s}({!r}) : Unable to fetch the microcode from a decompiled function using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, func.__class__))
+
+    @classmethod
+    def by(cls, func, *flags):
+        '''Decompile the function `func` with the given `flags` and return an ``idaapi.mba_t``.'''
+        if isinstance(func, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
+            func = func.entry_ea
+        cfunc = function(func, *flags)
+        return cfunc.mba
+
+    @classmethod
+    def prologue(cls, func):
+        '''Return the bounds containing the detected prologue for the function described by `func`.'''
+        mba = func if isinstance(func, ida_hexrays_types.mba_t) else cls(func)
+        start, stop = mba.entry_ea, mba.last_prolog_ea
+        return interface.bounds_t(start, stop)
+
+    @classmethod
+    def epilogue(cls, func):
+        '''Return the bounds containing the detected epilogue for the function described by `func`.'''
+        mba = func if isinstance(func, ida_hexrays_types.mba_t) else cls(func)
+        fn, ea = mba.mbr.pfn, mba.first_epilog_ea
+        area = interface.function.chunk(fn, ea)
+        if not area:
+            raise exceptions.ItemNotFoundError(u"{:s}.epilogue({:#x}) : Unable to determine the chunk from the function at {:#x} containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), mba.entry_ea, mba.entry_ea, ea))
+        start, stop = ea, interface.range.stop(area)
+        return interface.bounds_t(start, stop)
