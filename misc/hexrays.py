@@ -407,6 +407,7 @@ class ida_hexrays_template(object):
     voff_t = missing_class
     vivl_t = missing_class
     scif_t = missing_class
+    codegen_t = missing_class
 
     init_hexrays_plugin = use_callable(utils.fconstant(False))
     get_hexrays_version = use_callable(utils.fconstant('0.0.0.0'))
@@ -546,6 +547,7 @@ class ida_hexrays_types(object):
     cinsn_t             = Fget_type_from_module(ida_hexrays, 'cinsn_t')
     citem_t             = Fget_type_from_module(ida_hexrays, 'citem_t')
     cnumber_t           = Fget_type_from_module(ida_hexrays, 'cnumber_t')
+    codegen_t           = Fget_type_from_module(ida_hexrays, 'codegen_t')
     ctext_position_t    = Fget_type_from_module(ida_hexrays, 'ctext_position_t')
     ctree_item_t        = Fget_type_from_module(ida_hexrays, 'ctree_item_t')
     gco_info_t          = Fget_type_from_module(ida_hexrays, 'gco_info_t')
