@@ -4568,6 +4568,24 @@ class range(object):
         left, right = cls.unpack(area)
         return right - left
 
+    @classmethod
+    def vector(cls, iterable):
+        '''Return the boundaries specified in `iterable` as a vector of ranges.'''
+        item_t, vector_t = (idaapi.area_t, idaapi.areavec_t) if idaapi.__version__ < 7.0 else (idaapi.range_t, idaapi.rangevec_t)
+        vector = vector_t()
+        for bounds in iterable:
+            if isinstance(bounds, item_t):
+                start, stop = cls.unpack(bounds)
+            elif hasattr(bounds, 'bounds'):
+                start, stop = bounds.bounds
+            elif isinstance(bounds, (bounds_t, tuple)):
+                start, stop = bounds
+            else:
+                start, stop = (lambda integer: (integer, integer + 1))(int(bounds))
+            range = item_t(start, stop)
+            vector.push_back(range)
+        return vector
+
 class node(object):
     """
     This namespace contains a number of methods that extract information
