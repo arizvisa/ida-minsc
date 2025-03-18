@@ -6108,9 +6108,9 @@ class tinfo(object):
                     reg = architecture.promote(reg)
 
                 if (reg.position, reg.bits) != (8 * regoff, 8 * size):
-                    reg = partialregister_t(reg, 8 * regoff, 8 * size)
+                    reg = architecture.by_partial(reg, 8 * regoff, 8 * size)
             except KeyError:
-                reg = partialregister_t(architecture.by_index(ridx1), 8 * regoff, 8 * size)
+                reg = architecture.by_partial(ridx1, 8 * regoff, 8 * size)
             return offset, reg
 
         # This is ALOC_STACK, but for argpart_t we return it as a key-value pair.
