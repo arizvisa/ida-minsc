@@ -344,6 +344,16 @@ class architecture_t(object):
         return self.by_indextype(index, dtype)
     byindexsize = internal.utils.alias(by_indexsize)
 
+    @utils.multicase(name=(types.string, types.integer), offset=types.integer, size=types.integer)
+    def by_partial(self, name, offset, size):
+        '''Return a `register_t` or `partialregister_t` for the register with the given `name` starting at `offset` up to the maximum `size`.'''
+        register = self.by(name)
+        return interface.partialregister_t(register, offset, size)
+    @utils.multicase(register=interface.register_t, offset=types.integer, size=types.integer)
+    def by_partial(self, register, offset, size):
+        '''Return a `register_t` or `partialregister_t` for the given `register` starting at `offset` up to the maximum `size`.'''
+        return interface.partialregister_t(register, offset, size)
+
     @utils.multicase(name=types.string)
     def by(self, name):
         '''Return a register from the given architecture by its `name`.'''
@@ -535,13 +545,17 @@ else:
                 return
             return
 
-        @utils.multicase(register=(types.string, interface.register_t), size=types.integer)
+        @utils.multicase(register=(types.string, interface.register_t, types.integer), size=types.integer)
         def by_partial(self, register, size):
             '''Return a `register_t` or `partialregister_t` for the given `register` up to the maximum `size`.'''
-            reg = self.by(name)
-            return self.by_partial(reg.realname, size)
+            return self.by_partial(register, -1, size)
+        @utils.multicase(register=(types.string, interface.register_t), size=types.integer)
+        def by_partial(self, register, offset, size):
+            '''Return a `register_t` or `partialregister_t` for the given `register` from `offset` up to the maximum `size`.'''
+            reg = self.by(register)
+            return self.by_partial(reg.realname, offset, size)
         @utils.multicase(index=types.integer, size=types.integer)
-        def by_partial(self, index, size):
+        def by_partial(self, index, offset, size):
             '''Return a `register_t` or `partialregister_t` for the register at the specified `index` up to the maximum `size`.'''
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
             midx, maximum, dtype = index, size, dtype_by_size(size)
@@ -600,10 +614,18 @@ else:
                     mregindex, res = mreg_scan(res), mregindex
                 continue
 
-            # now we have the actual register (mregindex), we use it to calculate the offset
-            # into the register that we'll need to use and then figure out what's the largest
-            # possible size that we'll be able to promote to.
-            offset = midx - mregindex
+            # now that we have the super register (mregindex), we can calculate
+            # the offset into it. we then check it against the parameter offset
+            # just in case they differ. despite this, we trust our calculation
+            # since microregisters should always have a zero offset anyways, and
+            # the register number is the truth about what the decompiler sees.
+            expected = midx - mregindex
+            if offset >= 0 and offset != 8 * expected:
+                logging.warning("{:s}.by_partial({:d}, {:d}, {:d}) : Expected the chosen offset for the register to be {:+d} due to the location of register {:s} ({:d}) relative to its larger register {:s} ({:d}).".format('.'.join([__name__, self.__class__.__name__]), index, offset, size, 8 * expected, ida_hexrays.get_mreg_name(midx, size), midx, ida_hexrays.get_mreg_name(mregindex, pow(2, math.ceil(math.log2(size)))), mregindex))
+            offset = expected
+
+            # next we will need to use it to figure out what's the largest
+            # possible size that we would be able to promote to.
             candidates = [size for size in mreg_candidates(mregindex)]
             selected = [size for size in candidates if size <= maximum]
             if len(selected):
