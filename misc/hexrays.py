@@ -1519,3 +1519,101 @@ class code(object):
             raise exceptions.ItemNotFoundError(u"{:s}.epilogue({:#x}) : Unable to determine the chunk from the function at {:#x} containing the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), mba.entry_ea, mba.entry_ea, ea))
         start, stop = ea, interface.range.stop(area)
         return interface.bounds_t(start, stop)
+
+class snippet(object):
+    """
+    This namespace is for interacting with any microcode that is produced by the
+    decompiler as an ``ida_hexrays.mba_t``. A snippet is used to describe a list
+    of `interface.bounds_t`, or is accessible from some of the other decompiler
+    types such as ``ida_hexrays.mblock_t``. It provides similar functionality to
+    the `code` namespace, but is different in that it is intended to be used
+    with microcode that is not guaranteed to belong to a function.
+
+    Many functions within this namespace assume that they are given a proper
+    ``ida_hexrays.mba_t`` rather than extracting the address and decompiling
+    it as performed by the `code` namespace. When fetching a snippet of
+    microcode from any of the supported types, the implementation will always
+    try to return the ``ida_hexrays.mba_t`` that is available in its parameter.
+    Each function takes care to avoid decompiling anything that is unnecessary.
+    """
+
+    def __new__(cls, snippet):
+        '''Return the ``ida_hexrays.mba_t`` for the specified microcode `snippet`.'''
+        if isinstance(snippet, ida_hexrays_types.mba_t):
+            return snippet
+
+        # if we were given a function, then we can extract it pretty easily.
+        elif isinstance(snippet, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
+            return snippet.mba
+
+        # types that represent microcode in different ways.
+        elif isinstance(snippet, ida_hexrays_types.mblock_t):
+            return snippet.mba
+        elif isinstance(snippet, ida_hexrays_types.mbl_graph_t):
+            return snippet.mba
+        elif isinstance(snippet, ida_hexrays_types.codegen_t):
+            return snippet.mba
+
+        # a reference to an lvar.
+        elif isinstance(snippet, ida_hexrays_types.var_ref_t):
+            return snippet.mba
+
+        # micro-operations (mops)
+        elif isinstance(snippet, (ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t, ida_hexrays_types.scif_t)):
+            return snippet.mba
+        raise exceptions.InvalidTypeOrValueError(u"{:s}({!r}) : Unable to fetch the microcode from a snippet using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), snippet, snippet.__class__))
+
+    @classmethod
+    def get(cls, ranges, *flags):
+        '''Return an ``ida_hexrays.mba_t`` generated from the boundaries specified in `ranges` with the given `flags` and requested `maturity` level.'''
+        failure = ida_hexrays.hexrays_failure_t()
+        if isinstance(ranges, idaapi.func_t):
+            mbr, additional, maturity = ida_hexrays.mba_ranges_t(ranges), [], ida_hexrays.MMAT_LVARS
+            bounds = [interface.range.bounds(ranges)]
+        elif isinstance(ranges, types.unordered):
+            vector = interface.range.vector(ranges)
+            mbr, additional, maturity = ida_hexrays.mba_ranges_t(vector), ['DECOMP_NO_FRAME'], ida_hexrays.MMAT_GLBOPT3
+            iterable = (mbr.ranges[index] for index in range(mbr.ranges.size()))
+            bounds = [interface.range.bounds(area) for area in iterable]
+        else:
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.get({!r}) : Unable to determine the ranges for a microcode snippet using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), ranges, ranges.__class__))
+
+        # Figure out the default flags and maturity level if we weren't given
+        # them as the extra parameters.
+        iterable = (getattr(ida_hexrays, attribute, 0) for attribute in ['DECOMP_NO_WAIT', 'DECOMP_NO_CACHE', 'DECOMP_ALL_BLKS'] + additional)
+        default_flags = functools.reduce(operator.or_, iterable, 0)
+        iterable = itertools.chain(flags, [default_flags, maturity][len(flags) - 2:])
+        [flags, mmat] = [item for item in iterable][:2]
+
+        # Now we can generate the microcode for the `mba_ranges_t`, and then
+        # check if it failed. Otherwise, we can just return it.
+        mba = ida_hexrays.gen_microcode(mbr, failure, None, flags, mmat)
+        if hf.code != ida_hexrays.MERR_OK:
+            iterable = map("{:s}".format, bounds)
+            parameter = "[{:s}]".format(', '.join(iterable))
+            description = "{:#x} ({:s})".format(hf.errea, utils.string.of(hf.desc())) if hasattr(hf, 'desc') else "{:#x}".format(hf.errea)
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.get({!s}) : Unable to generate the microcode for the specified ranges due to an error ({:d}) at {!s}.".format('.'.join([__name__, cls.__name__]), parameter, hf.code, description))
+        return mba
+
+    @classmethod
+    def warnings(cls, mba):
+        '''Yield each warning that resulted from generating the microcode specified by `mba`.'''
+        mblockarray = cls(mba)
+        warns = mblockarray.notes
+        copied = [(warns[index].ea, warns[index].id, warns[index].text) for index in range(warns.size())]
+        for ea, id, text in copied:
+            yield ea, id, utils.string.of(text)
+        return
+
+    @classmethod
+    def blocks(cls, mba):
+        '''Yield each microcode block belonging to the microcode specified by `mba`.'''
+        mblockarray = cls(mba)
+
+        # We gather each block as a list before returning the iterator for them
+        # since they appear pretty fucking fragile.
+        blocks = []
+        for index in range(mblockarray.qty):
+            mblock = mblockarray.get_mblock(index)
+            blocks.append(mblock)
+        return (mblock for mblock in blocks)
