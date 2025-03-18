@@ -1288,7 +1288,7 @@ class function(object):
         elif isinstance(func, ida_hexrays_types.mba_t):
             return cls(func.entry_ea)
         elif isinstance(func, (types.integer, idaapi.func_t)):
-            return cls.cached(func) if cls.has(func) and cached else cls.by_address(func)
+            return cls.cached(func) if cls.has(func) and cached else cls.by(func)
         elif isinstance(func, idaapi.lvar_locator_t):
             return cls(func.defea)
         elif isinstance(func, (ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_ref_t, ida_hexrays_types.stkvar_ref_t)):
