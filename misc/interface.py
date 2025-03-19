@@ -10389,6 +10389,21 @@ class function(object):
         return
 
     @classmethod
+    def enumerate(cls):
+        '''Yield the index and address for each function within the database.'''
+        quantity = idaapi.get_func_qty()
+
+        # We can now use the quantity to iterate through all of the functions
+        # within the functions list. Once we get the `idaapi.func_t`, we unpack
+        # its starting address so we can yield it along with the function index.
+        for index in builtins.range(0, max(quantity, -1) + 1):
+            fn = idaapi.getn_func(index)
+            if fn:
+                yield index, range.start(fn)
+            continue
+        return
+
+    @classmethod
     def by_address(cls, ea):
         '''Return the ``idaapi.func_t`` that contains the address `ea`.'''
         return idaapi.get_func(int(ea))
