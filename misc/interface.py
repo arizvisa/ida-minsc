@@ -10363,6 +10363,32 @@ class function(object):
         return idaapi.get_func(int(ea)) is not None and idaapi.segtype(int(ea)) != idaapi.SEG_XTRN
 
     @classmethod
+    def iterate(cls, *bounds):
+        '''Yield the address for each function in the database within the specified `bounds`.'''
+        [packed] = bounds if bounds else [address.bounds()]
+
+        # unpack the parameter we were given into its start and end addresses.
+        if hasattr(packed, 'bounds'):
+            start, stop = sorted(packed.bounds)
+        elif isinstance(packed, tuple):
+            start, stop = sorted(packed)
+        else:
+            start, stop = sorted(range.unpack(packed))
+
+        # find first function chunk by skipping over any chunk that is a tail.
+        ch = idaapi.get_fchunk(start) or idaapi.get_next_fchunk(start)
+        while ch and range.start(ch) < stop and (ch.flags & idaapi.FUNC_TAIL):
+            ch = idaapi.get_next_fchunk(range.start(ch))
+
+        # we have a non-tail chunk, so we can now iterate through the rest of
+        # the functions within the boundaries we determined at the beginning.
+        while ch and range.start(ch) < stop:
+            if function.has(range.start(ch)):
+                yield range.start(ch)
+            ch = idaapi.get_next_func(range.start(ch))
+        return
+
+    @classmethod
     def by_address(cls, ea):
         '''Return the ``idaapi.func_t`` that contains the address `ea`.'''
         return idaapi.get_func(int(ea))
