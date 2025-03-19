@@ -10565,6 +10565,36 @@ class function(object):
             continue
         return
 
+    @classmethod
+    def enumerate_chunks(cls):
+        '''Enumerate all of the function chunks within the database.'''
+        quantity = idaapi.get_fchunk_qty()
+
+        # Use the quantity to iterate through all of the chunks
+        # in the database and yield whatever the api gave us.
+        for index in builtins.range(0, max(quantity, -1) + 1):
+            ch = idaapi.getn_fchunk(index)
+            if ch:
+                yield index, ch
+            continue
+        return
+
+    @classmethod
+    def chunk_ordinal(cls, ea):
+        '''Return the index for the function chunk at the address `ea`.'''
+        if isinstance(ea, internal.types.integer) or hasattr(ea, '__int__'):
+            start, stop = int(ea), 0
+        elif isinstance(ea, tuple):
+            start, stop = ea.bounds if hasattr(ea, 'bounds') else ea
+        else:
+            start, stop = interface.range.unpack(ea)
+
+        # Now we have an address that we can use to get the chunk.
+        res = idaapi.get_fchunk_num(start)
+        if res < 0:
+            raise function.missing(ea)
+        return res
+
     __skippable_name__ = '$ ignore micro'
     @classmethod
     def skippable(cls, boundaries):
