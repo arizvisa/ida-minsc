@@ -92,10 +92,24 @@ class schema(object):
     namespace that derives itself from this definition is expected to assign a
     name themselves.
     """
+    name = 'minsc.tags'
 
+    # XXX: we choose a base tag of 1 with the hope that it won't clash with the
+    #      disassembler or some other plugin. this is because the sdk defines
+    #      its tags so that they fit within the upper-alpha character set. this
+    #      is relevant since some of the schemas in this module will stash their
+    #      usage and reference counts inside a netnode that doesn't belong to it
+    #      (such as for functions and structures/types). I also faintly remember
+    #      that something elsewhere used a lower-alpha tag, so we start at the
+    #      control-characters moving upwards by multiples of 8 to avoid the
+    #      whole situation entirely.
+    basetag = 0
+
+    # These values should be overwritten by the implementer.
+    statstag = basetag + 1
     NSUP_SCHEMA_VERSION = NSUP_START + 1
 
-    statstag = netnode.alttag
+    # The default schema that should be overwritten by an implementation.
     schema = {
         (netnode.sup, statstag): {
             NSUP_SCHEMA_VERSION: 1,
@@ -410,17 +424,16 @@ class tags(schema):
     desired tag name. The allocation or deallocation of a bit position for their
     tag is then handled automatically by this namespace.
     """
+    basetag = schema.basetag + 0o10
 
-    name = 'minsc.tags.index'
-
-    statstag = schema.statstag
+    ## the tags in this schema start at index 0x8.
+    statstag = basetag
     NSUP_SCHEMA_VERSION = schema.NSUP_SCHEMA_VERSION
     NSUP_TAGNAME_USAGE = NSUP_START + 0x10
 
-    ## tags
-    nametag = netnode.hashtag
-    indextag = netnode.suptag
-    counttag = indextag + 1
+    nametag = basetag + 1
+    indextag = basetag + 2
+    counttag = basetag + 3
 
     ## schema
     schema = {
@@ -1217,15 +1230,15 @@ class globals(counted):
     This depends on the `tags` namespace to perform all the conversion and do
     the reference counting.
     """
-    name = 'minsc.tags.globals'
+    basetag = schema.basetag + 0o20
 
-    statstag = schema.statstag
+    ## the tags in this schema start at index 0x10.
+    statstag = basetag + 0
     NSUP_SCHEMA_VERSION = schema.NSUP_SCHEMA_VERSION
     NSUP_TAGNAME_USAGE = NSUP_START + 0x10
 
-    ## tags
-    addresstag = netnode.suptag
-    counttag = addresstag + 1
+    addresstag = basetag + 1
+    counttag = basetag + 2
 
     ## schema
     schema = {
@@ -1394,18 +1407,19 @@ class contents(counted):
     from tag names to their bit position. Reference counting is also handled by
     the aforementioned namespace.
     """
-    name = 'minsc.tags.contents'
+    basetag = schema.basetag + 0o30
 
-    statstag = schema.statstag
+    ## the tags in this schema start at index 0x18.
+    statstag = basetag + 0
     NSUP_SCHEMA_VERSION = schema.NSUP_SCHEMA_VERSION
 
-    ## tags
-    addresstag = netnode.suptag
-    usagetag = addresstag + 1
-    ownershiptag = usagetag + 1
+    addresstag = basetag + 1
+    usagetag = basetag + 2
+    ownershiptag = basetag + 3
 
-    # tags attached directly to a function
-    counttag = usagetag + 1
+    # tags attached directly to a function. lowercased to avoid
+    # potentially clashing with someone else's netnode tag.
+    counttag = ord(b'c')
 
     ## schema
     schema = {
@@ -1920,17 +1934,18 @@ class members(counted):
     This depends on the `tags` namespace to perform all the conversion and do
     the reference counting.
     """
-    name = 'minsc.tags.members'
+    basetag = schema.basetag + 0o40
 
-    statstag = schema.statstag
+    ## the tags in this schema start at index 0x20.
+    statstag = basetag + 0
     NSUP_SCHEMA_VERSION = schema.NSUP_SCHEMA_VERSION
 
-    ## tags
-    membertag = netnode.suptag
-    usagetag = membertag + 1
+    membertag = basetag + 1
+    usagetag = basetag + 2
 
-    # tags attached directly to a structure
-    counttag = usagetag + 1
+    # tags attached directly to a structure. lowercased to avoid
+    # potentially classhing with someone else's netnode tag.
+    counttag = ord(b'c')
 
     ## schema
     schema = {
@@ -2143,13 +2158,13 @@ class structure(schema):
     This depends on the `tags` namespace to perform all the conversion and do
     the reference counting.
     """
-    name = 'minsc.tags.types'
+    basetag = schema.basetag + 0o50
 
-    statstag = schema.statstag
+    ## the tags in this schema start at index 0x28.
+    statstag = basetag + 0
     NSUP_SCHEMA_VERSION = schema.NSUP_SCHEMA_VERSION
 
-    ## tags
-    typetag = netnode.suptag
+    typetag = basetag + 1
 
     ## schema
     schema = {
