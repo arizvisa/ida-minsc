@@ -10404,6 +10404,12 @@ class function(object):
         return
 
     @classmethod
+    def ordinal(cls, ea):
+        '''Return the ordinal for the function at the address `ea`.'''
+        func = cls.by(ea)
+        return idaapi.get_func_num(range.start(func))
+
+    @classmethod
     def by_address(cls, ea):
         '''Return the ``idaapi.func_t`` that contains the address `ea`.'''
         return idaapi.get_func(int(ea))
