@@ -2092,6 +2092,9 @@ class reference_v0(object):
         def decrement(cls, address, name):
             return internal.tagcache.globals.dec(address, name)
         @classmethod
+        def count(cls, address):
+            return internal.tagcache.globals.count(address)
+        @classmethod
         def name(cls):
             return internal.tagcache.globals.name()
         @classmethod
@@ -2129,6 +2132,9 @@ class reference_v0(object):
         @classmethod
         def decrement(cls, address, name, **target):
             return internal.tagcache.contents.dec(address, name, target=target.get('target'))
+        @classmethod
+        def count(cls, address, **target):
+            return internal.tagcache.contents.count(address, target=target.get('target'))
         @classmethod
         def iterate(cls):
             return internal.tagcache.contents.iterate()
@@ -2170,6 +2176,12 @@ class reference_v0(object):
         def decrement(cls, sid, name):
             return 0
         @classmethod
+        def get(cls, sid):
+            return {name for name in []}
+        @classmethod
+        def count(cls, sid):
+            return 0
+        @classmethod
         def erase(cls, sid):
             return []
 
@@ -2192,6 +2204,12 @@ class reference_v0(object):
             return 0
         @classmethod
         def decrement(cls, mid, name):
+            return 0
+        @classmethod
+        def get(cls, mid):
+            return {name for name in []}
+        @classmethod
+        def count(cls, mid):
             return 0
         @classmethod
         def erase_member(cls, sid, mid):
@@ -2253,6 +2271,9 @@ class reference_v1(object):
             position, count = internal.tagindex.globals.decrement(address, name) if internal.tagindex.tags.has(name) else (0, 0)
             return count
         @classmethod
+        def count(cls, address):
+            return len(cls.get(address))
+        @classmethod
         def name(cls):
             used = internal.tagindex.globals.usage()
             return internal.tagindex.tags.names(used)
@@ -2298,6 +2319,9 @@ class reference_v1(object):
             position, counts = internal.tagindex.contents.decrement(address, name, **target) if internal.tagindex.tags.has(name) else (0, {})
             owner = interface.function.by_address(target.get('target', address))
             return counts.get(interface.range.start(owner), 0)
+        @classmethod
+        def count(cls, address, **target):
+            return len(cls.get(address, **target))
         @classmethod
         def iterate(cls):
             iterable = internal.tagindex.contents.select()
@@ -2346,6 +2370,12 @@ class reference_v1(object):
             position, count = internal.tagindex.structure.decrement(sid, name) if internal.tagindex.tags.has(name) else (0, 0)
             return count
         @classmethod
+        def get(cls, sid):
+            return internal.tagindex.structure.get(sid)
+        @classmethod
+        def count(cls, sid):
+            return len(cls.get(sid))
+        @classmethod
         def erase(cls, sid):
             return internal.tagindex.structure.erase([sid])
 
@@ -2371,6 +2401,12 @@ class reference_v1(object):
         def decrement(cls, mid, name):
             position, count = internal.tagindex.members.decrement(mid, name) if internal.tagindex.tags.has(name) else (0, 0)
             return count
+        @classmethod
+        def get(cls, mid):
+            return internal.tagindex.members.get(mid)
+        @classmethod
+        def count(cls, mid):
+            return len(cls.get(mid))
         @classmethod
         def erase_member(cls, sid, mid):
             return internal.tagindex.members.erase(sid, [mid])
