@@ -513,6 +513,14 @@ class contents(tagging):
         return sorted(res.keys())
 
     @classmethod
+    def count(cls, address, **target):
+        '''Return the number of tags applied to the specified `address` for the function `target`.'''
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
+        res = res.get(cls.__address__, {})
+        return res.get(address, 0)
+
+    @classmethod
     def erase(cls, ea):
         '''Remove the contents of the function at the address `ea`.'''
         target = ea if netnode.blob.has(ea, index=0, tag=cls.btag) else cls._key(ea)
@@ -672,6 +680,11 @@ class globals(tagging):
     def address(cls):
         '''Return all the tag addresses in the specified database (globals and func-tags)'''
         return netnode.alt.fiter(tagging.node())
+
+    @classmethod
+    def count(cls, address):
+        '''Return the number of tags applied to the specified `address`.'''
+        return netnode.alt.get(tagging.node(), address)
 
     @classmethod
     def erase(cls, address):
