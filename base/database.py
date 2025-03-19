@@ -544,26 +544,6 @@ class functions(object):
         '''Return the address of each of the functions within the database as a list.'''
         return [item for item in cls.iterate(*string, **type)]
 
-    @utils.multicase()
-    @classmethod
-    def __iterate__(cls):
-        '''Iterates through each of the functions within the current database.'''
-        left, right = interface.address.bounds()
-
-        # find first function chunk
-        ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
-        while ch and interface.range.start(ch) < right and (ch.flags & idaapi.FUNC_TAIL) != 0:
-            ui.navigation.procedure(interface.range.start(ch))
-            ch = idaapi.get_next_fchunk(interface.range.start(ch))
-
-        # iterate through the rest of the functions in the database
-        while ch and interface.range.start(ch) < right:
-            ui.navigation.procedure(interface.range.start(ch))
-            if interface.function.has(interface.range.start(ch)):
-                yield interface.range.start(ch)
-            ch = idaapi.get_next_func(interface.range.start(ch))
-        return
-
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -580,7 +560,7 @@ class functions(object):
     @utils.string.decorate_arguments('name', 'like', 'regex', 'iregex')
     def iterate(cls, **type):
         '''Iterate through the functions from the database that match the keywords specified by `type`.'''
-        iterable = cls.__iterate__()
+        iterable = (ui.navigation.procedure(ea) for ea in interface.function.iterate())
         for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
         for item in iterable: yield item
