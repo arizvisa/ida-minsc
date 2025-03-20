@@ -1276,9 +1276,11 @@ class sup(object):
 class hash(object):
     """
     This namespace is used for interacting with the dictionary stored
-    within a given netnode. This dictionary is keyed by bytes of a
-    maximum length of 510, and is used to store bytes of a maximum
-    length of 1024. IDA refers to this dictionary as a "hashval".
+    within a given netnode. The dictionary is keyed by UTF-8 encoded
+    strings with a maximum length of 510 characters. It allows storing
+    multiple types, up to a maximum length of 1024 bytes (MAXSPECSIZE.
+
+    The disassembler refers to this data structure as a "hashval".
     """
 
     @classmethod
@@ -1513,6 +1515,33 @@ class hash(object):
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}{!s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, '' if tag is None else ", tag={!s}".format(tag), description))
         return '\n'.join(res)
+
+class hashbytes(hash):
+    """
+    This is a derivative of the `hash` namespace which is used to
+    store string data within a given netnode. Specifically, this
+    namespace is different from `hash` (which allows you to store
+    a UTF-8 in a netnode) by allowing the user to specify their key
+    as an arbitrary number of raw bytes up to 510.
+
+    This results in a dictionary in where the key is encoded when
+    written into its specified netnode. It allows storing bytes
+    up to a maximum length of 1024 (MAXSPECSIZE).
+    """
+
+    # FIXME: we're not allowed to store any null bytes inside
+    #        these due to the limitation that they are strings.
+    @classmethod
+    def encode_key(cls, data):
+        if isinstance(data, internal.types.string):
+            return data.encode('utf-8').decode('latin1', 'replace')
+        return bytes(data).decode('latin1', 'replace')
+
+    @classmethod
+    def decode_key(cls, string):
+        if isinstance(string, internal.types.string):
+            return string.encode('latin1', 'replace')
+        return bytes(string)
 
 # FIXME: implement a file-allocation-table based filesystem using the netnode wrappers defined above
 class filesystem(object):
