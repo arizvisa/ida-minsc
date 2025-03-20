@@ -930,7 +930,7 @@ else:
 
     logging.debug(u"{:s} : Successfully defined Hex-Rays (decompiler) microcode architecture.".format(__name__))
 
-class microarchitecture_attribute(object):
+class microarchitecture(object):
     """
     This class is basically a place for containing whatever `uarchitecture_t`
     is currently instantiated. This way a hook can be used to synchronize it
