@@ -200,9 +200,22 @@ class pycompat(object):
         if isinstance(object, functools.partial):
             return "{:s}({:s}{:s}{:s})".format(cls.fullname(functools.partial), cls.fullname(object.func), ", {:s}".format(', '.join(map("{!s}".format, object.args))) if object.args else '', ", {:s}".format(string.kwargs(object.keywords)) if object.keywords else '')
 
+        elif isinstance(object, internal.types.method):
+            Fqualified_name = cls.method.name
+
         # Otherwise we'll have to just trust whatever name the object has.
-        Fqualified_name = fattribute('__qualname__') if hasattr(object, '__qualname__') else cls.function.name if isinstance(object, internal.types.function) else cls.code.name if isinstance(object, internal.types.code) else fattribute('__name__', object.__name__)
-        return '.'.join([object.__module__, Fqualified_name(object)] if hasattr(object, '__module__') else [Fqualified_name(object)])
+        elif hasattr(object, '__qualname__'):
+            Fqualified_name = fattribute('__qualname__')
+        elif isinstance(object, internal.types.function):
+            Fqualified_name = cls.function.name
+        elif isinstance(object, internal.types.code):
+            Fqualified_name = cls.code.name
+        else:
+            Fqualified_name = fattribute('__name__', object.__name__)
+
+        # Extract the module from the object and combine it into a full name.
+        module = cls.module(object)
+        return '.'.join([module, Fqualified_name(object)] if module else [Fqualified_name(object)])
 
     @classmethod
     def file(cls, callable):
