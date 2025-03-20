@@ -224,7 +224,7 @@ class pycompat(object):
     @classmethod
     def module(cls, object):
         '''Return the module name for the specified `object`.'''
-        return object.__module__
+        return getattr(object, '__module__', '')
 
     # this class definition gets used as a base class, before its name
     # gets reassigned later when it goes out of scope.
