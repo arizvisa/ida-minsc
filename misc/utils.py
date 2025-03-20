@@ -412,7 +412,30 @@ class pycompat(object):
     code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38 if (sys.version_info.major, sys.version_info.minor) < (3, 11) else code_311
 
     class method(object):
-        pass
+        @classmethod
+        def name(cls, object):
+            self, plain, func = cls.self(object), object.__name__, object.__func__
+            owner_t = self if isinstance(self, type) else self.__class__
+            if not hasattr(object, '__qualname__'):
+                return '.'.join([owner_t.__name__, plain])
+
+            # if the qualified name didn't match, and our method name isn't in
+            # the owner class, then the qualified name describes the super class
+            # and we need to correct it.
+            elif plain not in owner_t.__dict__:
+                this = object.__qualname__.split('.')
+                owner = owner_t.__qualname__.split('.')
+                matching = [name for name, ownername in zip(this, owner) if name == ownername]
+                iterable = itertools.chain(matching, [owner_t.__name__], this[-1:])
+                return '.'.join(iterable)
+
+            # if there's no difference between the owner and the qualified name,
+            # then we can just trust the qualified name.
+            elif getattr(object, '__qualname__', '').endswith('.'.join(['', owner_t.__name__, plain])):
+                return object.__qualname__
+
+            # otherwise use the qualified name of the class being derived from.
+            return '.'.join([owner_t.__qualname__, plain])
 
     class method_2x(method):
         @classmethod
