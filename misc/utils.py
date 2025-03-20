@@ -200,6 +200,17 @@ class pycompat(object):
         if isinstance(object, functools.partial):
             return "{:s}({:s}{:s}{:s})".format(cls.fullname(functools.partial), cls.fullname(object.func), ", {:s}".format(', '.join(map("{!s}".format, object.args))) if object.args else '', ", {:s}".format(string.kwargs(object.keywords)) if object.keywords else '')
 
+        # Get the module and combine it with the short name into a full name.
+        module, qualified_name = cls.module(object), cls.shortname(object)
+        return '.'.join([module, qualified_name] if module else [Fqualified_name])
+
+    @classmethod
+    def shortname(cls, object):
+        '''Return the qualified name for the specified `object` as a string if possible.'''
+        if isinstance(object, functools.partial):
+            return "{:s}({:s}{:s}{:s})".format(cls.fullname(functools.partial), cls.shortname(object.func), ", {:s}".format(', '.join(map("{!s}".format, object.args))) if object.args else '', ", {:s}".format(string.kwargs(object.keywords)) if object.keywords else '')
+
+        # If we were given a method, then we need to specially handle it.
         elif isinstance(object, internal.types.method):
             Fqualified_name = cls.method.name
 
@@ -213,9 +224,7 @@ class pycompat(object):
         else:
             Fqualified_name = fattribute('__name__', object.__name__)
 
-        # Extract the module from the object and combine it into a full name.
-        module = cls.module(object)
-        return '.'.join([module, Fqualified_name(object)] if module else [Fqualified_name(object)])
+        return Fqualified_name(object)
 
     @classmethod
     def file(cls, callable):
