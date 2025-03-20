@@ -457,7 +457,10 @@ class pycompat(object):
     else:
         code = code_311
 
-    class method_2x(object):
+    class method(object):
+        pass
+
+    class method_2x(method):
         @classmethod
         def new(cls, function, instance, type):
             return internal.types.method(function, instance, type)
@@ -474,7 +477,7 @@ class pycompat(object):
         def function(cls, object):
             return object.im_func
 
-    class method_3x(object):
+    class method_3x(method):
         @classmethod
         def new(cls, function, instance, type=None):
             return internal.types.method(function, instance)
