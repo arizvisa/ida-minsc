@@ -411,7 +411,10 @@ class pycompat(object):
 
     code = code_2x if sys.version_info.major < 3 else code_37 if (sys.version_info.major, sys.version_info.minor) < (3, 8) else code_38 if (sys.version_info.major, sys.version_info.minor) < (3, 11) else code_311
 
-    class method_2x(object):
+    class method(object):
+        pass
+
+    class method_2x(method):
         @classmethod
         def new(cls, function, instance, type):
             return internal.types.method(function, instance, type)
@@ -428,7 +431,7 @@ class pycompat(object):
         def function(cls, object):
             return object.im_func
 
-    class method_3x(object):
+    class method_3x(method):
         @classmethod
         def new(cls, function, instance, type=None):
             return internal.types.method(function, instance)
