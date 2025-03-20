@@ -924,7 +924,7 @@ def finders():
     # the catalog, so we do it as a lazy-constructed attribute.
     def Fmicro_proxy_container(update=micro_proxy.update_module):
         internal = __import__('internal.architecture')
-        return internal.architecture.microarchitecture_attribute(update)
+        return internal.architecture.microarchitecture(update)
 
     def Fupdate_catalog_proxy(update=catalog_proxy.update_module, micro=Fmicro_proxy_container):
         internal = __import__('internal.architecture')
