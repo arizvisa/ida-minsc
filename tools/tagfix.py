@@ -23,8 +23,7 @@ import six, sys, logging, builtins
 import functools, operator, itertools, types
 logging = logging.getLogger(__name__)
 
-import database as db, function as func, ui
-import internal
+import ui, internal
 
 import idaapi
 output = sys.stderr
@@ -39,15 +38,17 @@ def fetch_contents(fn):
     contains the reference counts for each of the tags applied to the contents
     of the function `fn`.
     """
-    f, results, counts = func.address(fn), {}, {}
-    for ea in map(ui.navigation.analyze, func.iterate(fn)):
-        items = db.tag(ea)
-        results[ea] = {tag for tag in items}
-        for tag in items:
-            integer = counts.get(tag, 0)
-            counts[tag] = integer + 1
+    fn, results, counts = internal.interface.function.by(fn), {}, {}
+    for start, end in map(internal.interface.range.unpack, internal.interface.function.chunks(fn)):
+        for ea in internal.interface.address.items(start, end):
+            items = internal.tags.address.get(ea)
+            results[ea] = {tag for tag in items}
+            for tag in items:
+                integer = counts.get(tag, 0)
+                counts[tag] = integer + 1
+            continue
         continue
-    return func.address(fn), results, counts
+    return internal.interface.range.start(fn), results, counts
 
 def fetch_globals_functions():
     """Fetch all of the global tags (functions) from the database.
@@ -58,10 +59,11 @@ def fetch_globals_functions():
     database in bulk.
     """
     result = []
-    functions = [item for item in db.functions.iterate()]
-    for i, ea in enumerate(map(ui.navigation.analyze, functions)):
+    functions = [item for item in internal.interface.function.enumerate()]
+    for i, ea in functions:
+        ea = ui.navigation.analyze(ea)
         six.print_(u"globals: collecting the tags that were applied to function {:#x} : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
-        result.append((ea, {item for item in func.tag(ea)}))
+        result.append((ea, {item for item in internal.tags.function.get(ea)}))
     return result
 
 def fetch_globals_data():
@@ -72,12 +74,12 @@ def fetch_globals_data():
     used to calculate the reference counts of applied to the database in bulk.
     """
     result = []
-    left, right = db.information.bounds()
+    left, right = internal.interface.address.bounds()
     six.print_(u'globals: collecting any tags that have been applied to a global address', file=output)
-    for ea in map(ui.navigation.analyze, db.address.iterate(left, right)):
+    for ea in map(ui.navigation.analyze, internal.interface.address.items(left, right)):
         if idaapi.get_func(ea):
             continue
-        result.append((ea, {item for item in db.tag(ea)}))
+        result.append((ea, {item for item in internal.tags.address.get(ea)}))
     return result
 
 def fetch_globals():
@@ -109,9 +111,7 @@ def fetch_globals():
 
 def contents(address):
     '''Generate the cache for the contents of the function at the given `address`.'''
-    try:
-        func.address(address)
-    except internal.exceptions.FunctionNotFoundError:
+    if not internal.interface.function.has(address):
         logging.warning(u"{:s}.contents({:#x}): Unable to fetch cache the for the address {:#x} as it is not a function.".format('.'.join([__name__]), address, address))
         return {}, {}
 
@@ -122,12 +122,12 @@ def contents(address):
 
     # Gather the current reference counts for the function, and update its tags.
     logging.debug(u"{:s}.contents({:#x}): Updating the tag references in the cache belonging to function {:#x}.".format('.'.join([__name__]), address, address))
-    original = {tag : count for tag, count in internal.tags.contents.counts(address)}
+    original = internal.tags.reference.contents.counts(address)
     for ea, tags in results.items():
         for tag in tags:
-            internal.tags.contents.increment(ea, tag, target=address)
+            internal.tags.reference.contents.increment(ea, tag, target=address)
         continue
-    modified = {tag : count for tag, count in internal.tags.contents.counts(address)}
+    modified = internal.tags.reference.contents.counts(address)
 
     # Now we'll go through the original and modified counts to make sure that
     # they correlate to the counts that we tallied when fetching the contents.
@@ -146,12 +146,12 @@ def globals():
     address, counts = fetch_globals()
 
     # Gather the current reference counts for the globals, and update their tags.
-    original = {tag : count for tag, count in internal.tags.globals.counts()}
+    original = internal.tags.reference.globals.counts()
     for ea, tags in address.items():
         for tag in tags:
-            internal.tags.globals.increment(ea, tag)
+            internal.tags.reference.globals.increment(ea, tag)
         continue
-    modified = {tag : count for tag, count in internal.tags.globals.counts()}
+    modified = internal.tags.reference.globals.counts()
 
     # Now we'll go through both counts to make sure that they correlate to the
     # counts that we tallied when fetching all the globals.
@@ -165,10 +165,10 @@ def globals():
 
 def all():
     '''Build the index of references for all the globals and generate the caches for every function in the database.'''
-    functions = [item for item in db.functions()]
+    functions = [item for item in internal.interface.function.enumerate()]
 
     # process all function contents tags
-    for i, ea in enumerate(functions):
+    for i, ea in functions:
         six.print_(u"updating the cache for the tags belonging to function ({:#x}) : {:d} of {:d}".format(ea, 1 + i, len(functions)), file=output)
         _, _ = contents(ea)
 
@@ -179,24 +179,32 @@ def all():
 def customnames():
     '''Iterate through all of the "custom" names within the database and update their references in either the index or their associated function cache.'''
     # FIXME: first delete all the custom names '__name__' tag
-    left, right = db.config.bounds()
-    for ea in db.address.iterate(left, right):
-        ctx = internal.tags.reference.contents if func.within(ea) and func.address(ea) != ea else internal.tags.reference.globals
-        if db.type.has_customname(ea):
+    left, right = internal.interface.address.bounds()
+    for ea in internal.interface.address.items(left, right):
+        fn = internal.interface.function.by(ea) if internal.interface.function.has(ea) else None
+        if fn is None or internal.interface.range.start(fn) == ea:
+            ctx = internal.tags.reference.globals
+        else:
+            ctx = internal.tags.reference.contents
+        if internal.interface.address.flags(ea, idaapi.MS_COMM) & idaapi.FF_NAME:
             ctx.increment(ea, '__name__')
         continue
     return
 
 def extracomments():
     '''Iterate through all of the "extra" comments within the database and update their references in either the index or their associated function cache.'''
-    left, right = db.config.bounds()
-    for ea in db.address.iterate(left, right):
-        ctx = internal.tags.reference.contents if func.within(ea) else internal.tags.reference.globals
+    left, right = internal.interface.address.bounds()
+    for ea in internal.interface.address.items(left, right):
+        fn = internal.interface.function.by(ea) if internal.interface.function.has(ea) else None
+        if fn is None or internal.interface.range.start(fn) == ea:
+            ctx = internal.tags.reference.globals
+        else:
+            ctx = internal.tags.reference.contents
 
-        count = db.extra.__count__(ea, idaapi.E_PREV)
+        count = internal.comment.extra.count(ea, idaapi.E_PREV)
         if count: [ ctx.increment(ea, '__extra_prefix__') for i in range(count) ]
 
-        count = db.extra.__count__(ea, idaapi.E_NEXT)
+        count = internal.comment.extra.count(ea, idaapi.E_NEXT)
         if count: [ ctx.increment(ea, '__extra_suffix__') for i in range(count) ]
     return
 
@@ -208,7 +216,7 @@ def everything():
 def erase_globals():
     '''Remove the contents of the index from the database which is used for storing information about the global tags.'''
     addresses = {ea for ea, _ in internal.tags.reference.globals.iterate()}
-    names = {tag for tag, _ in internal.tags.reference.globals.counts()}
+    names = {tag for tag in internal.tags.reference.globals.counts()}
     total = len(names) + len(addresses)
 
     yield total
@@ -220,7 +228,7 @@ def erase_globals():
     #    internal.tags.reference.destroy_tag(k)
     #    yield current + idx, k
 
-    current += len(names)
+    current = len(names)
     for idx, ea in enumerate(addresses):
         internal.tags.reference.globals.erase_address(ea)
         yield current + idx, ea
@@ -228,11 +236,11 @@ def erase_globals():
 
 def erase_contents():
     '''Remove the cache associated with each function from the database.'''
-    functions = [item for item in db.functions()]
+    functions = [item for item in internal.interface.function.enumerate()]
     yield len(functions)
 
-    for idx, ea in enumerate(map(ui.navigation.set, functions)):
-        internal.tags.reference.contents.erase(ea)
+    for idx, ea in functions:
+        internal.tags.reference.contents.erase(ui.navigation.set(ea))
         yield idx, ea
     return
 
