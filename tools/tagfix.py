@@ -554,4 +554,65 @@ def verify_v0():
     six.print_(u"Verification of globals has {:s}. Successfully verified{:s} {:d} of {:d} indexed functions.".format('succeeded' if ok else 'failed', ' only' if verified < available else '', verified, available))
     return ok and verified == available
 
+def upgrade_globals_v1():
+    '''Upgrade the global tags stored in the tagcache (v0) to the tagindex (v1).'''
+    oldcount = newcount = 0
+    for ea, count in internal.tagcache.globals.iterate():
+        context = internal.tags.function if internal.interface.function.has(ea) else internal.tags.address
+        res = context.get(ea)
+        oldcount += count
+        newcount += len([internal.tagindex.globals.increment(ea, name) for name in res])
+    return oldcount, newcount
+
+def upgrade_function_v1(func):
+    '''Upgrade the content tags stored in the tagcache (v0) for the function `func` to the tagindex (v1).'''
+    oldcount = newcount = 0
+    for ea in internal.tagcache.contents.address(func, target=func):
+        res = internal.tags.address.get(ea)
+        oldcount += internal.tagcache.contents.count(ea, target=ea)
+        newcount += len([internal.tagindex.contents.increment(ea, name, target=func) for name in res])
+    return oldcount, newcount
+
+def upgrade_functions_v1():
+    '''Upgrade the content tags stored in the tagcache (v0) to the tagindex (v1).'''
+    oldcount = newcount = 0
+    for ea in internal.interface.function.iterate():
+        old, new = upgrade_function_v1(ea)
+        oldcount += old
+        newcount += new
+    return oldcount, newcount
+
+def upgrade_structures_v1():
+    '''Upgrade the structure tags to the tagindex (v1).'''
+    oldcount = newcount = 0
+    for sptr in internal.structure.iterate():
+        res = internal.tags.structure.get(sptr)
+        oldcount += len(res)
+        newcount += len([internal.tagindex.structure.increment(sptr.id, name) for name in res])
+    return oldcount, newcount
+
+def upgrade_members_v1():
+    '''Upgrade the structure tags to the tagindex (v1).'''
+    oldcount = newcount = 0
+    for sptr in internal.structure.iterate():
+        for mowner, mindex, mptr in internal.structure.members.iterate(sptr):
+            res = internal.tags.member.get(mptr)
+            oldcount += len(res)
+            newcount += len([internal.tagindex.members.increment(mptr.id, name) for name in res])
+        continue
+    return oldcount, newcount
+
+def upgrade_v1():
+    '''Upgrade the tags from the tagcache (v0) to the tagindex (v1).'''
+    oldcount = newcount = 0
+    old, new = upgrade_globals_v1()
+    oldcount, newcount = oldcount + old, newcount + new
+    old, new = upgrade_functions_v1()
+    oldcount, newcount = oldcount + old, newcount + new
+    old, new = upgrade_structures_v1()
+    oldcount, newcount = oldcount + old, newcount + new
+    old, new = upgrade_members_v1()
+    oldcount, newcount = oldcount + old, newcount + new
+    return oldcount, newcount
+
 __all__ = ['everything', 'globals', 'contents']
