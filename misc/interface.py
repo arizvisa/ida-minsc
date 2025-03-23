@@ -10376,11 +10376,10 @@ class function(object):
         elif not ea:
             return True
 
-        # If we were given an address to check, extract the chunks for the
-        # function and return true if any of them contain it.
-        [address] = map(int, ea)
-        iterable = (range.bounds(ch) for ch in cls.chunks(fn))
-        return any(start <= address < end for start, end in iterable)
+        # If we were given an address to check, get a list of the functions that
+        # own it, and check if the function we were given is contained in them.
+        entry, owners = range.start(fn), cls.owners(*map(int, ea))
+        return entry in {ea for ea in owners}
 
     @classmethod
     def iterate(cls, *bounds):
