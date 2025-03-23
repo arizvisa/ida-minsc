@@ -10358,9 +10358,29 @@ class function(object):
     of these is really only for influencing the type of side-effect to apply.
     '''
     @classmethod
-    def has(cls, ea):
-        '''Return if the address `ea` is within a function and not an external.'''
-        return idaapi.get_func(int(ea)) is not None and idaapi.segtype(int(ea)) != idaapi.SEG_XTRN
+    def has(cls, func, *ea):
+        '''Return if the address `func` is within a function (not external) or contains the address `ea`.'''
+        f = int(func)
+        fn = idaapi.get_func(f)
+
+        # If the function address is not a function, then return false.
+        if not fn:
+            return False
+
+        # If the address is in an external segment, then it's not a function.
+        elif idaapi.segtype(f) == idaapi.SEG_XTRN:
+            return False
+
+        # If we got here, we didn't hit any constraints which means that we must
+        # be a function.
+        elif not ea:
+            return True
+
+        # If we were given an address to check, extract the chunks for the
+        # function and return true if any of them contain it.
+        [address] = map(int, ea)
+        iterable = (range.bounds(ch) for ch in cls.chunks(fn))
+        return any(start <= address < end for start, end in iterable)
 
     @classmethod
     def iterate(cls, *bounds):
