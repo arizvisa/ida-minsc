@@ -251,19 +251,19 @@ def erase():
         six.print_(u"removing the global {:s} from the index : {:d} of {:d}".format(format(addressOrName), 1 + res + idx, total), file=output)
     return
 
-def verify_index():
+def verify_index_v0():
     '''Iterate through the index and verify that each contents entry is pointing at the right functions.'''
-    cls, ok = internal.tags.reference.contents, True
+    cls, ok = internal.tagcache.contents, True
 
     # Iterate through the entire index of contents.
     for ea, available in cls.iterate():
-        if not func.within(ea):
+        if not internal.interface.function.has(ea):
             ok, _ = False, six.print_(u"[{:#x}] the item in the index ({:#x}) has been orphaned and is not associated with a function".format(ea, ea), file=output)
             continue
 
         # Verify the owner of the address the cache is stored in
         # actually belongs to the correct function.
-        f = ui.navigation.analyze(func.address(ea))
+        f = ui.navigation.analyze(internal.interface.range.start(internal.interface.function.by(ea)))
         if f != ea:
             ok, _ = False, six.print_(u"[{:#x}] the item has the wrong parent ({:#x}) and should be owned by {:#x}".format(ea, ea, f), file=output)
             continue
@@ -281,9 +281,9 @@ def verify_index():
         continue
     return ok
 
-def verify_content(ea):
+def verify_content_v0(ea):
     '''Iterate through the contents cache for an individual function and verify that the addresses in its cache are correct.'''
-    cls = internal.tags.reference.contents
+    cls = internal.tagcache.contents
     try:
         cache = cls._read(ea, ea)
 
@@ -312,20 +312,20 @@ def verify_content(ea):
 
     # If we're not within a function, then we need to bail because
     # the next tests can't possibly succeed.
-    if not func.within(ea):
+    if not internal.interface.function.has(ea):
         six.print_(u"[{:#x}] the cache at {:#x} is not part of a function".format(ea, ea), file=output)
         return False
-    f = func.address(ea)
+    f = internal.interface.range.start(internal.interface.function.by(ea))
 
     # If we verify that the addresses in the cache are all within the
     # function that the cache is associated with, then we're done.
-    if not builtins.all(func.contains(f, item) for item in cache[cls.__address__]):
-        missed = {item for item in cache[cls.__address__] if not func.contains(f, item)}
+    if not builtins.all(internal.interface.function.has(f, item) for item in cache[cls.__address__]):
+        missed = {item for item in cache[cls.__address__] if not internal.interface.function.has(f, item)}
         six.print_(u"[{:#x}] the cache references {:d} address{:s} that are not owned by function {:#x}".format(ea, len(missed), '' if len(missed) == 1 else 'es', f), file=output)
 
         # Otherwise, some of the addresses are pointing to the wrong place.
         for index, item in enumerate(sorted(missed)):
-            six.print_(u"[{:#x}] item {:d} of {:d} at {:#x} should be owned by {:#x} but {:s}".format(ea, 1 + index, len(missed), item, f, "is in {:#x}".format(func.address(item)) if func.within(item) else 'is not in a function'), file=output)
+            six.print_(u"[{:#x}] item {:d} of {:d} at {:#x} should be owned by {:#x} but {:s}".format(ea, 1 + index, len(missed), item, f, "is in {:#x}".format(interface.range.start(interface.function.by(item))) if internal.interface.function.has(item) else 'is not in a function'), file=output)
         return False
 
     # Iterate through the cache for a function and store all of the tags
@@ -333,7 +333,7 @@ def verify_content(ea):
     # tags because we're going to do some quirky things to adjust for them.
     results, implicit = {}, {key : [] for key in ['__typeinfo__', '__name__']}
     for ea in cache[cls.__address__]:
-        items, empty = {key for key in db.tag(ea)}, {item for item in []}
+        items, empty = {key for key in internal.tags.address.get(ea)}, {item for item in []}
         for name in items:
             results.setdefault(ea, empty).add(name)
 
@@ -417,9 +417,9 @@ def verify_content(ea):
         continue
     return True
 
-def verify_globals():
+def verify_globals_v0():
     '''Verify the globals for every address from the database.'''
-    cls = internal.tags.reference.globals
+    cls = internal.tags.reference_v0.globals
 
     # Calculate all the possible combinations for the implicit tags so that
     # we can use them to figure out which variation will match.
@@ -433,22 +433,22 @@ def verify_globals():
     # of each tag at the given address. We default with db.tag to fetch
     # them and switch it up only if a function is detected.
     for ea, count in cls.iterate():
-        Ftags = db.tag
+        Ftags = internal.tags.address.get
 
         # First figure out how to validate the address. If it's a function,
         # then we can use func.address.
-        if func.within(ea):
-            f = func.address(ea)
+        if internal.interface.function.has(ea):
+            f = internal.interface.range.start(internal.interface.function.by(ea))
             if f != ea:
                 six.print_(u"[{:#x}] the item in the global index ({:#x}) is not at the beginning of a function ({:#x})".format(ea, ea, f), file=output)
 
             # We can now force the address to point to the actual function
             # address because func.tag will correct this anyways.
-            ea, Ftags = f, func.tag
+            ea, Ftags = f, internal.tags.function.get
 
         # In this case we must be a global and we need to use a combination
         # of database.contains, and then interface.address.head.
-        elif not db.within(ea):
+        elif not internal.interface.bounds_t(*internal.interface.address.bounds()).contains(ea):
             ok, _ = False, six.print_(u"[{:#x}] the item in the global index ({:#x}) is not within the boundaries of the database".format(ea, ea), file=output)
             continue
 
@@ -467,7 +467,7 @@ def verify_globals():
         matches = [combination for combination in available if combination & expected == combination]
         if count in {len(expected - match) for match in matches}:
             candidates = [match for match in matches if len(expected - match) == count]
-            logging.debug(u"{:s}.verify_globals(): Found {:d} candidate{:s} for the tags ({:s}) belonging to the {:s} at {:#x} that would result in a proper count of {:d} reference{:s}.".format('.'.join([__name__]), len(candidates), '' if len(candidates) == 1 else 's', ', '.join(map("{!r}".format, expected)), 'function' if func.within(ea) else 'address', ea, count, '' if count == 1 else 's'))
+            logging.debug(u"{:s}.verify_globals(): Found {:d} candidate{:s} for the tags ({:s}) belonging to the {:s} at {:#x} that would result in a proper count of {:d} reference{:s}.".format('.'.join([__name__]), len(candidates), '' if len(candidates) == 1 else 's', ', '.join(map("{!r}".format, expected)), 'function' if internal.interface.function.has(ea) else 'address', ea, count, '' if count == 1 else 's'))
             format = functools.partial(u"{:s}.verify_globals(): ...Candidate #{:d} would remove {:s}{:s} resulting in: {:s}.".format, '.'.join([__name__]))
             [logging.debug(format(1 + index, "{:d} tag".format(len(listable)) if len(listable) == 1 else "{:d} tags".format(len(listable)), ", {:s}{:s}".format(', '.join(map("{!r}".format, listable[:-1])), ", and {!r},".format(*listable[-1:]) if len(listable) > 1 else ", {!r},".format(*listable)) if listable else '', ', '.join(map("{!r}".format, expected - candidate)))) for index, (candidate, listable) in enumerate(zip(candidates, map(sorted, candidates)))]
 
@@ -482,7 +482,7 @@ def verify_globals():
                 format = "{:d} to {:d} references".format if len(largest) - len(smallest) > 0 and len(expected) > 0 else "{:d} references".format
             else:
                 format = "{:d} references".format
-            ok, _ = False, six.print_(u"[{:#x}] expected to find {:d} reference{:s} at {:s} {:#x}, but found {:s} instead".format(ea, count, '' if count == 1 else 's', 'function' if func.within(ea) else 'address', ea, format(len(expected - largest), len(expected - smallest))))
+            ok, _ = False, six.print_(u"[{:#x}] expected to find {:d} reference{:s} at {:s} {:#x}, but found {:s} instead".format(ea, count, '' if count == 1 else 's', 'function' if internal.interface.function.has(ea) else 'address', ea, format(len(expected - largest), len(expected - smallest))))
 
         # First tally up all of the counts that aren't affected by implicit tags.
         for key in expected - implicit:
@@ -523,26 +523,26 @@ def verify_globals():
         continue
     return ok
 
-def verify_contents():
+def verify_contents_v0():
     '''Verify the contents of every single function in the index.'''
-    index = sorted({ea for ea, _ in internal.tags.reference.contents.iterate()})
+    index = sorted({ea for ea, _ in internal.tags.reference_v0.contents.iterate()})
 
     # Verify the index as the very first thing.
-    ok = verify_index()
+    ok = verify_index_v0()
     if not ok:
         six.print_(u'some issues were found within the index... ignoring them and proceeding to verify each cache referenced by the index', file=output)
 
     # Now we can iterate through the index and process each function's contents.
     i = count = 0
     for i, ea in enumerate(index):
-        ok = verify_content(ui.navigation.set(ea))
+        ok = verify_content_v0(ui.navigation.set(ea))
         count += 1 if ok else 0
     return count, len(index)
 
-def verify():
+def verify_v0():
     '''Use the index to verify the reference counts for the globals, functions, and the caches containing their contents.'''
-    verified, available = verify_contents()
-    ok = verify_globals()
+    verified, available = verify_contents_v0()
+    ok = verify_globals_v0()
     six.print_(u"Verification of globals has {:s}. Successfully verified{:s} {:d} of {:d} indexed functions.".format('succeeded' if ok else 'failed', ' only' if verified < available else '', verified, available))
     return ok and verified == available
 
