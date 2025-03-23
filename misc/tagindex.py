@@ -135,12 +135,12 @@ class schema(object):
         '''Returns whether the schema exists and return its version if so.'''
         name = "$ {:s}".format(cls.name)
         if not netnode.has(name):
-            return
+            return -1
 
         node = netnode.get(name)
         if netnode.sup.has(node, cls.NSUP_SCHEMA_VERSION, tag=cls.statstag):
             return netnode.sup.get(node, cls.NSUP_SCHEMA_VERSION, types.integer, tag=cls.statstag)
-        return
+        return -1
 
     @classmethod
     def destroy(cls):
