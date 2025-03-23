@@ -615,4 +615,348 @@ def upgrade_v1():
     oldcount, newcount = oldcount + old, newcount + new
     return oldcount, newcount
 
+class relocate_schema_v1(object):
+    """
+    This namespace is an intermediary that was used to migrate tags from the
+    tagindex while in a development state to the final tagging index where each
+    table is consolidated within the same netnode.
+    """
+
+    class definitions(object):
+        """
+        This is a definition for each of the different schemas that can be found
+        within the tagging index. During development, the tagging index had
+        split up each table into distinctly separate netnodes.
+        """
+
+        class schema(object):
+            statstag = internal.netnode.alttag
+            interfaces = {statstag: internal.netnode.alt}
+
+        class tags(schema):
+            name = 'minsc.tags.index'
+            nametag = internal.netnode.hashtag
+            indextag = internal.netnode.suptag
+            counttag = indextag + 1
+            interfaces = {
+                'statstag': internal.netnode.sup,
+                'nametag': internal.netnode.hash,
+                'indextag': internal.netnode.sup,
+                'counttag': internal.netnode.alt,
+            }
+
+        class globals(schema):
+            name = 'minsc.tags.globals'
+            addresstag = internal.netnode.suptag
+            counttag = addresstag + 1
+            interfaces = {
+                'statstag': internal.netnode.sup,
+                'addresstag': internal.netnode.sup,
+                'counttag': internal.netnode.alt,
+            }
+
+        class contents(schema):
+            name = 'minsc.tags.contents'
+            addresstag = internal.netnode.suptag
+            usagetag = addresstag + 1
+            interfaces = {
+                'statstag': internal.netnode.sup,
+                'addresstag': internal.netnode.sup,
+                'usagetag': internal.netnode.sup,
+                'ownershiptag': internal.netnode.alt,
+            }
+
+            counttag = usagetag + 1         # func
+            ownershiptag = internal.netnode.alttag + 1 # func
+
+            # scoped to the function's internal.netnode
+            localinterfaces = {
+                'counttag': internal.netnode.alt,
+            }
+
+        class members(schema):
+            name = 'minsc.tags.members'
+            membertag = internal.netnode.suptag
+            usagetag = membertag + 1
+            interfaces = {
+                'statstag': internal.netnode.sup,
+                'membertag': internal.netnode.sup,
+                'usagetag': internal.netnode.sup,
+            }
+            counttag = usagetag + 1   # sid
+            localinterfaces = {
+                'counttag': internal.netnode.alt,
+            }
+
+        class structure(schema):
+            name = 'minsc.tags.types'
+            typetag = internal.netnode.suptag
+
+            interfaces = {
+                'statstag': internal.netnode.sup,
+                'typetag': internal.netnode.sup,
+            }
+
+    @classmethod
+    def __migrate_schema(cls, schema, destination):
+        schema_descr = internal.utils.pycompat.fullname(schema)
+        dest_descr = internal.utils.pycompat.fullname(destination)
+
+        sname = "$ {:s}".format(schema.name)
+        if not(internal.netnode.has(sname)):
+            logging.info("{:s}.__migrate_schema({!s}, {!s}) : Aborting copy from netnode \"{:s}\" due it not being found.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(sname, '"')))
+            return []
+
+        snode = internal.netnode.get(sname)
+        dnode = destination.node()
+        logging.info("{:s}.__migrate_schema({!s}, {!s}) : Copying schema from netnode {:#x} to {:#x}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, snode, dnode))
+
+        results = []
+        for tagname, nodeinterface in schema.interfaces.items():
+            stag = getattr(schema, tagname)
+            dtag = getattr(destination, tagname)
+
+            logging.info("{:s}.__migrate_schema({!s}, {!s}) : Copying from netnode {:#x} tag {:#0{:d}x} to {:#x} tag {:#0{:d}x} with {!s}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, snode, stag, 2 + 2, dnode, dtag, 2 + 2, internal.utils.pycompat.fullname(nodeinterface)))
+            for key in nodeinterface.fiter(snode, tag=stag):
+                value = nodeinterface.get(snode, key, tag=stag)
+                ok = nodeinterface.set(dnode, key, value, tag=dtag)
+                results.append((stag, dtag, key)) if ok else results
+
+                desc = "{:#x}".format(key) if isinstance(key, internal.types.integer) else "{!r}".format(key)
+                if ok:
+                    logging.debug("{:s}.__migrate_schema({!s}, {!s}) : Copied key {!s} from netnode {:#x} tag {:#0{:d}x} to netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, desc, snode, stag, 2 + 2, dnode, dtag, 2 + 2))
+                else:
+                    logging.debug("{:s}.__migrate_schema({!s}, {!s}) : Unable to copy key {!s} from netnode {:#x} tag {:#0{:d}x} to netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, desc, snode, stag, 2 + 2, dnode, dtag, 2 + 2))
+                continue
+            continue
+        return results
+
+    @classmethod
+    def __migrate_functions(cls, schema, destination):
+        schema_descr = internal.utils.pycompat.fullname(schema)
+        dest_descr = internal.utils.pycompat.fullname(destination)
+
+        if not hasattr(schema, 'localinterfaces'):
+            logging.info("{:s}.__migrate_functions({!s}, {!s}) : Aborting copy for schema \"{:s}\" due it not having any interfaces.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(schema_descr, '"')))
+            return []
+
+        sname = "$ {:s}".format(schema.name)
+        if not(internal.netnode.has(sname)):
+            logging.info("{:s}.__migrate_functions({!s}, {!s}) : Aborting copy from netnode \"{:s}\" due it not being found.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(sname, '"')))
+            return []
+
+        snode = internal.netnode.get(sname)
+        dnode = destination.node()
+        logging.info("{:s}.__migrate_functions({!s}, {!s}) : Copying functions for schema \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(schema_descr, '"'), internal.utils.string.escape(dest_descr, '"')))
+
+        results = []
+        for ea in internal.interface.function.iterate():
+            snode = dnode = idaapi.ea2node(ea)
+
+            for tagname, nodeinterface in schema.localinterfaces.items():
+                stag, dtag = (getattr(item, tagname) for item in [schema, destination])
+                logging.info("{:s}.__migrate_functions({!s}, {!s}) : Copying function {:#x} from netnode {:#x} tag {:#0{:d}x} to {:#x} tag {:#0{:d}x} with {!s}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, ea, snode, stag, 2 + 2, dnode, dtag, 2 + 2, internal.utils.pycompat.fullname(nodeinterface)))
+                for key in nodeinterface.fiter(snode, tag=stag):
+                    value = nodeinterface.get(snode, key, tag=stag)
+                    ok = nodeinterface.set(dnode, key, value, tag=dtag)
+                    results.append((ea, stag, dtag, key)) if ok else results
+
+                    desc = "{:#x}".format(key) if isinstance(key, internal.types.integer) else "{!r}".format(key)
+                    if ok:
+                        logging.debug("{:s}.__migrate_functions({!s}, {!s}) : Copied key {!s} for function {:#x} from netnode {:#x} tag {:#0{:d}x} to netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, desc, ea, snode, stag, 2 + 2, dnode, dtag, 2 + 2))
+                    else:
+                        logging.debug("{:s}.__migrate_functions({!s}, {!s}) : Unable to copy key {!s} for function {:#x} from netnode {:#x} tag {:#0{:d}x} to netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, desc, ea, snode, stag, 2 + 2, dnode, dtag, 2 + 2))
+                    continue
+                continue
+            continue
+        return results
+
+    @classmethod
+    def __migrate_structures(cls, schema, destination):
+        schema_descr = internal.utils.pycompat.fullname(schema)
+        dest_descr = internal.utils.pycompat.fullname(destination)
+
+        if not hasattr(schema, 'localinterfaces'):
+            logging.info("{:s}.__migrate_structures({!s}, {!s}) : Aborting copy for schema \"{:s}\" due it not having any interfaces.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(schema_descr, '"')))
+            return []
+
+        sname = "$ {:s}".format(schema.name)
+        if not(internal.netnode.has(sname)):
+            logging.info("{:s}.__migrate_structures({!s}, {!s}) : Aborting copy from netnode \"{:s}\" due it not being found.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(sname, '"')))
+            return []
+
+        logging.info("{:s}.__migrate_structures({!s}, {!s}) : Copying structures for schema \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, internal.utils.string.escape(schema_descr, '"'), internal.utils.string.escape(dest_descr, '"')))
+
+        results = []
+        for sptr in internal.structure.iterate():
+            snode = dnode = sid = sptr.id
+
+            for tagname, nodeinterface in schema.localinterfaces.items():
+                stag, dtag = (getattr(item, tagname) for item in [schema, destination])
+                logging.info("{:s}.__migrate_structures({!s}, {!s}) : Copying structure {:#x} from netnode {:#x} tag {:#0{:d}x} to {:#x} tag {:#0{:d}x} with {!s}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, sid, snode, stag, 2 + 2, dnode, dtag, 2 + 2, internal.utils.pycompat.fullname(nodeinterface)))
+                for key in nodeinterface.fiter(snode, tag=stag):
+                    value = nodeinterface.get(snode, key, tag=stag)
+                    ok = nodeinterface.set(dnode, key, value, tag=dtag)
+                    results.append((sid, stag, dtag, key)) if ok else results
+
+                    desc = "{:#x}".format(key) if isinstance(key, internal.types.integer) else "{!r}".format(key)
+                    if ok:
+                        logging.debug("{:s}.__migrate_structures({!s}, {!s}) : Copied key {!s} for structure {:#x} from netnode {:#x} tag {:#0{:d}x} to netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, desc, sid, snode, stag, 2 + 2, dnode, dtag, 2 + 2))
+                    else:
+                        logging.debug("{:s}.__migrate_structures({!s}, {!s}) : Unable to copy key {!s} for structure {:#x} from netnode {:#x} tag {:#0{:d}x} to netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, dest_descr, desc, sid, snode, stag, 2 + 2, dnode, dtag, 2 + 2))
+                    continue
+                continue
+            continue
+        return results
+
+    @classmethod
+    def __erase_functions(cls, schema):
+        schema_descr = internal.utils.pycompat.fullname(schema)
+
+        if not hasattr(schema, 'localinterfaces'):
+            logging.info("{:s}.__erase_functions({!s}) : Aborting removal of schema \"{:s}\" due it not having any interfaces.".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(schema_descr, '"')))
+            return []
+
+        sname = "$ {:s}".format(schema.name)
+        if not(internal.netnode.has(sname)):
+            logging.info("{:s}.__erase_functions({!s}) : Aborting removal of netnode \"{:s}\" due it not being found.".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(sname, '"')))
+            return []
+
+        snode = internal.netnode.get(sname)
+        logging.info("{:s}.__erase_functions({!s}) : Removing functions for schema \"{:s}\".".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(schema_descr, '"')))
+
+        results = []
+        for ea in internal.interface.function.iterate():
+            snode = idaapi.ea2node(ea)
+            for tagname, nodeinterface in schema.localinterfaces.items():
+                stag = getattr(schema, tagname)
+                logging.info("{:s}.__erase_functions({!s}) : Removing function {:#x} from netnode {:#x} tag {:#0{:d}x} with {!s}.".format('.'.join([__name__, cls.__name__]), schema_descr, ea, snode, stag, 2 + 2, internal.utils.pycompat.fullname(nodeinterface)))
+
+                for key in nodeinterface.fiter(snode, tag=stag):
+                    ok = nodeinterface.remove(snode, key, tag=stag)
+                    results.append((ea, stag, key)) if ok else results
+
+                    desc = "{:#x}".format(key) if isinstance(key, internal.types.integer) else "{!r}".format(key)
+                    if ok:
+                        logging.debug("{:s}.__erase_functions({!s}) : Removed key {!s} for function {:#x} from netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, desc, ea, snode, stag, 2 + 2))
+                    else:
+                        logging.debug("{:s}.__erase_functions({!s}) : Unable to remove key {!s} for function {:#x} from netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, desc, ea, snode, stag, 2 + 2))
+                    continue
+                continue
+            continue
+        return results
+
+    @classmethod
+    def __erase_structures(cls, schema):
+        schema_descr = internal.utils.pycompat.fullname(schema)
+
+        if not hasattr(schema, 'localinterfaces'):
+            logging.info("{:s}.__erase_structures({!s}) : Aborting removal of schema \"{:s}\" due it not having any interfaces.".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(schema_descr, '"')))
+            return []
+
+        sname = "$ {:s}".format(schema.name)
+        if not(internal.netnode.has(sname)):
+            logging.info("{:s}.__erase_structures({!s}) : Aborting removal of netnode \"{:s}\" due it not being found.".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(sname, '"')))
+            return []
+
+        snode = internal.netnode.get(sname)
+        logging.info("{:s}.__erase_structures({!s}) : Removing functions for schema \"{:s}\".".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(schema_descr, '"')))
+
+        results = []
+        for sptr in internal.structure.iterate():
+            snode = sid = sptr.id
+            for tagname, nodeinterface in schema.localinterfaces.items():
+                stag = getattr(schema, tagname)
+                logging.info("{:s}.__erase_structures({!s}) : Removing structure {:#x} from netnode {:#x} tag {:#0{:d}x} with {!s}.".format('.'.join([__name__, cls.__name__]), schema_descr, sid, snode, stag, 2 + 2, internal.utils.pycompat.fullname(nodeinterface)))
+
+                for key in nodeinterface.fiter(snode, tag=stag):
+                    ok = nodeinterface.remove(snode, key, tag=stag)
+                    results.append((sid, stag, key)) if ok else results
+
+                    desc = "{:#x}".format(key) if isinstance(key, internal.types.integer) else "{!r}".format(key)
+                    if ok:
+                        logging.debug("{:s}.__erase_structures({!s}) : Removed key {!s} for structure {:#x} from netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, desc, sid, snode, stag, 2 + 2))
+                    else:
+                        logging.debug("{:s}.__erase_structures({!s}) : Unable to remove key {!s} for structure {:#x} from netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, desc, sid, snode, stag, 2 + 2))
+                    continue
+                continue
+            continue
+        return results
+
+    @classmethod
+    def __erase_schema(cls, schema):
+        schema_descr = internal.utils.pycompat.fullname(schema)
+
+        sname = "$ {:s}".format(schema.name)
+        if not(internal.netnode.has(sname)):
+            logging.info("{:s}.__erase_schema({!s}) : Aborting removal of netnode \"{:s}\" due it not being found.".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(sname, '"')))
+            return []
+
+        snode = internal.netnode.get(sname)
+        logging.info("{:s}.__erase_schema({!s}) : Removing functions for schema \"{:s}\".".format('.'.join([__name__, cls.__name__]), schema_descr, internal.utils.string.escape(schema_descr, '"')))
+
+        results = []
+        for tagname, nodeinterface in schema.interfaces.items():
+            stag = getattr(schema, tagname)
+
+            logging.info("{:s}.__erase_schema({!s}) : Removing from netnode {:#x} tag {:#0{:d}x} with {!s}.".format('.'.join([__name__, cls.__name__]), schema_descr, snode, stag, 2 + 2, internal.utils.pycompat.fullname(nodeinterface)))
+            for key in nodeinterface.fiter(snode, tag=stag):
+                ok = nodeinterface.remove(snode, key, tag=stag)
+                results.append((snode, stag, key)) if ok else results
+
+                desc = "{:#x}".format(key) if isinstance(key, internal.types.integer) else "{!r}".format(key)
+                if ok:
+                    logging.debug("{:s}.__erase_schema({!s}) : Removed key {!s} from netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, desc, snode, stag, 2 + 2))
+                else:
+                    logging.debug("{:s}.__erase_schema({!s}) : Unable to remove key {!s} from netnode {:#x} tag {:#0{:d}x}.".format('.'.join([__name__, cls.__name__]), schema_descr, desc, snode, stag, 2 + 2))
+                continue
+            continue
+        return results
+
+    @classmethod
+    def migrate(cls):
+        schemata = [
+            (cls.definitions.tags, internal.tagindex.tags),
+            (cls.definitions.globals, internal.tagindex.globals),
+            (cls.definitions.contents, internal.tagindex.contents),
+            (cls.definitions.members, internal.tagindex.members),
+            (cls.definitions.structure, internal.tagindex.structure),
+        ]
+
+        results = {}
+        for schema, destination in schemata:
+            results[schema.__name__] = cls.__migrate_schema(schema, destination)
+
+        schema, destination = cls.definitions.contents, internal.tagindex.contents
+        results['.'.join([schema.__name__, 'local'])] = cls.__migrate_functions(schema, destination)
+
+        schema, destination = cls.definitions.members, internal.tagindex.members
+        results['.'.join([schema.__name__, 'local'])] = cls.__migrate_structures(schema, destination)
+
+        return results
+
+    @classmethod
+    def erase(cls):
+        schemata = [
+            cls.definitions.tags, cls.definitions.globals,
+            cls.definitions.contents, cls.definitions.members,
+            cls.definitions.structure
+        ]
+
+        results = {}
+        for schema in schemata:
+            results[schema.__name__] = cls.__erase_schema(schema)
+
+        schema = cls.definitions.contents
+        results['.'.join([schema.__name__, 'local'])] = cls.__erase_functions(schema)
+
+        schema = cls.definitions.members
+        results['.'.join([schema.__name__, 'local'])] = cls.__erase_structures(schema)
+
+        return results
+
+    def __new__(cls):
+        migrated, removed = cls.migrate(), cls.erase()
+        return len(migrated), len(removed)
+
 __all__ = ['everything', 'globals', 'contents']
