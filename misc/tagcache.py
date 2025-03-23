@@ -73,6 +73,13 @@ class tagging(object):
         cls.__cache_id__ = node
         return node
 
+    @classmethod
+    def version(cls):
+        '''Return the version number of the tagging cache being used by the database.'''
+        if netnode.has(cls.__node__):
+            return 0
+        return -1
+
 class contents(tagging):
     """
     This namespace is used to update the tag state for any content tags
