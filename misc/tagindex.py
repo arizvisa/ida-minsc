@@ -250,12 +250,6 @@ class schema(object):
         return False
 
     @classmethod
-    def version(cls):
-        '''Return the version number for the netnode containing the current schema.'''
-        node = cls.node()
-        return netnode.sup.get(node, cls.NSUP_SCHEMA_VERSION, types.integer, tag=cls.statstag)
-
-    @classmethod
     def iterate(cls, *args, **kwargs):
         '''Iterate through each key and used tags for the current schema.'''
         return cls.forward(*args, **kwargs)
