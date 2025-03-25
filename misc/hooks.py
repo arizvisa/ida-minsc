@@ -9,7 +9,7 @@ to be used by the average user.
 
 import six
 import builtins, sys, logging, heapq, traceback, contextlib
-import functools, operator, itertools
+import functools, operator, itertools, collections, fnmatch, re
 logging = logging.getLogger(__name__)
 
 import database, function, ui
@@ -5040,6 +5040,527 @@ class localtypesmonitor_84(object):
 
                 logging.debug(u"{:s}.member_updater({:d}, {!s}, {!s}) : Added the specified tags ({!s}) to the member at index {:d} ({:#x}) of type {!s} ({:#x}).".format('.'.join([__name__, cls.__name__]), ltc, parameter, '...', ', '.join(map("{!r}".format, changed)), mindex, mid, parameter, sid))
             continue
+        return
+
+class decompilermonitor_types(object):
+    """
+    This class is intended to preserve the order of the change events
+    dispatched by the decompiler.
+    """
+
+    class func_comment_t(interface.namedtypedtuple):
+        _fields = 'ea', 'itp', 'comment'
+        _types = internal.types.integer, internal.types.integer, internal.types.string
+        _formats = "{:#x}".format, "{:d}".format, "{!r}".format
+
+    class lvar_locator_t(interface.namedtypedtuple):
+        _fields = 'defea', 'atype', 'alocinfo'
+        _types = internal.types.integer, internal.types.integer, internal.types.object
+        _formats = "{:#x}".format, "{:d}".format, "{!s}".format
+
+    class lvar_name_t(interface.namedtypedtuple):
+        _fields = 'name', 'is_user_name'
+        _types = internal.types.string, internal.types.bool
+        _formats = "{!r}".format, "{!s}".format
+
+class decompilermonitor_types(decompilermonitor_types):
+    class variable_t(interface.namedtypedtuple):
+        _fields = 'name', 'comment', 'type'
+        _types = decompilermonitor_types.lvar_name_t, internal.types.string, idaapi.tinfo_t
+        _formats = "{!r}".format, "{!r}".format, interface.tinfo.quoted
+
+    class cmt_changed(decompilermonitor_types.func_comment_t):
+        pass
+
+    class lvar_name_changed(interface.namedtypedtuple):
+        _fields = 'locator', 'name', 'is_user_name'
+        _types = decompilermonitor_types.lvar_locator_t, internal.types.string, internal.types.bool
+        _formats = "{!s}".format, "{!r}".format, "{!s}".format
+
+    class lvar_type_changed(interface.namedtypedtuple):
+        _fields = 'locator', 'type'
+        _types = decompilermonitor_types.lvar_locator_t, idaapi.tinfo_t
+        _formats = "{!s}".format, interface.tinfo.quoted
+
+    class lvar_cmt_changed(interface.namedtypedtuple):
+        _fields = 'locator', 'comment'
+        _types = decompilermonitor_types.lvar_locator_t, internal.types.string
+        _formats = "{!s}".format, "{!r}".format
+
+    class func_printed(interface.namedtypedtuple):
+        _fields = 'comments', 'variables'
+        _types = internal.types.list, internal.types.list
+        _formats = 2 * [lambda list: "..{:d} item{:s}..".format(len(list), '' if len(list) == 1 else 's')]
+
+class decompilermonitor_state(object):
+    """
+    This class maintains the state of all of the functions in the database that
+    have been decompiled. This is necessary in order to preserve the previous
+    information for a function so that when an event occurs, the old information
+    and the new information can be compared.
+    """
+
+    # define a dictionary that is used to map immutable types to their handler.
+    handlers = {}
+    define_handler = functools.partial(functools.partial, operator.setitem, handlers)
+
+    def __init__(self):
+        self.loaded = False
+
+        # This dictionary contains dictionaries for each function where a
+        # a function is identified by its entrypoint address. The function
+        # dictionary is keyed by the address and `idaapi.item_preciser_t` for
+        # each comment that resides within a decompiled function.
+        self.commentcache = {}
+        self.lvarcache = {}
+
+        # These queues are responsible for catching all of the events that are
+        # dispatched by the decompiler. The elements inside this queue are
+        # intended to be immutable and from the `decompilermonitor_types`.
+        self.updatequeues = collections.defaultdict(collections.deque)
+
+    def __iter__(self):
+        '''Iterate through all of functions that have had received some kind of event.'''
+        for ea in sorted(self.updatequeues):
+            yield ea
+        return
+
+    def __contains__(self, ea):
+        '''Return whether the queue for the decompiled function `ea` has already been initialized.'''
+        return ea in self.updatequeues
+
+    def available(self):
+        '''Return a list of the addresses for each function that have some information about them cached.'''
+        iterable = itertools.chain(self.commentcache, self.lvarcache)
+        return sorted({ea for ea in iterable})
+
+    def consume(self, func, count=-1):
+        '''Consume the number of events specified by `count` for the decompiled function specifed by `func`.'''
+        cls, ea = self.__class__, internal.hexrays.function.address(func)
+
+        requests, counter = [], count
+        while ea in self.updatequeues and len(self.updatequeues[ea]) and (count < 0 or counter > 0):
+            item = self.updatequeues[ea].popleft()
+
+            # check the type of the item that was popped from the queue. if its
+            # type is not handled by us while we were collecting them, then we
+            # reinsert the elements we consumed back to the front of the queue
+            # and then abort executing them.
+            item_t = item.__class__
+            if item_t not in self.handlers:
+                self.updatequeues[ea].appendleft((item for _, _, _, item in requests))
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.consume({:d}) : Not sure how to process an event of the type {!s}".format('.'.join([__name__, cls.__name__]), count, utils.pycompat.fullname(item_t)))
+
+            # grab the handler for the item, and collect it with all of its
+            # parameters so that we can dispatch them later.
+            handler = self.handlers[item.__class__]
+            requests.append((handler, self, ea, item))
+            counter -= 1
+
+        # we're supposed to get request ids from this api, but idapython will
+        # only return a true or false. so if it fails, we accept that our state
+        # will become desynchronized because we can't tell which were called.
+        if requests and not idaapi.execute_ui_requests([functools.partial(*request_args) for request_args in requests]):
+            logging.error(u"{:s}.consume({:#x}, {:d}) : Unable to execute {:d} request{:s} which may result in decompiler information becoming desynchronized.".format('.'.join([__name__, cls.__name__]), ea, count, len(requests), '' if len(requests) == 1 else 's'))
+        return
+
+    def get_user_comment(self, func, ea, itp):
+        '''Return the cached comment for the address `ea` and precisor `itp` from the decompiled function `func`.'''
+        f = internal.hexrays.function.address(func)
+        cache = self.commentcache.get(f, {})
+        return cache.get((ea, itp), '')
+
+    def get_variable_comment(self, func, variable):
+        '''Return the comment for the specified `variable` from the decompiled function `func`.'''
+        cfunc = internal.hexrays.function(func)
+        if isinstance(variable, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(cfunc, variable)
+        else:
+            locator = tuple(variable)
+
+        ea = internal.hexrays.function.address(cfunc)
+        key = internal.hexrays.variable.identity(locator)
+        cache = self.lvarcache.get(ea, {})
+        if key in cache:
+            _, res, _ = cache[key]
+            return res
+        return
+
+    def get_variable_name(self, func, variable):
+        '''Return the name for the specified `variable` from the decompiled function `func`.'''
+        cfunc = internal.hexrays.function(func)
+        if isinstance(variable, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(cfunc, variable)
+        else:
+            locator = tuple(variable)
+
+        ea = internal.hexrays.function.address(cfunc)
+        key = internal.hexrays.variable.identity(locator)
+        cache = self.lvarcache.get(ea, {})
+        if key in cache:
+            res, _, _ = cache[key]
+            return res.name, res.is_user_name
+        return
+
+    def get_variable_type(self, func, variable):
+        '''Return the comment for the specified `variable` from the decompiled function `func`.'''
+        cfunc = internal.hexrays.function(func)
+        if isinstance(variable, internal.hexrays.ida_hexrays_types.hexrays_funcvar_types):
+            locator = internal.hexrays.variables.by(cfunc, variable)
+        else:
+            locator = tuple(variable)
+
+        ea = internal.hexrays.function.address(cfunc)
+        key = internal.hexrays.variable.identity(locator)
+        cache = self.lvarcache.get(ea, {})
+        if key in cache:
+            _, _, res = cache[key]
+            return interface.tinfo.copy(res)
+        return
+
+    def comments(self, func):
+        '''Yield the cached comments for the decompiled function `func`.'''
+        f = internal.hexrays.function.address(func)
+        comments = self.commentcache.get(f, {})
+        for ea, itp in sorted(comments):
+            comment = comments.get(ea, itp, '')
+            if comment:
+                yield ea, itp, comment
+            continue
+        return
+
+    def variables(self, func):
+        '''Yield the cached variable information for the decompiled function `func`.'''
+        f = internal.hexrays.function.address(func)
+        variables = self.lvarcache.get(f, {})
+        for locator in sorted(variables):
+            name, comment, type = variables[locator]
+            yield locator, name, comment, type
+        return
+
+    def collect_user_comments(self, cfunc):
+        '''Return all of the comments attached to the decompiled function specified by `cfunc` as a list.'''
+        results = []
+        for ea, itp, comment in internal.hexrays.function.user_comments(cfunc.user_cmts):
+            item = decompilermonitor_types.func_comment_t(ea, itp, comment)
+            results.append(item)
+        return results
+
+    def collect_variables(self, cfunc):
+        '''Return all of the information for the variables in the decompiled function `cfunc` as a list.'''
+        results = []
+        for locator in internal.hexrays.variables.iterate(cfunc):
+            variable = self.get_variable(cfunc, locator)
+            results.append(variable)
+        return results
+
+    def get_variable(self, cfunc, locator):
+        '''Return the information for the variable described by `locator` from the decompiled function `cfunc`.'''
+        lvar = internal.hexrays.variables.get(cfunc, locator)
+        id = internal.hexrays.variable.identity(lvar)
+        name = internal.hexrays.variable.get_name(cfunc, locator)
+        lvarname = decompilermonitor_types.lvar_name_t(name, True if lvar.has_user_name else False)
+        comment = internal.hexrays.variable.get_comment(cfunc, locator)
+        type = internal.hexrays.variable.get_type(cfunc, locator)
+        return decompilermonitor_types.lvar_locator_t(*id), decompilermonitor_types.variable_t(lvarname, comment, type)
+
+    @classmethod
+    def get_locator(cls, lvar):
+        '''Return the variable locator for the variable specified by `lvar`.'''
+        atype, alocinfo = interface.tinfo.location_raw(lvar.location)
+        return decompilermonitor_types.lvar_locator_t(lvar.defea, atype, alocinfo)
+
+    def cmt_changed(self, cfunc, treeloc, cmt):
+        '''Receive the comment that was dispatched by the `Hexrays_Hooks.cmt_changed` event.'''
+        hexrays, locator = internal.hexrays, treeloc
+
+        # if the queue hasn't been created yet, then we need to grab all the
+        # information from the function so that we can initialize it.
+        ea = hexrays.function.address(cfunc)
+        if ea not in self.updatequeues:
+            self.func_printed(cfunc)
+
+        # create the function comment event and append it to the matching queue.
+        item = decompilermonitor_types.func_comment_t(locator.ea, locator.itp, utils.string.of(cmt))
+        self.updatequeues[ea].append(decompilermonitor_types.cmt_changed(*item))
+
+    @define_handler(decompilermonitor_types.cmt_changed)
+    def __process_cmt_changed(self, ea, event):
+        '''Handler for the `Hexrays_Hooks.cmt_changed` event.'''
+        cache = self.commentcache[ea]
+        commentea, itp, newcomment = event
+        oldcomment = cache.pop((commentea, itp), '')
+        cache[commentea, itp] = newcomment
+
+        cls = self.__class__
+        logging.debug(u"{:s}.__process_cmt_changed({:#x}, {!s}) : Comment at {:#x} was updated from \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, event, commentea, oldcomment, newcomment))
+
+    def lvar_name_changed(self, vdui, lvar, name, is_user_name):
+        '''Receive a variable rename that was dispatched by the `Hexrays_Hooks.lvar_name_changed` event.'''
+        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
+
+        # if we haven't allocated the queue for this function yet, then we need
+        # to grab all of its attributes so that we can initialize everything.
+        ea, locator = hexrays.function.address(cfunc), self.get_locator(lvar)
+        if ea not in self.updatequeues:
+            self.func_printed(cfunc)
+
+        # now we can attach the `lvar_name_changed` event to the function queue.
+        item = decompilermonitor_types.lvar_name_changed(locator, utils.string.of(name), True if is_user_name else False)
+        self.updatequeues[ea].append(item)
+
+    @define_handler(decompilermonitor_types.lvar_name_changed)
+    def __process_lvar_name_changed(self, ea, event):
+        '''Handler for the `Hexrays_Hooks.lvar_name_changed` event.'''
+        cls = self.__class__
+        cache = self.lvarcache[ea]
+        locator, name, is_user_name = event
+
+        old = cache.pop(locator, None)
+        if old:
+            oldname, oldcomment, oldtype = old
+            newname = decompilermonitor_types.lvar_name_t(name, is_user_name)
+            cache[locator] = decompilermonitor_types.variable_t(newname, oldcomment, oldtype)
+            logging.debug(u"{:s}.__process_lvar_name_changed({:#x}, {!s}) : Name for variable at {:#x} was updated from \"{:s}\"{:s} to \"{:s}\"{:s}.".format('.'.join([__name__, cls.__name__]), ea, event, locator.defea, utils.string.escape(oldname.name, '"'), ' (user)' if oldname.is_user_name else '', utils.string.escape(newname.name, '"'), ' (user)' if newname.is_user_name else ''))
+        else:
+            cache[locator] = decompilermonitor_types.variable_t(newname, '', idaapi.tinfo_t(idaapi.BT_VOID))
+            logging.debug(u"{:s}.__process_lvar_name_changed({:#x}, {!s}) : Name for variable at {:#x} was updated from {!s} to \"{:s}\"{:s}.".format('.'.join([__name__, cls.__name__]), ea, event, locator.defea, None, utils.string.escape(newname.name, '"'), ' (user)' if newname.is_user_name else ''))
+        return
+
+    def lvar_type_changed(self, vdui, lvar, tinfo):
+        '''Receive a variable type change that was dispatched by the `Hexrays_Hooks.lvar_type_changed` event.'''
+        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
+
+        # check if we've allocated the queue for this function yet. if we
+        # haven't, then we need to before we add the `lvar_type_changed` event.
+        ea, locator = hexrays.function.address(cfunc), self.get_locator(lvar)
+        if ea not in self.updatequeues:
+            self.func_printed(cfunc)
+
+        # we should be good to add this event to the function's queue.
+        item = decompilermonitor_types.lvar_type_changed(locator, interface.tinfo.copy(tinfo))
+        self.updatequeues[ea].append(item)
+
+    @define_handler(decompilermonitor_types.lvar_type_changed)
+    def __process_lvar_type_changed(self, ea, event):
+        '''Handler for the `Hexrays_Hooks.lvar_type_changed` event.'''
+        cls = self.__class__
+        cache = self.lvarcache[ea]
+        locator, newtype = event
+
+        old = cache.pop(locator, None)
+        if old:
+            oldname, oldcomment, oldtype = old
+            cache[locator] = decompilermonitor_types.variable_t(oldname, oldcomment, interface.tinfo.copy(newtype))
+            logging.debug(u"{:s}.__process_lvar_type_changed({:#x}, {!s}) : Type for variable at {:#x} was updated from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ea, event, locator.defea, interface.tinfo.quoted(oldtype), interface.tinfo.quoted(newtype)))
+
+        else:
+            logging.error(u"{:s}.__process_lvar_type_changed({:#x}, {!s}) : Type for variable at {:#x} was updated from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), ea, event, locator.defea, None, interface.tinfo.quoted(newtype)))
+            noname = decompilermonitor_types.lvar_name_t('', False)
+            cache[locator] = decompilermonitor_types.variable_t(noname, '', interface.tinfo.copy(newtype))
+        return
+
+    def lvar_cmt_changed(self, vdui, lvar, cmt):
+        '''Receive a variable comment change that was dispatched by the `Hexrays_Hooks.lvar_cmt_changed` event.'''
+        hexrays, cfunc, mba = internal.hexrays, vdui.cfunc, vdui.mba
+
+        # verify that we've already allocated the queue for this function. since
+        # if we haven't, then we don't know what the comment was changed from.
+        ea, locator = hexrays.function.address(cfunc), self.get_locator(lvar)
+        if ea not in self.updatequeues:
+            self.func_printed(cfunc)
+
+        # now we can append the `lvar_cmt_changed` event to the queue.
+        item = decompilermonitor_types.lvar_cmt_changed(locator, utils.string.of(cmt))
+        self.updatequeues[ea].append(item)
+
+    @define_handler(decompilermonitor_types.lvar_cmt_changed)
+    def __process_lvar_cmt_changed(self, ea, event):
+        '''Handler for the `Hexrays_Hooks.lvar_cmt_changed` event.'''
+        cls = self.__class__
+        cache = self.lvarcache[ea]
+        locator, newcomment = event
+
+        old = cache.pop(locator, None)
+        if old:
+            oldname, oldcomment, oldtype = old
+            cache[locator] = decompilermonitor_types.variable_t(oldname, newcomment, oldtype)
+            logging.debug(u"{:s}.__process_lvar_cmt_changed({:#x}, {!s}) : Comment for variable at {:#x} was updated from \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, event, locator.defea, utils.string.escape(oldcomment, '"'), utils.string.escape(newcomment, '"')))
+
+        else:
+            logging.error(u"{:s}.__process_lvar_cmt_changed({:#x}, {!s}) : Comment for variable at {:#x} was updated from {!s} to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, event, locator.defea, None, utils.string.escape(newcomment, '"')))
+            noname = decompilermonitor_types.lvar_name_t('', False)
+            cache[locator] = decompilermonitor_types.variable_t(noname, newcomment, idaapi.tinfo_t(idaapi.BT_VOID))
+        return
+
+    def func_printed(self, cfunc):
+        '''Gather all information from the function `cfunc` that has been dispatched by the `Hexrays_Hooks.func_printed` event.'''
+        hexrays, cfunc, mba = internal.hexrays, cfunc, cfunc.mba
+
+        # get the address of the printed function. if the queue has already been
+        # allocated, then we can ignore this event since we've already collected
+        # all the initial information that was needed for tracking changes.
+        ea = hexrays.function.address(cfunc)
+        if ea in self.updatequeues:
+            return
+
+        # grab all information from the printed function.
+        comments = self.collect_user_comments(cfunc)
+        variables = self.collect_variables(cfunc)
+
+        # add the event to the queue for the function.
+        item = decompilermonitor_types.func_printed(comments, variables)
+        self.updatequeues[ea].append(item)
+
+    @define_handler(decompilermonitor_types.func_printed)
+    def __process_func_printed(self, ea, event):
+        '''Handler for the `Hexrays_Hooks.func_printed` event.'''
+        comments, variables = event
+        commentcache = self.commentcache.setdefault(ea, {})
+        lvarcache = self.lvarcache.setdefault(ea, {})
+
+        # start by caching all the comments in the event.
+        for commentea, itp, comment in comments:
+            commentcache[commentea, itp] = comment
+
+        # now we can cache all of the variables from the event.
+        for locator, (name, comment, type) in variables:
+            copied = interface.tinfo.copy(type)
+            lvarcache[locator] = decompilermonitor_types.variable_t(name, comment, copied)
+
+        cls = self.__class__
+        logging.debug(u"{:s}.__process_func_printed({:#x}, {!s}) : Decompiled function was initialized with {:d} comment{:s} and {:d} variable{:s}.".format('.'.join([__name__, cls.__name__]), ea, event, len(comments), '' if len(comments) == 1 else 's', len(variables), '' if len(variables) == 1 else 's'))
+
+    def __repr_function(self, ea, indent=4):
+        cfunc = internal.hexrays.function(ea)
+        lines, variables, cache = [], [], self.lvarcache.get(ea, {})
+        for key in sorted(cache):
+            key_descr = "{:#x}.{:d}.{!s}".format(*key)
+            variables.append("{!s}: {!s}".format(key_descr, cache[key]))
+        variables and lines.append("{:#x}: variables ({:d})".format(ea, len(cache)))
+        lines.extend("{:>{:d}s}{:s}".format('', indent, line) for line in variables)
+
+        comments, cache = [], self.commentcache.get(ea, {})
+        for key in sorted(cache):
+            key_descr = "{:#x}.{:d}".format(*key)
+            comments.append("{!s}: {!s}".format(key_descr, utils.string.escape(cache[key], '"')))
+        comments and lines.append("{:#x}: comments ({:d})".format(ea, len(cache)))
+        lines.extend("{:>{:d}s}{:s}".format('', indent, line) for line in comments)
+
+        updates = []
+        for index, item in enumerate(self.updatequeues[ea]):
+            updates.append("update[{:d}]: {!s}".format(index, item))
+        updates and lines.append("<{:#x}> updates ({:d})".format(ea, len(updates)))
+        lines.extend("{:>{:d}s}{:s}".format('', indent, line) for line in updates)
+
+        return '\n'.join(lines)
+
+    def __repr__(self, indent=4):
+        lines = ["{!s} {:d} decompiled function{:s}".format(self.__class__, len(self.updatequeues), '' if len(self.updatequeues) == 1 else 's')]
+        for ea in sorted(self.updatequeues):
+            cfunc = internal.hexrays.function(ea)
+            name = interface.name.get(ea)
+            if interface.name.mangled(ea, name) == idaapi.FF_UNK:
+                description = utils.string.of(idaapi.print_tinfo('', 0, 0, 0, cfunc.type, utils.string.to(name), ''))
+            else:
+                description = interface.function.name(ea)
+            rows = ["{:#x}: {!s}".format(ea, description)]
+            iterable = self.__repr_function(ea).split('\n')
+            rows.extend(("{:>{:d}s}{:s}".format('', indent, row) for row in iterable))
+            lines.extend(rows)
+        return '\n'.join(lines)
+
+    def __iterate_functions(self, *pattern):
+        '''Yield each decompiled function being tracked that matches the specified `pattern`.'''
+        if not pattern:
+            Fmatch_description = Faddress = utils.fconstant(True)
+
+        # If we were given a string, then we'll match the function description.
+        elif isinstance(pattern[0], internal.types.string):
+            Fmatch_description = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match
+            Faddress = utils.fconstant(True)
+
+        # Otherwise, treat it as a list of addresses to include.
+        else:
+            [address] = pattern
+            candidates = {ea for ea in address} if isinstance(address, internal.types.unordered) else {address}
+            Fmatch_description = utils.fconstant(True)
+            Faddress = functools.partial(operator.contains, candidates)
+
+        # Iterate through all of the queues that we have available.
+        for ea in sorted(self.updatequeues):
+            if not Faddress(ea):
+                continue
+
+            # Get the function and format its name into a description.
+            cfunc = internal.hexrays.function(ea)
+            name = interface.name.get(ea)
+            if interface.name.mangled(ea, name) == idaapi.FF_UNK:
+                description = utils.string.of(idaapi.print_tinfo('', 0, 0, 0, cfunc.type, utils.string.to(name), ''))
+            else:
+                description = interface.function.name(ea)
+
+            # Now we can check if the pattern matches the description and yield
+            # the address and decompiled function when it does.
+            if Fmatch_description(description):
+                yield ea, cfunc, description
+            continue
+        return
+
+    def list(self, *pattern):
+        '''List the decompiled functions matching the specified `pattern`.'''
+        iterable = self.__iterate_functions(*pattern)
+
+        # Iterate through all of the matching functions.
+        count = 0
+        for ea, cfunc, description in iterable:
+            count and six.print_()
+            six.print_(u"{:#x}: {!s}".format(ea, description))
+            listing = self.__repr_function(ea).split('\n')
+            six.print_('\n'.join("{:>{:d}s}{:s}".format('', 4, line) for line in listing))
+            count += 1
+        return
+
+    # FIXME: why aren't we using the hexrays.variables matchers here?
+    def list_variables(self, func, *pattern):
+        '''List the variables matching the specified `pattern` from the decompiled function `func`.'''
+        Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else utils.fconstant(True)
+
+        # Go through the matching functions and display each tracked variable.
+        count, indent = 0, 4
+        for ea, cfunc, description in self.__iterate_functions(func):
+            count and six.print_()
+            six.print_(u"{:#x}: {!s}".format(ea, description))
+
+            # Now we just need to grab the cached variables and print them.
+            cache = self.lvarcache.get(ea, {})
+            for key in sorted(cache):
+                key_descr = "{:#x}.{:d}.{!s}".format(*key)
+                variable = cache[key]
+                defea, atype, alocinfo = key
+                locator = internal.hexrays.variable.new_locator(defea, internal.hexrays.variable.copy_vdloc(atype, alocinfo))
+                lvar = internal.hexrays.variables.by(cfunc, locator)
+                name = internal.hexrays.variable.get_name(cfunc, lvar)
+                if Fmatch(name):
+                    six.print_(u"{:>{:d}s}{!s}: {!s}".format('', indent, key_descr, cache[key]))
+                    count += 1
+                continue
+            count += 1
+        return
+
+    def list_comments(self, *pattern):
+        '''List the comments from the cache for the decompiled function `func`.'''
+        count, indent = 0, 4
+        for ea, cfunc, description in self.__iterate_functions(*pattern):
+            count and six.print_()
+            six.print_(u"{:#x}: {!s}".format(ea, description))
+
+            # Now grab the comments we've cached and print them.
+            cache = self.commentcache.get(ea, {})
+            for key in sorted(cache):
+                key_descr = "{:#x}.{:d}".format(*key)
+                six.print_(u"{:>{:d}s}{!s}: {!s}".format('', indent, key_descr, utils.string.escape(cache[key], '"')))
+            count += 1
         return
 
 class supermethods(object):
