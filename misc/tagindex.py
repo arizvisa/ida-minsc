@@ -394,6 +394,19 @@ class suptools(bigintegertools):
     # here is the interface that we will use.
     interface = netnode.sup
 
+class hashtools(bigintegertools):
+    """
+    This namespace is a derivative of the `bigintegertools` implementation
+    that uses the `netnode.hashintegers` namespace to store its values. The
+    disassembler normally provides "hashvals" to associate an arbitrary type
+    with a string-based key. However, we want to map a big integer to another
+    big integer. So, by using `netnode.hasintegers` we can encode a big integer
+    into a string that can be used with the original "hashvals" api.
+    """
+
+    # now we can use bigints as a key.
+    interface = netnode.hashintegers
+
 class tags(schema):
     """
     This namespace is responsible for managing all of the tag names throughout
