@@ -47,7 +47,7 @@ NSUP_START = idaapi.NSUP_ORIGFMD + 0x1000
 ### Define the hooks that can be used by an outsider to initialize the tagindex.
 def init_tagindex(*idp_modname):
     '''This function is a hook that is responsible for deploying our schemas.'''
-    schemas = [tags, globals, contents, members, structure]
+    schemas = [tags, globals, contents, members, structure, hexfunction]
     for item in schemas:
         if item.exists():
             logging.info(u"{:s}.init_tagindex({!s}) : Using the already existing netnode for \"{!s}\".".format(__name__, "{!r}".format(*idp_modname) if idp_modname else '', utils.string.escape(utils.pycompat.fullname(item), '"')))
@@ -2347,4 +2347,399 @@ class structure(schema):
             filtered = [utils.string.of(comment) for comment in filter(None, iterable)]
             exploded = ','.join(map("{:d}".format, tags.explode(integer)))
             lines.append("[{:#x}] {:<{:d}s} : {:<{:d}s} : {:<{:d}s}{:s}".format(sid, fullname, maxname, exploded, maxpositions, "{!s}".format(names), maxtags, " // {!s}".format(filtered) if filtered else ''))
+        return '\n'.join(lines)
+
+class hexfunction(counted):
+    """
+    This namespace is used to track the tag state for any tags applied to an
+    address in a decompiled function. The implementation of this namespace is
+    very similar to `contents` with the difference being that we use a tuple
+    containing the address and an ``item_preciser_t`` rather than just the
+    address. We accomplish this by encoding the tuple as a bigint and storing it
+    in the netnode using a "hashval" type. The `netnode.hashintegers` namespace
+    is used to facilitate the usage of a bigint as a key.
+    """
+    name = 'minsc.decompiler'   # FIXME
+
+    basetag = schema.basetag + 0o60
+
+    ## the tags in this schema start at index 0x30.
+    statstag = basetag + 0
+    NSUP_SCHEMA_VERSION = schema.NSUP_SCHEMA_VERSION
+
+    precisertag = basetag + 1
+    usagetag = basetag + 2
+
+    # tags attached directly to a function
+    counttag = ord(b'd')
+
+    schema = {
+        (netnode.sup, statstag): {
+            NSUP_SCHEMA_VERSION: 1,
+        },
+        (netnode.hashintegers, precisertag): {},
+        (netnode.sup, usagetag): {},
+
+        # scoped to the decompiled function
+        (netnode.sup, counttag): {},
+    }
+
+    __preciser_size = 32
+    @classmethod
+    def encode_preciser(cls, preciser):
+        '''Encode the tuple specified by `preciser` as an integer.'''
+        shift, shiftmask = pow(2, cls.__preciser_size), pow(2, cls.__preciser_size) - 1
+        ea, itp = preciser
+
+        # an `item_preciser_t` is 32-bits in size... we could compress it since
+        # only the top 2-bits and lower 8-bits are in use, but we encode the
+        # full 32-bits hopefully future-proofing this schema.
+        res, clamped = idaapi.ea2node(ea) * shift, itp & shiftmask
+        return res | clamped
+
+    @classmethod
+    def encode_preciser_start(cls, preciser):
+        '''Encode the tuple or starting address specified by `preciser` as an integer.'''
+        shiftmask = pow(2, cls.__preciser_size) - 1
+
+        # if we were given an address, then use the lowest `item_preciser_t` so
+        # that all the following precisers for the address are also selected.
+        ea, itp = (preciser, 0) if isinstance(preciser, internal.types.integer) else preciser
+        return cls.encode_preciser((ea, itp & shiftmask))
+
+    @classmethod
+    def encode_preciser_stop(cls, preciser):
+        '''Encode the tuple or stopping address specified by `preciser` as an integer.'''
+        shiftmask = pow(2, cls.__preciser_size) - 1
+
+        # if we were given an address, then use the highest `item_preciser_t` so
+        # that all the previous precisers for the address are also selected.
+        ea, itp = (preciser, -1) if isinstance(preciser, internal.types.integer) else preciser
+        return cls.encode_preciser((ea, itp & shiftmask))
+
+    @classmethod
+    def decode_preciser(cls, integer):
+        '''Decode the specified `integer` into a tuple containing the address and preciser.'''
+        shift = pow(2, cls.__preciser_size)
+        ea, itp = divmod(integer, shift)
+        return idaapi.node2ea(ea), itp
+
+    # methods that the parent namespace requires us to implement.
+    @classmethod
+    def hascount(cls, node, key, position, *tag, **kwargs):
+        '''Return whether the reference count at the specified `key` exists for the tag at `position` of the netnode specified by `node`.'''
+        ea, itp = cls.decode_preciser(key)
+        countnode = interface.range.start(interface.function.by(ea))
+        return super(hexfunction, cls).hascount(countnode, key, position, cls.counttag)
+
+    @classmethod
+    def getcount(cls, node, key, position, *tag, **kwargs):
+        '''Return the reference count at the specified `key` for the tag at `position` of the netnode specified by `node`.'''
+        ea, itp = cls.decode_preciser(key)
+        countnode = interface.range.start(interface.function.by(ea))
+        return super(hexfunction, cls).getcount(countnode, key, position, cls.counttag)
+
+    @classmethod
+    def setcount(cls, node, key, position, count, *tag, **kwargs):
+        '''Set the reference count at the specified `key` for the tag at `position` of the netnode specified by `node` to `count`.'''
+        ea, itp = cls.decode_preciser(key)
+        countnode = interface.range.start(interface.function.by(ea))
+        return super(hexfunction, cls).setcount(countnode, key, position, count, cls.counttag)
+
+    @classmethod
+    def getusage(cls, node, key, *tag, **kwargs):
+        '''Set the usage mask for the function `func` to the integer in `used`.'''
+        usagenode = cls.node()
+        return super(hexfunction, cls).getusage(usagenode, key, cls.usagetag)
+
+    @classmethod
+    def setusage(cls, node, key, used, *tag, **kwargs):
+        '''Set the usage mask for the function `func` to the integer in `used`.'''
+        usagenode = cls.node()
+        return super(hexfunction, cls).setusage(usagenode, key, used, cls.usagetag)
+
+    # back to our regularly scheduled program..
+    @classmethod
+    def get(cls, preciser):
+        '''Return all of the tags that are currently associated with the specified `preciser`.'''
+        node, integer = cls.node(), cls.encode_preciser(preciser)
+        res = hashtools.bigint(node, integer, tag=cls.precisertag)
+        return tags.names(res)
+
+    @classmethod
+    def usage(cls, func):
+        '''Return the usage mask containing tags used in the contents for the function `func`.'''
+        node, key = cls.node(), idaapi.ea2node(func)
+        return cls.getusage(node, key, cls.usagetag)
+
+    @classmethod
+    def adjust(cls, func, key, name, adjustment):
+        '''Adjust the reference count and usage for the tag `name` at `key` for the decompiled function `func`.'''
+        usagenode, countnode = cls.node(), idaapi.ea2node(func)
+        fnkey, func_descr, key_descr = idaapi.ea2node(func), "{:#x}".format(func), "({:#x}, {:d})".format(*cls.decode_preciser(key))
+        with tags.transactional_adjust(name) as (position, tagcount):
+            bit, clear = pow(2, position), ~pow(2, position)
+
+            # start by getting the reference count for the specified tag in the
+            # given function. afterwards, we grab the usage mask to so that we
+            # can compare them to determine if the mask needs to be updated.
+            ok = cls.hascount(countnode, key, position, tag=cls.counttag)
+            count = cls.getcount(countnode, key, position, tag=cls.counttag) if ok else 0
+            usage = cls.getusage(usagenode, fnkey, cls.usagetag)
+
+            # next we check the reference count to ensure an increment doesn't
+            # overflow the counter.
+            if adjustment > 0 and not(count + adjustment < MAXIMUM_SPEC_INTEGER):
+                bits = count.bit_count() if hasattr(count, 'bit_count') else "{:b}".format(count).count('1')
+                raise OverflowError(u"{:s}.adjust({:s}, {!s}, {!s}, {:+d}) : Unable to increment ({:+d}) the reference count ({:d}) for the specified tag ({!s}) due to the current count already being at its maximum number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, adjustment, count, "{!r}".format(name), bits))
+
+            # we also check for underflow because that's what the implementation
+            # from the `contents.adjust_owners` function does.
+            elif adjustment < 0 and not(count + adjustment >= 0):
+                bits = count.bit_count() if hasattr(count, 'bit_count') else "{:b}".format(count).count('1')
+                raise OverflowError(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Unable to decrement ({:+d}) the reference count ({:d}) for the specified tag ({!s}) due to the current count already being at its minimum number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, adjustment, count, "{!r}".format(name), bits))
+
+            # now that all of that was successful, we need to update the count
+            # and the mask too. if the original count is larger than 0 or the
+            # adjustment is 0, then we don't need to change anything.
+            newcount = count + adjustment
+
+            if count > 1:
+                newusage = usage
+            elif adjustment > 0:
+                newusage = usage | bit
+            elif adjustment < 0:
+                newusage = usage & clear
+            else:
+                newusage = usage
+
+            # now we can use our tagcount coroutine to adjust the count for the
+            # tag name and update the function usage if it needed to be changed.
+            try:
+                ok_count = cls.setcount(countnode, key, position, newcount, tag=cls.counttag)
+                ok_mask = newusage == usage or cls.setusage(usagenode, fnkey, newusage, tag=cls.usagetag)
+
+                # if both succeeded, then we can safely adjust the count.
+                if ok_count and ok_mask:
+                    position, count = tagcount.send(adjustment)
+
+                # if either failed, then we need to raise an exception to abort.
+                else:
+                    raise exceptions.DisassemblerError(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Unable to update the preciser {!s} for the given tag ({!s}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, "{!r}".format(name)))
+
+            # if an exception was raised, then we need to restore everything
+            # that we've modified before sending the exception upwards to abort.
+            except Exception as E:
+                bits = usage.bit_count() if hasattr(usage, 'bit_count') else "{:b}".format(usage).count('1')
+                logging.info(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Rolling back the usage mask and reference count for the preciser {!s} to its previous number of bits ({:d}) and value ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, bits, count))
+                if not cls.setcount(countnode, key, position, count, tag=cls.counttag):
+                    logging.error(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Unable to roll back the reference count for the preciser {!s} in netnode {:#x} to its previous value ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, countnode, count))
+                elif not cls.setusage(usagenode, fnkey, usage, cls.usagetag):
+                    logging.error(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Unable to roll back the usage mask for the preciser {!s} in netnode {:#x} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, usagenode, bits))
+                tagcount.throw(E)
+
+            # now we check our work..
+            written = cls.getusage(usagenode, fnkey, tag=cls.usagetag)
+            adjusted = cls.getcount(countnode, key, position, tag=cls.counttag)
+
+            # first we make sure the usage mask is what was written.
+            if newusage != written:
+                raise AssertionError(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Error updating the usage masks for the preciser {!s} in the specified netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, usagenode))
+
+            # then we check if the new reference count was updated.
+            elif newcount != adjusted:
+                raise AssertionError(u"{:s}.adjust({!s}, {!s}, {!s}, {:+d}) : Error updating the reference count for the preciser {!s} in the specified netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), func_descr, key_descr, "{!r}".format(name), adjustment, key_descr, countnode))
+
+            return position, newcount
+        return position, newcount
+
+    @classmethod
+    def increment(cls, preciser, name):
+        '''Increment the reference count for the tag with the specified `name` for the location in a decompiled function specified by `preciser`.'''
+        node, key = cls.node(), cls.encode_preciser_start(preciser)
+        key_descr = "({:#x}, {:d})".format(*cls.decode_preciser(key))
+
+        # first we need to know what the caller is talking aobut.
+        position, count = tags.get(name) if tags.has(name) else tags.add(name)
+        bit, clear = pow(2, position), ~pow(2, position)
+
+        # then figure out the function, and grab its entrypoint.
+        ea, _ = cls.decode_preciser(key)
+        fn = internal.hexrays.function.address(ea)
+
+        # now we can check to see if the bit has already been set.
+        res = hashtools.bigint(node, key, tag=cls.precisertag)
+        if res & bit:
+            return position, cls.getcount(idaapi.ea2node(node), key, position, tag=cls.counttag)
+
+        # otherwise, we can go ahead and set it.
+        elif not hashtools.setbigint(node, key, res | bit, tag=cls.precisertag):
+            raise exceptions.DisassemblerError(u"{:s}.increment({!s}, {!s}) : Unable to increment the reference count of the specified tag ({!s}) for preciser {:#x} in the current netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), key_descr, "{!r}".format(name), "{!r}".format(name), key_descr, node))
+
+        # now we can adjust the usage and reference count for the given tag.
+        try:
+            result = cls.adjust(fn, key, name, +1)
+
+        # if an exception was raised, then we need to undo the setting that we
+        # just did before trying to adjust the reference count.
+        except:
+            bits = res.bit_count() if hasattr(res, 'bit_count') else "{:b}".format(res).count('1')
+            logging.info(u"{:s}.increment({!s}, {!s}) : Rolling back the usage mask for the preciser {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), key_descr, "{!r}".format(name), key_descr, bits))
+            if not hashtools.setbigint(node, key, res, tag=cls.precisertag):
+                logging.error(u"{:s}.increment({!s}, {!s}) : Unable to roll back the usage mask for the preciser {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), key_descr, "{!r}".format(name), key_descr, bits))
+            raise
+        return result
+
+    @classmethod
+    def decrement(cls, preciser, name):
+        '''Decrement the reference count for the tag with the specified `name` for the location in a decompiled function specified by `preciser`.'''
+        node, key = cls.node(), cls.encode_preciser_start(preciser)
+        key_descr = "({:#x}, {:d})".format(*cls.decode_preciser(key))
+
+        # verify the tag exists since we can't decrement if it doesn't.
+        if not(tags.has(name)):
+            raise exceptions.MissingTagError(u"{:s}.decrement({!s}, {!s}) : Unable to decrement the reference count of the specified tag ({!s}) due to the tag not being available.".format('.'.join([__name__, cls.__name__]), key_descr, "{!r}".format(name), "{!r}".format(name)))
+
+        # figure out the bit position that we're supposed to decrement.
+        position, count = tags.get(name) if tags.has(name) else tags.add(name)
+        bit, clear = pow(2, position), ~pow(2, position)
+
+        # before adjusting anything, we need to figure out which decompiled
+        # function needs to be decremented. we extract this from the preciser.
+        ea, _ = cls.decode_preciser(key)
+        fn = internal.hexrays.function.address(ea)
+
+        # next we can check if the position exists at the specified key.
+        res = hashtools.bigint(node, key, tag=cls.precisertag)
+        if not(res & bit):
+            return position, cls.getcount(idaapi.ea2node(fn), key, position, tag=cls.counttag)
+
+        # otherwise, we need to clear the bit position from the address.
+        elif not hashtools.setbigint(node, key, res & clear, tag=cls.precisertag):
+            raise exceptions.DisassemblerError(u"{:s}.decrement({!s}, {!s}) : Unable to decrement the reference count of the specified tag ({!s}) for the preciser {!s} in the current netnode ({:#x}).".format('.'.join([__name__, cls.__name__]), key_descr, "{!r}".format(name), "{!r}".format(name), key_descr, node))
+
+        # now we can decrement the count at the preciser we were given.
+        try:
+            result = cls.adjust(fn, key, name, -1)
+
+        # if that raised an exception, then we need to undo the setting we made.
+        except:
+            bits = res.bit_count() if hasattr(res, 'bit_count') else "{:b}".format(res).count('1')
+            logging.info(u"{:s}.decrement({!s}, {!s}) : Rolling back the usage mask for the preciser {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), key_descr, "{!r}".format(name), key_descr, bits))
+            if not hashtools.setbigint(node, key, res, tag=cls.precisertag):
+                logging.error(u"{:s}.decrement({!s}, {!s}) : Unable to roll back the usage mask for the preciser {!s} to its previous number of bits ({:d}).".format('.'.join([__name__, cls.__name__]), key_descr, "{!r}".format(name), key_descr, bits))
+            raise
+        return result
+
+    @classmethod
+    def forward(cls, *preciser):
+        '''Yield a preciser tuple and mask for each tag starting from the specified address or `preciser` (if given).'''
+        node = cls.node()
+        for key, integer in hashtools.forward(node, *map(cls.encode_preciser_start, preciser), tag=cls.precisertag):
+            yield cls.decode_preciser(key), integer
+        return
+
+    @classmethod
+    def backward(cls, *preciser):
+        '''Yield a preciser tuple and mask for each tag in reverse from the specified address or `preciser` (if given).'''
+        node = cls.node()
+        for key, integer in hashtools.backward(node, *map(cls.encode_preciser_stop, preciser), tag=cls.precisertag):
+            yield cls.decode_preciser(key), integer
+        return
+
+    @classmethod
+    def range(cls, start, stop):
+        '''Return a list of each preciser tuple and mask from the address or preciser `start` to `stop`.'''
+        encoded_start, encoded_stop = cls.encode_preciser_start(start), cls.encode_preciser_stop(stop)
+        items = hashtools.range(cls.node(), encoded_start, encoded_stop, tag=cls.precisertag)
+        return [(cls.decode_preciser(key), integer) for key, integer in items]
+
+    @classmethod
+    def function(cls, func):
+        '''Yield every preciser and mask belonging to the decompiled function `func`.'''
+        fn = interface.function.by(func)
+        chunks = interface.function.chunks(fn)
+        ranges = map(interface.range.unpack, chunks)
+
+        # next we'll need to iterate through each range and yield each item.
+        iterables = (cls.range(*bounds) for bounds in ranges)
+        for preciser, integer in itertools.chain(*iterables):
+            yield preciser, integer
+        return
+
+    @classmethod
+    def erase(cls, func):
+        '''Remove the precisers, masks, and reference counts for the decompiled function `func`.'''
+        node, parameter = cls.node(), "{:#x}".format(func) if isinstance(func, types.integer) else "{:s}".format(func)
+        fn = func if isinstance(func, types.integer) and netnode.sup.has(node, idaapi.ea2node(func), cls.usagetag) else interface.function.by(func)
+        address = fn if isinstance(fn, types.integer) else interface.range.start(fn)
+
+        key = idaapi.ea2node(address)
+        if not netnode.sup.remove(node, key, cls.usagetag):
+            logging.error(u"{:s}.erase({!s}) : Unable to remove the usage mask for the decompiled function at {:#x} from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, address, node))
+
+        for position in netnode.sup.fiter(key, cls.counttag):
+            if netnode.sup.remove(key, position, tag=cls.counttag):
+                continue
+            logging.error(u"{:s}.erase({!s}) : Unable to remove the reference count for the specified tag ({:d}) from netnode {:#x}.".format('.'.join([__name__, cls.__name__]), parameter, position, key))
+
+        # now we need to remove the address masks from this entire function.
+        chunks = interface.function.chunks(fn)
+        ranges = map(interface.range.unpack, chunks)
+        usage = cls.usage(key)
+
+        # snag all the precisers and values for the given function, and then go
+        # through and decrement each of them till everything is removed.
+        deleting = {preciser : used for preciser, used in cls.function(fn)}
+        for preciser, used in deleting.items():
+            for position in tags.explode(used):
+
+                # if our count doesn't exist, due to a discrepancy (corruption),
+                # then set it to 1 so that we can decrement without issue.
+                if not cls.hascount(address, cls.encode_preciser(preciser), position, tag=cls.counttag):
+                    cls.setcount(address, cls.encode_preciser(preciser), position, 1, tag=cls.counttag)
+                cls.decrement(preciser, position)
+            continue
+        return sorted(deleting)
+
+    @classmethod
+    def select(cls, *ea):
+        '''Yield the function address and usage for the contents of each decompiled function in the database.'''
+        node = cls.node()
+        for key, integer in super(hexfunction, cls).forward(node, *map(idaapi.ea2node, ea), tag=cls.usagetag):
+            yield idaapi.node2ea(key), integer
+        return
+
+    @classmethod
+    def repr(cls, *pattern):
+        Fmatch = re.compile(fnmatch.translate(*pattern), re.IGNORECASE).match if pattern else utils.fconstant(True)
+        usageresults = suptools.fall(cls.node(), tag=cls.usagetag)
+
+        lines = []
+        lines.append(u"Schema version: {:d}".format(cls.version()))
+
+        listable = [','.join(map("{:d}".format, tags.explode(integer))) for ea, integer in usageresults if Fmatch("{:#x}".format(ea))]
+        positions_width = max(map(len, listable)) if listable else 0
+
+        # FIXME: would be nice to display the reference counts for each function.
+
+        usage = [(u'Usage tags:')]
+        for key, integer in usageresults:
+            ea = idaapi.node2ea(key)
+            if not Fmatch("{:#x}".format(ea)):
+                continue
+            exploded = ','.join(map("{:d}".format, tags.explode(integer)))
+            usage.append("{!s}: {:<{:d}s} : {!s}".format("{:#x}".format(ea) if ea == key else "{:#x} ({:#x})".format(ea, key), exploded, positions_width, tags.names(integer)))
+        lines.extend(itertools.chain(usage, [''] if usage else []))
+
+        items = [(cls.decode_preciser(key), integer) for key, integer in hashtools.forward(cls.node(), tag=cls.precisertag)]
+        listable = [','.join(map("{:d}".format, tags.explode(integer))) for (ea, itp), integer in items if Fmatch("{:#x}".format(idaapi.node2ea(ea)))]
+        positions_width = max(map(len, listable)) if listable else 0
+
+        lines.append(u'Precisers with tags:')
+        for (ea, itp), integer in items:
+            if not Fmatch("{:#x}".format(ea)):
+                continue
+            exploded = ','.join(map("{:d}".format, tags.explode(integer)))
+            lines.append("{!s}: {:<{:d}s} : {!s}".format("({:#x}, {:d})".format(ea, itp), exploded, positions_width, tags.names(integer)))
         return '\n'.join(lines)
