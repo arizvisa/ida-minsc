@@ -1519,29 +1519,105 @@ class hash(object):
 class hashbytes(hash):
     """
     This is a derivative of the `hash` namespace which is used to
-    store string data within a given netnode. Specifically, this
-    namespace is different from `hash` (which allows you to store
-    a UTF-8 in a netnode) by allowing the user to specify their key
-    as an arbitrary number of raw bytes up to 510.
+    store string data within a given netnode. This namespace is
+    different from `hash` (which allows you to store a UTF-8 in a
+    netnode) in that you can specify the key as an arbitrary number
+    of raw bytes.
+
+    The bytes stored in a "hashval" are encoded to ensure that
+    there's no "\0" byte being used since it is intended to store
+    only strings. We overcome this limitation by always ensuring
+    that the lowest bit is always set resulting in each byte being
+    able to store only 7-bits worth of information. It is worth
+    noting that the encoding we use will screw up the ordering of
+    each item in the "hashval".
 
     This results in a dictionary in where the key is encoded when
-    written into its specified netnode. It allows storing bytes
-    up to a maximum length of 1024 (MAXSPECSIZE).
+    written into its specified netnode. The maximum length of a
+    "hashval" key is 1024 bytes (MAXSPECSIZE). Due to the encoding,
+    the maximum size is not 8192 bits, but 7168 bits. This results
+    in the size being 896 bytes for a 12.5% increase in its cost.
     """
 
-    # FIXME: we're not allowed to store any null bytes inside
-    #        these due to the limitation that they are strings.
-    @classmethod
-    def encode_key(cls, data):
-        if isinstance(data, internal.types.string):
-            return data.encode('utf-8').decode('latin1', 'replace')
-        return bytes(data).decode('latin1', 'replace')
+    # FIXME: is there a better way to do this with a universal coding and
+    #        perhaps reduce the bit loss that this algorithm has?
+
+    # FIXME: a side effect of encoding this is that the sort order that the
+    #        disassembler uses will be incorrectly sorted since it will be
+    #        acting on the encoded bytes and not the original ones.
+
+    @staticmethod
+    def __decode_bytes(bytes):
+        '''Yield each of the specified `bytes` decoded into their original form.'''
+        octets = bytearray(bytes)
+        iterable = itertools.cycle([pow(2, index) for index in range(8)][::-1])
+        shifts = itertools.chain([pow(2, 0)], iterable)
+
+        # zip together our powers of 2 in order to figure out where the bits
+        # that're carried are supposed to go. the only time that we have less
+        # than 7-bits is when we're at a multiple of the first byte.
+        carry = 0
+        for octet, shift in zip(octets, shifts):
+            carry += octet * shift
+            if shift == 1:
+                continue
+            carry, integer = divmod(carry, 0x100)
+            yield integer
+        return
+
+    @staticmethod
+    def __encode_bytes(bytes):
+        '''Yield each of the specified `bytes` encoded into a form that excludes "\x00" bytes.'''
+        octets, shift = bytearray(bytes), 0x80
+
+        # FIXME: is there a way to avoid this counting?
+        count, extra = divmod(8 * len(octets), 7)
+        count += 1 if extra else 0
+
+        # carrying the high bit aggregates a bit count that is a power of 2, so
+        # we'll need to include those bits for each octet that we process.
+        carry = index = 0
+        for index, octet in enumerate(octets):
+            carry, integer = divmod(octet * pow(2, index) + carry, shift)
+            yield integer
+
+        # handle the carried integer until we hit the expected byte count.
+        while 1 + index < count:
+            carry, integer = divmod(carry, shift)
+            yield integer
+            index += 1
+        return
 
     @classmethod
-    def decode_key(cls, string):
-        if isinstance(string, internal.types.string):
-            return string.encode('latin1', 'replace')
-        return bytes(string)
+    def encode_bytes(cls, decoded):
+        '''Encode the bytes specified by `decoded`.'''
+        encoded = cls.__encode_bytes(decoded)
+        iterable = (2 * integer + 1 for integer in encoded)
+        return bytearray(iterable)
+
+    @classmethod
+    def decode_bytes(cls, encoded):
+        '''Decode the specified `encoded` bytes back to their original form..'''
+        iterable = (integer // 2 for integer in bytearray(encoded))
+        decoded = cls.__decode_bytes(iterable)
+        return bytearray(decoded)
+
+    @classmethod
+    def encode_key(cls, key):
+        '''Encode the bytes specified by `key` into a format recognized by the "hashval" api.'''
+        if isinstance(key, internal.types.string):
+            data = cls.encode_bytes(key.encode('latin1', 'replace')).decode('latin1', 'replace')
+        else:
+            data = cls.encode_bytes(bytes(key)).decode('latin1', 'replace')
+        return super(hashbytes, cls).encode_key(data)
+
+    @classmethod
+    def decode_key(cls, data):
+        '''Decode the specified `data` from the "hashval" api back into its original bytes.'''
+        key = super(hashbytes, cls).decode_key(data)
+        if isinstance(key, internal.types.string):
+            return bytes(cls.decode_bytes(key.encode('latin1', 'replace')))
+        return bytes(cls.decode_bytes(key))
 
 # FIXME: implement a file-allocation-table based filesystem using the netnode wrappers defined above
 class filesystem(object):
