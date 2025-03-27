@@ -1499,22 +1499,27 @@ class hash(object):
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.rbounds({:s}, {!r}, {!r}, type={!r}{!s}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), description, start, stop, type, '' if tag is None else ", tag={!s}".format(tag), type))
 
     @classmethod
-    def repr(cls, nodeidx, tag=None):
+    def __repr__(cls, nodeidx, tag, format_key):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         res, stag = [], utils.sbyte(tag, netnode.hashtag)
         try:
-            l1 = max(len("{!s}".format(key or '')) for key in cls.fiter(nodeidx, tag=stag))
+            l1 = max(len('' if key is None else format_key(key)) for key in cls.fiter(nodeidx, tag=stag))
             l2 = max(len("{!r}".format(cls.get(nodeidx, key, tag=stag))) for key in cls.fiter(nodeidx, tag=stag))
         except ValueError:
             l1, l2 = 0, 2
 
         for index, key in enumerate(cls.fiter(nodeidx, tag=stag)):
             value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=stag)), l2, cls.get(nodeidx, key, None, tag=stag), cls.get(nodeidx, key, bytes, tag=stag), cls.get(nodeidx, key, int, tag=stag), cls.get(nodeidx, key, int, tag=stag))
-            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, "{!r}".format(key), l1, value))
+            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, format_key(key), l1, value))
         if not res:
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}{!s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, '' if tag is None else ", tag={!s}".format(tag), description))
         return '\n'.join(res)
+
+    @classmethod
+    def repr(cls, nodeidx, tag=None):
+        '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
+        return cls.__repr__(nodeidx, tag, "{!r}".format)
 
 class hashbytes(hash):
     """
@@ -1619,6 +1624,11 @@ class hashbytes(hash):
             return bytes(cls.decode_bytes(key.encode('latin1', 'replace')))
         return bytes(cls.decode_bytes(key))
 
+    @classmethod
+    def repr(cls, nodeidx, tag=None):
+        '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
+        return cls.__repr__(nodeidx, tag, operator.methodcaller('hex'))
+
 class hashintegers(hashbytes):
     """
     This is a derivative of the `hashbytes` namespace which allows
@@ -1676,20 +1686,7 @@ class hashintegers(hashbytes):
     @classmethod
     def repr(cls, nodeidx, tag=None):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
-        res, stag, format_key = [], utils.sbyte(tag, netnode.hashtag), "{:#x}".format
-        try:
-            l1 = max(len(format_key(key)) for key in cls.fiter(nodeidx, tag=stag))
-            l2 = max(len("{!r}".format(cls.get(nodeidx, key, tag=stag))) for key in cls.fiter(nodeidx, tag=stag))
-        except ValueError:
-            l1, l2 = 0, 2
-
-        for index, key in enumerate(cls.fiter(nodeidx, tag=stag)):
-            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=stag)), l2, cls.get(nodeidx, key, None, tag=stag), cls.get(nodeidx, key, bytes, tag=stag), cls.get(nodeidx, key, int, tag=stag), cls.get(nodeidx, key, int, tag=stag))
-            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, format_key(key), l1, value))
-        if not res:
-            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}{!s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, '' if tag is None else ", tag={!s}".format(tag), description))
-        return '\n'.join(res)
+        return cls.__repr__(nodeidx, tag, "{:#x}".format)
 
 # the classname is kinda long, so i'm including an alias.
 hashints = hashintegers
