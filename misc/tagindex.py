@@ -270,20 +270,19 @@ class schema(object):
             yield key, integer
         return
 
-class suptools(object):
+class bigintegertools(object):
     """
-    This class is a wrapper around the `netnode.sup` namespace. In the
-    disassembler, "supvals" can be used to associate an arbitrary type with
-    an integer. In our case, we want to map an integer to another integer so
-    that we can associate tags with a specific address/identifier. However,
-    the "supval" api only allows you to fetch and store word-sized integers
-    depending on which version of the disassembler is being used. To work
-    around this limitation, we take responsibility for encoding and decoding
-    the integer so that we can encode a big integer into a "supval" as its
-    corresponding bytes.
+    This class is a wrapper around the namespaces for the `netnode` module. In
+    the disassembler, "supvals" and "hashvals" can be used to associate an
+    arbitrary type with some key. In this case, we want to map a key to an
+    integer of some kind so that we can associate tags with the different things
+    in the disassembler. However, the native api only allows you to fetch and
+    store word-sized integers depending on which version of the database that is
+    being used. To work around this limitation, we take responsibility for
+    encoding and decoding the integer so that we can encode a big integer into
+    bytes that can be stored within either one of these interfaces.
 
-    This namespace consists mostly of wrappers around the netnode api that can
-    be found inside the `internal.netnode` module.
+    The `interface` attribute specifies which netnode interface to use.
     """
 
     @classmethod
@@ -305,7 +304,7 @@ class suptools(object):
     @classmethod
     def bigint(cls, node, key, *args, **kwargs):
         '''Return the integer stored at the given `key` of the netnode specified by `node`.'''
-        exists = netnode.sup.has(node, key, *args, **kwargs)
+        exists = cls.interface.has(node, key, *args, **kwargs)
 
         # first check to see if there is an integer stored. if not, then we can
         # just return 0 with no bits set which says that no tags are available.
@@ -314,7 +313,7 @@ class suptools(object):
 
         # the supval api only returns integers that are the size of a word. so,
         # to support bigints, we get it as bytes and then decode it ourselves.
-        bytes = netnode.sup.get(node, key, types.bytearray, *args, **kwargs)
+        bytes = cls.interface.get(node, key, types.bytearray, *args, **kwargs)
         return cls.decode_integer(bytes)
 
     @classmethod
@@ -326,13 +325,13 @@ class suptools(object):
         # encode the integer ourselves to work around said limitation.
         if unsigned:
             unsigned_encoded = cls.encode_integer(unsigned)
-            return netnode.sup.set(node, key, unsigned_encoded, *args, **kwargs)
+            return cls.interface.set(node, key, unsigned_encoded, *args, **kwargs)
 
         # if we're setting the integer to 0, then remove the supval from the
         # specified netnode. otherwise due to the nonexistence of the "supval",
         # and being asked to clear it, we can get away with doing nothing.
-        elif netnode.sup.has(node, key, *args, **kwargs):
-            return netnode.sup.remove(node, key, *args, **kwargs)
+        elif cls.interface.has(node, key, *args, **kwargs):
+            return cls.interface.remove(node, key, *args, **kwargs)
 
         return True
 
@@ -340,9 +339,9 @@ class suptools(object):
     def forward(cls, node, *key, **tag):
         '''Yield each key and integer from `node` in order starting at the specified `key` (if given).'''
         if key:
-            iterable = netnode.sup.forward(node, *itertools.chain(key[:1], [types.bytearray], key[1:], [tag.pop('tag')] if 'tag' in tag and not key[1:] else []))
+            iterable = cls.interface.forward(node, *itertools.chain(key[:1], [types.bytearray], key[1:], [tag.pop('tag')] if 'tag' in tag and not key[1:] else []))
         else:
-            iterable = netnode.sup.fitems(node, types.bytearray, **tag)
+            iterable = cls.interface.fitems(node, types.bytearray, **tag)
 
         # now we can just decode each integer and yield it to the caller.
         for key, bytes in iterable:
@@ -353,9 +352,9 @@ class suptools(object):
     def backward(cls, node, *key, **tag):
         '''Yield each key and integer from `node` in reverse order starting at the specified `key` (if given).'''
         if key:
-            iterable = netnode.sup.backward(node, *itertools.chain(key[:1], [types.bytearray], key[1:], [tag.pop('tag')] if 'tag' in tag and not key[1:] else []))
+            iterable = cls.interface.backward(node, *itertools.chain(key[:1], [types.bytearray], key[1:], [tag.pop('tag')] if 'tag' in tag and not key[1:] else []))
         else:
-            iterable = netnode.sup.ritems(node, types.bytearray, **tag)
+            iterable = cls.interface.ritems(node, types.bytearray, **tag)
 
         # iterate through all the bytes we got, decode an integer, and yield it.
         for key, bytes in iterable:
@@ -365,21 +364,35 @@ class suptools(object):
     @classmethod
     def fall(cls, node, **tag):
         '''Return a list containing all the keys and integers from the netnode specified in `node` in order.'''
-        items = netnode.sup.fall(node, types.bytearray, **tag)
+        items = cls.interface.fall(node, types.bytearray, **tag)
         return [(key, cls.decode_integer(bytes)) for key, bytes in items]
 
     @classmethod
     def rall(cls, node, **tag):
         '''Return a list containing all the keys and integers from the netnode specified in `node` in reverse order.'''
-        items = netnode.sup.rall(node, types.bytearray, **tag)
+        items = cls.interface.rall(node, types.bytearray, **tag)
         return [(key, cls.decode_integer(bytes)) for key, bytes in items]
 
     @classmethod
     def range(cls, node, start, stop, **tag):
         '''Return a list of each key and integer in `node` from the key specified by `start` until the key in `stop`.'''
-        Fitems = netnode.sup.fbounds if start <= stop else netnode.sup.rbounds
+        Fitems = cls.interface.fbounds if start <= stop else cls.interface.rbounds
         items = Fitems(node, start, stop, types.bytearray, **tag)
         return [(key, cls.decode_integer(bytes)) for key, bytes in items]
+
+class suptools(bigintegertools):
+    """
+    This namespace is a derivative of the `bigintegertools` implementation
+    that uses the `netnode.sup` namespace to store its values. Within the
+    disassembler, "supvals" can be used to associate an arbitrary type with
+    an integer key. Since the "supval" api only allows you to store and fetch
+    word-sized integers, we use the `bigintegertools` namespace to handle the
+    encoding and decoding of integers ourselves so that we can use the entire
+    space that is available for the "supval" api.
+    """
+
+    # here is the interface that we will use.
+    interface = netnode.sup
 
 class tags(schema):
     """
