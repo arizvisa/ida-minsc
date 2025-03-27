@@ -1619,6 +1619,63 @@ class hashbytes(hash):
             return bytes(cls.decode_bytes(key.encode('latin1', 'replace')))
         return bytes(cls.decode_bytes(key))
 
+class hashintegers(hashbytes):
+    """
+    This is a derivative of the `hashbytes` namespace which allows
+    using arbitrary bytes as a key for the "hashval" within a given
+    netnode. This namespace is different from `hashbytes` in that
+    you specify the key as an integer that is encoded into a string
+    that is used with the "hashval" api.
+
+    Normally when it is desired to use an integer as a key, the other
+    netnode types such as "supval" or "altval" would suffice. However,
+    these types only support a key that is the size of an address or
+    identifier as specified in the database. By using the "hashval"
+    api, we are allowed 1024 bytes (MAXSPECSIZE) for the key.
+
+    To accomplish this, we encode an integer into bytes and then use
+    the `hashbytes` namespace to encode those bytes into a string
+    that can be used with the "hashval" api. Due to the current
+    encoding implemented by the `hashbytes` namespace, this allows
+    for encoding 7168-bit numbers for the key.
+
+    It is worth noting that due to the `hashbytes` implementation,
+    the integers which are being stored will not be ordered like
+    either the "supval" or "altval" types.
+    """
+
+    @classmethod
+    def encode_integer(cls, integer):
+        '''Return the specified `integer` encoded as an array of bytes.'''
+        digits, divisor = [], 0x100
+        while integer > 0:
+            integer, digit = divmod(integer, divisor)
+            digits.insert(0, digit)
+        return bytearray(digits or [0])
+
+    @classmethod
+    def decode_integer(cls, bytes):
+        '''Return the specified array of `bytes` decoded as an integer.'''
+        iterable = iter(bytearray(bytes)) if isinstance(bytes, (b''.__class__, bytearray)) else iter(bytes or b'')
+        Faggregate = lambda carry, octet: carry * 0x100 + octet
+        return functools.reduce(Faggregate, iterable, 0)
+
+    @classmethod
+    def encode_key(cls, integer):
+        '''Encode the specified `integer` into a key that can be used with the "hashval" api.'''
+        bytes = cls.encode_integer(integer)
+        return super(hashintegers, cls).encode_key(bytes)
+
+    @classmethod
+    def decode_key(cls, data):
+        '''Decode the specified `data` from the "hashval" api back into an
+        integer.'''
+        bytes = super(hashintegers, cls).decode_key(data)
+        return cls.decode_integer(bytes)
+
+# the classname is kinda long, so i'm including an alias.
+hashints = hashintegers
+
 # FIXME: implement a file-allocation-table based filesystem using the netnode wrappers defined above
 class filesystem(object):
     ALLOCATION_TABLE = '$ file-allocation-table'
