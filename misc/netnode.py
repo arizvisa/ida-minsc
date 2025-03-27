@@ -1673,6 +1673,24 @@ class hashintegers(hashbytes):
         bytes = super(hashintegers, cls).decode_key(data)
         return cls.decode_integer(bytes)
 
+    @classmethod
+    def repr(cls, nodeidx, tag=None):
+        '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
+        res, stag, format_key = [], utils.sbyte(tag, netnode.hashtag), "{:#x}".format
+        try:
+            l1 = max(len(format_key(key)) for key in cls.fiter(nodeidx, tag=stag))
+            l2 = max(len("{!r}".format(cls.get(nodeidx, key, tag=stag))) for key in cls.fiter(nodeidx, tag=stag))
+        except ValueError:
+            l1, l2 = 0, 2
+
+        for index, key in enumerate(cls.fiter(nodeidx, tag=stag)):
+            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=stag)), l2, cls.get(nodeidx, key, None, tag=stag), cls.get(nodeidx, key, bytes, tag=stag), cls.get(nodeidx, key, int, tag=stag), cls.get(nodeidx, key, int, tag=stag))
+            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, format_key(key), l1, value))
+        if not res:
+            description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}{!s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, '' if tag is None else ", tag={!s}".format(tag), description))
+        return '\n'.join(res)
+
 # the classname is kinda long, so i'm including an alias.
 hashints = hashintegers
 
