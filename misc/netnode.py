@@ -1510,7 +1510,7 @@ class hash(object):
 
         for index, key in enumerate(cls.fiter(nodeidx, tag=stag)):
             value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=stag)), l2, cls.get(nodeidx, key, None, tag=stag), cls.get(nodeidx, key, bytes, tag=stag), cls.get(nodeidx, key, int, tag=stag), cls.get(nodeidx, key, int, tag=stag))
-            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, "{!s}".format(key), l1, value))
+            res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, "{!r}".format(key), l1, value))
         if not res:
             description = "{:#x}".format(nodeidx) if isinstance(nodeidx, internal.types.integer) else "{!r}".format(nodeidx)
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:s}{!s}) : The specified node ({:s}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), description, '' if tag is None else ", tag={!s}".format(tag), description))
