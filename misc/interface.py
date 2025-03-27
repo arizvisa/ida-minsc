@@ -300,7 +300,11 @@ class typemap(object):
 
             # grab the structure_t and check the flags to figure out if we need to size it.
             structure = internal.structure.new(sptr.id, 0 if offset is None else offset)
-            return structure if element == size else (structure, size) if variableQ else [structure, size // element]
+            if element == size:
+                return structure
+            elif element:
+                return (structure, size) if variableQ else [structure, size // element]
+            return [structure, size]
 
         # Verify that we actually have the datatype in our typemap and that we can look it up.
         elif all(item not in cls.inverted for item in [dsize, dtype, (dtype, typeid), (dtype, strtype)]):
@@ -344,8 +348,10 @@ class typemap(object):
         # If the datatype size (sz) is not an integer, then we need to calculate
         # the size ourselves using the size parameter we were given and the element
         # size of the datatype as determined by the flags (DT_TYPE | MS_CLS).
+        elsize = idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
         if not isinstance(sz, internal.types.integer):
-            count = size // idaapi.get_data_elsize(idaapi.BADADDR, flag, idaapi.opinfo_t())
+            res, extra = divmod(size, elsize) if elsize else (size, 0)
+            count = res + 1 if extra else res
             return [t, count] if count > 1 else t
 
         # If we received an alignment type, then we need to specially handle this
