@@ -482,6 +482,10 @@ class functions(object):
         `exceptions` Filter the functions for any that either handles an exception or sets up a handler
         `tagged` - Filter the functions for any that use the specified tag(s)
         `contents` - Filter the functions for any that use the specified tag(s) in their contents
+        `thunk` - Filter the functions for any that are thunks
+        `export` or `exports` - Filter the functions for any that are exports
+        `entrypoint` or `entrypoints` - Filter the functions for any that are entrypoints
+        `listed` - Filter the functions for any with a listed name
         `predicate` - Filter the functions by passing their ``idaapi.func_t`` to a callable
 
     Some examples of how to use these keywords are as follows::
@@ -509,6 +513,9 @@ class functions(object):
     __matcher__.mapping('library', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_LIB))
     __matcher__.mapping('wrapper', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
     __matcher__.mapping('lumina', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, getattr(idaapi, 'FUNC_LUMINA', 0x10000)))
+    __matcher__.mapping('thunk', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
+    __matcher__.combinator('listed', utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.fthrough(utils.fidentity, utils.fcompose(idaapi.get_nlist_idx, idaapi.get_nlist_ea)), utils.funpack(operator.eq))))
+    __matcher__.alias('list', 'listed')
 
     # FIXME: we determine a frame is missing by checking if its `func_t.frame`
     #        is `idaapi.BADNODE`. this might be a terrible idea and there's a
@@ -532,6 +539,8 @@ class functions(object):
     if all(hasattr(idaapi, Fname) for Fname in ['tryblks_t', 'get_tryblks']):
         __matcher__.mapping('exceptions', operator.truth, interface.function.by_address, lambda fn: idaapi.get_tryblks(idaapi.tryblks_t(), fn), utils.fpartial(operator.ne, 0))
 
+    # FIXME: is there some reason why i thought the following matchers were
+    #        actually useful?
     # chunk matching
     #__matcher__.boolean('greater', operator.le, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max))
     #__matcher__.boolean('less', operator.ge, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(0)), min)), __matcher__.boolean('lt', operator.gt, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(0)), min))
@@ -539,6 +548,15 @@ class functions(object):
     # entry point matching
     __matcher__.boolean('greater', operator.le, utils.fidentity), __matcher__.boolean('gt', operator.lt, utils.fidentity)
     __matcher__.boolean('less', operator.ge, utils.fidentity), __matcher__.boolean('lt', operator.gt, utils.fidentity)
+
+    # FIXME: we have no quick way of getting the ordinal for a given address. if
+    #        we inverted the "altval" for the entrypoints netnode, we could do
+    #        an O(1) lookup for an entrypoint by address. instead, though, we
+    #        create a set during the keyword and test the address against that.
+    __matcher__.combinator('export', utils.fcompose(utils.fcompose, utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(interface.entries.exports), utils.fpartial(utils.itermap, utils.nth(1)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(interface.entries.exports), utils.fpartial(utils.itermap, utils.nth(1)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains), utils.frpartial(utils.fcompose, operator.not_)))))
+    __matcher__.alias('exports', 'export')
+    __matcher__.combinator('entrypoint', utils.fcompose(utils.fcompose, utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(interface.entries.entries), utils.fpartial(utils.itermap, utils.nth(1)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(interface.entries.entries), utils.fpartial(utils.itermap, utils.nth(1)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains), utils.frpartial(utils.fcompose, operator.not_)))))
+    __matcher__.alias('entrypoints', 'entrypoint'), __matcher__.alias('entries', 'entrypoint'), __matcher__.alias('entry', 'entrypoint')
 
     def __new__(cls, *string, **type):
         '''Return the address of each of the functions within the database as a list.'''
