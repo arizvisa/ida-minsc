@@ -6420,23 +6420,45 @@ def make_ida_not_suck_cocks(nw_code):
 
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
-        scheduler.ready(hook.idb, 'deleting_func_tail', removing_func_tail, 0)
-        scheduler.ready(hook.idb, 'func_added', add_func, 0)
-        scheduler.ready(hook.idb, 'deleting_func', del_func, 0)
-        scheduler.ready(hook.idb, 'set_func_start', set_func_start, 0)
-        scheduler.ready(hook.idb, 'set_func_end', set_func_end, 0)
+        scheduler.default(hook.idp, 'ev_init', functions.database_init, -100)
+
+        scheduler.ready(hook.idb, 'thunk_func_created', functions.thunk_func_created, 0)
+        scheduler.ready(hook.idb, 'func_tail_appended', functions.func_tail_appended, 0)
+
+        scheduler.ready(hook.idb, 'func_added', functions.added, 0)
+        scheduler.ready(hook.idb, 'deleting_func', functions.deleting, 0)
+        scheduler.ready(hook.idb, 'func_deleted', functions.deleted, 0)
+
+        # XXX: on later versions, the "func_tail_deleted" event does not always
+        #      get called... this works fine as a one-shot though.
+        scheduler.ready(hook.idb, 'deleting_func_tail', functions.deleting_func_tail, 0)
+        #scheduler.ready(hook.idb, 'func_tail_deleted', functions.func_tail_deleted, 0)
+
+        scheduler.ready(hook.idb, 'set_func_start', functions.set_func_start, 0)
+        scheduler.ready(hook.idb, 'set_func_end', functions.set_func_end, 0)
 
     elif idaapi.__version__ >= 6.9:
-        scheduler.ready(hook.idb, 'removing_func_tail', removing_func_tail, 0)
-        [ scheduler.ready(hook.idp, item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
+        scheduler.default(hook.idp, 'init', functions.database_init, -100)
+
+        scheduler.ready(hook.idb, 'removing_func_tail', functions.removing_func_tail, 0)
+        scheduler.ready(hook.idb, 'thunk_func_created', functions.thunk_func_created, 0)
+        scheduler.ready(hook.idb, 'func_tail_appended', functions.func_tail_appended, 0)
+
+        scheduler.ready(hook.idp, 'add_func', functions.added, 0)
+        scheduler.ready(hook.idp, 'del_func', functions.del_func, 0)
+        scheduler.ready(hook.idp, 'set_func_start', functions.set_func_start, 0)
+        scheduler.ready(hook.idp, 'set_func_end', functions.set_func_end, 0)
 
     else:
-        scheduler.ready(hook.idb, 'func_tail_removed', func_tail_removed, 0)
-        scheduler.ready(hook.idp, 'add_func', add_func, 0)
-        scheduler.ready(hook.idp, 'del_func', del_func, 0)
-        scheduler.ready(hook.idb, 'tail_owner_changed', tail_owner_changed, 0)
+        scheduler.default(hook.notification, idaapi.NW_OPENIDB, functions.database_init, -30)
 
-    [ scheduler.ready(hook.idb, item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
+        scheduler.ready(hook.idb, 'func_tail_removed', functions.func_tail_removed, 0)
+        scheduler.ready(hook.idp, 'add_func', functions.added, 0)
+        scheduler.ready(hook.idp, 'del_func', functions.del_func, 0)
+        scheduler.ready(hook.idb, 'tail_owner_changed', functions.tail_owner_changed, 0)
+
+        scheduler.ready(hook.idb, 'thunk_func_created', functions.thunk_func_created, 0)
+        scheduler.ready(hook.idb, 'func_tail_appended', functions.func_tail_appended, 0)
 
     ## Relocate the tagcache for an individual segment if that segment is moved.
     scheduler.ready(hook.idb, 'segm_start_changed', segm_start_changed, 0)
