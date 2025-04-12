@@ -1070,6 +1070,10 @@ class blocks(object):
         > G = function.blocks.graph()
 
     """
+
+    # FIXME: this class should really have a matcher class so that basic blocks
+    #        can be filtered by tags, instructions, or other random attributes.
+
     @utils.multicase()
     def __new__(cls, **external):
         '''Return the bounds of each basic block for the current function.'''
@@ -1162,6 +1166,22 @@ class blocks(object):
                 result.append(interface.range.bounds(bb))
             continue
         return result
+
+    @utils.multicase()
+    @classmethod
+    def register(cls, *registers, **modifiers):
+        '''Yield each block in the current function that uses any one of the given `registers`.'''
+        return cls.register(ui.current.function(), *registers, **modifiers)
+    @utils.multicase(func=(idaapi.func_t, types.integer))
+    @classmethod
+    def register(cls, func, *registers, **modifiers):
+        '''Yield each block in the function `func` that uses any one of the given `registers`.'''
+        for bb in interface.function.blocks(func):
+            iterable = (True for _ in block.register(bb, *registers, **modifiers))
+            if next(iterable, False):
+                yield interface.range.bounds(bb)
+            continue
+        return
 
     @utils.multicase()
     @classmethod
