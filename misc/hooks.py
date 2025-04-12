@@ -266,20 +266,13 @@ class address(changingchanged):
 
     @classmethod
     def updater(cls):
-        # Receive the new comment and its type from the cmt_changing
-        # event. After receiving it, then we can use the address to
-        # figure out what the old comment was.
-        ea, rpt, new = (yield)
-        old = utils.string.of(idaapi.get_cmt(ea, rpt))
+        # Receive the old and expected comments from the "cmt_changing" event.
+        ea, rpt, old, expected = (yield)
 
-        # Decode the comments into their tags (dictionaries), and
-        # then update their references before we update the comment.
-        f, o, n = idaapi.get_func(ea), internal.comment.decode(old), internal.comment.decode(new)
-        cls._update_refs(ea, o, n)
-
-        # Wait for cmt_changed event...
+        # After receiving it, then we need to wait until the "cmt_changed" event
+        # was dispatched confirming that the comment was really changed.
         try:
-            newea, nrpt, none = (yield)
+            newea, nrpt, new = (yield)
 
         # If we end up catching a GeneratorExit then that's because
         # this event is being violently closed due to receiving a
@@ -288,11 +281,13 @@ class address(changingchanged):
             logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while the {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
             return
 
-        # Now to fix the comment the user typed.
-        if (newea, nrpt, none) == (ea, rpt, None):
-            ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
+        # Decode each the comments into their tags (dictionaries) so that we can
+        # compare them to figure out what changed about the comment.
+        o, e, n = (internal.comment.decode(cmt) for cmt in [old, expected, new])
 
-            if (ncmt or '') != new:
+        # Now to match the comments and fix the comment that was applied.
+        if (newea, nrpt) == (ea, rpt):
+            if (new or '') != (expected or ''):
                 logging.warning(u"{:s}.updater() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
             # If the comment is of the correct format, then we can simply
@@ -300,47 +295,43 @@ class address(changingchanged):
             if internal.comment.check(new):
                 idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
-            # If there's a comment to set, then assign it to the requested
-            # address.
+            # If it's not properly formatted, then assign it as-is.
             elif new:
                 idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
             # Otherwise, we can just delete all the references at the address.
-            else:
-                cls._delete_refs(ea, o)
-            return
+            # Now we can just go ahead and update the references with whatever
+            # was changed.
+            return cls._update_refs(ea, o, n)
 
-        # If the changed event doesn't happen in the right order.
+        # If the changed event didn't happen in the right order, and we got an
+        # address that didn't match what was expected, then we erase anything
+        # that was at that address, and reapply its references.
         logging.fatal(u"{:s}.updater() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
-        # Delete the old comment and its references.
         cls._delete_refs(ea, o)
         idaapi.set_cmt(ea, '', rpt)
         logging.warning(u"{:s}.updater() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
-        # Create the references for the new comment.
-        new = utils.string.of(idaapi.get_cmt(newea, nrpt))
-        n = internal.comment.decode(new)
         cls._create_refs(newea, n)
 
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring address.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-
-        # Construct our new state, and then grab our old comment. This is because
-        # we're going to submit this to the state that we've constructed after we've
-        # disabled the necessary events.
         logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received address.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        event, oldcmt = cls.new(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
-        # First disable our hooks so that we can prevent re-entrancy issues
+        # First disable our hooks so that we can prevent re-entrancy issues, and
+        # grab our old comment before the disassembler changes it.
         [ ui.hook.idb.disable(item) for item in ['changing_cmt', 'cmt_changed'] ]
+        oldcmt = idaapi.get_cmt(ea, repeatable_cmt)
 
-        # Now we can use our coroutine to begin the comment update, so that
-        # later, the "changed" event can do the actual update.
+        # Construct our new state, and then submit everything about the comment
+        # to the coroutine to begin updating the comment.
+        event, old, new = cls.new(ea), utils.string.of(oldcmt), utils.string.of(newcmt)
+
         try:
-            event.send((ea, bool(repeatable_cmt), utils.string.of(newcmt)))
+            event.send((ea, bool(repeatable_cmt), old or '', new or ''))
 
         # If a StopIteration was raised when submitting the comment to the coroutine,
         # then something failed and we need to let the user know about it.
@@ -358,19 +349,18 @@ class address(changingchanged):
     def changed(cls, ea, repeatable_cmt):
         if interface.node.identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring address.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-
-        # Resume the state that was created by the changing event, and then grab
-        # our new comment that we will later submit to it.
         logging.debug(u"{:s}.changed({:#x}, {:d}) : Received address.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        event, newcmt = cls.resume(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
-        # First disable our hooks so that we can prevent re-entrancy issues
+        # First disable the hooks to prevent re-entrancy issues. Afterwards, we
+        # grab the new comment that was just applied to the parameter address.
         [ ui.hook.idb.disable(item) for item in ['changing_cmt', 'cmt_changed'] ]
+        newcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
-        # Now we can use our coroutine to update the comment state, so that the
-        # coroutine will perform the final update.
+        # Now we can resume the state that was created by the "changing" event,
+        # send what we have to our coroutine, and then complete the update.
+        event = cls.resume(ea)
         try:
-            event.send((ea, bool(repeatable_cmt), None))
+            event.send((ea, bool(repeatable_cmt), newcmt or ''))
 
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we something bugged out and we need to let the user
@@ -378,13 +368,15 @@ class address(changingchanged):
         except StopIteration:
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Abandoning update of {:s} comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea), exc_info=True)
 
-        # Re-enable our hooks that we had prior disabled
-        finally:
-            [ ui.hook.idb.enable(item) for item in ['changing_cmt', 'cmt_changed'] ]
-
         # Updating the comment was complete, that should've been it and so we can
         # just close our event since we're done.
-        event.close()
+        else:
+            event.close()
+
+        # Re-enable all of the hooks that we disabled at the beginning.
+        finally:
+            [ ui.hook.idb.enable(item) for item in ['changing_cmt', 'cmt_changed'] ]
+        return
 
     @classmethod
     def old_changed(cls, ea, repeatable_cmt):
