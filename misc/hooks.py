@@ -1956,6 +1956,579 @@ def set_func_end(pfn, new_end):
         return
     return
 
+class functions(changingchanged):
+    """
+    This namespace handles all tracking of tags that are related to functions
+    and their tails. The addition of a function has the effect of migrating any
+    overlapping global tags into the contents of the function. Likewise, the
+    removal of a function results in any contents tags associated with the
+    function being migrated into the global tags. These changes are managed by
+    this namespace using the "func_added" event, and the 2-part "deleting_func"
+    and "func_deleted" events.
+
+    The disassembler also allows the user to modify a function by adjusting its
+    boundaries. Hence, this namespace also hooks the "set_func_start" and the
+    "set_func_end" events. Another characteristic of the disassembler is its
+    ability to allow a function chunk to be owned by multiple functions. Thus,
+    in order to track the reference count for a corresponding function we also
+    hook the "removing_func_tail" or "deleting_func_tail" events.
+
+    The implementation of this namespace includes variations that can update
+    either the "tagcache", supported by the `internal.tagcache` module, or the
+    "tagindex", which is supported by the `internal.tagindex` module.
+    """
+    excluded = {'__typeinfo__', '__name__'}
+
+    @classmethod
+    def globals_tagcache(cls, fn, chunks):
+        '''Return all of the global tags overlapping with the function `fn` and its `chunks` from the tagcache.'''
+        F = cls.contents_nonindexed
+        iterable = (F(fn, start, stop) for start, stop in chunks)
+        flattened = itertools.chain(*(items for items in iterable))
+        return [(ea, names) for ea, names in flattened]
+
+    @classmethod
+    def globals_tagindex(cls, fn, chunks):
+        '''Return all of the global tags overlapping with the function `fn` and its `chunks` from the tagindex.'''
+        F = internal.tagindex.globals.range
+        iterable = (F(start, stop) for start, stop in chunks)
+        flattened = itertools.chain(*(items for items in iterable))
+        return [(ea, internal.tagindex.tags.names(used)) for ea, used in flattened]
+
+    @classmethod
+    def globals(cls, fn, chunks):
+        '''Return all of the global tags overlapping with the function `fn` and its `chunks`.'''
+        return cls.globals_tagindex(fn, chunks)
+
+    @classmethod
+    def added(cls, pfn):
+        '''func_added(pfn)'''
+        start, stop = interface.range.unpack(pfn)
+        ea, chunks = start, [interface.range.unpack(ch) for ch in interface.function.chunks(pfn)]
+
+        # check that we're not adding an import as a function. if this happens,
+        # then this is because IDA's ELF loader is creating a function here.
+        if idaapi.segtype(start) == idaapi.SEG_XTRN:
+            return
+
+        # We can exclude both the "__name__" and "__typeinfo__" tags since we're
+        # tracking them explicitly with another pair of hooks.
+        logging.debug(u"{:s}.added({:#x}..{:#x}) : Updating the tags for the new function being added at address {:#x} to {:#x}.".format('.'.join([__name__, cls.__name__]), start, stop, start, stop))
+
+        # First thing to do is to grab all the globals that are within the
+        # chunks we were given for the function. Then we can grab the tags for
+        # the new function so that we can update our globals with them.
+        newcontents = cls.globals(pfn, chunks)
+        newfunction = {name for name in internal.tags.function.get(start)}
+
+        ordered = [ea for ea, _ in newcontents]
+        contents = {ea : names for ea, names in newcontents}
+
+        # Now we can use the snapshot of the globals to promote them into
+        # contents tags for the currently added function.
+        for ea in ordered:
+            for name in contents[ea] - cls.excluded:
+                internal.tags.reference.contents.increment(ea, name, target=start)
+            count = len(contents[ea] - cls.excluded)
+            logging.debug(u"{:s}.added({:#x}..{:#x}) : Added {:d} tag{:s} to the contents address {:#x} of the added function ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, count, '' if count == 1 else 's', ea, start))
+
+        # Then we can go ahead and remove the tags from the globals.
+        for ea in ordered:
+            for name in contents[ea] - cls.excluded:
+                internal.tags.reference.globals.decrement(ea, name)
+            count = len(contents[ea] - cls.excluded)
+            logging.debug(u"{:s}.added({:#x}..{:#x}) : Removed {:d} tag{:s} from the globals address {:#x} due to the address being added to a function ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, count, '' if count == 1 else 's', ea, start))
+
+        # We need to specially handle the function entrypoint since some of its
+        # tags will be promoted to function comments, and some of them will be
+        # associated with the entrypoint address.
+        for name in contents.get(start, []):
+            if name in newfunction:
+                internal.tags.reference.contents.decrement(ea, name, target=start)
+                logging.debug(u"{:s}.added({:#x}..{:#x}) : Entrypoint for the function at {:#x} was adjusted by removing the tag \"{:s}\" from its contents.".format('.'.join([__name__, cls.__name__]), start, stop, start, internal.utils.string.escape(name, '"')))
+            continue
+
+        # All that's left to do is to add the function's tags to the globals.
+        newtags = newfunction - cls.excluded
+        for name in newtags:
+            internal.tags.reference.globals.increment(start, name)
+
+        count = len(newtags)
+        logging.debug(u"{:s}.added({:#x}..{:#x}) : Function at {:#x} was added with {:d} global tag{:s} ({:s}).".format('.'.join([__name__, cls.__name__]), start, stop, start, count, '' if count == 1 else 's', ', '.join(map("{!r}".format, sorted(newtags)))))
+
+    @classmethod
+    def deleting(cls, pfn):
+        '''deleting_func(pfn)'''
+        start, stop = interface.range.unpack(pfn)
+        ea, chunks = start, [interface.range.unpack(ch) for ch in interface.function.chunks(pfn)]
+        logging.debug(u"{:s}.deleting({:#x}) : Received functions.deleting event for function {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        # Create a new event using the entrypoint of the funciton we were given.
+        event = cls.new(ea)
+        try:
+            event.send((pfn, chunks))
+        except StopIteration:
+            logging.fatal(u"{:s}.deleting({:#x}) : Abandoning deletion for function {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        return
+
+    @classmethod
+    def deleted(cls, func_ea):
+        '''func_deleted(func_ea)'''
+        logging.debug(u"{:s}.deleted({:#x}) : Received functions.deleted event for function {:#x}.".format('.'.join([__name__, cls.__name__]), func_ea, func_ea))
+
+        # Use the function address to resume our event.
+        event = cls.resume(func_ea)
+        try:
+            event.send(func_ea)
+        except StopIteration:
+            logging.fatal(u"{:s}.deleted({:#x}) : Abandoning delete for function {:#x} due to an unexpected termination of the event handler.".format('.'.join([__name__, cls.__name__]), func_ea, func_ea))
+        event.close()
+
+    @classmethod
+    def __contents_iterable(cls, iterable):
+        results = []
+        for ea in iterable:
+            names = internal.tags.address.get(ea)
+            results.append((ea, {name for name in names}))
+        return results
+
+    @classmethod
+    def contents_nonindexed(cls, fn, start, stop):
+        '''Return the contents of the function `fn` and all of the specified `chunks`.'''
+        iterable = (ea for ea in interface.address.items(start, stop))
+        return cls.__contents_iterable(iterable)
+
+    @classmethod
+    def contents_tagcache(cls, fn, start, stop):
+        '''Return the contents of the function `fn` and all of the specified `chunks` from the tagcache.'''
+        iterable = internal.tags.reference.contents.address(ea, target=interface.range.start(fn))
+        filtered = (ea for ea in iterable if start <= ea < stop)
+        return cls.__contents_iterable(filtered)
+
+    @classmethod
+    def contents_tagindex(cls, fn, start, stop):
+        '''Return the contents of the function `fn` and all of the specified `chunks` from the tagindex.'''
+        iterable = internal.tagindex.contents.range(start, stop)
+        return [(ea, internal.tagindex.tags.names(used)) for ea, used in iterable]
+
+    @classmethod
+    def erase_tagcache(cls, fn, chunks):
+        '''Erase the contents of the function `fn` and all of the specified `chunks` from the tagcache.'''
+        return internal.tagcache.contents.erase(fn)
+
+    @classmethod
+    def erase_tagindex(cls, fn, chunks):
+        '''Erase the contents of the function `fn` and all of the specified `chunks` from the tagindex.'''
+        result = []
+        for start, stop in chunks:
+            removed = internal.tagindex.contents.erase_bounds(fn, start, stop)
+            result.extend(removed)
+        return internal.tagindex.contents.erase_usage(fn), result
+
+    @classmethod
+    def contents(cls, fn, chunks):
+        '''Return the contents of the function `fn` and all of the specified `chunks`.'''
+        F = cls.contents_tagindex
+        iterable = (F(fn, start, stop) for start, stop in chunks)
+        flattened = itertools.chain(*(items for items in iterable))
+        return [(ea, names) for ea, names in flattened]
+
+    @classmethod
+    def erase(cls, fn, chunks):
+        '''Erase the contents of the function `fn` from all of the specified `chunks`.'''
+        return cls.erase_tagindex(fn, chunks)
+
+    @classmethod
+    def updater(cls):
+        '''This coroutine is responsible for accepting both "deleted" and "deleting" events in order to migrate tags between a function and the database.'''
+        contents = {}
+
+        # Grab the function and its chunks so that we can use them to fetch all
+        # the tags that belonged to the function being removed.
+        pfn, chunks = (yield)
+        owner, contents = interface.range.start(pfn), cls.contents(pfn, chunks)
+
+        # Now that we have all the relevant tags for the function, we can wait
+        # until the function has actually been removed.
+        try:
+            ea = (yield)
+
+        except GeneratorExit:
+            logging.debug(u"{:s}.updater() : Terminating state due to explicit request from owner while function {:#x} was being removed.".format('.'.join([__name__, cls.__name__]), interface.range.start(ea)))
+            return
+
+        # Ensure the deleted function entrypoint matches the deleting function.
+        fn = pfn if ea == owner else ea
+
+        # Now we just need to go back through all of our contents and add
+        # each one as a global.
+        for ea, names in contents:
+            for name in names:
+                internal.tags.reference.globals.increment(ea, name)
+            continue
+
+        # And then we can remove everything from the function.
+        removed = cls.erase(owner, chunks)
+
+    @classmethod
+    def thunk_func_created(cls, pfn):
+        # XXX: This might be interesting to track, but the disassembler generally
+        #      removes them unless they're actually referenced by something.
+        pass
+
+    @classmethod
+    def func_tail_appended(cls, pfn, tail):
+        """This hook is for when a chunk is appended to a function.
+
+        If the tail we were given only has one owner, then that means we need to
+        demote the tags for the tail from globals to contents tags. If there's more
+        than one, then we simply add the references in the tail to the function.
+        """
+        left, right = bounds = interface.range.bounds(tail)
+        referrers = [fn for fn in interface.function.owners(bounds.left)]
+
+        # If the number of referrers is larger than just 1, then the tail is
+        # owned by more than one function. We still doublecheck, though, to
+        # ensure that our pfn is still in the list.
+        if len(referrers) > 1:
+            if not operator.contains(referrers, interface.range.start(pfn)):
+                logging.warning(u"{:s}.func_tail_appended({:#x}, {!s}) : Adjusting contents of function ({:#x}) but function was not found in the owners ({:s}) of chunk {!s}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+            # Now we just need to snapshot the contents of the tail that was
+            # added, and increment the reference count for each tag.
+            # the tags for the function in pfn.
+            contents = cls.contents(pfn, [(left, right)])
+
+            for ea, names in contents:
+                for name in names:
+                    internal.tags.reference.contents.increment(ea, name, target=interface.range.start(pfn))
+                    logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Increasing reference count for content tag ({:s}) at {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, utils.string.repr(name), ea, interface.range.start(pfn)))
+                continue
+            return
+
+        # Otherwise if there was only one referrer, then that means this
+        # tail is being demoted from globals tags to contents that are
+        # owned by the function in pfn.
+        if not operator.contains(referrers, interface.range.start(pfn)):
+            logging.warning(u"{:s}.func_tail_appended({:#x}, {!s}) : Demoting globals in {!s} and adding them to the cache for function {:#x} but function was not found in the owners ({:s}) of chunk {!s}.".format(__name__, interface.range.start(pfn), bounds, bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+        # We start by snapshotting all of the globals that are within the
+        # function tail so that we can migrate them into the function contents.
+        newcontents = cls.globals(pfn, [(left, right)])
+
+        # Add each tag to the contents of the current function.
+        for ea, names in newcontents:
+            for name in names:
+                internal.tags.reference.contents.increment(ea, name, target=interface.range.start(pfn))
+            logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Added {:d} tag{:s} from the appended function tail ({!s}) to the contents for the function at {:#x}.".format(__name__, interface.range.start(pfn), bounds, len(names), '' if len(names) == 1 else 's', bounds, interface.range.start(pfn)))
+
+        # Now we just need to remove the globals tags since they were migrated
+        # into the contents for the current function.
+        for ea, names in newcontents:
+            for name in names:
+                internal.tags.reference.globals.decrement(ea, name)
+            logging.debug(u"{:s}.func_tail_appended({:#x}, {!s}) : Removed {:d} tag{:s} from the globals due to being part of the appended function tail ({!s}) for the function at {:#x}.".format(__name__, interface.range.start(pfn), bounds, len(names), '' if len(names) == 1 else 's', bounds, interface.range.start(pfn)))
+        return
+
+    # XXX: on later versions of the disassembler, the "func_tail_deleted" event
+    #      does not get dispatched.
+
+    @classmethod
+    def deleting_func_tail(cls, pfn, tail):
+        """This hook is for when a chunk is removed from a function.
+
+        If the tail we were given only has one owner, then we promote the tags in
+        the tail to globals tags. Otherwise, we just decrease the reference count
+        in the cache for the function that the tail was removed from.
+        """
+        left, right = bounds = interface.range.bounds(tail)
+        referrers = [fn for fn in function.chunk.owners(left)]
+
+        # Before we do anything, we need to make sure we can iterate through the
+        # boundaries of the function tail that is being removed.
+        try:
+            iterable = interface.address.items(left, right)
+
+        # If any of the addresses from the tail are out of bounds, then the
+        # disassembler removed the tail from the database. This means that we'll
+        # have to delete the contents of the tail manually using its boundaries.
+        except exceptions.OutOfBoundsError:
+            contents = cls.contents(pfn, [(left, right)])
+
+            for ea, names in contents:
+                internal.tags.reference.contents.erase_address(pfn, ea)
+                logging.debug(u"{:s}.deleting_func_tail({:#x}, {!s}) : Removed {:d} tag{:s} associated with the unmapped tail {:#x}..{:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, len(items), utils.string.repr(tag)))
+                continue
+            return
+
+        # If the number of referrers is larger than 1, then the tail was just removed
+        # from the pfn function. We verify that the pfn is still in the list of
+        # referrers and warn the user if it isn't.
+        if len(referrers) > 1:
+            if not operator.contains(referrers, interface.range.start(pfn)):
+                logging.warning(u"{:s}.deleting_func_tail({:#x}, {!s}) : Adjusting contents of function ({:#x}) but function was not found in the owners ({:s}) of chunk {!s}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+            # So there's no promotion from a contents tag to a global tag, since
+            # the address is still part of some number of functions. Thus, we
+            # only need to snapshot the tags and then decrement them.
+            contents = cls.contents(pfn, [(left, right)])
+            for ea, names in contents:
+                for name in names:
+                    internal.tags.reference.contents.decrement(ea, name, target=interface.range.start(pfn))
+                    logging.debug(u"{:s}.deleting_func_tail({:#x}, {!s}) : Decreasing reference count for content tag ({:s}) at {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, utils.string.repr(name), ea, interface.range.start(pfn)))
+                continue
+            return
+
+        # Otherwise, there's just one referrer and it should be pointing to pfn.
+        if not operator.contains(referrers, interface.range.start(pfn)):
+            logging.warning(u"{:s}.deleting_func_tail({:#x}, {!s}) : Promoting contents for function ({:#x}) but function was not found in the owners ({:s}) of chunk {!s}.".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, interface.range.start(pfn), ', '.join(map("{:#x}".format, referrers)), bounds))
+
+        # If there's just one referrer, then the referrer should be pfn and we should
+        # be promoting the relevant addresses in the cache from contents to globals.
+        contents = cls.contents(pfn, [(left, right)])
+
+        # Start by adding global tags for each address in the function tail.
+        for ea, names in contents:
+            for name in names:
+                internal.tags.reference.globals.increment(ea, name)
+            logging.debug(u"{:s}.deleting_func_tail({:#x}, {!s}) : Added {:d} tag{:s} to the global address from the removed function tail ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, len(names), '' if len(names) == 1 else 's', bounds))
+
+        # Now we can remove the contents address for each address in the tail.
+        for ea, names in contents:
+            for name in names:
+                internal.tags.reference.contents.decrement(ea, name, target=interface.range.start(pfn))
+            logging.debug(u"{:s}.deleting_func_tail({:#x}, {!s}) : Removed {:d} tag{:s} from the contents address for the removed function tail ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(pfn), bounds, len(names), '' if len(names) == 1 else 's', bounds))
+        return
+
+    @classmethod
+    def move_entry_tagcache(cls, pfn, new):
+        '''Move the contents of the tagcache for the function `pfn` to the address specified by `new`.'''
+        saved = []
+
+        # save every reference count for the function.
+        for ea in internal.tagcache.contents.address(interface.range.start(pfn), target=interface.range.start(pfn)):
+            res = address.get(ea)
+            if res:
+                saved.append((ea, res))
+            continue
+
+        # adjust the reference count for the netnode at the new address.
+        for ea, res in saved:
+            for name in res:
+                internal.tags.reference.contents.increment(ea, name, target=new)
+            continue
+
+        # decrease the reference count for the netnode at the old address.
+        for ea, res in saved:
+            for name in res:
+                internal.tags.reference.contents.decrement(ea, name, target=pfn)
+            continue
+        return saved
+
+    @classmethod
+    def move_entry_tagindex(cls, pfn, new):
+        '''Move the contents of the tagindex for the function `pfn` to the address specified by `new`.'''
+        node = idaapi.ea2node(new)
+        oldusage = internal.tagindex.contents.usage(pfn)
+        usage = internal.tagindex.contents.erase_usage(pfn) if oldusage else oldusage
+        return internal.tagindex.contents.setusage(0, node, usage, 0)
+
+    @classmethod
+    def move_entry(cls, pfn, new):
+        '''Move the contents for the function `pfn` to the address specified by `new`.'''
+        ea = pfn if isinstance(pfn, internal.types.integer) else interface.range.start(pfn)
+        return cls.move_entry_tagindex(ea, new)
+
+    @classmethod
+    def set_func_start(cls, pfn, new_start):
+        """This is called when the user changes the beginning of the function to another address.
+
+        If this happens, we simply walk from the new address to the old address of
+        the function that was changed. Then we can update the reference count for
+        any globals that were tagged by moving them into the function's tagcache.
+        """
+        start, stop = interface.range.unpack(pfn)
+
+        # If new_start has added some addresses to the function, then we need to
+        # snapshot the global tags before transforming them into content tags.
+        if start > new_start:
+            newcontents = cls.globals(pfn, [(new_start, start)])
+            old = {name for name in internal.tags.function.get(start)}
+
+            # Add each global within the range to the function contents.
+            for ea, names in newcontents:
+                for name in names:
+                    internal.tags.reference.contents.increment(ea, name, target=start)
+                logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Added {:d} tag{:s} to the contents address {:#x} of the adjusted function ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, new_start, len(names), '' if len(names) == 1 else 's', ea, start))
+
+            # Now we can remove each global that was moved into the function.
+            for ea, names in newcontents:
+                for name in names:
+                    internal.tags.reference.globals.decrement(ea, name)
+                logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Removed {:d} tag{:s} from the globals address {:#x} due to it being added to the function {:#x}.".format('.'.join([__name__, cls.__name__]), start, stop, new_start, len(names), '' if len(names) == 1 else 's', ea, start))
+
+            # And remove the globals that were associated with the old address.
+            for name in old:
+                internal.tags.reference.globals.decrement(start, name)
+
+            cls.move_entry(pfn, new_start)
+            return
+
+        # If new_start has removed some addresses from the function, then we
+        # need to transform any removed content tags into global tags.
+        elif start < new_start:
+            contents = cls.contents(pfn, [(start, new_start)])
+
+            # Add each contents address within the range as a global.
+            for ea, names in contents:
+                for name in names:
+                    internal.tags.reference.globals.increment(ea, name)
+                logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Added {:d} tag{:s} to the globals address {:#x} from the adjusted function ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, new_start, len(names), '' if len(names) == 1 else 's', ea, start))
+
+            # Now we can remove each contents tag that was migrated.
+            for ea, names in contents:
+                for name in names:
+                    internal.tags.reference.contents.decrement(ea, name, target=start)
+                logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Removed {:d} tag{:s} from the contents address {:#x} due to it being removed from the function {:#x}.".format('.'.join([__name__, cls.__name__]), start, stop, new_start, len(names), '' if len(names) == 1 else 's', ea, start))
+
+            cls.move_entry(pfn, new_start)
+            return
+
+        logging.debug(u"{:s}.set_func_start({:#x}..{:#x}, {:#x}) : Received an invalid event due to there being no difference between old start ({:#x}) and new start ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, new_start, start, new_start))
+
+    @classmethod
+    def set_func_end(cls, pfn, new_end):
+        """This is called when the user changes the ending of the function to another address.
+
+        If this happens, we simply walk from the old end of the function to the new
+        end of the function that was changed. Then we can update the reference count
+        for any globals that were tagged by moving them into the function's tagcache.
+        """
+        start, stop = interface.range.unpack(pfn)
+
+        # If new_end has added addresses to the function, then we need to
+        # snapshot the globals tags and transform them into content tags.
+        if new_end > stop:
+            newcontents = cls.globals(pfn, [(stop, new_end)])
+
+            # Add each global within the range to the function contents.
+            for ea, names in newcontents:
+                for name in names:
+                    internal.tags.reference.contents.increment(ea, name, target=start)
+                logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Added {:d} tag{:s} to the contents address {:#x} of the adjusted function ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, new_end, len(names), '' if len(names) == 1 else 's', ea, start))
+
+            # Now we can remove each global that was moved into the function.
+            for ea, names in newcontents:
+                for name in names:
+                    internal.tags.reference.globals.decrement(ea, name)
+                logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Removed {:d} tag{:s} from the globals address {:#x} due to it being added to the function {:#x}.".format('.'.join([__name__, cls.__name__]), start, stop, new_end, len(names), '' if len(names) == 1 else 's', ea, start))
+            return
+
+        # If new_end has removed some addresses from the function, then we will
+        # need to transform their content tags back into global tags.
+        elif new_end < stop:
+            contents = cls.contents(pfn, [(new_end, stop)])
+
+            # Add each contents address within the range as a global.
+            for ea, names in contents:
+                for name in names:
+                    internal.tags.reference.globals.increment(ea, name)
+                logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Added {:d} tag{:s} to the globals address {:#x} from the adjusted function ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, new_end, len(names), '' if len(names) == 1 else 's', ea, start))
+
+            for ea, names in contents:
+                for name in names:
+                    internal.tags.reference.contents.decrement(ea, name, target=start)
+                logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Removed {:d} tag{:s} from the contents address {:#x} due to it being removed from the function {:#x}.".format('.'.join([__name__, cls.__name__]), start, stop, new_end, len(names), '' if len(names) == 1 else 's', ea, start))
+            return
+
+        logging.debug(u"{:s}.set_func_end({:#x}..{:#x}, {:#x}) : Received an invalid event due to there being no difference between old end ({:#x}) and new end ({:#x}).".format('.'.join([__name__, cls.__name__]), start, stop, new_end, stop, new_end))
+
+    @classmethod
+    def removing_func_tail(cls, pfn, tail):
+        '''This hook is for when a chunk is removed from a function on older versions of the disassembler.'''
+
+        # the only difference here is that the event has different name.
+        return cls.deleting_func_tail(pfn, tail)
+
+    @classmethod
+    def func_tail_removed(cls, pfn, ea):
+        """This hook is for when a chunk is removed from a function in older versions of the disassembler.
+
+        We simply iterate through the old chunk, decrease all of its tags in the
+        function context, and increase their reference within the global context.
+        """
+        start, stop = interface.range.unpack(pfn)
+
+        # first we'll grab the addresses from our refs
+        listable = internal.tags.reference.contents.address(ea, target=start)
+
+        # these should already be sorted, so our first step is to filter out what
+        # doesn't belong. in order to work around one of the issues posed in the
+        # issue arizvisa/ida-minsc#61, we need to explicitly check that each item is
+        # not None prior to their comparison against `pfn`. this is needed in order
+        # to work around a null-pointer exception raised by SWIG when it calls the
+        # area_t.__ne__ method to do the comparison.
+        tail, missing = ea, [ item for item in listable if not idaapi.get_func(item) or idaapi.get_func(item) != pfn ]
+
+        # if there was nothing found, then we can simply exit the hook early
+        if not missing:
+            return
+
+        logging.debug(u"{:s}.func_tail_removed({:#x}..{:#x}, {:#x}) : Updating the tags for the function tail being removed at address {:#x} to {:#x}.".format('.'.join([__name__, cls.__name__]), start, stop, tail, start, stop))
+
+        # now iterate through the min/max of the list as hopefully this is
+        # our event.
+        for ea in interface.address.items(min(missing), max(missing)):
+            for k in internal.tags.address.get(ea):
+                internal.tags.reference.contents.decrement(ea, k, target=start)
+                internal.tags.reference.globals.increment(ea, k)
+                logging.debug(u"{:s}.func_tail_removed({:#x}..{:#x}, {:#x}) : Exchanging (increasing) reference count at {:#x} for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format('.'.join([__name__, cls.__name__]), start, stop, tail, ea, utils.string.repr(k), utils.string.repr(k)))
+            continue
+        return
+
+    @classmethod
+    def tail_owner_changed(cls, tail, owner_func):
+        """This hook is for when a chunk is moved to another function and is for older versions of the disassembler.
+
+        We simply iterate through the new chunk, decrease all of its tags in its
+        previous function's context, and increase their reference within the new
+        function's context.
+        """
+        # XXX: this is for older versions of IDA
+
+        # this is easy as we just need to walk through tail and add it
+        # to owner_func
+        for ea in interface.address.items(interface.range.bounds(tail)):
+            for k in internal.tags.address.get(ea):
+                internal.tags.reference.contents.decrement(ea, k)
+                internal.tags.reference.contents.increment(ea, k, target=owner_func)
+                logging.debug(u"{:s}.tail_owner_changed({:#x}, {:#x}) : Exchanging (increasing) reference count for contents tag {!s} and (decreasing) reference count for contents tag {!s}.".format('.'.join([__name__, cls.__name__]), interface.range.start(tail), owner_func, utils.string.repr(k), utils.string.repr(k)))
+            continue
+        return
+
+    @classmethod
+    def del_func(cls, pfn):
+        """This is called when a function is removed/deleted in one single shot on older versions of the disassembler.
+
+        When a function is removed, all of its tags get moved from the function back
+        into the database as global tags. We iterate through the entire function and
+        transform its tags by decreasing its reference count within the function,
+        and then increasing it for the database. Afterwards we simply remove the
+        reference count cache for the function.
+        """
+        start, stop = bounds = interface.range.bounds(pfn)
+        ea, chunks = start, [interface.range.unpack(ch) for ch in interface.function.chunks(pfn)]
+        contents = cls.contents(pfn, chunks)
+
+        # just need to make everything a global... plain and simple (hopefully).
+        for ea, names in contents:
+            for name in names:
+                internal.tags.reference.globals.increment(ea, name)
+            continue
+
+        # And then we can remove everything from the function.
+        removed = cls.erase(fn, chunks)
+
 class structures(changingchanged):
     """
     This namespace handles the 2-part event that can be dispatched by the
