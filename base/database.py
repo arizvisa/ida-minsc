@@ -485,6 +485,7 @@ class functions(object):
         `thunk` - Filter the functions for any that are thunks
         `export` or `exports` - Filter the functions for any that are exports
         `entrypoint` or `entrypoints` - Filter the functions for any that are entrypoints
+        `result` - Filter the functions for any that return the specified type
         `listed` - Filter the functions for any with a listed name
         `predicate` - Filter the functions by passing their ``idaapi.func_t`` to a callable
 
@@ -508,7 +509,7 @@ class functions(object):
     __matcher__.alias('decorated', 'mangled')
     __matcher__.combinator('arguments', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), function.type, operator.methodcaller('get_nargs'))
     __matcher__.alias('args', 'arguments')
-    __matcher__.mapping('typed', operator.truth, lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
+    __matcher__.mapping('typed', operator.truth, interface.address.has_typeinfo)
     __matcher__.mapping('decompiled', operator.truth, function.type.decompiled)
     __matcher__.mapping('library', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_LIB))
     __matcher__.mapping('wrapper', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
@@ -516,6 +517,9 @@ class functions(object):
     __matcher__.mapping('thunk', operator.truth, interface.function.by_address, operator.attrgetter('flags'), utils.fpartial(operator.and_, idaapi.FUNC_THUNK))
     __matcher__.combinator('listed', utils.fcompose(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fcompose, utils.fthrough(utils.fidentity, utils.fcompose(idaapi.get_nlist_idx, idaapi.get_nlist_ea)), utils.funpack(operator.eq))))
     __matcher__.alias('list', 'listed')
+
+    # FIXME: add supporting sequences of types using interface.typematch
+    __matcher__.combinator('result', utils.fpartial(utils.fpartial, interface.tinfo.same), interface.tinfo.function_details, utils.nth(1), operator.attrgetter('rettype'), interface.tinfo.copy)
 
     # FIXME: we determine a frame is missing by checking if its `func_t.frame`
     #        is `idaapi.BADNODE`. this might be a terrible idea and there's a
