@@ -634,7 +634,7 @@ class functions(object):
 
             # Figure out the maximum values for each of these attributes
             blocks = max(len(builtins.list(function.blocks(func, silent=True))), blocks)
-            exits = max(len(builtins.list(function.bottom(func))), exits)
+            exits = max(len(builtins.list(function.leave(func))), exits)
             refs = max(len(xref.up(ea)), refs)
             lvars = max(func.frsize, lvars)
             avars = max(Fcount_avars(func), avars)
@@ -697,7 +697,7 @@ class functions(object):
                 func.frsize, clvars,
                 Fcount_avars(func), cavars,
                 len(xref.up(ea)), crefs,
-                len(builtins.list(function.bottom(func))), cexits,
+                len(builtins.list(function.leave(func))), cexits,
                 " exceptions:{:d}+{:d}/{:d}".format(blkcount - trycount, trycount, ehcount) if tb else ''
             ))
         return
