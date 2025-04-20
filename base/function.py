@@ -337,14 +337,36 @@ def address(frame):
     if res is None:
         raise interface.function.missing(frame)
     return interface.range.start(res)
-top = addr = utils.alias(address)
+top = addr = enter = utils.alias(address)
 
 @utils.multicase()
 def bottom():
-    '''Return the exit-points of the current function.'''
-    return bottom(ui.current.function())
+    '''Return the bottom address of the chunk at the current address.'''
+    ea = ui.current.address()
+    return interface.range.end(interface.function.chunk(ea, ea))
+@utils.multicase(ea=types.integer)
+def bottom(ea):
+    '''Return the bottom address of the chunk at the address `ea`.'''
+    return interface.range.end(interface.function.chunk(ea, ea))
 @utils.multicase(func=(idaapi.func_t, types.integer))
 def bottom(func):
+    '''Return the bottom address of the chunk for the entrypoint of the function `func`.'''
+    fn = interface.function.by(func)
+    return interface.range.end(fn)
+@utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
+def bottom(frame):
+    '''Return the bottom address of the chunk for the function with the specified `frame`.'''
+    res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
+    if res is None:
+        raise interface.function.missing(frame)
+    return interface.range.end(res)
+
+@utils.multicase()
+def leave():
+    '''Return the exit-points of the current function.'''
+    return leave(ui.current.function())
+@utils.multicase(func=(idaapi.func_t, types.integer))
+def leave(func):
     '''Return the exit-points of the function `func`.'''
     fn = interface.function.by(func)
     fc = blocks.flowchart(fn, idaapi.FC_PREDS)
@@ -357,12 +379,12 @@ def bottom(func):
     )
     return tuple(database.address.prev(interface.range.end(item)) for item in fc if item.type in exit_types)
 @utils.multicase(frame=(idaapi.struc_t, internal.structure.structure_t))
-def bottom(frame):
+def leave(frame):
     '''Return the exit-points of the function that owns the specified `frame`.'''
     res = interface.function.by_frame(frame if isinstance(frame, idaapi.struc_t) else frame.ptr)
     if res is None:
         raise interface.function.missing(frame)
-    return bottom(res)
+    return leave(res)
 
 @utils.multicase()
 def marks():
