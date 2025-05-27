@@ -9143,8 +9143,8 @@ class typematch(object):
 
         > collection = typematch(['signed long', 'char[]', 'struct mystruc**'])
         > iterable = typematch.collect_scalars_from_type(typeinfo)
-        > print( typematch.use(collection, iterable) )
-        > for type in typematch.select(collection, iterable): ...
+        > print( typematch.use_subtypes(collection, iterable) )
+        > for type in typematch.select_subtypes(collection, iterable): ...
         > for candidate in typematch.candidates(collection, sometype): ...
 
     """
@@ -9402,8 +9402,8 @@ class typematch(object):
         return collection.get(key_flags, collection.get((base,), []))
 
     @classmethod
-    def use(cls, collection, subtypes):
-        '''Return whether the specified `type` is composed of any of the types from the given `collection`.'''
+    def use_subtypes(cls, collection, subtypes):
+        '''Return whether any of the specified `subtypes` are composed of any of the types from the given `collection`.'''
         result = False
         for subtype in subtypes:
             key = subtype.get_ordinal() or subtype.get_type_name()
@@ -9420,12 +9420,12 @@ class typematch(object):
         return result
 
     @classmethod
-    def select(cls, collection, subtypes):
-        '''Yield each type from the specified `subtypes` that match a type from the given `collection`.'''
+    def select_subtypes(cls, collection, subtypes):
+        '''Yield each subtype from the specified `subtypes` that match a type from the given `collection`.'''
         for subtype in subtypes:
             key = subtype.get_ordinal() or subtype.get_type_name()
             candidates = collection[key] if key in collection else cls.candidates(collection, subtype)
-            if candidates:
+            if any(tinfo.compare(ti, subtype) for ti in candidates):
                 yield subtype, candidates
             continue
         return
