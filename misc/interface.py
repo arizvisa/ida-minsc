@@ -9420,6 +9420,12 @@ class typematch(object):
         return result
 
     @classmethod
+    def use(cls, collection, type):
+        '''Return whether the specified `type` is composed of any of the types from the given `collection`.'''
+        subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
+        return cls.use_subtypes(collection, subtypes)
+
+    @classmethod
     def select_subtypes(cls, collection, subtypes):
         '''Yield each subtype from the specified `subtypes` that match a type from the given `collection`.'''
         for subtype in subtypes:
@@ -9428,6 +9434,14 @@ class typematch(object):
             if any(tinfo.compare(ti, subtype) for ti in candidates):
                 yield subtype, candidates
             continue
+        return
+
+    @classmethod
+    def select(cls, collection, type):
+        '''Yield each subtype from the specified `type` that match a type from the given `collection`.'''
+        subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
+        for subtype, candidates in cls.select_subtypes(collection, subtypes):
+            yield subtype, candidates
         return
 
 ## figure out the boundaries of sval_t
