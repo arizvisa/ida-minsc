@@ -9414,7 +9414,7 @@ class typematch(object):
 
             # Check any of the candidates that were found from the collection
             # for any types that are also castable to the current subtype.
-            if any(tinfo.compare(ti, subtype) for ti in candidates):
+            if any(tinfo.equals(ti, subtype) for ti in candidates):
                 return True
             continue
         return result
@@ -9431,7 +9431,7 @@ class typematch(object):
         for subtype in subtypes:
             key = subtype.get_ordinal() or subtype.get_type_name()
             candidates = collection[key] if key in collection else cls.candidates(collection, subtype)
-            if any(tinfo.compare(ti, subtype) for ti in candidates):
+            if any(tinfo.equals(ti, subtype) for ti in candidates):
                 yield subtype, candidates
             continue
         return
