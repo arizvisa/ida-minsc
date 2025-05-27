@@ -9142,9 +9142,8 @@ class typematch(object):
     Some ways to utilize this namespace are::
 
         > collection = typematch(['signed long', 'char[]', 'struct mystruc**'])
-        > iterable = typematch.collect_scalars_from_type(typeinfo)
-        > print( typematch.use_subtypes(collection, iterable) )
-        > for type in typematch.select_subtypes(collection, iterable): ...
+        > print( typematch.use(collection, type_or_prototype) )
+        > for subtype, matches in typematch.select(collection, type_or_prototype): ...
         > for candidate in typematch.candidates(collection, sometype): ...
 
     """
