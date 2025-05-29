@@ -590,6 +590,22 @@ class ida_hexrays_types(object):
     vdloc_t             = Fget_type_from_module(ida_hexrays, 'vdloc_t')
     vivl_t              = Fget_type_from_module(ida_hexrays, 'vivl_t')
     voff_t              = Fget_type_from_module(ida_hexrays, 'voff_t')
+
+    ceinsn_t            = Fget_type_from_module(ida_hexrays, 'ceinsn_t')
+    cif_t               = Fget_type_from_module(ida_hexrays, 'cif_t')
+    cloop_t             = Fget_type_from_module(ida_hexrays, 'cloop_t')
+    cfor_t              = Fget_type_from_module(ida_hexrays, 'cfor_t')
+    cwhile_t            = Fget_type_from_module(ida_hexrays, 'cwhile_t')
+    cdo_t               = Fget_type_from_module(ida_hexrays, 'cdo_t')
+    creturn_t           = Fget_type_from_module(ida_hexrays, 'creturn_t')
+    cgoto_t             = Fget_type_from_module(ida_hexrays, 'cgoto_t')
+    casm_t              = Fget_type_from_module(ida_hexrays, 'casm_t')
+    cblock_t            = Fget_type_from_module(ida_hexrays, 'cblock_t')
+    carg_t              = Fget_type_from_module(ida_hexrays, 'carg_t')
+    carglist_t          = Fget_type_from_module(ida_hexrays, 'carglist_t')
+    ccase_t             = Fget_type_from_module(ida_hexrays, 'ccase_t')
+    ccases_t            = Fget_type_from_module(ida_hexrays, 'ccases_t')
+    cswitch_t           = Fget_type_from_module(ida_hexrays, 'cswitch_t')
     del(Fget_type_from_module)
 
     ## just some type groups to reduce amount of typing needed for multicase decorations.
