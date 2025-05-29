@@ -504,6 +504,22 @@ class ida_hexrays_template(object):
     ctext_position_t = missing_class
     qstring_printer_t = missing_class
 
+    ceinsn_t = missing_class
+    cif_t = missing_class
+    cloop_t = missing_class
+    cfor_t = missing_class
+    cwhile_t = missing_class
+    cdo_t = missing_class
+    creturn_t = missing_class
+    cgoto_t = missing_class
+    casm_t = missing_class
+    cblock_t = missing_class
+    carg_t = missing_class
+    carglist_t = missing_class
+    ccase_t = missing_class
+    ccases_t = missing_class
+    cswitch_t = missing_class
+
     has_cached_cfunc = use_callable(utils.fconstant(False))
 
     user_labels_begin = user_labels_end = user_labels_next = user_labels_first = user_labels_second = missing_callable
