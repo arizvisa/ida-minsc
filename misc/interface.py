@@ -9401,24 +9401,6 @@ class typematch(object):
         return collection.get(key_flags, collection.get((base,), []))
 
     @classmethod
-    def use_subtypes(cls, collection, subtypes):
-        '''Return whether any of the specified `subtypes` are composed of any of the types from the given `collection`.'''
-        result = False
-        for subtype in subtypes:
-            key = subtype.get_ordinal() or subtype.get_type_name()
-            if key not in collection:
-                candidates = cls.candidates(collection, subtype)
-            else:
-                candidates = collection[key]
-
-            # Check any of the candidates that were found from the collection
-            # for any types that are also castable to the current subtype.
-            if any(tinfo.equals(ti, subtype) for ti in candidates):
-                return True
-            continue
-        return result
-
-    @classmethod
     def use(cls, collection, type):
         '''Return whether the specified `type` is composed of any of the types from the given `collection`.'''
         subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
