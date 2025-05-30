@@ -9325,7 +9325,7 @@ class typematch(object):
 
             # We attempt to force every type into a named type so that we
             # can use the serialized data as the key when it's complex.
-            Fnamed_type and idaapi.replace_ordinal_typerefs(library, ti)
+            Fnamed_type and Fnamed_type(ti)
             key = cls.unpack(ti)
 
             # If the key used to represent our type has
@@ -9379,6 +9379,68 @@ class typematch(object):
         '''Recursively yield each individual type that composes the specified function `prototype`.'''
         library, iterable = tinfo.library(type), itertools.chain((subtype for _, subtype, _ in tinfo.function(prototype)), [prototype])
         return cls.collect_scalars_from_types(library, [type for type in iterable])
+
+    @classmethod
+    def collect_scalars_from_pointer(cls, library, type):
+        '''Yield each scalar type for the specified pointer `type` from a type `library`.'''
+        bytes, fields, comments = type.serialize()
+        data = bytearray(bytes)
+
+        # If it's not a pointer, then there's nothing for us to yield.
+        if not type.is_ptr():
+            return
+
+        # Figure out the index to use for slicing the base type of the pointer.
+        iterable = (index for index, byte in enumerate(data) if byte & idaapi.TYPE_BASE_MASK != idaapi.BT_PTR)
+        index = next(iterable)
+
+        # Slice up the serialized data to extract the declaration. This way we
+        # can yield the pointer type without its modifiers and its flags.
+        slice, [decl], remaining = data[:index], data[index : index + 1], data[index + 1:]
+        base, flags, modifiers = (decl & mask for mask in cls.masks)
+
+        if modifiers == idaapi.BTM_CONST | idaapi.BTM_VOLATILE:
+            yield tinfo.get(library, slice + bytearray([base | flags | idaapi.BTM_CONST]) + remaining, fields, comments)
+            yield tinfo.get(library, slice + bytearray([base | flags | idaapi.BTM_VOLATILE]) + remaining, fields, comments)
+
+        elif modifiers:
+            yield tinfo.get(library, slice + bytearray([base | flags]) + remaining, fields, comments)
+
+        if flags and base != idaapi.BT_COMPLEX:
+            yield tinfo.get(library, slice + bytearray([base]) + remaining, fields, comments)
+
+        # Go through and remove a dereference from the pointer type so that we
+        # can serialize the pointer type and slice up its declaration type.
+        subtype = type
+        while subtype.is_ptr():
+            subtype = idaapi.remove_pointer(subtype)
+            yield tinfo.copy(subtype, library)
+
+            bytes, fields, comments = subtype.serialize()
+            data = bytearray(bytes)
+
+            # Determine the index that we'll need to use to extract the base
+            # type for the pointer by skipping over all the BT_PTR bytes.
+            iterable = (index for index, byte in enumerate(data) if byte & idaapi.TYPE_BASE_MASK != idaapi.BT_PTR)
+            index = next(iterable)
+
+            # Slice up the serialized data so that we can extract its
+            # declaration type. Then we can yield a variation of the current
+            # pointer type without its modifiers and without its flags.
+            slice, [decl], remaining = data[:index], data[index : index + 1], data[index + 1:]
+            base, flags, modifiers = (decl & mask for mask in cls.masks)
+
+            if modifiers == idaapi.BTM_CONST | idaapi.BTM_VOLATILE:
+                yield tinfo.get(library, slice + bytearray([base | flags | idaapi.BTM_CONST]) + remaining, fields, comments)
+                yield tinfo.get(library, slice + bytearray([base | flags | idaapi.BTM_VOLATILE]) + remaining, fields, comments)
+
+            elif modifiers:
+                yield tinfo.get(library, slice + bytearray([base | flags]) + remaining, fields, comments)
+
+            if flags and base != idaapi.BT_COMPLEX:
+                yield tinfo.get(library, slice + bytearray([base]) + remaining, fields, comments)
+            continue
+        return
 
     @classmethod
     def candidates(cls, collection, type):
