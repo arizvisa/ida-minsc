@@ -5117,14 +5117,15 @@ class type(object):
         def id(cls, ea):
             '''Return the identifier of the structure at address `ea`.'''
             FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+            address = interface.address.head(ea, warn=True)
 
-            info, ea, flags = idaapi.opinfo_t(), interface.address.head(ea, warn=True), interface.address.flags(ea)
+            info, flags = idaapi.opinfo_t(), interface.address.flags(address)
             if flags & idaapi.DT_TYPE != FF_STRUCT:
                 raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, FF_STRUCT, flags & idaapi.DT_TYPE))
 
-            ok = idaapi.get_opinfo(ea, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, ea, idaapi.OPND_ALL, flags)
+            ok = idaapi.get_opinfo(address, idaapi.OPND_ALL, flags, info) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(info, address, idaapi.OPND_ALL, flags)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to `{:s}({:#x}, {:d}, {:#x})` failed for the address at {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, utils.pycompat.fullname(idaapi.get_opinfo), ea, idaapi.OPND_ALL, flags, ea))
+                raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to `{:s}({:#x}, {:d}, {:#x})` failed for the address at {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, utils.pycompat.fullname(idaapi.get_opinfo), address, idaapi.OPND_ALL, flags, ea))
             return info.tid
 
         @utils.multicase()
