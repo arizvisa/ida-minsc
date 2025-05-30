@@ -9281,13 +9281,10 @@ class typematch(object):
                 subtype = tinfo.at_ordinal(ordinal, library) if ordinal else tinfo.at_name(name, library)
                 queue.append(subtype) if subtype else queue
 
-            # If it's a pointer, then we dereference until we get to a concrete type.
+            # If it's a pointer, then use our implementation to grab variations.
             elif ti.is_ptr():
-                subtype, components = ti, []
-                while subtype.is_ptr():
-                    subtype = idaapi.remove_pointer(subtype)
-                    components.append(subtype)
-                queue.extend(components)
+                iterable = cls.collect_scalars_from_pointer(library, ti)
+                queue.extend(iterable)
 
             # An array only requires us to know its element type.
             elif ti.is_array():
@@ -9357,13 +9354,11 @@ class typematch(object):
                 subtype = tinfo.at_ordinal(ordinal, library) if ordinal else tinfo.at_name(name, library)
                 queue.append(subtype) if subtype else queue
 
-            # If it's a pointer, then we dereference until we get to a concrete type.
+            # If it's a pointer, then we can use collect_scalars_from_pointer to
+            # gather all candidate variations of the pointer type.
             elif ti.is_ptr():
-                subtype, components = ti, []
-                while subtype.is_ptr():
-                    subtype = idaapi.remove_pointer(subtype)
-                    components.append(subtype)
-                queue.extend(components)
+                iterable = cls.collect_scalars_from_pointer(library, ti)
+                queue.extend(iterable)
 
             # If it's an enumeration, then we only need to queue up its base type.
             elif ti.is_enum():
