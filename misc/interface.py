@@ -9143,6 +9143,7 @@ class typematch(object):
 
         > collection = typematch(['signed long', 'char[]', 'struct mystruc**'])
         > print( typematch.use(collection, type_or_prototype) )
+        > print( typematch.like(collection, type_or_prototype) )
         > for subtype, matches in typematch.select(collection, type_or_prototype): ...
         > for candidate in typematch.candidates(collection, sometype): ...
 
@@ -9401,13 +9402,6 @@ class typematch(object):
         return collection.get(key_flags, collection.get((base,), []))
 
     @classmethod
-    def use(cls, collection, type):
-        '''Return whether the specified `type` is composed of any of the types from the given `collection`.'''
-        subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
-        iterable = cls.__select_subtypes__(collection, subtypes)
-        return True if next(iterable, False) else False
-
-    @classmethod
     def __select_subtypes__(cls, collection, subtypes):
         '''Yield each subtype from the specified `subtypes` that match a type from the given `collection`.'''
         for subtype in subtypes:
@@ -9419,12 +9413,26 @@ class typematch(object):
         return
 
     @classmethod
+    def use(cls, collection, type):
+        '''Return whether the specified `type` is composed of any of the types from the given `collection`.'''
+        subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
+        iterable = cls.__select_subtypes__(collection, subtypes)
+        return True if next(iterable, False) else False
+
+    @classmethod
     def select(cls, collection, type):
         '''Yield each subtype from the specified `type` that match a type from the given `collection`.'''
         subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
         for subtype, candidates in cls.__select_subtypes__(collection, subtypes):
             yield subtype, candidates
         return
+
+    @classmethod
+    def like(cls, collection, type):
+        '''Return whether the specified `type` is related to any of the types from the given `collection`.'''
+        subtypes = cls.collect_scalars_from_type(type)
+        iterable = cls.__select_subtypes__(collection, subtypes)
+        return True if next(iterable, False) else False
 
 ## figure out the boundaries of sval_t
 if idaapi.BADADDR == 0xffffffff:
