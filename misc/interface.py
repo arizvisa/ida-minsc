@@ -9422,10 +9422,11 @@ class typematch(object):
     def use(cls, collection, type):
         '''Return whether the specified `type` is composed of any of the types from the given `collection`.'''
         subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
-        return cls.use_subtypes(collection, subtypes)
+        iterable = cls.__select_subtypes__(collection, subtypes)
+        return True if next(iterable, False) else False
 
     @classmethod
-    def select_subtypes(cls, collection, subtypes):
+    def __select_subtypes__(cls, collection, subtypes):
         '''Yield each subtype from the specified `subtypes` that match a type from the given `collection`.'''
         for subtype in subtypes:
             key = subtype.get_ordinal() or subtype.get_type_name()
@@ -9439,7 +9440,7 @@ class typematch(object):
     def select(cls, collection, type):
         '''Yield each subtype from the specified `type` that match a type from the given `collection`.'''
         subtypes = cls.collect_types_from_prototype(type) if type.is_func() or type.is_funcptr() else cls.collect_types_from_type(type)
-        for subtype, candidates in cls.select_subtypes(collection, subtypes):
+        for subtype, candidates in cls.__select_subtypes__(collection, subtypes):
             yield subtype, candidates
         return
 
