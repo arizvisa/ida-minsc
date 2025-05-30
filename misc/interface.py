@@ -9262,7 +9262,8 @@ class typematch(object):
             # We attempt to force every type into a named type so that we
             # can use the serialized data as the key when it's complex.
             Fnamed_type and idaapi.replace_ordinal_typerefs(library, ti)
-            key = cls.unpack(ti)
+            key, decl = cls.unpack(ti), ti.get_decltype()
+            base, flags, modifiers = (decl & mask for mask in cls.masks)
 
             # If the key used to represent our type has
             # already been queued, then we can skip it.
@@ -9307,6 +9308,18 @@ class typematch(object):
             elif ti.is_enum():
                 subtype = tinfo.enumeration(ti)
                 queue.append(subtype)
+
+            # If it's an integer, boolean, or floating-point type, then queue
+            # variations of the type without its flags or individual modifiers.
+            elif ti.is_bool() or ti.is_int() or ti.is_float():
+                if modifiers == idaapi.BTM_CONST | idaapi.BTM_VOLATILE:
+                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_CONST))
+                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_VOLATILE))
+
+                elif modifiers:
+                    queue.append(idaapi.tinfo_t(base | flags))
+
+                flags and queue.append(idaapi.tinfo_t(base))
 
             # All of the type's components have been processed, so
             # we only need to yield a copy of it back to the caller.
