@@ -203,16 +203,45 @@ class ida_hexrays_template(object):
     m_fdiv = 0x48
 
     cot_empty = 0
-    cot_call = 57
-    cot_num = 61
-    cot_fnum = 62
-    cot_str = 63
-    cot_helper = 68
-    cit_empty = 70
-    cit_block = 71
-    cit_return = 80
-    cit_goto = 81
-    cit_asm = 82
+    cot_asg = 2             # x = y
+    cot_asgbor = 3          # x |= y
+    cot_asgxor = 4          # x ^= y
+    cot_asgband = 5         # x &= y
+    cot_asgadd = 6          # x += y
+    cot_asgsub = 7          # x -= y
+    cot_asgmul = 8          # x *= y
+    cot_asgsshr = 9         # x >>= y signed
+    cot_asgushr = 10        # x >>= y unsigned
+    cot_asgshl = 11         # x <<= y
+    cot_asgsdiv = 12        # x /= y signed
+    cot_asgudiv = 13        # x /= y unsigned
+    cot_asgsmod = 14        # x %= y signed
+    cot_asgumod = 15        # x %= y unsigned
+
+    cot_call = 57           # x(...)
+    cot_index = 58          # x[y]
+    cot_memref = 59         # x.m
+    cot_memptr = 60         # x->m, access size in 'ptrsize'
+    cot_num = 61            # n
+    cot_fnum = 62           # fpc
+    cot_str = 63            # string constant
+    cot_obj = 64            # obj_ea
+    cot_helper = 68         # arbitrary name
+    cot_type = 69           # arbitrary type
+
+    cit_empty = 70          # instruction types start here
+    cit_block = 71          # block-statement: { ... }
+    cit_expr = 72           # expression-statement: expr;
+    cit_if = 73             # if-statement
+    cit_for = 74            # for-statement
+    cit_while = 75          # while-statement
+    cit_do = 76             # do-statement
+    cit_switch = 77         # switch-statement
+    cit_break = 78          # break-statement
+    cit_continue = 79       # continue-statement
+    cit_return = 80         # return-statement
+    cit_goto = 81           # goto-statement
+    cit_asm = 82            # asm-statement
 
     MMIDX_GLBLOW = 0
     MMIDX_LVARS = 1
