@@ -5131,6 +5131,18 @@ class type(object):
 
         @utils.multicase()
         @classmethod
+        def name(cls):
+            '''Return the name of the structure at the current address.'''
+            return cls.name(ui.current.address())
+        @utils.multicase(ea=internal.types.integer)
+        @classmethod
+        def name(cls, ea):
+            '''Return the name of the structure at the address `ea`.'''
+            sid = cls.id(ea)
+            return _structure.name(sid)
+
+        @utils.multicase()
+        @classmethod
         def folded(cls):
             '''Return whether the structure displayed at the current address has been folded into a single line.'''
             return cls.folded(ui.current.address())
