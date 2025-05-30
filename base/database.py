@@ -1906,6 +1906,9 @@ class exports(object):
             return interface.entries.has(type['index'])
         elif type:
             raise E.InvalidParameterError(u"{:s}.has({:s}) : The given keyword parameter{:s} not supported.".format('.'.join([__name__, cls.__name__]), utils.string.kwargs(type), ' is' if len(type) == 1 else 's are'))
+
+        # otherwise use the current address to check for an entry point.
+        ea = ui.current.address()
         address, _ = interface.range.bounds(interface.function.by_address(ea)) if interface.function.has(ea) else (interface.address.inside(ea), 0)
         return interface.entries.has_address(address)
     @utils.multicase(ea=internal.types.integer)
