@@ -1031,7 +1031,14 @@ class variable(object):
     def get_locator(cls, reference):
         '''Return the ``ida_hexrays.lvar_locator_t`` for the variable described by the specified `reference`.'''
         types = ida_hexrays_types.lvar_ref_t, ida_hexrays_types.var_ref_t, ida_hexrays_types.lvar_t, ida_hexrays_types.lvar_locator_t
-        if not isinstance(reference, types):
+
+        # first check if we were given an expression of the correct op type.
+        if isinstance(reference, ida_hexrays_types.citem_t) and reference.op in {ida_hexrays.cot_var}:
+            expr = reference if isinstance(reference, ida_hexrays_types.cexpr_t) else reference.cexpr
+            reference = expr.v
+
+        # otherwise it needs to be one of the supported types to continue.
+        elif not isinstance(reference, types):
             raise exceptions.InvalidTypeOrValueError(u"{:s}.get_locator({!r}) : Unable to fetch the variable locator from the requested reference ({!r}) due to it being an unsupported type {:s}.".format('.'.join([__name__, cls.__name__]), reference, reference, utils.pycompat.fullname(reference.__class__)))
 
         elif isinstance(reference, ida_hexrays_types.lvar_locator_t):
