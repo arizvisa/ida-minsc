@@ -218,6 +218,18 @@ class ida_hexrays_template(object):
     cot_asgsmod = 14        # x %= y signed
     cot_asgumod = 15        # x %= y unsigned
 
+    cot_fneg = 46           # -x fp
+    cot_neg = 47            # -x
+    cot_cast = 48           # (type)x
+    cot_lnot = 49           # !x
+    cot_bnot = 50           # ~x
+    cot_ptr = 51            # *x, access size in 'ptrsize'
+    cot_ref = 52            # &x
+    cot_postinc = 53        # x++
+    cot_postdec = 54        # x--
+    cot_preinc = 55         # ++x
+    cot_predec = 56         # --x
+
     cot_call = 57           # x(...)
     cot_index = 58          # x[y]
     cot_memref = 59         # x.m
@@ -226,6 +238,9 @@ class ida_hexrays_template(object):
     cot_fnum = 62           # fpc
     cot_str = 63            # string constant
     cot_obj = 64            # obj_ea
+    cot_var = 65            # v
+    cot_insn = 66           # instruction in expression, internal representation only
+    cot_sizeof = 67         # sizeof(x)
     cot_helper = 68         # arbitrary name
     cot_type = 69           # arbitrary type
 
