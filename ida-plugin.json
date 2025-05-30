@@ -1,0 +1,12 @@
+{
+  "IDAMetadataDescriptorVersion": 1,
+  "plugin": {
+    "name": "ida-minsc",
+    "entryPoint": "idapythonrc.py",
+    "categories": ["python", "library", "dwim", "hamsters", "portable", "indexed-comments", "API-scripting-and-automation", "vulnerability-research-and-exploit-development", "collaboration-and-productivity", "other"],
+    "logoPath": "http://arizvisa.github.io/ida-minsc/_images/hamster.svg",
+    "idaVersions": "<8.5",
+    "description": "IDA-minsc wraps IDAPython to provide a higher-level context-sensitive pattern-matching api that simplifies many annotation tasks. This augments things like decoding structured data from the database, adds support for indexing, tags, and python types to comments, and allows for arithmetic with things such as structures, bitmasks/enumerations, and much more.",
+    "version": "0.0.0"
+  }
+}
