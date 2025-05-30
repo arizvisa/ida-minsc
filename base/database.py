@@ -4442,6 +4442,7 @@ class type(object):
     @utils.multicase(ea=internal.types.integer)
     def __new__(cls, ea):
         '''Return the type information for the address `ea` as an ``idaapi.tinfo_t``.'''
+        ea = interface.address.head(ea, warn=True)
         return interface.address.typeinfo(ea)
     @utils.multicase(none=internal.types.none)
     def __new__(cls, none):
