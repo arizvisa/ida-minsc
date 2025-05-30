@@ -4816,7 +4816,7 @@ class type(object):
     def has(cls, ea):
         '''Return if the address at `ea` has any type information associated with it.'''
         try:
-            ok = cls(ea) is not None
+            ok = interface.address.typeinfo(ea) is not None
 
         # If we got an exception raised, then we were unable to parse this type
         # properly. Prior to failing, check to see if the name is a mangled C++
