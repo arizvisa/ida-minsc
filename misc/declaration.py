@@ -1698,7 +1698,7 @@ class mangled(object):
         if not attempt:
             cls = self.__class__
             raise internal.exceptions.DisassemblerError(u"{:s}(\"{:s}\", {:#x}{:s}) : Unable to demangle the specified symbol (type {:d}) using the disassembler.".format('.'.join([__name__, cls.__name__]), utils.string.escape(symbol, '"'), mask, '' if Ftransform is None else utils.string.kwargs({'Ftransform': utils.pycompat.fullname(Ftransform)}), self.type(symbol)))
-        decoded = self.__extract_specifiers(self.__extract_scope(attempt))
+        decoded = self.__extract_specifiers__(self.__extract_scope_(attempt))
         transformed = Ftransform(decoded) if Ftransform else decoded
         self.__decoded = transformed
         self.tokens = tokens = self.tokens[:] if hasattr(self, 'tokens') else []
@@ -1706,7 +1706,7 @@ class mangled(object):
         self.__tree__, self.__mangled = result, True if errors else False
         return transformed, order, result, errors
 
-    def __extract_specifiers(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers if string[-1:] not in _string.ascii_letters}, specifier_tokens={string for string in _declaration_specifiers if string[-1:] in _string.ascii_letters}):
+    def __extract_specifiers__(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers if string[-1:] not in _string.ascii_letters}, specifier_tokens={string for string in _declaration_specifiers if string[-1:] in _string.ascii_letters}):
         '''Remove a declaration specifier "__declspec" from the beginning of the unmangled `string` if it exists.'''
         index, _ = next(token.indices(string, breaking_characters), (-1, None)) if len(breaking_characters) > 1 else (string.find(*breaking_characters), 1)
 
@@ -1725,7 +1725,7 @@ class mangled(object):
         self.__declaration_specifier__ = ''
         return string
 
-    def __extract_scope(self, string):
+    def __extract_scope_(self, string):
         '''Remove a scope from the beginning of an unmangled `string` if it exists.'''
         point = 1 + string.find(': ')
         if string[:point] in self._declaration_scopes:
