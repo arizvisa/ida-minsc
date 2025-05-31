@@ -1712,27 +1712,27 @@ class mangled(object):
 
         point = 1 + index
         if string[:point] in self._declaration_specifiers:
-            self.__declaration_specifier = string[:point]
+            self.__declaration_specifier__ = string[:point]
             return string[point:].lstrip()
 
         # try the whitespace next...
         index = string.find(' ')
         if 0 <= index and string[:index] in self._declaration_specifiers:
-            self.__declaration_specifier = string[:index]
+            self.__declaration_specifier__ = string[:index]
             return string[index:].lstrip()
 
         # ...and then we give up.
-        self.__declaration_specifier = ''
+        self.__declaration_specifier__ = ''
         return string
 
     def __extract_scope(self, string):
         '''Remove a scope from the beginning of an unmangled `string` if it exists.'''
         point = 1 + string.find(': ')
         if string[:point] in self._declaration_scopes:
-            self.__declaration_scope = string[:point]
+            self.__declaration_scope__ = string[:point]
             return string[point:].lstrip()
 
-        self.__declaration_scope = ''
+        self.__declaration_scope__ = ''
         return string
 
     @property
@@ -1748,12 +1748,12 @@ class mangled(object):
     @property
     def scope(self):
         '''Return the scope of the decoded string after being demangled.'''
-        return self.__declaration_scope
+        return self.__declaration_scope__
 
     @property
     def specifier(self):
         '''Return the declaration specifier of the decoded string after being demangled.'''
-        return self.__declaration_specifier
+        return self.__declaration_specifier__
 
     def has(self, index):
         '''Return whether the specified `index` contains tokens inside of it.'''
