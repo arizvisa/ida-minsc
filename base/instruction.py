@@ -280,6 +280,30 @@ def ops_immediate(ea, **modifiers):
 ops_constant = ops_const = utils.alias(ops_immediate)
 
 @utils.multicase()
+def ops_load(**modifiers):
+    '''Return references to the operands that are being loaded by the current instruction.'''
+    return ops_load(ui.current.address(), **modifiers)
+@utils.multicase(ea=types.integer)
+def ops_load(ea, **modifiers):
+    '''Return references to the operands that are being loaded by the instruction at address `ea`.'''
+    ea = interface.address.inside(ea)
+    modifiers.setdefault('load', True)
+    iterable = interface.regmatch(**modifiers)(ea)
+    return tuple(iterable)
+
+@utils.multicase()
+def ops_store(**modifiers):
+    '''Return references to the operands that are being stored by the current instruction.'''
+    return ops_store(ui.current.address(), **modifiers)
+@utils.multicase(ea=types.integer)
+def ops_store(ea, **modifiers):
+    '''Return references to the operands that are being stored by the instruction at address `ea`.'''
+    ea = interface.address.inside(ea)
+    modifiers.setdefault('store', True)
+    iterable = interface.regmatch(**modifiers)(ea)
+    return tuple(iterable)
+
+@utils.multicase()
 def ops_register(**modifiers):
     '''Return references to the operands for the current instruction that are using registers.'''
     return ops_register(ui.current.address(), **modifiers)
