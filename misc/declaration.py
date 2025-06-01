@@ -2419,7 +2419,7 @@ class symbol(mangled):
     ]
 
     # random keywords that aren't worth anything other than unnecessary whitespace (really).
-    _declaration_specifiers = {'enum ', 'struct ', 'union ', 'class ', 'const ', 'volatile '}
+    _declaration_specifiers = {'enum ', 'struct ', 'union ', 'class ', 'const ', 'volatile ', 'static '}
 
     # Miscellaneous tuples for caching symbol segments.
     __cache_declaration = ()
@@ -2445,17 +2445,29 @@ class symbol(mangled):
         # need to decode the mangled symbol and parse it.
         decoded, order, tree, errors = self.__init_mangled__(mangled, self.__flags)
 
-        # FIXME: need to add support for targets where the symbol is suffixed by
-        #        braces for things like "{for $class}".
+        # Check if the unmangled string is braced, and cache its range so that
+        # it can be explored.
+        self.__declaration_and_name, self.__brace_suffix = extract.braces(decoded, None, tree[None])
 
     @property
     def __declaration_components(self):
         '''Return a cached tuple containing the extracted components of a symbol declaration.'''
         if self.__cache_declaration:
             return self.__cache_declaration
-        range = len(self.__declaration_specifier__.strip()), len(self.string)
-        declaration, name = extract.declaration_and_name(self.string, range, self.__tree__[None])
-        result = self.__cache_declaration = declaration, name
+
+        declaration, name = extract.declaration_and_name(self.string, *self.__declaration_and_name)
+
+        # the name is a requirement... so if the range for the name is not
+        # empty, then we have everything we need to return.
+        if operator.ne(*name):
+            result = self.__cache_declaration = declaration, name
+            return result
+
+        # otherwise, our name was in the declaration.
+        (_, stop) = self.__brace_suffix
+        (start, _), _ = declaration
+        newdeclaration = (start, start), []
+        result = self.__cache_declaration = newdeclaration, (start, stop)
         return result
 
     def __extract_specifiers__(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers if string[-1:] not in _string.ascii_letters}, specifier_tokens={string for string in _declaration_specifiers if string[-1:] in _string.ascii_letters}):
