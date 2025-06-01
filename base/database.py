@@ -2283,10 +2283,11 @@ class imports(object):
         `name` - Filter the imports by a name or a list of names
         `module` - Filter the imports according to the specified module name
         `fullname` - Filter the full name (module + symbol) of each import with a glob
-        `like` - Filter the symbol names of all the imports according to a glob
+        `like` - Filter the names of all the imports according to a glob
         `bounds` - Filter the imports within the given boundaries
-        `regex` - Filter the symbol names of all the imports according to a regular-expression
-        `iregex` - Filter the symbol names of all the imports according to a case-insensitive regular-expression
+        `regex` - Filter the names of all the imports according to a regular-expression
+        `iregex` - Filter the names of all the imports according to a case-insensitive regular-expression
+        `unmangled` - Filter the unmangled names of the imports using a regular-expression
         `ordinal` - Filter the imports by the import hint (ordinal) or a list of hints
         `function` - Filter the imports for any that are functions.
         `convention` or `cc` - Filter the imports for any that using the specified calling convention(s)
@@ -2351,6 +2352,8 @@ class imports(object):
     __matcher__.combinator('ordinal', utils.fcondition(utils.finstance(internal.types.integer))(utils.fpartial(utils.fpartial, operator.eq), utils.fpartial(utils.fpartial, operator.contains)), operator.itemgetter(1), operator.itemgetter(-1))
     __matcher__.combinator('iregex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __format__.__func__)
     __matcher__.combinator('regex', utils.fcompose(re.compile, operator.attrgetter('match')), operator.itemgetter(1), __format__.__func__)
+    __matcher__.combinator('unmangled', utils.fcondition(utils.finstance(internal.types.string))(utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fcompose(utils.fcompose, utils.fpartial(utils.fcondition(operator.not_), utils.fconstant(None))), utils.fcompose(utils.fpartial(utils.fcompose, utils.fthrough(utils.fcompose(utils.funpack(interface.name.mangled), utils.fpartial(operator.ne, idaapi.FF_UNK)), operator.itemgetter(-1)), utils.fcondition(builtins.all)(utils.fcompose(operator.itemgetter(-1), internal.declaration.demangle), utils.fconstant(''))), utils.fapply)), utils.fcompose(utils.fcompose(operator.truth, utils.fpartial(utils.fpartial, operator.eq)), utils.fpartial(utils.fcompose, utils.funpack(interface.name.mangled), utils.fpartial(operator.ne, idaapi.FF_UNK)))), utils.fthrough(operator.itemgetter(0), utils.fcompose(operator.itemgetter(1), operator.itemgetter(1))))
+    __matcher__.alias('demangled', 'unmangled')
     __matcher__.mapping('typed', operator.truth, operator.itemgetter(0), lambda ea: idaapi.get_tinfo2(ea, idaapi.tinfo_t()) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(idaapi.tinfo_t(), ea))
     __matcher__.combinator('tagged', utils.fcompose(utils.fcompose, utils.fcondition(utils.finstance(internal.types.bool, internal.types.integer), utils.finstance(internal.types.string))(utils.fcondition(operator.truth)(utils.fcompose(utils.fdiscard(internal.tags.select.database), utils.fpartial(utils.imap, utils.nth(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(utils.fdiscard(internal.tags.select.database), utils.fpartial(utils.imap, utils.nth(0)), internal.types.set, utils.fpartial(utils.fpartial, utils.fcompose(operator.contains, operator.not_)))), utils.fcompose(internal.tags.select.database, utils.fpartial(utils.itermap, utils.nth(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)), utils.fcompose(internal.types.set, internal.tags.select.database, utils.fpartial(utils.itermap, utils.nth(0)), internal.types.set, utils.fpartial(utils.fpartial, operator.contains)))), operator.itemgetter(0))
     __matcher__.alias('tag', 'tagged'), __matcher__.alias('tags', 'tagged')
