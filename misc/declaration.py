@@ -2489,7 +2489,7 @@ class symbol(mangled):
     def __repr__(self):
         '''Return the internal representation of the string that contains the function name.'''
         cls = self.__class__
-        return "{!s} {!r}".format(cls, self.string)
+        return "{!s} ({:s}) {!r}".format(cls, self.specifier.strip(), self.string)
 
 class selection(object):
     """
