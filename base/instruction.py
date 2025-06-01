@@ -242,35 +242,41 @@ def ops_access(ea, **modifiers):
     return tuple(iterable)
 
 @utils.multicase()
-def ops_read():
+def ops_read(**modifiers):
     '''Return references to the operands that are being read by the current instruction.'''
-    return ops_read(ui.current.address())
+    return ops_read(ui.current.address(), **modifiers)
 @utils.multicase(ea=types.integer)
-def ops_read(ea):
+def ops_read(ea, **modifiers):
     '''Return references to the operands that are being read by the instruction at address `ea`.'''
-    ops = interface.instruction.access(interface.address.inside(ea))
-    return tuple(ref for ref in ops if 'r' in ref.access)
+    ea = interface.address.inside(ea)
+    modifiers.setdefault('read', True)
+    iterable = interface.regmatch(**modifiers)(ea)
+    return tuple(iterable)
 
 @utils.multicase()
-def ops_modified():
+def ops_modified(**modifiers):
     '''Return references to the operands that are being written to or modified by the current instruction.'''
-    return ops_modified(ui.current.address())
+    return ops_modified(ui.current.address(), **modifiers)
 @utils.multicase(ea=types.integer)
-def ops_modified(ea):
+def ops_modified(ea, **modifiers):
     '''Return references to the operands that are being written to or modified by the instruction at address `ea`.'''
-    ops = interface.instruction.access(interface.address.inside(ea))
-    return tuple(ref for ref in ops if 'w' in ref.access)
+    ea = interface.address.inside(ea)
+    modifiers.setdefault('write', True)
+    iterable = interface.regmatch(**modifiers)(ea)
+    return tuple(iterable)
 ops_write = ops_modify = utils.alias(ops_modified)
 
 @utils.multicase()
-def ops_immediate():
+def ops_immediate(**modifiers):
     '''Return references to the operands for the current instruction that are immediates.'''
-    return ops_immediate(ui.current.address())
+    return ops_immediate(ui.current.address(), **modifiers)
 @utils.multicase(ea=types.integer)
-def ops_immediate(ea):
+def ops_immediate(ea, **modifiers):
     '''Return references to the operands for the instruction at address `ea` that are immediates.'''
-    ops = interface.instruction.access(interface.address.inside(ea))
-    return tuple(ref for ref in ops if not any(bit in ref.access for bit in 'rw'))
+    ea = interface.address.inside(ea)
+    modifiers.setdefault('read', False), modifiers.setdefault('write', False)
+    iterable = interface.regmatch(**modifiers)(ea)
+    return tuple(iterable)
 ops_constant = ops_const = utils.alias(ops_immediate)
 
 @utils.multicase()
