@@ -2590,8 +2590,27 @@ class name_component(selection):
     def parameters(self):
         (start, stop), segments = self.__selection__
         string = self.__string__[start : stop]
-        branch = segments[-1] if segments and string and string[-1] == '>' else (stop, stop)
-        return self.descend(angle_parameters, branch)
+        if not(segments or string):
+            return self.descend(parameters, (stop, stop))
+        elif string[-1] == '>':
+            return self.descend(angle_parameters, segments[-1])
+        elif string[-1] == '}':
+            return self.descend(brace_parameters, segments[-1])
+
+        # otherwise we passthrough here in order to return an empty paramters.
+        # FIXME: this could probably be removed and still be safe (relatively).
+        elif True:
+            pass
+
+        # none of the following parameter types are real.. they're only here as
+        # a sorta placeholder for "potentially" supported parameter types.
+        elif string[-1] == ']':
+            return self.descend(bracket_parameters, segments[-1])
+        elif string[-1] == ')':
+            return self.descend(group_parameters, segments[-1])
+        elif string[-1] == '\'' or string[-2:].strip() in '\'':
+            return self.descend(quoted_parameters, segments[-1])
+        return self.descend(parameters, (stop, stop))
 
 class parameters(selection):
     __pairs__ = {}
@@ -2630,6 +2649,7 @@ class angle_parameters(parameters): __pairs__ = {'<>'}
 class group_parameters(parameters): __pairs__ = {'()'}
 class bracket_parameters(parameters): __pairs__ = {'[]'}
 class brace_parameters(parameters): __pairs__ = {'{}'}
+class quoted_parameters(parameters): __pairs__ = {'`\''}
 
 def qualified_declaration_or_function_pointer(tree, string, range, segments):
     (start, stop) = range
