@@ -286,6 +286,23 @@ class extract(object):
         return
 
     @classmethod
+    def braces(cls, string, range, segments, group={'()', '<>', '{}'}):
+        '''Use the given `tree` to split a trailing `group` using the given `range` and `segments` from `string`.'''
+        start, stop = range if isinstance(range, tuple) else (0, len(string))
+        segments = segments[:]
+
+        # extract the last component and select the range out of the string.
+        left, right = segments.pop(-1) if segments else (stop, stop)
+        braced = string[left : right]
+
+        # if the sliced string is cuddled by a pairs, then we can return the
+        # range with segments. Otherwise, return exactly what we were given.
+        checked = braced[:1] + braced[-1:] in group
+        range = (start, left) if checked else (start, stop)
+        result = range, segments if checked else segments + [(left, right)]
+        return result, (left, right) if checked else (right, right)
+
+    @classmethod
     def elements(cls, string, range, segments, pairs={'[]'}):
         '''Yield each segment from a `string` selected bv the provided `range` and `segments` that is aligned contiguously and cuddled by any of the specified `pairs`.'''
         start, stop = range if isinstance(range, tuple) else (0, len(string))
