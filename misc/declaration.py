@@ -2569,9 +2569,17 @@ class name_component(selection):
         (start, stop), segments = self.__selection__
         if len(segments) > 1:
             (start, stop), segments = self.__correct_selection
+
+        # if everything was filtered out, then return the entire string.
         filtered = [(left, right) for left, right in segments if self.__string__[left : right] not in {' '}]
-        (point, _) = filtered[-1] if filtered else (stop, stop)
-        return self.__string__[start : point]
+        if not filtered:
+            return self.__string__[start : stop]
+
+        # otherwise go ahead and use the filter if it contains anything.
+        (point, _) = filtered[-1]
+        if start < point:
+            return self.__string__[start : point]
+        return self.__string__[start : stop]
 
     @property
     def specifier(self):
