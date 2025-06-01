@@ -2374,6 +2374,94 @@ class function(mangled):
         start, _ = parameters
         return group_parameters(self.__tree__, self.string, parameters, self.__tree__.get(start, []))
 
+class symbol(mangled):
+    """
+    This class processes a mangled symbol name for the
+    data within a database. It provides functionality
+    similar to the `function` class, but for data name
+    rather than a function name.
+    """
+    tokens = ['()', '<>', '[]', '{}', "`'", ' ', ',', '*', '&', ['::']]
+
+    # Default flags that we'll use for demangling a non-function name.
+    flags = [
+        getattr(idaapi, 'MNG_NOPTRTYP', 0x00000007),    # fear, near, __ptr64 : no way to keep ptr64
+
+        getattr(idaapi, 'MNG_ZPT_SPACE', 0x00400000),
+        getattr(idaapi, 'MNG_SHORT_S', 0x00100000),     # signed int -> sint
+        getattr(idaapi, 'MNG_SHORT_U', 0x00200000),     # unsigned int -> uint
+
+        #getattr(idaapi, 'MNG_NOECSU', 0x00002000),     # class/struct/union/enum : decided to keep this.
+        #getattr(idaapi, 'MNG_NOSTVIR', 0x00001000),    # static/virtual : decided to keep this.
+        getattr(idaapi, 'MNG_NOTHROW', 0x00000800),
+        getattr(idaapi, 'MNG_NOPOSTFC', 0x00000200),    # const suffix
+
+        getattr(idaapi, 'MNG_NOCLOSUR', 0x00008000),    # __closure
+        getattr(idaapi, 'MNG_NOUNALG', 0x00010000),     # __unaligned
+        getattr(idaapi, 'MNG_NOMANAGE', 0x00020000),    # managed underscores
+    ]
+
+    # random keywords that aren't worth anything other than unnecessary whitespace (really).
+    _declaration_specifiers = {'enum ', 'struct ', 'union ', 'class ', 'const ', 'volatile '}
+
+    # Miscellaneous tuples for caching symbol segments.
+    __cache_declaration = ()
+    __flags = functools.reduce(operator.or_, flags, getattr(idaapi, 'MNG_NOPTRTYP', 7))
+
+    def __init__(self, mangled):
+        if self.type(mangled) != self.MANGLED_DATA:
+            cls = self.__class__
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}(\"{:s}\") : Unable to demangle the given string as a symbol due to it being a non-data type ({:d}).".format('.'.join([__name__, cls.__name__]), utils.string.escape(mangled, '"'), self.type(mangled)))
+
+        # Figure out the default flags that are needed to demangle just the name. Some
+        # compilers chosen by the disassembler will return None wihout the correct flags.
+        MNG_IGN_JMP, MNG_NODEFINIT, MNG_NOECSU = (getattr(idaapi, attribute, default) for attribute, default in [('MNG_IGN_JMP', 0x04000000), ('MNG_NODEFINIT', 0x00000008), ('MNG_NOECSU', 0x00002000)])
+        name_flags = functools.reduce(operator.or_, [MNG_IGN_JMP, MNG_NODEFINIT], self.__flags & 0x00F00000)
+
+        # First we need to do a "test" demangle to determine if the "'" token has two
+        # meanings. This only happens with the "`'" segments and always ends in "''".
+        just_name = self.decode(mangled, name_flags)
+        if not just_name:
+            raise internal.exceptions.AssertionError(u"{:s}(\"{:s}\") : Unable to parse out the name from the demangled symbol returned by {:s}(\"{:s}\", {:#0{:d}x}).".format('.'.join([__name__, self.__class__.__name__]), utils.string.escape(mangled, '"'), '.'.join(item.__name__ for item in [idaapi, idaapi.demangle_name] if hasattr(item, '__name__')), utils.string.escape(mangled, '"'), self.__flags, 2 + 8))
+
+        # That should be all of the special cases, so now we just
+        # need to decode the mangled symbol and parse it.
+        decoded, order, tree, errors = self.__init_mangled__(mangled, self.__flags)
+
+        # FIXME: need to add support for targets where the symbol is suffixed by
+        #        braces for things like "{for $class}".
+
+    @property
+    def __declaration_components(self):
+        '''Return a cached tuple containing the extracted components of a symbol declaration.'''
+        if self.__cache_declaration:
+            return self.__cache_declaration
+        range = len(self.__declaration_specifier__.strip()), len(self.string)
+        declaration, name = extract.declaration_and_name(self.string, range, self.__tree__[None])
+        result = self.__cache_declaration = declaration, name
+        return result
+
+    def __extract_specifiers__(self, string, breaking_characters={string[-1:] for string in _declaration_specifiers if string[-1:] not in _string.ascii_letters}, specifier_tokens={string for string in _declaration_specifiers if string[-1:] in _string.ascii_letters}):
+        '''Remove a declaration specifier "__declspec" from the beginning of the unmangled `string` if it exists.'''
+        return super(symbol, self).__extract_specifiers__(string, breaking_characters, specifier_tokens)
+
+    @property
+    def result(self):
+        '''Return the declaration for the type of the symbol.'''
+        declaration, name = self.__declaration_components
+        return qualified_declaration_or_function_pointer(self.__tree__, self.string, *declaration)
+
+    @property
+    def name(self):
+        '''Return a list for each name component from the decoding string containing both the name and segment for the component's template parameters.'''
+        declaration, name = self.__declaration_components
+        return fullname(self.__tree__, self.string, name, self.__tree__[None])
+
+    def __repr__(self):
+        '''Return the internal representation of the string that contains the function name.'''
+        cls = self.__class__
+        return "{!s} {!r}".format(cls, self.string)
+
 class selection(object):
     """
     This class is a base class that stores a string, a tree, and a token
