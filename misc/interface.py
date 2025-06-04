@@ -9486,9 +9486,30 @@ class typematch(object):
         '''Yield each subtype from the specified `subtypes` that match a type from the given `collection`.'''
         for subtype in subtypes:
             key = subtype.get_ordinal() or subtype.get_type_name()
-            candidates = collection[key] if key in collection else cls.candidates(collection, subtype)
+            available = collection[key] if key in collection else cls.candidates(collection, subtype)
+
+            # split up the arrays from the list of candidates. this is necessary
+            # so that we can special-case the matching for arrays.
+            iterable = itertools.groupby(available, operator.methodcaller('is_array'))
+            grouped = {key : [candidate for candidate in candidates] for key, candidates in iterable}
+            candidates, arrays = ([candidate for candidate in grouped.pop(key, [])] for key in [False, True])
+
+            # first check for exact type matches against all the potential
+            # non-array candidates.
             if any(tinfo.equals(ti, subtype) for ti in candidates):
-                yield subtype, candidates
+                yield subtype, available
+
+            # otherwise, if we found some arrays and our subtype is an array,
+            # we extract the element and count from the subtype and candidates.
+            # this way we can match the array using the minimum selected count.
+            elif arrays and subtype.is_array():
+                subtypeelement, subtypecount = tinfo.array(subtype)
+                iterable = map(tinfo.array, arrays)
+                matching = ((element, count) for element, count in iterable if tinfo.equals(element, subtypeelement))
+                selected = (True for element, count in matching if count <= subtypecount)
+                if next((True for element, count in matching if count <= subtypecount), False):
+                    yield subtype, available
+                continue
             continue
         return
 
