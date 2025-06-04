@@ -9414,7 +9414,12 @@ class typematch(object):
         elif modifiers:
             yield tinfo.get(library, slice + bytearray([base | flags]) + remaining, fields, comments)
 
-        if flags and base != idaapi.BT_COMPLEX:
+        # FIXME: if there are no modifiers, this function will yield duplicates
+        #        of the pointer type without the modifiers for some reason.
+        if flags and base in {idaapi.BT_UNK, idaapi.BT_VOID, idaapi.BT_ARRAY}:
+            yield tinfo.get(library, slice + bytearray([base | flags]) + remaining, fields, comments)
+
+        elif base not in {idaapi.BT_COMPLEX, idaapi.BT_RESERVED}:
             yield tinfo.get(library, slice + bytearray([base]) + remaining, fields, comments)
 
         # Go through and remove a dereference from the pointer type so that we
@@ -9445,7 +9450,12 @@ class typematch(object):
             elif modifiers:
                 yield tinfo.get(library, slice + bytearray([base | flags]) + remaining, fields, comments)
 
-            if flags and base != idaapi.BT_COMPLEX:
+            # FIXME: if the pointer type that we're processing has no modifiers,
+            #        this loop can return duplicate entries of the pointer type.
+            if flags and base in {idaapi.BT_UNK, idaapi.BT_VOID, idaapi.BT_ARRAY}:
+                yield tinfo.get(library, slice + bytearray([base | flags]) + remaining, fields, comments)
+
+            elif base not in {idaapi.BT_COMPLEX, idaapi.BT_RESERVED}:
                 yield tinfo.get(library, slice + bytearray([base]) + remaining, fields, comments)
             continue
         return
