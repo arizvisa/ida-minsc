@@ -9250,6 +9250,31 @@ class typematch(object):
         return hash(serialized[0]), len(serialized[0]), name
 
     @classmethod
+    def collect_modifiers_from_type(cls, library, type):
+        '''Yield each combination of modifiers for a given `type` from the specified type `library`.'''
+        decl = type.get_decltype()
+
+        # unpack the different components and grab the serialized data for the
+        # type reference that we're being asked to process.
+        base, flags, modifiers = (decl & mask for mask in cls.masks)
+        bytes, fields, comments = type.serialize()
+
+        # convert the bytes into an array so that we can rebuild the type with
+        # the different combinations of modifiers that were given.
+        data = bytearray(bytes)
+
+        # if we got both modifiers, then yield each one individually.
+        if modifiers == idaapi.BTM_CONST | idaapi.BTM_VOLATILE:
+            yield tinfo.get(library, bytearray([base | flags | idaapi.BTM_CONST]) + data[1:], fields, comments)
+            yield tinfo.get(library, bytearray([base | flags | idaapi.BTM_VOLATILE]) + data[1:], fields, comments)
+
+        # if we got one modifier, then we can just yield its base type since the
+        # caller will likely yield the modified type as-is.
+        elif modifiers:
+            yield tinfo.get(library, bytearray([base | flags]) + data[1:], fields, comments)
+        return
+
+    @classmethod
     def collect_types_from_library(cls, library, types):
         '''Yield each type composing all of the specified `types` from a type `library`.'''
         Fnamed_type = functools.partial(idaapi.replace_ordinal_typerefs, library) if hasattr(idaapi, 'replace_ordinal_typerefs') else None
@@ -9281,6 +9306,11 @@ class typematch(object):
                 subtype = tinfo.at_ordinal(ordinal, library) if ordinal else tinfo.at_name(name, library)
                 queue.append(subtype) if subtype else queue
 
+                # If it has some modifiers, then we need to add more candidates
+                # for all the different combinations.
+                iterable = cls.collect_modifiers_from_type(library, ti)
+                queue.extend(iterable)
+
             # If it's a pointer, then use our implementation to grab variations.
             elif ti.is_ptr():
                 iterable = cls.collect_scalars_from_pointer(library, ti)
@@ -9309,14 +9339,18 @@ class typematch(object):
             # If it's an integer, boolean, or floating-point type, then queue
             # variations of the type without its flags or individual modifiers.
             elif ti.is_bool() or ti.is_int() or ti.is_float():
-                if modifiers == idaapi.BTM_CONST | idaapi.BTM_VOLATILE:
-                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_CONST))
-                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_VOLATILE))
+                iterable = cls.collect_modifiers_from_type(library, ti)
+                queue.extend(iterable)
 
-                elif modifiers:
-                    queue.append(idaapi.tinfo_t(base | flags))
+                # Now we can do the base type without any flags or modifiers.
+                (flags or modifiers) and queue.append(idaapi.tinfo_t(base))
 
-                flags and queue.append(idaapi.tinfo_t(base))
+            # Now to queue up variations for the disassembler types.
+            elif flags and base in {idaapi.BT_UNK, idaapi.BT_VOID}:
+                iterable = cls.collect_modifiers_from_type(library, ti)
+                queue.extend(iterable)
+
+                (flags or modifiers) and queue.append(idaapi.tinfo_t(base | flags))
 
             # All of the type's components have been processed, so
             # we only need to yield a copy of it back to the caller.
@@ -9336,7 +9370,8 @@ class typematch(object):
             # We attempt to force every type into a named type so that we
             # can use the serialized data as the key when it's complex.
             Fnamed_type and Fnamed_type(ti)
-            key = cls.unpack(ti)
+            key, decl = cls.unpack(ti), ti.get_decltype()
+            base, flags, modifiers = (decl & mask for mask in cls.masks)
 
             # If the key used to represent our type has
             # already been queued, then we can skip it.
@@ -9354,6 +9389,9 @@ class typematch(object):
                 subtype = tinfo.at_ordinal(ordinal, library) if ordinal else tinfo.at_name(name, library)
                 queue.append(subtype) if subtype else queue
 
+                iterable = cls.collect_modifiers_from_type(library, ti)
+                queue.extend(iterable)
+
             # If it's a pointer, then we can use collect_scalars_from_pointer to
             # gather all candidate variations of the pointer type.
             elif ti.is_ptr():
@@ -9368,16 +9406,19 @@ class typematch(object):
             # If it's a scalar type that can take modifiers, then expand them
             # into all possible combinations and add them to the queue.
             elif ti.is_bool() or ti.is_int() or ti.is_float():
-                decl = ti.get_decltype()
-                base, flags, modifiers = (decl & mask for mask in cls.masks)
-                if modifiers == idaapi.BTM_CONST | idaapi.BTM_VOLATILE:
-                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_CONST))
-                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_VOLATILE))
+                iterable = cls.collect_modifiers_from_type(library, ti)
+                queue.extend(iterable)
 
-                elif modifiers:
-                    queue.append(idaapi.tinfo_t(base | flags))
-
+                # Now we can do the base type without any flags or modifiers.
                 (flags or modifiers) and queue.append(idaapi.tinfo_t(base))
+
+            # Last thing to check is the disassembler types so that we can
+            # include all modifier combinations and the base type (with flags).
+            elif flags and base in {idaapi.BT_UNK, idaapi.BT_VOID}:
+                iterable = cls.collect_modifiers_from_type(library, ti)
+                queue.extend(iterable)
+
+                (flags or modifiers) and queue.append(idaapi.tinfo_t(base | flags))
 
             # All of the type's components have been processed, so
             # we only need to yield a copy of it back to the caller.
