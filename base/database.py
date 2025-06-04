@@ -1306,10 +1306,10 @@ class search(object):
 
         # Then we figure out what case option the user gave us if there was one.
         if any(k in direction for k in ['case', 'sensitive', 'casesensitive']):
-            foldcase = not builtins.next(direction[k] for k in ['case', 'sensitive', 'casesensitive'])
+            foldcase = not builtins.next(direction[k] for k in ['case', 'sensitive', 'casesensitive'] if k in direction)
 
-        elif any(k in direction for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive']):
-            foldcase = builtins.next(direction[k] for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive'])
+        elif any(k in direction for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase']):
+            foldcase = builtins.next(direction[k] for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase'])
 
         # Otherwise we'll be doing a case-insensitive search (non-folded case).
         else:
@@ -1345,9 +1345,17 @@ class search(object):
         If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
         reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
+
+        if any(k in options for k in ['case', 'sensitive', 'casesensitive']):
+            foldcase = not builtins.next(options[k] for k in ['case', 'sensitive', 'casesensitive'] if k in options)
+        elif any(k in options for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase']):
+            foldcase = builtins.next(options[k] for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase'])
+        else:
+            foldcase = False
+
         flags = idaapi.SEARCH_REGEX
         flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
-        flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
+        flags |= 0 if foldcase else idaapi.SEARCH_CASE
         res = idaapi.find_text(ea, 0, 0, utils.string.to(string), flags)
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
@@ -1370,15 +1378,25 @@ class search(object):
         If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
         reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
+
+        if any(k in options for k in ['case', 'sensitive', 'casesensitive']):
+            foldcase = not builtins.next(options[k] for k in ['case', 'sensitive', 'casesensitive'] if k in options)
+        elif any(k in options for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase']):
+            foldcase = builtins.next(options[k] for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase'])
+        else:
+            foldcase = False
+
         flags = 0
         flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
-        flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
+        flags |= 0 if foldcase else idaapi.SEARCH_CASE
         res = idaapi.find_text(ea, 0, 0, utils.string.to(string), flags)
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     bytext = by_string = bystring = utils.alias(by_text, 'search')
 
+    # FIXME: the following `by_name` function is kind of worthless as it is
+    #        intended only for the "SEARCH_IDENT" flag.
     @utils.multicase(name=internal.types.string)
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -1395,38 +1413,27 @@ class search(object):
         If `ignorecase` is specified as true, then perform a case-insensitive search (slowly).
         """
         reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
-        ignore = builtins.next((options[k] for k in ['ignore', 'case', 'ignorecase'] if k in options), False)
+
+        if any(k in options for k in ['case', 'sensitive', 'casesensitive']):
+            foldcase = not builtins.next(options[k] for k in ['case', 'sensitive', 'casesensitive'] if k in options)
+        elif any(k in options for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase']):
+            foldcase = builtins.next(options[k] for k in ['fold', 'folded', 'foldcase', 'insensitive', 'nocase', 'caseless', 'caseinsensitive', 'ignorecase'])
+        else:
+            foldcase = False
+
         flags = idaapi.SEARCH_IDENT
         flags |= idaapi.SEARCH_UP if reversed else idaapi.SEARCH_DOWN
-        flags |= idaapi.SEARCH_CASE if ignore else 0
-        res = idaapi.BADADDR if ignore else idaapi.get_name_ea(ea, utils.string.to(name))
+        flags |= 0 if foldcase else idaapi.SEARCH_CASE
+        res = idaapi.BADADDR if foldcase else idaapi.get_name_ea(ea, utils.string.to(name))
         res = idaapi.find_text(ea, 0, 0, utils.string.to(name), flags) if res == idaapi.BADADDR else res
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     byname = utils.alias(by_name, 'search')
 
-    @utils.multicase(pattern=(internal.types.string, internal.types.bytes, internal.types.bytearray))
     @classmethod
-    def iterate(cls, pattern, **options):
-        '''Iterate through all search results that match the `pattern` starting at the current address.'''
-        predicate = options.pop('predicate', cls)
-        return cls.iterate(ui.current.address(), pattern, predicate, **options)
-    @utils.multicase(ea=internal.types.integer, pattern=(internal.types.string, internal.types.bytes, internal.types.bytearray))
-    @classmethod
-    def iterate(cls, ea, pattern, **options):
-        '''Iterate through all search results that match the specified `pattern` starting at address `ea`.'''
-        predicate = options.pop('predicate', cls)
-        return cls.iterate(ea, pattern, predicate, **options)
-    @utils.multicase(pattern=(internal.types.string, internal.types.bytes, internal.types.bytearray))
-    @classmethod
-    def iterate(cls, pattern, predicate, **options):
-        '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at the current address.'''
-        return cls.iterate(ui.current.address(), pattern, predicate, **options)
-    @utils.multicase(ea=internal.types.integer, pattern=(internal.types.string, internal.types.bytes, internal.types.bytearray))
-    @classmethod
-    def iterate(cls, ea, pattern, predicate, **options):
-        '''Iterate through all search results matched by the function `predicate` with the specified `pattern` starting at address `ea`.'''
+    def __iterate__(cls, ea, pattern, predicate, **options):
+        '''Iterate through the search results matched by the function `predicate` with the specified `pattern` starting at address `ea`.'''
         reversed = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         Fnext = address.prev if reversed else address.next
 
@@ -1449,26 +1456,37 @@ class search(object):
         return
 
     @utils.multicase()
-    def __new__(cls, pattern, **direction):
-        '''Search through the database at the current address for the specified `pattern`.'''
-        return cls(ui.current.address(), pattern, **direction)
+    def iterate(cls, pattern, **options):
+        '''Search through the database for the specified `pattern` from the current address and yield each result.'''
+        return cls(ui.current.address(), pattern, cls.by_bytes, **options)
+    @utils.multicase(predicate=(internal.types.string, internal.types.callable))
+    @classmethod
+    def iterate(cls, pattern, predicate, **options):
+        '''Search through the database for the specified `pattern` using the function `predicate` from the current address and yield each result.'''
+        return cls.iterate(ui.current.address(), pattern, predicate, **options)
     @utils.multicase(ea=internal.types.integer)
-    def __new__(cls, ea, pattern, **direction):
-        """Search through the database at address `ea` for the specified `pattern`.'''
+    @classmethod
+    def iterate(cls, ea, pattern, **options):
+        '''Search through the database for the specified `pattern` from the address `ea` and yield each result.'''
+        return cls.iterate(ea, pattern, cls.by_bytes, **options)
+    @utils.multicase(ea=internal.types.integer, predicate=(internal.types.string, internal.types.callable))
+    @classmethod
+    def iterate(cls, ea, pattern, predicate, **options):
+        """Search through the database for the specified `pattern` using the function `predicate` from the address `ea` and yield each matching address.'''
 
         If `reverse` is specified as a bool, then search backwards from the given address.
         If `radix` is specified, then use it as the numerical radix for describing the bytes.
         If `radix` is not specified, then assume that `data` represents the exact bytes to search.
         """
         if idaapi.__version__ < 7.5:
-            direction.setdefault('radix', 16)
-            return cls.by_bytes(ea, pattern, **direction)
+            options.setdefault('radix', 16)
+            return cls.iterate(ea, pattern, predicate, **options)
 
         # If we're using a more recent version of IDA, then we can actually allow users to
         # specify their own full queries here. If they already gave us an idaapi.compiled_binpat_vec_t,
         # then we just pass that through onto by_bytes.
         if isinstance(pattern, idaapi.compiled_binpat_vec_t):
-            return cls.by_bytes(ea, pattern, **direction)
+            return cls.iterate(ea, pattern, predicate, **options)
 
         # Check if we were given multiple patterns for any particular reason and
         # combine them into a list so we can parse them all individually.
@@ -1476,9 +1494,9 @@ class search(object):
         patterns = [pattern for pattern in listable]
 
         # Extract the radix if we were given one so that we can pretty up the logs.
-        radix, formats = direction.get('radix', 16), {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02x}".format}
+        radix, formats = options.get('radix', 16), {8: "{:0o}".format, 10: "{:d}".format, 16: "{:02x}".format}
         if not operator.contains(formats, radix):
-            raise E.InvalidParameterError(u"{:s}({:#x}, {:s}{:s}) : An invalid radix ({:d}) was specified.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', radix))
+            raise E.InvalidParameterError(u"{:s}({:#x}, {:s}{:s}) : An invalid radix ({:d}) was specified.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(options)) if options else '', radix))
         format = formats[radix]
 
         # Now we need to parse them all individually into an idaapi.compiled_binpat_vec_t().
@@ -1491,16 +1509,37 @@ class search(object):
 
             # Now to parse each one with idaapi.parse_binpat_str(), but of course the idaapi.parse_binpat_str()
             # api returns an empty string on success and a None on failure.
-            if idaapi.parse_binpat_str(result, ea, utils.string.to(string), radix, direction.get('encoding', idaapi.PBSENC_ALL)) is None:
-                raise E.DisassemblerError(u"{:s}({:#x}, {:s}{:s}) : Unable to parse the provided pattern {:s}(\"{:s}\").".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', "at index {:d} ".format(index) if len(patterns) > 1 else '', utils.string.escape(string, '"')))
+            if idaapi.parse_binpat_str(result, ea, utils.string.to(string), radix, options.get('encoding', idaapi.PBSENC_ALL)) is None:
+                raise E.DisassemblerError(u"{:s}({:#x}, {:s}{:s}) : Unable to parse the provided pattern {:s}(\"{:s}\").".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(options)) if options else '', "at index {:d} ".format(index) if len(patterns) > 1 else '', utils.string.escape(string, '"')))
 
             # Log what was just parsed to help with debugging things.
             parsed = result[index]
             description = "{:s}" if parsed.all_bytes_defined() else "{:s}) with mask ({:s}"
-            logging.info(u"{:s}({:#x}, {:s}{:s}) : Successfully parsed the pattern at index {:d} (\"{:s}\") into bytes ({:s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', index, utils.string.escape(string, '"'), description.format(*(' '.join(map(format, bytearray(item))) for item in [parsed.bytes, parsed.mask]))))
+            logging.info(u"{:s}({:#x}, {:s}{:s}) : Successfully parsed the pattern at index {:d} (\"{:s}\") into bytes ({:s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(patterns), u", {:s}".format(utils.string.kwargs(options)) if options else '', index, utils.string.escape(string, '"'), description.format(*(' '.join(map(format, bytearray(item))) for item in [parsed.bytes, parsed.mask]))))
 
-        # Everything was parsed, so we should be able to just hand things off to by_bytes.
-        return cls.by_bytes(ea, result, **direction)
+        # Everything was parsed, so we should be able to just hand things off.
+        return cls.__iterate__(ea, result, predicate, **options)
+
+    @utils.multicase()
+    def __new__(cls, pattern, **options):
+        '''Search through the database for the specified `pattern` from the current address and return the results.'''
+        iterable = cls.iterate(ui.current.address(), pattern, cls.by_bytes, **options)
+        return [ea for ea in iterable]
+    @utils.multicase(predicate=(internal.types.string, internal.types.callable))
+    def __new__(cls, pattern, predicate, **options):
+        '''Search through the database for the specified `pattern` using the function `predicate` from the current address and return the results.'''
+        iterable = cls.iterate(ui.current.address(), pattern, predicate, **options)
+        return [ea for ea in iterable]
+    @utils.multicase(ea=internal.types.integer)
+    def __new__(cls, ea, pattern, **options):
+        '''Search through the database for the specified `pattern` from the address `ea` and return the results.'''
+        iterable = cls.iterate(ea, pattern, cls.by_bytes, **options)
+        return [ea for ea in iterable]
+    @utils.multicase(ea=internal.types.integer, predicate=(internal.types.string, internal.types.callable))
+    def __new__(cls, ea, pattern, predicate, **options):
+        '''Search through the database for the specified `pattern` using the function `predicate` from the address `ea` and return the results.'''
+        iterable = cls.iterate(ea, pattern, predicate, **options)
+        return [ea for ea in iterable]
 
 byname = by_name = utils.alias(search.by_name, 'search')
 
