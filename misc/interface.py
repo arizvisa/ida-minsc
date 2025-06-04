@@ -9365,6 +9365,20 @@ class typematch(object):
                 subtype = tinfo.enumeration(ti)
                 queue.append(subtype)
 
+            # If it's a scalar type that can take modifiers, then expand them
+            # into all possible combinations and add them to the queue.
+            elif ti.is_bool() or ti.is_int() or ti.is_float():
+                decl = ti.get_decltype()
+                base, flags, modifiers = (decl & mask for mask in cls.masks)
+                if modifiers == idaapi.BTM_CONST | idaapi.BTM_VOLATILE:
+                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_CONST))
+                    queue.append(idaapi.tinfo_t(base | flags | idaapi.BTM_VOLATILE))
+
+                elif modifiers:
+                    queue.append(idaapi.tinfo_t(base | flags))
+
+                (flags or modifiers) and queue.append(idaapi.tinfo_t(base))
+
             # All of the type's components have been processed, so
             # we only need to yield a copy of it back to the caller.
             yield tinfo.copy(ti, library)
