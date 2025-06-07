@@ -1700,3 +1700,76 @@ class snippet(object):
             mblock = mblockarray.get_mblock(index)
             blocks.append(mblock)
         return (mblock for mblock in blocks)
+
+class ctree(object):
+    """
+    This namespace provides basic utility functions for the elements that
+    are exposed to the user via the CTREE api. These elements can be found under
+    the "treeitems" property of an instance of the ``ida_hexrays.cfunc_t`` or
+    ``ida_hexrays.cfuncptr_t`` objects from the decompiler.
+
+    The namespace supports both expressions and instructions from the CTREE api,
+    and exists primarily to support navigating between both element types from
+    the decompiler output. To guard against situations where an expression or
+    instruction type has been deallocated by the decompiler, the functions in
+    this namespace return indices into the `cfunc_t.treeitems` array.
+    """
+
+    @classmethod
+    def down(cls, func, item):
+        '''Return the indices of each ``ida_hexrays.citem_t`` from the function `func` that are used by the specified `item`.'''
+        cfunc = function(func)
+
+        # grab the index and check that it actually references a cfunc treeitem.
+        index = item.index if isinstance(item, ida_hexrays_types.citem_t) else item
+        if not(0 <= index < cfunc.treeitems.size()):
+            raise exceptions.IndexOutOfBoundsError(u"{:s}.down({:#x}, {:d}) : Unable to locate the specified item due to the index ({:d}) being out of bounds ({:s}).".format('.'.join([__name__, cls.__name__]), function.address(cfunc), index, index, "{:d}..{:d}".format(0, cfunc.treeitems.size()) if cfunc.treeitems.size() else '0'))
+        citem = cfunc.treeitems[index]
+
+        # iterate forward from the index of the current item while looking for
+        # items that our current item is the parent of.
+        results = []
+        for index in range(index, cfunc.treeitems.size()):
+            if citem.find_parent_of(cfunc.treeitems[index]):
+                results.append(index)
+            continue
+        return results
+
+    @classmethod
+    def up(cls, func, item):
+        '''Return the indices of each ``ida_hexrays.citem_t`` from the function `func` that uses the specified `item` as one of its children.'''
+        cfunc = hexrays.function(func)
+        count = cfunc.treeitems.size()
+
+        # set the current item using the starting index.
+        index = item.index if isinstance(item, ida_hexrays_types.citem_t) else item
+        if not(0 <= index < count):
+            raise exceptions.IndexOutOfBoundsError(u"{:s}.up({:#x}, {:d}) : Unable to locate the specified item due to the index ({:d}) being out of bounds ({:s}).".format('.'.join([__name__, cls.__name__]), function.address(cfunc), index, index, "{:d}..{:d}".format(0, count) if count else "{:d}".format(0)))
+        citem = cfunc.treeitems[index]
+
+        # now we can start traversing upward from the item we're starting with.
+        results, cindex = [], citem.index
+        while citem.is_expr():
+            cexpr = citem.cexpr
+
+            # traverse backwards until we find an item that is a parent of the
+            # expression that we're currently at.
+            for index in range(cexpr.index, 0, -1):
+                citem = cfunc.treeitems[index - 1]
+                if cexpr.is_child_of(citem):
+                    cindex = index - 1
+                    break
+                continue
+
+            # if we got all the way to the first node (instruction), then add
+            # its index and return. this should _never_ happen unless the first
+            # treeitem is not an instruction.
+            else:
+                results.append(0)
+                break
+
+            # use the index to get the item type and append it to our results
+            # before continuing onto the next parent.
+            citem = cfunc.treeitems[cindex]
+            results.append(citem.index)
+        return results
