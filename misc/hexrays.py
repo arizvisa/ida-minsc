@@ -1810,3 +1810,93 @@ class ctree(object):
             citem = cfunc.treeitems[cindex]
             results.append(citem.index)
         return results
+
+    @classmethod
+    def repr(cls, *args):
+        '''Return the canonical string representation for the specifed CTREE item.'''
+        func, item = itertools.chain([None] if len(args) < 2 else [], args)
+
+        # If we weren't given a function for the item, then we need the address
+        # so that we can figure it out. If there is no address (BADADDR), then
+        # we just ask the citem_t to try and render itself without it.
+        if func is None:
+            if isinstance(item, ida_hexrays_types.ctree_item_t):
+                ea = item.get_ea()
+            elif isinstance(item, ida_hexrays_types.citem_t) and item.ea == idaapi.BADADDR:
+                c = item.cexpr if item.is_expr() else item.cinsn
+                return utils.string.of(c.dstr())
+            elif isinstance(item, (ida_hexrays_types.citem_t, ida_hexrays_types.treeloc_t)):
+                ea = item.ea
+            elif isinstance(item, ida_hexrays_types.hexrays_var_types):
+                return variables.repr(item)
+            elif isinstance(item, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
+                return cls.repr(item, item)
+            else:
+                raise exceptions.InvalidTypeOrValueError(u"{:s}.repr({!r}) : Unable to render the specified item using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), item, func.__class__))
+            cfunc = function(ea)
+
+        # We've got a function, so use it to get an `ida_hexrays.cfunc_t`.
+        else:
+            cfunc = function(func)
+
+        # FIXME: The following instances of the "mvar" property have been
+        #        deprecated. Their original intention is to grab the comment
+        #        that might be associated with a specific item or variable and
+        #        include it in the string that gets returned. The correct thing
+        #        to do here is to check the cache to identify which "precisers"
+        #        associated with the item or lvar have a comment attached.
+
+        # If the item is a citem_t, then we can use it to render itself.
+        if isinstance(item, ida_hexrays_types.citem_t):
+            res = idaapi.tag_remove(item.print1(cfunc))
+            mvar = item.mvar if hasattr(item, 'mvar') else ''
+            return "{!s}{:s}".format(utils.string.of(res), " // {:s}".format(mvar) if mvar else '')
+
+        # If it is an lvar_t, then we can chain into `variables` to render it.
+        elif isinstance(item, ida_hexrays_types.hexrays_var_types):
+            return variables.repr(cfunc, item)
+
+        # Otherwise, if it's a cree_item_t then we need its item type so that we
+        # can figure out which union member that we need to render.
+        elif isinstance(item, ida_hexrays_types.ctree_item_t):
+            citype = item.citype
+            if citype == ida_hexrays.VDI_LVAR:
+                c = lvar = item.l
+            elif citype == ida_hexrays.VDI_FUNC:
+                c = cfunc = item.f
+            elif citype == ida_hexrays.VDI_EXPR:
+                citem = item.it
+                cexpr, cinsn = item.e, item.i
+                return cls.repr(cexpr if citem.is_expr() else cinsn)
+            elif citype == ida_hexrays.VDI_TAIL and item.loc in cfunc.user_cmts:
+                c = treeloc = item.loc
+            else:
+                ea = function.address(cfunc)
+                raise exceptions.InvalidTypeOrValueError(u"{:s}.repr({:#x}, {!r}) : Unable to render the specified CTREE item as a \"{:s}\" due to its item type ({:d}) being unsupported.".format('.'.join([__name__, cls.__name__]), ea, item, utils.string.escape(utils.pycompat.fullname(ida_hexrays_types.ctree_item_t), '"'), citype))
+            return cls.repr(cfunc, c)
+
+        # If we were given a `treeloc_t`, then render the comment if it exists.
+        elif isinstance(item, ida_hexrays_types.treeloc_t):
+            cmt = cfunc.user_cmts.get(item)
+            string = utils.string.of('' if cmt is None else cmt.c_str()) 
+            lines = string.split('\n') if '\n' in string else [string]
+            return '\n'.join(map("// {:s}".format, lines))
+
+        # If we were given an entire function, then render its pseudocode.
+        elif isinstance(item, (ida_hexrays_types.cfunc_t, ida_hexrays_types.cfuncptr_t)):
+            lines = item.get_pseudocode()
+            iterable = (lines[index] for index in range(lines.size()))
+            taggedlines = (utils.string.of(item.line) for item in iterable)
+            untagged = (idaapi.tag_remove(item) for item in taggedlines)
+            return '\n'.join(untagged)
+
+        # If we were not given an index, then we need to abort due to the item
+        # type being completely unsupported.
+        elif not isinstance(item, types.integer):
+            ea = function.address(cfunc)
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.repr({:#x}, {!r}) : Unable to render the specified CTREE item due to its type ({!s}) being unsupported.".format('.'.join([__name__, cls.__name__]), ea, item, item.__class__))
+
+        # Use the index we were given the grab the specific tree item and then
+        # recurse into ourselves to do the actual rendering.
+        treeitem = cfunc.treeitems[item]
+        return cls.repr(cfunc, treeitem)
