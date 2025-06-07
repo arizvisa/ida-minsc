@@ -968,6 +968,43 @@ class variables(object):
         # to use whatever it was we were given.
         raise exceptions.InvalidTypeOrValueError(u"{:s}.address({!r}) : Unable to fetch an address from an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), locator, mptr.__class__))
 
+    @classmethod
+    def repr(cls, *args):
+        '''Return the canonical string representation for the variable identified by the given `args`.'''
+        func, arg = itertools.chain([None] if len(args) < 2 else [], args)
+
+        # If we were just given a locator without a function, then figure out
+        # the function and return the variable rendered to a string.
+        if func is None and isinstance(arg, ida_hexrays_types.hexrays_var_types):
+            locator = cls.by(arg)
+            ea = function.address(locator.defea)
+            cfunc = function(ea)
+            return cls.repr(cfunc, arg)
+
+        # If we got an unsupported type, then throw up an exception.
+        elif not isinstance(func, ida_hexrays_types.hexrays_func_types):
+            raise exceptions.InvalidTypeOrValueError(u"{:s}.repr({!r}, {!r}) : Unable to determine the function belonging to the specified variable using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, arg, func.__class__))
+
+        # If we were given a valid variable type, then we're good to go and only
+        # need to grab the `cfunc_t` and the `lvar_locator_t` for the variable.
+        elif isinstance(arg, ida_hexrays_types.hexrays_funcvar_types):
+            cfunc = function(func)
+            locator = cls.by(cfunc, arg)
+
+            # Now we just need to grab the properties for the variable.
+            ti = variable.get_type(cfunc, locator)
+            name = variable.get_name(cfunc, locator)
+            location = cls.storage(cfunc, locator)
+            comment = variable.get_comment(cfunc, locator)
+            state = internal.comment.decode(comment)
+
+            #flags = "notarg({:d}),regvar({:d}),argvar({:d})".format(lvar.is_notarg(), lvar.is_reg_var(), lvar.is_arg_var)
+            description = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(name), '') or "{!s}".format(ti)
+            return "{:s} /* {!s} ({:#x}) */{:s}".format(description, location, locator.defea, " /* {!r} */".format(state) if state else '')# + '\t'+flags
+
+        # If we got here, then the variable type is completely unsupported.
+        raise exceptions.InvalidTypeOrValueError(u"{:s}.repr({!r}, {!r}) : Unable to render the specified variable using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), func, arg, func.__class__))
+
 class variable(object):
     """
     This namespace contains utilities that are related to an individual variable
