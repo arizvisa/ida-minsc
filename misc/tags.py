@@ -596,14 +596,12 @@ class query_v1(object):
         for ea, used in internal.tagindex.globals.iterate():
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield ea, internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield ea, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield ea, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -615,14 +613,12 @@ class query_v1(object):
         for ea, used in internal.tagindex.contents.select():
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield ea, internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield ea, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield ea, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -635,14 +631,12 @@ class query_v1(object):
         for ea, used in internal.tagindex.contents.function(interface.range.start(fn)):
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield ea, internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield ea, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield ea, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield ea, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -654,14 +648,12 @@ class query_v1(object):
         for sid, used in internal.tagindex.structure.iterate():
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield sid, internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield sid, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield sid, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield sid, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -676,14 +668,12 @@ class query_v1(object):
         for mid, used in internal.tagindex.members.structure(sids):
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield mid, internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield mid, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield mid, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield mid, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -695,14 +685,12 @@ class query_v1(object):
         for sid, used in internal.tagindex.members.select():
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield sid, internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield sid, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield sid, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield sid, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -714,14 +702,12 @@ class query_v1(object):
         for mid, used in internal.tagindex.members.forward():
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield mid, internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield mid, internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield mid, internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield mid, internal.tagindex.tags.names(used & requested)
             continue
         return
 
@@ -811,14 +797,12 @@ class query_v1(object):
             used = functools.reduce(operator.or_, iterable, 0)
             if not(used):
                 continue
-            elif rmask and used & rmask != rmask:
-                continue
-            elif not(rmask) and imask and not(used & imask):
-                continue
-            elif selection and used & requested:
-                yield blocks[ea], internal.tagindex.tags.names(used & requested)
-            elif not selection and used:
+            elif not(selection) and used:
                 yield blocks[ea], internal.tagindex.tags.names(used)
+            elif rmask and used & rmask == rmask:
+                yield blocks[ea], internal.tagindex.tags.names(used & requested)
+            elif not(rmask) and used & imask:
+                yield blocks[ea], internal.tagindex.tags.names(used & requested)
             continue
         return
 
