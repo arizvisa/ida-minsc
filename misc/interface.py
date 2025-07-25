@@ -7604,12 +7604,12 @@ class tinfo(object):
     @classmethod
     def bitfield(cls, type):
         '''Return the number of bits, size, and sign for the specified bitfield `type`.'''
-        bf, size = idaapi.bitfield_type_data_t(), type.get_size()
-        if not bf:
+        bt, size = idaapi.bitfield_type_data_t(), type.get_size()
+        if not type.get_bitfield_details(bt):
             sign = type.get_sign()
             return 8 * size, size, {idaapi.no_sign: 0, idaapi.type_signed: -1, idaapi.type_unsigned: +1}[sign]
-        size, width = bf.nbytes, bf.width
-        return width, size, +1 if bt.is_unsigned() else -1
+        size, width = bt.nbytes, bt.width
+        return width, size, +1 if bt.is_unsigned else -1
 
     @classmethod
     def enumeration(cls, type):
