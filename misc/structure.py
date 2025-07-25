@@ -56,6 +56,14 @@ def frame(sptr):
     SF_FRAME = getattr(idaapi, 'SF_FRAME', 0x40)
     return True if sptr.props & SF_FRAME else False
 
+def v9union(type):
+    '''Return whether the specified `type` is defined as a union.'''
+    return type.is_union()
+
+def v9frame(type):
+    '''Return whether the specified `type` belongs to a function as a frame.'''
+    return type.is_frame()
+
 def iterate():
     '''Iterate through the structures defined in the database.'''
     res = idaapi.get_first_struc_idx()
@@ -1007,6 +1015,485 @@ class member(object):
                 continue
             continue
         return results
+
+class v9members(object):
+    """
+    This preliminary namespace is similar to the other `members` namespace with
+    the primary difference being that this implementation uses the v9 api for
+    its functionality. The other difference is that due to the v9 changes, the
+    offset and sizes used by this namespace are in bits rather than bytes. These
+    bits are never translated and it is assumed that all calculations are
+    relative to the top of the structure.
+
+    When returning an individual member, the functions within this namespace
+    will always return it as a 3-element tuple composed of the
+    ``idaapi.tinfo_t``, an integer for its index, and the ``idaapi.udm_t``
+    which contains a copy of the member's information.
+    """
+
+    @classmethod
+    def gaps(cls, type):
+        '''Return a dictionary and list of points for the boundaries of each gap in the specified `type`.'''
+        rs = idaapi.areaset_t() if idaapi.__version__ < 7.0 else idaapi.rangeset_t()
+        if not type.calc_gaps(rs):
+            raise E.DisassemblerError(u"{:s}.gaps({!s}) : Unable to calculate the gaps for the specified type {!s}.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), interface.tinfo.quoted(tinfo)))
+
+        # Now we can collect the gaps for the specified type.
+        gaps, iterable = [], range(rs.nranges())
+        for gap in map(rs.getrange, iterable):
+            leftbytes, rightbytes = interface.range.unpack(gap)
+            [leftbits, rightbits] = (8 * bytes for bytes in [leftbytes, rightbytes])
+            gaps.append((leftbits, rightbits))
+
+        # Next we gather them into an interval tree to be used with bisect. The
+        # gaps should already be sorted, so we can just add them in reverse,
+        # giving priority to the inclusive point on the left.
+        segments = {}
+        for index, (left, right) in enumerate(gaps):
+            segments.setdefault(right, index)
+            segments[left] = index
+
+        points = {point for point in itertools.chain(*gaps)}
+        return {point: gaps[index] for point, index in segments.items()}, sorted(points)
+
+    @classmethod
+    def iterate(cls, type, *slice):
+        '''Yield each member specified by `slice` from the structure identified by `sptr`.'''
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.iterate({!s}, {!r}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.iterate({!s}, {!r}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), slice))
+
+        # Figure out what was selected from the slice and yield each member.
+        [selection] = slice if slice else [builtins.slice(None)]
+        count = utd.size()
+        for index in range(*selection.indices(count)):
+            udm = utd[index]
+            yield tinfo, index, udm
+        return
+
+    @classmethod
+    def index(cls, type, udm):
+        '''Return the index of the member `udm` in the specified structure or union `type`.'''
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        # FIXME: render the specified udm as a comprehensible string.
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.index({!s}, {!s}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), udm))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.index({!s}, {!s}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), udm))
+
+        # If it's a union, then the offset is the index.
+        if v9union(tinfo):
+            return udm.offset
+
+        # Now we can use the member offset (bits) to ask the udt_type_data_t
+        # about the index. We simply use the offset to get the correct index.
+        mindex = utd.find_member(udm, idaapi.STRMEM_OFFSET)
+        if not (0 <= mindex < utd.size()):
+            raise E.MemberNotFoundError(u"{:s}.index({!s}, {!s}) : Unable to find a member at the specified bit offset ({:#x}) of the given type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), udm, udm.offset, tinfo.get_tid()))
+        return mindex
+
+    @classmethod
+    def index_after(cls, type, offset):
+        '''Return the index of a member at the given `offset` or after from the specified structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.index_after({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.index_after({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        else:
+            offset = int(offset)
+
+        # First figure out the boundaries of the entire structure type. If the
+        # offset is before or after the structure, then clamp the index.
+        count = utd.size()
+        bits = utd[count - 1].offset if count and tinfo.is_varstruct() else 8 * utd.unpadded_size
+        if (offset >= bits) or (offset < 0) or not(count):
+            return 0 if offset < 0 else count
+
+        # Next thing is to try and find the gaps in the structure so that we can
+        # determine when udt.find_member will return a -1 for a missing member.
+        segments, points = cls.gaps(tinfo)
+        if points:
+            index = bisect.bisect_right(points, offset) - 1
+            left, right = segments[points[max(0, index)]]
+
+            # If the offset actually was pointing into one of the gaps, then set
+            # the new offset to the member immediately following the gap. If it
+            # wasn't pointing to a gap, then trust the offset to get the index.
+            key = udm_t()
+            key.offset = 1 + right if (left <= offset < right) else offset
+
+        # Hopefully we can trust the udt.find_member api and use it in order to
+        # get the index of the member at the specified offset.
+        else:
+            key = udm_t()
+            key.offset = offset
+
+        # Then we can go ahead and use the offset to grab the member index.
+        mindex = utd.find_member(key, idaapi.STRMEM_OFFSET)
+        if not (0 <= mindex < count):
+            raise E.MemberNotFoundError(u"{:s}.index_after({!s}, {:#x}) : Unable to find a member at the specified bit offset ({:#x}) of the given type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset, key.offset, tinfo.get_tid()))
+
+        # Now we need to figure out if the specified offset is actually
+        # contained by the member. If it is within bounds, then we got it.
+        udm = utd[mindex]
+        moffset, msize = udm.offset, udm.size
+        if moffset <= offset < moffset + msize:
+            return mindex + 1
+
+        # Otherwise, we're pointing after the structure and can use the number
+        # of members as the count to return.
+        return mindex if offset <= moffset else min(count, mindex + 1)
+
+    @classmethod
+    def index_before(cls, type, offset):
+        '''Return the index of a member at the given `offset` or before from the specified structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.index_before({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.index_before({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        else:
+            offset = int(offset)
+
+        # First we need to figure out the structure dimensions. This way we can
+        # clamp the index if the offset points outside the structure. If it's a
+        # variable-length structure, then return the index of the last member.
+        count = utd.size()
+        bits = utd[count - 1].offset if count and tinfo.is_varstruct() else 8 * utd.unpadded_size
+        if (offset >= bits) or (offset < 0) or not(count):
+            return 0 if offset < 0 else count
+
+        # Now we'll try to find the gaps in the structure so that we can prevent
+        # utd.find_member from returning a -1.
+        segments, points = cls.gaps(tinfo)
+        if points:
+            index = bisect.bisect_right(points, offset) - 1
+            left, right = segments[points[max(0, index)]]
+
+            # If the offset is within one of our gaps, then figure out the gap's
+            # bounds so we can correct the offset to point at the following
+            # member. Otherwise, the offset can be used to get the member index.
+            key = udm_t()
+            key.offset = left - 1 if (left <= offset < right) else offset
+
+        # Otherwise, we should be able to use the offset we were given with the
+        # udt.find_member api in order to find the index of the correct member.
+        else:
+            key = udm_t()
+            key.offset = offset
+
+        # Now we can use the offset in the key to figure out the member index.
+        mindex = utd.find_member(key, idaapi.STRMEM_OFFSET)
+        if not (0 <= mindex < count):
+            raise E.MemberNotFoundError(u"{:s}.index_before({!s}, {:#x}) : Unable to find a member at the specified bit offset ({:#x}) of given type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset, key.offset, tinfo.get_tid()))
+
+        # Next we figure out if the member actually contains the specified
+        # offset. If it is, then we already got the correct index.
+        udm = utd[mindex]
+        moffset, msize = udm.offset, udm.size
+        if moffset <= offset < moffset + msize:
+            return mindex
+
+        # If the found member is a gap, then return the predecessor of the index
+        # unless the predecessor index is before the first index (index < 0).
+        return mindex if offset <= moffset else min(count, mindex + 1)
+
+    @classmethod
+    def contains(cls, type, offset):
+        '''Return whether the given `offset` is within the boundaries of the specified structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.contains({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.contains({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        else:
+            offset = int(offset)
+
+        # First we check if the structure type is variable-sized. If it is, then
+        # we only need to ensure that the offset is larger or equal to zero.
+        if tinfo.is_varstruct():
+            return 0 <= offset
+        return 0 <= offset < 8 * utd.total_size
+
+    @classmethod
+    def has_name(cls, type, name):
+        '''Return whether a member with the given `name` exists within the specified structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.has_name({!s}, {!r}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.has_name({!s}, {!r}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
+
+        # Now we can take our name, pack it to a string, and then use it as a
+        # key with the udt_type_data_t instance for the structure type.
+        key, string = udm_t(), name if isinstance(name, types.ordered) else [name]
+        packed = interface.tuplename(*string)
+        key.name = utils.string.to(packed)
+        mindex = utd.find_member(key, idaapi.STRMEM_NAME)
+        return 0 <= mindex < utd.size()
+
+    @classmethod
+    def has_offset(cls, type, offset):
+        '''Return whether a member exists at the `offset` of the specified structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.has_offset({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.has_offset({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        else:
+            offset = int(offset)
+
+        # First we check that the offset is within the structure boundaries. If
+        # it's a variable-length structure and the offset comes after, then
+        # we've successfully found a member at the given offset.
+        if not cls.contains(tinfo, offset):
+            return False
+
+        count = utd.size()
+        bits = utd[count - 1].offset if count and tinfo.is_varstruct() else 8 * utd.unpadded_size
+        if offset >= bits:
+            return True if tinfo.is_varstruct() else False
+
+        # Now we'll grab the gaps from the structure type so that we can
+        # distinguish whether the specified offset points at a member or not.
+        segments, points = cls.gaps(tinfo)
+        if points:
+            index = bisect.bisect_right(points, offset) - 1
+            left, right = segments[points[max(0, index)]]
+
+            # Check if the offset was actually pointing inside a gap. If it was,
+            # then we can go ahead and return false here.
+            if left <= offset < right:
+                return False
+
+        # We should now be able to use the offset to try and find the index.
+        key = udm_t()
+        key.offset = offset
+        mindex = utd.find_member(key, idaapi.STRMEM_OFFSET)
+
+        # If the index is valid, then we can assume that a member exists.
+        if 0 <= mindex < count:
+            return True # or not(utd[mindex].is_gap())
+        return False
+
+    @classmethod
+    def has_bounds(cls, type, start, stop):
+        '''Return whether any members exist in the specified structure or union `type` from the offset `start` to `stop`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.has_bounds({!s}, {:#x}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.has_bounds({!s}, {:#x}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
+        else:
+            [left, right] = sorted(map(int, [start, stop]))
+
+        # Grab the structure dimensions so that we can check a few things.
+        key, is_union, is_variable = udm_t(), v9union(tinfo), tinfo.is_varstruct()
+        bits, count = 8 * utd.unpadded_size, utd.size()
+
+        # If both points come before the structure, then we can abort here.
+        if left < 0 and right <= 0:
+            return False
+
+        # If both boundaries come after the structure or are the same, then they
+        # can't contain a member unless it's a variable-length structure.
+        elif left >= bits and right > bits and not(tinfo.is_varstruct()):
+            return False
+
+        # If there aren't any members in the structure, or there isn't even
+        # space for a single bit within the range, then we can return false.
+        elif not(count) or left == right:
+            return False
+
+        # Now we'll figure out the gaps for the structure so that we can adjust
+        # the start and stop positions to an offset pointing into a member.
+        segments, points = cls.gaps(tinfo)
+        startoffset, stopoffset = left, right
+
+        if points:
+            gapindex = bisect.bisect_right(points, left) - 1
+            gapleft, gapright = segments[points[max(0, gapindex)]]
+
+            # If our starting position (left) points inside the discovered gap,
+            # then update it to point at the first member following the gap.
+            startoffset = 1 + gapright if gapleft <= left < gapright else left
+
+        # Do the same thing, but for the end position (right side).
+        if points:
+            gapindex = bisect.bisect_right(points, right) - 1
+            gapleft, gapright = segments[points[max(0, gapindex)]]
+
+            # If the right side is inside the gap, then we just need to update
+            # the position to point at the member right in front of the gap.
+            stopoffset = gapleft - 1 if gapleft <= right < gapright else right
+
+        # Now we'll need to grab the start and stop indices so that we can
+        # iterate through the correct range of members. None of these should
+        # fail since we just corrected the positions using the gaps. If either
+        # does fail, though, then throw up an exception with our complaints.
+        key = udm_t()
+        key.offset = max(0, startoffset)
+        leftindex = utd.find_member(key, idaapi.STRMEM_OFFSET) if startoffset < bits else count
+
+        key = udm_t()
+        key.offset = max(0, stopoffset)
+        rightindex = utd.find_member(key, idaapi.STRMEM_OFFSET) if stopoffset < bits else count
+
+        if not(0 <= leftindex <= count) or not(0 <= rightindex <= count):
+            label, wrong = ('starting', startoffset) if (0 <= rightindex < count) else ('ending', stopoffset)
+            raise E.MemberNotFoundError(u"{:s}.has_bounds({!s}, {:#x}, {:#x}) : Unable to find a member at the {:s} offset ({:+#x}) in the specified structure ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop, label, wrong, tinfo.get_tid()))
+
+        # If we're pointing at a single member, then we just need to check if
+        # our start and stop offset contains the single member.
+        elif leftindex == rightindex and leftindex < count:
+            udm = utd[leftindex]
+            mleft, mright = (0, udm.size) if is_union else (udm.offset, udm.offset + max(1, udm.size))
+            return left <= mleft and mright <= right
+
+        # If the single member is the variable-length array, then we do the same
+        # thing but using a non-zero size.
+        elif leftindex == rightindex and tinfo.is_varstruct():
+            udm = utd[count - 1]
+            mtype, _ = (udm.type, 0) if udm.size else interface.tinfo.array(udm.type)
+            moffset, msize = udm.offset, 8 * interface.tinfo.size(mtype)
+            mleft, mright = moffset, moffset + msize
+            return left <= mleft and mright <= right
+
+        # Adjust both the indices so that we can iterate through the available
+        # members and check whether any of them contain our offset.
+        startindex, stopindex = max(0, leftindex), count if rightindex < 0 else min(count, 1 + rightindex)
+        for mindex in range(startindex, stopindex):
+            udm = utd[mindex]
+            mleft, mright = (0, udm.size) if is_union else (udm.offset, udm.offset + udm.size)
+
+            # Now we'll need to extract the member and determine its actual size
+            # in case we're using a variable-length structure type.
+            msize, mtype = udm.size, udm.type
+            if mtype.is_array():
+                ti, length = interface.tinfo.array(mtype)
+                melement = 8 * ti.get_size()
+
+            # Otherwise we can trust the number of bits specified by the udm_t.
+            else:
+                melement = msize
+
+            # If it's a union, then the bounds are checked against the size.
+            if is_union and left <= mleft and msize <= right:
+                return True
+
+            # Otherwise, check if the given bounds actually contains the member.
+            elif mleft < mright and left <= mleft and mright <= right:
+                return True
+
+            # If we have a variable-length structure and the member has no size,
+            # then the bounds cover it if there is at least one member covered.
+            elif is_variable and mleft == mright and left <= mleft and mright + melement <= right:
+                return True
+            continue
+        return False
+
+    @classmethod
+    def by_identifier(cls, type, identifier):
+        '''Return the member with the given `identifier` belonging to the specified structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        identifier = tinfo.get_udm_tid(cls.index(tinfo, identifier)) if isinstance(identifier, udm_t) else int(identifier)
+
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.by_identifier({!s}, {:#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier))
+
+        # This should be easy, since we should be able to ask the v9 api to get
+        # the udm by its id. However, it's worth noting that the v9 api can
+        # delete the entire type on failure, so we make a copy just in case.
+        udm, count, ti = udm_t(), utd.size(), interface.tinfo.copy(tinfo)
+        mindex = ti.get_udm_by_tid(udm, identifier)
+        if not(0 <= mindex < count) or not(count):
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({!s}, {:#x}) : Unable to locate the member using the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), identifier, identifier))
+        return tinfo, mindex, udm
+
+    @classmethod
+    def by_index(cls, type, index):
+        '''Return the member at the given `index` of the specified structure or union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.by_index({!s}, {:d}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.by_index({!s}, {:d}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index))
+
+        if not(0 <= index < utd.size()):
+            is_union = v9union(tinfo)
+            raise E.MemberNotFoundError(u"{:s}.by_index({!s}, {:d}) : Unable to find a member at the specified index ({:d}) of the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), index, index, 'union' if is_union else 'frame' if v9frame(tinfo) else 'structure', tinfo.get_tid()))
+        return tinfo, index, utd[index]
+
+    @classmethod
+    def by_name(cls, type, name):
+        '''Return the member with the given `name` belonging to the structure identified by `sptr`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.by_name({!s}, {!r}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.by_name({!s}, {!r}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name))
+
+        # Now we can take our name, pack it to a string, and then use it as a
+        # key with the udt_type_data_t instance for the structure type.
+        key, string = udm_t(), name if isinstance(name, types.ordered) else [name]
+        packed = interface.tuplename(*string)
+        key.name = utils.string.to(packed)
+        mindex = utd.find_member(key, idaapi.STRMEM_NAME)
+        if not(0 <= mindex < utd.size()):
+            raise E.MemberNotFoundError(u"{:s}.by_name({!s}, {!r}) : Unable to locate a member with the specified name \"{:s}\" for the given {:s} ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), name, utils.string.escape(packed, '"'), 'union' if v9union(tinfo) else 'frame' if v9frame(tinfo) else 'structure', tinfo.get_tid()))
+        return tinfo, mindex, utd[mindex]
+
+    @classmethod
+    def by_fullname(cls, name):
+        '''Return the member with the given full `name` which is composed of both the type and member names.'''
+        raise NotImplementedError
+
+    @classmethod
+    def nearest(cls, type, offset):
+        '''Return the member from the specified structure or union `type` that is at or before the given `offset`.'''
+        tinfo, offset = interface.tinfo.copy(type), int(offset)
+        available = [packed for packed in cls.iterate(tinfo)]
+        while len(available) > 1:
+            index = len(available) // 2
+            ti, mindex, udm = available[index]
+            pivot = 0 if v9union(udm.type) else udm.offset
+            available = available[:index] if offset < pivot else available[index:]
+        return available[0] if available else ()
+
+    @classmethod
+    def at_offset(cls, type, offset):
+        '''Yield the members at the given `offset` of the specified structure or union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def in_offset(cls, type, offset):
+        '''Yield the members at the given `offset` of the specified union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def at_bounds(cls, type, start, stop):
+        '''Yield the members from the offset `start` to `stop` within the specified structure or union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def overlaps(cls, type, start, stop):
+        '''Yield the members belong to the specified structure or union `type` that overlap the given offset from `start` to `stop`.'''
+        raise NotImplementedError
 
 class members(object):
     """
