@@ -1459,9 +1459,39 @@ class v9members(object):
         return tinfo, mindex, utd[mindex]
 
     @classmethod
-    def by_fullname(cls, name):
+    def by_fullname(cls, name, delimiter='.'):
         '''Return the member with the given full `name` which is composed of both the type and member names.'''
-        raise NotImplementedError
+        string = name if isinstance(name, types.ordered) else [name]
+        fullname = interface.tuplename(*string)
+        components = fullname.split(delimiter) if delimiter in fullname else [fullname]
+
+        # this function doesn't really make sense for type information, since
+        # the disassembler doesn't really let you use "." for types or field
+        # names... however, the way it is implemented actually does. so, we
+        # start by slicing up the name into its components and index through
+        # each while trying to see if the name matches a type name.
+        for index in range(1, len(components)):
+            typename = delimiter.join(components[:index])
+            mname = delimiter.join(components[index:]) if index < len(components) else ''
+
+            # if the type name doesn't exist, then we try the next candidate.
+            if not interface.tinfo.has_name(typename):
+                continue
+
+            # if it does exist, then we need to grab the type and then check its
+            # members for whatever is left from the name components.
+            tinfo = interface.tinfo.at_name(typename)
+            if not tinfo:
+                logging.error(u"{:s}.by_fullname({!r}) : Skipping the current type name \"{:s}\" due to the disassembler not returning a type for it.".format('.'.join([__name__, cls.__name__]), typename))
+                continue
+
+            # now we can check the type's members for the remaining name
+            # components. if the name was found, then we can just use the
+            # `v9members.by_name` function with our type and matching name.
+            elif cls.has_name(tinfo, mname):
+                return cls.by_name(tinfo, mname)
+            continue
+        raise E.MemberNotFoundError(u"{:s}.by_fullname({!r}) : Unable to locate a candidate member matching the specified full name \"{:s}\".".format('.'.join([__name__, cls.__name__]), fullname, utils.string.escape(fullname, '"')))
 
     @classmethod
     def nearest(cls, type, offset):
@@ -1478,7 +1508,90 @@ class v9members(object):
     @classmethod
     def at_offset(cls, type, offset):
         '''Yield the members at the given `offset` of the specified structure or union `type`.'''
-        raise NotImplementedError
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.at_offset({!s}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.at_offset({!s}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        else:
+            realoffset = int(offset)
+
+        # Start out by verifying that our structure can contain the offset.
+        bits, count = 8 * utd.total_size, utd.size()
+        is_union, is_variable = v9union(tinfo), tinfo.is_varstruct()
+
+        if not cls.contains(tinfo, realoffset):
+            return
+
+        # First we do a smoke test to make sure that the type is not both a
+        # union and a variable-length structure.
+        elif is_union and is_variable:
+            logging.warning(u"{:s}.at_offset({!s}, {:+#x}) : Disassembler returned a union ({:#x}) of size (+{:#x}) that is also a variable-length structure.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), realoffset, tinfo.get_tid(), bits))
+            return
+
+        # Check if our current type is a union or not. If it's a union, then we
+        # need to yield multiple members that overlap with the specified offset.
+        elif is_union:
+
+            # Iterate through each member in the union and check their sizes.
+            for index in range(utd.size()):
+                udm = utd[index]
+                mbits = udm.size
+
+                # If the requested offset is within the boundaries of our union
+                # member, then we found a match and can yield it.
+                if 0 <= realoffset < mbits:
+                    yield tinfo, index, udm
+
+                # This next condition shouldn't happen...but if it does, we
+                # check the offset against the member size and then yield it.
+                elif is_variable and udm.size <= min(mbits, realoffset):
+                    yield tinfo, index, udm
+                continue
+            return
+
+        # Any other type means that we can use the regular api to determine the
+        # member to yield. Before that, though, we need to know the gaps of the
+        # type so that we can ensure that we're pointing directly at a member.
+        key = udm_t()
+
+        # So, we need to enumerate all of the gaps in the structure type so
+        # that we can predict when utd.find_member will return -1.
+        segments, points = cls.gaps(tinfo)
+        if points:
+            index = bisect.bisect_right(points, realoffset) - 1
+            left, right = segments[points[max(0, index)]]
+
+            # If our realoffset points inside a gap, then we can just return to
+            # avoid yielding any members.
+            if left <= realoffset < right:
+                return
+            pass
+
+        # So, If it's a variable length structure, then we can still use the API,
+        # but we'll need to clamp its size to the total size of the structure.
+        key.offset = min(bits, realoffset) if is_variable else realoffset
+
+        # Now we use the API to get the member index for the given offset, and
+        # then we can go ahead and check its bounds against the offset.
+        mindex = utd.find_member(key, idaapi.STRMEM_OFFSET)
+        if mindex < 0:
+            raise E.DisassemblerError(u"{:s}.at_offset({!s}, {:+#x}) : Unable to find a member at the given offset ({:+#x}) of the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), realoffset, key.offset, tinfo.get_tid()))
+
+        # If it's using a variable-length structure, then we do some explicit
+        # checks to see if it points past the end of the variable-length member.
+        elif is_variable and not(utd[mindex].size):
+            if utd[mindex].offset <= realoffset:
+                yield tinfo, mindex, utd[mindex]
+            pass
+
+        # If it's just a regular structure with the member being sized, then we
+        # just check if the given offset is within the member's boundaries.
+        elif utd[mindex].offset <= realoffset < utd[mindex].offset + utd[mindex].size:
+            yield tinfo, mindex, utd[mindex]
+        return
 
     @classmethod
     def in_offset(cls, type, offset):
@@ -1488,11 +1601,216 @@ class v9members(object):
     @classmethod
     def at_bounds(cls, type, start, stop):
         '''Yield the members from the offset `start` to `stop` within the specified structure or union `type`.'''
-        raise NotImplementedError
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.at_bounds({!s}, {:+#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        else:
+            left, right = sorted(map(int, [start, stop]))
+
+        # Start out by grabbing the structure dimensions and type.
+        bits, key, count = 8 * utd.total_size, udm_t(), utd.size()
+        is_union, is_variable = v9union(tinfo), tinfo.is_varstruct()
+
+        # If the boundaries are the same, then there's nothing to yield since
+        # nothing can exist within a zero-length'd segment.
+        if left == right:
+            return
+
+        # If it's a union, then we capture all the members and sort them by
+        # their size. This is so can filter them and support returning them in
+        # reverse order if we were asked to.
+        elif is_union:
+            members, direction = {}, +1 if start <= stop else -1
+            for index in range(count):
+                udm = utd[index]
+                mbits = udm.size
+                members.setdefault(mbits, []).append(index)
+
+            # Now that we've collected all the members keyed by size, we can
+            # traverse them in order and exclude the ones outside our bounds.
+            for mbits in sorted(members)[::direction]:
+                ordered = members[mbits][::direction]
+
+                # If it's not a variable-length structure, then we just need to
+                # check the size to determine if the size should be skipped.
+                if not(is_variable) and not(left <= 0 and mbits <= right):
+                    continue
+
+                # If the structure is variable-length and the bounds do not
+                # include the entire size, then we can totally skip that too.
+                elif is_variable and not(left <= 0 and mbits <= min(mbits, right)):
+                    continue
+
+                # Now we just have to yield each member in order. This is a
+                # union anyways, so all members should really be the same.
+                for mindex in ordered:
+                    yield tinfo, mindex, utd[mindex]
+                continue
+            return
+
+        # We were given a regular structure, so to start out we need to figure
+        # out the indices of the members within our range. This way we can just
+        # create a slice for yielding all of the valid elements.
+        lindex = cls.index_before(tinfo, left) if left >= 0 else None
+        rindex = cls.index_after(tinfo, right) if start <= stop else cls.index_before(tinfo, right)
+        ordering = slice(lindex, rindex, +1) if start <= stop else slice(rindex, lindex - 1 if lindex else None, -1)
+
+        # Now we can iterate through our slice and check if each member's
+        # boundaries are within the bounds that we were given.
+        for index in range(*ordering.indices(count)):
+            udm = utd[index]
+            mleft, mbits = udm.offset, udm.size
+
+            # Here we adjust the element size so that at least one element will
+            # need to be encompassed for the last element in a variable-length
+            # structure.
+            if is_variable and not(mbits):
+                ti, length = interface.tinfo.array(udm.type)
+                melement = 8 * ti.get_size()
+
+            else:
+                melement = mbits
+
+            # Finally we can test if the member is within the chosen boundaries.
+            mright = mleft + melement
+            if mbits and mright > mleft and left <= mleft and right >= mright:
+                yield tinfo, index, udm
+
+            elif is_variable and not(mbits) and right >= mright:
+                yield tinfo, index, udm
+            continue
+        return
 
     @classmethod
     def overlaps(cls, type, start, stop):
         '''Yield the members belong to the specified structure or union `type` that overlap the given offset from `start` to `stop`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.overlaps({!s}, {:+#x}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.overlaps({!s}, {:+#x}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), start, stop))
+        else:
+            left, right = sorted(map(int, [start, stop]))
+
+        # Start out by grabbing the structure dimensions and type.
+        bits, key, count = 8 * utd.total_size, udm_t(), utd.size()
+        is_union, is_variable = v9union(tinfo), tinfo.is_varstruct()
+
+        # If the boundaries are the same, then there's nothing to yield since
+        # nothing can exist within a zero-length'd segment.
+        if left == right:
+            return
+
+        # If it's a union, then we capture all the members and sort them by
+        # their size. This is so can filter them and support returning them in
+        # reverse order if we were asked to.
+        elif is_union:
+            members, direction = {}, +1 if start <= stop else -1
+            for index in range(count):
+                udm = utd[index]
+                mbits = udm.size
+                members.setdefault(mbits, []).append(index)
+
+            # Now that we've collected all the members keyed by size, we can
+            # traverse them in order and exclude any that don't overlap.
+            for mbits in sorted(members)[::direction]:
+                ordered = members[mbits][::direction]
+
+                # If it's not a variable-length structure, then we just verify
+                # that the bounds touch any part of the member (0..mbits).
+                if not(is_variable) and not(left <= mbits and right > 0):
+                    continue
+
+                # If the structure is variable-length and the bounds do not
+                # overlap any part of the member, then we can skip that too.
+                elif is_variable and not(left < mbits and mright > 0):
+                    continue
+
+                # Finally we can yield our results in the order that we stored
+                # them as. This is a union, so all members should generally be
+                # the same.
+                for mindex in ordered:
+                    yield tinfo, mindex, utd[mindex]
+                continue
+            return
+
+        # We have a regular structure, so we start by figuring out the indices
+        # of the members within the bounds. This way we can slice all the
+        # elements that are touching and figuring out which ones overlap.
+        lindex = cls.index_before(tinfo, left) if left >= 0 else None
+        rindex = cls.index_after(tinfo, right) if start <= stop else cls.index_before(tinfo, right)
+        ordering = slice(lindex, rindex, +1) if start <= stop else slice(rindex, lindex - 1 if lindex else None, -1)
+
+        # Now we can iterate through our slice and check each members bounds.
+        for index in range(*ordering.indices(count)):
+            udm = utd[index]
+            mleft, mbits = udm.offset, udm.size
+            mright = mleft + mbits
+
+            # Use the element size to calculate the right side of the member,
+            # and then check that our bounds overlap with any part of it.
+            if mbits and mright > mleft and left < mright and right > mleft:
+                yield tinfo, index, udm
+
+            # If it's a variable-length member, then we need to check if our
+            # boundaries are touching the left side and right sides.
+            elif is_variable and not(mbits) and left < mright + 1 and right > mleft:
+                yield tinfo, index, udm
+            continue
+        return
+
+    @classmethod
+    def references(cls, type):
+        '''Return the structure members and operand references that reference the specified structure `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def at(cls, type, offset, *filter):
+        """Traverse into the specified structure `type` yielding each member located at the specified `offset`.
+
+        If a closure is passed as the `filter` parameter, then use the function to filter the chosen candidates during descent.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def slice(cls, type, slice):
+        '''Return a `slice` of the contiguous list of members belonging to the specified structure `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def remove_slice(cls, type, slice, *offset):
+        '''Remove a `slice` of the members belonging to the specified structure or union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def remove_bounds(cls, type, start, stop, *offset):
+        '''Remove the members at the offset `start` to `stop` from the specified structure or union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def clear_slice(cls, type, slice, *offset):
+        '''Clear a `slice` of the members belonging to the specified structure or union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def clear_bounds(cls, type, start, stop, *offset):
+        '''Undefine the members at the offset `start` to `stop` of the specified structure or union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def layout_getslice(cls, type, slice):
+        '''Return a contiguous `slice` of the layout belonging to the specified structure or union `type`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def layout_setslice(cls, type, slice, layout, *offset):
+        '''Update the contigious `slice` belonging to the specified structure or union `type` with the specified `layout`.'''
         raise NotImplementedError
 
 class members(object):
