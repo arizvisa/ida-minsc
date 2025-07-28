@@ -62,6 +62,8 @@ def v9union(type):
 
 def v9frame(type):
     '''Return whether the specified `type` belongs to a function as a frame.'''
+    if idaapi.__version__ < 8.5:
+        return False
     return type.is_frame()
 
 def iterate():
@@ -288,6 +290,250 @@ class xref(object):
                 yield member
             continue
         return
+
+class v9member(object):
+    """
+    This preliminary namespace is similar to the `member` namespace with the
+    primary difference being that this uses the v9 api. The other difference is
+    that since v9 changes the meaning of the member offset and size from bytes
+    to bits, we also calculate everything using bits.
+
+    In this namespace, the first `v9member.by` function is an internal function
+    that is used to get information about the structure or union type that is
+    passed as a parameter. This is intended to allow a caller to pass multiple
+    sets of parameters in order to get information about a structure or union
+    member.
+    """
+
+    # FIXME: Of course, the udt_type_data_t and udm_t are not referenced counted
+    #        properly and can go out of scope. I complained about this and how
+    #        certain types can be lost to igor, but he didn't believe me...
+    #        pretty much saying that my email was too long and he didn't bother.
+    @classmethod
+    def by(cls, *args, **caller):
+        '''Internal function that gets information about a member given an id or a type and an index.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        tinfo, utd, udm = idaapi.tinfo_t(), idaapi.udt_type_data_t(), udm_t()
+
+        # Grab the caller name from the parameters and prepare a format string
+        # so that the error message accurately displays the caller.
+        prefix = caller.get('caller', [__name__, cls.__name__, 'by'])
+        caller_args = caller.get('args', '')
+        prefix_format = u"{:s}({{!s}}{{!s}})".format('.'.join(prefix))
+
+        # Get the member information using a member identifier.
+        if len(args) == 1 and (interface.node.identifier(*args) or operator.eq(idaapi.BADADDR, *args)):
+            [mid] = args
+            formatted_args = "{:#x}".format(mid)
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+
+            # Now we can try and figure out the type using the member id.
+            if not tinfo.get_type_by_tid(mid):
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the specified identifier ({:#x}).".format(caller_format, mid))
+            elif not (tinfo.is_struct() or v9union(tinfo)):
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, tinfo.get_tid()))
+            elif not tinfo.get_udt_details(utd):
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+            else:
+                count = utd.size()
+
+            # Use the member id to snag the correct member from the type.
+            mindex = tinfo.get_udm_by_tid(udm, mid)
+            if not (0 <= mindex < count):
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member with the given identifier ({:#x}) in the specified type ({:#x}).".format(caller_format, mid, tinfo.get_tid()))
+            return tinfo, utd, mindex, udm
+
+        # Try using a type and its udm index.
+        elif len(args) == 2 and isinstance(args[-1], types.integer):
+            [type, mindex] = args
+            tinfo = interface.tinfo.copy(type)
+            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:d}".format(mindex)])
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+
+            # Verify that the type is valid and get its details.
+            if not (tinfo.is_struct() or v9union(tinfo)):
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, tinfo.get_tid()))
+            elif not tinfo.get_udt_details(utd):
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+            else:
+                count = utd.size()
+
+            # If the index is out-of-bounds, then abort.
+            if not (0 <= mindex < count):
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given index ({:d}) of the specified type ({:#x}).".format(caller_format, mindex, tinfo.get_tid()))
+            return tinfo, utd, mindex, utd[mindex]
+
+        # Try using a type and the offset for the member.
+        elif len(args) == 2 and isinstance(args[-1], udm_t):
+            [type, udm] = args
+            tinfo = interface.tinfo.copy(type)
+            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:d}".format(udm.offset) if v9union(tinfo) else "{:#x}".format(udm.offset)])
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+            tinfo = interface.tinfo.copy(tinfo)
+
+            # Verify the type we were given and use it to get its details.
+            if not (tinfo.is_struct() or v9union(tinfo)):
+                raise E.InvalidTypeOrValueError(u"{:s} : The specified type ({:#x}) is not a structure, union, or a frame.".format(caller_format, tinfo.get_tid()))
+            elif not tinfo.get_udt_details(utd):
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, tinfo.get_tid()))
+            else:
+                count = utd.size()
+
+            # Ask our member vector for whatever index is in the udm_t.
+            mindex = utd.find_member(udm, idaapi.STRMEM_AUTO)
+            if not (0 <= mindex < count):
+                description = "index ({:d})".format(udm.offset) if v9union(tinfo) else "offset ({:#x})".format(udm.offset)
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the member at the given {:s} of the specified type ({:#x}).".format(caller_format, description, tinfo.get_tid()))
+            return tinfo, utd, mindex, utd[mindex]
+
+        # If we couldn't figure out what the arguments mean, then just give up.
+        iterable = (("{!r}".format(arg) if isinstance(arg, types.string) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in args)
+        formatted_args = ', '.join(iterable)
+        caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+        raise E.InvalidParameterError(u"{:s} : Unable to find the member using the specified parameters.".format(caller_format))
+
+    @classmethod
+    def has(cls, mid):
+        '''Return whether a member with the specified `mid` exists within the database.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        tinfo, utd, udm = idaapi.tinfo_t(), idaapi.udt_type_data_t(), udm_t()
+
+        # If we can't get information about the type, then assume that it
+        # doesn't exist.
+        if not tinfo.get_type_by_tid(mid):
+            return False
+        elif not (tinfo.is_struct() or v9union(tinfo)):
+            return False
+        elif not tinfo.get_udt_details(utd):
+            return False
+
+        # Now that we have the type for the identifier, then we can search it
+        # for the member identifier. A valid index means that it was found.
+        udm = udm_t()
+        mindex = tinfo.get_udm_by_tid(udm, mid)
+        return 0 <= mindex
+
+    @classmethod
+    def index(cls, *args):
+        '''Return the index of the specified member.'''
+        _, _, mindex, _ = cls.by(*args, caller=[__name__, cls.__name__, 'by'])
+        return mindex
+
+    @classmethod
+    def has_name(cls, *args):
+        '''Return whether the name of the specified member is user-defined.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'has_name'])
+        mid, name = tinfo.get_udm_tid(mindex), utils.string.of(udm.name)
+
+        # If the member is a gap (v9 api), then we act as if there's no name
+        # applied. This is different from the disassembler, because in the v9
+        # api all the members are contiguous and given a default name.
+        if udm.is_gap():
+            return False
+
+        # If the type is not a function frame, then we only need to check that
+        # the name matches directly with "field_%X".
+        if not v9frame(tinfo):
+            field, offset = name.split('_', 1) if '_' in name else (name, '')
+            bytes, _ = divmod(udm.offset, 8)
+            expected = "{:x}".format(bytes)
+            return (field, offset.lower()) != ('field', expected)
+
+        # If we're using earlier than 8.5, then we can just use the older
+        # `member` namespace to figure out whether a frame member is named.
+        if idaapi.__version__ < 8.5:
+            packed = idaapi.get_member_by_id(mid)
+            if not(packed):
+                raise E.MemberNotFoundError(u"{:s}.has_name({:#x}) : Unable to find the frame member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+            mptr, fullname, sptr = packed
+            return member.has_name(mptr)
+
+        # We can start out by checking that the member name is not one of the
+        # names that we can check using the v9 api.
+        if idaapi.is_anonymous_member_name(name) or udm.is_special_member() or udm.is_retaddr() or udm.is_savregs():
+            return False
+
+        # Now we need to figure out the function and boundaries of the frame so
+        # that we can distinguish between variables, args, and preserved regs.
+        ea = tinfo.get_frame_func()
+
+        # If we couldn't get the function or its frame, then do a prefix check
+        # to determine if it has a custom name.
+        fn = idaapi.get_func(ea)
+        if ea == idaapi.BADADDR or not fn:
+            return any(name.startswith(prefix) for prefix in {'arg_', 'var_'})
+
+        # Otherwise, we will need to calculate the default name and compare it
+        # ourselves using the member offset converted from bits to bytes.
+        moffset, _ = divmod(udm.offset, 8)
+        args, frsize = idaapi.frame_off_args(fn), fn.frsize
+        var, offset = name.split('_', 1) if '_' in name else (name, '')
+        prefix, expected = ('var', "{:x}".format(frsize - moffset)) if moffset < args else ('arg', "{:x}".format(moffset - args))
+        return (var, offset.lower()) != (prefix, expected)
+
+    @classmethod
+    def get_name(cls, *args):
+        '''Return the name of the specified member as a string.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'get_name'])
+        return utils.string.of(udm.name)
+
+    @classmethod
+    def fullname(cls, *args):
+        '''Return the full name of the specified member as a string.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'fullname'])
+        tname, mname = tinfo.get_type_name(), udm.name
+        return '.'.join(map(utils.string.of, [tname, mname]))
+
+    @classmethod
+    def set_name(cls, *args):
+        '''Set the name of the specified member to a string and return the original name.'''
+        tinfo, utd, mindex, udm = cls.by(*args[:-1], caller=[__name__, cls.__name__, 'set_name'], args="{!r}".format(*args[-1:]))
+        tname, mname = tinfo.get_type_name(), udm.name
+        fullname = '.'.join(map(utils.string.of, [tname, mname]))
+
+        # Extract the string from the specified parameters.
+        mid, res = tinfo.get_udm_tid(mindex), args[-1]
+        string = interface.tuplename(*res) if isinstance(res, types.ordered) else res
+
+        # If this is a special member, then complain since modifying the name
+        # changes the member to being non-special for some reason.
+        if v9frame(tinfo) and (udm.is_special_member() or udm.is_retaddr() or udm.is_savregs()):
+            mdescr = "index ({:d})".format(udm.offset) if v9union(tinfo) else "offset ({:#x})".format(udm.offset)
+            logging.warning(u"{:s}.set_name({:#x}, {!r}) : Modifying the name for the special member \"{:s}\" at {:s} will unfortunately demote its special properties.".format('.'.join([__name__, cls.__name__]), mid, string, utils.string.escape(utils.string.of(fullname), '"'), mdescr))
+
+        # Validate the name using the constraints for a netnode name.
+        ida_string = utils.string.to(string)
+        res = idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
+        if ida_string and ida_string != res:
+            logging.info(u"{:s}.set_name({:#x}, {!r}) : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), mid, string, 'union' if v9union(tinfo) else 'frame' if v9frame(tinfo) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            ida_string = res
+
+        # Now we can actually rename the member using v9's `tinfo_t.rename_udm`.
+        terr = tinfo.rename_udm(mindex, ida_string, idaapi.ETF_FORCENAME)
+        if terr != TERR_OK:
+            errname, errdesc = interface.tinfo.format_type_error(terr)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s}.set_name({:#x}, {!r}) : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\" due to error {:s}.".format('.'.join([__name__, cls.__name__]), mid, string, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if v9union(tinfo) else 'frame' if v9frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
+
+        # FIXME: Verify that the name was actually assigned by fetching the type
+        #        and its members again.
+        return mname
+
+    @classmethod
+    def remove_name(cls, *args):
+        '''Reset the name for the specified member specified by `mid` and return the original name.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'remove_name'])
+        mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
+        fullname = '.'.join(map(utils.string.of, [tname, mname]))
+        default = cls.default_name(mid, udm.offset)
+        return cls.set_name(mid, default)
+
+    @classmethod
+    def default_name(cls, mid, *offset):
+        '''Return the default name for the member given by `mid` at the given `offset` if provided.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'remove_name'])
+        mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
+        raise NotImplementedError
 
 class member(object):
     """
@@ -1026,9 +1272,9 @@ class v9members(object):
     relative to the top of the structure.
 
     When returning an individual member, the functions within this namespace
-    will always return it as a 3-element tuple composed of the
-    ``idaapi.tinfo_t``, an integer for its index, and the ``idaapi.udm_t``
-    which contains a copy of the member's information.
+    will always return it as a triple-tuple composed of the ``idaapi.tinfo_t``,
+    an integer for its index, and the ``idaapi.udm_t`` which contains a copy of
+    the member's information.
     """
 
     @classmethod
@@ -1596,6 +1842,20 @@ class v9members(object):
     @classmethod
     def in_offset(cls, type, offset):
         '''Yield the members at the given `offset` of the specified union `type`.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        utd, tinfo = idaapi.udt_type_data_t(), interface.tinfo.copy(type)
+
+        if not (tinfo.is_struct() or v9union(tinfo)):
+            raise E.InvalidTypeOrValueError(u"{:s}.in_offset({!s}, {:+#x}) : The specified type is not a structure, union, or a frame.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        elif not tinfo.get_udt_details(utd):
+            raise E.DisassemblerError(u"{:s}.in_offset({!s}, {:+#x}) : Unable to get the details for the specified type.".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), offset))
+        else:
+            realoffset = int(offset)
+
+        # Start out by grabbing the structure dimensions and type.
+        bits, key, count = 8 * utd.total_size, udm_t(), utd.size()
+        key.offset, is_union, is_variable = realoffset, v9union(tinfo), tinfo.is_varstruct()
+
         raise NotImplementedError
 
     @classmethod
