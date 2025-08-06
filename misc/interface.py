@@ -262,8 +262,12 @@ class typemap(object):
     # Assign the default values for the processor that was selected for the database.
     @classmethod
     def __newprc__(cls, pnum):
-        info = idaapi.get_inf_structure()
-        bits = 64 if info.is_64bit() else 32 if info.is_32bit() else None
+        if idaapi.__version__ < 7.3:
+            info = idaapi.get_inf_structure()
+            bits = 64 if info.is_64bit() else 32 if info.is_32bit() else 16
+        else:
+            Fis_32bit =  idaapi.inf_is_32bit if hasattr(idaapi, 'inf_is_32bit') else idaapi.inf_is_32bit_or_higher
+            bits = 64 if idaapi.inf_is_64bit() else 32 if Fis_32bit else 16
         if bits is None: return
 
         typemap.integermap[None] = typemap.integermap[int, bits // 8]
@@ -469,8 +473,12 @@ class typemap(object):
             # which is either because we didn't receive a processor notification,
             # the database wasn't loaded, or because of something crazy and unexpected.
             if None not in table:
-                info = idaapi.get_inf_structure()
-                Fprocessor_name = operator.attrgetter('procname' if hasattr(info, 'procname') else 'procName')
+                if idaapi.__version__ < 7.3:
+                    info = idaapi.get_inf_structure()
+                    Fprocessor_name = operator.attrgetter('procname' if hasattr(info, 'procname') else 'procName')
+                    processor_name = Fprocessor_name(info)
+                else:
+                    processor_name = idaapi.inf_get_procname()
                 why = '' if info and Fprocessor_name(info) else ' due to the processor size not being detected or a database not currently open.'
                 raise internal.exceptions.ItemNotFoundError(u"{:s}.resolve({!s}) : Unable the resolve the given type ({!s}) to a corresponding native type{:s}.".format('.'.join([__name__, cls.__name__]), pythonType, pythonType, why))
             flag, typeid = table[None]
@@ -3671,10 +3679,16 @@ class database(object):
     """
 
     # cache the initial idainfo structure, but it should get updated by one of the hooks.
-    __idainfo__ = idaapi.get_inf_structure()
+    __idainfo__ = idaapi.get_inf_structure() if idaapi.__version__ < 7.3 else object()
 
     @classmethod
     def __init_info_structure__(cls, idp_modname):
+        if idaapi.__version__ < 7.3:
+            return cls.__init_info_structure72__(idp_modname)
+        return cls.__init_info_structure73__(idp_modname)
+
+    @classmethod
+    def __init_info_structure72__(cls, idp_modname):
         idainfo = idaapi.get_inf_structure()
         if idainfo:
             logging.debug(u"{:s}.__init_info_structure__({!s}) : Successfully fetched and cached information structure for database.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(idp_modname, '"')))
@@ -3692,11 +3706,30 @@ class database(object):
                 mode = ' kernelspace' if idainfo.lflags & idaapi.LFLG_KERNMODE else ' userspace'
             else:
                 mode = ''
-            logging.warning(u"Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s}{mode:s} {format:s}.".format('.'.join([idainfo.__class__.__module__, idainfo.__class__.__name__]), tag=idainfo.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=idainfo.version))
+            logging.warning(u"Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s}{mode:s} {format:s}.".format('.'.join([__name__, cls.__name__]), tag=idainfo.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=idainfo.version))
 
         else:
             logging.fatal(u"{:s}.__init_info_structure__({!s}) : Unknown error while trying to get information structure for database.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(idp_modname, '"')))
         cls.__idainfo__ = idainfo
+
+    @classmethod
+    def __init_info_structure73__(cls, idp_modname):
+        logging.debug(u"{:s}.__init_info_structure__({!s}) : Successfully fetched and cached information structure for database.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape(idp_modname, '"')))
+
+        # Display summary of the database and what it's used for.
+        Fis_32bit =  idaapi.inf_is_32bit if hasattr(idaapi, 'inf_is_32bit') else idaapi.inf_is_32bit_or_higher
+        format = 'library' if idaapi.inf_is_dll() else 'binary'
+
+        bits = "{:d}-bit".format(64 if idaapi.inf_is_64bit() else 32 if Fis_32bit() else 16)
+        byteorder = "{:s}-endian".format('big' if idaapi.inf_is_be() else 'little')
+
+        mode = ' kernelspace' if idaapi.inf_is_kernel_mode() else ' userspace'
+
+        # hardcode the idainfo tag, since there seems to be no api to rerecord_class('ROOT\\subscription\\ms_409','CommandLineEventConsumer','__EventConsumer')turn it.
+        tag = 'IDA'
+        version = idaapi.inf_get_version()
+
+        logging.warning(u"Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s}{mode:s} {format:s}.".format(tag=tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=version))
 
     @classmethod
     def __nw_init_info_structure__(cls, nw_code, is_old_database):
@@ -3707,7 +3740,7 @@ class database(object):
     @classmethod
     def version(cls):
         '''Return the version of the database.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.version
         return idaapi.inf_get_version()
 
@@ -3732,13 +3765,13 @@ class database(object):
     @classmethod
     def flags(cls, *mask):
         '''Return the value of the ``idainfo.lflags`` field from the database with the specified `mask`.'''
-        lflags = cls.__idainfo__.lflags if idaapi.__version__ < 7.2 else idaapi.inf_get_lflags()
+        lflags = cls.__idainfo__.lflags if idaapi.__version__ < 7.3 else idaapi.inf_get_lflags()
         return operator.and_(lflags, *mask) if mask else lflags
 
     @classmethod
     def setflags(cls, mask, value):
         '''Set the ``idainfo.lflags`` with the provided `mask` from the database to the specified `value`.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             ok, cls.__idainfo__.lflags = True, (result & ~mask) | (value & mask)
 
         # Newer versions of IDA use the idaapi.inf_set_lflags() function.
@@ -3777,7 +3810,7 @@ class database(object):
         '''Return whether the current database is read-only or not.'''
         if idaapi.__version__ < 7.0:
             raise internal.exceptions.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-        elif idaapi.__version__ < 7.2:
+        elif idaapi.__version__ < 7.3:
             ok = cls.__idainfo__.readonly_idb()
         else:
             ok = idaapi.inf_readonly_idb()
@@ -3786,14 +3819,14 @@ class database(object):
     @classmethod
     def filetype(cls):
         '''Return the file type identified by the loader when creating the database.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.filetype
         return idaapi.inf_get_filetype()
 
     @classmethod
     def setfiletype(cls, filetype_t):
         '''Set the file type identified by the loader to the specified `filetype_t`.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             ok, cls.__idainfo__.filetype = True, filetype_t
 
         # Newer versions of IDA use the idaapi.inf_get_filetype() and idaapi.inf_set_filetype() functions.
@@ -3806,14 +3839,14 @@ class database(object):
         '''Return the operating system type identified by the loader when creating the database.'''
         # FIXME: this is a bitflag that should be documented in libfuncs.hpp
         #        which unfortunately is not included anywhere in the sdk.
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.ostype
         return idaapi.inf_get_ostype()
 
     @classmethod
     def setostype(cls, ostype_t):
         '''Set the operating system type for the database to the specified `ostype_t`.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             ok, cls.__idainfo__.ostype = True, ostype_t
 
         # Newer versions of IDA use the idaapi.inf_get_filetype() and idaapi.inf_set_filetype() functions.
@@ -3826,14 +3859,14 @@ class database(object):
         '''Return the application type identified by the loader when creating the database.'''
         # FIXME: this is a bitflag that should be documented in libfuncs.hpp
         #        which unfortunately is not included anywhere in the sdk.
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.apptype
         return idaapi.inf_get_apptype()
 
     @classmethod
     def setapptype(cls, apptype_t):
         '''Set the application type for the current database to the specified `apptype_t`.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             ok, cls.__idainfo__.apptype = True, apptype_t
 
         # Newer versions of IDA use the idaapi.inf_get_filetype() and idaapi.inf_set_filetype() functions.
@@ -3846,7 +3879,7 @@ class database(object):
         '''Return the number of changes within the current database.'''
         if idaapi.__version__ < 7.0:
             return None
-        elif idaapi.__version__ < 7.2:
+        elif idaapi.__version__ < 7.3:
             return cls.__idainfo__.database_change_count
         return idaapi.inf_get_database_change_count()
 
@@ -3866,7 +3899,7 @@ class database(object):
     @classmethod
     def compiler(cls):
         '''Return the compiler that was configured for the current database.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.cc
 
         # Newer versions of IDA use the idaapi.inf_get_cc() function.
@@ -3876,21 +3909,21 @@ class database(object):
     @classmethod
     def entrypoint(cls):
         '''Return the first entry point for the database.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.start_ea
         return idaapi.inf_get_start_ea()
 
     @classmethod
     def margin(cls):
         '''Return the current margin position for the current database.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.margin
         return idaapi.inf_get_margin()
 
     @classmethod
     def strtype(cls):
         '''Return the default string type configured for the current database.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             return cls.__idainfo__.strtype
         return idaapi.inf_get_strtype()
 
@@ -3976,7 +4009,7 @@ class address(object):
     @classmethod
     def bounds(cls):
         '''Return the smallest and largest address within the database as a tuple.'''
-        if idaapi.__version__ < 7.2:
+        if idaapi.__version__ < 7.3:
             info = idaapi.get_inf_structure()
             min, max = info.minEA, info.maxEA
         else:
@@ -11726,8 +11759,11 @@ class decode(object):
 
         # If we weren't given a byteorder, then we just take the default order from the database.
         if not any(arg in byteorder for arg in args):
-            information = idaapi.get_inf_structure()
-            mf = idaapi.cvar.inf.mf if idaapi.__version__ < 7.0 else information.lflags & idaapi.LFLG_MSF
+            if idaapi.__version__ < 7.3:
+                information = idaapi.get_inf_structure()
+                mf = idaapi.cvar.inf.mf if idaapi.__version__ < 7.0 else information.lflags & idaapi.LFLG_MSF
+            else:
+                mf = idaapi.inf_is_be()
             return 'big' if mf else 'little'
 
         # Otherwise, we were given a byteorder as a keyword and we can use it.
