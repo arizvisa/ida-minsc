@@ -27,16 +27,32 @@ def new(identifier, offset):
 
 def has(id):
     '''Return whether a structure with the specified `id` exists within the database.'''
-    return True if interface.node.identifier(id) and idaapi.get_struc(id) else False
+    tinfo = idaapi.tinfo_t()
+    if hasattr(idaapi, 'get_struc'):
+        return True if interface.node.identifier(id) and idaapi.get_struc(id) else False
+    elif interface.node.identifier(id) and tinfo.get_type_by_tid(id):
+        return tinfo.is_struct() or tinfo.is_union()
+    return False
 
 def by_index_or_identifier(index_or_identifier):
     '''Return the structure at the specified `index_or_identifier` from the database.'''
-    if interface.node.identifier(index_or_identifier):
+    tinfo = idaapi.tinfo_t()
+    if hasattr(idaapi, 'get_struc') and interface.node.identifier(index_or_identifier):
         return idaapi.get_struc(index_or_identifier)
+    elif interface.node.identifier(index_or_identifier):
+        if tinfo.get_type_by_tid(index_or_identifier):
+            return interface.tinfo.copy(tinfo)
+        raise E.StructureNotFoundError(u"{:s}.by_index_or_identifier({:#x}) : Unable to locate a structure with the specified identifier ({:#x}).".format(__name__, index_or_identifier, index_or_identifier))
 
     # otherwise, the index is definitely an index and we'll use it to grab the sptr.
-    sid = idaapi.get_struc_by_idx(index_or_identifier)
-    return None if sid == idaapi.BADADDR else idaapi.get_struc(sid)
+    if hasattr(idaapi, 'get_struc_by_idx'):
+        sid = idaapi.get_struc_by_idx(index_or_identifier)
+        return None if sid == idaapi.BADADDR else idaapi.get_struc(sid)
+
+    ti = interface.tinfo.for_ordinal(index_or_identifier)
+    if ti and (ti.is_struct() or ti.is_union()):
+        return ti
+    raise E.StructureNotFoundError(u"{:s}.by_index_or_identifier({:d}) : Unable to locate a structure at the specified index ({:d}).".format(__name__, index_or_identifier, index_or_identifier))
 
 def by_index(index):
     '''Return the structure at the specified `index` from the database.'''
