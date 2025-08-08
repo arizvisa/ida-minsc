@@ -7452,13 +7452,17 @@ class tinfo(object):
         if not tinfo:
             raise internal.exceptions.ItemNotFoundError(u"{:s}.identifier({!s}{:s}) : Unable to find the specified type within the current local types library.".format('.'.join([__name__, cls.__name__]), type_description, ", {!s}".format(*always) if always else ''))
 
+        # If we have a get_tid method, then use that since get_tinfo_tid is not
+        # available via idapython...thanks to the fucks over at hex-rays.
+        elif hasattr(tinfo, 'get_tid'):
+            return tinfo.get_tid()
+
         # If we're using 8.4, then we can just process this with the new api.
         # XXX: It's worth noting that this api is not side-effect free and can
         #      result in a type being added to the library regardless of whether
         #      its "force_tid" parameter is set to true or not.
-        elif idaapi.__version__ >= 8.4:
-            res = idaapi.get_tinfo_tid(tinfo, *itertools.chain(always if always else [False]))
-            return res
+        elif hasattr(idaapi, 'get_tinfo_tid'):
+            return idaapi.get_tinfo_tid(tinfo, *itertools.chain(always if always else [False]))
 
         # If it's not a type that we can return an identifier for, then raise an
         # exception since we have no way to process this on earlier than v8.4.
