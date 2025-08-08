@@ -538,12 +538,79 @@ class v9member(object):
         default = cls.default_name(mid, udm.offset)
         return cls.set_name(mid, default)
 
+    # FIXME: this function requires specifying the type and member in order to
+    #        allow calculating the default name for when a member doesn't exist.
+    #        declaration could be `default_name(tid, mid, offset)`.
     @classmethod
-    def default_name(cls, mid, *offset):
+    def default_name(cls, *args):
         '''Return the default name for the member given by `mid` at the given `offset` if provided.'''
-        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'remove_name'])
-        mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
-        raise NotImplementedError
+        utd = idaapi.udt_type_data_t()
+
+        # If we were given 3 parameters (type and member index), then check if
+        # the user specified an invalid member index so that we can calculate
+        # the name without the member.
+        if len(args) == 3 and isinstance(args[1], types.integer) and args[1] < 0:
+            type, mindex, moffset = args
+            tinfo = interface.tinfo.copy(type)
+            if not tinfo.get_udt_details(utd):
+                raise E.DisassemblerError(u"{:s}.default_name({!s}, {:d}, {:+#x}) : Unable to get the details for the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), mindex, offset, tinfo.get_tid()))
+            udm, offset = None, abs(mindex) if union(tinfo) else 8 * int(moffset)
+            mid, tname, mname = idaapi.BADNODE, tinfo.get_type_name(), None
+
+        # Otherwise we were only given the type and member information, so we'll
+        # need to calculate the member offset ourselves. In case we were given
+        # an offset, then cull it out since the member index was specified.
+        elif len(args) in {2, 3}:
+            tinfo, utd, mindex, udm = cls.by(*args[:2], caller=[__name__, cls.__name__, 'default_name'])
+            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
+            offset = udm.offset if udm else mindex if union(tinfo) else 8 * tinfo.get_size()
+
+        else:
+            descriptions = (("{:d}".format(arg) if isinstance(arg, types.integer) else "{!r}".format(arg)) for arg in args)
+            raise E.InvalidParameterError(u"{:s}.default_name({!s}) : An unexpected number of parameters ({:d}) were specified.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions)))
+
+        # Define some format specifiers that we can use for each field type.
+        fmtVar, fmtArg, fmtField = (fmt.format for fmt in ["var_{:X}", "arg_{:X}", "field_{:X}"])
+        specials = [' s', ' r'] if idaapi.__version__ < 8.5 else ['__saved_registers', '__return_address']
+        fmtSpecial_s, fmtSpecial_r = (utils.fconstant(format) for format in specials)
+
+        # Now we can check to see if there's a function associated with this
+        # type, because if it isn't then we can just use our formats for it.
+        ea, count = tinfo.get_frame_func(), utd.size()
+        fn = idaapi.get_func(ea)
+        if ea == idaapi.BADADDR or not fn:
+            moffset, _ = divmod(udm.offset if udm else offset, 8)
+            return fmtField(abs(mindex) if union(tinfo) else moffset)
+
+        # Now we need to figure out where our member is. If it's within the
+        # `func_t.frsize`, then we're a "var_" relative to `func_t.frsize`.
+        moff, _ = divmod(offset, 8)
+        if moff < fn.frsize:
+            fmt, moffset = fmtVar, fn.frsize - moff
+
+        # If it's within `func_t.frregs`, then we're a special " s" name.
+        elif moff < idaapi.frame_off_retaddr(fn):
+            fmt, moffset = fmtSpecial_s, None
+
+        # If it's at the saved registers, then we're a special " r" name.
+        elif moff < idaapi.frame_off_args(fn):
+            fmt, moffset = fmtSpecial_r, None
+
+        # Anything else should be an argument that is relative to the sum
+        # of all the segments we chopped out. So we will use "arg_" here.
+        elif moff < idaapi.frame_off_args(fn) + fn.argsize:
+            fmt, moffset = fmtArg, moff - idaapi.frame_off_args(fn)
+
+        # Anything else though...is a bug, it shouldn't happen unless IDA is not
+        # actually populating the fields correctly (looking at you x64). So, lets
+        # just be silently pedantic here.
+        else:
+            fmt, moffset = fmtArg, moff - idaapi.frame_off_args(fn)
+            mdescr = "index ({:d})".format(offset) if union(tinfo) else "offset ({:#x})".format(moff)
+            logging.debug(u"{:s}.default_name({:#x}, {:#x}, {:#x}) : Treating the name for the member at {:s} as an argument due to its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), tinfo.get_tid(), mid, offset, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
+
+        # We have our formatter and translated offset, so we can simply return it.
+        return fmt(moffset)
 
 class member(object):
     """
