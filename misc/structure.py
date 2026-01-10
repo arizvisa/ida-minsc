@@ -330,12 +330,14 @@ class v9member(object):
         prefix = caller.get('caller', [__name__, cls.__name__, 'by'])
         caller_args = caller.get('args', '')
         prefix_format = u"{:s}({{!s}}{{!s}})".format('.'.join(prefix))
+        iterable = (("{:d}".format(arg) if isinstance(arg, types.integer) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in caller_args)
+        extra_args = ', '.join(iterable)
 
         # Get the member information using a member identifier.
         if len(args) == 1 and (interface.node.identifier(*args) or operator.eq(idaapi.BADADDR, *args)):
             [mid] = args
             formatted_args = "{:#x}".format(mid)
-            caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
 
             # Now we can try and figure out the type using the member id.
             if not tinfo.get_type_by_tid(mid):
@@ -358,7 +360,7 @@ class v9member(object):
             [type, mindex] = args
             tinfo = interface.tinfo.copy(type)
             formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:d}".format(mindex)])
-            caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+            caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
 
             # Verify that the type is valid and get its details.
             if not (tinfo.is_struct() or union(tinfo)):
@@ -400,6 +402,59 @@ class v9member(object):
         iterable = (("{!r}".format(arg) if isinstance(arg, types.string) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in args)
         formatted_args = ', '.join(iterable)
         caller_format = prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+        raise E.InvalidParameterError(u"{:s} : Unable to find the member using the specified parameters.".format(caller_format))
+
+    @classmethod
+    def format_unknown_args(cls, *args, **caller):
+        '''Return the specified caller function rendered as a string that can be used for emitting messages to the user.'''
+        prefix = caller.get('caller', [__name__, cls.__name__, 'format'])
+        caller_args = caller.get('args', [])
+        prefix_format = u"{:s}({{!s}}{{!s}})".format('.'.join(prefix))
+        iterable = (("{!r}".format(arg) if isinstance(arg, types.string) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in args)
+        formatted_args = ', '.join(iterable)
+        if isinstance(caller_args, types.string):
+            return prefix_format.format(formatted_args, ", {:s}".format(caller_args) if caller_args else '')
+        extra_args = [("{:d}".format(arg) if isinstance(arg, types.integer) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in caller_args]
+        return prefix_format.format(formatted_args, ", {:s}".format(', '.join(extra_args)) if extra_args else '')
+
+    @classmethod
+    def format_args(cls, *args, **caller):
+        '''Return the specified caller function and arguments for selecting a member rendered as a string.'''
+        prefix = caller.get('caller', [__name__, cls.__name__, 'format'])
+        caller_args = caller.get('args', '')
+        prefix_format = u"{:s}({{!s}}{{!s}})".format('.'.join(prefix))
+
+        # Render any of the extra arguments we were given.
+        if isinstance(caller_args, types.string):
+            extra_args = caller_args
+        else:
+            iterable = (("{:d}".format(arg) if isinstance(arg, types.integer) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in caller_args)
+            extra_args = ', '.join(iterable)
+
+        # Get the member information using a member identifier.
+        if len(args) == 1:
+            [mid] = args
+            formatted_args = "{:#x}".format(mid)
+            return prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
+
+        # Try using a type and its udm index.
+        elif len(args) == 2 and isinstance(args[-1], types.integer):
+            [type, mindex] = args
+            tinfo = interface.tinfo.copy(type)
+            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:d}".format(mindex)])
+            return prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
+
+        # Try using a type and the udm offset for the member.
+        elif len(args) == 2 and isinstance(args[-1], udm_t):
+            [type, udm] = args
+            tinfo = interface.tinfo.copy(type)
+            formatted_args = ', '.join([interface.tinfo.quoted(tinfo), "{:d}".format(udm.offset) if union(tinfo) else "{:#x}".format(udm.offset)])
+            return prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
+
+        # If we couldn't figure out what the arguments mean, then just give up.
+        iterable = (("{!r}".format(arg) if isinstance(arg, types.string) else interface.tinfo.quoted(arg) if isinstance(arg, idaapi.tinfo_t) else "{!s}".format(arg)) for arg in args)
+        formatted_args = ', '.join(iterable)
+        caller_format = prefix_format.format(formatted_args, ", {:s}".format(extra_args) if extra_args else '')
         raise E.InvalidParameterError(u"{:s} : Unable to find the member using the specified parameters.".format(caller_format))
 
     @classmethod
@@ -452,9 +507,10 @@ class v9member(object):
         # If we're using earlier than 8.5, then we can just use the older
         # `member` namespace to figure out whether a frame member is named.
         if idaapi.__version__ < 8.5:
+            caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'has_name'])
             packed = idaapi.get_member_by_id(mid)
             if not(packed):
-                raise E.MemberNotFoundError(u"{:s}.has_name({:#x}) : Unable to find the frame member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+                raise E.MemberNotFoundError(u"{:s} : Unable to find the frame member with the specified identifier ({:#x}).".format(caller_format, mid))
             mptr, fullname, sptr = packed
             return member.has_name(mptr)
 
@@ -465,7 +521,7 @@ class v9member(object):
 
         # Now we need to figure out the function and boundaries of the frame so
         # that we can distinguish between variables, args, and preserved regs.
-        ea = tinfo.get_frame_func()
+        ea = tinfo.get_frame_func() if hasattr(tinfo, 'get_frame_func') else idaapi.BADADDR
 
         # If we couldn't get the function or its frame, then do a prefix check
         # to determine if it has a custom name.
@@ -504,26 +560,27 @@ class v9member(object):
         # Extract the string from the specified parameters.
         mid, res = tinfo.get_udm_tid(mindex), args[-1]
         string = interface.tuplename(*res) if isinstance(res, types.ordered) else res
+        caller_format = cls.format_args(*args[:-1], caller=[__name__, cls.__name__, 'set_name'], args=["{!r}".format(string)])
 
         # If this is a special member, then complain since modifying the name
         # changes the member to being non-special for some reason.
         if frame(tinfo) and (udm.is_special_member() or udm.is_retaddr() or udm.is_savregs()):
             mdescr = "index ({:d})".format(udm.offset) if union(tinfo) else "offset ({:#x})".format(udm.offset)
-            logging.warning(u"{:s}.set_name({:#x}, {!r}) : Modifying the name for the special member \"{:s}\" at {:s} will unfortunately demote its special properties.".format('.'.join([__name__, cls.__name__]), mid, string, utils.string.escape(utils.string.of(fullname), '"'), mdescr))
+            logging.warning(u"{:s} : Modifying the name for the special member \"{:s}\" at {:s} will unfortunately demote its special properties.".format(caller_format, utils.string.escape(utils.string.of(fullname), '"'), mdescr))
 
         # Validate the name using the constraints for a netnode name.
         ida_string = utils.string.to(string)
         res = idaapi.validate_name(ida_string[:], idaapi.SN_IDBENC)
         if ida_string and ida_string != res:
-            logging.info(u"{:s}.set_name({:#x}, {!r}) : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format('.'.join([__name__, cls.__name__]), mid, string, 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
+            logging.info(u"{:s} : Stripping invalid characters from desired {:s} member name \"{:s}\" resulted in \"{:s}\".".format(caller_format, 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
         # Now we can actually rename the member using v9's `tinfo_t.rename_udm`.
         terr = tinfo.rename_udm(mindex, ida_string, idaapi.ETF_FORCENAME)
-        if terr != TERR_OK:
+        if terr != idaapi.TERR_OK:
             errname, errdesc = interface.tinfo.format_type_error(terr)
             description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
-            raise E.DisassemblerError(u"{:s}.set_name({:#x}, {!r}) : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\" due to error {:s}.".format('.'.join([__name__, cls.__name__]), mid, string, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
+            raise E.DisassemblerError(u"{:s} : Unable to assign the specified name \"{:s}\" to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, utils.string.escape(utils.string.of(ida_string), '"'), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
 
         # FIXME: Verify that the name was actually assigned by fetching the type
         #        and its members again.
@@ -553,21 +610,28 @@ class v9member(object):
             type, mindex, moffset = args
             tinfo = interface.tinfo.copy(type)
             if not tinfo.get_udt_details(utd):
-                raise E.DisassemblerError(u"{:s}.default_name({!s}, {:d}, {:+#x}) : Unable to get the details for the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.tinfo.quoted(tinfo), mindex, offset, tinfo.get_tid()))
+                caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(moffset)])
+                raise E.DisassemblerError(u"{:s} : Unable to get the details for the specified type ({:#x}).".format(caller_format, offset, tinfo.get_tid()))
             udm, offset = None, abs(mindex) if union(tinfo) else 8 * int(moffset)
             mid, tname, mname = idaapi.BADNODE, tinfo.get_type_name(), None
 
         # Otherwise we were only given the type and member information, so we'll
         # need to calculate the member offset ourselves. In case we were given
         # an offset, then cull it out since the member index was specified.
-        elif len(args) in {2, 3}:
-            tinfo, utd, mindex, udm = cls.by(*args[:2], caller=[__name__, cls.__name__, 'default_name'])
+        elif (len(args) == 1 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 2 and isinstance(args[0], idaapi.tinfo_t)):
+            tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'default_name'])
             mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
             offset = udm.offset if udm else mindex if union(tinfo) else 8 * tinfo.get_size()
 
+        elif (len(args) == 2 and isinstance(args[0], types.integer) and interface.node.identifier(args[0])) or (len(args) == 3 and isinstance(args[0], idaapi.tinfo_t)):
+            tinfo, utd, mindex, udm = cls.by(*args[:-1], caller=[__name__, cls.__name__, 'default_name'], args=["{:#x}".format(*args[-1:])])
+            mid, tname, mname = tinfo.get_udm_tid(mindex), tinfo.get_type_name(), udm.name
+            [offset] = args[-1:]
+
         else:
-            descriptions = (("{:d}".format(arg) if isinstance(arg, types.integer) else "{!r}".format(arg)) for arg in args)
-            raise E.InvalidParameterError(u"{:s}.default_name({!s}) : An unexpected number of parameters ({:d}) were specified.".format('.'.join([__name__, cls.__name__]), ', '.join(descriptions)))
+            descriptions = [("{:d}".format(arg) if isinstance(arg, types.integer) else "{!r}".format(arg)) for arg in args]
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'default_name'])
+            raise E.InvalidParameterError(u"{:s} : An unexpected number of parameters ({:d}) were specified.".format(caller_format, len(descriptions)))
 
         # Define some format specifiers that we can use for each field type.
         fmtVar, fmtArg, fmtField = (fmt.format for fmt in ["var_{:X}", "arg_{:X}", "field_{:X}"])
@@ -576,10 +640,10 @@ class v9member(object):
 
         # Now we can check to see if there's a function associated with this
         # type, because if it isn't then we can just use our formats for it.
-        ea, count = tinfo.get_frame_func(), utd.size()
-        fn = idaapi.get_func(ea)
+        ea = tinfo.get_frame_func() if hasattr(tinfo, 'get_frame_func') else idaapi.BADADDR
+        fn, count = idaapi.get_func(ea), utd.size()
         if ea == idaapi.BADADDR or not fn:
-            moffset, _ = divmod(udm.offset if udm else offset, 8)
+            moffset, _ = divmod(offset, 8)
             return fmtField(abs(mindex) if union(tinfo) else moffset)
 
         # Now we need to figure out where our member is. If it's within the
@@ -607,10 +671,226 @@ class v9member(object):
         else:
             fmt, moffset = fmtArg, moff - idaapi.frame_off_args(fn)
             mdescr = "index ({:d})".format(offset) if union(tinfo) else "offset ({:#x})".format(moff)
-            logging.debug(u"{:s}.default_name({:#x}, {:#x}, {:#x}) : Treating the name for the member at {:s} as an argument due to its location ({:#x}) being outside of the frame ({:#x}).".format('.'.join([__name__, cls.__name__]), tinfo.get_tid(), mid, offset, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
+            caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'default_name'], args=["{:+#x}".format(moffset)])
+            logging.debug(u"{:s} : Treating the name for the member at {:s} as an argument due to its location ({:#x}) being outside of the frame ({:#x}).".format(caller_format, mdescr, moff, sum([idaapi.frame_off_args(fn), fn.argsize])))
 
         # We have our formatter and translated offset, so we can simply return it.
         return fmt(moffset)
+
+    @classmethod
+    def get_type(cls, *args):
+        '''Return the pythonic type of the specified member translated to the given `offset`.'''
+        if len(args) in {2, 3} and isinstance(args[0], internal.types.integer):
+            args, [offset] = args[:-1], 0 if len(args) < 3 else args[-1:]
+        elif len(args) in {3, 4}:
+            args, [offset] = args[:-1], 0 if len(args) < 4 else args[-1:]
+        else:
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_type'])
+            raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        # FIXME: return the pythonic type
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
+        raise NotImplementedError
+
+    @classmethod
+    def set_type(cls, *args):
+        '''Apply the pythonic `type` at the given `offset` to the specified member.'''
+        if len(args) in {2, 3} and isinstance(args[0], internal.types.integer):
+            args, [type, offset] = args[:1], itertools.chain(args[1:], [0]) if len(args) < 3 else args[1:]
+        elif len(args) in {4, 5}:
+            args, [type, offset] = args[:2], itertools.chain(args[2:], [0]) if len(args) < 5 else args[2:]
+        else:
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'get_type'])
+            raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        # FIXME: return the pythonic type
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'get_type'], args="{:#x}".format(offset))
+        raise NotImplementedError
+
+    @classmethod
+    def has_typeinfo(cls, *args):
+        '''Return whether there is type information applied to the specified member.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'has_typeinfo'])
+
+        # XXX: in later versions of the disassembler, all members will have the
+        #      type information unless the member is a gap. so, we only return
+        #      true if it is not a gap and not a primitive type.
+        ti = interface.tinfo.copy(udm.type)
+        return False if udm.is_gap() else ti.has_details()
+
+    @classmethod
+    def get_typeinfo(cls, *args):
+        '''Return the type information of the specified member.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'get_typeinfo'])
+        ti = interface.tinfo.copy(udm.type)
+        return ti
+
+    @classmethod
+    def format_error_typeinfo(cls, code):
+        '''Return the specified error `code` as a tuple composed of the error name and its description.'''
+        descriptions, names = {}, {getattr(idaapi, attribute) : attribute for attribute in dir(idaapi) if attribute.startswith('TERR_')}
+        descriptions[idaapi.TERR_OK] = 'ok'
+        descriptions[idaapi.TERR_SAVE_ERROR] = 'failed to save'
+        descriptions[idaapi.TERR_SERIALIZE] = 'failed to serialize'
+        descriptions[idaapi.TERR_BAD_NAME] = 'name is not acceptable'
+        descriptions[idaapi.TERR_BAD_SYNC] = 'failed to synchronize with IDB'
+        descriptions[idaapi.TERR_BAD_ARG] = 'bad argument'
+        descriptions[idaapi.TERR_BAD_TYPE] = 'bad type'
+        descriptions[idaapi.TERR_BAD_SIZE] = 'bad size'
+        descriptions[idaapi.TERR_BAD_INDEX] = 'bad index'
+        descriptions[idaapi.TERR_BAD_ARRAY] = 'arrays are forbidden as function arguments'
+        descriptions[idaapi.TERR_BAD_BF] = 'bitfields are forbidden as function arguments'
+        descriptions[idaapi.TERR_BAD_OFFSET] = 'bad member offset'
+        descriptions[idaapi.TERR_BAD_UNIVAR] = 'unions cannot have variable sized members'
+        descriptions[idaapi.TERR_BAD_VARLAST] = 'variable sized member must be the last member in the structure'
+        descriptions[idaapi.TERR_OVERLAP] = 'the member overlaps with other members that cannot be deleted'
+        descriptions[idaapi.TERR_BAD_SUBTYPE] = 'recursive structure nesting is forbidden'
+        descriptions[idaapi.TERR_BAD_VALUE] = 'value is not acceptable'
+        descriptions[idaapi.TERR_NO_BMASK] = 'bitmask is not found'
+        descriptions[idaapi.TERR_BAD_BMASK] = 'Bad enum member mask. The specified mask should not intersect with any existing mask in the enum. Zero masks are prohibited too'
+        descriptions[idaapi.TERR_BAD_MSKVAL] = 'bad bmask and value combination'
+        descriptions[idaapi.TERR_BAD_REPR] = 'bad or incompatible field representation'
+        descriptions[idaapi.TERR_GRP_NOEMPTY] = 'could not delete group mask for not empty group'
+        descriptions[idaapi.TERR_DUPNAME] = 'duplicate name'
+        descriptions[idaapi.TERR_UNION_BF] = 'unions cannot have bitfields'
+        descriptions[idaapi.TERR_BAD_TAH] = 'bad bits in the type attributes (TAH bits)'
+        descriptions[idaapi.TERR_BAD_BASE] = 'bad base class'
+        descriptions[idaapi.TERR_BAD_GAP] = 'bad gap'
+        descriptions[idaapi.TERR_NESTED] = 'recursive structure nesting is forbidden'
+        descriptions[idaapi.TERR_NOT_COMPAT] = 'the new type is not compatible with the old type'
+        descriptions[idaapi.TERR_BAD_LAYOUT] = 'failed to calculate the structure/union layout'
+        descriptions[idaapi.TERR_BAD_GROUPS] = 'bad group sizes for bitmask enum'
+        descriptions[idaapi.TERR_BAD_SERIAL] = 'enum value has too many serials'
+        descriptions[idaapi.TERR_ALIEN_NAME] = 'enum member name is used in another enum'
+        descriptions[idaapi.TERR_STOCK] = 'stock type info cannot be modified'
+        descriptions[idaapi.TERR_ENUM_SIZE] = 'bad enum size'
+        descriptions[idaapi.TERR_NOT_IMPL] = 'not implemented'
+        return names.get(code, ''), descriptions.get(code, '')
+
+    @classmethod
+    def set_typeinfo(cls, *args, flags=idaapi.ETF_COMPATIBLE):
+        '''Apply the type information in `info` to the specified member using the given `flags`.'''
+
+        if len(args) not in {2, 3}:
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'set_typeinfo'], args=["flags={:#x}".format(flags)])
+            raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        # Extract the parameters and the type that we're going to apply.
+        [info], args = args[-1:], args[:-1]
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'set_typeinfo'])
+        caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'set_typeinfo'], args=[interface.tinfo.quoted(info), "flags={:#x}".format(flags)])
+
+        # Now we can just use the parent type to change the member's type.
+        res, terr = interface.tinfo.copy(udm.type), tinfo.set_udm_type(mindex, info, flags)
+        if terr != idaapi.TERR_OK:
+            errname, errdesc = cls.format_error_typeinfo(terr)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s} : Unable to assign the specified type {:s} to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, interface.tinfo.quoted(info), 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
+        return res
+
+    @classmethod
+    def remove_typeinfo(cls, mptr):
+        '''Remove the type information from the member specified by `mptr`.'''
+        raise NotImplementedError
+
+    @classmethod
+    def get_comment(cls, *args):
+        '''Return the comment from the specified member as a string.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'get_comment'])
+        return utils.string.of(udm.cmt)
+
+    @classmethod
+    def set_comment(cls, *args):
+        '''Assign the given `string` as a comment to the specified member, giving priority to the repeatable comment, and return the previous one'''
+        if len(args) in {2, 3} and isinstance(args[0], internal.types.integer):
+            args, [string, repeatable] = args[:1], args[-2:] if isinstance(args[-1], internal.types.bool) else itertools.chain(args[-1:], [True])
+        elif len(args) in {3, 4}:
+            args, [string, repeatable] = args[:2], args[-2:] if isinstance(args[-1], internal.types.bool) else itertools.chain(args[-1:], [True])
+        else:
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'set_comment'])
+            raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        caller_format = cls.format_args(*args, caller=[__name__, cls.__name__, 'set_comment'], args=["{!r}".format(string), "{!s}".format(True if repeatable else False)])
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'set_comment'], args=["{!r}".format(string), "{!s}".format(True if repeatable else False)])
+
+        res, terr = utils.string.of(udm.cmt), tinfo.set_udm_cmt(mindex, utils.string.to(string), repeatable)
+        if terr != idaapi.TERR_OK:
+            errname, errdesc = cls.format_error_typeinfo(terr)
+            description = "{:s} ({:s})".format(errname, errdesc) if errname and errdesc else errname if errname else "({:d})".format(terr)
+            raise E.DisassemblerError(u"{:s} : Unable to assign the specified comment {!r} to the {:s} member \"{:s}\" due to error {:s}.".format(caller_format, 'repeatable' if repeatable else 'regular', string, 'union' if union(tinfo) else 'frame' if frame(tinfo) else 'structure', utils.string.escape(fullname, '"'), description))
+        return res
+
+    @classmethod
+    def contains(cls, *args):
+        '''Return whether the given `offset` resides within the specified member.'''
+        if len(args) not in {2, 3}:
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'contains'])
+            raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        args, [offset] = args[:-1], args[-1:]
+
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'contains'], args=["{:#x}".format(offset)])
+        if union(tinfo):
+            return 0 <= offset < udm.size
+        return udm.offset <= offset < udm.offset + udm.size
+
+    @classmethod
+    def element(cls, *args):
+        '''Return the size for a single element belonging to the specified member.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'element'])
+        if udm.type.is_array():
+            type, length = interface.tinfo.array(udm.type)
+            return 8 * interface.tinfo.size(type)
+        return interface.tinfo.size(udm.type)
+
+    @classmethod
+    def size(cls, *args):
+        '''Return the size of the type for the specified member.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'size'])
+        return udm.size
+
+    @classmethod
+    def at(cls, *args):
+        '''Return the distance of the given `offset` from the member in `mptr` as a tuple composed of an array index and element offset.'''
+        if len(args) not in {2, 3}:
+            caller_format = cls.format_unknown_args(*args, caller=[__name__, cls.__name__, 'at'])
+            raise E.InvalidParameterError(u"{:s} : Unable to find the member using an unsupported number of parameters.".format(caller_format))
+
+        args, [offset] = args[:-1], args[-1:]
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'at'], args=["{:#x}".format(offset)])
+        moffset = 0 if union(tinfo) else udm.offset
+
+        if udm.type.is_array():
+            type, _ = interface.tinfo.array(udm.type)
+            return divmod(int(offset) - moffset, 8 * type.get_size())
+
+        index, remainder = divmod(int(offset) - moffset, udm.size)
+        return index, remainder
+
+    @classmethod
+    def packed(cls, *args):
+        '''Pack the information about the specified member with its structure at the specified `offset` into a tuple in case it is to be removed.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'packed'])
+        mid = tinfo.get_udm_tid(mindex)
+        name = utils.string.of(udm.name)
+        ptype = ()      # FIXME: return the pythonic type
+        location = interface.location_t(udm.offset, udm.size)
+        type = interface.tinfo.copy(udm.type)
+        comment = utils.string.of(udm.cmt)
+        return mid, name, ptype, location, type, comment
+
+    @classmethod
+    def has_references(cls, *args):
+        '''Return whether the specified member is referenced by an address within the database.'''
+        tinfo, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'has_references'])
+        mid = tinfo.get_udm_tid(mindex)
+        iterable = (ea for ea, iscode, xtype in interface.xref.to(mid, idaapi.XREF_ALL))
+        return next((True for ea in iterable if not interface.node.identifier(ea)), False)
+
+    @classmethod
+    def references(cls, *args):
+        '''Return a list of all the operand references in the database for the specified member.'''
+        raise NotImplementedError
 
 class member(object):
     """
