@@ -887,10 +887,156 @@ class v9member(object):
         iterable = (ea for ea, iscode, xtype in interface.xref.to(mid, idaapi.XREF_ALL))
         return next((True for ea in iterable if not interface.node.identifier(ea)), False)
 
+    # FIXME: this function needs to be comprehensively checked to ensure that it
+    #        actually works like `member.references` that it's based on.
     @classmethod
     def references(cls, *args):
         '''Return a list of all the operand references in the database for the specified member.'''
-        raise NotImplementedError
+        FF_STROFF = idaapi.stroff_flag() if hasattr(idaapi, 'stroff_flag') else idaapi.stroffflag()
+        FF_STKVAR = idaapi.stkvar_flag() if hasattr(idaapi, 'stkvar_flag') else idaapi.stkvarflag()
+
+        owner, utd, mindex, udm = cls.by(*args, caller=[__name__, cls.__name__, 'references'])
+        oid, mid = owner.get_tid(), owner.get_udm_tid(mindex)
+        fn, is_union, is_frame = owner.get_frame_func() if hasattr(owner, 'get_frame_func') else idaapi.BADADDR, union(owner), frame(owner)
+
+        # if the type belongs to a frame, then we need to specially handle it.
+        if interface.node.identifier(oid) and is_frame and fn != idaapi.BADADDR:
+            raise NotImplementedError
+
+        # otherwise we just grab all of the references, and then recursively
+        # walk through each one to figure out the parent types using our type.
+        refs = [packed_frm_iscode_type for packed_frm_iscode_type in interface.xref.to(mid, idaapi.XREF_ALL)]
+        parents, children, queue, table = {oid}, {mid}, {oid}, {oid : owner, mid : udm}
+
+        while True:
+            work = {item for item in []}
+
+            # iterate through all of the references that belong to the types
+            # that we've aggregate into the processed queue.
+            iterable = ((idaapi.tinfo_t(), id) for id in queue)
+            iterable = ((ti.get_type_by_tid(id), ti) for ti, id in iterable)
+            filtered = (ti for ok, ti in iterable if ok)
+            for _, item in itertools.chain(*map(interface.xref.typeinfo, filtered)):
+                if isinstance(item, interface.ref_t):
+                    continue
+
+                mowner, mudt, mindex, mudm = item
+                if frame(mowner):
+                    continue
+
+                # now we need to grab the identifiable information for each type.
+                mownerid = mowner.get_tid()
+                mrealoffset = 0 if union(mowner) else mudm.offset
+                memberid = mowner.get_udm_tid(mindex)
+
+                table[mownerid] = mowner
+                table[memberid] = item
+
+                # if it's a union, then we update our working queue.
+                if union(mowner):
+                    candidates = [(mowner.get_udm_tid(index), (mowner, udt, index, udt[index])) for index in range(mudt.size())]
+                    table.update((mcandidateid, mcandidate) for mcandidateid, mcandidate in candidates if mcandidateid != idaapi.BADADDR)
+                    children.update(mcandidateid for mcandidateid, mcandidate in candidates if cls.contains(mcandidateid, mrealoffset))
+
+                    iterable = ((cmember.type, (cowner, cudt, cindex, cmember)) for _, (cowner, cudt, cindex, cmember) in candidates)
+                    candidates = [(ctype.get_tid(), ctype) for ctype, packed in iterable if ctype.get_tid() != idaapi.BADADDR]
+                    table.update((ctid, type) for ctid, packed in candidates)
+                    work.update(ctid for ctid, _ in candidates)
+
+                work.add(mownerid), children.add(memberid)
+
+            # if we didn't add any new things to our working queue , then we're
+            # done. otherwise, we can merge it, reload the queue with more work,
+            # and then do it again.
+            if work & parents == work:
+                break
+
+            parents, queue = parents | work, work - parents
+
+        # okay, now we can convert this set into a set of structures and members to look for
+        iterable = (cls.by(cid) for cid in children)
+        candidates = {id for id in itertools.chain(*([mowner.get_tid(), mowner.get_udm_tid(mindex)] for mowner, mudt, mindex, mudm in iterable))}
+
+        # now figure out which operand has the structure member applied to it
+        results = []
+        for ea, iscode, xtype in refs:
+            flags, access = interface.address.flags(ea, idaapi.MS_0TYPE|idaapi.MS_1TYPE), [item.access for item in interface.instruction.access(ea)]
+            listable = [(opnum, operand, address.opinfo(ea, opnum)) for opnum, operand in enumerate(address.operands(ea)) if address.opinfo(ea, opnum)]
+
+            # if there are some stack operands the figure the correct one out.
+            if flags & FF_STKVAR in {FF_STKVAR, idaapi.FF_0STK, idaapi.FF_1STK}:
+                logging.debug(u"{:s}.references({:#x}) : Found {:s} reference at {:#x} to member ({:#x}) with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, 'FF_STKVAR', ea, mid, address.flags(ea)))
+                masks = [(idaapi.MS_0TYPE, idaapi.FF_0STK), (idaapi.MS_1TYPE, idaapi.FF_1STK)]
+                iterable = ((opnum, access[opnum]) for opnum, (mask, ff) in enumerate(masks) if flags & mask == ff)
+                results.extend(interface.opref_t(ea, opnum, interface.access_t(xtype, iscode)) for opnum, opaccess in iterable)
+
+            # if there was no operand information, then this was prolly a global
+            elif not listable:
+                available = {target for target, iscode, xtype in interface.xref.of(ea) if not (iscode and xtype == idaapi.fl_F)}
+                addresses = {target for target in available if not interface.node.identifier(target)}
+
+                # Start by verifying that our member is in the reverse-reference,
+                # then check that the address that references our member is a
+                # structure.
+                iterable = (address.flags(target, idaapi.DT_TYPE) == FF_STRUCT for target in map(interface.address.head, addresses))
+                if mid not in available - addresses or not any(iterable):
+                    logging.debug(u"{:s}.references({:#x}) : Skipping reference at {:#x} to member ({:#x}) with flags ({:#x}) due to the address having no operand information.".format('.'.join([__name__, cls.__name__]), mid, ea, mid, address.flags(ea)))
+                    continue
+
+                # Now we need to know which operand is referencing the member.
+                logging.debug(u"{:s}.references({:#x}) : Found global reference at {:#x} to member ({:#x}) with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, ea, mid, address.flags(ea)))
+                listable = []
+                for opnum, operand in enumerate(address.operands(ea)):
+                    if operand.type != idaapi.o_mem:
+                        continue
+                    elif operand.addr not in addresses:
+                        continue
+                    listable.append((opnum, operand))
+
+                # If we didn't get any operands, then log that we could not find
+                # the requested reference and are essentially discarding it.
+                if not listable:
+                    logging.warning(u"{:s}.references({:#x}) : Could not confirm the operand for instruction {:#x} that is referencing member ({:#x}) of global ({:s}).".format('.'.join([__name__, cls.__name__]), mid, ea, mid, ', '.join(map("{:#x}".format, addresses))))
+
+                iterable = ((opnum, address.reference(ea, opnum)) for opnum, operand in listable)
+
+            # if the flags for the given address represent a structure offset,
+            # then we need to figure out which operand contains it to populate
+            # the opref_t being returned correctly.
+            elif flags & FF_STROFF in {FF_STROFF, idaapi.FF_0STRO, idaapi.FF_1STRO}:
+                logging.debug(u"{:s}.references({:#x}) : Found {:s} reference at {:#x} to member ({:#x}) with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, 'FF_STROFF', ea, mid, address.flags(ea)))
+                iterable = [(opnum, idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr), interface.node.get_stroff_path(ea, opnum)) for opnum, op, _ in listable]
+                iterable = ((opnum, interface.strpath.of_tids(delta + value, tids)) for opnum, value, (delta, tids) in iterable if tids)
+                iterable = ((opnum, {member.id for _, member, _ in path}) for opnum, path in iterable)
+                iterable = ((opnum, access[opnum]) for opnum, identifiers in iterable if identifiers & candidates)
+                results.extend(interface.opref_t(ea, opnum, interface.access_t(xtype, iscode)) for opnum, opaccess in iterable)
+
+            # otherwise the operand's refinfo_t has the information we need to
+            # extract.
+            else:
+                logging.debug(u"{:s}.references({:#x}) : Found operand reference at {:#x} to member ({:#x}) with flags ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, ea, mid, address.flags(ea)))
+                iterable = ((opnum, address.reference(ea, opnum)) for opnum, _, info in listable if info.ri.is_target_optional())
+
+            # next we'll do some math to determine if the operand that
+            # references the member is actually pointing directly at it.
+            left, right = interface.address.bounds()
+            for opnum, integer in iterable:
+                offset = interface.address.head(integer, silent=True)
+                if not (left <= offset < right): continue
+
+                # if our operand address wasn't valid, then we've bailed. so we just
+                # need to align the operand address to the head of the reference.
+                offset = interface.address.head(offset, silent=True)
+
+                # all that's left to do is verify that the structure is in our list of
+                # candidates that we collected earlier. although, we can totally do a
+                # better job here and calculate the boundaries of the exact member to
+                # confirm that the offset we resolved actually points at it.
+                if address.flags(offset, idaapi.DT_TYPE) == FF_STRUCT and address.structure(offset) in candidates:
+                    results.append(interface.opref_t(ea, opnum, interface.access_t(xtype, iscode)))
+                continue
+            continue
+        return results
 
 class member(object):
     """
