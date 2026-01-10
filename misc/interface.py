@@ -10535,6 +10535,66 @@ class xref(object):
             continue
         return
 
+    @classmethod
+    def typeinfo(cls, type):
+        '''Yield each type referencing the specified `type` as a tuple composed of the offset and reference type.'''
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        results, tid, owner = [], type.get_tid(), tinfo.copy(type)
+
+        # Iterate through each reference to the type in order to determine what it was
+        # actually applied to. If it's an identifier, then we need to figure out
+        # what type or frame that is being referenced.
+        for xrfrom, xriscode, xrtype in cls.to(tid, idaapi.XREF_ALL):
+            if node.identifier(xrfrom):
+                mid, xowner, utd, udm = xrfrom, idaapi.tinfo_t(), idaapi.udt_type_data_t(), udm_t()
+
+                # figure out the type id for the referenced member, get its
+                # details, and then use it to figure out the member's index.
+                if not xowner.get_type_by_tid(mid):
+                    raise internal.exceptions.StructureNotFoundError(u"{:s}.typeinfo({:#x}) : Unable to locate the type owning the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, mid))
+
+                elif not xowner.get_udt_details(utd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.typeinfo({:#x}) : Unable to get the details for the specified type ({:#x}).".format('.'.join([__name__, cls.__name__]), tid, mid))
+
+                mindex = xowner.get_udm_by_tid(udm, mid)
+                if mindex < 0:
+                    raise internal.exceptions.MemberNotFoundError(u"{:s}.typeinfo({:#x}) : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), tid, mid))
+                packed = xowner, utd, mindex, udm
+
+                # Next we check if the type being references belongs to a frame.
+                ea = xowner.get_frame_func() if hasattr(xowner, 'get_frame_func') else idaapi.BADADDR
+                func = idaapi.get_func(ea)
+
+                # If we were unable to get the frame, then we're referencing a
+                # member from a different type and we can yield what we got.
+                if ea == idaapi.BADADDR:
+                    yield 0, packed
+
+                # If we couldn't grab the func, then we just bail.
+                elif not func:
+                    raise internal.exceptions.FunctionNotFoundError(u"{:s}.typeinfo({:#x}) : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), tid, mid, ea))
+
+                # If we couldn't grab the frame, then we bail on that too.
+                elif not idaapi.get_frame(func):
+                    raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.typeinfo({:#x})) : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), tid, ea, mid))
+
+                # Otherwise we're referencing a frame member, and we need to figure out
+                # the base that the type will be at and then we can return it.
+                # FIXME: this has not been tested at all yet.
+                yield function.frame_offset(func), packed
+
+            # If it's not code, then we're just a reference to an address and so we
+            # need to yield the address it's for along with its reference type.
+            elif not address.flags(xrfrom, idaapi.MS_CLS) == idaapi.FF_CODE:
+                yield xrfrom, ref_t(xrfrom, reftype_t.of(xrtype))
+
+            # If it's code, then we skip this because structure_t.up only returns
+            # data references to the structure and operands are for structure_t.refs.
+            else:
+                logging.debug(u"{:s}.typeinfo({:#x}) : Skipping {:s}({:d}) reference at {:#x} with the type ({:d}) due to the reference address not marked as data.".format('.'.join([__name__, cls.__name__]), tid, 'code' if xriscode else 'data', xriscode, xrfrom, xrtype))
+            continue
+        return
+
 xiterate = internal.utils.alias(xref.iterate, 'xref')
 
 class function(object):
