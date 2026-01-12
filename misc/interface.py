@@ -5343,7 +5343,55 @@ class strpath(object):
     def format(cls, sptr, mptr, offset=0):
         '''Return the description of an individual item for a structure path.'''
         MF_UNIMEM = getattr(idaapi, 'MF_UNIMEM', 0x2)
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
 
+        if isinstance(sptr, (idaapi.tinfo_t, internal.types.integer)) and isinstance(mptr, (internal.types.integer, internal.types.none)):
+            sid, mid, offset = sptr, idaapi.BADADDR if mptr is None else mptr, offset
+            tinfo_description = '.'.join([idaapi.tinfo_t.__module__, idaapi.tinfo_t.__name__] if hasattr(idaapi.tinfo_t, '__module__') else [idaapi.tinfo_t.__name__])
+            offset_description = "{:+#x}".format(offset) if offset else ''
+
+            # convert our fields into a tinfo_t that we can use.
+            ti = idaapi.tinfo_t()
+            if isinstance(sid, idaapi.tinfo_t):
+                ti, sid = tinfo.copy(sid), sid.get_tid()
+            elif sid is None and tinfo.identifier(mid) and ti.get_udm_by_tid(mid) >= 0:
+                ti, sid = tinfo.copy(ti), idaapi.BADADDR
+            elif sid is None:
+                ti = None
+            elif not isinstance(sid, internal.types.integer):
+                raise internal.exceptions.InvalidParameterError(u"{:s}.format({!s}, {!s}, {:d}) : Unable to determine the type and member using an supported type ({!s}).".format('.'.join([__name__, cls.__name__]), sid, "{:#x}".format(mid) if isinstance(mid, internal.types.integer) else mid, offset, sid.__class__))
+            elif ti.get_type_by_tid(sid):
+                ti, sid = tinfo.copy(ti), sid
+            else:
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.format({!s}, {!s}, {:d}) : Unable to find the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), "{:#x}".format(sid), "{:#x}".format(mid) if isinstance(mid, internal.types.integer) else mid, offset, sid))
+
+            # now we can figure out what kind of member information we need.
+            utd = idaapi.udt_type_data_t()
+            if not ti:
+                mindex = -1
+            elif not ti.get_udt_details(utd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.format({!s}, {!s}, {:d}) : Unable to get the details for the type {:s}.".format('.'.join([__name__, cls.__name__]), "{:#x}".format(ti.get_tid()), "{:#x}".format(mid) if node.identifier(mid) else "{:d}".format(mid), offset, tinfo.quoted(ti)))
+            elif node.identifier(mid):
+                mindex = ti.get_udm_by_tid(udm_t(), mid)
+            else:
+                mindex = mid
+            udm = utd[mindex] if 0 <= mindex < utd.size() else None
+
+            # if there's no member, then we're simply a structure and offset.
+            if ti and udm is None:
+                sname = internal.utils.string.of(ti.get_type_name())
+                return "{:s}({:#x}, \"{:s}\"){:s}".format(tinfo_description, sid, internal.utils.string.escape(sname, '"'), offset_description)
+            elif not ti:
+                return cls.format(ti, mindex, offset)
+
+            # next we need to verify the member we selected is actually a member
+            # that is related to our type.
+            sname = internal.utils.string.of(ti.get_type_name())
+            mname = internal.utils.string.of(udm.name)
+            fullname = '.'.join([sname, mname])
+            return "{:s}({:#x}, {:#x}, \"{:s}\", {:s}={!s}{:s})".format(tinfo_description, ti.get_tid(), ti.get_udm_tid(mindex), internal.utils.string.escape(fullname, '"'), 'index' if ti.is_union() else 'offset', "{:d}".format(udm.offset) if ti.is_union() else "{:#x}".format(udm.offset), offset_description)
+
+        # otherwise we can figure everything out using the structure/member api.
         sptr_t, mptr_t = idaapi.struc_t if sptr is None else sptr.__class__, idaapi.member_t if mptr is None else mptr.__class__
         sptr_description = '.'.join([sptr_t.__module__, sptr_t.__name__] if hasattr(sptr_t, '__module__') else [sptr_t.__name__])
         mptr_description = '.'.join([mptr_t.__module__, mptr_t.__name__] if hasattr(mptr_t, '__module__') else [mptr_t.__name__])
@@ -5361,17 +5409,17 @@ class strpath(object):
 
         # Now we need to check that the member is actually a member. So we
         # grab its name, and try and get the member by its id.
-        sname, mname = ((internal.netnode.name.get(item.id) or '') for item in [sptr, mptr])
         result = idaapi.get_member_by_id(mptr.id)
 
         # If we got something then we need to check that the mptr is related
         # to the sptr by comparing it to the member's structure id that we got.
         if result and sptr.id == result[2].id:
-            name = mname[len(sname):]
-            return "{:s}({:#x}, {:#x}{:s} {:s}={:#x}{:s})".format(mptr_description, mptr.id, sptr.id, internal.utils.string.escape(name, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
+            _, name, _ = result
+            return "{:s}({:#x}, {:#x}, \"{:s}\" {:s}={:#x}{:s})".format(mptr_description, mptr.id, sptr.id, internal.utils.string.escape(name, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
 
         # Anything else means the member is not part of the structure and we
         # clarify that by listing the full name of the member and the parent.
+        sname, mname = idaapi.get_struc_name(sptr.id), idaapi.get_struc_name(mptr.id)
         member = "{:s}({:#x}, \"{:s}\" {:s}={:#x}{:s})".format(mptr_description, mptr.id, internal.utils.string.escape(mname, '"'), 'index' if mptr.props & MF_UNIMEM else 'offset', mptr.soff, offset_description)
         parent = "{:s}({:#x}, \"{:s}\")".format(sptr_description, sptr.id, internal.utils.string.escape(sname, '"'))
         return ' '.join(['(ERROR)', parent, 'is unrelated to', member])
