@@ -5382,24 +5382,64 @@ class strpath(object):
     def calculate(cls, delta=0, Fcollect=operator.truth):
         '''This is just a utility function that consumes `(sptr, mptr, offset)` items and yields the resulting delta to get to it.'''
         SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
 
         # Spin in while always returning the current delta that we've calculated on. If we
         # received an empty value, then yield our state because that's all we're good for.
-        while True:
+        udm = udm_t()
+        while udm:
             item = (yield delta)
             if item is None:
                 continue
 
+            # If we're using a type rather than a structure, then all of our
+            # variables being unpacked should be integers, other than the first
+            # which could be a type or a type identifier.
+            if isinstance(item[0], (internal.types.integer, idaapi.tinfo_t)) and all(isinstance(integer, (internal.types.integer, internal.types.none)) for integer in item[1:]):
+                ti = idaapi.tinfo_t()
+                tid, mindex, offset = item
+
+                # Start by converting the unpacked values into a tinfo_t that we
+                # will use to get the member and sizes to calculate the offset.
+                if isinstance(tid, idaapi.tinfo_t):
+                    ti, tid = tinfo.copy(tid), tid.get_tid()
+                elif not isinstance(tid, internal.types.integer):
+                    raise internal.exceptions.InvalidParameterError(u"{:s}.calculate({:d}, Fcollect={:s}) : Unable to determine the type and member using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), delta, '...', tid.__class__))
+                elif ti.get_type_by_tid(tid):
+                    ti, tid = tinfo.copy(ti), tid
+                else:
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.calculate({:d}, Fcollect={:s}) : Unable to find the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), delta, '...', tid))
+
+                # Now we need to figure out how many members there are so that
+                # we can tell if a valid member index was given or not.
+                utd = idaapi.udt_type_data_t()
+                if not ti.get_udt_details(utd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.calculate({:d}, Fcollect={:s}) : Unable to get the details for the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), delta, '...', tid))
+                elif mindex is None:
+                    mindex = -1
+                elif node.identifier(mindex):
+                    mindex = ti.get_udm_by_tid(udm_t(), mindex)
+                else:
+                    mindex = mindex
+                udm = utd[mindex] if 0 <= mindex < utd.size() else None
+
+                # Now we should have the type and its member so we can finally
+                # calculate the current delta from whatever it is we got.
+                delta = sum([delta, 0 if any([ti.is_union(), udm is None]) else udm.offset, offset])
+                Fcollect((tid, ti.get_udm_tid(mindex), offset))
+                udm = None if udm is None or udm.type.get_tid() == idaapi.BADADDR else udm
+
             # This is super simple as we only need to check if our sptr is a union. We
             # don't care about validating this path because someone else should've.
-            sptr, mptr, offset = item
-            delta = sum([delta, 0 if sptr.props & SF_UNION else 0 if mptr is None else idaapi.get_struc_size(mptr) if mptr.id == sptr.id else mptr.soff, offset])
-            Fcollect((sptr, mptr, offset))
+            else:
+                sptr, mptr, offset = item
+                delta = sum([delta, 0 if sptr.props & SF_UNION else 0 if mptr is None else idaapi.get_struc_size(mptr) if mptr.id == sptr.id else mptr.soff, offset])
+                Fcollect((sptr, mptr, offset))
 
-            # If our path has actually stopped at a field, then we can just break out
-            # of our loop because there's nothing that can change anything
-            if isinstance(mptr, idaapi.member_t) and not idaapi.get_sptr(mptr):
-                break
+                # If our path has actually stopped at a field, then we can just break out
+                # of our loop because there's nothing that can change anything
+                udm = None if isinstance(mptr, idaapi.member_t) and not idaapi.get_sptr(mptr) else udm
+
             continue
 
         # This loop just continuously yields the delta because technically our path is
