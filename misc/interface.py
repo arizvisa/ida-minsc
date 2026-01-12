@@ -5126,6 +5126,59 @@ class strpath(object):
                 return mptr.soff <= offset
             return mptr.soff <= offset < mptr.eoff
 
+        def v9contains(type, utd, mindex, offset):
+            '''Return whether the member specified by `sid` and `mid` contains the specified offset.'''
+            udm = utd[mindex] if 0 <= mindex < utd.size() else None
+
+            # now we can check the offset relative to the member
+            if udm is None:
+                raise internal.exceptions.MemberNotFoundError(u"{:s}.v9contains({!s}, {!r}, {!s}, {:d}) : Unable to get the member at index {:d} of the type {:s}.".format(format_description, tinfo.quoted(type), utd, "{:d}".format(mid), offset, mindex, tinfo.quoted(type)))
+            elif type.is_union():
+                return offset < udm.size
+            elif udm.size == 0:
+                return udm.offset + udm.size <= offset
+            elif type.is_varstruct() and utd.size() > 0 and mindex == utd.size() - 1:
+                return udm.offset <= offset
+            return udm.offset <= offset < udm.offset + udm.size
+
+        # If the first parameter is for a local type, then figure the list of
+        # candidates from the member information.
+        if isinstance(sptr, (idaapi.tinfo_t, internal.types.integer)):
+            sid, ti = sptr, idaapi.tinfo_t()
+            format_description = "{:s}.candidates({!s}, {:d})".format('.'.join([__name__, cls.__name__]), tinfo.quoted(sid) if isinstance(sid, idaapi.tinfo_t) else "{:#x}".format(sid), offset)
+
+            # convert our fields into a tinfo_t that we can use.
+            if isinstance(sid, idaapi.tinfo_t):
+                ti = tinfo.copy(sid)
+            elif not isinstance(sid, internal.types.integer):
+                raise internal.exceptions.InvalidParameterError(u"{:s} : Unable to determine the type and member using an unsupported type ({!s}).".format(format_description, sid.__class__))
+            elif ti.get_type_by_tid(sid):
+                ti = tinfo.copy(ti)
+            else:
+                raise internal.exceptions.InvalidTypeOrValueError(u"{:s} : Unable to find the type with the specified identifier ({:#x}).".format(format_description, sid))
+
+            # next we need to figure out the member information.
+            utd = idaapi.udt_type_data_t()
+            if not ti.get_udt_details(utd):
+                raise internal.exceptions.DisassemblerError(u"{:s}.v9contains({!s}, {!s}, {:d}) : Unable to get the details for the type {:s}.".format(format_description, "{:#x}".format(ti.get_tid()), "{:#x}".format(mid) if node.identifier(mid) else "{:d}".format(mid), offset, tinfo.quoted(ti)))
+
+            # collect the candidate members for the structure type or union.
+            members = [mindex for mindex in builtins.range(utd.size())]
+            if any([0 <= offset < 8 * tinfo.size(ti), ti.is_varstruct()]):
+                candidates = [mindex for mindex in members if v9contains(ti, utd, mindex, offset)]
+            elif ti.is_union():
+                candidates = [mindex for mindex in members]
+            else:
+                candidates = members[:1] if offset < 0 else members[-1:]
+
+            # all that is left to do is to return our matching candidates. if
+            # our type is a union, then all the members should match.
+            if candidates:
+                delta = 0 if ti.is_union() else next(utd[mindex].offset for mindex in candidates)
+                assert(ti.is_union() or all(delta == utd[mindex].offset for mindex in candidates))
+                return sid, candidates, offset - delta
+            return sid, [], offset
+
         # First grab all the members and then use them to collect the boundaries for
         # all of the candidate members that are within the requested offset.
         members = [sptr.get_member(index) for index in builtins.range(sptr.memqty)]
@@ -5219,18 +5272,68 @@ class strpath(object):
     @classmethod
     def fullname(cls, path, sep='.'):
         '''Return the given structure path as an easily-read string.'''
-        result = []
+        result, udm_t = [], idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
         for sptr, mptr, offset in path:
-            if mptr:
+            if isinstance(sptr, (idaapi.tinfo_t, internal.types.integer)) and isinstance(mptr, internal.types.integer):
+                sid, mid, offset = sptr, mptr, offset
+
+                # convert our fields into a tinfo_t that we can use.
+                ti = idaapi.tinfo_t()
+                if isinstance(sid, idaapi.tinfo_t):
+                    ti = tinfo.copy(sid)
+                elif sid is None:
+                    ti = None
+                elif not isinstance(sid, internal.types.integer):
+                    raise internal.exceptions.InvalidParameterError(u"{:s}.fullname({!s}, sep={!r}) : Unable to determine the type and member using an unsupported type ({!s}).".format('.'.join([__name__, cls.__name__]), path, sep, sid.__class__))
+                elif ti.get_type_by_tid(sid):
+                    ti = tinfo.copy(ti)
+                else:
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.fullname({!s}, sep={!r}) : Unable to find the type with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), path, sep, sid))
+
+                # next we need to figure out the member information.
+                utd = idaapi.udt_type_data_t()
+                if not ti:
+                    mindex = -1
+                elif not ti.get_udt_details(utd):
+                    raise internal.exceptions.DisassemblerError(u"{:s}.fullname({!s}, sep={!r}) : Unable to get the details for the type {:s}.".format('.'.join([__name__, cls.__name__]), path, sep, tinfo.quoted(ti)))
+                elif node.identifier(mid):
+                    mindex = ti.get_udm_by_tid(udm_t(), mid)
+                else:
+                    mindex = mid
+                udm = utd[mindex] if 0 <= mindex < utd.size() else None
+
+                # then we can build the description for each path entry.
+                if ti and udm is not None:
+                    sname = internal.utils.string.of(ti.get_type_name())
+                    mname, msize, mtype = internal.utils.string.of(udm.name), udm.size, tinfo.copy(udm.type)
+                    melement, _ = tinfo.array(mtype) if mtype.is_array() else (None, 0)
+                    elementsize = 8 * melement.get_size() if melement else 1
+                    fullname = '.'.join([sname, mname])
+                    arrayQ, hindex = mtype.is_array(), (msize - 1) // elementsize
+                    index, item = divmod(offset, elementsize) if arrayQ else (0, offset)
+                    index, offset = (index, item) if index * elementsize < msize or msize == 0 else (hindex, item + (offset - hindex * elementsize))
+                    item = "{:s}{:s}{:s}".format(fullname if not result else mname, "[{:d}]".format(index) if arrayQ else '', "({:+#x})".format(offset) if offset else "{:+#x}".format(offset) if udm is None else '')
+
+                elif ti:
+                    item = ''.join([internal.utils.string.of(ti.get_type_name()), "({:+#x})".format(offset) if offset else ''])
+
+                else:
+                    item = "{{ERR!{:+#x}}}".format(offset)
+
+                result.append(item)
+                continue
+
+            # otherwise, we can just figure it out using structure/members.
+            elif mptr:
                 _, fullname, owner = idaapi.get_member_by_id(mptr.id)
                 name, msize, size = idaapi.get_member_name(mptr.id), idaapi.get_data_elsize(mptr.id, mptr.flag), idaapi.get_member_size(mptr)
-                sname, oname = (internal.netnode.name.get(ptr.id) for ptr in [sptr, owner])
+                sname, oname = (idaapi.get_struc_name(ptr.id) for ptr in [sptr, owner])
                 arrayQ, hindex = msize != size, (size - 1) // msize
                 index, item = divmod(offset, msize) if arrayQ else (0, offset)
                 index, offset = (index, item) if index * msize < size or mptr.soff == mptr.eoff else (hindex, item + (offset - hindex * msize))
                 item = "{:s}{:s}{:s}".format(fullname if not result else name if owner.id == sptr.id else "{{ERR!{:s}|{:s}}}{:s}".format(sname, oname, name), "[{:d}]".format(index) if arrayQ else '', "({:+#x})".format(offset) if offset else '' if mptr else "{:+#x}".format(offset))
             elif sptr:
-                item = ''.join([internal.netnode.name.get(sptr.id), "({:+#x})".format(offset) if offset else ''])
+                item = ''.join([idaapi.get_struc_name(sptr.id), "({:+#x})".format(offset) if offset else ''])
             else:
                 item = "{{ERR!{:+#x}}}".format(offset)
             result.append(item)
