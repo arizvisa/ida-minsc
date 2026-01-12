@@ -5731,7 +5731,8 @@ class strpath(object):
         # that the user gave us in the suggested path and collect our description.
         suggestion_description = []
         for sptr, mptr, offset in suggestion:
-            items = flailer.setdefault(sptr.id, [])
+            sid = getattr(sptr, 'id', sptr)
+            items = flailer.setdefault(sid, [])
             items.append((mptr, offset))
             suggestion_description.append(cls.format(sptr, mptr, offset))
 
@@ -5739,7 +5740,8 @@ class strpath(object):
         # in our table and chooses the default candidate when it doesn't exist.
         sptr, candidates, carry = (yield)
         while flailer:
-            items = flailer[sptr.id] if flailer.get(sptr.id, []) else flailer.pop(sptr.id, [])
+            sid = sptr.get_tid() if isinstance(sptr, idaapi.tinfo_t) else getattr(sptr, 'id', sptr)
+            items = flailer[sid] if flailer.get(sid, []) else flailer.pop(sid, [])
 
             # If we know about this structure, then grab the element out of it and
             # adjust our offset by the delta we found within our suggestion.
@@ -5758,7 +5760,7 @@ class strpath(object):
             sptr, candidates, carry = (yield (sptr, mptr, carry))
 
         # We terminated, so let the caller know where we actually stopped at.
-        logging.debug(u"{:s}.flail([{:s}]) : Flailing ended at {:s} with {:d} possible candidates ({:s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, None, carry), len(candidates), ', '.join("{:#x}".format(item.id) for item in candidates)))
+        logging.debug(u"{:s}.flail([{:s}]) : Flailing ended at {:s} with {:d} possible candidates ({:s}).".format('.'.join([__name__, cls.__name__]), "[{:s}]".format(', '.join(suggestion_description)), cls.format(sptr, None, carry), len(candidates), ', '.join("{:#x}".format(getattr(item, 'id', item)) for item in candidates)))
 
     @classmethod
     def of_tids(cls, offset, tids):
