@@ -7506,7 +7506,7 @@ class tinfo(object):
             item = cls.resolve(item) if item.is_ptr() else item
 
             # Our type should have a name of some sort for the specific condition we're testing for.
-            tname = item.get_type_name()
+            tname = internal.utils.string.of(item.get_type_name())
             if not tname:
                 logging.warning(u"{:s}.lower_function_type(\"{:s}\") : The specified type information ({!r}) has no name and cannot be added to the type library.".format('.'.join([__name__, cls.__name__]), internal.utils.string.escape("{!s}".format(type), '"'), "{!s}".format(item)))
                 continue
@@ -9348,7 +9348,7 @@ class typematch(object):
             # if it's a typeref, then we figure out whether it has an ordinal,
             # a name, or both so that we can use it as a key for an exact match.
             if (base, flags) == (idaapi.BT_COMPLEX, idaapi.BTMT_TYPEDEF):
-                keys = [ti.get_ordinal(), ti.get_type_name()]
+                keys = [ti.get_ordinal(), internal.utils.string.of(ti.get_type_name())]
                 [res.setdefault(key, [ti]) for key in keys if key]
 
             # if we need the full type to check this, then use all masks as the key.
@@ -9415,7 +9415,7 @@ class typematch(object):
     @classmethod
     def unpack(cls, type):
         '''Unpack the unique attributes from the specified `type` as its identity.'''
-        decl, size, name = type.get_decltype(), type.get_size(), type.get_type_name() or ''
+        decl, size, name = type.get_decltype(), type.get_size(), internal.utils.string.of(type.get_type_name() or '')
 
         # We only need the fields if it's a base type. We also assume
         # that the type that we get is _always_ going to be a named type.
@@ -9478,7 +9478,7 @@ class typematch(object):
 
             # Type references allow for recursion, so we need to check these.
             if ti.is_typeref():
-                name, ordinal = ti.get_type_name(), tinfo.ordinal(ti, library)
+                name, ordinal = internal.utils.string.of(ti.get_type_name()), tinfo.ordinal(ti, library)
                 keys = [ordinal, name] if ordinal else [name]
                 if any(key in refs for key in keys):
                     [ refs.setdefault(key, ti) for key in keys ]
@@ -9561,7 +9561,7 @@ class typematch(object):
 
             # Type references allow for recursion, so we need to check these.
             if ti.is_typeref():
-                name, ordinal = ti.get_type_name(), tinfo.ordinal(ti, library)
+                name, ordinal = internal.utils.string.of(ti.get_type_name()), tinfo.ordinal(ti, library)
                 keys = [ordinal, name] if ordinal else [name]
                 if any(key in refs for key in keys):
                     [ refs.setdefault(key, ti) for key in keys ]
@@ -9720,7 +9720,7 @@ class typematch(object):
     def __select_subtypes__(cls, collection, subtypes):
         '''Yield each subtype from the specified `subtypes` that match a type from the given `collection`.'''
         for subtype in subtypes:
-            key = subtype.get_ordinal() or subtype.get_type_name()
+            key = subtype.get_ordinal() or internal.utils.string.of(subtype.get_type_name())
             available = collection[key] if key in collection else cls.candidates(collection, subtype)
 
             # split up the arrays from the list of candidates. this is necessary
