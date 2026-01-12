@@ -5201,22 +5201,145 @@ class strpath(object):
     def collect(cls, struc, Fcollect):
         '''This is a utility function that starts at the given sptr in `struc` and consumes either an `sptr`, `mptr`, or an `offset` while adding completed items via `Fcollect`.'''
         SF_UNION = getattr(idaapi, 'SF_UNION', 0x2)
+        udm_t = idaapi.udt_member_t if idaapi.__version__ < 8.4 else idaapi.udm_t
+        format_description = "{:s}.collect({:#x}, result={!s})".format('.'.join([__name__, cls.__name__]), struc.get_tid() if isinstance(struc, idaapi.tinfo_t) else struc if isinstance(struc, internal.types.integer) else struc.id, Fcollect)
 
-        sptr, mptr, offset = struc, None, 0
+        sptr = idaapi.tinfo_t()
+        if isinstance(struc, idaapi.tinfo_t):
+            v9, sptr, sid = True, tinfo.copy(struc), struc.get_tid()
+        elif isinstance(struc, internal.types.integer) and node.identifier(struc) and sptr.get_type_by_tid(struc):
+            v9, sptr, sid = True, sptr, struc
+        elif isinstance(struc, internal.types.integer):
+            raise internal.exceptions.InvalidParameterError(u"{:s} : Unable to determine the type for the specified identifier ({:#x}).".format(format_description, struc))
+        else:
+            v9, sptr, sid = False, struc, struc.id
+
+        mptr, offset = None, 0
         while True:
             try:
                 item = (yield sptr)
 
             # We're being told that we need to gtfo so save what's left and exit our loop.
+
             except GeneratorExit:
                 Fcollect((sptr, mptr, offset))
                 break
+
+            # Check if we were given a type rather than a structure so that we
+            # can support later versions of the disassembler.
+            ti = idaapi.tinfo_t()
+            if v9 and isinstance(sptr, (idaapi.tinfo_t, internal.types.integer)):
+                sid, mid, offset, user = sptr, mptr, offset, item
+
+                # get the type for the current sptr that we're working on.
+                if isinstance(sid, idaapi.tinfo_t):
+                    ti = tinfo.copy(sid)
+                elif not isinstance(sid, internal.types.integer):
+                    raise internal.exceptions.InvalidParameterError(u"{:s} : Unable to determine the type and member using an unsupported type ({!s}).".format(format_description, sid.__class__))
+                elif ti.get_type_by_tid(sid):
+                    ti = tinfo.copy(ti)
+                else:
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s} : Unable to find the type with the specified identifier ({:#x}).".format(format_description, sid))
+                sid, sname = ti.get_tid(), internal.utils.string.of(ti.get_type_name())
+
+                # and then we can figure out the member index from what we got.
+                utd = idaapi.udt_type_data_t()
+                if not ti or mid is None:
+                    mindex = -1
+                elif not ti.get_udt_details(utd):
+                    raise internal.exceptions.DisassemblerError(u"{:s} : Unable to get the details for the type {:s}.".format(format_description, tinfo.quoted(ti)))
+                elif node.identifier(mid):
+                    mindex = ti.get_udm_by_tid(udm_t(), mid)
+                else:
+                    mindex = mid
+                udm = utd[mindex] if 0 <= mindex < utd.size() else None
+
+                # if the item we were given is an identifier, then store it so
+                # that we can figure out the type or member associated with it.
+                usertype, integer = idaapi.tinfo_t(), int(item) if hasattr(item, '__int__') else item
+                if node.identifier(user) and not usertype.get_type_by_tid(user):
+                    raise internal.exceptions.DisassemblerError(u"{:s} : Unable to get the type for the specified identifier type ({:s}).".format(format_description, tinfo.quoted(ti), user))
+                elif node.identifier(user):
+                    id, usertype = user, usertype
+
+                # If we were given an offset and we have a member, then we can just update our
+                # current offset with it. This allows one to consolidate multiple offsets, but
+                # as there's a chance of there being no member defined yet will result in an
+                # error as soon as they try to transition to one.
+                elif isinstance(integer, internal.types.integer) and not node.identifier(integer):
+                    offset += integer
+                    continue
+
+                else:
+                    id, usertype = user.get_tid(), tinfo.copy(user)
+
+                # next we need to distinguish what type of identifier we were
+                # given, either it's a structure or it's a member of one.
+                userstructureQ = id == usertype.get_tid()
+
+                # if the given id correlates to the type that we received from
+                # the disassembler, then we were given the identifier to a
+                # structure and the user wants to use the member size.
+                if userstructureQ and id == sid:
+                    mid = id
+
+                # if we were given a structure then check if the current member
+                # matches the structure that was selected by the user.
+                elif userstructureQ and id == udm.type.get_tid():
+                    Fcollect((sid, mid, offset))
+                    sid, mid, offset = id, None, 0
+
+                # if we were given a structure member, then we need to check it.
+                elif not userstructureQ:
+                    user_udm = udm_t()
+                    user_mindex = usertype.get_udm_by_tid(user_udm, user)
+                    expected = tinfo.copy(user_udm.type)
+
+                    # if there wasn't a member assigned, and the user's parent
+                    # is the same as our current type, then we can assign it.
+                    if udm is None and usertype.get_tid() == sid:
+                        mid = id
+
+                    # if we'd already assigned the member and the user's parent
+                    # is the same as our current structure, log a warning.
+                    elif usertype.get_udm_tid(user_mindex) == sid:
+                        logging.warning(u"{:s} : Overwriting member \"{:s}\" ({:#x}) of collected results with \"{:s}\" ({:#x}) due to it belonging to the current \"{:s}\" ({:#x}).".format(format_description, internal.utils.string.escape('.'.join(map(internal.utils.string.of, [sname, udm.name])), '"'), mid, internal.utils.string.escape(internal.utils.string.of(expected.get_type_name()), '"'), id, internal.utils.string.escape(internal.utils.string.of(ti.get_type_name())), sid))
+                        mid = id
+
+                    # if we got here, then we need to append our state. Since
+                    # our member is None, we need to fix it up to point to an
+                    # actual member before continuing to the next iteration.
+                    elif udm is None:
+                        udm = udm_t()
+                        udm.offset = offset
+                        uindex = ti.find_udm(udm, idaapi.STRMEM_OFFSET)
+                        if uindex < 0:
+                            raise internal.exceptions.DisassemblerError(u"{:s} : Unable to find the member for type \"{:s}\" at the specified offset ({:#x}).".format(format_description, internal.utils.string.escape(internal.utils.string.of(ti.get_type_name()), '"'), offset))
+                        Fcollect((sid, ti.get_udm_tid(uindex), offset - (0 if ti.is_union() else udm.offset)))
+                        sid, mid, offset = usertype.get_tid(), user, 0
+
+                    # if we got here, then our structure id doesn't match the
+                    # member id, so add our current position and then transition
+                    # into the new structure.
+                    else:
+                        Fcollect((sid, mid, offset))
+                        sid, mid, offset = usertype.get_tid(), user, 0
+
+                # if we hit this case, then we got a member that wasn't actually
+                # valid in the context of the structure, so we can just bail.
+                else:
+                    Fcollect((sid, mid, offset))
+                    raise internal.exceptions.InvalidTypeOrValueError(u"{:s} : Unable to continue collecting results due to the received item ({!s}) being unrelated.".format('.'.join([__name__, cls.__name__]), user))
+
+                # if we were given an integer, then update the offset with it.
+                sptr, mptr, offset = sid, mid, offset
+                continue
 
             # If we were given an offset and we have a member, then we can just update our
             # current offset with it. This allows one to consolidate multiple offsets, but
             # as there's a chance of there being no member defined yet will result in an
             # error as soon as they try to transition to one.
-            if isinstance(item, internal.types.integer) or hasattr(item, '__int__'):
+            elif isinstance(item, internal.types.integer) or hasattr(item, '__int__'):
                 offset += int(item)
 
             # If we were given a structure and it's the same as the one that we're on,
